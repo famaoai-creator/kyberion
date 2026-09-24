@@ -4,6 +4,8 @@ import {
   buildOrganizationProjectLink,
   buildOrganizationCadence,
   buildOrganizationDecision,
+  listOrganizationDecisions,
+  listOrganizationIncidents,
   listOrganizationOperationalStates,
   reconcileOrganizationState,
 } from '@agent/core/organization-operating-model-management';
@@ -24,6 +26,8 @@ import {
   saveOrganizationOperationState,
   saveOrganizationCadence,
   saveOrganizationDecision,
+  loadOrganizationIncident,
+  saveOrganizationIncident,
 } from '@agent/core/organization-operating-model-operations';
 import {
   loadOrganizationOperatingModelCatalog,
@@ -43,9 +47,18 @@ import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
+import {
+  createOrganizationIncident,
+  transitionOrganizationIncident,
+  transitionOrganizationDecision,
+} from '@agent/core/organization-interventions';
+import { verifyDecisionApprovalRef } from './organization_decision_approval.js';
+import { assertScopedOperationRunRef } from './organization_operation_refs.js';
+import { organizationOperationDueProjection } from '@agent/core/organization-operation-runtime';
 import type {
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
+  OrganizationIncidentRecord,
   OrganizationManagementView,
   OrganizationOperationRecord,
   OrganizationOperationRun,
@@ -107,6 +120,7 @@ type ParsedArgs = {
   operationType?: OrganizationOperationType;
   triggerKind?: OrganizationOperationRecord['trigger']['kind'];
   triggerExpression?: string;
+  triggerTimezone?: string;
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   allowedActions: string[];
@@ -118,6 +132,12 @@ type ParsedArgs = {
   cadenceType?: OrganizationCadenceRecord['cadence_type'];
   schedule?: string;
   decisionId?: string;
+  incidentId?: string;
+  severity?: OrganizationIncidentRecord['severity'];
+  impactSummary?: string;
+  mitigationMissionId?: string;
+  postIncidentReviewRef?: string;
+  approvalRef?: string;
   decisionType?: OrganizationDecisionRecord['decision_type'];
   decisionOwner?: string;
   dueAt?: string;
@@ -281,6 +301,30 @@ function parseArgs(args: string[]): ParsedArgs {
       parsed.decisionId = args[++index];
       continue;
     }
+    if (arg === '--incident-id') {
+      parsed.incidentId = args[++index];
+      continue;
+    }
+    if (arg === '--severity') {
+      parsed.severity = args[++index] as OrganizationIncidentRecord['severity'];
+      continue;
+    }
+    if (arg === '--impact-summary') {
+      parsed.impactSummary = args[++index];
+      continue;
+    }
+    if (arg === '--mitigation-mission-id') {
+      parsed.mitigationMissionId = args[++index];
+      continue;
+    }
+    if (arg === '--post-incident-review-ref') {
+      parsed.postIncidentReviewRef = args[++index];
+      continue;
+    }
+    if (arg === '--approval-ref') {
+      parsed.approvalRef = args[++index];
+      continue;
+    }
     if (arg === '--decision-type') {
       parsed.decisionType = args[++index] as OrganizationDecisionRecord['decision_type'];
       continue;
@@ -385,6 +429,10 @@ function parseArgs(args: string[]): ParsedArgs {
       parsed.triggerExpression = args[++index];
       continue;
     }
+    if (arg === '--timezone') {
+      parsed.triggerTimezone = args[++index];
+      continue;
+    }
     if (arg === '--execution-kind') {
       parsed.executionKind = args[++index] as ParsedArgs['executionKind'];
       continue;
@@ -460,7 +508,8 @@ function usage(): string {
     '  pnpm organization operation list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization project list --organization-id <id> [--json]',
     '  pnpm organization cadence list --organization-id <id> [--status <status>] [--json]',
-    '  pnpm organization decision list --organization-id <id> [--cadence-id <id>] [--status <status>] [--json]',
+    '  pnpm organization decision list --organization-id <id> [--decision-id <id>] [--cadence-id <id>] [--status <status>] [--json]',
+    '  pnpm organization incident list --organization-id <id> [--incident-id <id>] [--json]',
     '  pnpm organization lineage --organization-id <id> [--json]',
     '  pnpm organization learning list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <type> --source-ref <ref> --title <title> --summary <summary> --target-kind <kind> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
@@ -473,12 +522,17 @@ function usage(): string {
     '  pnpm organization objective add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --title <title> [--description <text>] [--horizon <h>] [--owner-role <role>]',
     '  pnpm organization domain add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --domain-id <id> --name <name> --owner-role <role> [--purpose <text>]',
     '  pnpm organization service add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --domain-id <id> --name <name> --outcome <text> --owner-role <role> --consumer <c>... [--slo-target <t>] [--slo-window <w>] [--runbook-ref <ref>]... [--record-status <s>]',
-    '  pnpm organization operation add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --name <name> --operation-type <continuous|scheduled|event_driven|governance> --owner-role <role> [--service-id <id>] [--purpose <text>] [--trigger-kind <k>] [--trigger-expression <value>] [--execution-kind <mission|task_session|pipeline|actuator|runbook>] [--execution-ref <ref>] [--record-status <draft|active>] [--allowed-action <text>]... [--approval-required-action <text>]... [--forbidden-action <text>]... [--operation-source-ref <ref>]... [--evidence-output <ref>]...',
+    '  pnpm organization operation add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --name <name> --operation-type <continuous|scheduled|event_driven|governance> --owner-role <role> [--service-id <id>] [--purpose <text>] [--trigger-kind <k>] [--trigger-expression <value>] [--timezone <IANA>] [--execution-kind <mission|task_session|pipeline|actuator|runbook>] [--execution-ref <ref>] [--record-status <draft|active>] [--allowed-action <text>]... [--approval-required-action <text>]... [--forbidden-action <text>]... [--operation-source-ref <ref>]... [--evidence-output <ref>]...',
     '  pnpm organization operation run record --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --run-id <id> --run-status <succeeded|failed|blocked|cancelled> --result-summary <text> [--started-at <iso>] [--completed-at <iso>] [--evidence-ref <ref>]... [--exception-ref <ref>]... [--execution-ref <ref>] [--dry-run|--apply]',
+    '  pnpm organization operation run execute --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --run-id <id> --dry-run|--apply [--json] (governed pipelines/ targets only)',
+    '  pnpm organization operation tick --organization-id <id> --tier <tier> [--tenant-slug <slug>] --dry-run|--apply [--json] (one catch-up run per due operation)',
     '  pnpm organization operation run list --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--operation-id <id>] [--json]',
     '  pnpm organization service state set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --health-status <healthy|degraded|critical|unknown> [--reconcile-status <current|stale|missing_source|conflict|unknown>] [--freshness-seconds <n>] [--confidence <0..1>] [--source-timestamp <iso>]',
     '  pnpm organization cadence add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --cadence-id <id> --name <name> --cadence-type <daily|weekly|monthly|quarterly|ad_hoc> --schedule <text> --owner-role <role> [--record-status <s>]',
     '  pnpm organization decision add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --cadence-id <id> --title <title> --decision-owner <role> --due-at <iso> --option <o>... [--decision-type <t>] [--requested-by <role>] [--chosen-option <o>] [--rationale <text>] [--follow-up-ref <ref>]... [--record-status <s>]',
+    '  pnpm organization decision transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --record-status <status> [--chosen-option <o>] [--rationale <text>] [--approval-ref <channel:id>] [--follow-up-ref <ref>]... --dry-run|--apply',
+    '  pnpm organization incident add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --incident-id <id> --title <title> --severity <level> --owner-role <role> --impact-summary <text> [--service-id <id>] [--operation-id <id>] --dry-run|--apply',
+    '  pnpm organization incident transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --incident-id <id> --record-status <status> [--impact-summary <text>] [--mitigation-mission-id <id>] [--post-incident-review-ref <ref>] --dry-run|--apply',
     '  pnpm organization project attach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
     '  pnpm organization project detach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
     '  pnpm organization pause|resume|archive --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
@@ -514,52 +568,6 @@ function requireFlags(command: string, flags: Record<string, string | undefined>
     throw new Error(
       `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required for ${command}.`
     );
-  }
-}
-
-function assertScopedOperationRunRef(
-  ref: string,
-  operation: OrganizationOperationRecord,
-  label: string
-): void {
-  const tenant = operation.tenant_slug;
-  const scopeRoots =
-    operation.tier === 'confidential' && tenant
-      ? [
-          `knowledge/confidential/${tenant}/`,
-          'knowledge/confidential/common/',
-          'knowledge/product/',
-          'active/shared/',
-          `active/missions/confidential/${tenant}/`,
-          `active/projects/confidential/${tenant}/`,
-          `active/organizations/confidential/${tenant}/`,
-        ]
-      : operation.tier === 'public'
-        ? [
-            'knowledge/public/',
-            'knowledge/product/',
-            'active/shared/',
-            'active/missions/public/',
-            'active/projects/public/',
-            'active/organizations/public/',
-          ]
-        : tenant
-          ? [
-              `knowledge/personal/${tenant}/`,
-              'knowledge/product/',
-              'active/shared/',
-              `active/missions/personal/${tenant}/`,
-              `active/projects/personal/${tenant}/`,
-              `active/organizations/personal/${tenant}/`,
-            ]
-          : ['knowledge/product/'];
-  if (
-    ref.includes('\\') ||
-    ref.split('/').includes('..') ||
-    !scopeRoots.some((prefix) => ref.startsWith(prefix)) ||
-    !safeExistsSync(pathResolver.rootResolve(ref))
-  ) {
-    throw new Error(`${label} must be an existing path within the operation scope: ${ref}`);
   }
 }
 
@@ -985,6 +993,18 @@ export function runOrganizationOperatingModelCli(
         '--due-at': parsed.dueAt,
       });
       const mode = resolveWriteMode(parsed, 'decision add');
+      if (parsed.recordStatus && parsed.recordStatus !== 'proposed')
+        throw new Error(
+          'New decisions must start as proposed; use decision transition for later states.'
+        );
+      if (
+        listOrganizationDecisions({
+          organizationId,
+          tier: parsed.tier,
+          tenantSlug: parsed.tenantSlug,
+        }).some((entry) => entry.decision_id === parsed.decisionId)
+      )
+        throw new Error(`Decision already exists: ${parsed.decisionId}`);
       const addition = buildOrganizationDecision({
         organizationId,
         decisionId: parsed.decisionId!,
@@ -1007,6 +1027,148 @@ export function runOrganizationOperatingModelCli(
           ? [saveOrganizationDecision(addition.decision), saveOrganizationCadence(addition.cadence)]
           : [];
       emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
+      return;
+    }
+    if (parsed.command === 'incident add') {
+      requireFlags('incident add', {
+        '--organization-id': organizationId,
+        '--tier': parsed.tier,
+        '--incident-id': parsed.incidentId,
+        '--title': parsed.title,
+        '--severity': parsed.severity,
+        '--owner-role': parsed.ownerRole,
+        '--impact-summary': parsed.impactSummary,
+      });
+      const mode = resolveWriteMode(parsed, 'incident add');
+      if (
+        loadOrganizationIncident(parsed.incidentId!, {
+          organizationId: organizationId!,
+          tier: parsed.tier,
+          tenantSlug: parsed.tenantSlug,
+        })
+      )
+        throw new Error(`Incident already exists: ${parsed.incidentId}`);
+      const incident = createOrganizationIncident({
+        incidentId: parsed.incidentId!,
+        organizationId: organizationId!,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        title: parsed.title!,
+        severity: parsed.severity!,
+        ownerRole: parsed.ownerRole!,
+        impactSummary: parsed.impactSummary!,
+        serviceId: parsed.serviceId,
+        operationId: parsed.operationId,
+      });
+      emit(
+        {
+          mode,
+          incident,
+          saved_path: mode === 'apply' ? saveOrganizationIncident(incident) : null,
+        },
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'incident transition') {
+      requireFlags('incident transition', {
+        '--organization-id': organizationId,
+        '--tier': parsed.tier,
+        '--incident-id': parsed.incidentId,
+        '--record-status': parsed.recordStatus,
+      });
+      const mode = resolveWriteMode(parsed, 'incident transition');
+      const current = loadOrganizationIncident(parsed.incidentId!, {
+        organizationId: organizationId!,
+        tier: parsed.tier,
+        tenantSlug: parsed.tenantSlug,
+      });
+      if (!current) throw new Error(`Incident not found: ${parsed.incidentId}`);
+      if (parsed.recordStatus === 'closed') {
+        const reviewRef = parsed.postIncidentReviewRef || current.post_incident_review_ref || '';
+        const prefix =
+          current.tier === 'confidential'
+            ? `knowledge/confidential/${current.tenant_slug}/`
+            : current.tier === 'personal'
+              ? current.tenant_slug
+                ? `knowledge/personal/${current.tenant_slug}/`
+                : ''
+              : 'knowledge/public/';
+        if (
+          !prefix ||
+          !reviewRef.startsWith(prefix) ||
+          reviewRef.includes('\\') ||
+          reviewRef.split('/').includes('..') ||
+          !safeExistsSync(pathResolver.rootResolve(reviewRef))
+        )
+          throw new Error(
+            'Closing an incident requires an existing review in the same knowledge tier and tenant.'
+          );
+      }
+      const incident = transitionOrganizationIncident(
+        current,
+        parsed.recordStatus as OrganizationIncidentRecord['status'],
+        {
+          impactSummary: parsed.impactSummary,
+          mitigationMissionId: parsed.mitigationMissionId,
+          postIncidentReviewRef: parsed.postIncidentReviewRef,
+        }
+      );
+      emit(
+        {
+          mode,
+          incident,
+          saved_path: mode === 'apply' ? saveOrganizationIncident(incident) : null,
+        },
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'decision transition') {
+      requireFlags('decision transition', {
+        '--organization-id': organizationId,
+        '--tier': parsed.tier,
+        '--decision-id': parsed.decisionId,
+        '--record-status': parsed.recordStatus,
+      });
+      const mode = resolveWriteMode(parsed, 'decision transition');
+      const current = listOrganizationDecisions({
+        organizationId: organizationId!,
+        tier: parsed.tier,
+        tenantSlug: parsed.tenantSlug,
+      }).find((decision) => decision.decision_id === parsed.decisionId);
+      if (!current) throw new Error(`Decision not found: ${parsed.decisionId}`);
+      const target = parsed.recordStatus as OrganizationDecisionRecord['status'];
+      const approvalRef =
+        target === 'approved' || target === 'rejected'
+          ? verifyDecisionApprovalRef(parsed.approvalRef, current, target)
+          : undefined;
+      const decision = transitionOrganizationDecision(current, target, {
+        chosenOption: parsed.chosenOption,
+        rationale: parsed.rationale,
+        approvalRef,
+        followUpRefs: parsed.followUpRefs,
+      });
+      emit(
+        {
+          mode,
+          decision,
+          saved_path: mode === 'apply' ? saveOrganizationDecision(decision) : null,
+        },
+        parsed.json
+      );
+      return;
+    }
+    if (parsed.command === 'incident list') {
+      if (!organizationId) throw new Error('--organization-id is required for incident list.');
+      emit(
+        listOrganizationIncidents({
+          organizationId,
+          tier: readScope.tier,
+          tenantSlug: readScope.tenantSlug,
+        }).filter((incident) => !parsed.incidentId || incident.incident_id === parsed.incidentId),
+        parsed.json
+      );
       return;
     }
     if (parsed.command === 'service state set') {
@@ -1054,6 +1216,7 @@ export function runOrganizationOperatingModelCli(
         purpose: parsed.purposeText,
         triggerKind: parsed.triggerKind,
         triggerExpression: parsed.triggerExpression,
+        triggerTimezone: parsed.triggerTimezone,
         executionKind: parsed.executionKind,
         executionRef: parsed.executionRef,
         evidenceOutputs: parsed.evidenceOutputs,
@@ -1153,7 +1316,9 @@ export function runOrganizationOperatingModelCli(
         tier: operation.tier,
         ...(operation.tenant_slug ? { tenant_slug: operation.tenant_slug } : {}),
         status: runStatus === 'cancelled' ? 'paused' : runStatus,
-        due_status: operation.trigger.kind === 'manual' ? 'not_scheduled' : 'unknown',
+        ...organizationOperationDueProjection(operation, {
+          last_run_at: completedAt,
+        } as OrganizationOperationState),
         last_run_at: completedAt,
         last_result_summary: parsed.resultSummary!,
         last_evidence_refs: parsed.evidenceRefs,
@@ -1272,7 +1437,11 @@ export function runOrganizationOperatingModelCli(
             ...(parsed.cadenceId
               ? decisions.filter((decision) => decision.cadence_id === parsed.cadenceId)
               : decisions),
-          ].filter((decision) => !parsed.status || decision.status === parsed.status),
+          ].filter(
+            (decision) =>
+              (!parsed.status || decision.status === parsed.status) &&
+              (!parsed.decisionId || decision.decision_id === parsed.decisionId)
+          ),
           parsed.json
         );
         return;

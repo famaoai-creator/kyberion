@@ -1356,6 +1356,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_GEMINI_IMAGE_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Gemini image model used for reference-image generation via generateContent (e.g. avatar sets from a user photo); defaults to gemini-2.5-flash-image.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_GEMINI_MODEL",
       "category": "provider",
       "type": "string",

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { useVoice } from '../lib/use-voice';
+import { DockAvatar } from './dock-avatar';
 import { buildIntentResolutionView } from '../lib/intent-resolution-view';
 import type { ConciergeMessageKey } from '../lib/i18n';
 import type {
@@ -78,7 +79,7 @@ export function ConversationDock() {
   const [busy, setBusy] = React.useState(false);
   const voice = useVoice(locale);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
-  const { speakText, notifyServerSpeech } = voice;
+  const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
   const sessionIdRef = React.useRef(
     `concierge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   );
@@ -101,6 +102,10 @@ export function ConversationDock() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || busy) return;
+      // PA-09: every send path starts from a user gesture (submit, chip,
+      // action button) or a mic turn that began with one — resume Web Audio
+      // now so the avatar's reply audio may play (autoplay policy).
+      void unlockSpeechAudio();
       setBusy(true);
       setMessages((prev) => [...prev, { id: newMessageId(), role: 'user', text: trimmed }]);
       try {
@@ -153,7 +158,7 @@ export function ConversationDock() {
         setBusy(false);
       }
     },
-    [busy, locale, t, notifyServerSpeech, speakText]
+    [busy, locale, t, notifyServerSpeech, speakText, unlockSpeechAudio]
   );
 
   // Tier 1 mic turn: one server-side capture → STT → reply. The transcript is
@@ -203,6 +208,7 @@ export function ConversationDock() {
   }, [busy, t, voice]);
 
   const handleMicClick = React.useCallback(() => {
+    void voice.unlockSpeechAudio();
     if (voice.listening) {
       voice.stopListening();
       return;
@@ -242,7 +248,15 @@ export function ConversationDock() {
   return (
     <aside className="conversation-dock" aria-label={t('dock.title')}>
       <div className="dock-header">
-        <strong>{t('dock.title')}</strong>
+        <div className="dock-header-title">
+          <DockAvatar
+            voice={voice}
+            busy={busy}
+            label={t('dock.avatar_label')}
+            personalLabel={t('dock.avatar_personal_label')}
+          />
+          <strong>{t('dock.title')}</strong>
+        </div>
         <button
           type="button"
           className="dock-collapse"

@@ -39,6 +39,15 @@
             "cost": "declared"
           }
         },
+        "gemini_image": {
+          "traits": { "quality": 0.9, "speed": 0.6, "privacy": 0, "cost": 0.2 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
         "llm_api": {
           "traits": { "quality": 0.8, "speed": 0.6, "privacy": 0.6, "cost": 0.2 },
           "trait_basis": {

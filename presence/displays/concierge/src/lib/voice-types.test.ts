@@ -29,6 +29,10 @@ describe('voice response parsers', () => {
       status: 'speaking',
       text: 'hello',
     });
+    expect(parseVoiceSpeechState({ status: 'speaking', estimated_ms: 2400 })).toEqual({
+      status: 'speaking',
+      estimated_ms: 2400,
+    });
   });
 
   it('rejects malformed status and listen-once responses', () => {
@@ -37,6 +41,8 @@ describe('voice response parsers', () => {
       parseVoiceStatusResponse({ available: true, inputDevices: [{ id: '0' }] })
     ).toBeUndefined();
     expect(parseVoiceSpeechState({ status: 'unknown' })).toBeUndefined();
+    expect(parseVoiceSpeechState({ status: 'speaking', estimated_ms: -5 })).toBeUndefined();
+    expect(parseVoiceSpeechState({ status: 'speaking', estimated_ms: '5' })).toBeUndefined();
     expect(parseVoiceStopResponse({ ok: true, stopped: false, reason: 'manual_stop' })).toEqual({
       ok: true,
       stopped: false,

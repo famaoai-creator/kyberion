@@ -5951,6 +5951,11 @@
         "ja": "対象",
         "qps-ploc": "⟦Ïŧėɱ ŀőř⟧"
       },
+      "chronos_org_col_next_action": {
+        "en": "Next action",
+        "ja": "次の操作",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
       "chronos_org_col_priority": {
         "en": "Priority",
         "ja": "優先度",
@@ -9196,6 +9201,146 @@
         "ja": "音声サンプルは最大3件まで登録できます。",
         "qps-ploc": "⟦Ůṗ ŧő ŧħřėė ṽőïƈė şȧɱṗŀėş ƈȧñ ƀė řėɠïşŧėřėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "setup.avatar_generate_title": {
+        "en": "Create an avatar from this photo",
+        "ja": "この写真からアバターを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧñ ȧṽȧŧȧř ƒřőɱ ŧħïş ṗħőŧő ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.avatar_generate_description": {
+        "en": "Creates a stylised avatar with six expressions (neutral, joy, thinking, listening, speaking, mouth open) from the photo registered above.",
+        "ja": "上で登録した写真から、6 つの表情(通常・喜び・考え中・聞いている・話している・口を開けた状態)のイラスト風アバターを作成します。",
+        "qps-ploc": "⟦Ƈřėȧŧėş ȧ şŧẏŀïşėḓ ȧṽȧŧȧř ẇïŧħ şïẋ ėẋṗřėşşïőñş (ñėůŧřȧŀ, ĵőẏ, ŧħïñķïñɠ, ŀïşŧėñïñɠ, şṗėȧķïñɠ, ɱőůŧħ őṗėñ) ƒřőɱ ŧħė ṗħőŧő řėɠïşŧėřėḓ ȧƀőṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "setup.avatar_generate_button": {
+        "en": "Create avatar from photo",
+        "ja": "写真からアバターを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧṽȧŧȧř ƒřőɱ ṗħőŧő ŀőřėɱ ï⟧"
+      },
+      "setup.avatar_generate_needs_photo": {
+        "en": "Register a photo above first.",
+        "ja": "先に上で写真を登録してください。",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ ṗħőŧő ȧƀőṽė ƒïřşŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "setup.avatar_generate_no_provider": {
+        "en": "No image generator that can work from a photo is available right now.",
+        "ja": "写真をもとに画像を作成できる生成サービスが、現在利用できません。",
+        "qps-ploc": "⟦Ñő ïɱȧɠė ɠėñėřȧŧőř ŧħȧŧ ƈȧñ ẇőřķ ƒřőɱ ȧ ṗħőŧő ïş ȧṽȧïŀȧƀŀė řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "setup.avatar_consent_title": {
+        "en": "Create an avatar from your photo?",
+        "ja": "写真からアバターを作成しますか?",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧñ ȧṽȧŧȧř ƒřőɱ ẏőůř ṗħőŧő? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "setup.avatar_consent_cloud": {
+        "en": "Your registered photo will be sent to {provider} to create the avatar images. Nothing is sent if you cancel.",
+        "ja": "アバター画像を作成するため、登録済みの写真を {provider} に送信します。キャンセルした場合は何も送信されません。",
+        "qps-ploc": "⟦Ẏőůř řėɠïşŧėřėḓ ṗħőŧő ẇïŀŀ ƀė şėñŧ ŧő {provider} ŧő ƈřėȧŧė ŧħė ȧṽȧŧȧř ïɱȧɠėş. Ñőŧħïñɠ ïş şėñŧ ïƒ ẏőů ƈȧñƈėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "setup.avatar_consent_handoff": {
+        "en": "Your registered photo will be handed to {provider}, which sends it to its own image service to create the avatar images. Nothing is sent if you cancel.",
+        "ja": "登録済みの写真を {provider} に渡し、{provider} が自身の画像生成サービスへ送信してアバター画像を作成します。キャンセルした場合は何も送信されません。",
+        "qps-ploc": "⟦Ẏőůř řėɠïşŧėřėḓ ṗħőŧő ẇïŀŀ ƀė ħȧñḓėḓ ŧő {provider}, ẇħïƈħ şėñḓş ïŧ ŧő ïŧş őẇñ ïɱȧɠė şėřṽïƈė ŧő ƈřėȧŧė ŧħė ȧṽȧŧȧř ïɱȧɠėş. Ñőŧħïñɠ ïş şėñŧ ïƒ ẏőů ƈȧñƈėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "setup.avatar_consent_local": {
+        "en": "Your photo is processed on this computer by {provider}. Nothing leaves this computer.",
+        "ja": "写真はこのコンピューター上の {provider} で処理され、外部には送信されません。",
+        "qps-ploc": "⟦Ẏőůř ṗħőŧő ïş ṗřőƈėşşėḓ őñ ŧħïş ƈőɱṗůŧėř ƀẏ {provider}. Ñőŧħïñɠ ŀėȧṽėş ŧħïş ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "setup.avatar_consent_confirm": {
+        "en": "Send and create",
+        "ja": "送信して作成",
+        "qps-ploc": "⟦Şėñḓ ȧñḓ ƈřėȧŧė ŀőřė⟧"
+      },
+      "setup.avatar_consent_confirm_local": {
+        "en": "Create",
+        "ja": "作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ŀőř⟧"
+      },
+      "setup.avatar_generate_running": {
+        "en": "Creating your avatar. This can take a few minutes.",
+        "ja": "アバターを作成しています。数分かかることがあります。",
+        "qps-ploc": "⟦Ƈřėȧŧïñɠ ẏőůř ȧṽȧŧȧř. Ŧħïş ƈȧñ ŧȧķė ȧ ƒėẇ ɱïñůŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.avatar_generate_done": {
+        "en": "Your avatar set is ready. Check the preview below.",
+        "ja": "アバターができあがりました。下のプレビューをご確認ください。",
+        "qps-ploc": "⟦Ẏőůř ȧṽȧŧȧř şėŧ ïş řėȧḓẏ. Ƈħėƈķ ŧħė ṗřėṽïėẇ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.avatar_generate_handoff": {
+        "en": "{provider} has to create the images. Ask your assistant to create the frames listed in {path}, then press Create again.",
+        "ja": "画像の作成は {provider} が行います。アシスタントに {path} に記載された画像の作成を依頼してから、もう一度「作成」を押してください。",
+        "qps-ploc": "⟦{provider} ħȧş ŧő ƈřėȧŧė ŧħė ïɱȧɠėş. Ȧşķ ẏőůř ȧşşïşŧȧñŧ ŧő ƈřėȧŧė ŧħė ƒřȧɱėş ŀïşŧėḓ ïñ {path}, ŧħėñ ṗřėşş Ƈřėȧŧė ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "setup.avatar_generate_failed": {
+        "en": "The avatar could not be created. Please try again later.",
+        "ja": "アバターを作成できませんでした。時間をおいて再度お試しください。",
+        "qps-ploc": "⟦Ŧħė ȧṽȧŧȧř ƈőůŀḓ ñőŧ ƀė ƈřėȧŧėḓ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.avatar_generate_denied": {
+        "en": "The photo was not sent because the confirmation was missing or has expired. Please create again and confirm.",
+        "ja": "確認が行われていないか期限切れのため、写真は送信されませんでした。もう一度作成して確認してください。",
+        "qps-ploc": "⟦Ŧħė ṗħőŧő ẇȧş ñőŧ şėñŧ ƀėƈȧůşė ŧħė ƈőñƒïřɱȧŧïőñ ẇȧş ɱïşşïñɠ őř ħȧş ėẋṗïřėḓ. Ṗŀėȧşė ƈřėȧŧė ȧɠȧïñ ȧñḓ ƈőñƒïřɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "setup.avatar_generate_busy": {
+        "en": "An avatar is already being created. Please wait until it finishes.",
+        "ja": "アバターを作成中です。完了までお待ちください。",
+        "qps-ploc": "⟦Ȧñ ȧṽȧŧȧř ïş ȧŀřėȧḓẏ ƀėïñɠ ƈřėȧŧėḓ. Ṗŀėȧşė ẇȧïŧ ůñŧïŀ ïŧ ƒïñïşħėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "setup.avatar_preview_title": {
+        "en": "Generated avatar",
+        "ja": "作成したアバター",
+        "qps-ploc": "⟦Ɠėñėřȧŧėḓ ȧṽȧŧȧř ŀőřėɱ⟧"
+      },
+      "setup.avatar_expression_neutral": {
+        "en": "Neutral",
+        "ja": "通常",
+        "qps-ploc": "⟦Ñėůŧřȧŀ ŀőř⟧"
+      },
+      "setup.avatar_expression_joy": {
+        "en": "Joy",
+        "ja": "喜び",
+        "qps-ploc": "⟦Ĵőẏ ŀőř⟧"
+      },
+      "setup.avatar_expression_thinking": {
+        "en": "Thinking",
+        "ja": "考え中",
+        "qps-ploc": "⟦Ŧħïñķïñɠ ŀőř⟧"
+      },
+      "setup.avatar_expression_listening": {
+        "en": "Listening",
+        "ja": "聞いている",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ ŀőř⟧"
+      },
+      "setup.avatar_expression_speaking": {
+        "en": "Speaking",
+        "ja": "話している",
+        "qps-ploc": "⟦Şṗėȧķïñɠ ŀőř⟧"
+      },
+      "setup.avatar_expression_mouth_open": {
+        "en": "Mouth open",
+        "ja": "口を開けた状態",
+        "qps-ploc": "⟦Ɱőůŧħ őṗėñ ŀőř⟧"
+      },
+      "setup.avatar_use": {
+        "en": "Use this avatar",
+        "ja": "このアバターを使う",
+        "qps-ploc": "⟦Ůşė ŧħïş ȧṽȧŧȧř ŀőřė⟧"
+      },
+      "setup.avatar_used": {
+        "en": "This avatar is now used as your avatar.",
+        "ja": "このアバターを使うように設定しました。",
+        "qps-ploc": "⟦Ŧħïş ȧṽȧŧȧř ïş ñőẇ ůşėḓ ȧş ẏőůř ȧṽȧŧȧř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "setup.avatar_in_use": {
+        "en": "In use",
+        "ja": "使用中",
+        "qps-ploc": "⟦Ïñ ůşė ŀőř⟧"
+      },
+      "setup.avatar_draft_pending": {
+        "en": "This new set is a draft. Your current avatar stays in use until you choose \"Use this avatar\".",
+        "ja": "この新しいセットは下書きです。「このアバターを使う」を選ぶまで、今のアバターが使われます。",
+        "qps-ploc": "⟦Ŧħïş ñėẇ şėŧ ïş ȧ ḓřȧƒŧ. Ẏőůř ƈůřřėñŧ ȧṽȧŧȧř şŧȧẏş ïñ ůşė ůñŧïŀ ẏőů ƈħőőşė \"Ůşė ŧħïş ȧṽȧŧȧř\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
       "setup.avatar_saved": {
         "en": "Avatar created and registered in your personal profile.",
         "ja": "アバター画像を作成し、個人プロファイルへ登録しました。",
@@ -9215,6 +9360,16 @@
         "en": "Ask the secretary",
         "ja": "秘書に相談",
         "qps-ploc": "⟦Ȧşķ ŧħė şėƈřėŧȧřẏ ŀőřėɱ⟧"
+      },
+      "dock.avatar_label": {
+        "en": "Secretary avatar",
+        "ja": "秘書のアバター",
+        "qps-ploc": "⟦Şėƈřėŧȧřẏ ȧṽȧŧȧř ŀőřėɱ⟧"
+      },
+      "dock.avatar_personal_label": {
+        "en": "Your avatar",
+        "ja": "あなたのアバター",
+        "qps-ploc": "⟦Ẏőůř ȧṽȧŧȧř ŀőř⟧"
       },
       "dock.open": {
         "en": "Open the conversation",
@@ -15511,6 +15666,16 @@
         "ja": "次の発話を待っています。",
         "qps-ploc": "⟦Ŀïşŧėñïñɠ ƒőř ẏőůř ñėẋŧ ŧůřñ. ŀőřėɱ ïṗş⟧"
       },
+      "partner_avatar_label": {
+        "en": "Kyberion avatar",
+        "ja": "Kyberion のアバター",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ȧṽȧŧȧř ŀőřė⟧"
+      },
+      "partner_avatar_personal_label": {
+        "en": "Your avatar",
+        "ja": "あなたのアバター",
+        "qps-ploc": "⟦Ẏőůř ȧṽȧŧȧř ŀőř⟧"
+      },
       "voice_planning_subtitle": {
         "en": "Planning and executing: {summary}",
         "ja": "計画して実行中: {summary}",
@@ -20432,6 +20597,11 @@
         "en": "Drop or paste an image to use it as the background.",
         "ja": "画像をドロップまたは貼り付けると背景になります。",
         "qps-ploc": "⟦Ḓřőṗ őř ṗȧşŧė ȧñ ïɱȧɠė ŧő ůşė ïŧ ȧş ŧħė ƀȧƈķɠřőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "talking_avatar_label_state": {
+        "en": "{label}, {state}",
+        "ja": "{label}（{state}）",
+        "qps-ploc": "⟦{label}, {state} ŀőřėɱ⟧"
       },
       "sketch_background_added": {
         "en": "Background image added.",

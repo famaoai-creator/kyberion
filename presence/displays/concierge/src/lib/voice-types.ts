@@ -38,6 +38,8 @@ export interface VoiceSpeechState {
   text?: string;
   startedAt?: number;
   engine_id?: string;
+  /** PA-09: expected host playback length (bounds host-mode mouth motion). */
+  estimated_ms?: number;
 }
 
 /** Aggregated probe result returned by GET /api/voice/status. */
@@ -154,7 +156,9 @@ export function parseVoiceSpeechState(value: unknown): VoiceSpeechState | undefi
   if (
     (text === undefined && value.text !== undefined) ||
     (engineId === undefined && value.engine_id !== undefined) ||
-    (value.startedAt !== undefined && !isFiniteNumber(value.startedAt))
+    (value.startedAt !== undefined && !isFiniteNumber(value.startedAt)) ||
+    (value.estimated_ms !== undefined &&
+      (!isFiniteNumber(value.estimated_ms) || value.estimated_ms < 0))
   ) {
     return undefined;
   }
@@ -163,6 +167,7 @@ export function parseVoiceSpeechState(value: unknown): VoiceSpeechState | undefi
     ...(text !== undefined ? { text } : {}),
     ...(value.startedAt !== undefined ? { startedAt: value.startedAt } : {}),
     ...(engineId !== undefined ? { engine_id: engineId } : {}),
+    ...(value.estimated_ms !== undefined ? { estimated_ms: value.estimated_ms } : {}),
   };
 }
 

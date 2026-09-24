@@ -31,6 +31,12 @@ import {
 } from './voice/index.js';
 // PA-01 pads: ui:toolbar / ui:dialog / ui:drawing-palette / ui:sketch-board (vanilla/pads.js helpers).
 import { isKbPadComponentType, renderPadComponent, type KbPadComponentType } from './pads/index.js';
+// PA-09 talking avatar: ui:talking-avatar (controller + lip-sync shared with vanilla/avatar.js).
+import {
+  isKbAvatarComponentType,
+  renderAvatarComponent,
+  type KbAvatarComponentType,
+} from './avatar/index.js';
 
 // Module-local: the package does not depend on @types/node, and bundlers
 // replace `process.env.NODE_ENV` textually.
@@ -158,6 +164,8 @@ type KbBaseCatalogType = Exclude<
   | KbVoiceComponentType
   // PA-01 pads
   | KbPadComponentType
+  // PA-09 talking avatar
+  | KbAvatarComponentType
 >;
 
 function renderCatalog(
@@ -316,6 +324,9 @@ export function A2UIRenderer({
           props,
           childIds.length ? renderChildren(childIds) : null
         );
+      // PA-09 talking avatar
+      if (isKbAvatarComponentType(catalogType))
+        return renderAvatarComponent(catalogType, id, props);
       return renderCatalog(
         id,
         catalogType,

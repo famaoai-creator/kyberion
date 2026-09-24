@@ -286,6 +286,23 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     max_undo: 40,
     show_download: true,
   },
+  'ui:talking-avatar': {
+    name: 'kyberion',
+    label: 'Kyberion avatar',
+    images: {
+      neutral: '/assets/avatars/kyberion-neutral.svg',
+      joy: 'https://cdn.example.com/joy.png',
+      mouth_open: './mouth.png',
+    },
+    expression: 'joy',
+    state: 'speaking',
+    show_state: true,
+    mouth: { x: 0.5, y: 0.51, width: 0.16 },
+    mouth_mode: 'frames',
+    size: 'lg',
+    shape: 'rounded',
+    fallback_initials: 'KY',
+  },
 };
 
 describe('kyberion-base A2UI catalog', () => {
@@ -437,6 +454,36 @@ describe('kyberion-base A2UI catalog', () => {
     expect(() => validateA2UIComponentProps('ui:sketch-board', { ...board, image: 'x' })).toThrow(
       /image/u
     );
+  });
+
+  // PA-09 talking avatar
+  it('keeps talking-avatar images to same-origin / http(s) URLs and bounds the anchor', () => {
+    const base = { name: 'a', label: 'A', images: { neutral: '/n.svg' } };
+    const withImage = (key: string, url: string) =>
+      validateA2UIComponentProps('ui:talking-avatar', {
+        ...base,
+        images: { ...base.images, [key]: url },
+      });
+    expect(() => validateA2UIComponentProps('ui:talking-avatar', base)).not.toThrow();
+    expect(() => withImage('neutral', 'data:image/png;base64,AAAA')).toThrow();
+    expect(() => withImage('joy', 'DATA:image/svg+xml,<svg/>')).toThrow();
+    expect(() => withImage('joy', 'blob:https://x/1')).toThrow();
+    expect(() => withImage('joy', 'javascript:alert(1)')).toThrow();
+    expect(() => withImage('joy', '//evil.example/x.png')).toThrow();
+    expect(() => withImage('joy', 'https://cdn.example.com/j.png')).not.toThrow();
+    expect(() => withImage('video', '/v.mp4')).toThrow(/video/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:talking-avatar', { ...base, images: { joy: '/j.png' } })
+    ).toThrow(/neutral/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:talking-avatar', { ...base, mouth: { x: 1.2 } })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:talking-avatar', { ...base, mouth_open: 0.5 })
+    ).toThrow(/mouth_open/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:talking-avatar', { ...base, state: 'talking' })
+    ).toThrow();
   });
 
   it('resolves legacy aliases and leaves non-catalog types alone', () => {
