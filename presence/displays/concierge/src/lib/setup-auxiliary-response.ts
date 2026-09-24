@@ -4,6 +4,7 @@ const PLUGIN_STATUSES = new Set([
   'activatable',
   'pending_approval',
   'blocked_broken_manifest',
+  'blocked_digest_mismatch',
   'not_loadable',
 ]);
 

@@ -58,6 +58,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/image-generation-bridge.ts',
     consumers: ['libs/core/image-generation-bridge.ts'],
   },
+  'risky-approval-override': {
+    declaration: 'libs/core/risky-op-approval-port.ts',
+    consumers: ['libs/core/risky-op-approval-port.ts'],
+  },
+  'scenario-op-override': {
+    declaration: 'libs/core/actuator-op-registry.ts',
+    consumers: ['libs/core/actuator-op-registry.ts', 'scripts/pipeline-execution-part-control.ts'],
+  },
   'virtual-camera-capture': {
     declaration: 'libs/core/virtual-camera-bridge.ts',
     consumers: ['libs/core/virtual-camera-bridge.ts'],

@@ -16,6 +16,7 @@ const PLUGIN_STATUS_KEYS: Record<string, ConciergeMessageKey> = {
   activatable: 'setup.plugin_status_activatable',
   pending_approval: 'setup.plugin_status_pending',
   blocked_broken_manifest: 'setup.plugin_status_blocked',
+  blocked_digest_mismatch: 'setup.plugin_status_digest_mismatch',
   not_loadable: 'setup.plugin_status_not_loadable',
 };
 
@@ -24,6 +25,7 @@ const PLUGIN_STATUS_PILL: Record<string, KbStatus> = {
   activatable: 'ready',
   pending_approval: 'pending',
   blocked_broken_manifest: 'blocked',
+  blocked_digest_mismatch: 'blocked',
   not_loadable: 'unavailable',
 };
 

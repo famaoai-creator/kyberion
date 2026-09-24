@@ -133,4 +133,92 @@ describe('speakSegmented', () => {
     expect(result.interrupted).toBe(true);
     expect(result.completed).toBe(false);
   });
+
+  it('pause() stops a non-pausable segment and replays it from the start on resume()', async () => {
+    const played: string[] = [];
+    const first = pendingHandle();
+    let stops = 0;
+    const segmentStarts: number[] = [];
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      play: (audioPath) => {
+        played.push(audioPath);
+        if (played.length > 1) return immediateHandle();
+        return {
+          done: first.done,
+          stop: () => {
+            stops += 1;
+            return first.stop();
+          },
+        };
+      },
+      onSegmentStart: ({ index }) => segmentStarts.push(index),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(played).toEqual(['/tmp/seg-0.wav']);
+
+    controller.pause?.();
+    controller.pause?.();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The current sentence is silenced, not left playing into the mic.
+    expect(stops).toBe(1);
+    expect(played).toEqual(['/tmp/seg-0.wav']);
+
+    controller.resume?.();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/seg-0.wav', '/tmp/seg-0.wav', '/tmp/seg-1.wav']);
+    expect(segmentStarts).toEqual([0, 1]);
+    expect(result.metrics.segments_spoken).toBe(2);
+  });
+
+  it('pause() pauses a pausable handle in place and resume() continues it', async () => {
+    const played: string[] = [];
+    const calls: string[] = [];
+    const first = pendingHandle();
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      play: (audioPath) => {
+        played.push(audioPath);
+        if (played.length > 1) return immediateHandle();
+        return {
+          ...first,
+          pause: () => calls.push('pause'),
+          resume: () => calls.push('resume'),
+        };
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.pause?.();
+    expect(calls).toEqual(['pause']);
+    controller.resume?.();
+    expect(calls).toEqual(['pause', 'resume']);
+    first.finish();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/seg-0.wav', '/tmp/seg-1.wav']);
+  });
+
+  it('stop() while paused ends without replaying the stopped segment', async () => {
+    const played: string[] = [];
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      play: (audioPath) => {
+        played.push(audioPath);
+        return pendingHandle();
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.pause?.();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const result = await controller.stop();
+    expect(result.interrupted).toBe(true);
+    expect(played).toEqual(['/tmp/seg-0.wav']);
+  });
 });

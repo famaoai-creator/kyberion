@@ -173,6 +173,27 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
     a2ui_projection: false,
   },
   {
+    operation_id: 'chronos.plugin_view.read',
+    resource: 'plugin-views',
+    method: 'GET',
+    path: '/api/headless/a2ui/plugin-views',
+    description:
+      'Read the declarative views of approved, digest-verified plugins visible to the viewer.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        tenant: { type: 'string' },
+        tier: { type: 'string', enum: ['public', 'confidential'] },
+      },
+      additionalProperties: false,
+    },
+    output_schema: { type: 'object', description: 'Plugin view listings and a composed A2UI.' },
+    a2ui_projection: true,
+  },
+  {
     operation_id: 'chronos.work_items.update_status',
     resource: 'work-items',
     method: 'POST',
@@ -194,6 +215,30 @@ export const CHRONOS_HEADLESS_OPERATIONS: readonly HeadlessOperationDescriptor[]
       additionalProperties: false,
     },
     output_schema: { type: 'object', description: 'Updated WorkItem.' },
+    a2ui_projection: false,
+  },
+  {
+    operation_id: 'chronos.plugin_view.action',
+    resource: 'plugin-views',
+    method: 'POST',
+    path: '/api/headless/a2ui/plugin-views',
+    description:
+      'Invoke a declared plugin view action (human authority queues an approval request).',
+    effect: 'write',
+    required_role: 'localadmin',
+    required_permissions: ['surface.headless.write'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        plugin_id: { type: 'string' },
+        view_id: { type: 'string' },
+        action_id: { type: 'string' },
+        params: { type: 'object' },
+      },
+      required: ['plugin_id', 'view_id', 'action_id'],
+      additionalProperties: false,
+    },
+    output_schema: { type: 'object', description: 'Approval request id or dispatch outcome.' },
     a2ui_projection: false,
   },
 ];
@@ -303,6 +348,12 @@ export function buildChronosHeadlessManifest(): HeadlessApiManifest {
         resource: 'collaboration',
         description: 'Tenant-scoped human and agent collaboration evidence.',
         query_path: '/api/headless/collaboration',
+      },
+      {
+        resource: 'plugin-views',
+        description: 'Declarative views contributed by approved plugins.',
+        query_path: '/api/headless/a2ui/plugin-views',
+        a2ui_path: '/api/headless/a2ui/plugin-views',
       },
     ],
     operations: CHRONOS_HEADLESS_OPERATIONS.map((operation) => ({

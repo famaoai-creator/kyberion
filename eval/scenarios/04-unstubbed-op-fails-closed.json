@@ -1,0 +1,21 @@
+{
+  "schema_version": "kyberion-scenario.v1",
+  "id": "unstubbed-op-fails-closed",
+  "title": "An op without a fixture fails closed",
+  "description": "Negative scenario: system:exec has no fixture, so the simulated profile rejects it with SCENARIO_UNSTUBBED_OP before the real actuator is reached.",
+  "tier": 1,
+  "lane": "pr-deterministic",
+  "executionProfile": "simulated",
+  "modelFixtures": "model-free",
+  "requires": {},
+  "seed": { "clock": { "start_iso": "2026-01-05T09:00:00.000Z" } },
+  "fixtures": { "ops": {} },
+  "turns": [
+    {
+      "kind": "pipeline",
+      "pipeline": "fixtures/unstubbed-exec.pipeline.json",
+      "expectError": "[SCENARIO_UNSTUBBED_OP] system:exec"
+    }
+  ],
+  "finalChecks": [{ "type": "opNotCalled", "op": "system:exec" }]
+}

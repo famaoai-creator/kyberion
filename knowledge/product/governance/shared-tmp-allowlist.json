@@ -532,6 +532,18 @@
       "count": 1,
       "classification": "migrate-candidate",
       "note": "routing summary fallback; report-class artifact"
+    },
+    {
+      "file": "libs/core/scenario-run-context.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "per-run scenario sandbox root (seed files, fixture writes); disposed after each run unless --keep"
+    },
+    {
+      "file": "scripts/scenario_runner.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "scenario run reports/trajectories for the developer running `pnpm scenario`; regenerated per run"
     }
   ]
 }

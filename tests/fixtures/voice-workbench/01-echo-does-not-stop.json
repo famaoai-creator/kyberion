@@ -1,0 +1,19 @@
+{
+  "id": "echo-does-not-stop",
+  "description": "The mic picks up the assistant's own speech: playback pauses provisionally, then resumes as echo and the echoed final is dropped.",
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": {
+        "type": "tts_start",
+        "text": "明日の東京の天気は晴れ、最高気温は二十五度の予報です。"
+      }
+    },
+    { "at_ms": 500, "event": { "type": "vad_start", "rms": 3000 } },
+    { "at_ms": 700, "event": { "type": "stt_partial", "text": "明日の東京の天気は晴れ" } },
+    { "at_ms": 1100, "event": { "type": "vad_silence" } },
+    { "at_ms": 1200, "event": { "type": "stt_final", "text": "明日の東京の天気は晴れ" } },
+    { "at_ms": 3000, "event": { "type": "tts_end" } }
+  ],
+  "expect": { "commits": [], "drops": 1, "hard_stops": 0, "resumes": 1, "cancelled_reasons": [] }
+}

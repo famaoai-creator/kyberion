@@ -11,8 +11,11 @@ import {
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
 import { loadApprovalRequest } from '@agent/core/approval-store';
 import {
+  isScenarioApprovalGranted,
   resolveActuatorOperation,
   resolveActuatorOperationTimeout,
+  resolveScenarioOpOverride,
+  type ResolvedActuatorOperation,
 } from '@agent/core/actuator-op-registry';
 import { executeProgrammaticToolCall } from '@agent/core/programmatic-tool-calling';
 import type { AdfStep, AdfSkippedStep } from '@agent/core/adf-engine';
@@ -418,6 +421,12 @@ export async function dispatchProgrammaticToolCall(
  * the exact effect step.
  */
 export function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unknown>): boolean {
+  // ES-02: a scenario run may approve an op only when a fixture serves it,
+  // so this never admits a real side effect. Unregistered -> false.
+  if (typeof step.op === 'string' && step.op.includes(':')) {
+    const [scenarioDomain, scenarioAction] = normalizePipelineOp(step.op).split(':');
+    if (isScenarioApprovalGranted(scenarioDomain, scenarioAction)) return true;
+  }
   const approvalRef =
     typeof step.budget?.approval_ref === 'string' ? step.budget.approval_ref.trim() : '';
   if (!approvalRef || !step.id) return false;
@@ -494,6 +503,25 @@ export async function dispatchLeafOp(
   // `{{items}}` or `{{dry_run}}`). Resolve them before applying the op
   // contract so the validator sees the value the actuator will receive.
   params = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
+
+  // ES-02: a registered scenario runner serves (or fails closed) leaf ops
+  // before any inline, composite (ptc / run_pipeline) or real actuator
+  // dispatch, so an op a fixture was approved for is always fixture-served.
+  // Unregistered -> null.
+  const scenarioOperation = resolveScenarioOpOverride(domain, action);
+  if (scenarioOperation) {
+    validatePipelineOpInput(domain, action, params);
+    return dispatchResolvedActuatorOperation(
+      step,
+      domain,
+      action,
+      params,
+      ctx,
+      opts,
+      stepPolicy,
+      scenarioOperation
+    );
+  }
 
   if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
     return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
@@ -663,6 +691,28 @@ export async function dispatchLeafOp(
   validatePipelineOpInput(domain, action, params);
   await assertPipelineStepCapabilityAvailable(domain, action);
   const resolvedOperation = resolveActuatorOperation(domain, action);
+  return dispatchResolvedActuatorOperation(
+    step,
+    domain,
+    action,
+    params,
+    ctx,
+    opts,
+    stepPolicy,
+    resolvedOperation
+  );
+}
+
+async function dispatchResolvedActuatorOperation(
+  step: PipelineAdfStep,
+  domain: string,
+  action: string,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  opts: RunStepsOptions,
+  stepPolicy: ReasoningStepPolicy,
+  resolvedOperation: ResolvedActuatorOperation | null
+): Promise<Record<string, unknown>> {
   if (opts.trace) {
     opts.trace.addEvent('actuator.resolved', {
       domain,

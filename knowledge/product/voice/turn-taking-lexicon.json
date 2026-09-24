@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "description": "Japanese lexical cues for realtime voice turn-taking (EV-01/03/06). Linguistic data, not user-facing copy: continuation particles hold the turn, fillers are ignored for barge-in and the respond gate, commit endings close a turn.",
+  "ja": {
+    "continuation_particles": [
+      "けれど",
+      "けど",
+      "ので",
+      "のに",
+      "たら",
+      "って",
+      "て",
+      "で",
+      "が",
+      "し",
+      "から",
+      "と",
+      "、"
+    ],
+    "eot_fillers": ["えーと", "えっと", "あの", "その", "まあ", "うーん", "ええと"],
+    "commit_endings": ["です", "ます", "ください", "か"],
+    "respond_gate_fillers": [
+      "えーと",
+      "えっと",
+      "あのー",
+      "あの",
+      "その",
+      "まあ",
+      "うーん",
+      "ええと",
+      "んー",
+      "えー"
+    ],
+    "barge_in_backchannels": [
+      "えーっと",
+      "えーと",
+      "えっと",
+      "あのー",
+      "うーん",
+      "うんうん",
+      "そのー",
+      "まあ",
+      "まー",
+      "えー",
+      "あー",
+      "あの",
+      "うん",
+      "ええ",
+      "んー",
+      "ん"
+    ]
+  }
+}
