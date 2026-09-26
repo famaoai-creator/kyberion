@@ -6,6 +6,7 @@ import {
   hashPipelineOutput,
   loadPipelineRunJournal,
   newPipelineRunId,
+  pipelineJournalChannelSnapshot,
   readPipelineRunJournal,
 } from './pipeline-run-journal.js';
 
@@ -34,6 +35,45 @@ describe('pipeline run journal', () => {
       __pipeline_route_next: 'sink',
     });
     expect(restored.finished?.status).toBe('succeeded');
+    safeRmSync(journal.path);
+  });
+
+  it('records a sensitive channel only as a hash/length marker and re-runs it on resume', () => {
+    const digest = { text: '*組織運営ダイジェスト* tenant-a 機密', status: 'attention' };
+    const plain = pipelineJournalChannelSnapshot('organization_digest', {
+      organization_digest: digest,
+    });
+    expect(plain).toEqual({ output_channels_snapshot: { organization_digest: digest } });
+    const sensitive = pipelineJournalChannelSnapshot(
+      'organization_digest',
+      { organization_digest: digest },
+      { sensitive: true }
+    );
+    expect(sensitive.redacted_channels).toEqual(['organization_digest']);
+    expect(sensitive.output_channels_snapshot.organization_digest).toEqual({
+      redacted: true,
+      sha256: hashPipelineOutput(digest),
+      length: expect.any(Number),
+    });
+    expect(JSON.stringify(sensitive)).not.toContain('機密');
+    expect(pipelineJournalChannelSnapshot('missing', {}, { sensitive: true })).toEqual({
+      output_channels_snapshot: {},
+    });
+
+    const runId = `test-sensitive-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'journal-sensitive-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['build_digest'],
+    });
+    journal.append('node_completed', {
+      step_id: 'build_digest',
+      ...sensitive,
+      output_hash: hashPipelineOutput(sensitive.output_channels_snapshot),
+    });
+    const restored = loadPipelineRunJournal(runId);
+    expect(restored.completed_nodes.has('build_digest')).toBe(false);
+    expect(safeReadFile(journal.path, { encoding: 'utf8' }) as string).not.toContain('機密');
     safeRmSync(journal.path);
   });
 

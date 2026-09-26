@@ -273,7 +273,13 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     "| Assembling a narrated video from scenes/briefs | `video-composition-actuator` | Distinct from `media-generation-actuator`'s `generate_video`, which produces a single generative video clip rather than composing a narrated sequence. |"
   );
   lines.push(
-    '| Image perception (OCR, layout/content inspection) | `vision-actuator` (`inspect_image`, `ocr_image`) | `vision-actuator` is perception-only; its generation-shaped ops are compatibility facades that forward to `media-generation-actuator`. |'
+    '| Image perception (OCR, layout/content inspection) | `vision-actuator` (`inspect_image`, `ocr_image`); CLI `pnpm kyberion see` (audio: `listen`, video: `watch` — see perception-playbook) | `vision-actuator` is perception-only; its generation-shaped ops are compatibility facades that forward to `media-generation-actuator`. |'
+  );
+  lines.push(
+    '| GUI action by target (`computer_interaction`) | web page: `browser-actuator`; desktop app / OS: `system-actuator`; PTY: `terminal-actuator`; device: `android-actuator` / `ios-actuator` | Split by target on purpose (same schema, non-overlapping action sets) — not duplicates. Navigation (`goto`, `activate_application`, `open_deep_link`) belongs to the same executors. See action-playbook. |'
+  );
+  lines.push(
+    '| Speech output (TTS: speak or write an audio file) | `voice-actuator` (`generate_voice`, `speak_local`); CLI `pnpm kyberion speak` | Inverse of `pnpm kyberion listen`. Streaming TTS for meetings / realtime voice lives in the streaming-tts bridges, not here. |'
   );
   lines.push(
     '| One-shot OS command / shell | `system-actuator` (`pipeline` → `system:exec`, `system:shell`) | Use `process-actuator` instead if the command must be supervised or outlive the calling step. |'

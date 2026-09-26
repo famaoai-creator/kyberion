@@ -83,6 +83,121 @@
         "en": "This result only proposes an organizational management unit; it does not execute work or change state.",
         "ja": "この結果は組織の管理単位を提案するだけで、実行や状態変更は行いません。",
         "qps-ploc": "⟦Ŧħïş řėşůŀŧ őñŀẏ ṗřőṗőşėş ȧñ őřɠȧñïẑȧŧïőñȧŀ ɱȧñȧɠėɱėñŧ ůñïŧ; ïŧ ḓőėş ñőŧ ėẋėƈůŧė ẇőřķ őř ƈħȧñɠė şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "organization_digest_header": {
+        "en": "*Organization digest* {when} ({count} organizations)",
+        "ja": "*組織運営ダイジェスト* {when}（{count}組織）",
+        "qps-ploc": "⟦*Őřɠȧñïẑȧŧïőñ ḓïɠėşŧ* {when} ({count} őřɠȧñïẑȧŧïőñş) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "organization_digest_clean": {
+        "en": "Nothing needs attention.",
+        "ja": "対応が必要な項目はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ȧŧŧėñŧïőñ. ŀőřėɱ ï⟧"
+      },
+      "organization_digest_section_due": {
+        "en": "Overdue and due-today operations",
+        "ja": "期限切れ・本日期限の運用",
+        "qps-ploc": "⟦Őṽėřḓůė ȧñḓ ḓůė-ŧőḓȧẏ őṗėřȧŧïőñş ŀőřėɱ ïṗşů⟧"
+      },
+      "organization_digest_section_deadlines": {
+        "en": "Business-day deadlines",
+        "ja": "営業日期限",
+        "qps-ploc": "⟦Ƀůşïñėşş-ḓȧẏ ḓėȧḓŀïñėş ŀőřėɱ ï⟧"
+      },
+      "organization_digest_section_decisions": {
+        "en": "Decisions awaiting approval",
+        "ja": "承認待ちの決定事項",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "organization_digest_section_services": {
+        "en": "Service observations",
+        "ja": "サービス観測",
+        "qps-ploc": "⟦Şėřṽïƈė őƀşėřṽȧŧïőñş ŀőřėɱ ⟧"
+      },
+      "organization_digest_section_incidents": {
+        "en": "Open incidents",
+        "ja": "未解決インシデント",
+        "qps-ploc": "⟦Őṗėñ ïñƈïḓėñŧş ŀőřė⟧"
+      },
+      "organization_digest_label_overdue": {
+        "en": "overdue",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦őṽėřḓůė ŀőř⟧"
+      },
+      "organization_digest_label_failed": {
+        "en": "last run failed",
+        "ja": "前回失敗",
+        "qps-ploc": "⟦ŀȧşŧ řůñ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "organization_digest_label_due_today": {
+        "en": "due today",
+        "ja": "本日期限",
+        "qps-ploc": "⟦ḓůė ŧőḓȧẏ ŀőř⟧"
+      },
+      "organization_digest_due_line": {
+        "en": "[{label}] {name} — scheduled {when}",
+        "ja": "[{label}] {name} — 予定 {when}",
+        "qps-ploc": "⟦[{label}] {name} — şƈħėḓůŀėḓ {when} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "organization_digest_deadline_missed_line": {
+        "en": "[missed] {name} — due {when}",
+        "ja": "[期限超過] {name} — 期限 {when}",
+        "qps-ploc": "⟦[ɱïşşėḓ] {name} — ḓůė {when} ŀőřėɱ ïṗş⟧"
+      },
+      "organization_digest_deadline_upcoming_line": {
+        "en": "{name} — {count} business day(s) left ({when})",
+        "ja": "{name} — あと{count}営業日（{when}）",
+        "qps-ploc": "⟦{name} — {count} ƀůşïñėşş ḓȧẏ(ş) ŀėƒŧ ({when}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "organization_digest_deadline_today_line": {
+        "en": "{name} — due today ({when})",
+        "ja": "{name} — 本日期限（{when}）",
+        "qps-ploc": "⟦{name} — ḓůė ŧőḓȧẏ ({when}) ŀőřėɱ ïṗ⟧"
+      },
+      "organization_digest_decision_count": {
+        "en": "{count} pending",
+        "ja": "{count}件",
+        "qps-ploc": "⟦{count} ṗėñḓïñɠ ŀőřė⟧"
+      },
+      "organization_digest_decision_line": {
+        "en": "{title} (due {when})",
+        "ja": "{title}（期限 {when}）",
+        "qps-ploc": "⟦{title} (ḓůė {when}) ŀőřėɱ ⟧"
+      },
+      "organization_digest_more": {
+        "en": "{count} more",
+        "ja": "ほか{count}件",
+        "qps-ploc": "⟦{count} ɱőřė ŀőř⟧"
+      },
+      "organization_digest_service_expiring_line": {
+        "en": "[expires within 7 days] {name} — until {when}",
+        "ja": "[7日以内に失効] {name} — {when}まで",
+        "qps-ploc": "⟦[ėẋṗïřėş ẇïŧħïñ 7 ḓȧẏş] {name} — ůñŧïŀ {when} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "organization_digest_service_stale_line": {
+        "en": "[expired] {name} (expired {when})",
+        "ja": "[失効] {name}（{when}失効）",
+        "qps-ploc": "⟦[ėẋṗïřėḓ] {name} (ėẋṗïřėḓ {when}) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "organization_digest_service_stale_line_unknown": {
+        "en": "[expired] {name}",
+        "ja": "[失効] {name}",
+        "qps-ploc": "⟦[ėẋṗïřėḓ] {name} ŀőřėɱ⟧"
+      },
+      "organization_digest_service_unobserved_line": {
+        "en": "[unobserved] {name}",
+        "ja": "[未観測] {name}",
+        "qps-ploc": "⟦[ůñőƀşėřṽėḓ] {name} ŀőřėɱ ⟧"
+      },
+      "organization_digest_incident_line": {
+        "en": "[{severity}] {title} ({status})",
+        "ja": "[{severity}] {title}（{status}）",
+        "qps-ploc": "⟦[{severity}] {title} ({status}) ŀőřėɱ ïṗşů⟧"
+      },
+      "organization_digest_skipped_tenants_line": {
+        "en": "Tenants that could not be read (excluded): {tenants}",
+        "ja": "読み込めなかったテナント（集計から除外）: {tenants}",
+        "qps-ploc": "⟦Ŧėñȧñŧş ŧħȧŧ ƈőůŀḓ ñőŧ ƀė řėȧḓ (ėẋƈŀůḓėḓ): {tenants} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       }
     },
     "chronos": {
@@ -6262,6 +6377,36 @@
         "en": "  search <query>       Search actuators by name, description, or path",
         "ja": "  search <query>       名前・説明・パスでアクチュエータを検索",
         "qps-ploc": "⟦  şėȧřƈħ <ɋůėřẏ>       Şėȧřƈħ ȧƈŧůȧŧőřş ƀẏ ñȧɱė, ḓėşƈřïṗŧïőñ, őř ṗȧŧħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_help_read": {
+        "en": "  read <file> [--ocr]  Read a pdf/pptx/docx/xlsx as Markdown via the native engines (--json, --out)",
+        "ja": "  read <file> [--ocr]  pdf/pptx/docx/xlsx をネイティブエンジンで Markdown として読む(--json, --out)",
+        "qps-ploc": "⟦  řėȧḓ <ƒïŀė> [--őƈř]  Řėȧḓ ȧ ṗḓƒ/ṗṗŧẋ/ḓőƈẋ/ẋŀşẋ ȧş Ɱȧřķḓőẇñ ṽïȧ ŧħė ñȧŧïṽė ėñɠïñėş (--ĵşőñ, --őůŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "cli_help_write": {
+        "en": "  write <brief.json>   Turn a semantic brief into pptx/docx/xlsx/pdf via the design layer (--out, --to)",
+        "ja": "  write <brief.json>   セマンティックブリーフを pptx/docx/xlsx/pdf にする(--out, --to)",
+        "qps-ploc": "⟦  ẇřïŧė <ƀřïėƒ.ĵşőñ>   Ŧůřñ ȧ şėɱȧñŧïƈ ƀřïėƒ ïñŧő ṗṗŧẋ/ḓőƈẋ/ẋŀşẋ/ṗḓƒ ṽïȧ ŧħė ḓėşïɠñ ŀȧẏėř (--őůŧ, --ŧő) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "cli_help_see": {
+        "en": "  see <image>          OCR an image locally (no egress) as Markdown (--describe, --lang, --json, --out)",
+        "ja": "  see <image>          画像をローカル OCR(外部送信なし)で Markdown として読む(--describe, --lang, --json, --out)",
+        "qps-ploc": "⟦  şėė <ïɱȧɠė>          ŐƇŘ ȧñ ïɱȧɠė ŀőƈȧŀŀẏ (ñő ėɠřėşş) ȧş Ɱȧřķḓőẇñ (--ḓėşƈřïƀė, --ŀȧñɠ, --ĵşőñ, --őůŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "cli_help_listen": {
+        "en": "  listen <audio>       Transcribe audio with the local speech-to-text backend (--timestamps, --lang, --json, --out)",
+        "ja": "  listen <audio>       音声をローカル音声認識で文字起こしする(--timestamps, --lang, --json, --out)",
+        "qps-ploc": "⟦  ŀïşŧėñ <ȧůḓïő>       Ŧřȧñşƈřïƀė ȧůḓïő ẇïŧħ ŧħė ŀőƈȧŀ şṗėėƈħ-ŧő-ŧėẋŧ ƀȧƈķėñḓ (--ŧïɱėşŧȧɱṗş, --ŀȧñɠ, --ĵşőñ, --őůŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "cli_help_speak": {
+        "en": "  speak <text>         Speak text with the local text-to-speech engine, or write audio (--out, --voice, --lang, --rate, --json)",
+        "ja": "  speak <text>         テキストをローカル音声合成で読み上げる、または音声ファイルに書き出す(--out, --voice, --lang, --rate, --json)",
+        "qps-ploc": "⟦  şṗėȧķ <ŧėẋŧ>         Şṗėȧķ ŧėẋŧ ẇïŧħ ŧħė ŀőƈȧŀ ŧėẋŧ-ŧő-şṗėėƈħ ėñɠïñė, őř ẇřïŧė ȧůḓïő (--őůŧ, --ṽőïƈė, --ŀȧñɠ, --řȧŧė, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "cli_help_watch": {
+        "en": "  watch <video>        Video metadata + transcript + OCR'd frame timeline (--every, --max-frames, --frames)",
+        "ja": "  watch <video>        動画のメタデータ・文字起こし・フレーム OCR タイムラインを出力(--every, --max-frames, --frames)",
+        "qps-ploc": "⟦  ẇȧŧƈħ <ṽïḓėő>        Ṽïḓėő ɱėŧȧḓȧŧȧ + ŧřȧñşƈřïṗŧ + ŐƇŘ'ḓ ƒřȧɱė ŧïɱėŀïñė (--ėṽėřẏ, --ɱȧẋ-ƒřȧɱėş, --ƒřȧɱėş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
       },
       "cli_help_info": {
         "en": "  info <name>          Show details for a specific actuator",

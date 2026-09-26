@@ -72,7 +72,7 @@
       },
       {
         "id": "CREDIT_CARD",
-        "regex": "(?<![0-9A-Fa-f])(?:\\d[ -]?){12,18}\\d(?![0-9A-Fa-f-])",
+        "regex": "(?<![0-9A-Fa-f.])(?:\\d[ -]?){12,18}\\d(?![0-9A-Fa-f-])",
         "description": "Payment card number (13-19 digits passing Luhn) — PCI DSS forbids storing the PAN, so the default is block, not mask",
         "severity": "pii",
         "action": "block",
