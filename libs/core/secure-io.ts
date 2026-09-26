@@ -1262,25 +1262,53 @@ export function safeLstat(filePath: string): fs.Stats {
   return fs.lstatSync(resolved);
 }
 
+/** True when an entry exists at p (a dangling symlink counts); throws on ELOOP and the like. */
+function entryExists(p: string): boolean {
+  try {
+    fs.lstatSync(p);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return false;
+    throw error;
+  }
+}
+
 /**
  * Canonical path with every symlink resolved, including symlinked parent
  * directories. A missing tail is resolved through its nearest existing
  * ancestor, so classification of a not-yet-written path still sees the real
- * parent. Like safeExistsSync it reveals no content, so only the sensitive-path
- * deny list applies (to the input and to the canonical path).
+ * parent. Fails closed: a symlink component that does not resolve (dangling,
+ * looping) and a canonical path outside the repository both throw. Like
+ * safeExistsSync it reveals no content, so only the sensitive-path deny list
+ * applies (to the input and to the canonical path).
  */
 export function safeRealpath(filePath: string): string {
   assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = path.resolve(pathResolver.resolve(filePath));
   const missing: string[] = [];
   let existing = resolved;
-  while (!fs.existsSync(existing)) {
-    const parent = path.dirname(existing);
-    if (parent === existing) break;
-    missing.unshift(path.basename(existing));
-    existing = parent;
+  let real: string;
+  try {
+    while (!entryExists(existing)) {
+      const parent = path.dirname(existing);
+      if (parent === existing) break;
+      missing.unshift(path.basename(existing));
+      existing = parent;
+    }
+    real = fs.realpathSync.native(existing);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+    throw new Error(
+      `[PATH_UNRESOLVABLE] ${filePath} has a component that does not resolve (${code})`
+    );
   }
-  const canonical = path.join(fs.realpathSync.native(existing), ...missing);
+  const canonical = path.join(real, ...missing);
+  const root = fs.realpathSync.native(pathResolver.rootDir());
+  const relative = path.relative(root, canonical);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`[PATH_OUTSIDE_REPOSITORY] ${filePath} resolves outside the repository`);
+  }
   assertSensitivePathAllowed(canonical, 'read', isSensitivePathMediated());
   return canonical;
 }
