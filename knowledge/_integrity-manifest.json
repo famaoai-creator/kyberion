@@ -735,7 +735,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 20796,
+      "size": 21743,
       "type": "md"
     },
     {
@@ -1527,7 +1527,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 51254,
+      "size": 51489,
       "type": "json"
     },
     {
@@ -3711,7 +3711,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 20351,
+      "size": 20557,
       "type": "json"
     },
     {

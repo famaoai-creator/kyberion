@@ -17,7 +17,7 @@ tags:
     security,
   ]
 importance: 7
-last_updated: 2026-09-26
+last_updated: 2026-09-27
 ---
 
 # Plugin Permissions, Lifecycle and Views
@@ -38,7 +38,7 @@ Plan: `docs/developer/improvement-plans-2026-09/ELIZA_ADOPTION_PLAN_2026-09-24.j
 | Runtime mediation (EP-03) | `plugin-grant-runtime.ts`, `plugin-contributions.ts`, `sandbox-policy.ts`     | governed host paths check the executing plugin's grant         |
 | Lifecycle (EP-04)         | `plugin-lifecycle.ts`, `scripts/plugin_install.ts --reload/--deactivate`      | ownership ledger, activate / reload / deactivate, apply ladder |
 | Views (EP-05)             | `plugin-view-contract.ts`, Chronos `GET/POST /api/headless/a2ui/plugin-views` | declarative A2UI documents, viewer gating, action routing      |
-| Plugin host (PH-01)       | `plugin-host.ts`, Chronos `lib/plugin-host-boot.ts` + `instrumentation.ts`    | which approved plugins run inside a long-running surface       |
+| Plugin host (PH-01)       | `plugin-host.ts`, Chronos `lib/plugin-host-boot.ts` (plugin-views routes)     | which approved plugins run inside a long-running surface       |
 | Iframe views (PH-02)      | `plugin-view-frame.ts`, Chronos `plugin-views/frame` route + frame broker     | sandboxed HTML views, CSP, postMessage action requests         |
 
 Each layer only narrows what the previous one allowed; none of them widens.
@@ -227,22 +227,36 @@ unchanged directory never re-imports a module. Import failures are recorded as
 audited (`plugin_host.*`); `status()` carries codes and digest prefixes only.
 The host lives on `globalThis[Symbol.for('kyberion.pluginHost.<surface>')]`,
 so dev-server reloads and separately bundled route modules share one host.
+The host must be created from the same bundle layer that runs the actions:
+Next.js compiles `instrumentation.ts` in its own webpack layer with a separate
+copy of every bundled `@agent/core` module, so a host started there registers
+plugin operations in registries the route handlers never see.
 
-Chronos: `src/instrumentation.ts` (Node.js runtime only) calls
-`ensureChronosPluginHost()`, which is idempotent and a no-op unless
-`KYBERION_CHRONOS_PLUGIN_HOST` is set. `KYBERION_CHRONOS_PLUGIN_HOST_TENANTS`
-is a comma list of tenants (each must resolve in the tenant registry; reserved
+Chronos: the plugin-views routes call `ensureChronosPluginHost()`, which is
+idempotent and a no-op unless `KYBERION_CHRONOS_PLUGIN_HOST` is set; the host
+starts with the first plugin-views request, so every plugin op in Chronos (not
+only view actions) stays inactive until that request. A boot failure is
+remembered for 60 s: plugin-views requests in that window neither retry nor
+log it again. `KYBERION_CHRONOS_PLUGIN_HOST_TENANTS`
+is a comma list of tenants (each must resolve in the tenant registry, read as
+`chronos_localadmin` because the registry is personal-tier; reserved
 scope names are rejected; unset = only tenant-less shared plugins);
 `KYBERION_PLUGIN_HOST_POLL_MS` tunes the poll (default 30 s). A boot failure
 is logged and leaves the host off (actions stay unavailable, Chronos keeps
-running). The plugin-views `GET` and `POST` also call `ensureChronosPluginHost()`,
-and the `POST` awaits one `syncNow()` before dispatching or executing, so an
+running). The `POST` awaits one `syncNow()` before dispatching or executing, so an
 approval never runs against a stale activation. The `GET` payload carries
 `host`: a readonly viewer gets `{ enabled }` only; a localadmin also gets
 per-plugin `state` / `reason_code` / digest prefix for the plugins of their
 tenant scope. The Chronos plugin-views screen shows a badge (host disabled /
 N plugins active / N refused) and explains a non-executable approved request
 (host disabled, host refused the plugin, or reload pending).
+
+`pnpm kyberion check plugin-views-e2e` (PE-02, `scripts/check_plugin_views_e2e.ts`)
+exercises all of this together: governed third-party install and approval in a
+hermetic root, the Chronos production build with the host enabled for one
+tenant, and Playwright Chromium through the iframe view, the host confirmation,
+one agent action and one approved human action (executed once, the second
+execution refused). See `plugins/README.md`.
 
 Limits: reloads keep the previous module in memory until the process exits;
 the host is still cooperative enforcement (§4), so enable it only where you
