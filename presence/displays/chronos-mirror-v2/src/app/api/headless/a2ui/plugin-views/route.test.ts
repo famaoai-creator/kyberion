@@ -24,6 +24,7 @@ import {
 const state = vi.hoisted(() => ({
   managedRoot: '',
   viewer: {} as Record<string, unknown>,
+  listOptions: [] as Array<{ tenantAllow?: readonly string[] } | undefined>,
 }));
 
 vi.mock('../../../../../lib/api-guard', () => ({
@@ -50,7 +51,10 @@ vi.mock('@agent/core/plugin-managed-install', async () => {
     listManagedPlugins: (
       root?: string,
       options?: Parameters<typeof actual.listManagedPlugins>[1]
-    ) => actual.listManagedPlugins(root ?? state.managedRoot, options),
+    ) => {
+      state.listOptions.push(options);
+      return actual.listManagedPlugins(root ?? state.managedRoot, options);
+    },
   };
 });
 
@@ -249,6 +253,23 @@ describe('GET /api/headless/a2ui/plugin-views', () => {
     expect((await listViews('?tenant=tenant-a')).body.data.views).toHaveLength(2);
   });
 
+  it("lists only the viewer's tenants, so other tenants' copies are not digested", async () => {
+    const foreign = install(fixtureSource(), { tenantSlug: 'tenant-a' });
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-b'] });
+    state.listOptions.length = 0;
+    expect((await listViews()).body.data.views).toEqual([]);
+    expect(state.listOptions.length).toBeGreaterThan(0);
+    expect(state.listOptions.every((options) => options?.tenantAllow?.join() === 'tenant-b')).toBe(
+      true
+    );
+    // A viewer scoped to 'all' keeps listing every tenant.
+    state.viewer = viewer({ role: 'localadmin' });
+    state.listOptions.length = 0;
+    const all = (await listViews()).body.data.views ?? [];
+    expect(all.map((view) => view.plugin_id)).toContain(foreign.pluginId);
+    expect(state.listOptions.every((options) => options?.tenantAllow === undefined)).toBe(true);
+  });
+
   it('applies the role gate and lets a tier filter narrow only', async () => {
     install(
       fixtureSource((manifest) => {
@@ -313,6 +334,26 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
       action_id: 'probe_env',
     });
     expect(agent.status).toBe(409);
+  });
+
+  it("refuses actions on another tenant's plugin without queueing anything", async () => {
+    const record = install(fixtureSource(), { tenantSlug: 'tenant-a' });
+    const audit = vi.spyOn(auditChain, 'record');
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-b'] });
+    for (const action_id of ['write_probe', 'probe_env']) {
+      const { status, body } = await act({
+        plugin_id: record.pluginId,
+        view_id: 'status',
+        action_id,
+        params: action_id === 'write_probe' ? { path: 'x' } : {},
+      });
+      expect(status).toBe(404);
+      expect(body.error).toBe('PLUGIN_VIEW_NOT_FOUND');
+    }
+    const actionAudits = audit.mock.calls.filter(([entry]) =>
+      String(entry.action).startsWith('plugin_view.action')
+    );
+    expect(actionAudits).toEqual([]);
   });
 
   it('refuses actions of a digest-mismatched plugin', async () => {
