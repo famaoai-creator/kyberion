@@ -7,6 +7,7 @@
     "agy_sdk",
     "playwright",
     "lightpanda",
+    "yt_dlp",
     "ffmpeg",
     "sox",
     "tesseract",

@@ -4074,6 +4074,15 @@
       "required": false,
       "description": "Optional executable path override for xcrun; leave unset to resolve it from the host toolchain.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_YTDLP_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for yt-dlp (video ingest); when unset, the installed managed binary, then the governed tool-runtime registry command (yt-dlp), is used.",
+      "documented": true,
+      "subsystem": "runtime"
     }
   ]
 }
