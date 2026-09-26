@@ -78,6 +78,35 @@ Kyberion 自体のメンテナンス。
 
 Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
 
+### B2. ロールの解決順序とロール引き受けポリシー (RA-01 / RA-02)
+
+`resolveRole()`（`libs/core/authority.ts`）は次の順で現在の Authority Role を決めます。secure-io / tier-guard の認可判定は `resolveIdentityContext()` 経由でこの結果を使います。
+
+1. **プロセス内で引き受けたロール** — `withExecutionContext` / `withExecutionContextAsync` が `AsyncLocalStorage`（`libs/core/foundation/execution-scope.ts`）に載せたロール。非同期コンテキストごとに独立し、`await` をまたいでも入れ子でも正しく戻ります。**プロセス内でしか設定できず、親プロセスから継承した環境変数からは決して来ません。**
+2. `SYSTEM_ROLE` — `scripts/surface_runtime.ts` が各サーフェスを `SYSTEM_ROLE=<surface id の - を _ にしたもの>`（例: Chronos → `chronos_mirror_v2`）で起動し、`pnpm surfaces` / `pnpm config-mission` も自身に設定します。
+3. `MISSION_ROLE`
+4. `process.argv[1]` のファイル名からの推定
+
+Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受けで決まった Persona が `KYBERION_PERSONA` より優先されます。
+
+環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。同期版に Promise を返す `fn` を渡した場合、スコープのロールはその Promise の継続（`await` の後）にも引き継がれますが、環境変数のミラーは `fn` が返った時点で元に戻ります。非同期の処理には `withExecutionContextAsync` を使ってください。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
+
+認可の入力になる Persona は実行スコープから解決します: secure-io の policy-engine 判定（`file_write` / `execute_command` の `agentId`）、`operation-policy-gate`、`organization-digest` の sovereign 判定は `executionPersonaText()` / `resolveExecutionPersona()` を使います。`MISSION_ROLE` / `KYBERION_PERSONA` を今も直接読む既知の箇所は、監査・トレースの帰属ラベル、または CLI の操作者 ID 照合だけです（非同期の引き受けの中では外側の値になります）:
+
+- 帰属ラベル: `network.ts`、`secret-guard.ts`、`secret-introduction.ts`、`delegated-task-observability.ts`、`provider-pins-store.ts`、`seam-provider-selection.ts`、`seam-selection-rules.ts`、`mission-lifecycle-service.ts`、`reasoning-bootstrap.ts`、`work-coordination.ts`、`project-management.ts`、`organization-operating-model*.ts`、`organization-operation-run-recording.ts`、`tenant-governance.ts`、`cloudflare-os-control-plane.ts`、`acp-mediator.ts`、`claude-agent-governance.ts`
+- CLI の操作者 ID 照合: `mission-maintenance.ts`（承認者）、`mission-work-reconciliation.ts`（採用者）
+- 明示的に渡された env を読むもの: `mcp-request-context.ts`、`authn-providers.ts`（`deps.env` があるときのみ。ないときはスコープを使う）
+
+以前は `SYSTEM_ROLE` が `MISSION_ROLE` より優先されていたため、surface_runtime から起動されたサーフェスでは `withExecutionContext` によるロール引き受けがすべて黙って無視されていました（例: Chronos の `chronos_localadmin` によるテナントレジストリ読み取りやプラグイン承認）。
+
+**ロール引き受けポリシー（多層防御）**: `SYSTEM_ROLE` が設定されたプロセスが引き受けられるのは、次のいずれかのロールだけです。それ以外を引き受けようとすると、`fn` を実行する前に `[ROLE_ASSUMPTION_DENIED]` で失敗します。
+
+- `SYSTEM_ROLE` 自身（常に許可）
+- [`role-assumption-policy.json`](./role-assumption-policy.json) の `shared_core_roles`（`libs/core` が自分のストアへ書くために呼び出し元の代わりに内部で引き受ける、範囲の狭いロール: `chronos_gateway`、`infrastructure_sentinel`、`knowledge_steward`、`slack_bridge`、`surface_runtime`）。広い権限を持つ `ecosystem_architect` / `mission_controller` / `sovereign_concierge` は共有せず、到達可能性で裏付けられたサーフェスごとに `may_assume` に理由付きで載せます
+- 同ファイルの `system_roles.<system role>.may_assume`
+
+スコープのストアは `globalThis` から到達できるため、スコープを読む側（`resolveRole()`、Persona 解決、子プロセス env）は引き受けられたロールを読み出すたびにこのポリシーで再検査します。拒否されるロールを載せたスコープは警告（`[ROLE_ASSUMPTION_IGNORED]`）を出して無視されます。スコープのオブジェクトは凍結されており、書き込み口は `authority.ts` が使う `runInExecutionScope` だけです。`system_roles` に載っていない `SYSTEM_ROLE` は自分自身しか引き受けられません。ポリシーファイルがない、または壊れている場合も同じです（fail closed）。この場合は警告を出し、60 秒ごとに読み直します。`SYSTEM_ROLE` のないプロセスの挙動は変わりません。一覧は、各サーフェスのエントリポイントから静的に到達できる `withExecutionContext*` 呼び出し（ロールのリテラル引数と、governed artifact 用のロールラッパー）から導出しています。到達可能性はモジュール単位で調べているため、現在のサーフェスはすべて `libs/core` 経由で 3 つの広いロールに到達します。さらに絞るには関数単位の呼び出し解析が必要です（到達できるのに許可されていないロールを引き受けると、本番で例外になります）。新しいサーフェスを追加したり、サーフェスから到達するコードで新しいロールを引き受けたりする場合は、このポリシーを更新してください。`knowledge/product/governance/surfaces/` の外にある独自のサーフェス manifest や customer overlay から起動するサーフェスにも、`SYSTEM_ROLE`（surface id の `-` を `_` にしたもの）のエントリが必要です。エントリがなければ、そのサーフェスは自分自身のロールしか引き受けられません（`libs/core/authority-role-assumption.test.ts` が、起動対象の全サーフェスにエントリがあることを検査します）。
+
 ### C. Authority (特権)
 
 特定の物理操作に対して与えられる、時間制限付きの「鍵」です。

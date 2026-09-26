@@ -28,6 +28,7 @@ import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { createLogger } from './logger.js';
+import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
 
 const logger = createLogger('secure-io');
 const auditChain = auditChainModule.auditChain;
@@ -190,6 +191,16 @@ export function buildSafeExecEnv(
     if (value !== undefined) {
       safeEnv[key] = value;
     }
+  }
+
+  // RA-01: a child inherits the role/persona assumed by the caller's own
+  // execution scope, not whatever a concurrent async context last mirrored
+  // into the process-global env.
+  const scope = currentExecutionScope();
+  if (scope?.assumedRole) {
+    safeEnv.MISSION_ROLE = scope.assumedRole;
+    if (typeof scope.assumedPersona === 'string') safeEnv.KYBERION_PERSONA = scope.assumedPersona;
+    else if (scope.assumedPersona === null) delete safeEnv.KYBERION_PERSONA;
   }
 
   for (const [key, value] of Object.entries(extraEnv)) {
@@ -436,7 +447,7 @@ export function safeWriteFile(
     _policyCheckInProgress = true;
     try {
       const policyDecision = policyEngine.evaluate({
-        agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+        agentId: executionPersonaText() || 'unknown',
         operation: 'file_write',
         target_tier: detectTier(resolved),
         // Root operator processes are sovereign-tier by default; subagent
@@ -447,13 +458,13 @@ export function safeWriteFile(
       });
       if (!policyDecision.allowed) {
         recordGovernanceAction(
-          getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+          executionPersonaText() || 'unknown',
           'file_write',
           `${resolved}:denied`,
           true
         );
         auditChain.record({
-          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+          agentId: executionPersonaText() || 'unknown',
           action: 'policy_violation',
           operation: 'file_write',
           result: 'failed',
@@ -773,20 +784,20 @@ function assertExecPolicy(command: string): void {
   const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+    agentId: executionPersonaText() || 'unknown',
     operation: 'execute_command',
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
     recordGovernanceAction(
-      getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+      executionPersonaText() || 'unknown',
       'execute_command',
       `${command}:denied`,
       true
     );
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+      agentId: executionPersonaText() || 'unknown',
       action: 'policy_violation',
       operation: 'execute_command',
       result: 'failed',

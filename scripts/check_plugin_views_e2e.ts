@@ -11,7 +11,10 @@
  *      --tenant`) and approves the pending install request through the
  *      operator CLI (`kyberion_home.js approvals --approve`);
  *   3. starts the built Chronos (`next start`) on a free loopback port with
- *      the plugin host enabled for that tenant and a random localadmin token;
+ *      the plugin host enabled for that tenant and a random localadmin token —
+ *      once directly and once with the environment surface_runtime gives every
+ *      surface (`SYSTEM_ROLE=chronos_mirror_v2`, RA-03), because a SYSTEM_ROLE
+ *      launch used to silently ignore Chronos's in-process role assumptions;
  *   4. drives Playwright Chromium: plugin-views listing -> iframe view ->
  *      click inside the iframe -> host confirmation -> agent action
  *      dispatched; human action -> approval request -> CLI approval ->
@@ -25,6 +28,7 @@
  * and the Chronos production build) and Playwright Chromium.
  *
  *   pnpm kyberion check plugin-views-e2e [--keep-root] [--timeout-ms 100000]
+ *     [--launch-mode direct|surface-runtime|both]   (default: both, sequentially)
  */
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
@@ -67,14 +71,43 @@ export interface E2eStepTiming {
   ms: number;
 }
 
-export interface PluginViewsE2eReport {
-  schema: 'pe-02-plugin-views-e2e/v1';
-  passed: true;
-  plugin_id: string;
-  tenant: string;
+/**
+ * How Chronos is launched. `direct` is a plain `next start`; `surface-runtime`
+ * adds the environment scripts/surface_runtime.ts injects for every surface
+ * (see {@link surfaceRuntimeLaunchEnv}).
+ */
+export type ChronosLaunchMode = 'direct' | 'surface-runtime';
+export const LAUNCH_MODES: readonly ChronosLaunchMode[] = ['direct', 'surface-runtime'];
+
+export interface PluginViewsE2eModeReport {
+  launch_mode: ChronosLaunchMode;
   approval_request_id: string;
   steps: E2eStepTiming[];
   total_ms: number;
+}
+
+export interface PluginViewsE2eReport {
+  schema: 'pe-02-plugin-views-e2e/v2';
+  passed: true;
+  plugin_id: string;
+  tenant: string;
+  runs: PluginViewsE2eModeReport[];
+  total_ms: number;
+}
+
+/**
+ * The environment a Chronos launched by `pnpm surfaces` receives on top of
+ * its own: surface_runtime.ts injects `AUTHORIZED_SCOPE=<service id>` and
+ * `SYSTEM_ROLE=<surface id with - -> _>`, and the `pnpm surfaces` script runs
+ * surface_runtime itself with `KYBERION_PERSONA=worker`, which the surface
+ * inherits. Kept in sync with those sources by check_plugin_views_e2e.test.ts.
+ */
+export function surfaceRuntimeLaunchEnv(): Record<string, string> {
+  return {
+    KYBERION_PERSONA: 'worker',
+    AUTHORIZED_SCOPE: 'chronos-mirror-v2',
+    SYSTEM_ROLE: 'chronos_mirror_v2',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -83,11 +116,17 @@ export interface PluginViewsE2eReport {
 
 export interface E2eOptions {
   keepRoot: boolean;
+  /** Per launch mode. */
   timeoutMs: number;
+  launchModes: ChronosLaunchMode[];
 }
 
 export function parseE2eArgs(argv: readonly string[]): E2eOptions {
-  const options: E2eOptions = { keepRoot: false, timeoutMs: DEFAULT_TIMEOUT_MS };
+  const options: E2eOptions = {
+    keepRoot: false,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    launchModes: [...LAUNCH_MODES],
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--keep-root') options.keepRoot = true;
@@ -97,6 +136,15 @@ export function parseE2eArgs(argv: readonly string[]): E2eOptions {
         throw new ScriptExitError(1, '--timeout-ms needs a number >= 10000');
       }
       options.timeoutMs = value;
+      index += 1;
+    } else if (arg === '--launch-mode') {
+      const value = argv[index + 1];
+      if (value === 'both') options.launchModes = [...LAUNCH_MODES];
+      else if (LAUNCH_MODES.includes(value as ChronosLaunchMode)) {
+        options.launchModes = [value as ChronosLaunchMode];
+      } else {
+        throw new ScriptExitError(1, '--launch-mode needs direct, surface-runtime or both');
+      }
       index += 1;
     }
   }
@@ -257,7 +305,12 @@ interface ChronosServer {
   stop(): Promise<void>;
 }
 
-function startChronos(root: string, port: number, token: string): ChronosServer {
+function startChronos(
+  root: string,
+  port: number,
+  token: string,
+  launchMode: ChronosLaunchMode
+): ChronosServer {
   const resourceId = `plugin-views-e2e-chronos-${port}`;
   const { child } = spawnManagedProcess({
     resourceId,
@@ -289,6 +342,7 @@ function startChronos(root: string, port: number, token: string): ChronosServer 
         KYBERION_CHRONOS_PLUGIN_HOST: 'true',
         KYBERION_CHRONOS_PLUGIN_HOST_TENANTS: TENANT_SLUG,
         KYBERION_PLUGIN_HOST_POLL_MS: '1000',
+        ...(launchMode === 'surface-runtime' ? surfaceRuntimeLaunchEnv() : {}),
       }),
     },
   });
@@ -464,7 +518,12 @@ async function confirmInHost(page: Page, actionId: string): Promise<void> {
   await dialog.waitFor({ state: 'hidden', timeout: STEP_TIMEOUT_MS });
 }
 
-async function scenario(root: string, timings: E2eStepTiming[], run: E2eRun): Promise<string> {
+async function scenario(
+  root: string,
+  timings: E2eStepTiming[],
+  run: E2eRun,
+  launchMode: ChronosLaunchMode
+): Promise<string> {
   const step = async <T>(name: string, fn: () => Promise<T> | T): Promise<T> => {
     const started = Date.now();
     try {
@@ -523,7 +582,7 @@ async function scenario(root: string, timings: E2eStepTiming[], run: E2eRun): Pr
     for (let attempt = 1; ; attempt += 1) {
       const port = await freeLoopbackPort();
       run.assertActive();
-      const started = await run.adoptServer(startChronos(root, port, token));
+      const started = await run.adoptServer(startChronos(root, port, token, launchMode));
       const state = await waitFor('Chronos /api/healthz', async () => {
         if (started.exited()) return 'exited';
         // Bounded: a port taken by another listener may accept and never answer.
@@ -709,6 +768,26 @@ async function scenario(root: string, timings: E2eStepTiming[], run: E2eRun): Pr
 
 export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginViewsE2eReport> {
   const options = parseE2eArgs(argv);
+  const started = Date.now();
+  const runs: PluginViewsE2eModeReport[] = [];
+  // Sequential: each mode gets its own hermetic root, server and browser.
+  for (const launchMode of options.launchModes) {
+    runs.push(await runPluginViewsE2eMode(launchMode, options));
+  }
+  return {
+    schema: 'pe-02-plugin-views-e2e/v2',
+    passed: true,
+    plugin_id: PLUGIN_ID,
+    tenant: TENANT_SLUG,
+    runs,
+    total_ms: Date.now() - started,
+  };
+}
+
+async function runPluginViewsE2eMode(
+  launchMode: ChronosLaunchMode,
+  options: E2eOptions
+): Promise<PluginViewsE2eModeReport> {
   const runId = `${Date.now()}-${randomBytes(4).toString('hex')}`;
   const root = pathResolver.sharedTmp(`plugin-views-e2e/${runId}`);
   const timings: E2eStepTiming[] = [];
@@ -733,12 +812,12 @@ export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginView
         reject(new Error(`plugin views E2E timed out after ${options.timeoutMs}ms`));
       }, options.timeoutMs);
     });
-    const approvalRequestId = await Promise.race([scenario(root, timings, run), timeout]);
+    const approvalRequestId = await Promise.race([
+      scenario(root, timings, run, launchMode),
+      timeout,
+    ]);
     return {
-      schema: 'pe-02-plugin-views-e2e/v1',
-      passed: true,
-      plugin_id: PLUGIN_ID,
-      tenant: TENANT_SLUG,
+      launch_mode: launchMode,
       approval_request_id: approvalRequestId,
       steps: timings,
       total_ms: Date.now() - started,
@@ -749,7 +828,7 @@ export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginView
     throw new ScriptExitError(
       1,
       [
-        `plugin views E2E failed: ${message}`,
+        `plugin views E2E failed (launch mode ${launchMode}): ${message}`,
         `steps: ${timings.map((entry) => `${entry.step}=${entry.ms}ms`).join(' ')}`,
         ...(tail ? ['--- Chronos log (tail) ---', tail] : []),
       ].join('\n')
