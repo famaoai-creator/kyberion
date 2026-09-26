@@ -20,6 +20,17 @@ const nextConfig = {
   // Node-oriented server modules external so dynamic capability/service
   // discovery is evaluated by Node rather than webpack.
   serverExternalPackages: ['@agent/core', 'node-pty', '@agentclientprotocol/sdk'],
+  // PH-02: Chronos pages may frame only same-origin documents (plugin iframe
+  // views, deliverable previews). API routes are excluded: the plugin view
+  // frame route sends its own sandbox CSP and must not get a second policy.
+  async headers() {
+    return [
+      {
+        source: '/((?!api/).*)',
+        headers: [{ key: 'Content-Security-Policy', value: "frame-src 'self'" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -16,6 +16,7 @@ import {
   type PluginViewActionOutcome,
   type PluginViewActionRequestSummary,
 } from '@agent/core/plugin-view-actions';
+import type { PluginHostStatus } from '@agent/core/plugin-host';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { toSurfaceAuthorizationContext, type ViewerContext } from './viewer-context';
 
@@ -69,27 +70,95 @@ export function readVisiblePluginViewActionRequests(
   return viewer.role === 'localadmin' ? listPluginViewActionRequests(views) : [];
 }
 
+/** PH-02: same-origin URL of an iframe view document (the frame route). */
+export const PLUGIN_VIEW_FRAME_ROUTE = '/api/headless/a2ui/plugin-views/frame';
+
+export function pluginViewFrameUrl(pluginId: string, viewId: string): string {
+  const params = new URLSearchParams({ plugin_id: pluginId, view_id: viewId });
+  return `${PLUGIN_VIEW_FRAME_ROUTE}?${params.toString()}`;
+}
+
+/** Plugin ids whose managed record lies in the viewer's tenant scope. */
+export function pluginIdsInViewerScope(
+  viewer: ViewerContext,
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+): Set<string> {
+  const scope = viewerForPluginViews(viewer).tenantSlugs;
+  return new Set(
+    listRecords()
+      .filter(
+        (record) => !record.tenantSlug || scope === 'all' || scope.includes(record.tenantSlug)
+      )
+      .map((record) => record.pluginId)
+  );
+}
+
+export interface PluginHostPayload {
+  enabled: boolean;
+  plugins?: Array<{
+    plugin_id: string;
+    state: PluginHostStatus['plugins'][number]['state'];
+    reason_code: string;
+    content_digest_prefix?: string;
+  }>;
+}
+
+/**
+ * PH-01: host visibility. A readonly viewer learns only whether the host is
+ * on; a localadmin also sees per-plugin state (codes only), limited to the
+ * plugins of their tenant scope.
+ */
+export function pluginHostPayload(
+  status: PluginHostStatus,
+  viewer: Pick<ViewerContext, 'role'>,
+  pluginIdsInScope: ReadonlySet<string>
+): PluginHostPayload {
+  if (viewer.role !== 'localadmin') return { enabled: status.enabled };
+  return {
+    enabled: status.enabled,
+    plugins: status.plugins
+      .filter((plugin) => pluginIdsInScope.has(plugin.pluginId))
+      .map((plugin) => ({
+        plugin_id: plugin.pluginId,
+        state: plugin.state,
+        reason_code: plugin.reasonCode,
+        ...(plugin.contentDigestPrefix
+          ? { content_digest_prefix: plugin.contentDigestPrefix }
+          : {}),
+      })),
+  };
+}
+
 export function buildPluginViewsPayload(
   views: LoadedPluginView[],
   errors: Array<{ pluginId: string; viewId?: string; code: string }>,
   locale: PluginViewLocale,
-  actionRequests: PluginViewActionRequestSummary[] = []
+  actionRequests: PluginViewActionRequestSummary[] = [],
+  host: PluginHostPayload = { enabled: false }
 ) {
   return {
     source_resource: 'plugin-views',
-    views: views.map((view) => ({
-      plugin_id: view.pluginId,
-      view_id: view.declaration.id,
-      title_key: view.declaration.titleKey,
-      title: pluginViewTitle(view.declaration.titleKey, locale),
-      refresh: view.declaration.lifecycle.refresh,
-      actions: view.declaration.actions.map((action) => ({
-        id: action.id,
-        authority: action.authority,
-        op: action.op,
-      })),
-      messages: view.messages,
-    })),
+    host,
+    views: views.map((view) => {
+      const frame = view.declaration.isolation === 'sandboxed-iframe';
+      return {
+        plugin_id: view.pluginId,
+        view_id: view.declaration.id,
+        title_key: view.declaration.titleKey,
+        title: pluginViewTitle(view.declaration.titleKey, locale),
+        refresh: view.declaration.lifecycle.refresh,
+        isolation: view.declaration.isolation,
+        capabilities: [...view.declaration.capabilities],
+        actions: view.declaration.actions.map((action) => ({
+          id: action.id,
+          authority: action.authority,
+          op: action.op,
+        })),
+        messages: view.messages,
+        // The document itself is served by the frame route, never inlined.
+        ...(frame ? { frame_url: pluginViewFrameUrl(view.pluginId, view.declaration.id) } : {}),
+      };
+    }),
     // Codes only: load diagnostics can carry managed-copy paths.
     errors: errors.map((error) => ({
       plugin_id: error.pluginId,
@@ -104,8 +173,7 @@ export function buildPluginViewsPayload(
       params: request.params,
       status: request.status,
       requested_at: request.requestedAt,
-      // Chronos does not activate plugins in-process (FU-02 known gap), so an
-      // approved request is usually not executable here.
+      // Executable only when the Chronos plugin host runs the approved copy (PH-01).
       executable: request.executable,
       ...(request.unavailableReason ? { unavailable_reason: request.unavailableReason } : {}),
     })),
@@ -161,38 +229,69 @@ export function parsePluginViewActionInput(body: Record<string, unknown>): Plugi
 }
 
 /**
- * Resolves the requested view among the plugin views visible to the viewer
- * and dispatches the action — or, with `approval_request_id`, executes the
- * approved human action once. A plugin that exists but is not activatable
- * (pending approval, digest mismatch) is 403; a view the viewer cannot see
- * is 404 so its existence is not disclosed.
+ * One view among the plugin views visible to the viewer. A plugin that
+ * exists in the viewer's tenant scope but is not activatable (pending
+ * approval, digest mismatch) is 403; a view the viewer cannot see — also any
+ * plugin of another tenant — is 404 so its existence is not disclosed.
  */
-export async function runPluginViewAction(
+export function findVisiblePluginView(
   viewer: ViewerContext,
-  input: PluginViewActionInput,
+  pluginId: string,
+  viewId: string,
   listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
-): Promise<PluginViewActionOutcome> {
+): LoadedPluginView {
   const scope = viewerForPluginViews(viewer).tenantSlugs;
   const record = listRecords().find(
     (entry) =>
-      entry.pluginId === input.plugin_id &&
+      entry.pluginId === pluginId &&
       // Another tenant's plugin is "not found", whatever its status.
       (!entry.tenantSlug || scope === 'all' || scope.includes(entry.tenantSlug))
   );
   if (record && record.activationStatus !== 'activatable') {
     throw new PluginViewError(
       'PLUGIN_VIEW_DENIED',
-      `plugin '${input.plugin_id}' is not activatable (status=${record.activationStatus})`
+      `plugin '${pluginId}' is not activatable (status=${record.activationStatus})`
     );
   }
   const { views } = readVisiblePluginViews(viewer, {}, () => (record ? [record] : []));
-  const view = views.find((candidate) => candidate.declaration.id === input.view_id);
+  const view = views.find((candidate) => candidate.declaration.id === viewId);
   if (!view) {
     throw new PluginViewError(
       'PLUGIN_VIEW_NOT_FOUND',
-      `view '${input.plugin_id}/${input.view_id}' is not available`
+      `view '${pluginId}/${viewId}' is not available`
     );
   }
+  return view;
+}
+
+/** PH-02: the validated document of a visible `sandboxed-iframe` view. */
+export function readVisiblePluginViewFrame(
+  viewer: ViewerContext,
+  pluginId: string,
+  viewId: string,
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+): string {
+  const view = findVisiblePluginView(viewer, pluginId, viewId, listRecords);
+  if (view.declaration.isolation !== 'sandboxed-iframe' || typeof view.html !== 'string') {
+    throw new PluginViewError(
+      'PLUGIN_VIEW_NOT_FOUND',
+      `view '${pluginId}/${viewId}' has no frame document`
+    );
+  }
+  return view.html;
+}
+
+/**
+ * Resolves the requested view among the plugin views visible to the viewer
+ * (`findVisiblePluginView`) and dispatches the action — or, with
+ * `approval_request_id`, executes the approved human action once.
+ */
+export async function runPluginViewAction(
+  viewer: ViewerContext,
+  input: PluginViewActionInput,
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+): Promise<PluginViewActionOutcome> {
+  const view = findVisiblePluginView(viewer, input.plugin_id, input.view_id, listRecords);
   const resolved = resolvePluginViewAction(view, input.action_id, input.params);
   if (input.approval_request_id) {
     return executeApprovedPluginViewAction(resolved, input.approval_request_id, {
