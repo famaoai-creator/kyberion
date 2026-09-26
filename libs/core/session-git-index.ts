@@ -9,6 +9,9 @@
  * stops a worker from committing with its private index anyway, so dispose
  * brings the shared index up to the moved HEAD for the paths those commits
  * changed — otherwise the owner's next commit would silently revert them.
+ * A reconcile that keeps failing (another git process holding `index.lock`)
+ * is audited as failed and recorded on the ledger entry as pending; the entry
+ * is kept until a later dispose or the janitor sweep completes it.
  */
 
 import * as path from 'node:path';
@@ -21,6 +24,7 @@ import {
   annotateWorkspace,
   deleteRegisteredWorkspace,
   GIT_INDEXES_ROOT_SUBPATH,
+  listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
   type WorkspaceLedgerOptions,
@@ -28,8 +32,7 @@ import {
   type WorkspaceRecord,
 } from './workspace-ledger.js';
 import {
-  isPidAlive,
-  isProcessGroupAlive,
+  isRecordedChildAlive,
   processStartMarker,
   type ProcessIdentityProbe,
 } from './workspace-process-identity.js';
@@ -77,16 +80,35 @@ export interface PrepareSessionGitIndexOptions {
   processProbe?: ProcessIdentityProbe;
   /** Test seam: audit sink for shared-index reconciliation (defaults to the audit chain). */
   audit?: (entry: SharedIndexReconcileAudit) => void;
+  /** Test seam: `index.lock` retry schedule of the shared-index reconcile. */
+  reconcileRetry?: ReconcileRetryOptions;
 }
 
 export interface SharedIndexReconcileAudit {
   sessionId: string;
   fromSha: string | null;
-  toSha: string;
+  /** HEAD the shared index was moved to; null when the failure left it unknown. */
+  toSha: string | null;
+  result: 'completed' | 'failed';
   /** Paths whose shared-index entry was moved to the new HEAD. */
   updated: string[];
   /** Paths left alone because the shared index held other staged work for them. */
   skipped: string[];
+  error?: string;
+}
+
+export interface ReconcileRetryOptions {
+  /** Waits (ms) before each retry while another git process holds `index.lock`. */
+  delaysMs?: number[];
+  /** Synchronous wait; defaults to a blocking sleep. */
+  sleep?: (ms: number) => void;
+}
+
+const INDEX_LOCK_RETRY_DELAYS_MS = [50, 150, 400];
+const INDEX_LOCKED = /index\.lock/;
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -183,13 +205,8 @@ function sameEntry(a: TreeEntry | null | undefined, b: TreeEntry | null): boolea
   return b !== null && a.mode === b.mode && a.oid === b.oid;
 }
 
-function gitOrThrow(cwd: string, args: string[], input?: string): string {
-  const result = safeExecResult('git', args, {
-    cwd,
-    timeoutMs: 60_000,
-    maxOutputMB: 256,
-    ...(input !== undefined ? { input } : {}),
-  });
+function gitOrThrow(cwd: string, args: string[]): string {
+  const result = safeExecResult('git', args, { cwd, timeoutMs: 60_000, maxOutputMB: 256 });
   if (result.status !== 0) {
     throw new Error(`git ${args[0]} failed: ${result.stderr.trim() || String(result.status)}`);
   }
@@ -200,12 +217,16 @@ function gitOrThrow(cwd: string, args: string[], input?: string): string {
  * After HEAD moved from `fromSha` (commits made through a private index),
  * move every shared-index entry the commits changed to the new HEAD — only
  * where the shared entry still equals `fromSha`'s, so work another session
- * staged there is never clobbered. Returns null when HEAD did not move.
+ * staged there is never clobbered. The shared index is re-read right before
+ * each write attempt, and a write refused because another git process holds
+ * `index.lock` is retried on `retry.delaysMs`. Returns null when HEAD did not
+ * move; throws when the write still fails.
  */
 export function reconcileSharedIndex(
   repoRoot: string,
   fromSha: string | null,
-  sessionId: string
+  sessionId: string,
+  retry: ReconcileRetryOptions = {}
 ): SharedIndexReconcileAudit | null {
   const head = gitText(repoRoot, ['rev-parse', '--verify', '--quiet', 'HEAD']) || null;
   if (!head || head === fromSha) return null;
@@ -216,21 +237,43 @@ export function reconcileSharedIndex(
           ([file, entry]) => [file, [null, entry] as [TreeEntry | null, TreeEntry | null]]
         )
       );
-  const shared = parseIndex(gitOrThrow(repoRoot, ['ls-files', '-s', '-z']));
-  const updated: string[] = [];
-  const skipped: string[] = [];
-  let input = '';
-  for (const [file, [before, after]] of changes) {
-    if (!sameEntry(shared.get(file), before)) {
-      skipped.push(file);
-      continue;
+  const delays = retry.delaysMs ?? INDEX_LOCK_RETRY_DELAYS_MS;
+  const sleep = retry.sleep ?? sleepSync;
+  for (let attempt = 0; ; attempt += 1) {
+    const shared = parseIndex(gitOrThrow(repoRoot, ['ls-files', '-s', '-z']));
+    const updated: string[] = [];
+    const skipped: string[] = [];
+    let input = '';
+    for (const [file, [before, after]] of changes) {
+      if (!sameEntry(shared.get(file), before)) {
+        skipped.push(file);
+        continue;
+      }
+      const zero = '0'.repeat((after ?? before)?.oid.length ?? 40);
+      input += after ? `${after.mode} ${after.oid}\t${file}\0` : `0 ${zero}\t${file}\0`;
+      updated.push(file);
     }
-    const zero = '0'.repeat((after ?? before)?.oid.length ?? 40);
-    input += after ? `${after.mode} ${after.oid}\t${file}\0` : `0 ${zero}\t${file}\0`;
-    updated.push(file);
+    const done = {
+      sessionId,
+      fromSha,
+      toSha: head,
+      result: 'completed' as const,
+      updated,
+      skipped,
+    };
+    if (!input) return done;
+    const written = safeExecResult('git', ['update-index', '-z', '--index-info'], {
+      cwd: repoRoot,
+      timeoutMs: 60_000,
+      input,
+    });
+    if (written.status === 0) return done;
+    const stderr = written.stderr.trim();
+    if (!INDEX_LOCKED.test(stderr) || attempt >= delays.length) {
+      throw new Error(`git update-index failed: ${stderr || String(written.status)}`);
+    }
+    sleep(delays[attempt]);
   }
-  if (input) gitOrThrow(repoRoot, ['update-index', '-z', '--index-info'], input);
-  return { sessionId, fromSha, toSha: head, updated, skipped };
 }
 
 function defaultReconcileAudit(entry: SharedIndexReconcileAudit): void {
@@ -238,10 +281,79 @@ function defaultReconcileAudit(entry: SharedIndexReconcileAudit): void {
     agentId: 'session-git-index',
     action: 'shared_index_reconcile',
     operation: 'dispose',
-    result: 'completed',
-    reason: `HEAD moved from ${entry.fromSha ?? '(none)'} to ${entry.toSha} during session ${entry.sessionId}`,
+    result: entry.result,
+    reason:
+      entry.result === 'completed'
+        ? `HEAD moved from ${entry.fromSha ?? '(none)'} to ${entry.toSha ?? '(unknown)'} during session ${entry.sessionId}`
+        : `shared index not reconciled after session ${entry.sessionId}: ${entry.error ?? 'unknown error'}`,
     metadata: { ...entry },
   });
+}
+
+export interface RunReconcileOptions {
+  audit?: (entry: SharedIndexReconcileAudit) => void;
+  retry?: ReconcileRetryOptions;
+}
+
+/**
+ * One audited reconcile of the shared index from `fromSha`. `ok` is false
+ * when it failed (audited with result `failed`); `sha` is the HEAD the
+ * shared index now follows.
+ */
+export function runSharedIndexReconcile(
+  repoRoot: string,
+  fromSha: string | null,
+  sessionId: string,
+  options: RunReconcileOptions = {}
+): { ok: boolean; sha: string | null } {
+  const audit = options.audit ?? defaultReconcileAudit;
+  const record = (entry: SharedIndexReconcileAudit) => {
+    try {
+      audit(entry);
+    } catch (error) {
+      logger.warn(`reconcile audit failed: ${errorText(error)}`);
+    }
+  };
+  try {
+    const result = reconcileSharedIndex(repoRoot, fromSha, sessionId, options.retry);
+    if (!result) return { ok: true, sha: fromSha };
+    logger.warn(
+      `HEAD moved to ${result.toSha} during session ${sessionId}; shared index updated for ${result.updated.length} path(s), ${result.skipped.length} with other staged work left alone`
+    );
+    record(result);
+    return { ok: true, sha: result.toSha };
+  } catch (error) {
+    logger.warn(`shared index reconcile failed for ${sessionId}: ${errorText(error)}`);
+    record({
+      sessionId,
+      fromSha,
+      toSha: null,
+      result: 'failed',
+      updated: [],
+      skipped: [],
+      error: errorText(error),
+    });
+    return { ok: false, sha: fromSha };
+  }
+}
+
+/**
+ * Complete the pending reconcile recorded on a git-index ledger entry (janitor
+ * sweep / a later dispose). Returns true when nothing is pending any more.
+ */
+export function retryPendingSharedIndexReconcile(
+  record: WorkspaceRecord,
+  ledger: WorkspaceLedgerOptions = {},
+  options: RunReconcileOptions = {}
+): boolean {
+  const pending = record.pendingReconcile;
+  if (!pending) return true;
+  const sessionId = record.owner.session_id ?? record.id;
+  if (!runSharedIndexReconcile(pending.repoRoot, pending.fromSha, sessionId, options).ok) {
+    return false;
+  }
+  annotateWorkspace(record.id, { pendingReconcile: null }, ledger);
+  return true;
 }
 
 /**
@@ -302,30 +414,55 @@ export function prepareSessionGitIndex(
     seedIndex(resolvedRoot, indexPath, baselineSha);
 
     const id = record.id;
-    const audit = options.audit ?? defaultReconcileAudit;
-    const childAlive = (pid: number): boolean =>
-      (probe.isPidAlive ?? isPidAlive)(pid) || (!probe.isPidAlive && isProcessGroupAlive(pid));
+    const reconcileOptions: RunReconcileOptions = {
+      ...(options.audit ? { audit: options.audit } : {}),
+      ...(options.reconcileRetry ? { retry: options.reconcileRetry } : {}),
+    };
+    const startMarker = probe.startMarker ?? processStartMarker;
     let reconciledSha = baselineSha;
-    let attachedChild: number | undefined;
+    let pendingRecorded = false;
+    let attachedChild: { childPid: number; childStartedAt?: string } | undefined;
     let released: WorkspaceRecord | null = null;
     let finished = false;
 
-    const reconcile = () => {
-      try {
-        const result = reconcileSharedIndex(resolvedRoot, reconciledSha, sessionId);
-        if (!result) return;
-        reconciledSha = result.toSha;
-        logger.warn(
-          `HEAD moved to ${result.toSha} during session ${sessionId}; shared index updated for ${result.updated.length} path(s), ${result.skipped.length} with other staged work left alone`
-        );
-        try {
-          audit(result);
-        } catch (error) {
-          logger.warn(`reconcile audit failed: ${errorText(error)}`);
+    const currentRecord = () => listWorkspaces(ledger).find((candidate) => candidate.id === id);
+    const childOf = (pid: number) => {
+      const childStartedAt = startMarker(pid);
+      return { childPid: pid, ...(childStartedAt ? { childStartedAt } : {}) };
+    };
+
+    // Reconcile this session's commits; on failure keep it pending in the ledger.
+    const reconcileOwn = (): boolean => {
+      const outcome = runSharedIndexReconcile(
+        resolvedRoot,
+        reconciledSha,
+        sessionId,
+        reconcileOptions
+      );
+      reconciledSha = outcome.sha;
+      if (outcome.ok) {
+        if (pendingRecorded) {
+          annotateWorkspace(id, { pendingReconcile: null }, ledger);
+          pendingRecorded = false;
         }
-      } catch (error) {
-        logger.warn(`shared index reconcile failed for ${sessionId}: ${errorText(error)}`);
+        return true;
       }
+      // An inherited pending reconcile starts from an older HEAD and covers ours.
+      if (pendingRecorded || !currentRecord()?.pendingReconcile) {
+        annotateWorkspace(
+          id,
+          { pendingReconcile: { repoRoot: resolvedRoot, fromSha: reconciledSha } },
+          ledger
+        );
+        pendingRecorded = true;
+      }
+      return false;
+    };
+
+    // A reconcile left pending by an earlier occupant of this ledger entry.
+    const settleInherited = (): boolean => {
+      const current = currentRecord();
+      return !current || retryPendingSharedIndexReconcile(current, ledger, reconcileOptions);
     };
 
     return {
@@ -337,17 +474,17 @@ export function prepareSessionGitIndex(
       env: { GIT_INDEX_FILE: indexPath },
       attachChild: (pid) => {
         if (pid === undefined || !Number.isInteger(pid) || pid <= 0) return;
-        attachedChild = pid;
+        attachedChild = childOf(pid);
         try {
-          annotateWorkspace(id, { childPid: pid }, ledger);
+          annotateWorkspace(id, attachedChild, ledger);
         } catch (error) {
           logger.warn(`could not record child ${pid} of ${sessionId}: ${errorText(error)}`);
         }
       },
       dispose: (disposeOptions = {}) => {
         if (finished) return;
-        reconcile();
         try {
+          const reconciled = reconcileOwn();
           if (!released) {
             released = releaseWorkspace(id, ledger, { bytes: realIndexBytes(indexPath) });
             if (!released) {
@@ -355,11 +492,21 @@ export function prepareSessionGitIndex(
               return;
             }
           }
-          const childPid = disposeOptions.childPid ?? attachedChild;
-          if (childPid !== undefined && childAlive(childPid)) {
-            if (childPid !== attachedChild) annotateWorkspace(id, { childPid }, ledger);
+          if (!reconciled || !settleInherited()) {
             logger.warn(
-              `child ${childPid} of ${sessionId} may still use ${indexPath}; kept for the janitor sweep`
+              `shared index reconcile pending for ${sessionId}; ${indexPath} kept for a later dispose or the janitor sweep`
+            );
+            return;
+          }
+          const child =
+            disposeOptions.childPid === undefined ||
+            disposeOptions.childPid === attachedChild?.childPid
+              ? attachedChild
+              : childOf(disposeOptions.childPid);
+          if (child && isRecordedChildAlive(child, probe)) {
+            if (child !== attachedChild) annotateWorkspace(id, child, ledger);
+            logger.warn(
+              `child ${child.childPid} of ${sessionId} may still use ${indexPath}; kept for the janitor sweep`
             );
             return;
           }

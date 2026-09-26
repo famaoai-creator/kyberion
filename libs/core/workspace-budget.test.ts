@@ -17,6 +17,7 @@ import {
   type WorkspaceBudgetOptions,
 } from './workspace-budget.js';
 import {
+  annotateWorkspace,
   listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
@@ -175,6 +176,42 @@ describe('workspace-budget', () => {
     safeWriteFile(path.join(dir, 'blob.bin'), 'x'.repeat(900));
     const worktree = registerWorkspace({ path: dir, kind: 'git-worktree', owner: {} }, options);
     releaseWorkspace(worktree.id, options);
+    const result = checkWorkspaceBudget(base, 200, options);
+    expect(result).toMatchObject({ allowed: false, reason: 'cap-exceeded', reclaimed: [] });
+    expect(safeExistsSync(dir)).toBe(true);
+  });
+
+  it('never reclaims a released git index whose delegated child still runs', () => {
+    const gitIndex = (name: string, child: { childPid: number; childStartedAt: string }) => {
+      const dir = path.join(base, 'workspaces', name);
+      safeWriteFile(path.join(dir, 'index'), 'x'.repeat(300));
+      const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+      clock += 1000;
+      releaseWorkspace(record.id, options);
+      annotateWorkspace(record.id, child, options);
+      return record;
+    };
+    const running = gitIndex('running', { childPid: 501, childStartedAt: 'child-501' });
+    const exited = gitIndex('exited', { childPid: 502, childStartedAt: 'child-502' });
+    const recycled = gitIndex('recycled', { childPid: 503, childStartedAt: 'child-503' });
+    const result = checkWorkspaceBudget(base, 800, {
+      ...options,
+      processProbe: {
+        isPidAlive: (pid) => pid !== 502,
+        startMarker: (pid) => (pid === 503 ? 'someone-else' : `child-${pid}`),
+      },
+    });
+    expect(result.reclaimed).toEqual([exited.id, recycled.id]);
+    expect(safeExistsSync(running.path)).toBe(true);
+    expect(listWorkspaces(options).map((record) => record.id)).toEqual([running.id]);
+  });
+
+  it('never reclaims a git index whose shared-index reconcile is pending', () => {
+    const dir = path.join(base, 'workspaces', 'pending');
+    safeWriteFile(path.join(dir, 'index'), 'x'.repeat(900));
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    releaseWorkspace(record.id, options);
+    annotateWorkspace(record.id, { pendingReconcile: { repoRoot: base, fromSha: null } }, options);
     const result = checkWorkspaceBudget(base, 200, options);
     expect(result).toMatchObject({ allowed: false, reason: 'cap-exceeded', reclaimed: [] });
     expect(safeExistsSync(dir)).toBe(true);

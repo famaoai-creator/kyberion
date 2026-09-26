@@ -93,6 +93,8 @@ function assertMissionOwnerPath(action: string): void {
  * commit is built with write-tree + commit-tree and HEAD is advanced with a
  * compare-and-swap `update-ref`, so a HEAD that moves between the check and
  * the update still fails closed (commit hooks do not run on this path).
+ * No production caller yet: the owner-side commit flow (mission_controller)
+ * is not wired to it, so today a session index is only reconciled on dispose.
  */
 export function commitFromSessionIndex(
   idx: SessionGitIndex,
@@ -141,12 +143,14 @@ export function commitFromSessionIndex(
     .split('\0')
     .filter(Boolean);
   // Bring the shared index in line with the new HEAD for the committed paths
-  // only, leaving anything else staged there untouched.
+  // only, leaving anything else staged there untouched. Literal pathspecs: a
+  // committed path containing `*?[` or `:(` must not match other paths.
   if (paths.length > 0) {
-    safeExec('git', ['reset', '-q', sha, '--pathspec-from-file=-', '--pathspec-file-nul'], {
-      cwd,
-      input: `${paths.join('\0')}\0`,
-    });
+    safeExec(
+      'git',
+      ['--literal-pathspecs', 'reset', '-q', sha, '--pathspec-from-file=-', '--pathspec-file-nul'],
+      { cwd, input: `${paths.join('\0')}\0` }
+    );
   }
   return { sha, paths };
 }

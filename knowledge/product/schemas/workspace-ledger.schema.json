@@ -27,7 +27,17 @@
       "bytes": { "type": "number", "minimum": 0 },
       "pid": { "type": "integer", "minimum": 1 },
       "pidStartedAt": { "type": "string", "minLength": 1 },
-      "childPid": { "type": "integer", "minimum": 1 }
+      "childPid": { "type": "integer", "minimum": 1 },
+      "childStartedAt": { "type": "string", "minLength": 1 },
+      "pendingReconcile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "repoRoot": { "type": "string", "minLength": 1 },
+          "fromSha": { "type": ["string", "null"] }
+        },
+        "required": ["repoRoot", "fromSha"]
+      }
     },
     "required": ["id", "path", "kind", "owner", "createdAt", "live"]
   }

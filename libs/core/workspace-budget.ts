@@ -18,6 +18,7 @@ import {
   type WorkspaceLedgerOptions,
   type WorkspaceRecord,
 } from './workspace-ledger.js';
+import { isRecordedChildAlive, type ProcessIdentityProbe } from './workspace-process-identity.js';
 
 export interface WorkspaceBudgetPolicy {
   /** Total bytes allowed across registered workspaces; 0 disables the cap. */
@@ -154,6 +155,8 @@ export interface WorkspaceBudgetOptions extends WorkspaceLedgerOptions {
   /** Test seam for the free-space probe. */
   statfs?: (targetPath: string) => { freeBytes: number };
   measure?: (targetPath: string) => number;
+  /** Test seam: liveness probes for the delegated child of a git-index record. */
+  processProbe?: ProcessIdentityProbe;
 }
 
 function nearestExistingDir(targetDir: string): string {
@@ -169,12 +172,25 @@ function nearestExistingDir(targetDir: string): string {
 /**
  * Released workspaces eligible for inline reclaim, oldest first. Git
  * worktrees are left to the janitor sweep, which honours the orphan TTL and
- * refuses worktrees with unsaved work.
+ * refuses worktrees with unsaved work. A released git index is kept while
+ * its delegated child still runs (dispose leaves it for exactly that reason)
+ * or while its shared-index reconcile is still pending.
  */
-function releasedOldestFirst(records: WorkspaceRecord[]): WorkspaceRecord[] {
+function releasedOldestFirst(
+  records: WorkspaceRecord[],
+  probe: ProcessIdentityProbe = {}
+): WorkspaceRecord[] {
   const key = (record: WorkspaceRecord) => Date.parse(record.releasedAt ?? record.createdAt) || 0;
   return records
-    .filter((record) => !record.live && record.kind !== 'git-worktree')
+    .filter(
+      (record) =>
+        !record.live &&
+        record.kind !== 'git-worktree' &&
+        !(
+          record.kind === 'git-index' &&
+          (record.pendingReconcile || isRecordedChildAlive(record, probe))
+        )
+    )
     .sort((a, b) => key(a) - key(b));
 }
 
@@ -196,7 +212,7 @@ export function checkWorkspaceBudget(
     records.map((record) => [record.id, record.bytes ?? measure(record.path)] as const)
   );
   let usedBytes = [...sizes.values()].reduce((sum, bytes) => sum + bytes, 0);
-  const reclaimable = releasedOldestFirst(records);
+  const reclaimable = releasedOldestFirst(records, options.processProbe);
   const reclaimed: string[] = [];
 
   // One record that vanished, changed or refuses deletion never aborts the check.

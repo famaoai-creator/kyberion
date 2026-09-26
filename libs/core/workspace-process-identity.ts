@@ -1,7 +1,12 @@
 /**
  * Process identity for workspace ledger records: a pid plus its start marker
  * (`ps -o lstart=`), so a recycled pid is never mistaken for the process that
- * registered a workspace.
+ * registered a workspace (or the delegated child using it).
+ *
+ * The marker is the raw `ps` output under `LC_ALL=C` / `TZ=UTC`, compared as
+ * an opaque string: parsing it would depend on the locale and time zone of
+ * whichever process reads it. Where no marker can be read (win32, a busybox
+ * `ps` without `lstart`), liveness falls back to plain pid existence.
  */
 
 import { safeExecResult } from './secure-io.js';
@@ -40,11 +45,10 @@ export function processStartMarker(pid: number): string | undefined {
     const result = safeExecResult('ps', ['-p', String(pid), '-o', 'lstart='], {
       timeoutMs: 1000,
       maxOutputMB: 1,
+      env: { LC_ALL: 'C', TZ: 'UTC' },
     });
-    const parsed = Date.parse(result.stdout.trim());
-    return result.status === 0 && Number.isFinite(parsed)
-      ? new Date(parsed).toISOString()
-      : undefined;
+    const marker = result.stdout.trim();
+    return result.status === 0 && marker.length > 0 ? marker : undefined;
   } catch {
     return undefined;
   }
@@ -64,4 +68,26 @@ export function isRecordedProcessAlive(
   if (!alive || !startedAt) return alive;
   const current = (probe.startMarker ?? processStartMarker)(pid);
   return current === undefined || current === startedAt;
+}
+
+export interface RecordedChild {
+  childPid?: number;
+  childStartedAt?: string;
+}
+
+/**
+ * Whether the delegated child recorded on a git-index workspace still runs:
+ * the recorded process itself (pid-reuse guarded), or any member of the
+ * process group it leads (a detached child's descendants keep the group, and
+ * a live group id is never handed out as a new pid). Injected probes replace
+ * the group check so tests stay hermetic.
+ */
+export function isRecordedChildAlive(
+  record: RecordedChild,
+  probe: ProcessIdentityProbe = {}
+): boolean {
+  const pid = record.childPid;
+  if (pid === undefined) return false;
+  if (isRecordedProcessAlive(pid, record.childStartedAt, probe)) return true;
+  return !probe.isPidAlive && isProcessGroupAlive(pid);
 }

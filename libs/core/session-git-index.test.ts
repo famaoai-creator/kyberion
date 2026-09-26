@@ -13,6 +13,7 @@ import {
 } from './secure-io.js';
 import { prepareSessionGitIndex, type PrepareSessionGitIndexOptions } from './session-git-index.js';
 import { listWorkspaces } from './workspace-ledger.js';
+import { sweepRegisteredWorkspaces } from './workspace-sweep.js';
 
 let base: string;
 let repo: string;
@@ -165,7 +166,24 @@ describe('prepareSessionGitIndex', () => {
       pid: process.pid,
       pidStartedAt: 'marker-1',
       childPid: 4321,
+      childStartedAt: 'marker-1',
     });
+  });
+
+  it('deletes the index once the recorded child pid was recycled by another process', () => {
+    let marker = 'child-start';
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-recycled' },
+      { ...options, processProbe: { isPidAlive: () => true, startMarker: () => marker } }
+    )!;
+    idx.attachChild(4321);
+    idx.dispose();
+    expect(safeExistsSync(idx.indexPath)).toBe(true);
+
+    marker = 'unrelated-process';
+    idx.dispose();
+    expect(safeExistsSync(path.dirname(idx.indexPath))).toBe(false);
+    expect(listWorkspaces(options.ledger)).toEqual([]);
   });
 
   it('keeps the index while the child may still run and deletes it on a later dispose', () => {
@@ -229,6 +247,97 @@ describe('dispose after a worker committed through its private index', () => {
     ]);
   });
 
+  function workerCommit(env: Record<string, string>): string {
+    safeWriteFile(path.join(repo, 'a.txt'), 'worker\n');
+    git(repo, ['add', 'a.txt'], env);
+    git(repo, ['commit', '-q', '-m', 'worker commit'], env);
+    return git(repo, ['rev-parse', 'HEAD']).trim();
+  }
+
+  function sharedEntry(file: string): string {
+    return git(repo, ['ls-files', '-s', file]).trim();
+  }
+
+  it('retries while another git process holds index.lock', () => {
+    const lock = path.join(repo, '.git', 'index.lock');
+    const sleep = vi.fn(() => safeRmSync(lock, { force: true }));
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-lock-retry' },
+      { ...options, audit: vi.fn(), reconcileRetry: { delaysMs: [1, 1, 1], sleep } }
+    )!;
+    workerCommit(idx.env);
+    safeWriteFile(lock, '');
+    idx.dispose();
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sharedEntry('a.txt')).toContain('a.txt');
+    expect(listWorkspaces(options.ledger)).toEqual([]);
+  });
+
+  it('audits a failed reconcile, keeps it pending and completes it on a later dispose', () => {
+    const lock = path.join(repo, '.git', 'index.lock');
+    const audit = vi.fn();
+    const sleep = vi.fn();
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-lock-held' },
+      { ...options, audit, reconcileRetry: { delaysMs: [1, 1, 1], sleep } }
+    )!;
+    const head = workerCommit(idx.env);
+    safeWriteFile(lock, '');
+    idx.dispose();
+    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'failed', fromSha: idx.baselineSha, toSha: null })
+    );
+    expect(safeExistsSync(idx.indexPath)).toBe(true);
+    expect(listWorkspaces(options.ledger)[0]).toMatchObject({
+      live: false,
+      pendingReconcile: { repoRoot: idx.repoRoot, fromSha: idx.baselineSha },
+    });
+    expect(sharedEntry('a.txt')).toBe('');
+
+    safeRmSync(lock, { force: true });
+    idx.dispose();
+    expect(audit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ result: 'completed', toSha: head, updated: ['a.txt'] })
+    );
+    expect(sharedEntry('a.txt')).toContain('a.txt');
+    expect(listWorkspaces(options.ledger)).toEqual([]);
+  });
+
+  it('lets the janitor sweep complete a pending reconcile before reclaiming the index', () => {
+    const lock = path.join(repo, '.git', 'index.lock');
+    const audit = vi.fn();
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-lock-sweep' },
+      { ...options, audit, reconcileRetry: { delaysMs: [], sleep: vi.fn() } }
+    )!;
+    workerCommit(idx.env);
+    safeWriteFile(lock, '');
+    idx.dispose();
+    const sweep = () =>
+      sweepRegisteredWorkspaces({
+        ledgerPath: options.ledger?.ledgerPath,
+        allowedRoots: options.ledger?.allowedRoots,
+        dryRun: false,
+        orphanTtlHours: 0,
+        processProbe: { isPidAlive: () => false },
+        reconcile: { audit, retry: { delaysMs: [], sleep: vi.fn() } },
+        measure: () => 0,
+      });
+
+    const blocked = sweep();
+    expect(blocked.deleted).toEqual([]);
+    expect(blocked.errors.join('\n')).toMatch(/reconcile pending/);
+    expect(safeExistsSync(idx.indexPath)).toBe(true);
+
+    safeRmSync(lock, { force: true });
+    const swept = sweep();
+    expect(swept.errors).toEqual([]);
+    expect(swept.deleted.map((record) => record.id)).toEqual([idx.workspaceId]);
+    expect(sharedEntry('a.txt')).toContain('a.txt');
+    expect(audit).toHaveBeenLastCalledWith(expect.objectContaining({ result: 'completed' }));
+  });
+
   it('does nothing when HEAD did not move', () => {
     const audit = vi.fn();
     const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-still' }, { ...options, audit })!;
@@ -264,6 +373,17 @@ describe('commitFromSessionIndex', () => {
     expect(result.paths).toEqual(['a.txt']);
     expect(git(repo, ['show', '--name-only', '--format=', 'HEAD']).trim()).toBe('a.txt');
     expect(stagedNames(repo)).toEqual(['other.txt']);
+  });
+
+  it('refreshes committed paths literally, never as glob patterns', () => {
+    safeWriteFile(path.join(repo, 'a*.txt'), 'star\n');
+    safeWriteFile(path.join(repo, 'ab.txt'), 'owner\n');
+    git(repo, ['add', 'ab.txt']);
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-literal' }, options)!;
+    git(repo, ['--literal-pathspecs', 'add', 'a*.txt'], idx.env);
+    const result = commitFromSessionIndex(idx, 'feat: star');
+    expect(result.paths).toEqual(['a*.txt']);
+    expect(stagedNames(repo)).toEqual(['ab.txt']);
   });
 
   it('fails closed when HEAD moves between the check and the ref update', () => {

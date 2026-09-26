@@ -10,6 +10,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import {
+  annotateWorkspace,
   listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
@@ -120,6 +121,22 @@ describe('sweepRegisteredWorkspaces', () => {
 
     const reclaimed = sweepRegisteredWorkspaces(sweepOptions());
     expect(reclaimed.deleted.map((r) => r.id)).toEqual([idx.id]);
+  });
+
+  it('reclaims a git index whose recorded child pid now belongs to another process', () => {
+    const idx = gitIndex('child-recycled', { pid: 301 });
+    releaseWorkspace(idx.id, ledger);
+    annotateWorkspace(idx.id, { childPid: 302, childStartedAt: 'child-302' }, ledger);
+    clock = T0 + 48 * HOUR;
+    const alive = (marker: string) =>
+      sweepRegisteredWorkspaces(
+        sweepOptions({
+          dryRun: true,
+          processProbe: { isPidAlive: (pid) => pid === 302, startMarker: () => marker },
+        })
+      );
+    expect(alive('child-302').orphaned).toEqual([]);
+    expect(alive('someone-else').orphaned.map((r) => r.id)).toEqual([idx.id]);
   });
 
   it('refuses to delete a record re-registered after the sweep took its snapshot', () => {
