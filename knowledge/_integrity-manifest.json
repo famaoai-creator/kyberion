@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 17024,
+      "size": 17238,
       "type": "md"
     },
     {
@@ -1293,7 +1293,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 14029,
+      "size": 14101,
       "type": "json"
     },
     {
@@ -1335,7 +1335,7 @@
     {
       "path": "product/governance/authority-roles/chronos_token_registry_reader.json",
       "tier": "public",
-      "size": 535,
+      "size": 607,
       "type": "json"
     },
     {
@@ -3537,7 +3537,7 @@
     {
       "path": "product/governance/role-assumption-policy.json",
       "tier": "public",
-      "size": 13878,
+      "size": 13438,
       "type": "json"
     },
     {

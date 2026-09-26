@@ -26,13 +26,8 @@
       "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. Chronos viewer-scoped routes assume chronos_localadmin / chronos_operator (withViewerExecutionContext*, plugin-host-boot tenant registry reads); chronos_token_registry_reader: lib/viewer-context.ts and lib/api-guard.ts read the chronos-access viewer token registry (its only grant) to resolve bearer/cookie tokens, plus libs/core authn-providers (registry-token provider); generation_scheduler via libs/core generation-scheduler. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, plugin-view-actions, surface-mission-proposals (plugin approvals and dispatch); ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core authn-providers (viewer principal registry), browser-onboarding, slack-onboarding, tool-runtime-policy."
     },
     "computer_surface": {
-      "may_assume": [
-        "chronos_token_registry_reader",
-        "ecosystem_architect",
-        "mission_controller",
-        "sovereign_concierge"
-      ],
-      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. chronos_token_registry_reader: libs/core authn-providers (registry-token provider reads the chronos-access viewer token registry, its only grant). ecosystem_architect: presence/displays/computer-surface/server.ts (/api/identity) and libs/core storage-janitor. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; sovereign_concierge: libs/core authn-providers, browser-onboarding, tool-runtime-policy."
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. ecosystem_architect: presence/displays/computer-surface/server.ts (/api/identity) and libs/core storage-janitor. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; sovereign_concierge: libs/core authn-providers, browser-onboarding, tool-runtime-policy."
     },
     "concierge": {
       "may_assume": [
@@ -66,13 +61,8 @@
       "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. scripts/oauth_callback_surface.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
     },
     "presence_studio": {
-      "may_assume": [
-        "chronos_token_registry_reader",
-        "ecosystem_architect",
-        "mission_controller",
-        "sovereign_concierge"
-      ],
-      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. chronos_token_registry_reader: libs/core authn-providers (registry-token provider reads the chronos-access viewer token registry, its only grant). Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts), plus libs/core authn-providers, browser-onboarding, slack-onboarding, tool-runtime-policy, background-review-patch, deployment-adapter, storage-janitor. mission_controller: hearing-mission-routes.ts and libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals."
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts), plus libs/core authn-providers, browser-onboarding, slack-onboarding, tool-runtime-policy, background-review-patch, deployment-adapter, storage-janitor. mission_controller: hearing-mission-routes.ts and libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals."
     },
     "slack_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
