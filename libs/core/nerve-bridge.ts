@@ -1,4 +1,3 @@
-import { appendJsonLine } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 /**
@@ -14,9 +13,9 @@ import * as os from 'node:os';
 import { createLogger } from './logger.js';
 import { subscribeJsonl } from './jsonl-tail.js';
 import {
+  appendStimulus,
   isStimulusExpired,
   normalizeNerveMessage,
-  rotateStimuliJournalIfNeeded,
   stimuliJournalPath,
 } from './stimuli-journal.js';
 
@@ -68,8 +67,8 @@ export function sendNerveMessage(input: {
   };
 
   try {
-    appendJsonLine(stimuliJournalPath(), msg);
-    rotateStimuliJournalIfNeeded();
+    // SB-01: append + rotation as the journal's store-writer role.
+    appendStimulus(msg);
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
   } catch (err) {
     logger.warn(`[nerve-bridge] suppressed error in sendNerveMessage: ${err}`);
