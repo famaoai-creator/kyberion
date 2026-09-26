@@ -1375,6 +1375,14 @@
       "types": "./dist/image-description-bridge.d.ts",
       "default": "./dist/image-description-bridge.js"
     },
+    "./image-dhash": {
+      "types": "./dist/image-dhash.d.ts",
+      "default": "./dist/image-dhash.js"
+    },
+    "./dirty-tile-describer": {
+      "types": "./dist/dirty-tile-describer.d.ts",
+      "default": "./dist/dirty-tile-describer.js"
+    },
     "./visual-workflow-compiler": {
       "types": "./dist/visual-workflow-compiler.d.ts",
       "default": "./dist/visual-workflow-compiler.js"

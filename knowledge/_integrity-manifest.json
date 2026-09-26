@@ -3663,7 +3663,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 19212,
+      "size": 19426,
       "type": "json"
     },
     {
@@ -4023,7 +4023,7 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 537,
+      "size": 551,
       "type": "json"
     },
     {
@@ -4153,6 +4153,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/yt_dlp.json",
+      "tier": "public",
+      "size": 3210,
+      "type": "json"
+    },
+    {
       "path": "product/governance/track-creation-policy.json",
       "tier": "public",
       "size": 10027,
@@ -4180,6 +4186,12 @@
       "path": "product/governance/video-composition-template-registry.json",
       "tier": "public",
       "size": 3018,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/video-ingest-policy.json",
+      "tier": "public",
+      "size": 858,
       "type": "json"
     },
     {
@@ -11752,6 +11764,12 @@
       "path": "product/schemas/video-generation-adf.schema.json",
       "tier": "public",
       "size": 1869,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/video-ingest-policy.schema.json",
+      "tier": "public",
+      "size": 1150,
       "type": "json"
     },
     {
