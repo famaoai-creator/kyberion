@@ -8,7 +8,13 @@
  *
  * This is plain module state rather than a capability seam: foundation must
  * not depend on the domain-layer seam catalog.
+ *
+ * FU-01: `runWithClock` binds a clock for one async context only (a scenario
+ * run), so concurrent work elsewhere in the process keeps real wall time.
+ * Resolution order: async-scoped clock, then `setClock`, then system.
  */
+
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface KyberionClock {
   now(): number;
@@ -19,10 +25,16 @@ export const systemClock: KyberionClock = {
 };
 
 let boundClock: KyberionClock | undefined;
+const scopedClock = new AsyncLocalStorage<KyberionClock>();
 
 /** Currently bound clock; falls back to the real system clock when nothing is bound. */
 export function getClock(): KyberionClock {
-  return boundClock ?? systemClock;
+  return scopedClock.getStore() ?? boundClock ?? systemClock;
+}
+
+/** Run `fn` (and all async work it starts) with `clock` as the current clock. */
+export function runWithClock<T>(clock: KyberionClock, fn: () => T): T {
+  return scopedClock.run(clock, fn);
 }
 
 /**

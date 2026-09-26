@@ -20,7 +20,10 @@
  * FU-01: every seam above acts only inside this run's async scope
  * (`runInScope`, see scenario-run-scope.ts). Calls from anywhere else in the
  * process see the normal op resolution, the canonical approval handler and
- * the previously bound reasoning backend, and are not recorded. A risky
+ * the previously bound reasoning backend, and are not recorded as side
+ * effects; in the simulated profile a dispatch with no scenario scope at all
+ * is recorded as a `scope_lost` warning (it may be run work whose async
+ * context was lost). A risky
  * approval is granted only to a request made while a fixture handler serves
  * that same op.
  */
@@ -58,10 +61,12 @@ import {
 import {
   appendScenarioApproval,
   appendScenarioOp,
+  appendScenarioWarning,
   appendScenarioWrite,
   createScenarioSideEffectLog,
   type ScenarioOpRecord,
   type ScenarioSideEffectLog,
+  type ScenarioWarningRecord,
 } from './scenario-side-effect-log.js';
 import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 
@@ -70,6 +75,7 @@ export type {
   ScenarioOpRecord,
   ScenarioReasoningRecord,
   ScenarioSideEffectLog,
+  ScenarioWarningRecord,
   ScenarioWriteRecord,
 } from './scenario-side-effect-log.js';
 
@@ -192,6 +198,13 @@ export function installScenarioInterceptor(
   let disposed = false;
   const scopeId = `${ctx.runId}:${crypto.randomBytes(8).toString('hex')}`;
   const inScope = (): boolean => getActiveScenarioRunId() === scopeId;
+  // FU-01: in the simulated profile, a dispatch with no scenario scope at all
+  // may be run work that lost its async context (and so escaped the fixtures).
+  // Unrelated host work is never blocked, but the leak is surfaced.
+  const noteScopeLost = (op: string, source: ScenarioWarningRecord['source']): void => {
+    if (def.executionProfile !== 'simulated' || getActiveScenarioRunId() !== undefined) return;
+    appendScenarioWarning(log, { kind: 'scope_lost', op, source });
+  };
 
   const decisionFor = (op: string): ScenarioApprovalDecision => decisions.get(op) ?? 'pending';
   const fixtureFor = (op: string): ScenarioOpFixture | undefined =>
@@ -224,7 +237,10 @@ export function installScenarioInterceptor(
         id: SCENARIO_CAPTURE_LISTENER_ID,
         order: Number.MIN_SAFE_INTEGER,
         run: (call) => {
-          if (!inScope()) return undefined;
+          if (!inScope()) {
+            noteScopeLost(call.op, call.source);
+            return undefined;
+          }
           const record = appendScenarioOp(log, {
             op: call.op,
             stage: 'preflight',
@@ -261,7 +277,10 @@ export function installScenarioInterceptor(
     disposers.push(
       registerScenarioOpOverride({
         resolve(request: ScenarioOpOverrideRequest) {
-          if (!inScope()) return undefined;
+          if (!inScope()) {
+            if (request.purpose === 'dispatch') noteScopeLost(request.op, 'op-dispatch');
+            return undefined;
+          }
           const fixture = fixtureFor(request.op);
           if (fixture) return { handler: fixtureHandler(request.op, fixture) };
           if (def.executionProfile !== 'simulated' || passthrough.has(request.op)) {

@@ -9201,7 +9201,7 @@
     {
       "path": "product/schemas/kyberion-scenario-report.schema.json",
       "tier": "public",
-      "size": 3230,
+      "size": 3911,
       "type": "json"
     },
     {
@@ -12159,7 +12159,7 @@
     {
       "path": "product/voice/realtime-voice-conversation-operations.md",
       "tier": "public",
-      "size": 11076,
+      "size": 11671,
       "type": "md"
     },
     {
