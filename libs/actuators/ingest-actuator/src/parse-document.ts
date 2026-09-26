@@ -3,8 +3,10 @@
  *
  * Pure capture: reads the raw input (file path / base64 / text), parses it
  * with the vendored libraries (mammoth for docx, pdf-parse for pdf, exceljs
- * for xlsx, a minimal deterministic converter for html — turndown is not
- * vendored) and returns the intermediate representation. Never writes into
+ * for xlsx, the native PPTX engine for pptx, a minimal deterministic
+ * converter for html — turndown is not vendored) and returns the
+ * intermediate representation. PPTX image OCR is opt-in (`ocr: true`) and
+ * local-only: board and report decks carry their figures as pasted images. Never writes into
  * knowledge/ — the knowledge landing is DA-05's ingest:commit.
  *
  * content_sha256 is computed over the RAW input bytes (before any parsing)
@@ -16,6 +18,7 @@ import { createHash } from 'node:crypto';
 import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
 import { pathResolver } from '@agent/core/path-resolver';
+import { assertReadableOfficeBytes, readDocument } from '@agent/core/document-reader';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -23,9 +26,10 @@ import {
   safeLstat,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { htmlToMarkdown } from './html-to-markdown.js';
+import { htmlToMarkdown } from '@agent/core/html-to-markdown';
 
-export type IngestFormat = 'docx' | 'pdf' | 'xlsx' | 'html' | 'slack_thread' | 'markdown' | 'text';
+export type IngestFormat =
+  'docx' | 'pdf' | 'xlsx' | 'pptx' | 'html' | 'slack_thread' | 'markdown' | 'text';
 
 export interface IngestSourceMeta {
   source_system?: string;
@@ -64,6 +68,8 @@ export interface ParseDocumentInput {
   content_text?: string;
   format: IngestFormat;
   source_meta?: IngestSourceMeta;
+  /** pptx/pdf/docx: OCR embedded images (local providers only). */
+  ocr?: boolean;
 }
 
 interface SlackMessage {
@@ -75,7 +81,10 @@ interface SlackMessage {
 // mammoth's bundled .d.ts predates its own convertToMarkdown export (present
 // in lib/index.js since 1.x) — augment locally, same as media-actuator.
 type MammothWithMarkdown = typeof mammoth & {
-  convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string; messages: unknown[] }>;
+  convertToMarkdown: (
+    input: { buffer: Buffer },
+    options?: { convertImage?: unknown }
+  ) => Promise<{ value: string; messages: unknown[] }>;
 };
 
 function resolveRawBytes(input: ParseDocumentInput): Buffer {
@@ -140,29 +149,22 @@ function extractSections(markdown: string): IngestSection[] | undefined {
   return sections.length > 0 ? sections : undefined;
 }
 
+/**
+ * Fallback docx reader (mammoth) for documents the native reader rejects.
+ * Images become `[image]` markers instead of mammoth's default base64 data
+ * URIs (one image-heavy document once produced an 11 MB card).
+ */
 async function parseDocx(raw: Buffer): Promise<string> {
+  const convertImage = mammoth.images.imgElement(async () => ({ src: 'kyberion-docx-image' }));
   try {
-    const result = await (mammoth as MammothWithMarkdown).convertToMarkdown({ buffer: raw });
-    return result.value;
+    const result = await (mammoth as MammothWithMarkdown).convertToMarkdown(
+      { buffer: raw },
+      { convertImage }
+    );
+    return result.value.replace(/!\[[^\]]*\]\(kyberion-docx-image\)/g, '_[image]_');
   } catch {
     const result = await mammoth.extractRawText({ buffer: raw });
     return result.value;
-  }
-}
-
-async function parsePdf(raw: Buffer): Promise<string> {
-  const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse({ data: new Uint8Array(raw) });
-  try {
-    const result = await parser.getText();
-    const pages = Array.isArray(result.pages) ? result.pages : [];
-    if (pages.length > 0) {
-      // Per-page text avoids pdf-parse's "-- 1 of 1 --" page-joiner noise.
-      return pages.map((page: { text?: string }) => String(page.text ?? '').trim()).join('\n\n');
-    }
-    return String(result.text ?? '');
-  } finally {
-    await parser.destroy();
   }
 }
 
@@ -193,7 +195,16 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
     sheet.eachRow({ includeEmpty: false }, (row) => {
       const cells: string[] = [];
       for (let col = 1; col <= sheet.columnCount; col += 1) {
-        cells.push(excelCellText(row.getCell(col).value).replace(/\|/g, '\\|'));
+        const cell = row.getCell(col);
+        // exceljs reports a merged range's value on every cell of the range;
+        // only the top-left master keeps it, so a banner row is not repeated
+        // across every column.
+        const isMergedSlave = cell.isMerged && cell.master && cell.master.address !== cell.address;
+        cells.push(
+          isMergedSlave
+            ? ''
+            : excelCellText(cell.value).replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|')
+        );
       }
       rows.push(cells);
     });
@@ -207,9 +218,34 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
     ];
     const markdown = lines.join('\n');
     tables.push({ name: sheet.name, markdown });
-    chunks.push(`## ${sheet.name}\n\n${markdown}`);
+    const hidden = sheet.state === 'hidden' || sheet.state === 'veryHidden';
+    chunks.push(`## ${sheet.name}${hidden ? ' (hidden sheet)' : ''}\n\n${markdown}`);
   });
   return { markdown: chunks.join('\n\n'), tables };
+}
+
+/**
+ * pdf / pptx / docx / xlsx go through the shared document reader
+ * (@agent/core/document-reader) — the same path as `pnpm kyberion read` and
+ * media:document_digest. mammoth / exceljs remain only as a fallback for a
+ * docx / xlsx the native reader rejects.
+ */
+async function readOfficeDocument(
+  raw: Buffer,
+  format: 'docx' | 'pdf' | 'xlsx' | 'pptx',
+  ocr: boolean
+): Promise<{ markdown: string; tables: IngestTable[]; title?: string }> {
+  try {
+    const result = await readDocument(raw, format, { ocr });
+    return { markdown: result.markdown, tables: result.tables, title: result.title };
+  } catch (error) {
+    if (format === 'docx') {
+      const markdown = await parseDocx(raw);
+      return { markdown, tables: [], title: extractTitle(markdown) };
+    }
+    if (format === 'xlsx') return parseXlsx(raw);
+    throw error;
+  }
 }
 
 function parseSlackThread(raw: Buffer): string {
@@ -241,6 +277,7 @@ export async function parseDocument(input: ParseDocumentInput): Promise<IngestIr
     throw new Error('ingest:parse_document — format is required');
   }
   const raw = resolveRawBytes(input);
+  assertReadableOfficeBytes(raw, input.format);
   const contentSha256 = createHash('sha256').update(raw).digest('hex');
 
   let textMarkdown: string;
@@ -249,16 +286,13 @@ export async function parseDocument(input: ParseDocumentInput): Promise<IngestIr
 
   switch (input.format) {
     case 'docx':
-      textMarkdown = normalizeMarkdown(await parseDocx(raw));
-      title = extractTitle(textMarkdown);
-      break;
     case 'pdf':
-      textMarkdown = normalizeMarkdown(await parsePdf(raw));
-      break;
-    case 'xlsx': {
-      const parsed = await parseXlsx(raw);
+    case 'xlsx':
+    case 'pptx': {
+      const parsed = await readOfficeDocument(raw, input.format, input.ocr === true);
       textMarkdown = normalizeMarkdown(parsed.markdown);
       tables = parsed.tables.length > 0 ? parsed.tables : undefined;
+      title = parsed.title;
       break;
     }
     case 'html':

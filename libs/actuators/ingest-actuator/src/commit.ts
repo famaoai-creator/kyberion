@@ -343,6 +343,7 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
     normalizedTargetPath === 'knowledge/public' ||
     normalizedTargetPath.startsWith('knowledge/public/');
   let knowledgeRoot: string;
+  let ledgerKnowledgeRoot: string;
   let stewardApproval: MemoryCandidate | null = null;
   if (isPublicTarget) {
     stewardApproval = requireStewardApproval(
@@ -353,10 +354,11 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
     knowledgeRoot = PUBLIC_INGEST_ROOT;
     // The ledger still lives under the (registered) tenant root — resolve it
     // so an unregistered tenant fails closed here too.
-    tenantIngestKnowledgeRoot(tenantSlug, pathOptions);
+    ledgerKnowledgeRoot = tenantIngestKnowledgeRoot(tenantSlug, pathOptions);
   } else {
     // Resolves via resolveTenant — an unregistered tenant fails closed here.
     knowledgeRoot = tenantIngestKnowledgeRoot(tenantSlug, pathOptions);
+    ledgerKnowledgeRoot = knowledgeRoot;
     if (tenantSlug === COMMON_TENANT_SLUG) {
       stewardApproval = requireStewardApproval(
         'knowledge/confidential/common',
@@ -517,8 +519,11 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
   // this actuator ever uses. The audit record is emitted AFTER leaving the
   // context so it carries the caller's own identity (and the caller's
   // customer-mirror permissions, when it has them).
+  // The tenant registry lives in the personal tier, which ingest_commit cannot
+  // read — hand the ledger the root resolved above instead of re-resolving it.
+  const ledgerPathOptions = { ...pathOptions, knowledgeRoot: ledgerKnowledgeRoot };
   const committed = withExecutionContext(INGEST_COMMIT_ROLE, () => {
-    const prior = findAssetBySource(tenantSlug, sourceSystem, sourceId, pathOptions);
+    const prior = findAssetBySource(tenantSlug, sourceSystem, sourceId, ledgerPathOptions);
 
     let version = 1;
     let supersedes: string | undefined;
@@ -588,7 +593,7 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
     // (d) land the SCRUBBED card and (e) append the ledger record — same ceremony.
     safeMkdir(path.dirname(landingAbsolute), { recursive: true });
     safeWriteFile(landingAbsolute, finalCard, { encoding: 'utf8' });
-    appendAssetRecord(tenantSlug, record, pathOptions);
+    appendAssetRecord(tenantSlug, record, ledgerPathOptions);
 
     return {
       committed: true as const,

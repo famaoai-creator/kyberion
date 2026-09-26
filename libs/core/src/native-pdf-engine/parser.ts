@@ -1,9 +1,15 @@
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
-import type { PdfDesignProtocol, PdfLayoutElement, PdfPage, PdfImageElement } from '../types/pdf-protocol.js';
+import type {
+  PdfDesignProtocol,
+  PdfLayoutElement,
+  PdfPage,
+  PdfImageElement,
+} from '../types/pdf-protocol.js';
 import { clamp } from '../../foundation/text.js';
 
 /**
@@ -20,10 +26,13 @@ export class NativePdfParser {
   private objectStreamIds: number[] = [];
   private fontUnicodeCache: Map<number, Map<string, string> | null> = new Map();
   private imagePathCache: Map<number, string | null> = new Map();
+  /** Per-document image dir: object ids repeat across PDFs, so a shared dir would let one document's image overwrite (or be read as) another's. */
+  private imageDirName: string;
 
   constructor(filePath: string) {
     this.buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
     this.str = this.buffer.toString('binary');
+    this.imageDirName = createHash('sha256').update(this.buffer).digest('hex').slice(0, 16);
     this.discoverObjects();
   }
 
@@ -77,14 +86,18 @@ export class NativePdfParser {
       try {
         data = zlib.inflateSync(rawData);
       } catch {
-        try { data = zlib.unzipSync(rawData); } catch { return false; }
+        try {
+          data = zlib.unzipSync(rawData);
+        } catch {
+          return false;
+        }
       }
     } else {
       data = rawData;
     }
 
     // Parse entries according to /W array
-    for (let i = 0; i < totalEntries && (i * entrySize) < data.length; i++) {
+    for (let i = 0; i < totalEntries && i * entrySize < data.length; i++) {
       const offset = i * entrySize;
       const type = this.readField(data, offset, w[0]);
       const field2 = this.readField(data, offset + w[0], w[1]);
@@ -110,7 +123,7 @@ export class NativePdfParser {
     if (width === 0) return 0;
     let val = 0;
     for (let i = 0; i < width; i++) {
-      val = (val << 8) | (buf[offset + i] & 0xFF);
+      val = (val << 8) | (buf[offset + i] & 0xff);
     }
     return val;
   }
@@ -265,7 +278,12 @@ export class NativePdfParser {
     const xmpEnd = this.str.indexOf('</x:xmpmeta>');
     if (xmpStart === -1 || xmpEnd === -1) return result;
 
-    const xmpBlock = this.str.substring(xmpStart, xmpEnd + 13);
+    // XMP packets are UTF-8 (ISO 16684-1), but this.str is a byte-per-char
+    // ('binary') view of the file — re-decode so non-ASCII titles and author
+    // names do not come out as mojibake.
+    const xmpBlock = Buffer.from(this.str.substring(xmpStart, xmpEnd + 13), 'binary').toString(
+      'utf8'
+    );
 
     // dc:title
     const titleMatch = xmpBlock.match(/<dc:title>.*?<rdf:Alt>.*?<rdf:li[^>]*>(.*?)<\/rdf:li>/s);
@@ -369,7 +387,9 @@ export class NativePdfParser {
   }
 
   private extractPageGeometry(obj: string): { width: number; height: number } {
-    const mediaBoxMatch = obj.match(/\/MediaBox\s*\[\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\]/);
+    const mediaBoxMatch = obj.match(
+      /\/MediaBox\s*\[\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\]/
+    );
     if (!mediaBoxMatch) return { width: 595, height: 842 };
     const x0 = parseFloat(mediaBoxMatch[1]);
     const y0 = parseFloat(mediaBoxMatch[2]);
@@ -467,12 +487,16 @@ export class NativePdfParser {
   private extractGraphicElements(
     content: string,
     pageHeight: number,
-    extGStateResources: Map<string, number>,
+    extGStateResources: Map<string, number>
   ): any[] {
     type ColorState = { r: number; g: number; b: number };
     const elements: any[] = [];
     const rgbToHex = (color: ColorState) => {
-      const toHex = (value: number) => clamp(Math.round(value * 255), 0, 255).toString(16).padStart(2, '0').toUpperCase();
+      const toHex = (value: number) =>
+        clamp(Math.round(value * 255), 0, 255)
+          .toString(16)
+          .padStart(2, '0')
+          .toUpperCase();
       return `${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
     };
     const isWhite = (color: ColorState) => color.r > 0.95 && color.g > 0.95 && color.b > 0.95;
@@ -515,7 +539,8 @@ export class NativePdfParser {
       });
     }
 
-    const opRegex = /([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+rg|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+RG|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+sc\b|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+SC\b|([\d.\-]+)\s+g(?:\s|$)|([\d.\-]+)\s+G(?:\s|$)|([\d.\-]+)\s+w(?:\s|$)|\/([A-Za-z0-9_.-]+)\s+gs(?:\s|$)|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+re\b|\bf\*?\b|\bS\b|\bB\*?\b/g;
+    const opRegex =
+      /([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+rg|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+RG|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+sc\b|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+SC\b|([\d.\-]+)\s+g(?:\s|$)|([\d.\-]+)\s+G(?:\s|$)|([\d.\-]+)\s+w(?:\s|$)|\/([A-Za-z0-9_.-]+)\s+gs(?:\s|$)|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+re\b|\bf\*?\b|\bS\b|\bB\*?\b/g;
     let match: RegExpExecArray | null;
     let pendingRect: { x: number; y: number; w: number; h: number } | null = null;
     while ((match = opRegex.exec(content)) !== null) {
@@ -533,7 +558,11 @@ export class NativePdfParser {
         continue;
       }
       if (match[10] !== undefined) {
-        strokeColor = { r: parseFloat(match[10]), g: parseFloat(match[11]), b: parseFloat(match[12]) };
+        strokeColor = {
+          r: parseFloat(match[10]),
+          g: parseFloat(match[11]),
+          b: parseFloat(match[12]),
+        };
         continue;
       }
       if (match[13] !== undefined) {
@@ -586,7 +615,10 @@ export class NativePdfParser {
       if (token === 'f' || token === 'f*' || token === 'B' || token === 'B*' || token === 'S') {
         const width = Math.abs(pendingRect.w);
         const height = Math.abs(pendingRect.h);
-        if (!(width > pageHeight * 0.9 && height > pageHeight * 0.9) && !(isBlack(fillColor) && width > 300 && height > 300)) {
+        if (
+          !(width > pageHeight * 0.9 && height > pageHeight * 0.9) &&
+          !(isBlack(fillColor) && width > 300 && height > 300)
+        ) {
           elements.push({
             type: 'rect',
             x: pendingRect.x,
@@ -596,8 +628,9 @@ export class NativePdfParser {
             text: '',
             fontSize: 0,
             fontName: '',
-            fillColor: (token !== 'S' && !isWhite(fillColor)) ? rgbToHex(fillColor) : undefined,
-            strokeColor: (token === 'S' || token === 'B' || token === 'B*') ? rgbToHex(strokeColor) : undefined,
+            fillColor: token !== 'S' && !isWhite(fillColor) ? rgbToHex(fillColor) : undefined,
+            strokeColor:
+              token === 'S' || token === 'B' || token === 'B*' ? rgbToHex(strokeColor) : undefined,
             lineWidth: lineWidth !== 1 ? lineWidth : undefined,
             opacity: fillOpacity < 1 ? fillOpacity : undefined,
           });
@@ -651,7 +684,11 @@ export class NativePdfParser {
       try {
         decoded = zlib.inflateSync(data);
       } catch (_) {
-        try { decoded = zlib.unzipSync(data); } catch (__) { return null; }
+        try {
+          decoded = zlib.unzipSync(data);
+        } catch (__) {
+          return null;
+        }
       }
     }
 
@@ -684,10 +721,11 @@ export class NativePdfParser {
   private extractPlacedImages(
     content: string,
     pageHeight: number,
-    imageResources: Map<string, number>,
+    imageResources: Map<string, number>
   ): PdfImageElement[] {
     const images: PdfImageElement[] = [];
-    const imageRegex = /(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\s*\/([A-Za-z0-9_.-]+)\s+Do/g;
+    const imageRegex =
+      /(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\s*\/([A-Za-z0-9_.-]+)\s+Do/g;
     let match: RegExpExecArray | null;
 
     while ((match = imageRegex.exec(content)) !== null) {
@@ -730,7 +768,10 @@ export class NativePdfParser {
       return null;
     }
 
-    const softMaskObjectId = Number.parseInt(fullObject.match(/\/SMask\s+(\d+)\s+0\s+R/)?.[1] || '', 10);
+    const softMaskObjectId = Number.parseInt(
+      fullObject.match(/\/SMask\s+(\d+)\s+0\s+R/)?.[1] || '',
+      10
+    );
     let extension = '';
     let data = raw.data;
     if (/\/DCTDecode\b/.test(raw.header)) {
@@ -738,7 +779,9 @@ export class NativePdfParser {
     } else if (/\/JPXDecode\b/.test(raw.header)) {
       extension = '.jp2';
     } else if (/\/FlateDecode\b/.test(raw.header)) {
-      const alphaMask = Number.isFinite(softMaskObjectId) ? this.extractSoftMaskAlpha(softMaskObjectId) : null;
+      const alphaMask = Number.isFinite(softMaskObjectId)
+        ? this.extractSoftMaskAlpha(softMaskObjectId)
+        : null;
       const png = this.convertFlateImageToPng(raw.header, raw.data, alphaMask);
       if (!png) {
         this.imagePathCache.set(objectId, null);
@@ -746,14 +789,16 @@ export class NativePdfParser {
       }
       extension = '.png';
       data = png;
-    } else if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
+    } else if (
+      data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    ) {
       extension = '.png';
     } else {
       this.imagePathCache.set(objectId, null);
       return null;
     }
 
-    const dir = pathResolver.sharedTmp('native-pdf/images');
+    const dir = pathResolver.sharedTmp(`native-pdf/images/${this.imageDirName}`);
     safeMkdir(dir, { recursive: true });
     const outPath = path.join(dir, `pdf-image-${objectId}${extension}`);
     safeWriteFile(outPath, data);
@@ -776,13 +821,24 @@ export class NativePdfParser {
 
   private decodeFlateImage(
     header: string,
-    compressedData: Buffer,
-  ): { width: number; height: number; channels: number; colorType: number; bitsPerComponent: number; rawPixels: Buffer } | null {
+    compressedData: Buffer
+  ): {
+    width: number;
+    height: number;
+    channels: number;
+    colorType: number;
+    bitsPerComponent: number;
+    rawPixels: Buffer;
+  } | null {
     const width = Number.parseInt(header.match(/\/Width\s+(\d+)/)?.[1] || '', 10);
     const height = Number.parseInt(header.match(/\/Height\s+(\d+)/)?.[1] || '', 10);
-    const bitsPerComponent = Number.parseInt(header.match(/\/BitsPerComponent\s+(\d+)/)?.[1] || '', 10);
+    const bitsPerComponent = Number.parseInt(
+      header.match(/\/BitsPerComponent\s+(\d+)/)?.[1] || '',
+      10
+    );
     const colorSpace = header.match(/\/ColorSpace\s*\/([A-Za-z0-9]+)/)?.[1] || '';
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+      return null;
     if (bitsPerComponent !== 8) return null;
 
     let channels = 0;
@@ -806,10 +862,21 @@ export class NativePdfParser {
 
     const rowStride = width * channels;
     if (rawPixels.length < rowStride * height) return null;
-    return { width, height, channels, colorType, bitsPerComponent, rawPixels: rawPixels.subarray(0, rowStride * height) };
+    return {
+      width,
+      height,
+      channels,
+      colorType,
+      bitsPerComponent,
+      rawPixels: rawPixels.subarray(0, rowStride * height),
+    };
   }
 
-  private convertFlateImageToPng(header: string, compressedData: Buffer, alphaMask?: Buffer | null): Buffer | null {
+  private convertFlateImageToPng(
+    header: string,
+    compressedData: Buffer,
+    alphaMask?: Buffer | null
+  ): Buffer | null {
     const decoded = this.decodeFlateImage(header, compressedData);
     if (!decoded) return null;
     const { width, height, channels, rawPixels } = decoded;
@@ -830,8 +897,8 @@ export class NativePdfParser {
       const alphaStart = row * width;
       const rowPixelsStart = dstStart + 1;
       for (let col = 0; col < width; col += 1) {
-        const srcPixel = srcStart + (col * channels);
-        const dstPixel = rowPixelsStart + (col * pngChannels);
+        const srcPixel = srcStart + col * channels;
+        const dstPixel = rowPixelsStart + col * pngChannels;
         for (let channel = 0; channel < channels; channel += 1) {
           pngScanlines[dstPixel + channel] = rawPixels[srcPixel + channel];
         }
@@ -839,7 +906,7 @@ export class NativePdfParser {
       }
     }
 
-    const signature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     const ihdr = Buffer.alloc(13);
     ihdr.writeUInt32BE(width, 0);
     ihdr.writeUInt32BE(height, 4);
@@ -868,14 +935,14 @@ export class NativePdfParser {
   }
 
   private crc32(buffer: Buffer): number {
-    let crc = 0 ^ (-1);
+    let crc = 0 ^ -1;
     for (let index = 0; index < buffer.length; index += 1) {
       crc ^= buffer[index];
       for (let bit = 0; bit < 8; bit += 1) {
-        crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+        crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
       }
     }
-    return (crc ^ (-1)) >>> 0;
+    return (crc ^ -1) >>> 0;
   }
 
   /**
@@ -893,7 +960,9 @@ export class NativePdfParser {
       // Literal string Tj: (text) Tj
       const tjRegex = /\((.*?)\)\s*Tj/g;
       let m;
-      while ((m = tjRegex.exec(block)) !== null) { lines.push(m[1]); }
+      while ((m = tjRegex.exec(block)) !== null) {
+        lines.push(m[1]);
+      }
 
       // Hex string Tj: <FEFF...> Tj  (PDF 2.0 Unicode)
       const hexTjRegex = /<([0-9A-Fa-f]+)>\s*Tj/g;
@@ -924,7 +993,11 @@ export class NativePdfParser {
     return lines;
   }
 
-  private extractPositionedText(content: string, pageHeight: number, fontResources: Map<string, number>): PdfLayoutElement[] {
+  private extractPositionedText(
+    content: string,
+    pageHeight: number,
+    fontResources: Map<string, number>
+  ): PdfLayoutElement[] {
     const elements: PdfLayoutElement[] = [];
     const btBlocks = content.split('BT');
     type AffineMatrix = [number, number, number, number, number, number];
@@ -941,7 +1014,8 @@ export class NativePdfParser {
     let currentCtm: AffineMatrix = [...identityMatrix];
     const btCtmMap: AffineMatrix[] = [];
 
-    const ctmTokenRegex = /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b/g;
+    const ctmTokenRegex =
+      /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b/g;
     let ctmTokenMatch: RegExpExecArray | null;
     while ((ctmTokenMatch = ctmTokenRegex.exec(content)) !== null) {
       const token = ctmTokenMatch[0].trim();
@@ -983,7 +1057,8 @@ export class NativePdfParser {
         leading: 0,
       };
 
-      const opRegex = /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
+      const opRegex =
+        /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
       let match: RegExpExecArray | null;
 
       while ((match = opRegex.exec(block)) !== null) {
@@ -1000,7 +1075,9 @@ export class NativePdfParser {
         }
 
         if (token.endsWith(' Tm')) {
-          const tmMatch = token.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+Tm$/);
+          const tmMatch = token.match(
+            /^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+Tm$/
+          );
           if (tmMatch) {
             const a = parseFloat(tmMatch[1]) || 0;
             const b = parseFloat(tmMatch[2]) || 0;
@@ -1104,7 +1181,11 @@ export class NativePdfParser {
       if (/[0-7]/.test(next)) {
         let octal = next;
         let advance = 1;
-        for (let j = i + 2; j < input.length && advance < 3 && /[0-7]/.test(input[j]); j++, advance++) {
+        for (
+          let j = i + 2;
+          j < input.length && advance < 3 && /[0-7]/.test(input[j]);
+          j++, advance++
+        ) {
           octal += input[j];
         }
         normalized += this.decodePdfByteToChar(parseInt(octal, 8));
@@ -1152,7 +1233,7 @@ export class NativePdfParser {
   private buildTextElement(
     text: string,
     state: { x: number; y: number; fontSize: number; fontName: string },
-    pageHeight: number,
+    pageHeight: number
   ): PdfLayoutElement {
     const fontSize = Math.max(8, state.fontSize || 12);
     const estimatedWidth = Math.max(fontSize * 1.2, text.length * fontSize * 0.55);
@@ -1195,7 +1276,7 @@ export class NativePdfParser {
     }
 
     // Check for UTF-16BE BOM (0xFE 0xFF)
-    if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
       // UTF-16BE decode (skip BOM)
       let result = '';
       for (let i = 2; i + 1 < bytes.length; i += 2) {
@@ -1220,10 +1301,10 @@ export class NativePdfParser {
       0x87: '\u2021',
       0x88: '\u02C6',
       0x89: '\u2030',
-      0x8A: '\u0160',
-      0x8B: '\u2039',
-      0x8C: '\u0152',
-      0x8E: '\u017D',
+      0x8a: '\u0160',
+      0x8b: '\u2039',
+      0x8c: '\u0152',
+      0x8e: '\u017D',
       0x91: '\u2018',
       0x92: '\u2019',
       0x93: '\u201C',
@@ -1233,18 +1314,20 @@ export class NativePdfParser {
       0x97: '\u2014',
       0x98: '\u02DC',
       0x99: '\u2122',
-      0x9A: '\u0161',
-      0x9B: '\u203A',
-      0x9C: '\u0153',
-      0x9E: '\u017E',
-      0x9F: '\u0178',
+      0x9a: '\u0161',
+      0x9b: '\u203A',
+      0x9c: '\u0153',
+      0x9e: '\u017E',
+      0x9f: '\u0178',
     };
     if (cp1252Map[byte]) return cp1252Map[byte];
     return String.fromCharCode(byte);
   }
 
   private decodeMappedHexSequence(hex: string, unicodeMap: Map<string, string>): string | null {
-    const lengths = Array.from(new Set([...unicodeMap.keys()].map((key) => key.length))).sort((a, b) => b - a);
+    const lengths = Array.from(new Set([...unicodeMap.keys()].map((key) => key.length))).sort(
+      (a, b) => b - a
+    );
     let cursor = 0;
     let result = '';
 
@@ -1320,7 +1403,10 @@ export class NativePdfParser {
         const end = parseInt(range[2], 16);
         let target = parseInt(range[3], 16);
         for (let code = start; code <= end; code++) {
-          cmap.set(code.toString(16).toUpperCase().padStart(range[1].length, '0'), this.decodeUnicodeHex(target.toString(16)));
+          cmap.set(
+            code.toString(16).toUpperCase().padStart(range[1].length, '0'),
+            this.decodeUnicodeHex(target.toString(16))
+          );
           target++;
         }
       }
@@ -1369,8 +1455,14 @@ export class NativePdfParser {
     const header = this.str.substring(Math.max(0, start - 200), start);
     let decoded = data;
     if (header.includes('/FlateDecode')) {
-      try { decoded = zlib.inflateSync(data); } catch (_) {
-        try { decoded = zlib.unzipSync(data); } catch (__) { return null; }
+      try {
+        decoded = zlib.inflateSync(data);
+      } catch (_) {
+        try {
+          decoded = zlib.unzipSync(data);
+        } catch (__) {
+          return null;
+        }
       }
     }
     return decoded.toString('latin1');
@@ -1389,23 +1481,25 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
   const parser = new NativePdfParser(sourcePath);
   const metadata = parser.extractMetadata();
   const pages = parser.extractPages();
-  const fullText = pages.map(p => p.text).join('\n\n');
+  const fullText = pages.map((p) => p.text).join('\n\n');
   const elements = pages.flatMap((page) => [
     ...(page.elements || []),
-    ...((page.images || []).map((image) => ({
+    ...(page.images || []).map((image) => ({
       type: 'image' as const,
       x: image.x,
       y: image.y,
       width: image.width,
       height: image.height,
-    }))),
+    })),
   ]);
-  const fonts = Array.from(new Set(
-    elements
-      .filter((element): element is PdfLayoutElement => element.type !== 'image')
-      .map((element) => element.fontName)
-      .filter(Boolean),
-  )) as string[];
+  const fonts = Array.from(
+    new Set(
+      elements
+        .filter((element): element is PdfLayoutElement => element.type !== 'image')
+        .map((element) => element.fontName)
+        .filter(Boolean)
+    )
+  ) as string[];
   const xBuckets = Array.from(new Set(elements.map((element) => Math.round(element.x / 40))));
   const layout = xBuckets.length >= 2 ? 'multi-column' : 'single-column';
 
@@ -1415,6 +1509,6 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
     source: { format: 'markdown' as any, body: fullText, title: metadata.title },
     content: { text: fullText, pages },
     metadata: { ...metadata, pageCount: pages.length },
-    aesthetic: { layout, elements, fonts }
+    aesthetic: { layout, elements, fonts },
   };
 }

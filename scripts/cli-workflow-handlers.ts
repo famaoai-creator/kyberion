@@ -65,7 +65,6 @@ export async function withWorkflowOutputPrinter<T>(
     activePrint = previousPrint;
   }
 }
-
 function printText(value: unknown = ''): void {
   const rendered = typeof value === 'string' ? value : String(value);
   activePrint(rendered.endsWith('\n') ? rendered.slice(0, -1) : rendered);

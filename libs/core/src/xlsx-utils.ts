@@ -3,12 +3,26 @@ import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 import {
-  XlsxDesignProtocol, XlsxWorksheet, XlsxRow, XlsxCell, XlsxColumn,
-  XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge,
-  XlsxColor, XlsxCellStyle, XlsxAlignment,
-  XlsxTextRun, XlsxTheme, XlsxDefinedName,
-  XlsxDrawing, XlsxDrawingElement,
-  XlsxDrawingAnchor, XlsxTable, XlsxTableColumn
+  XlsxDesignProtocol,
+  XlsxWorksheet,
+  XlsxRow,
+  XlsxCell,
+  XlsxColumn,
+  XlsxFont,
+  XlsxFill,
+  XlsxBorder,
+  XlsxBorderEdge,
+  XlsxColor,
+  XlsxCellStyle,
+  XlsxAlignment,
+  XlsxTextRun,
+  XlsxTheme,
+  XlsxDefinedName,
+  XlsxDrawing,
+  XlsxDrawingElement,
+  XlsxDrawingAnchor,
+  XlsxTable,
+  XlsxTableColumn,
 } from './types/xlsx-protocol.js';
 
 /**
@@ -42,7 +56,10 @@ function getAllTags(xml: string, tag: string): string[] {
   // Match both self-closing (<tag ... />) and open-close (<tag ...>...</tag>) forms
   // Using two separate patterns to avoid the self-closing form consuming siblings
   const results: string[] = [];
-  const re = new RegExp(`<${tag}(?:\\s[^>]*)?\\/>|<${tag}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>`, 'gi');
+  const re = new RegExp(
+    `<${tag}(?:\\s[^>]*)?\\/>|<${tag}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>`,
+    'gi'
+  );
   let match;
   while ((match = re.exec(xml)) !== null) {
     results.push(match[0]);
@@ -86,7 +103,20 @@ async function extractThemeAsync(zip: JSZip): Promise<XlsxTheme> {
   const xml = await themeFile.async('string');
   theme.rawXml = xml;
 
-  const colorTags = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6', 'hlink', 'folHlink'];
+  const colorTags = [
+    'dk1',
+    'lt1',
+    'dk2',
+    'lt2',
+    'accent1',
+    'accent2',
+    'accent3',
+    'accent4',
+    'accent5',
+    'accent6',
+    'hlink',
+    'folHlink',
+  ];
   for (const tag of colorTags) {
     const tagXml = getTagFull(xml, `a:${tag}`);
     if (tagXml) {
@@ -118,7 +148,9 @@ async function extractThemeAsync(zip: JSZip): Promise<XlsxTheme> {
 
 // ─── Shared Strings Extraction ───────────────────────────────
 
-async function extractSharedStrings(zip: JSZip): Promise<{ plain: string[]; rich: XlsxTextRun[][] }> {
+async function extractSharedStrings(
+  zip: JSZip
+): Promise<{ plain: string[]; rich: XlsxTextRun[][] }> {
   const plain: string[] = [];
   const rich: XlsxTextRun[][] = [];
 
@@ -165,12 +197,34 @@ function extractFontFromXml(xml: string): XlsxFont {
   const sz = getTagFull(xml, 'sz') || getTagFull(xml, 'x:sz');
   if (sz) font.size = parseFloat(getAttr(sz, 'val') || '11');
 
-  const name = getTagFull(xml, 'name') || getTagFull(xml, 'rFont') || getTagFull(xml, 'x:name') || getTagFull(xml, 'x:rFont');
+  const name =
+    getTagFull(xml, 'name') ||
+    getTagFull(xml, 'rFont') ||
+    getTagFull(xml, 'x:name') ||
+    getTagFull(xml, 'x:rFont');
   if (name) font.name = getAttr(name, 'val');
 
-  if (xml.includes('<b/>') || xml.includes('<b ') || xml.includes('<x:b/>') || xml.includes('<x:b ')) font.bold = true;
-  if (xml.includes('<i/>') || xml.includes('<i ') || xml.includes('<x:i/>') || xml.includes('<x:i ')) font.italic = true;
-  if (xml.includes('<u/>') || xml.includes('<u ') || xml.includes('<x:u/>') || xml.includes('<x:u ')) font.underline = true;
+  if (
+    xml.includes('<b/>') ||
+    xml.includes('<b ') ||
+    xml.includes('<x:b/>') ||
+    xml.includes('<x:b ')
+  )
+    font.bold = true;
+  if (
+    xml.includes('<i/>') ||
+    xml.includes('<i ') ||
+    xml.includes('<x:i/>') ||
+    xml.includes('<x:i ')
+  )
+    font.italic = true;
+  if (
+    xml.includes('<u/>') ||
+    xml.includes('<u ') ||
+    xml.includes('<x:u/>') ||
+    xml.includes('<x:u ')
+  )
+    font.underline = true;
   if (xml.includes('<strike/>') || xml.includes('<x:strike/>')) font.strike = true;
 
   const colorTag = getTagFull(xml, 'color') || getTagFull(xml, 'x:color');
@@ -240,8 +294,13 @@ function extractAlignmentFromXml(xml: string): XlsxAlignment | undefined {
 
 async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> {
   const styles: XlsxDesignProtocol['styles'] = {
-    fonts: [], fills: [], borders: [], numFmts: [],
-    cellXfs: [], namedStyles: [], tableStyles: []
+    fonts: [],
+    fills: [],
+    borders: [],
+    numFmts: [],
+    cellXfs: [],
+    namedStyles: [],
+    tableStyles: [],
   };
 
   const stylesFile = zip.file('xl/styles.xml');
@@ -254,7 +313,10 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
   const numFmtTags = getAllTags(xml, 'numFmt');
   for (const nf of numFmtTags) {
     const id = parseInt(getAttr(nf, 'numFmtId') || '0');
-    const code = getAttr(nf, 'formatCode') || '';
+    // Attribute values are XML-escaped (`"▲"` arrives as `&quot;▲&quot;`);
+    // keep the real format code so formatting works and the writer's
+    // escXml does not double-escape it on a round trip.
+    const code = decodeXmlAttribute(getAttr(nf, 'formatCode') || '');
     styles.numFmts.push({ id, formatCode: code });
   }
 
@@ -274,27 +336,30 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
   // Fills
   const fillsSection = getTagContent(xml, 'fills') || getTagContent(xml, 'x:fills');
   if (fillsSection) {
-    const fillTags = getAllTags(fillsSection, 'fill').length > 0
-      ? getAllTags(fillsSection, 'fill')
-      : getAllTags(fillsSection, 'x:fill');
+    const fillTags =
+      getAllTags(fillsSection, 'fill').length > 0
+        ? getAllTags(fillsSection, 'fill')
+        : getAllTags(fillsSection, 'x:fill');
     for (const f of fillTags) styles.fills.push(extractFillFromXml(f));
   }
 
   // Borders
   const bordersSection = getTagContent(xml, 'borders') || getTagContent(xml, 'x:borders');
   if (bordersSection) {
-    const borderTags = getAllTags(bordersSection, 'border').length > 0
-      ? getAllTags(bordersSection, 'border')
-      : getAllTags(bordersSection, 'x:border');
+    const borderTags =
+      getAllTags(bordersSection, 'border').length > 0
+        ? getAllTags(bordersSection, 'border')
+        : getAllTags(bordersSection, 'x:border');
     for (const b of borderTags) styles.borders.push(extractBorderFromXml(b));
   }
 
   // Cell format index table (cellXfs)
   const xfsSection = getTagContent(xml, 'cellXfs') || getTagContent(xml, 'x:cellXfs');
   if (xfsSection) {
-    const xfTags = getAllTags(xfsSection, 'xf').length > 0
-      ? getAllTags(xfsSection, 'xf')
-      : getAllTags(xfsSection, 'x:xf');
+    const xfTags =
+      getAllTags(xfsSection, 'xf').length > 0
+        ? getAllTags(xfsSection, 'xf')
+        : getAllTags(xfsSection, 'x:xf');
     for (const xf of xfTags) {
       const cs: XlsxCellStyle = { xfXml: xf };
       const fontId = parseInt(getAttr(xf, 'fontId') || '0');
@@ -306,7 +371,7 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
       if (styles.fills[fillId]) cs.fill = styles.fills[fillId];
       if (styles.borders[borderId]) cs.border = styles.borders[borderId];
 
-      const builtinFmt = styles.numFmts.find(n => n.id === numFmtId);
+      const builtinFmt = styles.numFmts.find((n) => n.id === numFmtId);
       if (builtinFmt) cs.numFmt = builtinFmt;
       else if (numFmtId > 0) cs.numFmt = { id: numFmtId, formatCode: getBuiltinNumFmt(numFmtId) };
 
@@ -326,17 +391,19 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
   // Named styles
   const cellStylesSection = getTagContent(xml, 'cellStyles') || getTagContent(xml, 'x:cellStyles');
   if (cellStylesSection) {
-    const csTags = getAllTags(cellStylesSection, 'cellStyle').length > 0
-      ? getAllTags(cellStylesSection, 'cellStyle')
-      : getAllTags(cellStylesSection, 'x:cellStyle');
+    const csTags =
+      getAllTags(cellStylesSection, 'cellStyle').length > 0
+        ? getAllTags(cellStylesSection, 'cellStyle')
+        : getAllTags(cellStylesSection, 'x:cellStyle');
     for (const cs of csTags) {
       const name = getAttr(cs, 'name') || 'Normal';
       const xfId = parseInt(getAttr(cs, 'xfId') || '0');
       const builtinId = getAttr(cs, 'builtinId');
       styles.namedStyles.push({
-        name, xfId,
+        name,
+        xfId,
         builtinId: builtinId ? parseInt(builtinId) : undefined,
-        style: styles.cellXfs[xfId] || {}
+        style: styles.cellXfs[xfId] || {},
       });
     }
   }
@@ -346,20 +413,47 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
 
 function getBuiltinNumFmt(id: number): string {
   const builtins: { [key: number]: string } = {
-    0: 'General', 1: '0', 2: '0.00', 3: '#,##0', 4: '#,##0.00',
-    9: '0%', 10: '0.00%', 11: '0.00E+00', 12: '# ?/?', 13: '# ??/??',
-    14: 'mm-dd-yy', 15: 'd-mmm-yy', 16: 'd-mmm', 17: 'mmm-yy',
-    18: 'h:mm AM/PM', 19: 'h:mm:ss AM/PM', 20: 'h:mm', 21: 'h:mm:ss',
-    22: 'm/d/yy h:mm', 37: '#,##0 ;(#,##0)', 38: '#,##0 ;[Red](#,##0)',
-    39: '#,##0.00;(#,##0.00)', 40: '#,##0.00;[Red](#,##0.00)',
-    45: 'mm:ss', 46: '[h]:mm:ss', 47: 'mmss.0', 48: '##0.0E+0', 49: '@'
+    0: 'General',
+    1: '0',
+    2: '0.00',
+    3: '#,##0',
+    4: '#,##0.00',
+    9: '0%',
+    10: '0.00%',
+    11: '0.00E+00',
+    12: '# ?/?',
+    13: '# ??/??',
+    14: 'mm-dd-yy',
+    15: 'd-mmm-yy',
+    16: 'd-mmm',
+    17: 'mmm-yy',
+    18: 'h:mm AM/PM',
+    19: 'h:mm:ss AM/PM',
+    20: 'h:mm',
+    21: 'h:mm:ss',
+    22: 'm/d/yy h:mm',
+    37: '#,##0 ;(#,##0)',
+    38: '#,##0 ;[Red](#,##0)',
+    39: '#,##0.00;(#,##0.00)',
+    40: '#,##0.00;[Red](#,##0.00)',
+    45: 'mm:ss',
+    46: '[h]:mm:ss',
+    47: 'mmss.0',
+    48: '##0.0E+0',
+    49: '@',
   };
   return builtins[id] || 'General';
 }
 
 // ─── Worksheet Extraction ────────────────────────────────────
 
-async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string, sheetId: string, sharedStrings: string[]): Promise<XlsxWorksheet> {
+async function extractWorksheet(
+  zip: JSZip,
+  sheetPath: string,
+  sheetName: string,
+  sheetId: string,
+  sharedStrings: string[]
+): Promise<XlsxWorksheet> {
   const ws: XlsxWorksheet = {
     id: sheetId,
     name: sheetName,
@@ -368,7 +462,7 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
     mergeCells: [],
     tables: [],
     conditionalFormats: [],
-    dataValidations: []
+    dataValidations: [],
   };
 
   const sheetFile = zip.file(sheetPath);
@@ -439,17 +533,16 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
   const cfSource = cfTags.length > 0 ? cfTags : getAllTags(xml, 'x:conditionalFormatting');
   for (const cf of cfSource) {
     const sqref = getAttr(cf, 'sqref') || '';
-    const rules = getAllTags(cf, 'cfRule').length > 0
-      ? getAllTags(cf, 'cfRule')
-      : getAllTags(cf, 'x:cfRule');
+    const rules =
+      getAllTags(cf, 'cfRule').length > 0 ? getAllTags(cf, 'cfRule') : getAllTags(cf, 'x:cfRule');
     ws.conditionalFormats.push({
       sqref,
-      rules: rules.map(r => ({
+      rules: rules.map((r) => ({
         type: getAttr(r, 'type') || '',
         priority: parseInt(getAttr(r, 'priority') || '0'),
         operator: getAttr(r, 'operator'),
-        rawXml: r
-      }))
+        rawXml: r,
+      })),
     });
   }
 
@@ -460,7 +553,7 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
     ws.dataValidations.push({
       sqref: getAttr(dv, 'sqref') || '',
       type: getAttr(dv, 'type') as any,
-      rawXml: dv
+      rawXml: dv,
     });
   }
 
@@ -472,7 +565,7 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
     const rawParts = [pmTag, psTag].filter(Boolean).join('');
     ws.pageSetup = {
       paperSize: psTag ? parseInt(getAttr(psTag, 'paperSize') || '0') || undefined : undefined,
-      orientation: psTag ? getAttr(psTag, 'orientation') as any : undefined,
+      orientation: psTag ? (getAttr(psTag, 'orientation') as any) : undefined,
       rawXml: rawParts || undefined,
     };
     if (pmTag) {
@@ -519,7 +612,7 @@ function extractRow(xml: string, sharedStrings: string[]): XlsxRow | null {
 
   const row: XlsxRow = {
     index: parseInt(rNum),
-    cells: []
+    cells: [],
   };
 
   const ht = getAttr(xml, 'ht');
@@ -598,7 +691,7 @@ async function extractDrawing(zip: JSZip, sheetPath: string, rId: string): Promi
 
   const relsXml = await relsFile.async('string');
   const relTags = getAllTags(relsXml, 'Relationship');
-  const drawingRel = relTags.find(r => getAttr(r, 'Id') === rId);
+  const drawingRel = relTags.find((r) => getAttr(r, 'Id') === rId);
   if (!drawingRel) return drawing;
 
   const drawingTarget = getAttr(drawingRel, 'Target');
@@ -609,7 +702,10 @@ async function extractDrawing(zip: JSZip, sheetPath: string, rId: string): Promi
     : path.join(sheetDir, drawingTarget).replace(/\\/g, '/');
 
   const normalizedPath = drawingPath.replace(/^xl\/\.\.\//, '');
-  const drawingFile = zip.file(normalizedPath) || zip.file(drawingPath) || zip.file('xl/drawings/' + path.basename(drawingPath));
+  const drawingFile =
+    zip.file(normalizedPath) ||
+    zip.file(drawingPath) ||
+    zip.file('xl/drawings/' + path.basename(drawingPath));
   if (!drawingFile) return drawing;
 
   const drawingXml = await drawingFile.async('string');
@@ -631,7 +727,8 @@ async function extractDrawing(zip: JSZip, sheetPath: string, rId: string): Promi
 
   // Embed image data for pic elements
   const drawingDir = path.dirname(normalizedPath || drawingPath);
-  const drawingRelsPath = drawingDir + '/_rels/' + path.basename(normalizedPath || drawingPath) + '.rels';
+  const drawingRelsPath =
+    drawingDir + '/_rels/' + path.basename(normalizedPath || drawingPath) + '.rels';
   const drawingRelsFile = zip.file(drawingRelsPath);
   if (drawingRelsFile) {
     const drawingRelsXml = await drawingRelsFile.async('string');
@@ -639,7 +736,9 @@ async function extractDrawing(zip: JSZip, sheetPath: string, rId: string): Promi
       if (el.type === 'image' && el.rawXml) {
         const embedMatch = el.rawXml.match(/r:embed="([^"]*)"/);
         if (embedMatch) {
-          const imgRelTag = getAllTags(drawingRelsXml, 'Relationship').find(r => getAttr(r, 'Id') === embedMatch[1]);
+          const imgRelTag = getAllTags(drawingRelsXml, 'Relationship').find(
+            (r) => getAttr(r, 'Id') === embedMatch[1]
+          );
           if (imgRelTag) {
             const imgTarget = getAttr(imgRelTag, 'Target') || '';
             const imgPath = imgTarget.startsWith('/')
@@ -669,7 +768,7 @@ function extractDrawingElement(xml: string, anchorType: string): XlsxDrawingElem
       col: parseInt(getTagContent(fromTag, 'xdr:col') || '0'),
       colOffset: emuToNum(getTagContent(fromTag, 'xdr:colOff')),
       row: parseInt(getTagContent(fromTag, 'xdr:row') || '0'),
-      rowOffset: emuToNum(getTagContent(fromTag, 'xdr:rowOff'))
+      rowOffset: emuToNum(getTagContent(fromTag, 'xdr:rowOff')),
     };
   }
 
@@ -680,7 +779,7 @@ function extractDrawingElement(xml: string, anchorType: string): XlsxDrawingElem
       col: parseInt(getTagContent(toTag, 'xdr:col') || '0'),
       colOffset: emuToNum(getTagContent(toTag, 'xdr:colOff')),
       row: parseInt(getTagContent(toTag, 'xdr:row') || '0'),
-      rowOffset: emuToNum(getTagContent(toTag, 'xdr:rowOff'))
+      rowOffset: emuToNum(getTagContent(toTag, 'xdr:rowOff')),
     };
   }
 
@@ -744,7 +843,7 @@ function extractDrawingElement(xml: string, anchorType: string): XlsxDrawingElem
     textRuns,
     spPrXml,
     txBodyXml,
-    rawXml
+    rawXml,
   };
 }
 
@@ -804,7 +903,7 @@ async function extractTables(zip: JSZip, sheetPath: string): Promise<XlsxTable[]
 
   const relsXml = await relsFile.async('string');
   const relTags = getAllTags(relsXml, 'Relationship');
-  const tableRels = relTags.filter(r => (getAttr(r, 'Type') || '').includes('table'));
+  const tableRels = relTags.filter((r) => (getAttr(r, 'Type') || '').includes('table'));
 
   for (const rel of tableRels) {
     const target = getAttr(rel, 'Target');
@@ -827,7 +926,7 @@ async function extractTables(zip: JSZip, sheetPath: string): Promise<XlsxTable[]
     for (const col of colTags) {
       columns.push({
         id: parseInt(getAttr(col, 'id') || '0'),
-        name: getAttr(col, 'name') || ''
+        name: getAttr(col, 'name') || '',
       });
     }
 
@@ -859,7 +958,7 @@ async function extractWorkbook(zip: JSZip): Promise<{
       name: getAttr(s, 'name') || '',
       sheetId: getAttr(s, 'sheetId') || '',
       rId: getAttr(s, 'r:id') || '',
-      state: getAttr(s, 'state')
+      state: getAttr(s, 'state'),
     });
   }
 
@@ -871,9 +970,10 @@ async function extractWorkbook(zip: JSZip): Promise<{
     const value = dn.replace(/<[^>]+>/g, '').trim();
     const localSheetId = getAttr(dn, 'localSheetId');
     result.definedNames.push({
-      name, value,
+      name,
+      value,
       localSheetId: localSheetId ? parseInt(localSheetId) : undefined,
-      hidden: getAttr(dn, 'hidden') === '1'
+      hidden: getAttr(dn, 'hidden') === '1',
     });
   }
 
@@ -898,10 +998,23 @@ async function resolveSheetPaths(zip: JSZip): Promise<Map<string, string>> {
   return map;
 }
 
+function decodeXmlAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x([0-9a-f]+);/gi, (_m, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_m, dec: string) => String.fromCodePoint(Number(dec)))
+    .replace(/&amp;/g, '&');
+}
+
 // ─── Main Entry Point ────────────────────────────────────────
 
-export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignProtocol> {
-  const buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
+/** Accepts a file path or the raw .xlsx bytes. */
+export async function distillXlsxDesign(source: string | Buffer): Promise<XlsxDesignProtocol> {
+  const buffer =
+    typeof source === 'string' ? (safeReadFile(source, { encoding: null }) as Buffer) : source;
   const zip = await JSZip.loadAsync(buffer);
 
   // 1. Theme
@@ -923,7 +1036,13 @@ export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignPro
     const sheetPath = sheetPaths.get(sheet.rId);
     if (!sheetPath) continue;
 
-    const ws = await extractWorksheet(zip, sheetPath, sheet.name, `sheet${sheet.sheetId}`, sharedStrings);
+    const ws = await extractWorksheet(
+      zip,
+      sheetPath,
+      sheet.name,
+      `sheet${sheet.sheetId}`,
+      sharedStrings
+    );
     if (sheet.state) ws.state = sheet.state as any;
 
     // Extract tables for this sheet
@@ -936,13 +1055,22 @@ export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignPro
   const rawParts: { [entryName: string]: string } = {};
   const skipPatterns = [
     /^xl\/worksheets\/sheet\d+\.xml$/,
-    /^xl\/drawings\/drawing\d+\.xml$/, /^xl\/drawings\/_rels\//, /^xl\/media\//, /^xl\/styles\.xml$/, /^xl\/sharedStrings\.xml$/,
-    /^xl\/theme\//, /^xl\/workbook\.xml$/, /^xl\/_rels\/workbook\.xml\.rels$/,
-    /^\[Content_Types\]\.xml$/, /^_rels\/\.rels$/, /^docProps\//, /^xl\/tables\//
+    /^xl\/drawings\/drawing\d+\.xml$/,
+    /^xl\/drawings\/_rels\//,
+    /^xl\/media\//,
+    /^xl\/styles\.xml$/,
+    /^xl\/sharedStrings\.xml$/,
+    /^xl\/theme\//,
+    /^xl\/workbook\.xml$/,
+    /^xl\/_rels\/workbook\.xml\.rels$/,
+    /^\[Content_Types\]\.xml$/,
+    /^_rels\/\.rels$/,
+    /^docProps\//,
+    /^xl\/tables\//,
   ];
   for (const [name, file] of Object.entries(zip.files)) {
     if (file.dir) continue;
-    if (skipPatterns.some(p => p.test(name))) continue;
+    if (skipPatterns.some((p) => p.test(name))) continue;
     const data = await file.async('base64');
     rawParts[name] = data;
   }

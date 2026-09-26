@@ -178,8 +178,19 @@ describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
     ).toThrow(/ingested_by is required/);
   });
 
-  it('commit is the only apply op this actuator declares', () => {
-    expect([...INGEST_ACTUATOR_APPLY_OPS]).toEqual(['commit']);
+  it('commit is the only writer: every other apply op lands files through commitIngest', () => {
+    expect([...INGEST_ACTUATOR_APPLY_OPS]).toEqual(['commit', 'meeting_digest']);
+    // meeting_digest composes the ceremony — it must never write directly.
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/ingest-actuator/src/meeting-digest.ts'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string;
+    expect(source).toContain('commitIngest(');
+    expect(source).not.toMatch(
+      /\bsafe(?:WriteFile|AppendFile|Mkdir|RmSync)\b|withExecutionContext\(/
+    );
   });
 });
 

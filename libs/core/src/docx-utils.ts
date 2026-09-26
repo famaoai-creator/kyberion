@@ -4,7 +4,10 @@
  * Follows the same architecture pattern as xlsx-utils.ts and pptx-utils.ts.
  */
 import JSZip from 'jszip';
-import { safeReadFile } from '../secure-io.js';
+import * as path from 'node:path';
+import { createHash } from 'node:crypto';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 import type {
   DocxDesignProtocol,
@@ -96,7 +99,20 @@ function getNumValTag(xml: string, tag: string): number | undefined {
 
 function extractTheme(themeXml: string): DocxTheme {
   const colors: Record<string, string> = {};
-  const colorMap = ['dk1', 'lt1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6', 'hlink', 'folHlink'];
+  const colorMap = [
+    'dk1',
+    'lt1',
+    'dk2',
+    'lt2',
+    'accent1',
+    'accent2',
+    'accent3',
+    'accent4',
+    'accent5',
+    'accent6',
+    'hlink',
+    'folHlink',
+  ];
   for (const name of colorMap) {
     const tagContent = getTagContentNS(themeXml, 'a', name);
     if (tagContent) {
@@ -105,8 +121,8 @@ function extractTheme(themeXml: string): DocxTheme {
     }
   }
 
-  const majorFontMatch = themeXml.match(/<a:majorFont[\s\S]*?<a:latin[^>]*typeface="([^"]*)"/)
-  const minorFontMatch = themeXml.match(/<a:minorFont[\s\S]*?<a:latin[^>]*typeface="([^"]*)"/)
+  const majorFontMatch = themeXml.match(/<a:majorFont[\s\S]*?<a:latin[^>]*typeface="([^"]*)"/);
+  const minorFontMatch = themeXml.match(/<a:minorFont[\s\S]*?<a:latin[^>]*typeface="([^"]*)"/);
 
   return {
     name: getSimpleAttr(themeXml, 'name'),
@@ -180,8 +196,14 @@ function extractBorderEdge(xml: string): DocxBorderEdge | undefined {
   if (!xml) return undefined;
   const edge: DocxBorderEdge = {
     val: getAttrExact(xml, 'w', 'val') as any,
-    sz: (() => { const v = getAttrExact(xml, 'w', 'sz'); return v ? parseInt(v, 10) : undefined; })(),
-    space: (() => { const v = getAttrExact(xml, 'w', 'space'); return v ? parseInt(v, 10) : undefined; })(),
+    sz: (() => {
+      const v = getAttrExact(xml, 'w', 'sz');
+      return v ? parseInt(v, 10) : undefined;
+    })(),
+    space: (() => {
+      const v = getAttrExact(xml, 'w', 'space');
+      return v ? parseInt(v, 10) : undefined;
+    })(),
     color: getAttrExact(xml, 'w', 'color'),
   };
   return cleanObj(edge) as DocxBorderEdge;
@@ -200,10 +222,22 @@ function extractParagraphProperties(xml: string): DocxParagraphProperties | unde
   const indTag = getTagFull(pPrXml, 'ind');
   if (indTag) {
     pPr.ind = {
-      left: (() => { const v = getAttrExact(indTag, 'w', 'left'); return v ? parseInt(v, 10) : undefined; })(),
-      right: (() => { const v = getAttrExact(indTag, 'w', 'right'); return v ? parseInt(v, 10) : undefined; })(),
-      firstLine: (() => { const v = getAttrExact(indTag, 'w', 'firstLine'); return v ? parseInt(v, 10) : undefined; })(),
-      hanging: (() => { const v = getAttrExact(indTag, 'w', 'hanging'); return v ? parseInt(v, 10) : undefined; })(),
+      left: (() => {
+        const v = getAttrExact(indTag, 'w', 'left');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
+      right: (() => {
+        const v = getAttrExact(indTag, 'w', 'right');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
+      firstLine: (() => {
+        const v = getAttrExact(indTag, 'w', 'firstLine');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
+      hanging: (() => {
+        const v = getAttrExact(indTag, 'w', 'hanging');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
     };
   }
 
@@ -211,9 +245,18 @@ function extractParagraphProperties(xml: string): DocxParagraphProperties | unde
   const spacingTag = getTagFull(pPrXml, 'spacing');
   if (spacingTag) {
     pPr.spacing = {
-      before: (() => { const v = getAttrExact(spacingTag, 'w', 'before'); return v ? parseInt(v, 10) : undefined; })(),
-      after: (() => { const v = getAttrExact(spacingTag, 'w', 'after'); return v ? parseInt(v, 10) : undefined; })(),
-      line: (() => { const v = getAttrExact(spacingTag, 'w', 'line'); return v ? parseInt(v, 10) : undefined; })(),
+      before: (() => {
+        const v = getAttrExact(spacingTag, 'w', 'before');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
+      after: (() => {
+        const v = getAttrExact(spacingTag, 'w', 'after');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
+      line: (() => {
+        const v = getAttrExact(spacingTag, 'w', 'line');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
       lineRule: getAttrExact(spacingTag, 'w', 'lineRule') as any,
     };
   }
@@ -296,10 +339,16 @@ function extractDrawing(drawingXml: string): DocxDrawing {
   // Anchor position
   if (!isInline) {
     drawing.behindDoc = drawingXml.includes('behindDoc="1"');
-    const posHMatch = drawingXml.match(/<wp:positionH[^>]*relativeFrom="([^"]*)"[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
-    if (posHMatch) drawing.positionH = { relativeFrom: posHMatch[1], offset: parseInt(posHMatch[2], 10) };
-    const posVMatch = drawingXml.match(/<wp:positionV[^>]*relativeFrom="([^"]*)"[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
-    if (posVMatch) drawing.positionV = { relativeFrom: posVMatch[1], offset: parseInt(posVMatch[2], 10) };
+    const posHMatch = drawingXml.match(
+      /<wp:positionH[^>]*relativeFrom="([^"]*)"[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/
+    );
+    if (posHMatch)
+      drawing.positionH = { relativeFrom: posHMatch[1], offset: parseInt(posHMatch[2], 10) };
+    const posVMatch = drawingXml.match(
+      /<wp:positionV[^>]*relativeFrom="([^"]*)"[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/
+    );
+    if (posVMatch)
+      drawing.positionV = { relativeFrom: posVMatch[1], offset: parseInt(posVMatch[2], 10) };
   }
 
   return drawing;
@@ -402,7 +451,7 @@ function extractParagraph(pXml: string): DocxParagraph {
       case 'hyperlink': {
         const rId = getAttrExact(fullMatch, 'r', 'id');
         const anchor = getAttrExact(fullMatch, 'w', 'anchor');
-        const hlRuns = getAllTagsNS(fullMatch, 'w', 'r').map(r => extractRun(r));
+        const hlRuns = getAllTagsNS(fullMatch, 'w', 'r').map((r) => extractRun(r));
         content.push({ type: 'hyperlink', hyperlink: { rId, anchor, runs: hlRuns } });
         break;
       }
@@ -439,7 +488,7 @@ function extractTableProperties(xml: string): DocxTableProperties | undefined {
   if (tblWTag) {
     const w = getAttrExact(tblWTag, 'w', 'w');
     const type = getAttrExact(tblWTag, 'w', 'type');
-    if (w) tblPr.tblW = { w: parseInt(w, 10), type: type as any || 'auto' };
+    if (w) tblPr.tblW = { w: parseInt(w, 10), type: (type as any) || 'auto' };
   }
 
   // Borders
@@ -466,7 +515,7 @@ function extractTableCellProperties(xml: string): DocxTableCellProperties | unde
   if (tcWTag) {
     const w = getAttrExact(tcWTag, 'w', 'w');
     const type = getAttrExact(tcWTag, 'w', 'type');
-    if (w) tcPr.tcW = { w: parseInt(w, 10), type: type as any || 'dxa' };
+    if (w) tcPr.tcW = { w: parseInt(w, 10), type: (type as any) || 'dxa' };
   }
 
   // Vertical merge
@@ -600,21 +649,24 @@ function extractSectionProperties(xml: string): DocxSectionProperties {
       left: parseInt(getAttrExact(pgMarTag, 'w', 'left') || '1440', 10),
       header: parseInt(getAttrExact(pgMarTag, 'w', 'header') || '720', 10),
       footer: parseInt(getAttrExact(pgMarTag, 'w', 'footer') || '720', 10),
-      gutter: (() => { const v = getAttrExact(pgMarTag, 'w', 'gutter'); return v ? parseInt(v, 10) : undefined; })(),
+      gutter: (() => {
+        const v = getAttrExact(pgMarTag, 'w', 'gutter');
+        return v ? parseInt(v, 10) : undefined;
+      })(),
     };
   }
 
   // Header/footer references
   const headerRefs = getAllTagsNS(xml, 'w', 'headerReference');
   if (headerRefs.length > 0) {
-    sectPr.headerRefs = headerRefs.map(ref => ({
+    sectPr.headerRefs = headerRefs.map((ref) => ({
       type: (getAttrExact(ref, 'w', 'type') || 'default') as any,
       rId: getAttrExact(ref, 'r', 'id') || '',
     }));
   }
   const footerRefs = getAllTagsNS(xml, 'w', 'footerReference');
   if (footerRefs.length > 0) {
-    sectPr.footerRefs = footerRefs.map(ref => ({
+    sectPr.footerRefs = footerRefs.map((ref) => ({
       type: (getAttrExact(ref, 'w', 'type') || 'default') as any,
       rId: getAttrExact(ref, 'r', 'id') || '',
     }));
@@ -714,7 +766,9 @@ function extractNumbering(numberingXml: string): DocxDesignProtocol['numbering']
 
 // ─── Relationships Extraction ───────────────────────────────
 
-function extractRelationships(relsXml: string): Array<{ id: string; type: string; target: string; targetMode?: string }> {
+function extractRelationships(
+  relsXml: string
+): Array<{ id: string; type: string; target: string; targetMode?: string }> {
   const rels: Array<{ id: string; type: string; target: string; targetMode?: string }> = [];
   const relTags = relsXml.match(/<Relationship[^>]*\/>/gi) || [];
   for (const relTag of relTags) {
@@ -729,7 +783,12 @@ function extractRelationships(relsXml: string): Array<{ id: string; type: string
 
 // ─── Header/Footer Extraction ───────────────────────────────
 
-function extractHeaderFooter(xml: string, type: 'header' | 'footer', rId: string, headerType: string): DocxHeaderFooter {
+function extractHeaderFooter(
+  xml: string,
+  type: 'header' | 'footer',
+  rId: string,
+  headerType: string
+): DocxHeaderFooter {
   return {
     type,
     rId,
@@ -758,13 +817,27 @@ function cleanObj(obj: Record<string, any>): Record<string, any> {
 
 // ─── Image Embedding ────────────────────────────────────────
 
+export interface DistillDocxOptions {
+  /**
+   * Inline every picture as base64 `imageData` — a self-contained design for
+   * lossless round-trips that outlive the tmp floor. Default: false, pictures
+   * are written as files and referenced by `imagePath` (the writer accepts
+   * either), keeping the design small for image-heavy documents.
+   */
+  embedImages?: boolean;
+  /** Where extracted pictures go (repo-relative or absolute inside the repo). Default: a per-document dir under sharedTmp. */
+  imageDir?: string;
+}
+
 /**
- * Walk body blocks and embed base64 image data for all drawings that reference image rIds.
+ * Walk body blocks and attach the picture of every drawing that references an
+ * image rId — as a file (`imagePath`) or, with `embed`, inline base64.
  */
 async function embedImageData(
   body: DocxBlockContent[],
   relationships: Array<{ id: string; type: string; target: string }>,
-  zip: JSZip
+  zip: JSZip,
+  output: { embed: boolean; imageDir: () => string }
 ): Promise<void> {
   // Build rId → target map for image relationships
   const imageRels = new Map<string, string>();
@@ -811,6 +884,7 @@ async function embedImageData(
   walkBlocks(body);
 
   // Resolve async reads
+  const written = new Map<string, string>();
   async function resolveImages(blocks: DocxBlockContent[]) {
     for (const block of blocks) {
       if (block.type === 'paragraph') {
@@ -818,10 +892,22 @@ async function embedImageData(
           if (pc.type === 'run') {
             for (const c of pc.run.content) {
               if (c.type === 'drawing' && (c.drawing as any)._pendingPath) {
-                const entry = zip.file((c.drawing as any)._pendingPath);
-                if (entry) {
+                const mediaPath = (c.drawing as any)._pendingPath as string;
+                const entry = zip.file(mediaPath);
+                if (entry && output.embed) {
                   const buf = await entry.async('nodebuffer');
                   c.drawing.imageData = buf.toString('base64');
+                } else if (entry) {
+                  let filePath = written.get(mediaPath);
+                  if (!filePath) {
+                    const dir = output.imageDir();
+                    safeMkdir(dir, { recursive: true });
+                    // Part names are unique within a package (word/media/imageN.ext).
+                    filePath = path.join(dir, path.posix.basename(mediaPath));
+                    safeWriteFile(filePath, await entry.async('nodebuffer'));
+                    written.set(mediaPath, filePath);
+                  }
+                  c.drawing.imagePath = filePath;
                 }
                 delete (c.drawing as any)._pendingPath;
               }
@@ -845,8 +931,13 @@ async function embedImageData(
 
 // ─── Main Extraction ────────────────────────────────────────
 
-export async function distillDocxDesign(filePath: string): Promise<DocxDesignProtocol> {
-  const buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
+/** Accepts a file path or the raw .docx bytes. */
+export async function distillDocxDesign(
+  source: string | Buffer,
+  options: DistillDocxOptions = {}
+): Promise<DocxDesignProtocol> {
+  const buffer =
+    typeof source === 'string' ? (safeReadFile(source, { encoding: null }) as Buffer) : source;
   const zip = await JSZip.loadAsync(buffer);
 
   async function readEntry(path: string): Promise<string | null> {
@@ -903,16 +994,29 @@ export async function distillDocxDesign(filePath: string): Promise<DocxDesignPro
         let headerType = 'default';
         for (const sect of sections) {
           const refs = rel.type === 'header' ? sect.headerRefs : sect.footerRefs;
-          const ref = refs?.find(r => r.rId === rel.id);
-          if (ref) { headerType = ref.type; break; }
+          const ref = refs?.find((r) => r.rId === rel.id);
+          if (ref) {
+            headerType = ref.type;
+            break;
+          }
         }
         headersFooters.push(extractHeaderFooter(partXml, rel.type as any, rel.id, headerType));
       }
     }
   }
 
-  // 8. Embed image data (base64) for lossless round-trip
-  await embedImageData(body, relationships, zip);
+  // 8. Attach pictures: files by default, inline base64 when embedImages is set.
+  // The default dir is per document (content hash) so documents — and
+  // tenants — never share or overwrite each other's extracted images.
+  await embedImageData(body, relationships, zip, {
+    embed: options.embedImages === true,
+    imageDir: () =>
+      options.imageDir
+        ? pathResolver.rootResolve(options.imageDir)
+        : pathResolver.sharedTmp(
+            `native-docx/images/${createHash('sha256').update(buffer).digest('hex').slice(0, 16)}`
+          ),
+  });
 
   return {
     version: '1.0.0',
