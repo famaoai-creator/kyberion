@@ -5,12 +5,15 @@
  * out of the edge bundle.
  */
 export async function register(): Promise<void> {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  try {
-    const { ensureChronosPluginHost } = await import('./lib/plugin-host-boot');
-    ensureChronosPluginHost();
-  } catch (error) {
-    // The plugin host must never keep Chronos from starting.
-    console.warn('[chronos-mirror-v2] plugin host boot failed', error);
+  // Keep the positive NEXT_RUNTIME check wrapping the import: Next only drops
+  // the Node-only module graph from the edge bundle for this exact shape.
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    try {
+      const { ensureChronosPluginHost } = await import('./lib/plugin-host-boot');
+      ensureChronosPluginHost();
+    } catch (error) {
+      // The plugin host must never keep Chronos from starting.
+      console.warn('[chronos-mirror-v2] plugin host boot failed', error);
+    }
   }
 }
