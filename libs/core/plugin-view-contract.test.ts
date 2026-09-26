@@ -741,6 +741,34 @@ describe('approved human view actions (FU-02)', () => {
     expect(loadApprovalRequest('chronos', id)?.applyResult).toBeUndefined();
   });
 
+  it('refuses to execute while the running module is not the approved copy', async () => {
+    vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({ ...entry, id: 'audit', timestamp: '', previousHash: '', currentHash: '' }) as AuditEntry
+    );
+    const { pluginId, managedRoot, view } = await activeFixture('views-exec-stale-module');
+    // Re-approved new content on disk, but the old module is still the active one.
+    const document = JSON.parse(readFixture('views/status.a2ui.json'));
+    document[1].updateComponents.components[1].props.label = 'Re-approved';
+    installApproved(
+      pluginId,
+      fixtureCopy({ 'views/status.a2ui.json': JSON.stringify(document) }),
+      managedRoot
+    );
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view(), 'write_probe', params),
+        id,
+        executor
+      ),
+      'PLUGIN_VIEW_ACTION_UNAVAILABLE'
+    );
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('approved');
+  });
+
   it('keeps the approval when the plugin is not active and refuses agent actions', async () => {
     const view = loadPluginViews(FIXTURE_DIR).views[0];
     const params = { path: `active/shared/tmp/${randomUUID()}` };
