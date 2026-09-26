@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
 import {
+  E2eRun,
   frameHeaderMismatches,
   missingAuditEvidence,
   parseE2eArgs,
@@ -64,5 +65,30 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
         id
       )
     ).toEqual(['plugin_host.activate completed']);
+  });
+
+  it('tears down a server or browser that finishes starting after the run was aborted', async () => {
+    const fakeServer = () => ({
+      baseUrl: 'http://127.0.0.1:1',
+      logTail: () => '',
+      exited: () => false,
+      stop: vi.fn(async () => undefined),
+    });
+    const run = new E2eRun();
+    const kept = fakeServer();
+    await expect(run.adoptServer(kept as never)).resolves.toBe(kept);
+
+    run.aborted = true;
+    const late = fakeServer();
+    await expect(run.adoptServer(late as never)).rejects.toThrow(/aborted/);
+    expect(late.stop).toHaveBeenCalledTimes(1);
+    const browser = { close: vi.fn(async () => undefined) };
+    await expect(run.adoptBrowser(browser as never)).rejects.toThrow(/aborted/);
+    expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(() => run.assertActive()).toThrow(/aborted/);
+
+    await run.teardown();
+    await run.teardown();
+    expect(kept.stop).toHaveBeenCalled();
   });
 });
