@@ -57,6 +57,14 @@ export interface MarkElementsParams {
   display_index?: number;
   /** Top-left of that display in global logical points, for multi-display clicks. */
   display_origin?: { x: number; y: number };
+  /**
+   * The screenshot is this machine's live screen, captured just now. Enables
+   * the os_accessibility detector (native-app element rects), which maps
+   * points with display_origin and scale. Never set for a stored image.
+   */
+  live_screen?: boolean;
+  /** Application whose front window os_accessibility reads (default: frontmost app). */
+  application?: string;
 }
 
 export interface MarkElementsResult {
@@ -155,6 +163,10 @@ export async function handleMarkElements(
       ...(domScale ? { dom_scale: domScale } : {}),
       ...(params.language ? { language: params.language } : {}),
       ...(params.ocr_mode ? { ocr_mode: params.ocr_mode } : {}),
+      ...(params.live_screen === true ? { live_screen: true } : {}),
+      ...(display?.origin ? { screen_origin: display.origin } : {}),
+      ...(params.scale !== undefined ? { screen_scale: scale } : {}),
+      ...(params.application ? { application: String(params.application) } : {}),
     },
     {
       ...(params.detectors?.length ? { detectors: params.detectors } : {}),
