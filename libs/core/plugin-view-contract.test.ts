@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import type { A2UIMessage } from './a2ui.js';
 import { findPluginManifestFor } from './plugin-grant-runtime.js';
+import { auditChain, type AuditEntry } from './audit-chain.js';
 import {
   decideApprovalRequest,
   listApprovalRequests,
@@ -34,7 +35,10 @@ import {
 import {
   composePluginViewsA2UI,
   dispatchPluginViewAction,
+  executeApprovedPluginViewAction,
   isPluginViewVisible,
+  listPluginViewActionRequests,
+  PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS,
   listPluginViewsForViewer,
   loadPluginViews,
   parsePluginViewDeclaration,
@@ -58,6 +62,7 @@ function tracked(dirPath: string): string {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   resetPluginLifecycleForTests();
   withExecutionContext('mission_controller', () => {
     while (cleanupPaths.length > 0) safeRmSync(cleanupPaths.pop() as string);
@@ -142,6 +147,37 @@ function newIds(prefix: string) {
     pluginId: `${prefix}-${id}`.slice(0, 60),
     managedRoot: tracked(pathResolver.shared(`plugins/managed-test-views-${id}`)),
   };
+}
+
+function trackActionRequest(id: string): void {
+  tracked(pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`));
+  tracked(pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.json`));
+  tracked(
+    pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
+  );
+}
+
+function approveActionRequest(id: string): void {
+  const pending = loadApprovalRequest('chronos', id);
+  decideApprovalRequest('mission_controller', {
+    channel: 'chronos',
+    requestId: id,
+    decision: 'approved',
+    decidedBy: 'human:approver',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: pending?.accountability?.payloadHash,
+    effectBinding: pending?.accountability?.effectBinding,
+  });
+}
+
+async function expectViewErrorAsync(promise: Promise<unknown>, code: string): Promise<void> {
+  const error = await promise.then(
+    () => undefined,
+    (reason: unknown) => reason
+  );
+  expect(error).toBeInstanceOf(PluginViewError);
+  expect((error as PluginViewError).code).toBe(code);
 }
 
 const publicReader: PluginViewViewer = {
@@ -481,7 +517,7 @@ describe('plugin view actions (EP-05)', () => {
     const record = listApprovalRequests({ storageChannels: ['chronos'] }).find(
       (entry) => entry.id === id
     );
-    tracked(pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`));
+    trackActionRequest(id);
     expect(record).toMatchObject({
       status: 'pending',
       accountability: { finalDecision: 'human_only' },
@@ -570,5 +606,166 @@ describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
 
     expect(deactivatePlugin(pluginId).ok).toBe(true);
     expect(listOwned(pluginId)).toEqual([]);
+  });
+});
+
+describe('approved human view actions (FU-02)', () => {
+  const executor = { executedBy: 'viewer-2', actorRole: 'localadmin', surface: 'api' as const };
+  const requester = { requestedBy: 'viewer-1', actorRole: 'localadmin', surface: 'api' as const };
+
+  async function activeFixture(prefix: string) {
+    const { pluginId, managedRoot } = newIds(prefix);
+    const record = installApproved(pluginId, fixtureCopy(), managedRoot);
+    expect((await activatePlugin({ record }, { managedRoot })).ok).toBe(true);
+    const view = () =>
+      listPluginViewsForViewer(listManagedPlugins(managedRoot), publicReader).views[0];
+    return { pluginId, managedRoot, record, view };
+  }
+
+  async function queue(view: LoadedPluginView, params: Record<string, unknown>): Promise<string> {
+    const outcome = await dispatchPluginViewAction(
+      resolvePluginViewAction(view, 'write_probe', params),
+      requester
+    );
+    expect(outcome.status).toBe('approval_required');
+    const id = (outcome as { approvalRequestId: string }).approvalRequestId;
+    trackActionRequest(id);
+    return id;
+  }
+
+  it('runs an approved action exactly once and audits the outcome', async () => {
+    const audit = vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({
+          ...entry,
+          id: 'audit',
+          timestamp: '',
+          previousHash: '',
+          currentHash: '',
+        }) as AuditEntry
+    );
+    const { view } = await activeFixture('views-exec');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    const resolved = () => resolvePluginViewAction(view(), 'write_probe', params);
+
+    // Not yet approved: refused without spending the approval.
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolved(), id, executor),
+      'PLUGIN_VIEW_APPROVAL_REQUIRED'
+    );
+    expect(listPluginViewActionRequests([view()])).toMatchObject([
+      { approvalRequestId: id, status: 'pending', params },
+    ]);
+
+    approveActionRequest(id);
+    // Changed params can never reuse the approval.
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view(), 'write_probe', { path: 'active/shared/tmp/other' }),
+        id,
+        executor
+      ),
+      'PLUGIN_VIEW_APPROVAL_MISMATCH'
+    );
+    // Expired approvals are refused.
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolved(), id, {
+        ...executor,
+        now: Date.now() + PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS + 1000,
+      }),
+      'PLUGIN_VIEW_APPROVAL_REQUIRED'
+    );
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('approved');
+
+    const executed = await executeApprovedPluginViewAction(resolved(), id, executor);
+    expect(executed).toEqual({ status: 'executed', handled: true, approvalRequestId: id });
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolved(), id, executor),
+      'PLUGIN_VIEW_APPROVAL_CONSUMED'
+    );
+    expect(loadApprovalRequest('chronos', id)?.applyResult).toMatchObject({
+      appliedBy: 'viewer-2',
+      result: 'success',
+    });
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('executed');
+
+    const executions = audit.mock.calls
+      .map(([entry]) => entry)
+      .filter((entry) => entry.action === 'plugin_view.action.execute');
+    expect(executions.map((entry) => entry.result)).toEqual([
+      'denied',
+      'denied',
+      'denied',
+      'completed',
+      'denied',
+    ]);
+    expect(executions[3]).toMatchObject({
+      agentId: 'viewer-2',
+      operation: 'permfixture:write',
+      correlationId: id,
+      metadata: {
+        approval_request_id: id,
+        requested_by: 'viewer-1',
+        approved_by: 'human:approver',
+      },
+    });
+  });
+
+  it('refuses an approval after the plugin is reinstalled with different content', async () => {
+    vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({ ...entry, id: 'audit', timestamp: '', previousHash: '', currentHash: '' }) as AuditEntry
+    );
+    const { pluginId, managedRoot, view } = await activeFixture('views-exec-digest');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+
+    const document = JSON.parse(readFixture('views/status.a2ui.json'));
+    document[1].updateComponents.components[1].props.label = 'Reinstalled';
+    installApproved(
+      pluginId,
+      fixtureCopy({ 'views/status.a2ui.json': JSON.stringify(document) }),
+      managedRoot
+    );
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('stale');
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view(), 'write_probe', params),
+        id,
+        executor
+      ),
+      'PLUGIN_VIEW_APPROVAL_MISMATCH'
+    );
+    expect(loadApprovalRequest('chronos', id)?.applyResult).toBeUndefined();
+  });
+
+  it('keeps the approval when the plugin is not active and refuses agent actions', async () => {
+    const view = loadPluginViews(FIXTURE_DIR).views[0];
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view, params);
+    approveActionRequest(id);
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view, 'write_probe', params),
+        id,
+        executor
+      ),
+      'PLUGIN_VIEW_ACTION_UNAVAILABLE'
+    );
+    expect(listPluginViewActionRequests([view])[0].status).toBe('approved');
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolvePluginViewAction(view, 'probe_env', {}), id, executor),
+      'PLUGIN_VIEW_ACTION_DENIED'
+    );
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view, 'write_probe', params),
+        '00000000-0000-4000-8000-000000000000',
+        executor
+      ),
+      'PLUGIN_VIEW_NOT_FOUND'
+    );
   });
 });

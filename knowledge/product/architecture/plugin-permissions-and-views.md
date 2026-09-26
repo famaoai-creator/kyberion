@@ -3,7 +3,7 @@ title: Plugin Permissions, Lifecycle and Views
 category: Architecture
 tags: [plugins, permissions, approval, digest, sandbox, lifecycle, a2ui, views, security]
 importance: 7
-last_updated: 2026-09-24
+last_updated: 2026-09-26
 ---
 
 # Plugin Permissions, Lifecycle and Views
@@ -140,15 +140,34 @@ authorized against the viewer first and can only narrow.
 Actions (`POST`): `chronos.plugin_view.action` is a localadmin write
 operation. Unknown actions are 404, an op the plugin does not provide is 403,
 invalid params are 400, a non-activatable plugin is 403. `authority: human`
-creates a human-only approval request (bound to plugin, content digest, view,
-action, op and params) in the Chronos approval queue; `authority: agent`
-dispatches through op preflight only when the owning plugin is active in the
-serving process, otherwise 409 — the web surface never imports plugin code.
+creates a human-only approval request (bound to plugin, content digest, grant
+digest, view, action, op and params; expires after 24 hours) in the Chronos
+approval queue; `authority: agent` dispatches through op preflight only when
+the owning plugin is active in the serving process, otherwise 409 — the web
+surface never imports plugin code.
+
+Executing an approved human action (FU-02): the same `POST` with
+`approval_request_id` (Chronos shows the requests of visible views to
+localadmin viewers, with an Execute button once approved). The executor needs
+localadmin and must see the view (another tenant's plugin is 404); it need not
+be the requester or the approver. The server recomputes the payload hash from
+the current plugin (content + grant digest), view, action and params and
+refuses (403) anything the approval does not cover, so changed params or a
+reinstalled plugin cannot reuse it. The approval must be approved by an
+authenticated human and unexpired (otherwise 409). Every check and the op
+preflight run before the approval is claimed, so a refusal — including 409
+when the plugin is not active in this process — never spends it; the claim is
+an exclusive create next to the request, so a second execution is 409. The
+op then runs through the same path as an agent action (active plugin
+registration, i.e. under its grant), the result is recorded on the approval
+(`applyResult`) and every attempt, refused or run, is written to the audit
+chain (`plugin_view.action.execute`).
 
 ## 7. Known gaps
 
-- Approved `human` view actions are recorded but not yet executed by a
-  follow-up dispatcher; the approval is the audit record of intent.
+- Executing an approved `human` action checks the digest of the plugin on
+  disk; the in-process activation is matched by plugin id only (a reload is
+  what re-binds it to a re-approved copy).
 - View text props are literal plugin strings (the catalog has no key props);
   only keys are vocabulary-checked.
 - `sandboxed-iframe`, view capabilities and personal-pads composition are
