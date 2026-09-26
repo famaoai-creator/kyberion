@@ -6,6 +6,7 @@ import {
   resolveScheduledPipelinePath,
   type PipelineScheduleRegistry,
   type ScheduledPipeline,
+  scheduleAllowedByOperator,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeWriteFile } from '../secure-io.js';
@@ -368,5 +369,27 @@ describe('pipeline scheduler', () => {
       ) as Record<string, unknown>;
       expect(raw).toEqual({ version: '1.0', schedules: [] });
     });
+  });
+});
+
+describe('operator schedule allowlist', () => {
+  it('allows every schedule when no allowlist is set', () => {
+    expect(scheduleAllowedByOperator('backup-daily', '')).toBe(true);
+    expect(scheduleAllowedByOperator('backup-daily', undefined)).toBe(true);
+  });
+
+  it('allows only listed schedule ids when an allowlist is set', () => {
+    const allowlist = ' organization-daily-digest , backup-daily ';
+    expect(scheduleAllowedByOperator('organization-daily-digest', allowlist)).toBe(true);
+    expect(scheduleAllowedByOperator('backup-daily', allowlist)).toBe(true);
+    expect(scheduleAllowedByOperator('ai-audit', allowlist)).toBe(false);
+  });
+
+  it('fails closed when a set allowlist parses to no schedule ids', () => {
+    for (const allowlist of [',', '  ', ' , ,']) {
+      expect(scheduleAllowedByOperator('organization-daily-digest', allowlist), allowlist).toBe(
+        false
+      );
+    }
   });
 });

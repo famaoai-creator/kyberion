@@ -50,6 +50,24 @@
       "minItems": 1,
       "items": { "$ref": "#/definitions/step" }
     },
+    "runtime": {
+      "type": "object",
+      "description": "Run-time needs of a tenant-scoped pipeline (knowledge/confidential/{tenant}/pipelines/). Chronos injects them only into that pipeline's tenant-bound child process, bounded by the tenant's governance/pipeline-runtime-allowlist.json and the global ceiling. Covered by the project-trust approval, which hashes the whole file.",
+      "additionalProperties": false,
+      "properties": {
+        "authorized_scope": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" }
+        },
+        "reasoning_backend": { "type": "string", "minLength": 1 },
+        "egress_policy_ref": {
+          "type": "string",
+          "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}/.+\\.json$"
+        },
+        "description": { "type": "string" }
+      }
+    },
     "schedule": {
       "type": "object",
       "required": ["cron"],
@@ -197,7 +215,11 @@
               "required": ["channel"],
               "properties": {
                 "channel": { "type": "string", "minLength": 1 },
-                "type": { "type": "string" }
+                "type": { "type": "string" },
+                "sensitive": {
+                  "type": "boolean",
+                  "description": "Confidential channel: the run journal records only a hash/length marker, and resume re-executes the step."
+                }
               },
               "additionalProperties": false
             }

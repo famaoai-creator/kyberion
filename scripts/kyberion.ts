@@ -204,7 +204,9 @@ export async function main(
   switch (entrypoint.id) {
     case 'operator-cli': {
       const { main: operatorCliMain } = await import('./cli.js');
-      await operatorCliMain(normalizedArgs);
+      // Pass the printer through: without it every operator-cli command
+      // (list / search / info / read …) rendered into a no-op sink.
+      await operatorCliMain(normalizedArgs, print);
       return;
     }
     case 'organization-model':

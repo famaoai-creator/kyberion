@@ -590,11 +590,25 @@
       "service_id": "gemini",
       "display_name": "Google AI Studio Gemini API presets",
       "auth_strategy": "api_key_query",
-      "operation_count": 2,
+      "operation_count": 4,
       "detail_ref": "knowledge/product/orchestration/service-presets/gemini.json",
       "operations": [
         {
           "action": "generate_image",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "generate_image_fast",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "generate_content_image",
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
@@ -876,7 +890,7 @@
       "service_id": "google-workspace",
       "display_name": "Google Workspace CLI Presets",
       "auth_strategy": "session",
-      "operation_count": 29,
+      "operation_count": 31,
       "detail_ref": "knowledge/product/orchestration/service-presets/google-workspace.json",
       "operations": [
         {
@@ -1064,6 +1078,22 @@
           "idempotency": "not_applicable"
         },
         {
+          "action": "calendar_events_patch",
+          "description": "Update a Google Calendar event.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_delete",
+          "description": "Delete a Google Calendar event.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
           "action": "meet_spaces_create",
           "description": "Create a Google Meet space using the authenticated Google account.",
           "kind": "capture",
@@ -1231,7 +1261,7 @@
       "service_id": "m365",
       "display_name": "Microsoft 365 CLI Presets",
       "auth_strategy": "none",
-      "operation_count": 17,
+      "operation_count": 19,
       "detail_ref": "knowledge/product/orchestration/service-presets/m365.json",
       "operations": [
         {
@@ -1269,6 +1299,22 @@
         {
           "action": "calendar_events_insert",
           "description": "Create a Microsoft 365 calendar event.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_update",
+          "description": "Update a Microsoft 365 calendar event.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "calendar_events_delete",
+          "description": "Delete a Microsoft 365 calendar event.",
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
@@ -1375,7 +1421,7 @@
     {
       "service_id": "media-generation",
       "display_name": "Kyberion Generative Media and Capture Unified Presets",
-      "operation_count": 6,
+      "operation_count": 4,
       "detail_ref": "knowledge/product/orchestration/service-presets/media-generation.json",
       "operations": [
         {
@@ -1405,22 +1451,6 @@
           "risk": "write",
           "approval_required": true,
           "idempotency": "recommended"
-        },
-        {
-          "action": "capture_screen",
-          "description": "macOS Native Screen Capture",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
-          "idempotency": "not_applicable"
-        },
-        {
-          "action": "record_screen",
-          "description": "Screen Recording via FFmpeg",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
-          "idempotency": "not_applicable"
         }
       ]
     },
@@ -1742,8 +1772,8 @@
     },
     {
       "service_id": "vision",
-      "display_name": "Kyberion Visual Generation and Capture Compatibility Alias",
-      "operation_count": 3,
+      "display_name": "Kyberion Visual Generation Compatibility Alias",
+      "operation_count": 1,
       "detail_ref": "knowledge/product/orchestration/service-presets/vision.json",
       "operations": [
         {
@@ -1752,22 +1782,6 @@
           "risk": "write",
           "approval_required": true,
           "idempotency": "recommended"
-        },
-        {
-          "action": "capture_screen",
-          "description": "macOS Native Screen Capture",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
-          "idempotency": "not_applicable"
-        },
-        {
-          "action": "record_screen",
-          "description": "Screen Recording via FFmpeg",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
-          "idempotency": "not_applicable"
         }
       ]
     },
