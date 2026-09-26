@@ -33,7 +33,7 @@ import type { SyncSourceTransport } from './sources/index.js';
 
 vi.mock('@agent/core/reasoning-bootstrap', () => ({ installReasoningBackends: () => false }));
 
-const TENANT = 'acme-corp';
+const TENANT = 'example-tenant';
 const ROOT_REL = `knowledge/confidential/${TENANT}`;
 const TARGET_DIR = `${ROOT_REL}/governance/weekly-sync`;
 const NOW_FRI = '2026-09-25T00:00:00.000Z'; // Fri 09:00 JST
@@ -75,7 +75,7 @@ function writeJobs(root: string, overrides: Record<string, unknown> = {}): void 
     id: 'weekly-sync',
     enabled: true,
     source_system: 'confluence',
-    source_params: { domain: 'acme', space_key: 'OPS', parent_page_ids: ['1000'] },
+    source_params: { domain: 'example', space_key: 'OPS', parent_page_ids: ['1000'] },
     title_pattern: 'Weekly OPS MTG',
     target_dir: TARGET_DIR,
     title_prefix: '週次定例',
@@ -140,7 +140,7 @@ function fakeBackend(): { backend: ReasoningBackend; prompts: string[] } {
           one_line: `${date} 一行要旨`,
           incidents:
             date === '2026-09-24'
-              ? [{ headline: '社用端末の紛失', details: ['連絡先: someone@example.com'] }]
+              ? [{ headline: '社用端末の紛失', details: ['連絡先: person@example.invalid'] }]
               : [],
           reviews: [{ category: 'SaaS', ticket: 'OSD-1', subject: 'A|B', result: '承認' }],
           new_topics: [],
@@ -216,7 +216,7 @@ function seedBackfill(root: string): void {
       'source_system: confluence',
       'source_page_id: "2001"',
       'source_title: "2026/9/10(木)：Weekly OPS MTG"',
-      'source_url: https://acme.atlassian.net/wiki/spaces/OPS/pages/2001',
+      'source_url: https://example.atlassian.net/wiki/spaces/OPS/pages/2001',
       'source_last_modified: 2026-09-10T06:47:17.442Z',
       'summary_status: final',
       '---',
@@ -318,7 +318,7 @@ describe('ingest:meeting_digest', () => {
           'source_system: confluence',
           'source_page_id: "2003"',
           'source_title: "2026/9/24(木)：Weekly OPS MTG"',
-          'source_url: https://acme.atlassian.net/wiki/spaces/OPS/pages/2003',
+          'source_url: https://example.atlassian.net/wiki/spaces/OPS/pages/2003',
           'source_version: 2',
           'source_last_modified: 2026-09-24T22:00:00.000Z',
           'summary_status: provisional',

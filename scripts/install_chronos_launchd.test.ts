@@ -14,7 +14,7 @@ import {
 describe('install_chronos_launchd plist generation', () => {
   const plist = buildChronosLaunchdPlist({
     nodePath: '/usr/local/bin/node',
-    repoRoot: '/Volumes/data/kyberion',
+    repoRoot: '/repo/kyberion',
     logDir: '/Users/alice/Library/Logs',
   });
 
@@ -22,13 +22,13 @@ describe('install_chronos_launchd plist generation', () => {
     expect(CHRONOS_LAUNCHD_LABEL).toBe('com.kyberion.chronos');
     expect(plist).toContain('<string>com.kyberion.chronos</string>');
     expect(plist).toContain('<key>WorkingDirectory</key>');
-    expect(plist).toContain('<string>/Volumes/data/kyberion</string>');
+    expect(plist).toContain('<string>/repo/kyberion</string>');
   });
 
   it('runs node against the built chronos daemon, in order', () => {
     const nodeIndex = plist.indexOf('<string>/usr/local/bin/node</string>');
     const scriptIndex = plist.indexOf(
-      '<string>/Volumes/data/kyberion/dist/scripts/chronos_daemon.js</string>'
+      '<string>/repo/kyberion/dist/scripts/chronos_daemon.js</string>'
     );
     expect(nodeIndex).toBeGreaterThan(-1);
     expect(scriptIndex).toBeGreaterThan(nodeIndex);
@@ -69,7 +69,7 @@ describe('install_chronos_launchd plist generation', () => {
   it('forwards allowlisted daemon settings and refuses anything else', () => {
     const withEnv = buildChronosLaunchdPlist({
       nodePath: '/usr/local/bin/node',
-      repoRoot: '/Volumes/data/kyberion',
+      repoRoot: '/repo/kyberion',
       logDir: '/Users/alice/Library/Logs',
       env: { KYBERION_CHRONOS_SCHEDULES: 'organization-daily-digest' },
     });
@@ -79,9 +79,9 @@ describe('install_chronos_launchd plist generation', () => {
     expect(() =>
       buildChronosLaunchdPlist({
         nodePath: '/usr/local/bin/node',
-        repoRoot: '/Volumes/data/kyberion',
+        repoRoot: '/repo/kyberion',
         logDir: '/Users/alice/Library/Logs',
-        env: { SLACK_BOT_TOKEN: 'xoxb-secret' },
+        env: { SLACK_BOT_TOKEN: 'test-token' },
       })
     ).toThrow(/cannot be forwarded/);
   });
