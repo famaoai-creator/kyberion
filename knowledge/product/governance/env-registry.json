@@ -3840,6 +3840,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_UIA_OPTIONS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Internal child-process channel: JSON options the os_accessibility detector sets on its own powershell.exe child on Windows (never read from the operator environment); do not set it.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_VAD",
       "category": "runtime",
       "type": "string",

@@ -144,12 +144,9 @@ describe('parseAccessibilitySnapshot', () => {
 describe('OsAccessibilityDetector', () => {
   const live = { image_path: 'screen.png', image_size: IMAGE, live_screen: true };
 
-  it('is unavailable without side effects off macOS or for an image that is not the live screen', async () => {
+  it('is unavailable without side effects off macOS/Windows or for an image that is not the live screen', async () => {
     const { run, calls } = fakeRunner();
     expect(await new OsAccessibilityDetector({ run, platform: 'linux' }).isAvailable(live)).toBe(
-      false
-    );
-    expect(await new OsAccessibilityDetector({ run, platform: 'win32' }).isAvailable(live)).toBe(
       false
     );
     const mac = new OsAccessibilityDetector({ run, platform: 'darwin' });
