@@ -91,6 +91,12 @@ Persona も同じスコープに従います（`resolveExecutionPersona()`）。
 
 環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
 
+認可の入力になる Persona は実行スコープから解決します: secure-io の policy-engine 判定（`file_write` / `execute_command` の `agentId`）、`operation-policy-gate`、`organization-digest` の sovereign 判定は `executionPersonaText()` / `resolveExecutionPersona()` を使います。`MISSION_ROLE` / `KYBERION_PERSONA` を今も直接読む既知の箇所は、監査・トレースの帰属ラベル、または CLI の操作者 ID 照合だけです（非同期の引き受けの中では外側の値になります）:
+
+- 帰属ラベル: `network.ts`、`secret-guard.ts`、`secret-introduction.ts`、`delegated-task-observability.ts`、`provider-pins-store.ts`、`seam-provider-selection.ts`、`seam-selection-rules.ts`、`mission-lifecycle-service.ts`、`reasoning-bootstrap.ts`、`work-coordination.ts`、`project-management.ts`、`organization-operating-model*.ts`、`organization-operation-run-recording.ts`、`tenant-governance.ts`、`cloudflare-os-control-plane.ts`、`acp-mediator.ts`、`claude-agent-governance.ts`
+- CLI の操作者 ID 照合: `mission-maintenance.ts`（承認者）、`mission-work-reconciliation.ts`（採用者）
+- 明示的に渡された env を読むもの: `mcp-request-context.ts`、`authn-providers.ts`（`deps.env` があるときのみ。ないときはスコープを使う）
+
 以前は `SYSTEM_ROLE` が `MISSION_ROLE` より優先されていたため、surface_runtime から起動されたサーフェスでは `withExecutionContext` によるロール引き受けがすべて黙って無視されていました（例: Chronos の `chronos_localadmin` によるテナントレジストリ読み取りやプラグイン承認）。
 
 **ロール引き受けポリシー（多層防御）**: `SYSTEM_ROLE` が設定されたプロセスが引き受けられるのは、次のいずれかのロールだけです。それ以外を引き受けようとすると、`fn` を実行する前に `[ROLE_ASSUMPTION_DENIED]` で失敗します。

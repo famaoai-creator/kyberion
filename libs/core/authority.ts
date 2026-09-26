@@ -15,9 +15,9 @@ import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
 import {
   currentExecutionScope,
+  executionPersonaText,
   executionScopeStorage,
   scopedAssumedRole,
-  scopedPersona,
   type ExecutionScope,
 } from './foundation/execution-scope.js';
 const logger = createLogger('authority');
@@ -267,9 +267,7 @@ export function resolveRole(): string | undefined {
  * process-global and races between concurrent async contexts.
  */
 export function resolveExecutionPersona(): string | undefined {
-  const scoped = scopedPersona();
-  if (scoped.bound) return scoped.persona;
-  return getRegisteredEnvText('KYBERION_PERSONA');
+  return executionPersonaText();
 }
 
 // ---------------------------------------------------------------------------
