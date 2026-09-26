@@ -10,8 +10,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
  * the personal tier. The chronos-access token registry is read through the
  * dedicated `chronos_token_registry_reader` role, whose only grant is that one
  * file. These tests run the real secure-io / tier-guard / secret-guard stack
- * against a hermetic KYBERION_ROOT that links the checked-in governance
- * policies (knowledge/product) and holds its own personal tier.
+ * against a hermetic KYBERION_ROOT with a copy of the checked-in governance
+ * policies (knowledge/product/governance, schemas) and holds its own personal tier.
  */
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -52,10 +52,15 @@ describe('TR-01 chronos_token_registry_reader', () => {
     fs.writeFileSync(path.join(root, 'AGENTS.md'), '# hermetic\n');
     fs.mkdirSync(path.join(root, 'knowledge', 'personal', 'connections'), { recursive: true });
     fs.mkdirSync(path.join(root, 'knowledge', 'personal', 'tenants'), { recursive: true });
-    fs.symlinkSync(
-      path.join(REPO_ROOT, 'knowledge', 'product'),
-      path.join(root, 'knowledge', 'product')
-    );
+    // Copied, not linked: secure-io refuses symlinked governance paths
+    // (policy engine, seam provider selection).
+    for (const dir of ['governance', 'schemas']) {
+      fs.cpSync(
+        path.join(REPO_ROOT, 'knowledge', 'product', dir),
+        path.join(root, 'knowledge', 'product', dir),
+        { recursive: true }
+      );
+    }
     issued = runtimeToken();
     fs.writeFileSync(
       path.join(root, REGISTRY_RELATIVE),
@@ -170,6 +175,79 @@ describe('TR-01 chronos_token_registry_reader', () => {
       writeChronosCoordination: false,
       writeProduct: false,
     });
+  });
+
+  it('decrypts an encrypted-at-rest registry under the reader role (persona worker)', async () => {
+    const { authority, registry } = await loadModules();
+    const encryption = await import('./secret-encryption.js');
+    const registryPath = path.join(root, REGISTRY_RELATIVE);
+    const plaintext = fs.readFileSync(registryPath, 'utf8');
+    encryption.overrideSecretEncryptionKeyForTests(randomBytes(32));
+    try {
+      const envelope = encryption.encryptConnectionDocument(
+        JSON.parse(plaintext) as Record<string, unknown>
+      );
+      expect(encryption.isEncryptedConnectionEnvelope(envelope)).toBe(true);
+      fs.writeFileSync(registryPath, `${JSON.stringify(envelope)}\n`);
+      expect(fs.readFileSync(registryPath, 'utf8')).not.toContain(issued.hash);
+
+      const result = authority.withExecutionContext(
+        registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+        () => ({
+          persona: authority.resolveIdentityContext().persona,
+          registrations: registry.readChronosTokenRegistrations(),
+        })
+      );
+      expect(result.persona).toBe('worker');
+      expect(
+        registry.findChronosTokenRegistration(issued.token, result.registrations ?? [])
+      ).toMatchObject({ role: 'readonly', tenant_slugs: ['acme-corp'] });
+    } finally {
+      encryption.overrideSecretEncryptionKeyForTests(null);
+      fs.writeFileSync(registryPath, plaintext);
+    }
+  });
+
+  it('reads the registry as the reader role through the authn seam (deps.registrations unset)', async () => {
+    process.env.SYSTEM_ROLE = 'concierge';
+    vi.resetModules();
+    const rolesDuringRead: Array<string | undefined> = [];
+    vi.doMock('./chronos-access-registry.js', async () => {
+      const actual = await vi.importActual<typeof import('./chronos-access-registry.js')>(
+        './chronos-access-registry.js'
+      );
+      const { resolveRole } = await import('./authority.js');
+      return {
+        ...actual,
+        readChronosTokenRegistrations: () => {
+          rolesDuringRead.push(resolveRole());
+          return actual.readChronosTokenRegistrations();
+        },
+      };
+    });
+    try {
+      const authority = await import('./authority.js');
+      authority.resetRoleAssumptionPolicyCache();
+      const { resolveAuthnSurfaceViewerScope } = await import('./surface-authn.js');
+      // No `registrations` key: the registry-token provider reads the registry.
+      const { scope, principal } = resolveAuthnSurfaceViewerScope({
+        token: issued.token,
+        local: false,
+        serverTenant: 'acme-corp',
+        surface: 'concierge',
+      });
+      expect(principal.provider).toBe('registry-token');
+      expect(scope).toMatchObject({
+        role: 'readonly',
+        tenantSlugs: ['acme-corp'],
+        source: 'token',
+      });
+      expect(rolesDuringRead.length).toBeGreaterThan(0);
+      expect(new Set(rolesDuringRead)).toEqual(new Set(['chronos_token_registry_reader']));
+      expect(authority.resolveRole()).toBe('concierge');
+    } finally {
+      vi.doUnmock('./chronos-access-registry.js');
+    }
   });
 
   it('cannot store a registration through the governed writer', async () => {
