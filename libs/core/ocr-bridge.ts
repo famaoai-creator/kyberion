@@ -20,6 +20,7 @@ import {
   type SeamProviderCandidate,
 } from './seam-provider-selection.js';
 import { matchSeamSelectionRule } from './seam-selection-rules.js';
+import { withEgressPayloadContext } from './egress-policy.js';
 
 const ocrProviderSeam = createSeam<OcrProvider>({
   key: 'ocr-provider',
@@ -31,6 +32,11 @@ const ocrProviderDisposers = new Map<string, () => void>();
 // Held as AdaptivePolicyRouter once classes below are constructed.
 let ocrGlobalRouter: any = null;
 let ocrBuiltinsRegistered = false;
+
+function providerDataPolicy(provider: OcrProvider): NonNullable<OcrProvider['dataPolicy']> {
+  if (provider.dataPolicy) return provider.dataPolicy;
+  return provider.dataEgress === 'external' ? 'training_eligible' : 'local_only';
+}
 
 /** Register an OCR backend into the ocr-provider seam. */
 export function registerOcrProvider(provider: OcrProvider): () => void {
@@ -391,6 +397,7 @@ export class AppleVisionOcrProvider implements OcrProvider {
 export class LlmApiOcrProvider implements OcrProvider {
   readonly id = 'llm_api';
   readonly dataEgress = 'external' as const; // uploads the image to a vendor API
+  readonly dataPolicy = 'training_eligible' as const;
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
@@ -599,12 +606,14 @@ export class LocalVlmOcrProvider implements OcrProvider {
    * name is not evidence, the resolved endpoint is.
    */
   readonly dataEgress: OcrDataEgress;
+  readonly dataPolicy: 'local_only' | 'training_eligible';
 
   constructor(endpoint = 'http://localhost:11434/api/generate', model = 'llama3-vision') {
     const ollamaHost = getRegisteredEnvText('OLLAMA_HOST');
     this.endpoint = ollamaHost ? `${ollamaHost.replace(/\/$/, '')}/api/generate` : endpoint;
     this.model = getRegisteredEnvText('OLLAMA_VLM_MODEL') || model;
     this.dataEgress = isLoopbackEndpoint(this.endpoint) ? 'loopback' : 'external';
+    this.dataPolicy = this.dataEgress === 'external' ? 'training_eligible' : 'local_only';
   }
 
   async isAvailable(): Promise<boolean> {
@@ -675,6 +684,19 @@ export class AdaptivePolicyRouter {
     return new Set<OcrDataEgress>(['none', 'loopback', 'external']);
   }
 
+  private allowedDataPolicies(
+    request: OcrRequest
+  ): ReadonlySet<NonNullable<OcrProvider['dataPolicy']>> {
+    switch (request.training_use || 'local_only') {
+      case 'training_eligible':
+        return new Set(['local_only', 'zero_retention', 'training_eligible']);
+      case 'zero_retention':
+        return new Set(['local_only', 'zero_retention']);
+      default:
+        return new Set(['local_only']);
+    }
+  }
+
   private getProviderIds(request: OcrRequest): string[] {
     const preferred =
       request.providerPreference && request.providerPreference.length > 0
@@ -713,6 +735,7 @@ export class AdaptivePolicyRouter {
   async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
     const mode = request.mode || 'balanced';
     const allowed = this.allowedEgress(mode);
+    const allowedPolicies = this.allowedDataPolicies(request);
     const candidates: SeamProviderCandidate[] = [];
     for (const provider of this.providers.values()) {
       if (!allowed.has(provider.dataEgress)) {
@@ -720,6 +743,17 @@ export class AdaptivePolicyRouter {
           id: provider.id,
           eligible: false,
           unmet: [`dataEgress '${provider.dataEgress}' not permitted by mode '${mode}'`],
+        });
+        continue;
+      }
+      const dataPolicy = providerDataPolicy(provider);
+      if (!allowedPolicies.has(dataPolicy)) {
+        candidates.push({
+          id: provider.id,
+          eligible: false,
+          unmet: [
+            `dataPolicy '${dataPolicy}' not permitted by training_use '${request.training_use || 'local_only'}'`,
+          ],
         });
         continue;
       }
@@ -781,6 +815,7 @@ export class AdaptivePolicyRouter {
     }
 
     const allowed = this.allowedEgress(request.mode || 'balanced');
+    const allowedPolicies = this.allowedDataPolicies(request);
     const candidates: OcrProvider[] = [];
     for (const id of this.getProviderIds(request)) {
       const provider = this.providers.get(id);
@@ -791,6 +826,7 @@ export class AdaptivePolicyRouter {
         );
         continue;
       }
+      if (!allowedPolicies.has(providerDataPolicy(provider))) continue;
       if (await provider.isAvailable()) candidates.push(provider);
     }
     return candidates;
@@ -826,7 +862,10 @@ function getRouter(): AdaptivePolicyRouter {
 }
 
 export async function ocrImage(request: OcrRequest): Promise<OcrResult> {
-  return await ocrImageWithRouter(request, getRouter());
+  return await ocrImageWithRouter(
+    { ...request, training_use: request.training_use || 'local_only' },
+    getRouter()
+  );
 }
 
 export async function ocrImageWithRouter(
@@ -842,11 +881,23 @@ export async function ocrImageWithRouter(
   for (const provider of candidates) {
     logger.info(`[ocr_bridge] Routing OCR request for ${request.path} to provider: ${provider.id}`);
     try {
-      const result = await provider.recognize(request);
+      const result = await withEgressPayloadContext(
+        {
+          tier: request.tier || 'public',
+          ...(request.tenant_slug ? { tenant_slug: request.tenant_slug } : {}),
+          purpose: request.purpose || 'ocr',
+        },
+        () => provider.recognize(request)
+      );
       if (result.status === 'succeeded') {
         // Stamp the served egress so callers can assert what actually happened
         // instead of trusting the mode they asked for.
-        return { ...result, providerDataEgress: provider.dataEgress };
+        return {
+          ...result,
+          providerDataEgress: provider.dataEgress,
+          dataPolicy: providerDataPolicy(provider),
+          tier: request.tier || 'public',
+        };
       }
       lastError = new Error(result.error || `${provider.id}_ocr_failed`);
       logger.warn(

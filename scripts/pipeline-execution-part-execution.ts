@@ -34,7 +34,10 @@ import {
 } from '@agent/core/actuator-forwarding-port';
 import { runToolCallBatch } from '@agent/core/tool-call-scheduler';
 import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/op-input-contracts';
-import { hashPipelineOutput } from '@agent/core/pipeline-run-journal';
+import {
+  hashPipelineOutput,
+  pipelineJournalChannelSnapshot,
+} from '@agent/core/pipeline-run-journal';
 import { deriveExecutionGraph } from '@agent/core/graph-scheduler';
 import type { ResourceClaim } from '@agent/core/tool-call-scheduler';
 import {
@@ -1179,13 +1182,10 @@ export async function runStepsInternal(
             : normalizePipelineOp(step.op) === 'core:judge_route'
               ? 'judge_route'
               : undefined;
-        const snapshot: Record<string, unknown> = {};
-        if (
-          journalDeclaredChannel &&
-          Object.prototype.hasOwnProperty.call(ctx, journalDeclaredChannel)
-        ) {
-          snapshot[journalDeclaredChannel] = ctx[journalDeclaredChannel];
-        }
+        const { output_channels_snapshot: snapshot, redacted_channels: redactedChannels } =
+          pipelineJournalChannelSnapshot(journalDeclaredChannel, ctx, {
+            sensitive: typeof step.produces === 'object' && step.produces.sensitive === true,
+          });
         const controlStateSnapshot: Record<string, unknown> = {};
         for (const key of ['__pipeline_route_next', '__judge_route_history', '__adf_terminal']) {
           if (Object.prototype.hasOwnProperty.call(ctx, key)) controlStateSnapshot[key] = ctx[key];
@@ -1203,6 +1203,7 @@ export async function runStepsInternal(
             ...(Object.keys(controlStateSnapshot).length > 0
               ? { control_state_snapshot: controlStateSnapshot }
               : {}),
+            ...(redactedChannels ? { redacted_channels: redactedChannels } : {}),
             output_hash: hashPipelineOutput(snapshot),
             duration_ms: durationMs,
           });

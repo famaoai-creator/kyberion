@@ -539,6 +539,18 @@
       "types": "./dist/organization-operation-runtime.d.ts",
       "default": "./dist/organization-operation-runtime.js"
     },
+    "./organization-operation-run-recording": {
+      "types": "./dist/organization-operation-run-recording.d.ts",
+      "default": "./dist/organization-operation-run-recording.js"
+    },
+    "./organization-digest": {
+      "types": "./dist/organization-digest.d.ts",
+      "default": "./dist/organization-digest.js"
+    },
+    "./business-calendar": {
+      "types": "./dist/business-calendar.d.ts",
+      "default": "./dist/business-calendar.js"
+    },
     "./organization-interventions": {
       "types": "./dist/organization-interventions.d.ts",
       "default": "./dist/organization-interventions.js"
@@ -1231,6 +1243,10 @@
       "types": "./dist/calendar-workflow.d.ts",
       "default": "./dist/calendar-workflow.js"
     },
+    "./calendar-slot-planner": {
+      "types": "./dist/calendar-slot-planner.d.ts",
+      "default": "./dist/calendar-slot-planner.js"
+    },
     "./fs-utils": {
       "types": "./dist/fs-utils.d.ts",
       "default": "./dist/fs-utils.js"
@@ -1374,14 +1390,6 @@
     "./image-description-bridge": {
       "types": "./dist/image-description-bridge.d.ts",
       "default": "./dist/image-description-bridge.js"
-    },
-    "./image-dhash": {
-      "types": "./dist/image-dhash.d.ts",
-      "default": "./dist/image-dhash.js"
-    },
-    "./dirty-tile-describer": {
-      "types": "./dist/dirty-tile-describer.d.ts",
-      "default": "./dist/dirty-tile-describer.js"
     },
     "./visual-workflow-compiler": {
       "types": "./dist/visual-workflow-compiler.d.ts",
@@ -3047,10 +3055,6 @@
       "types": "./dist/work-coordination-import-catalog.d.ts",
       "default": "./dist/work-coordination-import-catalog.js"
     },
-    "./video-ingest": {
-      "types": "./dist/video-ingest/index.d.ts",
-      "default": "./dist/video-ingest/index.js"
-    },
     "./work-integrations/github-issues": {
       "types": "./dist/work-integrations/github-issues.d.ts",
       "default": "./dist/work-integrations/github-issues.js"
@@ -3298,6 +3302,26 @@
     "./plugin-view-actions": {
       "types": "./dist/plugin-view-actions.d.ts",
       "default": "./dist/plugin-view-actions.js"
+    },
+    "./document-reader": {
+      "types": "./dist/document-reader.d.ts",
+      "default": "./dist/document-reader.js"
+    },
+    "./html-to-markdown": {
+      "types": "./dist/html-to-markdown.d.ts",
+      "default": "./dist/html-to-markdown.js"
+    },
+    "./image-dhash": {
+      "types": "./dist/image-dhash.d.ts",
+      "default": "./dist/image-dhash.js"
+    },
+    "./dirty-tile-describer": {
+      "types": "./dist/dirty-tile-describer.d.ts",
+      "default": "./dist/dirty-tile-describer.js"
+    },
+    "./video-ingest": {
+      "types": "./dist/video-ingest/index.d.ts",
+      "default": "./dist/video-ingest/index.js"
     },
     "./set-of-marks": {
       "types": "./dist/set-of-marks.d.ts",

@@ -41,6 +41,25 @@ export interface CalendarProviderInsertEventParams {
   sendUpdates?: 'all' | 'externalOnly' | 'none';
 }
 
+export interface CalendarProviderUpdateEventParams {
+  calendarId: string;
+  eventId: string;
+  summary?: string;
+  description?: string;
+  location?: string;
+  start?: Record<string, string>;
+  end?: Record<string, string>;
+  attendees?: string[];
+  reminderMinutesBeforeStart?: number;
+  sendUpdates?: 'all' | 'externalOnly' | 'none';
+}
+
+export interface CalendarProviderDeleteEventParams {
+  calendarId: string;
+  eventId: string;
+  sendUpdates?: 'all' | 'externalOnly' | 'none';
+}
+
 export interface CalendarProviderBridge {
   readonly provider_id: CalendarProviderId;
   resolveCalendarPath(calendarId?: string): string;
@@ -48,6 +67,8 @@ export interface CalendarProviderBridge {
   listCalendars(): Promise<unknown>;
   queryFreeBusy(params: CalendarProviderFreeBusyParams): Promise<unknown>;
   insertEvent(params: CalendarProviderInsertEventParams): Promise<unknown>;
+  updateEvent?(params: CalendarProviderUpdateEventParams): Promise<unknown>;
+  deleteEvent?(params: CalendarProviderDeleteEventParams): Promise<unknown>;
 }
 
 const calendarProviderSeam = createSeam<CalendarProviderBridge>({
@@ -154,6 +175,40 @@ function registerBuiltinCalendarProviders(): void {
         },
       });
     },
+    async updateEvent(params) {
+      return executeServicePreset('google-workspace', 'calendar_events_patch', {
+        params: {
+          calendarId: params.calendarId,
+          eventId: params.eventId,
+          ...(params.sendUpdates ? { sendUpdates: params.sendUpdates } : {}),
+        },
+        body: {
+          ...(params.summary !== undefined ? { summary: params.summary } : {}),
+          ...(params.description !== undefined ? { description: params.description } : {}),
+          ...(params.location !== undefined ? { location: params.location } : {}),
+          ...(params.start ? { start: params.start } : {}),
+          ...(params.end ? { end: params.end } : {}),
+          ...(params.attendees ? { attendees: params.attendees.map((email) => ({ email })) } : {}),
+          ...(params.reminderMinutesBeforeStart !== undefined
+            ? {
+                reminders: {
+                  useDefault: false,
+                  overrides: [{ method: 'popup', minutes: params.reminderMinutesBeforeStart }],
+                },
+              }
+            : {}),
+        },
+      });
+    },
+    async deleteEvent(params) {
+      return executeServicePreset('google-workspace', 'calendar_events_delete', {
+        params: {
+          calendarId: params.calendarId,
+          eventId: params.eventId,
+          ...(params.sendUpdates ? { sendUpdates: params.sendUpdates } : {}),
+        },
+      });
+    },
   });
 
   registerCalendarProvider({
@@ -219,6 +274,45 @@ function registerBuiltinCalendarProviders(): void {
                 onlineMeetingProvider: 'teamsForBusiness',
               }
             : {}),
+        },
+      });
+    },
+    async updateEvent(params) {
+      return executeServicePreset('m365', 'calendar_events_update', {
+        params: {
+          calendarPath: this.resolveCalendarPath(params.calendarId),
+          eventId: params.eventId,
+        },
+        body: {
+          ...(params.summary !== undefined ? { subject: params.summary } : {}),
+          ...(params.description !== undefined
+            ? { body: { contentType: 'text', content: params.description } }
+            : {}),
+          ...(params.location !== undefined ? { location: { displayName: params.location } } : {}),
+          ...(params.start ? { start: params.start } : {}),
+          ...(params.end ? { end: params.end } : {}),
+          ...(params.attendees
+            ? {
+                attendees: params.attendees.map((email) => ({
+                  emailAddress: { address: email },
+                  type: 'required',
+                })),
+              }
+            : {}),
+          ...(params.reminderMinutesBeforeStart !== undefined
+            ? {
+                isReminderOn: true,
+                reminderMinutesBeforeStart: params.reminderMinutesBeforeStart,
+              }
+            : {}),
+        },
+      });
+    },
+    async deleteEvent(params) {
+      return executeServicePreset('m365', 'calendar_events_delete', {
+        params: {
+          calendarPath: this.resolveCalendarPath(params.calendarId),
+          eventId: params.eventId,
         },
       });
     },

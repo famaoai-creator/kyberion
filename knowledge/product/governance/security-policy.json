@@ -427,6 +427,13 @@
         "active/audit/"
       ]
     },
+    "chronos_tenant_runner": {
+      "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/${KYBERION_TENANT}/"],
+      "allow_write": [
+        "customer/${KYBERION_TENANT}/logs/audit/",
+        "customer/${KYBERION_TENANT}/logs/traces/"
+      ]
+    },
     "chronos_gateway": {
       "allow_read": [
         "active/shared/coordination/chronos/",
@@ -575,6 +582,19 @@
         "active/shared/observability/retrospectives/"
       ],
       "allow_write": ["active/shared/observability/retrospectives/"]
+    },
+    "organization_operator": {
+      "allow_read": [
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "knowledge/confidential/${KYBERION_TENANT}/",
+        "knowledge/confidential/shared/"
+      ],
+      "allow_write": [
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/"
+      ]
     }
   },
   "authority_permissions": {

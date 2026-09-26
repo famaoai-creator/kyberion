@@ -8,7 +8,7 @@ describe('claude_code_hook entrypoint', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/claude_code_hook.ts'));
     expect(source).not.toContain('process.exitCode =');
     expect(source).toContain('process.stdout.write(');
-    expect(source).toContain("permissionDecision: 'allow'");
+    expect(source).toContain("permissionDecision: 'deny'");
     expect(source).toContain('run: async ({ argv }) =>');
     expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
     expect(source).toContain('readClaudeCodeHookTranscript(filePath: string)');

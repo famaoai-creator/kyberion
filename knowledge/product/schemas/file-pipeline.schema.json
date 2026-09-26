@@ -61,7 +61,11 @@
                 "required": ["channel"],
                 "properties": {
                   "channel": { "type": "string" },
-                  "type": { "type": "string", "description": "Optional data type hint." }
+                  "type": { "type": "string", "description": "Optional data type hint." },
+                  "sensitive": {
+                    "type": "boolean",
+                    "description": "Confidential channel: the run journal records only a hash/length marker, and resume re-executes the step."
+                  }
                 },
                 "additionalProperties": false
               }

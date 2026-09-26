@@ -1,4 +1,9 @@
-export type { PdfDesignProtocol, PdfAesthetic, PdfLayoutElement, PdfPage } from './src/types/pdf-protocol.js';
+export type {
+  PdfDesignProtocol,
+  PdfAesthetic,
+  PdfLayoutElement,
+  PdfPage,
+} from './src/types/pdf-protocol.js';
 export type {
   DocumentDesignProtocol,
   DocumentProvenance,
@@ -17,13 +22,26 @@ export type {
   XlsxMergeCell,
   XlsxWorksheet,
 } from './src/types/xlsx-protocol.js';
-export { distillPdfDesign } from './src/pdf-utils.js';
+export { distillPdfDesign, selectPdfOcrImages } from './src/pdf-utils.js';
 export { distillPptxDesign } from './src/pptx-utils.js';
 export { distillXlsxDesign } from './src/xlsx-utils.js';
 export { distillDocxDesign } from './src/docx-utils.js';
 export { generateNativePdf } from './src/native-pdf-engine/engine.js';
-export { generateNativePptx, patchPptxText, patchPptxParagraphs, extractPptxSlides, filterPptxSlides } from './src/native-pptx-engine/engine.js';
+export {
+  generateNativePptx,
+  patchPptxText,
+  patchPptxParagraphs,
+  extractPptxSlides,
+  filterPptxSlides,
+} from './src/native-pptx-engine/engine.js';
 export type { ExtractedSlide } from './src/native-pptx-engine/engine.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
-export { protocolToMarkdown, pdfToMarkdown, docxToMarkdown, xlsxToMarkdown, pptxToMarkdown } from './src/protocol-to-markdown.js';
+export {
+  protocolToMarkdown,
+  pdfToMarkdown,
+  docxToMarkdown,
+  xlsxToMarkdown,
+  pptxToMarkdown,
+  DOCX_IMAGE_MARKER,
+} from './src/protocol-to-markdown.js';

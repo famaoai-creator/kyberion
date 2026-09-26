@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [computer-use, browser, actuator, runtime, governance]
 owner: ecosystem_architect
-last_updated: 2026-09-13
+last_updated: 2026-09-25
 ---
 
 # Computer Use Runtime Model
@@ -35,7 +35,10 @@ It includes:
 
 Kyberion already contains much of the substrate:
 
-- `browser-actuator` for Playwright execution
+- `browser-actuator` for Playwright execution (web pages)
+- `system-actuator` for OS-level GUI actions through the macOS automation bridge
+  (`os-automation-bridge-model.md`)
+- `terminal-actuator` for PTY sessions
 - `surface-runtime` for governed long-lived surfaces
 - `A2UI` for human-facing live state
 - `Chronos` for control and inspection
@@ -189,7 +192,10 @@ Kyberion should expose computer use through distinct surfaces:
 
 ## Recommended Near-Term Implementation
 
-1. Keep `browser-actuator` as the physical executor.
+1. Keep the physical executors split by target — `browser-actuator` (page),
+   `system-actuator` (OS / desktop apps), `terminal-actuator` (PTY) — all speaking
+   the same `computer_interaction` contract (`target.executor`). They are not
+   duplicates and are not merged; see `orchestration/action-playbook.md`.
 2. Add `computer-interaction.schema.json` as the provider-neutral step contract.
 3. Create a `computer-surface` runtime that displays:
    - latest screenshot

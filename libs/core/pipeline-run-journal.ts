@@ -56,6 +56,12 @@ export interface PipelineRunNodeCompletedPayload {
   output_channels_snapshot: Record<string, unknown>;
   /** Durable control markers required to resume a declarative route safely. */
   control_state_snapshot?: Record<string, unknown>;
+  /**
+   * Channels recorded only as a hash/length marker (step `produces.sensitive`).
+   * A node with redacted channels is not resumable from the journal: resume
+   * re-executes it instead of restoring a placeholder.
+   */
+  redacted_channels?: string[];
   output_hash: string;
   duration_ms?: number;
 }
@@ -126,6 +132,7 @@ const pipelineNodeCompletedSchema = z.object({
   step_id: z.string(),
   output_channels_snapshot: z.record(z.string(), z.unknown()),
   control_state_snapshot: z.record(z.string(), z.unknown()).optional(),
+  redacted_channels: z.array(z.string()).optional(),
   output_hash: z.string(),
   duration_ms: z.number().optional(),
 });
@@ -155,10 +162,15 @@ pipelineJournalKernel.defineOp('pipeline.run_suspended', {
 pipelineJournalKernel.defineOp('pipeline.node_completed', {
   model: pipelineJournalModel,
   schema: pipelineNodeCompletedSchema,
-  apply: (state, payload) => ({
-    ...state,
-    completed_nodes: { ...state.completed_nodes, [payload.step_id]: payload },
-  }),
+  // A node whose output was redacted cannot be restored from the journal, so
+  // it is left out of completed_nodes and re-executes on resume.
+  apply: (state, payload) =>
+    payload.redacted_channels?.length
+      ? state
+      : {
+          ...state,
+          completed_nodes: { ...state.completed_nodes, [payload.step_id]: payload },
+        },
 });
 pipelineJournalKernel.defineOp('pipeline.node_failed', {
   model: pipelineJournalModel,
@@ -264,6 +276,41 @@ function stableValue(value: unknown): string {
 
 export function hashPipelineOutput(value: unknown): string {
   return createHash('sha256').update(stableValue(value)).digest('hex');
+}
+
+/** What a node_completed event records for a step's declared output channel. */
+export interface PipelineJournalChannelSnapshot {
+  output_channels_snapshot: Record<string, unknown>;
+  redacted_channels?: string[];
+}
+
+/**
+ * Snapshot a step's declared output channel for the run journal. The journal
+ * lands in the shared tier (`active/shared/runtime/pipeline-runs/`) unless a
+ * mission owns the run, so a channel marked sensitive (e.g. a cross-tenant
+ * confidential digest) is recorded only as `{ redacted, sha256, length }` —
+ * enough to correlate runs, never the content.
+ */
+export function pipelineJournalChannelSnapshot(
+  channel: string | undefined,
+  context: Record<string, unknown>,
+  options: { sensitive?: boolean } = {}
+): PipelineJournalChannelSnapshot {
+  if (!channel || !Object.prototype.hasOwnProperty.call(context, channel)) {
+    return { output_channels_snapshot: {} };
+  }
+  const value = context[channel];
+  if (!options.sensitive) return { output_channels_snapshot: { [channel]: value } };
+  return {
+    output_channels_snapshot: {
+      [channel]: {
+        redacted: true,
+        sha256: hashPipelineOutput(value),
+        length: stableValue(value).length,
+      },
+    },
+    redacted_channels: [channel],
+  };
 }
 
 function migrateEvent(raw: unknown): PipelineRunJournalEvent {

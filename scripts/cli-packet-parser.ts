@@ -10,7 +10,6 @@ interface OperatorPacketAction {
   suggested_pipeline_path?: string;
   suggested_followup_request?: string;
 }
-
 interface OperatorInteractionPacket {
   kind: 'operator-interaction-packet';
   interaction_type: 'clarification' | 'execution-preview' | 'status-summary' | 'delivery-summary';

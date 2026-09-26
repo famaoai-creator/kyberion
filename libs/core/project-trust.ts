@@ -165,3 +165,32 @@ export function assertProjectTrustApproval(requestId: string, inputPath: string)
     );
   }
 }
+
+/**
+ * Newest approved project-trust request that is valid for the CURRENT content
+ * of this exact resource, or null. Unattended runners (chronos tenant
+ * schedules) use this to find the human decision they must present; every
+ * candidate is re-verified through assertProjectTrustApproval, so an edited
+ * file, an expired or non-human decision never yields an id.
+ */
+export function findValidProjectTrustApproval(inputPath: string): string | null {
+  const resolved = normalizeRelativePath(inputPath);
+  if (isBuiltinPipelineResource(resolved.relative)) return null;
+  const candidates = listApprovalRequests({
+    storageChannels: [PROJECT_TRUST_APPROVAL_CHANNEL],
+    status: 'approved',
+  })
+    .filter((record) => isProjectTrustRequest(record, resolved.relative))
+    .sort((a, b) =>
+      String(b.decidedAt ?? b.requestedAt) < String(a.decidedAt ?? a.requestedAt) ? -1 : 1
+    );
+  for (const record of candidates) {
+    try {
+      assertProjectTrustApproval(record.id, resolved.relative);
+      return record.id;
+    } catch {
+      // Stale (content changed), expired or not a human decision — keep looking.
+    }
+  }
+  return null;
+}

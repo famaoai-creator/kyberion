@@ -146,6 +146,8 @@ Authority は原則としてミッションに紐づけて発行されます。A
 
 Persona が `unknown` のままだとほとんどの書き込みが拒否されます。`resolveIdentityContext()` の返す `executionMode` で現在のモードを確認できます。
 
+テナントに束縛された実行（`KYBERION_TENANT`、chronos のテナントパイプライン）の env 構成、違反を起こす組み合わせ、安全なプローブ手順、キルスイッチの確認方法は [tenant-bound-runtime-probing](./tenant-bound-runtime-probing.md) を参照してください。
+
 ---
 
 _Status: v3.0 — ExecutionMode / 4-tier / 28-role mapping (2026-06-02)_

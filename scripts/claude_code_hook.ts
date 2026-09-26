@@ -9,11 +9,12 @@
  *   node dist/scripts/claude_code_hook.js SessionStart  < event.json
  *   node dist/scripts/claude_code_hook.js UserPromptSubmit < event.json
  *   node dist/scripts/claude_code_hook.js PreToolUse     < event.json
+ *   node dist/scripts/claude_code_hook.js PreToolUseShellDeny < event.json
  *   node dist/scripts/claude_code_hook.js PostToolUse    < event.json
  *   node dist/scripts/claude_code_hook.js Stop           < event.json
  *
- * Never blocks Claude Code on an internal error: on failure it exits 0 and (for
- * PreToolUse) fails open with an explanatory reason.
+ * Hook failures fail closed for shell execution so a policy outage cannot turn
+ * a denied command into an allowed command.
  */
 
 import {
@@ -21,6 +22,7 @@ import {
   buildStopContext,
   buildUserPromptSubmitContext,
   evaluatePreToolUse,
+  evaluatePreToolUseShellDeny,
   recordCliUsage,
   recordPostToolUse,
   summarizeTranscriptUsage,
@@ -87,6 +89,24 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
       process.stdout.write(JSON.stringify(evaluatePreToolUse(payload)));
       return;
     }
+    case 'PreToolUseShellDeny': {
+      // Deny-only: silence (no JSON) leaves the decision to Claude Code.
+      try {
+        const decision = evaluatePreToolUseShellDeny(payload);
+        if (decision) process.stdout.write(JSON.stringify(decision));
+      } catch (err) {
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: 'PreToolUse',
+              permissionDecision: 'deny',
+              permissionDecisionReason: `Kyberion shell policy could not be evaluated: ${String(err)}`,
+            },
+          })
+        );
+      }
+      return;
+    }
     case 'PostToolUse': {
       try {
         recordPostToolUse(payload);
@@ -129,14 +149,14 @@ export const claudeCodeHook = defineScript({
     try {
       await main(hookArgv);
     } catch (err) {
-      // Fail open: emit an allow decision for PreToolUse so a hook bug never wedges the session.
+      // Fail closed for PreToolUse so a hook bug cannot bypass the policy.
       if (hookArgv[2] === 'PreToolUse') {
         process.stdout.write(
           JSON.stringify({
             hookSpecificOutput: {
               hookEventName: 'PreToolUse',
-              permissionDecision: 'allow',
-              permissionDecisionReason: `Kyberion hook errored (failing open): ${String(err)}`,
+              permissionDecision: 'deny',
+              permissionDecisionReason: `Kyberion hook errored; refusing tool use: ${String(err)}`,
             },
           })
         );

@@ -20,6 +20,7 @@ import '../libs/core/camera-output-bridge.js';
 import '../libs/core/deployment-adapter.js';
 import '../libs/core/embedding-backend.js';
 import '../libs/core/email-account-catalog.js';
+import '../libs/core/knowledge-adapter.js';
 import '../libs/core/image-generation-bridge.js';
 import '../libs/core/intent-extractor.js';
 import '../libs/core/judgment-backend.js';

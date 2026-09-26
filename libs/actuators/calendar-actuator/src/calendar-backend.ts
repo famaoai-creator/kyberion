@@ -6,12 +6,15 @@ import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 import {
   createCalendarEvent,
+  deleteCalendarEvent,
   listCalendarAgenda,
   listCalendars as listServiceCalendars,
   queryCalendarFreeBusy,
   readGwsAuthStatus,
+  updateCalendarEvent,
   type CalendarEventCreateResult,
 } from '@agent/core/calendar-workflow';
+import { planAvailableSlots, type AvailableSlot } from '@agent/core/calendar-slot-planner';
 
 export type CalendarBackendKind = string;
 export type CalendarBackendPreference = string;
@@ -38,9 +41,17 @@ export interface CalendarParams {
   time_zone?: string;
   title?: string;
   with_meet?: boolean;
+  event_id?: string;
+  reminder_minutes_before_start?: number;
+  send_updates?: 'all' | 'externalOnly' | 'none';
+  duration_minutes?: number;
+  slot_step_minutes?: number;
+  business_calendar?: 'none' | 'japanese_bank';
+  working_hours?: { start: string; end: string; weekdays?: number[] };
 }
 
 export interface CalendarEvent {
+  id?: string;
   backend?: string;
   title: string;
   start: string;
@@ -48,6 +59,11 @@ export interface CalendarEvent {
   calendar: string;
   location: string;
   description: string;
+}
+
+export interface CalendarSlotResult {
+  backend?: string;
+  slots: AvailableSlot[];
 }
 
 export interface CalendarSummary {
@@ -72,6 +88,13 @@ export interface CalendarEventMutation {
   error?: string;
 }
 
+export interface CalendarEventDeleteResult {
+  backend?: string;
+  status: string;
+  event_id: string;
+  calendar_id: string;
+}
+
 export interface CalendarBackendAdapter {
   readonly id: CalendarBackendKind;
   readonly priority?: number;
@@ -81,6 +104,9 @@ export interface CalendarBackendAdapter {
   listEvents(params: CalendarParams): Promise<CalendarEvent[]>;
   queryFreeBusy(params: CalendarParams): Promise<CalendarFreeBusyEntry[]>;
   createEvent(params: CalendarParams): Promise<CalendarEventMutation>;
+  updateEvent?(params: CalendarParams): Promise<CalendarEventMutation>;
+  deleteEvent?(params: CalendarParams): Promise<CalendarEventDeleteResult>;
+  findSlots?(params: CalendarParams): Promise<CalendarSlotResult>;
 }
 
 export type CalendarBackend = CalendarBackendAdapter;
@@ -167,6 +193,7 @@ export function normalizeCalendarEventList(value: unknown): CalendarEvent[] {
       throw new Error(`calendar-actuator: invalid calendar event at index ${index}`);
     }
     return {
+      ...(typeof entry.id === 'string' ? { id: entry.id } : {}),
       title: entry.title,
       start: entry.start,
       end: entry.end,
@@ -228,6 +255,25 @@ function calendarName(params: CalendarParams): string | undefined {
     params.calendar_id?.trim() ||
     undefined
   );
+}
+
+async function planSlotsFromBusy(
+  params: CalendarParams,
+  query: (params: CalendarParams) => Promise<CalendarFreeBusyEntry[]>
+): Promise<CalendarSlotResult> {
+  const busy = (await query(params)).flatMap((entry) => entry.busy);
+  return {
+    slots: planAvailableSlots({
+      range_start: params.start_date || '',
+      range_end: params.end_date || '',
+      duration_minutes: params.duration_minutes || 0,
+      ...(params.slot_step_minutes ? { slot_step_minutes: params.slot_step_minutes } : {}),
+      ...(params.time_zone ? { timezone: params.time_zone } : {}),
+      ...(params.business_calendar ? { business_calendar: params.business_calendar } : {}),
+      ...(params.working_hours ? { working_hours: params.working_hours } : {}),
+      busy,
+    }),
+  };
 }
 
 class JxaCalendarBackend implements CalendarBackend {
@@ -322,6 +368,10 @@ class JxaCalendarBackend implements CalendarBackend {
     return [...entries.values()];
   }
 
+  async findSlots(params: CalendarParams): Promise<CalendarSlotResult> {
+    return planSlotsFromBusy(params, (selected) => this.queryFreeBusy(selected));
+  }
+
   async createEvent(params: CalendarParams): Promise<CalendarEventMutation> {
     const title = params.title?.trim() || '';
     const calendar = calendarName(params);
@@ -414,6 +464,7 @@ class GwsCalendarBackend implements CalendarBackend {
     });
     const calendar = calendarName(params) || result.calendar_id;
     return result.events.map((event) => ({
+      ...(event.id ? { id: event.id } : {}),
       title: event.summary,
       start: event.start,
       end: event.end,
@@ -436,6 +487,10 @@ class GwsCalendarBackend implements CalendarBackend {
     return result.calendars;
   }
 
+  async findSlots(params: CalendarParams): Promise<CalendarSlotResult> {
+    return planSlotsFromBusy(params, (selected) => this.queryFreeBusy(selected));
+  }
+
   async createEvent(params: CalendarParams): Promise<CalendarEventMutation> {
     const result: CalendarEventCreateResult = await createCalendarEvent({
       provider: 'google-workspace',
@@ -455,6 +510,38 @@ class GwsCalendarBackend implements CalendarBackend {
       title: result.created_event.summary,
       id: result.created_event.id,
     };
+  }
+
+  async updateEvent(params: CalendarParams): Promise<CalendarEventMutation> {
+    const result = await updateCalendarEvent({
+      provider: 'google-workspace',
+      calendar_id: calendarName(params),
+      event_id: params.event_id || '',
+      summary: params.title,
+      start: params.start_date,
+      end: params.end_date,
+      description: params.description,
+      location: params.location,
+      attendees: params.attendees,
+      reminder_minutes_before_start: params.reminder_minutes_before_start,
+      send_updates: params.send_updates,
+      time_zone: params.time_zone,
+    });
+    return {
+      status: result.ok ? 'success' : 'error',
+      title: result.created_event.summary,
+      id: result.created_event.id,
+    };
+  }
+
+  async deleteEvent(params: CalendarParams): Promise<CalendarEventDeleteResult> {
+    const result = await deleteCalendarEvent({
+      provider: 'google-workspace',
+      calendar_id: calendarName(params),
+      event_id: params.event_id || '',
+      send_updates: params.send_updates,
+    });
+    return { status: result.ok ? 'success' : 'error', ...result };
   }
 }
 

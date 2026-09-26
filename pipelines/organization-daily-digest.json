@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "name": "organization-daily-digest",
+  "version": "1.0.0",
+  "description": "Sovereign-only daily digest across organization operations and tenant scopes.",
+  "schedule": {
+    "id": "organization-daily-digest",
+    "cron": "30 8 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false,
+    "deliver_to": {
+      "surface": "slack",
+      "channel": "env:KYBERION_OPERATOR_SLACK_DM",
+      "template": "{{context.organization_digest.text}}"
+    }
+  },
+  "steps": [
+    {
+      "id": "build_digest",
+      "role": "source",
+      "op": "core:organization_digest",
+      "params": {
+        "timezone": "Asia/Tokyo",
+        "locale": "ja-JP"
+      },
+      "produces": {
+        "channel": "organization_digest",
+        "type": "OrganizationDigest",
+        "sensitive": true
+      }
+    }
+  ]
+}

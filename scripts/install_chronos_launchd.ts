@@ -22,6 +22,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { escapeXml } from '@agent/core/text-escaping';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -42,10 +43,49 @@ export interface ChronosLaunchdPlistOptions {
    */
   logDir: string;
   label?: string;
+  /** Extra daemon environment (names must be in CHRONOS_FORWARDABLE_ENV). */
+  env?: Record<string, string>;
+}
+
+/**
+ * Settings the daemon may inherit from the installing shell. Secrets are
+ * deliberately absent: Chronos only enqueues deliveries, and each surface
+ * bridge sends with its own credentials.
+ */
+export const CHRONOS_FORWARDABLE_ENV = [
+  'KYBERION_PERSONA',
+  'KYBERION_CHRONOS_SCHEDULES',
+  'KYBERION_OPERATOR_SLACK_DM',
+  'KYBERION_REASONING_BACKEND',
+] as const;
+
+/**
+ * Read the `--forward-env` settings from this shell. The allowlist is checked
+ * before any value is read, so a refused name (e.g. a secret) is never loaded.
+ */
+export function resolveForwardedChronosEnv(
+  names: string[],
+  readEnv: (name: string) => string | undefined = (name) => getRegisteredEnvText(name)
+): Record<string, string> {
+  return Object.fromEntries(
+    names.map((name) => {
+      if (!(CHRONOS_FORWARDABLE_ENV as readonly string[]).includes(name)) {
+        throw new Error(`[POLICY_VIOLATION] ${name} cannot be forwarded to the Chronos daemon.`);
+      }
+      const value = readEnv(name);
+      if (!value) throw new Error(`--forward-env ${name}: not set in this shell.`);
+      return [name, value];
+    })
+  );
 }
 
 /** Pure plist generation — string in, string out, no I/O. */
 export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): string {
+  for (const name of Object.keys(options.env ?? {})) {
+    if (!(CHRONOS_FORWARDABLE_ENV as readonly string[]).includes(name)) {
+      throw new Error(`[POLICY_VIOLATION] ${name} cannot be forwarded to the Chronos daemon.`);
+    }
+  }
   const label = options.label ?? CHRONOS_LAUNCHD_LABEL;
   const daemonScript = path.join(options.repoRoot, 'dist/scripts/chronos_daemon.js');
   const stdoutPath = path.join(options.logDir, 'kyberion-chronos.log');
@@ -85,7 +125,13 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>${escapeXml(pathEnv)}</string>
+    <string>${escapeXml(pathEnv)}</string>${Object.entries(options.env ?? {})
+      .map(
+        ([name, value]) => `
+    <key>${escapeXml(name)}</key>
+    <string>${escapeXml(value)}</string>`
+      )
+      .join('')}
   </dict>
   <key>StandardOutPath</key>
   <string>${escapeXml(stdoutPath)}</string>
@@ -153,6 +199,12 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
       default: false,
       describe: 'Remove the LaunchAgent instead of installing it',
     })
+    .option('forward-env', {
+      type: 'string',
+      array: true,
+      default: [],
+      describe: `Copy a setting from this shell into the daemon (${CHRONOS_FORWARDABLE_ENV.join(', ')})`,
+    })
     .parseSync();
 
   const repoRoot = pathResolver.rootDir();
@@ -160,7 +212,8 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
   const uid = currentUid();
   const target = chronosLaunchAgentTargetPath();
   const logDir = path.join(os.homedir(), 'Library/Logs');
-  const plist = buildChronosLaunchdPlist({ nodePath, repoRoot, logDir });
+  const env = resolveForwardedChronosEnv(argv['forward-env'] as string[]);
+  const plist = buildChronosLaunchdPlist({ nodePath, repoRoot, logDir, env });
 
   if (argv.uninstall) {
     if (!argv.apply) {

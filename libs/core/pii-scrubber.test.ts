@@ -179,6 +179,15 @@ describe('scanContent', () => {
     expect(
       scanContent('sha256: ab4111111111111111cd').findings.map((f) => f.rule_id)
     ).not.toContain('CREDIT_CARD');
+    // Nor are the fraction digits of an unformatted spreadsheet ratio
+    // (0.332425738938115 happens to pass Luhn) — while a PAN after a sentence
+    // stays detected.
+    expect(
+      scanContent('| 利益率 | 0.332425738938115 |').findings.map((f) => f.rule_id)
+    ).not.toContain('CREDIT_CARD');
+    expect(
+      scanContent('番号は次のとおり。4111 1111 1111 1111').findings.map((f) => f.rule_id)
+    ).toContain('CREDIT_CARD');
   });
 
   it('bank account needs 支店/口座 context; postal needs 〒; dates are not phone numbers', () => {

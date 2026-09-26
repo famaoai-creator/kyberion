@@ -51,6 +51,7 @@ export type {
   CalendarBackendPreference,
   CalendarEvent,
   CalendarEventMutation,
+  CalendarEventDeleteResult,
   CalendarFreeBusyEntry,
   CalendarParams,
   CalendarSummary,

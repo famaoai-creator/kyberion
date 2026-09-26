@@ -39,6 +39,7 @@ const IMAGES: ReasoningImageAttachment[] = [{ path: '/tmp/page-1.png', media_typ
 const TEST_REASONING_SCOPE = {
   tier: 'public' as const,
   purpose: 'hermetic reasoning vision test',
+  training_use: 'training_eligible' as const,
 };
 
 function withTestReasoningScope<T>(fn: () => Promise<T>): Promise<T> {

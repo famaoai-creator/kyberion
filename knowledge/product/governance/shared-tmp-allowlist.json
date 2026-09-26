@@ -37,7 +37,7 @@
     },
     {
       "file": "libs/actuators/media-actuator/src/media-action-capture.ts",
-      "count": 5,
+      "count": 4,
       "classification": "migrate-candidate",
       "note": "PDF and presentation staging directories; migrate scope-owned media artifacts"
     },
@@ -162,6 +162,12 @@
       "note": "delegation request/result IPC files"
     },
     {
+      "file": "libs/core/document-reader.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "document reader staging/OCR work dirs (uuid, removed in finally)"
+    },
+    {
       "file": "libs/core/email-workflow.ts",
       "count": 1,
       "classification": "migrate-candidate",
@@ -270,10 +276,16 @@
       "note": "bounded secure spill for oversized text results"
     },
     {
+      "file": "libs/core/src/docx-utils.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "docx_extract picture files (per-document hash dir; embedImages keeps them in memory)"
+    },
+    {
       "file": "libs/core/src/native-pdf-engine/parser.ts",
       "count": 1,
       "classification": "legit-tmp",
-      "note": "extracted image cache"
+      "note": "extracted image cache (per-document hash dir)"
     },
     {
       "file": "libs/core/src/native-pptx-engine/examples/gen_project_plan.ts",
@@ -466,6 +478,12 @@
       "count": 3,
       "classification": "migrate-candidate",
       "note": "legacy local-pad root scan and safety boundary; reads shared tmp handoffs until migration cutover"
+    },
+    {
+      "file": "scripts/lib/perception.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "per-run scratch dir for `kyberion see|listen|watch` (normalized wav, sampled frames, bridge transcript); removed in finally"
     },
     {
       "file": "scripts/refactor/ephemeral-actuator-call.ts",

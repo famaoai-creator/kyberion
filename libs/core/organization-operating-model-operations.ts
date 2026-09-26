@@ -26,6 +26,7 @@ import {
   validateOrganizationLearningCandidate,
   loadOrganizationPurpose,
   loadOrganizationOperationalState,
+  assertOrganizationParent,
   loadOrganizationDomain,
   loadOrganizationService,
   operationDirectory,
@@ -158,7 +159,9 @@ export function saveOrganizationOperationRun(
       record.run_id,
       OPERATION_RUN_FILE_NAME
     ),
-    'organization operation run'
+    'organization operation run',
+    // A run is evidence: it is created once and never overwritten.
+    { exclusive: true }
   );
 }
 
@@ -475,6 +478,8 @@ export interface BuildOrganizationScaffoldInput {
   purpose?: string;
   principles?: string[];
   ownerRole?: string;
+  /** Parent organization in the same tier and tenant (a subsidiary without its own tenant). */
+  parentOrganizationId?: string;
   rootDir?: string;
 }
 
@@ -498,12 +503,22 @@ export function buildOrganizationScaffold(
       `Organization state already exists for '${input.organizationId}' (${input.tier}). Use 'purpose set' or 'reconcile' instead of 'init'.`
     );
   }
+  if (input.parentOrganizationId) {
+    assertOrganizationParent({
+      organizationId: input.organizationId,
+      parentOrganizationId: input.parentOrganizationId,
+      tier: input.tier,
+      tenantSlug: input.tenantSlug,
+      rootDir: input.rootDir,
+    });
+  }
   const state: OrganizationOperationalState = {
     organization_id: input.organizationId,
     name: input.name,
     tier: input.tier,
     ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
     status: 'active',
+    ...(input.parentOrganizationId ? { parent_organization_id: input.parentOrganizationId } : {}),
     active_project_ids: [],
     active_operation_ids: [],
     open_incident_ids: [],
@@ -841,6 +856,7 @@ export interface BuildOrganizationOperationInput {
   triggerKind?: OrganizationOperationRecord['trigger']['kind'];
   triggerExpression?: string;
   triggerTimezone?: string;
+  deadline?: OrganizationOperationRecord['deadline'];
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   evidenceOutputs?: string[];

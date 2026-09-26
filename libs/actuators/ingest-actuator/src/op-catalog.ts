@@ -22,7 +22,7 @@ export const INGEST_ACTUATOR_TRANSFORM_OPS = [
   'staleness_report',
 ] as const;
 
-export const INGEST_ACTUATOR_APPLY_OPS = ['commit'] as const;
+export const INGEST_ACTUATOR_APPLY_OPS = ['commit', 'meeting_digest'] as const;
 
 function toSpec(op: string, kind: PipelineStepType) {
   const contract = getOpInputContract('ingest', op);
