@@ -16,7 +16,8 @@ import { registerIdentityContextResolver } from './identity-context-bridge.js';
 import {
   currentExecutionScope,
   executionPersonaText,
-  executionScopeStorage,
+  registerAssumedRoleValidator,
+  runInExecutionScope,
   scopedAssumedRole,
   type ExecutionScope,
 } from './foundation/execution-scope.js';
@@ -349,6 +350,18 @@ export function isRoleAssumptionAllowed(systemRole: string, role: string): boole
   return policy.sharedCoreRoles.has(normalizedRole) || allowed.has(normalizedRole);
 }
 
+/**
+ * S1: the read-time check the execution-scope readers apply to every scoped
+ * role, so a scope run directly on the (globalThis-reachable) storage cannot
+ * bypass RA-02.
+ */
+function isScopedRoleAccepted(role: string): boolean {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  return !systemRole || isRoleAssumptionAllowed(systemRole, role);
+}
+
+registerAssumedRoleValidator(isScopedRoleAccepted);
+
 function assertRoleAssumptionAllowed(role: string): void {
   const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
   if (!systemRole) return;
@@ -488,7 +501,7 @@ export function withExecutionContext<T>(
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
-    return executionScopeStorage.run(prepared.scope, fn);
+    return runInExecutionScope(prepared.scope, fn);
   } finally {
     restoreMirroredEnv('MISSION_ROLE', written.role, previousRole);
     restoreMirroredEnv('KYBERION_PERSONA', written.persona, previousPersona);
@@ -511,7 +524,7 @@ export async function withExecutionContextAsync<T>(
   tenantSlug?: string
 ): Promise<T> {
   const prepared = prepareExecutionContext(role, persona, tenantSlug);
-  return await executionScopeStorage.run(prepared.scope, fn);
+  return await runInExecutionScope(prepared.scope, fn);
 }
 
 function resolveSudoScope(): string[] | undefined {
@@ -627,7 +640,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 
   let persona: Persona = normalizePersona(envPersona);
   const authorities: Authority[] = [];
-  const executionScope = executionScopeStorage.getStore();
+  const executionScope = currentExecutionScope();
   let tenantSlug: string | undefined = normalizeTenantSlug(
     tenantOverride ??
       (executionScope?.tenantBound

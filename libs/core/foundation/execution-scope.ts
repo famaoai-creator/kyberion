@@ -13,39 +13,97 @@ import { getRegisteredEnvText } from './env.js';
  *     concurrent requests served by one process.
  *
  * The scope is in-process only: it can never be inherited from a parent
- * process's environment. This leaf module has no imports beyond node core so
- * secure-io, the identity bridge and authority can all read it without an
- * import cycle. The storage is pinned on `globalThis` so that a second module
- * instance (source + dist registries in one process) still shares one scope.
+ * process's environment. This foundation module imports nothing but node core
+ * and the env accessor, so secure-io, the identity bridge and authority can all
+ * read it without an import cycle. The storage is pinned on `globalThis` so a
+ * second module instance (a bundled copy next to the external dist copy, as in
+ * the Next.js surfaces) still shares one scope.
+ *
+ * S1: because the store is reachable through `globalThis`, the readers below
+ * never trust a scope blindly. Every assumed role is re-checked at read time
+ * against the validator authority.ts registers (the RA-02 role assumption
+ * policy); a rejected role is ignored with a warning, so running a scope
+ * directly on the storage cannot bypass the policy. Scopes are frozen, and
+ * the only writer exported here is {@link runInExecutionScope}, owned by
+ * authority.ts.
  */
 export interface ExecutionScope {
-  tenantBound: boolean;
-  tenantSlug?: string;
-  /** Role assumed in-process by withExecutionContext*. */
-  assumedRole?: string;
+  readonly tenantBound: boolean;
+  readonly tenantSlug?: string;
+  /** Role assumed in-process by withExecutionContext* (already normalized). */
+  readonly assumedRole?: string;
   /**
    * Persona bound with the assumed role. `null` means the assumption cleared
    * the persona; `undefined` means the assumption left it to the environment.
    */
-  assumedPersona?: string | null;
+  readonly assumedPersona?: string | null;
 }
 
-const STORAGE_KEY = Symbol.for('kyberion.core.execution-scope');
+/** Returns false when the current process may not act as `role` (RA-02). */
+export type AssumedRoleValidator = (role: string) => boolean;
 
-type ScopeGlobal = typeof globalThis & {
-  [STORAGE_KEY]?: AsyncLocalStorage<ExecutionScope>;
-};
+interface ScopeRegistry {
+  readonly storage: AsyncLocalStorage<ExecutionScope>;
+  validator?: AssumedRoleValidator;
+}
+
+const REGISTRY_KEY = Symbol.for('kyberion.core.execution-scope.v1');
+
+type ScopeGlobal = typeof globalThis & { [REGISTRY_KEY]?: ScopeRegistry };
 
 const scopeGlobal = globalThis as ScopeGlobal;
 
-export const executionScopeStorage: AsyncLocalStorage<ExecutionScope> =
-  scopeGlobal[STORAGE_KEY] ?? (scopeGlobal[STORAGE_KEY] = new AsyncLocalStorage<ExecutionScope>());
+const registry: ScopeRegistry =
+  scopeGlobal[REGISTRY_KEY] ??
+  (scopeGlobal[REGISTRY_KEY] = { storage: new AsyncLocalStorage<ExecutionScope>() });
 
-export function currentExecutionScope(): ExecutionScope | undefined {
-  return executionScopeStorage.getStore();
+const warnedRejectedRoles = new Set<string>();
+
+/**
+ * Install the RA-02 validator (authority.ts). The first registration wins so a
+ * later module instance cannot replace it.
+ */
+export function registerAssumedRoleValidator(validator: AssumedRoleValidator): void {
+  if (!registry.validator) registry.validator = validator;
 }
 
-/** The role assumed by the innermost withExecutionContext*, if any. */
+/** Run `fn` inside a frozen copy of `scope`. Only authority.ts should call this. */
+export function runInExecutionScope<T>(scope: ExecutionScope, fn: () => T): T {
+  return registry.storage.run(Object.freeze({ ...scope }), fn);
+}
+
+function isAcceptedRole(role: string): boolean {
+  const validator = registry.validator;
+  if (validator) return validator(role);
+  // Before authority.ts registered its validator the policy cannot be
+  // consulted: fail closed only where RA-02 applies (a SYSTEM_ROLE process).
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  return !systemRole || systemRole.toLowerCase() === role;
+}
+
+/**
+ * The innermost scope. Its `assumedRole` / `assumedPersona` are removed when
+ * the role fails the read-time policy check, so callers can use the fields
+ * directly.
+ */
+export function currentExecutionScope(): ExecutionScope | undefined {
+  const scope = registry.storage.getStore();
+  const role = scope?.assumedRole?.trim();
+  if (!scope || !role) return scope;
+  if (isAcceptedRole(role)) return scope;
+  if (!warnedRejectedRoles.has(role)) {
+    warnedRejectedRoles.add(role);
+    console.warn(
+      `[ROLE_ASSUMPTION_IGNORED] an execution scope carries role '${role}', which this process may not assume; it is ignored.`
+    );
+  }
+  return Object.freeze({
+    tenantBound: scope.tenantBound,
+    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+  });
+}
+
+/** The role assumed by the innermost withExecutionContext*, if any (policy-checked). */
 export function scopedAssumedRole(): string | undefined {
   const role = currentExecutionScope()?.assumedRole?.trim();
   return role ? role : undefined;

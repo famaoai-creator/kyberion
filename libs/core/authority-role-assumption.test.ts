@@ -11,6 +11,7 @@ import {
   withExecutionContext,
   withExecutionContextAsync,
 } from './authority.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
 import { pathResolver } from './path-resolver.js';
 import { policyEngine } from './policy-engine.js';
 import {
@@ -375,6 +376,70 @@ describe('RA-02 role assumption policy', () => {
     expect(withExecutionContext('system_configurator', () => resolveRole())).toBe(
       'system_configurator'
     );
+  });
+});
+
+describe('S1 scope integrity', () => {
+  const original: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  type Registry = { storage: { run<T>(scope: unknown, fn: () => T): T } };
+  const rawStorage = () =>
+    (globalThis as unknown as Record<symbol, Registry>)[
+      Symbol.for('kyberion.core.execution-scope.v1')
+    ].storage;
+
+  it('ignores a scope run directly on the global storage with a role RA-02 rejects', () => {
+    process.env.SYSTEM_ROLE = 'slack_bridge';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const seen = rawStorage().run(
+        { tenantBound: false, assumedRole: 'chronos_localadmin', assumedPersona: 'sovereign' },
+        () => ({
+          role: resolveRole(),
+          persona: resolveExecutionPersona(),
+          child: buildSafeExecEnv().MISSION_ROLE,
+          identity: resolveIdentityContext().role,
+        })
+      );
+      expect(seen).toEqual({
+        role: 'slack_bridge',
+        persona: undefined,
+        child: undefined,
+        identity: 'slack_bridge',
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_ASSUMPTION_IGNORED]'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('still honours a directly run scope whose role the policy allows', () => {
+    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    const role = rawStorage().run({ tenantBound: false, assumedRole: 'chronos_localadmin' }, () =>
+      resolveRole()
+    );
+    expect(role).toBe('chronos_localadmin');
+  });
+
+  it('freezes the scope an assumption runs in', () => {
+    const frozen = withExecutionContext('mission_controller', () =>
+      Object.isFrozen(currentExecutionScope())
+    );
+    expect(frozen).toBe(true);
   });
 });
 
