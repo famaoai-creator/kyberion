@@ -156,6 +156,10 @@ async function runFailoverProbe(
       {
         tier: 'public',
         purpose: 'provider-neutral conformance failover probe',
+        // The primary is intentionally modeled as an external provider so
+        // the probe can observe a real provider failure reaching the local
+        // fallback. Keep the production default local_only unchanged.
+        training_use: 'training_eligible',
       },
       () => fallback.prompt('conformance failover probe')
     );
