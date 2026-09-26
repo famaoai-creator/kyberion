@@ -11,7 +11,13 @@
  * audited. This module owns the action-request sidecars
  * (`active/shared/coordination/channels/chronos/plugin-view-actions/`) that
  * carry the queued params the approval record itself does not store.
+ *
+ * AU-01: an `agent` dispatch is audited with the same event vocabulary as a
+ * human action's execution (`plugin_view.action.started` /
+ * `plugin_view.action.execute`, see `auditAgentActionDispatch`) — nobody
+ * approves it, so the dispatch itself is the accountable moment.
  */
+import { randomUUID } from 'node:crypto';
 import {
   getActivePluginContentDigest,
   getActivePluginPermissionsDigest,
@@ -357,9 +363,61 @@ export async function dispatchPluginViewAction(
     return { status: 'approval_required', approvalRequestId: record.id };
   }
 
-  const operation = activePluginOperation(resolved);
-  const input = await preflightActionInput(resolved);
-  const outcome = await operation.handler(operation.action, input, {}, operation.stepType);
+  // AU-01: an `agent` dispatch runs in-process with nobody to approve it, so
+  // it is audited the same way a human action's execution is: a `dispatchId`
+  // (generated once per call) correlates the pair the way `approvalRequestId`
+  // does for a human action. A pre-handler refusal (plugin not active, op
+  // unavailable, preflight rejection) is `denied` without a `started` entry
+  // — the call never started; a handler throw is `failed`; success is
+  // `completed`. Only `PluginViewError` refusals are audited here, the same
+  // policy `executeApprovedPluginViewAction` applies to its own pre-handler
+  // checks: an unexpected error type is never masked as a governed refusal.
+  const dispatchId = randomUUID();
+  let operation: ReturnType<typeof activePluginOperation>;
+  let input: Record<string, unknown>;
+  try {
+    operation = activePluginOperation(resolved);
+    input = await preflightActionInput(resolved);
+  } catch (error) {
+    if (error instanceof PluginViewError) {
+      auditAgentActionDispatch(
+        resolved,
+        dispatchId,
+        context,
+        { action: 'plugin_view.action.execute', result: 'denied' },
+        error.message
+      );
+    }
+    throw error;
+  }
+  auditAgentActionDispatch(
+    resolved,
+    dispatchId,
+    context,
+    { action: 'plugin_view.action.started', result: 'allowed' },
+    'agent action admitted by preflight; running the handler'
+  );
+  let outcome: Awaited<ReturnType<typeof operation.handler>>;
+  try {
+    outcome = await operation.handler(operation.action, input, {}, operation.stepType);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    auditAgentActionDispatch(
+      resolved,
+      dispatchId,
+      context,
+      { action: 'plugin_view.action.execute', result: 'failed' },
+      message
+    );
+    throw error;
+  }
+  auditAgentActionDispatch(
+    resolved,
+    dispatchId,
+    context,
+    { action: 'plugin_view.action.execute', result: 'completed' },
+    'agent action executed'
+  );
   return { status: 'dispatched', handled: outcome.handled };
 }
 
@@ -452,6 +510,49 @@ function auditActionExecution(
     });
   } catch (error) {
     logger.warn(`[plugin-view] action audit failed (ignored): ${String(error)}`);
+  }
+}
+
+/**
+ * AU-01: same event vocabulary as `auditActionExecution` (`started` /
+ * `execute` with `completed` / `failed` / `denied`), for an `agent`-authority
+ * dispatch. Never carries raw params — only a stable digest
+ * (`computeApprovalPayloadHash`), so params holding sensitive data leave no
+ * readable trace in the audit chain. A recording failure is logged and
+ * swallowed, exactly like the human path: it never turns a dispatch outcome
+ * into something the audit chain could not itself record.
+ */
+function auditAgentActionDispatch(
+  resolved: ResolvedPluginViewAction,
+  dispatchId: string,
+  context: DispatchPluginViewActionContext,
+  event: ActionAuditEvent,
+  reason: string
+): void {
+  try {
+    auditChain.record({
+      agentId: context.requestedBy,
+      action: event.action,
+      operation: resolved.action.op,
+      result: event.result,
+      reason,
+      correlationId: dispatchId,
+      metadata: {
+        plugin_id: resolved.view.pluginId,
+        view_id: resolved.view.declaration.id,
+        action_id: resolved.action.id,
+        authority: 'agent',
+        requested_by: context.requestedBy,
+        actor_role: context.actorRole,
+        surface: context.surface,
+        content_digest: resolved.view.contentDigest ?? null,
+        permissions_digest: resolved.view.permissionsDigest ?? null,
+        params_digest: computeApprovalPayloadHash(resolved.params),
+      },
+      ...(resolved.view.tenantSlug ? { tenantSlug: resolved.view.tenantSlug } : {}),
+    });
+  } catch (error) {
+    logger.warn(`[plugin-view] agent action audit failed (ignored): ${String(error)}`);
   }
 }
 
