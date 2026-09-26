@@ -11,6 +11,7 @@ import {
   ShellClaudeCliBackend,
 } from './shell-claude-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
+import { DelegationWallClockExceededError } from './delegation-concurrency.js';
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -39,6 +40,15 @@ vi.mock('./delegation-concurrency.js', () => ({
   }),
   withWallClockBudget: withWallClockBudgetMock,
   DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
+}));
+
+// WS-02: the private git index is stubbed so no real index is ever copied.
+const { prepareSessionGitIndexMock, sessionIndexDisposeMock } = vi.hoisted(() => ({
+  prepareSessionGitIndexMock: vi.fn(),
+  sessionIndexDisposeMock: vi.fn(),
+}));
+vi.mock('./session-git-index.js', () => ({
+  prepareSessionGitIndex: prepareSessionGitIndexMock,
 }));
 
 function createChild(stdoutText: string, exitCode = 0): any {
@@ -210,6 +220,65 @@ describe('shell-claude-cli-backend', () => {
       expect(spawnOptions.env.PATH).toBe(process.env.PATH);
       expect(spawnOptions.env.OPENAI_API_KEY).toBeUndefined();
       expect(spawnOptions.env.UNRELATED_TEST_SECRET).toBeUndefined();
+    });
+  });
+
+  describe('private session git index (WS-02)', () => {
+    beforeEach(() => {
+      vi.stubEnv('KYBERION_SESSION_GIT_INDEX', '1');
+      prepareSessionGitIndexMock.mockImplementation(({ sessionId }) => ({
+        sessionId,
+        env: { GIT_INDEX_FILE: `/private/${sessionId}/index` },
+        dispose: sessionIndexDisposeMock,
+      }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      spawnMock.mockClear();
+      prepareSessionGitIndexMock.mockReset();
+      sessionIndexDisposeMock.mockReset();
+      withWallClockBudgetMock.mockImplementation((_opts, fn) => fn());
+    });
+
+    it('gives an implementer delegation its own GIT_INDEX_FILE and disposes it on close', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+      await backend.delegateTask('do the thing', undefined, { profile: 'implementer' });
+
+      const [, , spawnOptions] = spawnMock.mock.calls[0];
+      const [{ sessionId }] = prepareSessionGitIndexMock.mock.calls[0];
+      expect(sessionId).toMatch(/^claude-/);
+      expect(spawnOptions.env.GIT_INDEX_FILE).toBe(`/private/${sessionId}/index`);
+      expect(sessionIndexDisposeMock).toHaveBeenCalled();
+    });
+
+    it('never gives explorer delegations a private index', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+      const backend = new ShellClaudeCliBackend({ bin: 'claude' });
+      await backend.delegateTask('look around', undefined, { profile: 'explorer' });
+
+      const [, , spawnOptions] = spawnMock.mock.calls[0];
+      expect(spawnOptions.env.GIT_INDEX_FILE).toBeUndefined();
+      expect(prepareSessionGitIndexMock).not.toHaveBeenCalled();
+    });
+
+    it('disposes the private index on a wall-clock-budget timeout', async () => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        stdin: new PassThrough(),
+        kill: vi.fn(),
+      });
+      spawnMock.mockReturnValueOnce(child);
+      withWallClockBudgetMock.mockImplementationOnce(() =>
+        Promise.reject(new DelegationWallClockExceededError('claude', 5))
+      );
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', timeoutMs: 5 });
+      await expect(
+        backend.delegateTask('do the thing', undefined, { profile: 'implementer' })
+      ).rejects.toThrow(/timed out/);
+      expect(sessionIndexDisposeMock).toHaveBeenCalledTimes(1);
     });
   });
 
