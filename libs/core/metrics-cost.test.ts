@@ -51,6 +51,27 @@ describe('resolveCostRates — per-model cost resolution', () => {
     expect(resolveCostRates('claude-opus-5-20990101')).not.toEqual(r);
   });
 
+  it('prices Grok 4.7 and the Fast serving tier, including the 200k long-context row', () => {
+    const standard = resolveCostRates('grok-4.7', 199_999);
+    expect(standard.prompt).toBeCloseTo(0.002 / 1000);
+    expect(standard.completion).toBeCloseTo(0.006 / 1000);
+    expect(standard.cache_read).toBeCloseTo(0.0005 / 1000);
+
+    const longContext = resolveCostRates('xai:grok-4.7', 200_000);
+    expect(longContext.prompt).toBeCloseTo(0.004 / 1000);
+    expect(longContext.completion).toBeCloseTo(0.012 / 1000);
+    expect(longContext.cache_read).toBeCloseTo(0.001 / 1000);
+
+    expect(resolveCostRates('grok-4.6', 0)).toEqual(resolveCostRates('grok-4.7', 0));
+    expect(resolveCostRates('grok-4.5', 0).cache_read).toBeCloseTo(0.0003 / 1000);
+
+    const fast = resolveCostRates('grok-4.7-fast', 0);
+    expect(fast.prompt).toBeCloseTo(0.004 / 1000);
+    expect(fast.completion).toBeCloseTo(0.012 / 1000);
+    expect(resolveCostRates('grok-4.7-build-fast', 200_000).completion).toBeCloseTo(0.018 / 1000);
+    expect(resolveCostRates('grok-4.7-build-fast', 200_000).cache_read).toBeCloseTo(0.0015 / 1000);
+  });
+
   it('falls back to default for unknown models', () => {
     expect(resolveCostRates('totally-unknown-model-xyz')).toEqual({
       prompt: 0.001 / 1000,
