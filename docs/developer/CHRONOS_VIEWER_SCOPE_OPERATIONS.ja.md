@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-08-24
+last_updated: 2026-09-27
 ---
 
 # Chronos viewer scope 運用手順
@@ -50,6 +50,10 @@ token の平文は保存しません。SHA-256 を計算し、secret-guard の�
 ```
 
 保存先は `knowledge/personal/connections/chronos-access.json` です。AC-05 の `KYBERION_SECRET_ENCRYPTION` が有効な環境では、通常の secret-guard 接続文書として暗号化して保存します。ログ、エラー、監査には token の値を出しません。
+
+登録は `issueChronosAccessToken`（`libs/core/chronos-access-registry.ts`。Concierge の「組織とメンバー」から token を発行する経路）で行います。token はこの関数が生成し、平文は一度だけ返します。
+
+Chronos は `SYSTEM_ROLE=chronos_mirror_v2` で起動されるため、自分のロールでは個人 tier を読めません。registry の読み取り（`src/lib/viewer-context.ts` と `src/lib/api-guard.ts`）は `chronos_token_registry_reader` ロールを引き受けて行います。このロールはこのファイルの読み取りしか許可されていません（TR-01）。この経路が壊れると、registry があるだけで env token を含むすべての token が 401 になります。`pnpm kyberion check plugin-views-e2e` は両方の起動モードで registry に token を登録し、その token で認証できることを確認します。
 
 既存の `KYBERION_API_TOKEN` と `KYBERION_LOCALADMIN_TOKEN` は all-scope の互換 token です。`KYBERION_LOCALHOST_AUTOADMIN=false` にすると loopback の無資格自動 admin を無効化できるため、すべての利用者に token が必要になります。クエリの tenant / organization / project は登録済み許可集合を narrow するだけで、許可集合を拡張しません。
 

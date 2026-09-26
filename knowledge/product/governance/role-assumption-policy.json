@@ -10,7 +10,7 @@
       "slack_bridge",
       "surface_runtime"
     ],
-    "rationale": "Narrow roles that libs/core modules assume internally on behalf of every caller to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh), knowledge_steward (mission creation), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime). The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them in may_assume with the modules that reach them."
+    "rationale": "Narrow roles that libs/core modules assume internally on behalf of every caller to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), knowledge_steward (mission creation), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime). The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them in may_assume with the modules that reach them."
   },
   "system_roles": {
     "chronos_mirror_v2": {
