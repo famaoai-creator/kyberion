@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import { safeExistsSync } from './secure-io.js';
 import {
   mountToVault,
   unmountFromVault,
@@ -21,14 +21,14 @@ describe('vault-mount', () => {
   it('mounts an existing directory and lists it', () => {
     // Mount a known directory (e.g. package.json or node_modules or a temp fixture)
     const testDir = path.resolve('node_modules');
-    if (!fs.existsSync(testDir)) return;
+    if (!safeExistsSync(testDir)) return;
 
     const mountName = 'test-node-modules-mount';
     try {
       const entry = mountToVault(testDir, mountName);
       expect(entry.name).toBe(mountName);
       expect(entry.targetPath).toBe(testDir);
-      expect(fs.existsSync(entry.mountPath)).toBe(true);
+      expect(safeExistsSync(entry.mountPath)).toBe(true);
 
       const mounts = listVaultMounts();
       const found = mounts.find((m) => m.name === mountName);
