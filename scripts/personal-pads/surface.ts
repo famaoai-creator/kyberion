@@ -11,6 +11,7 @@ import {
 } from './actions.js';
 import { getPadAdapter, publicPadAdapterConfigs, type PadAdapter } from './adapters.js';
 import { padsT } from './i18n.js';
+import { getPadPluginViews, type PadPluginViewsResult } from './plugin-views.js';
 import {
   getPadRegistryEntry,
   isPadId,
@@ -85,6 +86,14 @@ export interface PersonalPadsSurface {
   ) => PadActionAvailability;
   /** Optional host override for pad actions; transport and scope checks stay shared. */
   executeAction?: (input: PadActionInput) => Promise<PadActionResult>;
+  /**
+   * PH-03: read-only plugin views of the request scope (`PadMenuItem.id` is a
+   * closed pad union, so plugin views are a separate seam).
+   */
+  getPluginViews?: (
+    context: Pick<LocalPadContext, 'scope' | 'viewer_principal'>,
+    locale?: SupportedLocale
+  ) => PadPluginViewsResult;
 }
 
 export function getMenu(locale?: SupportedLocale): readonly PadMenuItem[] {
@@ -173,4 +182,5 @@ export const PERSONAL_PADS_SURFACE: PersonalPadsSurface = {
   getActionAvailability: (padId, actionId, locale) =>
     getPadActionAvailability(padId, actionId, undefined, locale),
   executeAction,
+  getPluginViews: (context, locale) => getPadPluginViews(context, locale),
 };

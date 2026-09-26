@@ -20,11 +20,17 @@ import {
   pluginViewErrorKey,
   PluginViewError,
   pluginViewErrorStatus,
+  pluginHostPayload,
+  pluginIdsInViewerScope,
   pluginViewLocale,
   readVisiblePluginViewActionRequests,
   readVisiblePluginViews,
   runPluginViewAction,
 } from '../../../../../lib/plugin-views-response';
+import {
+  chronosPluginHostStatus,
+  ensureChronosPluginHost,
+} from '../../../../../lib/plugin-host-boot';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +58,7 @@ export function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
+    ensureChronosPluginHost();
     const tenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tier = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tier'));
     // A client tenant/tier is authorized against the viewer and then only narrows.
@@ -59,7 +66,7 @@ export function GET(req: NextRequest) {
       tenantSlug: tenant,
       ...(tier ? { tier } : {}),
     });
-    const { views, errors, actionRequests } = withViewerExecutionContext(
+    const { views, errors, actionRequests, host } = withViewerExecutionContext(
       resolvedViewer.context,
       () => {
         const visible = readVisiblePluginViews(resolvedViewer.context, { tenant, tier });
@@ -68,6 +75,13 @@ export function GET(req: NextRequest) {
           actionRequests: readVisiblePluginViewActionRequests(
             resolvedViewer.context,
             visible.views
+          ),
+          host: pluginHostPayload(
+            chronosPluginHostStatus(),
+            resolvedViewer.context,
+            resolvedViewer.context.role === 'localadmin'
+              ? pluginIdsInViewerScope(resolvedViewer.context)
+              : new Set<string>()
           ),
         };
       }
@@ -79,7 +93,8 @@ export function GET(req: NextRequest) {
           views,
           errors,
           pluginViewLocale(req.headers.get('accept-language')),
-          actionRequests
+          actionRequests,
+          host
         ),
         resolvedViewer.context
       )
@@ -109,6 +124,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
     const input = parsePluginViewActionInput(parsedBody.body);
+    // PH-01: run against the current approved copy (no stale activation after
+    // an approval or re-install).
+    const host = ensureChronosPluginHost();
+    if (host) await host.syncNow();
     const outcome = await withViewerExecutionContextAsync(resolvedViewer.context, () =>
       runPluginViewAction(resolvedViewer.context, input)
     );

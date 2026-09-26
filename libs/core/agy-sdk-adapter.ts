@@ -1,7 +1,11 @@
 /* eslint-disable no-restricted-imports -- the provider boundary owns this managed bridge process. */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
-import { buildProviderChildEnv } from './provider-permission-profiles.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -151,17 +155,28 @@ export class AgySdkAdapter {
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
       const sdkApiKey = resolveGeminiApiKey();
-      child = (this.options.spawnProcess ?? spawn)(python, [script], {
+      // No profile: one bridge serves requests of every profile, so it never
+      // gets a private git index.
+      const spawnEnv = buildDelegationSpawnEnv({
+        provider: 'agy',
         cwd: this.options.cwd,
-        env: {
-          ...buildProviderChildEnv({ provider: 'agy' }),
-          KYBERION_AGY_SDK_CWD: this.options.cwd,
-          PYTHONUNBUFFERED: '1',
-          ...(sdkApiKey ? { KYBERION_AGY_SDK_API_KEY: sdkApiKey } : {}),
-        },
-        stdio: 'pipe',
-        shell: false,
-      }) as ChildProcessWithoutNullStreams;
+        sessionId: newDelegationSessionId('agy'),
+      });
+      child = spawnWithDelegationEnv(
+        spawnEnv,
+        () =>
+          (this.options.spawnProcess ?? spawn)(python, [script], {
+            cwd: this.options.cwd,
+            env: {
+              ...spawnEnv.env,
+              KYBERION_AGY_SDK_CWD: this.options.cwd,
+              PYTHONUNBUFFERED: '1',
+              ...(sdkApiKey ? { KYBERION_AGY_SDK_API_KEY: sdkApiKey } : {}),
+            },
+            stdio: 'pipe',
+            shell: false,
+          }) as ChildProcessWithoutNullStreams
+      );
       this.process = child;
       this.bootChild = child;
       this.runtimeInfo = {

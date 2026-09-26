@@ -24,6 +24,8 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 Chronos の `/api/headless/a2ui/plugin-views` は承認済みプラグインの宣言的ビュー(EP-05)を返す。`GET` は read operation `chronos.plugin_view.read`(`activatable` かつ内容 digest が承認時と一致する managed プラグインのみ。ロール・tier・tenant は viewer から server-side で評価し、`tier` / `tenant` query は狭めるだけ)、`POST` は localadmin の write operation `chronos.plugin_view.action`(`authority: human` の操作は承認キューに積まれ、`agent` の操作はプラグインがそのプロセスで稼働中の場合のみ実行)。管制塔の operator-home 投影の下に「プラグインビュー」として表示する。詳細: [`plugin-permissions-and-views`](../knowledge/product/architecture/plugin-permissions-and-views.md)。
 
+`sandboxed-iframe` ビュー(PH-02)の HTML 文書は `GET /api/headless/a2ui/plugin-views/frame?plugin_id=…&view_id=…` が返す。認可は一覧と同じ(`chronos.plugin_view.read`、viewer から見えないビューは 404、改ざん・未承認のプラグインは 403)で、応答ヘッダは `pluginViewFrameResponseHeaders()` と完全一致(CSP `sandbox allow-scripts; default-src 'none'; …`、`nosniff`、`no-referrer`、`no-store`、CORP `same-origin`、Permissions-Policy 全拒否)。Chronos は `<iframe sandbox="allow-scripts">` で埋め込み、postMessage のアクション要求はホストの確認ダイアログを経て既存の `POST` に渡す。Chronos のページは `frame-src 'self'`。Chronos のプラグインホスト(PH-01)は `KYBERION_CHRONOS_PLUGIN_HOST` で有効化した場合のみ承認済みプラグインをプロセス内で起動する。
+
 ## フロントデスク(共有レール)
 
 秘書室(concierge)と相棒(presence-studio)は別サーフェスのままだが、人には「人の動詞 5 つ」の 1 つのメニューに見える共有レールを持つ([FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md))。

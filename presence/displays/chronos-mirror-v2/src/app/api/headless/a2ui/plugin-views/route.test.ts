@@ -15,10 +15,16 @@ import {
 } from '@agent/core/secure-io';
 import { auditChain, type AuditEntry } from '@agent/core/audit-chain';
 import { activatePlugin, resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
+import {
+  createPluginHost,
+  disposePluginHost,
+  getOrCreatePluginHost,
+} from '@agent/core/plugin-host';
 
 const state = vi.hoisted(() => ({
   managedRoot: '',
   viewer: {} as Record<string, unknown>,
+  listOptions: [] as Array<{ tenantAllow?: readonly string[] } | undefined>,
 }));
 
 vi.mock('../../../../../lib/api-guard', () => ({
@@ -42,7 +48,13 @@ vi.mock('@agent/core/plugin-managed-install', async () => {
   );
   return {
     ...actual,
-    listManagedPlugins: (root?: string) => actual.listManagedPlugins(root ?? state.managedRoot),
+    listManagedPlugins: (
+      root?: string,
+      options?: Parameters<typeof actual.listManagedPlugins>[1]
+    ) => {
+      state.listOptions.push(options);
+      return actual.listManagedPlugins(root ?? state.managedRoot, options);
+    },
   };
 });
 
@@ -54,7 +66,7 @@ import {
 import { GET, POST } from './route';
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
-const FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json'];
+const FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json', 'views/frame.html'];
 const TMP_ROOT = pathResolver.sharedTmp('chronos-plugin-views-route-test');
 const cleanup: string[] = [];
 const ACTION_DIR = pathResolver.shared('coordination/channels/chronos/plugin-view-actions');
@@ -81,7 +93,8 @@ type PluginViewsResponseBody = {
   error?: string;
   error_key?: string;
   data?: {
-    views?: unknown[];
+    host?: { enabled: boolean; plugins?: Array<{ plugin_id: string; state: string }> };
+    views?: Array<{ view_id: string } & Record<string, unknown>>;
     a2ui?: { updateComponents?: { components?: unknown[] } };
     errors?: unknown[];
     outcome?: { status: string; approvalRequestId?: string; handled?: boolean };
@@ -162,13 +175,15 @@ async function act(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  state.managedRoot = pathResolver.shared(`plugins/managed-test-chronos-views-${randomUUID()}`);
+  state.managedRoot = pathResolver.sharedTmp(`plugins/managed-test-chronos-views-${randomUUID()}`);
   cleanup.push(state.managedRoot);
   state.viewer = viewer();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  disposePluginHost('chronos');
   resetPluginLifecycleForTests();
   withExecutionContext('mission_controller', () => {
     const ids = trackedActionIds.splice(0);
@@ -193,12 +208,24 @@ describe('GET /api/headless/a2ui/plugin-views', () => {
     const { status, body } = await listViews();
     expect(status).toBe(200);
     expect(body.resource).toBe('plugin-views');
-    expect(body.data.views).toHaveLength(1);
+    expect(body.data.host).toEqual({ enabled: false });
+    expect(body.data.views).toHaveLength(2);
     expect(body.data.views[0]).toMatchObject({
       plugin_id: record.pluginId,
       view_id: 'status',
       title: 'Permissions fixture status',
+      isolation: 'in-process-a2ui',
     });
+    expect(body.data.views[0].frame_url).toBeUndefined();
+    // PH-02: the iframe view is listed with its frame route URL, never its document.
+    expect(body.data.views[1]).toMatchObject({
+      view_id: 'status_frame',
+      isolation: 'sandboxed-iframe',
+      capabilities: ['action.request'],
+      messages: [],
+      frame_url: `/api/headless/a2ui/plugin-views/frame?plugin_id=${record.pluginId}&view_id=status_frame`,
+    });
+    expect(JSON.stringify(body.data.views[1])).not.toContain('<script');
     expect(body.data.a2ui.updateComponents.components[0]).toMatchObject({
       id: 'pv0-section',
       type: 'ui:section',
@@ -223,18 +250,37 @@ describe('GET /api/headless/a2ui/plugin-views', () => {
     expect((await listViews()).body.data.views).toEqual([]);
     expect((await listViews('?tenant=tenant-a')).status).toBe(403);
     state.viewer = viewer({ tenantSlugs: ['tenant-a'] });
-    expect((await listViews('?tenant=tenant-a')).body.data.views).toHaveLength(1);
+    expect((await listViews('?tenant=tenant-a')).body.data.views).toHaveLength(2);
+  });
+
+  it("lists only the viewer's tenants, so other tenants' copies are not digested", async () => {
+    const foreign = install(fixtureSource(), { tenantSlug: 'tenant-a' });
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-b'] });
+    state.listOptions.length = 0;
+    expect((await listViews()).body.data.views).toEqual([]);
+    expect(state.listOptions.length).toBeGreaterThan(0);
+    expect(state.listOptions.every((options) => options?.tenantAllow?.join() === 'tenant-b')).toBe(
+      true
+    );
+    // A viewer scoped to 'all' keeps listing every tenant.
+    state.viewer = viewer({ role: 'localadmin' });
+    state.listOptions.length = 0;
+    const all = (await listViews()).body.data.views ?? [];
+    expect(all.map((view) => view.plugin_id)).toContain(foreign.pluginId);
+    expect(state.listOptions.every((options) => options?.tenantAllow === undefined)).toBe(true);
   });
 
   it('applies the role gate and lets a tier filter narrow only', async () => {
     install(
       fixtureSource((manifest) => {
-        manifest.provides.views[0].roleGate = { minRole: 'localadmin', tiers: ['public'] };
+        for (const view of manifest.provides.views) {
+          view.roleGate = { minRole: 'localadmin', tiers: ['public'] };
+        }
       })
     );
     expect((await listViews()).body.data.views).toEqual([]);
     state.viewer = viewer({ role: 'localadmin' });
-    expect((await listViews()).body.data.views).toHaveLength(1);
+    expect((await listViews()).body.data.views).toHaveLength(2);
     expect((await listViews('?tier=confidential')).body.data.views).toEqual([]);
     state.viewer = viewer({ role: 'localadmin', tierAccess: ['public'] });
     expect((await listViews('?tier=confidential')).status).toBe(403);
@@ -288,6 +334,26 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
       action_id: 'probe_env',
     });
     expect(agent.status).toBe(409);
+  });
+
+  it("refuses actions on another tenant's plugin without queueing anything", async () => {
+    const record = install(fixtureSource(), { tenantSlug: 'tenant-a' });
+    const audit = vi.spyOn(auditChain, 'record');
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-b'] });
+    for (const action_id of ['write_probe', 'probe_env']) {
+      const { status, body } = await act({
+        plugin_id: record.pluginId,
+        view_id: 'status',
+        action_id,
+        params: action_id === 'write_probe' ? { path: 'x' } : {},
+      });
+      expect(status).toBe(404);
+      expect(body.error).toBe('PLUGIN_VIEW_NOT_FOUND');
+    }
+    const actionAudits = audit.mock.calls.filter(([entry]) =>
+      String(entry.action).startsWith('plugin_view.action')
+    );
+    expect(actionAudits).toEqual([]);
   });
 
   it('refuses actions of a digest-mismatched plugin', async () => {
@@ -460,5 +526,93 @@ describe('POST /api/headless/a2ui/plugin-views execute (FU-02)', () => {
     expect((await listViews()).body.data.action_requests).toMatchObject([
       { approval_request_id: id, status: 'stale' },
     ]);
+  });
+});
+
+describe('plugin-views with the Chronos plugin host enabled (PH-01)', () => {
+  function useHost() {
+    vi.stubEnv('KYBERION_CHRONOS_PLUGIN_HOST', '1');
+    const host = getOrCreatePluginHost('chronos', () =>
+      createPluginHost({
+        surface: 'chronos',
+        tenantAllow: [],
+        managedRoot: state.managedRoot,
+        audit: () => undefined,
+      })
+    );
+    return { host, syncNow: vi.spyOn(host, 'syncNow') };
+  }
+
+  it('executes an approved human action end-to-end without a manual activation', async () => {
+    vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({ ...entry, id: 'a', timestamp: '', previousHash: '', currentHash: '' }) as AuditEntry
+    );
+    const { syncNow } = useHost();
+    state.viewer = viewer({ role: 'localadmin' });
+    const record = install(fixtureSource());
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+
+    const queued = await act({
+      plugin_id: record.pluginId,
+      view_id: 'status',
+      action_id: 'write_probe',
+      params,
+    });
+    expect(queued.status).toBe(202);
+    const id = queued.body.data.outcome.approvalRequestId as string;
+    cleanup.push(
+      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`),
+      pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
+    );
+    trackedActionIds.push(id);
+    // The POST synced the host before acting: the plugin now runs in-process.
+    expect(syncNow).toHaveBeenCalledTimes(1);
+
+    const pending = loadApprovalRequest('chronos', id);
+    decideApprovalRequest('mission_controller', {
+      channel: 'chronos',
+      requestId: id,
+      decision: 'approved',
+      decidedBy: 'human:approver',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: pending?.accountability?.payloadHash,
+      effectBinding: pending?.accountability?.effectBinding,
+    });
+
+    const listed = (await listViews()).body.data;
+    expect(listed.host).toEqual({
+      enabled: true,
+      plugins: [expect.objectContaining({ plugin_id: record.pluginId, state: 'active' })],
+    });
+    expect(listed.action_requests).toMatchObject([
+      { approval_request_id: id, status: 'approved', executable: true },
+    ]);
+
+    const executed = await act({
+      plugin_id: record.pluginId,
+      view_id: 'status',
+      action_id: 'write_probe',
+      params,
+      approval_request_id: id,
+    });
+    expect(executed).toMatchObject({
+      status: 200,
+      body: { data: { outcome: { status: 'executed', approvalRequestId: id } } },
+    });
+    expect(syncNow).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a readonly viewer only whether the host is enabled', async () => {
+    const { host } = useHost();
+    const record = install(fixtureSource());
+    await host.syncNow();
+    expect((await listViews()).body.data.host).toEqual({ enabled: true });
+    state.viewer = viewer({ role: 'localadmin' });
+    expect((await listViews()).body.data.host).toEqual({
+      enabled: true,
+      plugins: [expect.objectContaining({ plugin_id: record.pluginId, state: 'active' })],
+    });
   });
 });

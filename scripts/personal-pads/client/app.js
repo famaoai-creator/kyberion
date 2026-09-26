@@ -16,6 +16,8 @@
  *   save / clear        → ui:save-bar;   status → ui:callout;   result → ui:code
  *   history             → ui:list / ui:empty-state / ui:skeleton
  *   unsaved changes     → ui:dialog (save / discard / cancel)
+ *   plugin views        → nav entry; the server-composed read-only A2UI of the
+ *                          approved plugin views of the request scope (PH-03)
  *
  * Render model: `renderA2UI` replaces a whole container, so every field has
  * its own container and only containers whose data changed are re-rendered.
@@ -116,9 +118,18 @@ export function startPersonalPads() {
   let artifactPendingByField = {};
   let artifactFailedFields = {};
   let dialogState = null;
+  let showingPluginViews = false;
+  let pluginViewsRequest = 0;
   const fieldHosts = new Map();
   const actionHosts = new Map();
   const renderedHosts = new Set();
+
+  // PH-03: plugin views replace the workspace (the draft is kept while hidden).
+  const pluginPanel = document.createElement('section');
+  pluginPanel.hidden = true;
+  pluginPanel.setAttribute('data-pp-plugin-views', '');
+  if (H.workspace && H.workspace.parentNode)
+    H.workspace.parentNode.insertBefore(pluginPanel, H.workspace.nextSibling);
 
   const selected = () => pads.find((pad) => pad.id === currentPad) || pads[0];
   const adapter = () => adapters.find((item) => item.pad_id === currentPad) || adapters[0];
@@ -263,23 +274,109 @@ export function startPersonalPads() {
           type: 'ui:nav-rail',
           props: {
             label: T('nav_label'),
-            items: pads.map((pad) => ({
-              id: pad.id,
-              label: pad.label,
-              hint: pad.description,
-              icon: PAD_ICONS[pad.id],
-              // A real link (open in a new tab works); a plain click selects in place.
-              href: `#pad=${encodeURIComponent(pad.id)}`,
-              action: { id: 'pp.pad.select', payload: { pad: pad.id } },
-              active: pad.id === currentPad,
-            })),
+            items: pads
+              .map((pad) => ({
+                id: pad.id,
+                label: pad.label,
+                hint: pad.description,
+                icon: PAD_ICONS[pad.id],
+                // A real link (open in a new tab works); a plain click selects in place.
+                href: `#pad=${encodeURIComponent(pad.id)}`,
+                action: { id: 'pp.pad.select', payload: { pad: pad.id } },
+                active: !showingPluginViews && pad.id === currentPad,
+              }))
+              .concat([
+                {
+                  id: 'pp-plugin-views',
+                  label: T('plugin_views_title'),
+                  href: '#plugin-views',
+                  action: { id: 'pp.plugin-views.open' },
+                  active: showingPluginViews,
+                },
+              ]),
           },
         },
       ],
       (action) => {
         if (action.id === 'pp.pad.select' && action.payload) selectPad(action.payload.pad);
+        else if (action.id === 'pp.plugin-views.open') openPluginViews();
       }
     );
+  }
+
+  // -- plugin views (read-only; actions are approved in Chronos) -------------------
+  function renderPluginViews(payload) {
+    const composed =
+      payload && payload.a2ui && payload.a2ui.updateComponents
+        ? payload.a2ui.updateComponents.components || []
+        : [];
+    const referenced = new Set(composed.flatMap((component) => component.children || []));
+    const roots = composed.filter((component) => !referenced.has(component.id));
+    const body = composed.length
+      ? [
+          {
+            id: 'pp-plugin-views-note',
+            type: 'ui:text',
+            props: { variant: 'caption', text: T('plugin_view_action_in_chronos') },
+          },
+        ].concat(composed)
+      : [
+          {
+            id: 'pp-plugin-views-empty',
+            type: 'ui:empty-state',
+            props: { title: T('plugin_views_empty') },
+          },
+        ];
+    render(
+      pluginPanel,
+      [
+        {
+          id: 'pp-plugin-views',
+          type: 'ui:section',
+          props: { title: T('plugin_views_title') },
+          children: [body[0].id].concat(composed.length ? roots.map((c) => c.id) : []),
+        },
+      ].concat(body)
+    );
+  }
+
+  function loadPluginViews() {
+    const request = ++pluginViewsRequest;
+    render(pluginPanel, [
+      { id: 'pp-plugin-views-loading', type: 'ui:skeleton', props: { lines: 3 } },
+    ]);
+    api(`/api/plugin-views?tier=${encodeURIComponent(currentTier)}`)
+      .then((payload) => {
+        if (request !== pluginViewsRequest || !showingPluginViews) return;
+        renderPluginViews(payload);
+      })
+      .catch((error) => {
+        if (request !== pluginViewsRequest || !showingPluginViews) return;
+        render(pluginPanel, [
+          {
+            id: 'pp-plugin-views-error',
+            type: 'ui:callout',
+            props: { tone: 'danger', title: error.message },
+          },
+        ]);
+      });
+  }
+
+  function showPluginPanel(visible) {
+    showingPluginViews = visible;
+    pluginPanel.hidden = !visible;
+    if (H.workspace) H.workspace.hidden = visible;
+    if (!visible) {
+      pluginViewsRequest += 1;
+      disposeHost(pluginPanel);
+    }
+    renderNav();
+  }
+
+  function openPluginViews() {
+    if (tierSwitching) return;
+    if (!showingPluginViews) showPluginPanel(true);
+    loadPluginViews();
   }
 
   function renderScope() {
@@ -1290,7 +1387,12 @@ export function startPersonalPads() {
 
   // -- pad / tier switching -----------------------------------------------------------------
   function selectPad(padId) {
-    if (!pads.some((pad) => pad.id === padId) || padId === currentPad) return;
+    if (!pads.some((pad) => pad.id === padId)) return;
+    if (padId === currentPad) {
+      if (showingPluginViews) showPluginPanel(false);
+      return;
+    }
+    if (showingPluginViews) showPluginPanel(false);
     guard(() => {
       currentPad = padId;
       dirty = false;
@@ -1302,7 +1404,7 @@ export function startPersonalPads() {
 
   function setScopeSwitching(active) {
     tierSwitching = active;
-    for (const node of [H.workspace, H.nav]) {
+    for (const node of [H.workspace, H.nav, pluginPanel]) {
       if (!node) continue;
       node.inert = active;
       if (active) node.setAttribute('aria-busy', 'true');
@@ -1332,6 +1434,7 @@ export function startPersonalPads() {
             setScopeSwitching(false);
             renderScope();
             renderPad();
+            if (showingPluginViews) loadPluginViews();
           })
           .catch((error) => {
             if (request !== tierRequest) return;

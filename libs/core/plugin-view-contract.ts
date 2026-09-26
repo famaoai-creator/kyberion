@@ -12,8 +12,12 @@
  *     catalogId `kyberion-base`, component types restricted to a
  *     display-only subset of the catalog, no HTML/script-capable props or
  *     navigation targets, and every `*Key` present in the vocabulary;
- *   - `sandboxed-iframe` isolation is reserved (`[PLUGIN_VIEW_UNSUPPORTED]`)
- *     and every requested capability is denied (the allowlist is empty);
+ *   - PH-02: a `sandboxed-iframe` view is one `views/*.html` document
+ *     (<= 512KB strict UTF-8, same containment rules) checked by
+ *     `plugin-view-frame.ts`; it is never composed into an A2UI surface and
+ *     is served only by a host route with a sandbox CSP;
+ *   - every requested capability outside `PLUGIN_VIEW_CAPABILITY_ALLOWLIST`
+ *     (`action.request` only) is denied;
  *   - every action targets one of the plugin's own `provides.ops`, declares
  *     a closed params schema (`additionalProperties:false` on every object)
  *     and is the only thing a document may reference as an action.
@@ -30,7 +34,7 @@ import { isRecord } from './foundation/text.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from './a2ui.js';
 import { A2UI_BASE_CATALOG_ID, type KyberionBaseComponentType } from './a2ui-catalog.js';
 import { resolveVocabularyEntry } from './vocabulary-catalog.js';
@@ -41,6 +45,16 @@ import {
 } from './plugin-managed-install.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
 import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
+import {
+  decodePluginViewFrameHtml,
+  findPluginViewFrameViolation,
+  isPluginViewFrameDocumentPath,
+  PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY,
+  PLUGIN_VIEW_FRAME_MAX_BYTES,
+  pluginViewMaySendActions,
+} from './plugin-view-frame.js';
+
+export { pluginViewMaySendActions };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -129,7 +143,10 @@ export interface ValidatePluginViewContext {
 export interface LoadedPluginView {
   pluginId: string;
   declaration: PluginViewDeclaration;
+  /** A2UI messages; always empty for a `sandboxed-iframe` view. */
   messages: A2UIMessage[];
+  /** PH-02: validated document of a `sandboxed-iframe` view. */
+  html?: string;
   providedOps: string[];
   contentDigest?: string;
   /** Digest of the approved permission grant (managed installs only). */
@@ -156,10 +173,13 @@ export interface PluginViewLoadResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Capabilities a view may request. Deny by default: nothing is allowlisted
- * until a capability has a reviewed host implementation.
+ * Capabilities a view may request. Deny by default: only capabilities with a
+ * reviewed host implementation are listed. `action.request` lets an iframe
+ * view ask the host to run one of its declared actions (host-confirmed).
  */
-export const PLUGIN_VIEW_CAPABILITY_ALLOWLIST: readonly string[] = Object.freeze([]);
+export const PLUGIN_VIEW_CAPABILITY_ALLOWLIST: readonly string[] = Object.freeze([
+  PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY,
+]);
 
 /**
  * Display-only subset of the `kyberion-base` catalog. Host chrome (app shell,
@@ -508,9 +528,18 @@ function validateDocument(
   return messages;
 }
 
+function validateFrameDocument(declaration: PluginViewDeclaration, document: unknown): void {
+  if (typeof document !== 'string') {
+    throw invalid(`view '${declaration.id}': an iframe document must be HTML text`);
+  }
+  const violation = findPluginViewFrameViolation(document);
+  if (violation) throw invalid(`view '${declaration.id}': iframe document ${violation}`);
+}
+
 /**
  * Validates a parsed declaration and its document. Throws `PluginViewError`
- * (`[PLUGIN_VIEW_*]`); returns the validated A2UI messages.
+ * (`[PLUGIN_VIEW_*]`); returns the validated A2UI messages (none for a
+ * `sandboxed-iframe` view, whose document is the HTML text).
  */
 export function validatePluginView(
   declaration: PluginViewDeclaration,
@@ -518,10 +547,10 @@ export function validatePluginView(
   context: ValidatePluginViewContext
 ): A2UIMessage[] {
   const decl = parsePluginViewDeclaration(declaration);
-  if (decl.isolation === 'sandboxed-iframe') {
-    throw new PluginViewError(
-      'PLUGIN_VIEW_UNSUPPORTED',
-      `view '${decl.id}': sandboxed-iframe isolation is not supported yet`
+  const frame = decl.isolation === 'sandboxed-iframe';
+  if (frame !== isPluginViewFrameDocumentPath(decl.document)) {
+    throw invalid(
+      `view '${decl.id}': ${decl.isolation} requires a ${frame ? 'views/*.html' : 'views/*.a2ui.json'} document`
     );
   }
   const deniedCapability = decl.capabilities.find(
@@ -553,6 +582,10 @@ export function validatePluginView(
     }
     compileParamsSchema(action.paramsSchema, `${decl.id}/${action.id}`);
   }
+  if (frame) {
+    validateFrameDocument(decl, document);
+    return [];
+  }
   return validateDocument(decl, document, vocabularyHas);
 }
 
@@ -566,7 +599,8 @@ function stringList(value: unknown): string[] {
     : [];
 }
 
-function readViewDocument(pluginRoot: string, relative: string): unknown {
+/** Contained, symlink-free regular file under the plugin root (at most `maxBytes`). */
+function resolveViewDocumentPath(pluginRoot: string, relative: string, maxBytes: number): string {
   const normalized = relative.replaceAll('\\', '/');
   if (normalized.split('/').some((segment) => segment === '..' || segment === '')) {
     throw invalid(`document path '${relative}' is not a plain views/ path`);
@@ -586,10 +620,26 @@ function readViewDocument(pluginRoot: string, relative: string): unknown {
     if (cursor === target ? !stat.isFile() : !stat.isDirectory()) {
       throw invalid(`document path '${relative}' is not a regular file`);
     }
-    if (cursor === target && stat.size > MAX_DOCUMENT_BYTES) {
-      throw invalid(`document '${relative}' exceeds ${MAX_DOCUMENT_BYTES} bytes`);
+    if (cursor === target && stat.size > maxBytes) {
+      throw invalid(`document '${relative}' exceeds ${maxBytes} bytes`);
     }
   }
+  return target;
+}
+
+function readViewFrameHtml(pluginRoot: string, relative: string): string {
+  const target = resolveViewDocumentPath(pluginRoot, relative, PLUGIN_VIEW_FRAME_MAX_BYTES);
+  try {
+    return decodePluginViewFrameHtml(safeReadFile(target, { encoding: null }) as Buffer);
+  } catch (error) {
+    throw invalid(
+      `document '${relative}' ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function readViewDocument(pluginRoot: string, relative: string): unknown {
+  const target = resolveViewDocumentPath(pluginRoot, relative, MAX_DOCUMENT_BYTES);
   try {
     // Wrapping lets the recursive dangerous-key check cover array documents too.
     return parseSafeJsonObjectValue(
@@ -685,7 +735,13 @@ export function loadPluginViews(
       const declaration = parsePluginViewDeclaration(entry);
       if (seen.has(declaration.id)) throw invalid(`duplicate view id '${declaration.id}'`);
       seen.add(declaration.id);
-      const document = readViewDocument(pluginRoot, declaration.document);
+      const frame = declaration.isolation === 'sandboxed-iframe';
+      const document =
+        frame && isPluginViewFrameDocumentPath(declaration.document)
+          ? readViewFrameHtml(pluginRoot, declaration.document)
+          : !frame && !isPluginViewFrameDocumentPath(declaration.document)
+            ? readViewDocument(pluginRoot, declaration.document)
+            : undefined;
       const messages = validatePluginView(declaration, document, {
         providedOps,
         grant,
@@ -695,6 +751,7 @@ export function loadPluginViews(
         pluginId,
         declaration,
         messages,
+        ...(frame ? { html: document as string } : {}),
         providedOps,
         ...(contentDigest ? { contentDigest } : {}),
         ...(permissionsDigest ? { permissionsDigest } : {}),
@@ -839,7 +896,8 @@ export function resolvePluginViewAction(
  * Composes the visible views into one `updateComponents` payload: one
  * `ui:section` per view (title resolved by `resolveTitle`) wrapping that
  * view's root components. Component ids are prefixed per view so views can
- * never collide or reference each other's components.
+ * never collide or reference each other's components. `sandboxed-iframe`
+ * views are skipped (a surface renders them in a sandboxed frame).
  */
 export function composePluginViewsA2UI(
   views: readonly LoadedPluginView[],
@@ -847,7 +905,8 @@ export function composePluginViewsA2UI(
   surfaceId = 'chronos.headless.plugin-views'
 ): { updateComponents: { surfaceId: string; components: A2UIComponent[] } } {
   const components: A2UIComponent[] = [];
-  views.forEach((view, index) => {
+  const composable = views.filter((view) => view.declaration.isolation !== 'sandboxed-iframe');
+  composable.forEach((view, index) => {
     const prefix = `pv${index}-`;
     const own = view.messages.flatMap((message) => message.updateComponents?.components ?? []);
     const childIds = new Set(own.flatMap((component) => component.children ?? []));

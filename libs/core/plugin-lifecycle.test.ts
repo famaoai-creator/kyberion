@@ -41,6 +41,22 @@ import {
   type PluginChangeSnapshot,
 } from './plugin-lifecycle.js';
 
+// Pass-through spy: records every file read / directory walk so tests can prove
+// which managed copies were digested.
+const secureIoReads = vi.hoisted(() => [] as string[]);
+vi.mock('./secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./secure-io.js')>();
+  const safeReadFile = ((...args: Parameters<typeof actual.safeReadFile>) => {
+    secureIoReads.push(String(args[0]));
+    return actual.safeReadFile(...args);
+  }) as typeof actual.safeReadFile;
+  const safeReaddir = ((...args: Parameters<typeof actual.safeReaddir>) => {
+    secureIoReads.push(String(args[0]));
+    return actual.safeReaddir(...args);
+  }) as typeof actual.safeReaddir;
+  return { ...actual, safeReadFile, safeReaddir };
+});
+
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
 const cleanupPaths: string[] = [];
 
@@ -456,5 +472,19 @@ describe('plugin lifecycle e2e with the permissions fixture (EP-03/EP-04)', () =
       '[PLUGIN_LIFECYCLE_DENIED]'
     );
     expect(isPluginActive(pluginId)).toBe(false);
+  });
+
+  it('re-verifies only the target managed copy when activating by id', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-byid');
+    const other = installApproved(`${pluginId.slice(0, 50)}-other`, fixtureSource(), managedRoot);
+    const target = installApproved(pluginId, fixtureSource(), managedRoot);
+    secureIoReads.length = 0;
+    const result = await activatePlugin({ record: target }, { managedRoot });
+    expect(result.ok).toBe(true);
+    expect(other.pluginId).not.toBe(target.pluginId);
+    const inside = (dir: string) => (p: string) => p === dir || p.startsWith(`${dir}${path.sep}`);
+    // The target copy is digested; the neighbouring copy is never touched.
+    expect(secureIoReads.some(inside(target.managedPath))).toBe(true);
+    expect(secureIoReads.filter(inside(other.managedPath))).toEqual([]);
   });
 });
