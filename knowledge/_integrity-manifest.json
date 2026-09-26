@@ -1291,6 +1291,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/authority-roles/chronos_tenant_runner.json",
+      "tier": "public",
+      "size": 972,
+      "type": "json"
+    },
+    {
       "path": "product/governance/authority-roles/cyber_security.json",
       "tier": "public",
       "size": 432,
@@ -3913,6 +3919,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tenant-bound-runtime-probing.md",
+      "tier": "public",
+      "size": 10711,
+      "type": "md"
+    },
+    {
       "path": "product/governance/tenant-onboarding-procedure.md",
       "tier": "public",
       "size": 3319,
@@ -4609,6 +4621,18 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/action-playbook.ja.md",
+      "tier": "public",
+      "size": 8025,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/action-playbook.md",
+      "tier": "public",
+      "size": 7348,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/active_inquiry_protocol.md",
       "tier": "public",
       "size": 1651,
@@ -4885,6 +4909,18 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/capability-verb-inventory.ja.md",
+      "tier": "public",
+      "size": 9160,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/capability-verb-inventory.md",
+      "tier": "public",
+      "size": 8284,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/code-documentation-production-playbook.md",
       "tier": "public",
       "size": 3469,
@@ -4960,6 +4996,18 @@
       "path": "product/orchestration/directives-protocol.md",
       "tier": "public",
       "size": 4626,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/document-file-reading-playbook.ja.md",
+      "tier": "public",
+      "size": 12808,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/document-file-reading-playbook.md",
+      "tier": "public",
+      "size": 10988,
       "type": "md"
     },
     {
@@ -5410,6 +5458,18 @@
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
       "size": 8351,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/perception-playbook.ja.md",
+      "tier": "public",
+      "size": 7062,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/perception-playbook.md",
+      "tier": "public",
+      "size": 6370,
       "type": "md"
     },
     {
