@@ -122,6 +122,7 @@ import {
   sweepStatusRules,
   scanDataVault,
   sweepDelegationChildren,
+  sweepWorkspaces,
   sweepTrash,
   restoreFromTrash,
   listReviewRequiredDirs,
@@ -140,6 +141,7 @@ import {
   type DelegationChildRecord,
 } from './storage-janitor.js';
 import { SUPERVISOR_EVENTS_LEGACY_FILE } from './agent-runtime-events.js';
+import type { WorkspaceRecord } from './workspace-ledger.js';
 import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
@@ -896,6 +898,174 @@ describe('storage-janitor', () => {
       expect(result.killed).toHaveLength(0);
       expect(result.errors).toHaveLength(3);
       expect(readRegistryRaw()).toHaveLength(0);
+    });
+  });
+
+  describe('sweepWorkspaces (WS-07)', () => {
+    // runJanitor reads the real clock, so fixtures are relative to it.
+    const NOW = Date.now();
+    const HOUR = 60 * 60 * 1000;
+    const iso = (msAgo: number) => new Date(NOW - msAgo).toISOString();
+
+    function workspacesRoot(): string {
+      return path.join(path.dirname(tmpDir), 'runtime', 'workspaces');
+    }
+    function ledgerPath(): string {
+      return path.join(workspacesRoot(), 'ledger.json');
+    }
+    function workspace(id: string, overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord {
+      const dir = path.join(workspacesRoot(), id);
+      writeFile(path.join(dir, 'file.txt'));
+      return {
+        id,
+        path: dir,
+        kind: 'scratch-dir',
+        owner: {},
+        createdAt: iso(48 * HOUR),
+        live: true,
+        ...overrides,
+      };
+    }
+    function writeLedger(records: WorkspaceRecord[]): void {
+      writeFile(ledgerPath(), JSON.stringify(records));
+    }
+    function ledgerIds(): string[] {
+      return (JSON.parse(fs.readFileSync(ledgerPath(), 'utf8')) as WorkspaceRecord[]).map(
+        (r) => r.id
+      );
+    }
+
+    function fixture() {
+      const releasedOld = workspace('ws-released-old', {
+        live: false,
+        releasedAt: iso(25 * HOUR),
+      });
+      const releasedRecent = workspace('ws-released-recent', {
+        live: false,
+        releasedAt: iso(1 * HOUR),
+      });
+      const liveTerminal = workspace('ws-live-terminal', { owner: { mission_id: 'MSN-DONE' } });
+      const liveActive = workspace('ws-live-active', { owner: { mission_id: 'MSN-ACTIVE' } });
+      const liveTerminalYoung = workspace('ws-live-terminal-young', {
+        owner: { mission_id: 'MSN-DONE' },
+        createdAt: iso(1 * HOUR),
+      });
+      writeLedger([releasedOld, releasedRecent, liveTerminal, liveActive, liveTerminalYoung]);
+      const stray = path.join(workspacesRoot(), 'stray');
+      fs.mkdirSync(stray, { recursive: true });
+      return { releasedOld, releasedRecent, liveTerminal, liveActive, liveTerminalYoung, stray };
+    }
+
+    const sweepOpts = {
+      now: () => NOW,
+      orphanTtlHours: 24,
+      isOwnerTerminal: (owner: { mission_id?: string }) => owner.mission_id === 'MSN-DONE',
+    };
+
+    it('reports nothing when no ledger exists', () => {
+      const result = sweepWorkspaces({ dryRun: false, ...sweepOpts });
+      expect(result).toEqual({
+        registered: 0,
+        orphaned: [],
+        deleted: [],
+        unregisteredDirs: [],
+        errors: [],
+      });
+    });
+
+    it('dry-run reports orphans and unregistered dirs without deleting anything', () => {
+      const f = fixture();
+      const result = sweepWorkspaces({ dryRun: true, ...sweepOpts });
+      expect(result.registered).toBe(5);
+      expect(result.orphaned.map((r) => r.id).sort()).toEqual([
+        'ws-live-terminal',
+        'ws-released-old',
+      ]);
+      expect(result.deleted).toEqual([]);
+      expect(result.unregisteredDirs).toEqual(['active/shared/runtime/workspaces/stray']);
+      expect(fs.existsSync(f.releasedOld.path)).toBe(true);
+      expect(ledgerIds()).toHaveLength(5);
+    });
+
+    it('deletes only registered orphans through the ledger and audits each deletion', () => {
+      const f = fixture();
+      const result = sweepWorkspaces({ dryRun: false, ...sweepOpts });
+      expect(result.errors).toEqual([]);
+      expect(result.deleted.map((r) => r.id).sort()).toEqual([
+        'ws-live-terminal',
+        'ws-released-old',
+      ]);
+      expect(fs.existsSync(f.releasedOld.path)).toBe(false);
+      expect(fs.existsSync(f.liveTerminal.path)).toBe(false);
+      expect(fs.existsSync(f.releasedRecent.path)).toBe(true);
+      expect(fs.existsSync(f.liveActive.path)).toBe(true);
+      expect(fs.existsSync(f.liveTerminalYoung.path)).toBe(true);
+      expect(fs.existsSync(f.stray)).toBe(true);
+      expect(ledgerIds().sort()).toEqual([
+        'ws-live-active',
+        'ws-live-terminal-young',
+        'ws-released-recent',
+      ]);
+      const audits = readRetentionAudit().filter((r) => r.event === 'WORKSPACE_DELETE');
+      expect(audits.map((r) => r.workspace_id).sort()).toEqual([
+        'ws-live-terminal',
+        'ws-released-old',
+      ]);
+    });
+
+    it('refuses to delete an orphan whose path became a symlink', () => {
+      const victim = path.join(testRootDir(), 'victim');
+      writeFile(path.join(victim, 'keep.txt'));
+      const linked = path.join(workspacesRoot(), 'ws-linked');
+      fs.mkdirSync(workspacesRoot(), { recursive: true });
+      fs.symlinkSync(victim, linked, 'dir');
+      writeLedger([
+        {
+          id: 'ws-linked',
+          path: linked,
+          kind: 'scratch-dir',
+          owner: {},
+          createdAt: iso(48 * HOUR),
+          live: false,
+          releasedAt: iso(48 * HOUR),
+        },
+      ]);
+      const result = sweepWorkspaces({ dryRun: false, ...sweepOpts });
+      expect(result.deleted).toEqual([]);
+      expect(result.errors.join('\n')).toContain('WORKSPACE_SYMLINK');
+      expect(fs.existsSync(path.join(victim, 'keep.txt'))).toBe(true);
+      expect(ledgerIds()).toEqual(['ws-linked']);
+    });
+
+    it('refuses to delete a ledger path outside the workspace roots', () => {
+      const outside = path.join(path.dirname(tmpDir), 'data-vault', 'precious');
+      writeFile(path.join(outside, 'keep.txt'));
+      writeLedger([
+        {
+          id: 'ws-outside',
+          path: outside,
+          kind: 'scratch-dir',
+          owner: {},
+          createdAt: iso(48 * HOUR),
+          live: false,
+          releasedAt: iso(48 * HOUR),
+        },
+      ]);
+      const result = sweepWorkspaces({ dryRun: false, ...sweepOpts });
+      expect(result.deleted).toEqual([]);
+      expect(result.errors.join('\n')).toContain('outside the allowed roots');
+      expect(fs.existsSync(path.join(outside, 'keep.txt'))).toBe(true);
+    });
+
+    it('is reported by runJanitor', () => {
+      fixture();
+      const report = runJanitor({ dryRun: true });
+      expect(report.workspaces).toEqual({
+        registered: 5,
+        orphaned: 1,
+        deleted: 0,
+        unregisteredDirs: ['active/shared/runtime/workspaces/stray'],
+      });
     });
   });
 
