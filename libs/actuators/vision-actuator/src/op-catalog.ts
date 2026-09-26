@@ -136,6 +136,8 @@ const MARK_ELEMENTS_SCHEMA = {
       required: ['x', 'y'],
       additionalProperties: false,
     },
+    live_screen: { type: 'boolean' },
+    application: { type: 'string', minLength: 1 },
   },
   additionalProperties: false,
   required: ['path', 'session_id'],

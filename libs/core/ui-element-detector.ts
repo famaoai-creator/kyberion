@@ -1,6 +1,8 @@
 import { logger } from './core.js';
 import { ocrImage } from './ocr-bridge.js';
 import type { OcrRequest, OcrResult, OcrRoutingMode } from './ocr-types.js';
+import { OsAccessibilityDetector } from './os-accessibility-detector.js';
+import { PixelRegionDetector } from './pixel-region-detector.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 import {
   resolveSeamProviderDecision,
@@ -19,9 +21,12 @@ import {
  * `ui-element-detector` seam: sources of Set-of-Marks candidate boxes.
  *
  * Built-ins are `browser_dom` (rects of the browser snapshot, exact and
- * ref-carrying) and `ocr_text` (text lines of any screenshot, the fallback).
- * A pixel detector (YOLO / OmniParser style tool runtime) registers here as
- * another provider with kind 'model'; nothing else changes.
+ * ref-carrying), `os_accessibility` (rects of the OS accessibility tree, exact,
+ * only for this machine's live screen), `ocr_text` (text lines of any
+ * screenshot) and `pixel_regions` (edge-based control/icon regions of any
+ * screenshot, unlabelled). A model detector (YOLO / OmniParser style tool
+ * runtime) registers here as another provider with kind 'model'; nothing else
+ * changes.
  *
  * Without an explicit detector list the governed selection policy ranks the
  * available detectors and the first one that finds anything wins. With an
@@ -149,7 +154,12 @@ export class OcrTextDetector implements UiElementDetector {
 export function ensureBuiltinUiElementDetectors(): void {
   if (builtinsRegistered) return;
   const registered = new Set(listUiElementDetectors().map((detector) => detector.id));
-  for (const detector of [new BrowserDomDetector(), new OcrTextDetector()]) {
+  for (const detector of [
+    new BrowserDomDetector(),
+    new OcrTextDetector(),
+    new OsAccessibilityDetector(),
+    new PixelRegionDetector(),
+  ]) {
     if (!registered.has(detector.id)) registerUiElementDetector(detector);
   }
   builtinsRegistered = true;
