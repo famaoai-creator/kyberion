@@ -132,6 +132,13 @@ jobs:
       - name: Validate first-win artifact contract
         run: pnpm run check -- --scope full --only first-win-smoke
 
+      # PE-02: the Chronos plugin host, a sandboxed-iframe plugin view and an
+      # approved human action end to end in Chromium, against a hermetic root
+      # under active/shared/tmp/ (reuses this job's build and Chromium; ~15 s).
+      - name: Plugin views E2E
+        timeout-minutes: 5
+        run: pnpm kyberion check plugin-views-e2e
+
   intent-smoke:
     runs-on: ubuntu-latest
     needs: lint-and-validate
