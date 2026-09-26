@@ -380,6 +380,7 @@ describe('RA-02 role assumption policy', () => {
     expect(isRoleAssumptionAllowed('concierge', 'concierge_localadmin')).toBe(true);
     expect(isRoleAssumptionAllowed('system_configurator', 'mission_controller')).toBe(true);
     expect(isRoleAssumptionAllowed('slack_bridge', 'chronos_localadmin')).toBe(false);
+    expect(isRoleAssumptionAllowed('not_listed_system_role', 'chronos_gateway')).toBe(false);
     expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(false);
   });
 
@@ -481,5 +482,25 @@ describe('RA-02 policy coverage', () => {
     // package.json `surfaces` / `config-mission` scripts.
     expect(policy.system_roles).toHaveProperty('surface_runtime');
     expect(policy.system_roles).toHaveProperty('system_configurator');
+  });
+
+  it('never shares the broad roles and justifies each per-surface grant (S2)', () => {
+    const policy = JSON.parse(
+      String(
+        safeReadFile(pathResolver.knowledge('product/governance/role-assumption-policy.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as {
+      shared_core_roles: { roles: string[] };
+      system_roles: Record<string, { may_assume: string[]; rationale: string }>;
+    };
+    const broad = ['ecosystem_architect', 'mission_controller', 'sovereign_concierge'];
+    expect(policy.shared_core_roles.roles.filter((role) => broad.includes(role))).toEqual([]);
+    for (const [systemRole, entry] of Object.entries(policy.system_roles)) {
+      for (const role of entry.may_assume.filter((candidate) => broad.includes(candidate))) {
+        expect(entry.rationale, `${systemRole} must justify ${role}`).toContain(`${role}`);
+      }
+    }
   });
 });
