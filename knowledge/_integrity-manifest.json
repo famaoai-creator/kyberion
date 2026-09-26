@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 15918,
+      "size": 17238,
       "type": "md"
     },
     {
@@ -1293,7 +1293,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 13471,
+      "size": 14101,
       "type": "json"
     },
     {
@@ -1330,6 +1330,12 @@
       "path": "product/governance/authority-roles/chronos_tenant_runner.json",
       "tier": "public",
       "size": 972,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/chronos_token_registry_reader.json",
+      "tier": "public",
+      "size": 607,
       "type": "json"
     },
     {
@@ -3531,7 +3537,7 @@
     {
       "path": "product/governance/role-assumption-policy.json",
       "tier": "public",
-      "size": 12935,
+      "size": 13438,
       "type": "json"
     },
     {
@@ -3543,7 +3549,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3650,
+      "size": 3714,
       "type": "json"
     },
     {
@@ -3657,7 +3663,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 22795,
+      "size": 22941,
       "type": "json"
     },
     {

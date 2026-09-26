@@ -78,6 +78,39 @@ describe('concierge viewer-context tier masking', () => {
     expect(context.tierAccess).toEqual(['confidential', 'public']);
   });
 
+  it('TR-01: reads the token registry under the narrow reader role under SYSTEM_ROLE', async () => {
+    const rolesDuringRead: string[] = [];
+    vi.doMock('@agent/core/chronos-access-registry', async () => {
+      const actual = await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+        '@agent/core/chronos-access-registry'
+      );
+      const { resolveRole } = await import('@agent/core/authority');
+      return {
+        ...actual,
+        readChronosTokenRegistrations: () => {
+          rolesDuringRead.push(resolveRole() ?? '');
+          return [
+            {
+              token_hash: tokenHash(REGISTERED_TOKEN),
+              role: 'readonly',
+              tenant_slugs: ['tenant-a'],
+            },
+          ];
+        },
+      };
+    });
+    vi.stubEnv('SYSTEM_ROLE', 'concierge');
+    const { resolveConciergeViewerContext } = await import('./viewer-context.js');
+    const context = resolveConciergeViewerContext(
+      new NextRequest('https://concierge.example/api/concierge/inbox', {
+        headers: { authorization: `Bearer ${REGISTERED_TOKEN}` },
+      })
+    );
+    expect(context).toMatchObject({ role: 'readonly', tenantSlugs: ['tenant-a'], source: 'token' });
+    expect(rolesDuringRead.length).toBeGreaterThan(0);
+    expect(new Set(rolesDuringRead)).toEqual(new Set(['chronos_token_registry_reader']));
+  });
+
   it('rejects a registration that explicitly requests the personal tier', async () => {
     mockRegistrations([
       {

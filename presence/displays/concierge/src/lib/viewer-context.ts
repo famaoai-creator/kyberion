@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { currentScope } from '@agent/core/scope-context';
 import {
+  CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   readChronosTokenRegistrations,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
@@ -139,7 +140,11 @@ function registrations(): ChronosTokenRegistration[] | null {
     // later calls use), so it must establish its own short-lived one here —
     // without it, a corrupt/unreadable-looking `{}` is returned silently and
     // every token viewer is rejected as unknown.
-    return withExecutionContext('sovereign_concierge', () => readChronosTokenRegistrations());
+    // TR-01: the narrow reader role (only grant: chronos-access.json) instead
+    // of the broad sovereign_concierge.
+    return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+      readChronosTokenRegistrations()
+    );
   } catch {
     throw new ConciergeViewerError(401, 'Concierge viewer token registry is unavailable.');
   }

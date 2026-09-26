@@ -16,6 +16,17 @@ const REGISTRY_PATH = pathResolver.knowledge('personal/connections/chronos-acces
 
 export type ChronosAccessRole = 'readonly' | 'localadmin';
 
+/**
+ * TR-01: the least-privilege authority role for reading this registry. Its
+ * only grant (security-policy.json) is read access to `chronos-access.json`;
+ * it has no role write grant (persona worker). Surfaces whose SYSTEM_ROLE cannot read the personal tier
+ * wrap `readChronosTokenRegistrations()` in
+ * `withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, …)` instead of a
+ * broad role such as sovereign_concierge (role-assumption-policy.json lists
+ * the surfaces that may assume it).
+ */
+export const CHRONOS_TOKEN_REGISTRY_READER_ROLE = 'chronos_token_registry_reader';
+
 export interface ChronosTokenRegistration {
   token_hash: string;
   role: ChronosAccessRole;
