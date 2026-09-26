@@ -556,7 +556,15 @@ export function validateTraceReplay(
     if (options.strictUnknownSpans && !isGovernedTraceSpanName(name)) {
       issues.push({ path: `${path}.name`, message: `span name is not governed: ${name}` });
     }
-    if (kind && parentKind && validateTraceParent(kind, parentKind).length > 0) {
+    // A namespaced span (`mission:commit`) nested in a span of the same kind is
+    // a phase of that boundary, not a new one, so the parent rule does not apply.
+    const isPhaseOfParent = kind === parentKind && name.trim().toLowerCase() !== kind;
+    if (
+      kind &&
+      parentKind &&
+      !isPhaseOfParent &&
+      validateTraceParent(kind, parentKind).length > 0
+    ) {
       issues.push(
         ...validateTraceParent(kind, parentKind).map((issue) => ({
           ...issue,

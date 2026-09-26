@@ -112,6 +112,29 @@ describe('PI-06 trace schema', () => {
     });
   });
 
+  it('accepts namespaced phase spans nested in a span of the same kind', () => {
+    const span = (name: string, children: unknown[] = []) => ({
+      spanId: `span-${name}`,
+      name,
+      startTime: '2026-01-01T00:00:00.000Z',
+      status: 'ok',
+      events: [],
+      artifacts: [],
+      knowledgeRefs: [],
+      children,
+    });
+    const trace = (inner: string) => ({
+      traceId: 'trace-phases',
+      rootSpan: span('mission-controller:finish', [span('mission:finish', [span(inner)])]),
+    });
+
+    expect(validateTraceReplay(trace('mission:commit'))).toEqual([]);
+    expect(validateTraceReplay(trace('mission'))).toContainEqual({
+      path: 'trace.rootSpan.children[0].children[0].mission.parents',
+      message: 'parent must be one of ',
+    });
+  });
+
   it('rejects replay events without a valid timestamp', () => {
     const issues = validateTraceReplay({
       traceId: 'trace-events',
