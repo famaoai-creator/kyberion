@@ -544,6 +544,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "scenario run reports/trajectories for the developer running `pnpm scenario`; regenerated per run"
+    },
+    {
+      "file": "libs/core/dirty-tile-describer.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "per-call redacted tile crops for the vision describer; removed after each call"
     }
   ]
 }
