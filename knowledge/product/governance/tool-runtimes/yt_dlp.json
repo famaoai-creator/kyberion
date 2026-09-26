@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "yt_dlp",
+      "display_name": "yt-dlp Video Downloader",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "yt-dlp",
+        "args": ["--version"],
+        "description": "Probe yt-dlp availability without any network access."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "yt-dlp"],
+        "description": "Fallback when no managed_binary artifact matches the host: install yt-dlp through Homebrew."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "yt-dlp.yt-dlp",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install yt-dlp through WinGet on Windows."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "yt-dlp",
+        "args": ["--version"],
+        "description": "Re-check the installed yt-dlp binary."
+      },
+      "managed_env_subpath": "tool-runtimes/yt_dlp",
+      "managed_binary": {
+        "version": "2026.08.19",
+        "relative_path": "bin/yt-dlp",
+        "artifacts": {
+          "darwin-arm64": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos",
+            "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos",
+            "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202"
+          },
+          "linux-arm64": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux_aarch64",
+            "sha256": "b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc"
+          },
+          "linux-x64": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux",
+            "sha256": "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a"
+          }
+        }
+      },
+      "notes": "Video metadata / subtitle / media fetcher for libs/core/video-ingest (vision fetch_video, build_video_brief). Unlicense: invoked as an external binary, never vendored. Complying with the source site's terms of service is the caller's responsibility. Never self-update (-U mutates the managed binary and needs network): when extractors break, bump managed_binary.version + checksums here and run `pnpm tool:setup -- --tool yt_dlp --apply`. The sha256 values are the upstream SHA2-256SUMS digests of the pinned release (verified 2026-09-26); a managed install fails closed on checksum mismatch. Override the binary with KYBERION_YTDLP_BIN."
+    }
+  ]
+}

@@ -16,6 +16,7 @@
 
 import { createHash } from 'node:crypto';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
 import {
   findInstalledManagedBinary,
@@ -121,7 +122,21 @@ function inspectTool(toolId: string): SetupRow {
   };
 }
 
-async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
+/**
+ * A managed_binary pin must be a real sha256. The all-zero placeholder (or any
+ * malformed digest) fails closed here, before any network access.
+ */
+export function assertPinnedSha256(toolId: string, version: string, sha256: unknown): string {
+  const digest = typeof sha256 === 'string' ? sha256.trim().toLowerCase() : '';
+  if (!/^[0-9a-f]{64}$/.test(digest) || /^0+$/.test(digest)) {
+    throw new Error(
+      `managed_binary sha256 for ${toolId} ${version} is not pinned (placeholder or malformed); fill in the upstream SHA2-256SUMS digest before installing`
+    );
+  }
+  return digest;
+}
+
+export async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   const artifact = resolveManagedBinaryArtifact(toolId);
   const target = resolveManagedBinaryPath(toolId);
   if (!artifact || !target) return null;
@@ -140,6 +155,17 @@ async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
     };
   }
 
+  // An unpinned (placeholder) digest never downloads; defer to the
+  // package-manager install_backend instead of failing the whole setup.
+  let expectedSha256: string;
+  try {
+    expectedSha256 = assertPinnedSha256(toolId, version, artifact.sha256);
+  } catch (error) {
+    logger.warn(
+      `[tool-runtime-setup] skipping managed_binary for ${toolId}: ${error instanceof Error ? error.message : String(error)}; falling back to the install_backend`
+    );
+    return null;
+  }
   const payload = await secureFetch<ArrayBuffer>({
     url: artifact.url,
     method: 'GET',
@@ -148,9 +174,9 @@ async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   });
   const data = Buffer.from(payload);
   const digest = createHash('sha256').update(data).digest('hex');
-  if (digest !== artifact.sha256) {
+  if (digest !== expectedSha256) {
     throw new Error(
-      `managed_binary checksum mismatch for ${toolId} ${version}: expected ${artifact.sha256}, got ${digest}`
+      `managed_binary checksum mismatch for ${toolId} ${version}: expected ${expectedSha256}, got ${digest}`
     );
   }
   const staging = `${target}.download`;

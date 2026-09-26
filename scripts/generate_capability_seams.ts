@@ -170,6 +170,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/task-plan-coordinator-port.ts',
     consumers: ['libs/core/task-executor.ts'],
   },
+  'ui-element-detector': {
+    declaration: 'libs/core/ui-element-detector.ts',
+    consumers: ['libs/actuators/vision-actuator/src/mark-elements.ts'],
+  },
   'voice-bridge': {
     declaration: 'libs/core/voice-bridge.ts',
     consumers: ['libs/actuators/meeting-actuator/src/meeting-intelligence-ops.ts'],

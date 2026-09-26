@@ -22,6 +22,7 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
+import * as browserMarks from './browser-mark-target.js';
 import { opControl } from './browser-control-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
@@ -522,6 +523,7 @@ async function opCapture(
         {
           ...ctx,
           last_snapshot: snapshot,
+          last_snapshot_id: browserMarks.browserSnapshotId(snapshot),
           last_capture: snapshot,
           ref_map: Object.fromEntries(
             snapshot.elements.map((element) => [element.ref, element.selector])
@@ -1158,7 +1160,31 @@ async function opApply(
         key: resolve(params.key),
       });
     case 'click_ref': {
-      const ref = resolve(params.ref);
+      let ref = resolve(params.ref);
+      if (browserMarks.isMarkTarget(ref)) {
+        const target = await browserMarks.resolveBrowserMarkTarget(ref, {
+          params,
+          sessionId: ctx.session_id || 'default',
+          currentSnapshotId: browserMarks.browserSnapshotId(ctx.last_snapshot),
+          captureScreen: () => page.screenshot(),
+        });
+        if (target.kind === 'point') {
+          await retry(async () => {
+            await page.mouse.click(target.x, target.y);
+          }, buildRetryOptions(params));
+          return browserRuntimeHelpers.recordBrowserAction(
+            { ...ctx, last_url: page.url() },
+            {
+              kind: 'apply',
+              op: 'click_ref',
+              tab_id: runtime.activeTabId,
+              ref,
+              element_name: target.mark.label,
+            }
+          );
+        }
+        ref = target.ref;
+      }
       const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
         ctx,
         ref,

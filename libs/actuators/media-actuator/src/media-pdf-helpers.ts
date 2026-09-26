@@ -228,9 +228,12 @@ export function buildPdfPageOcrOverlayLinesFromResult(
   const lines = sourceLines.map((line) => {
     const box = line.boundingBox;
     if (!box) return { text: line.text, confidence: line.confidence };
-    const normalized =
-      normalizedProvider ||
-      [box.x, box.y, box.width, box.height].every((value) => value >= 0 && value <= 1);
+    // Declared units win; the provider/range heuristic only covers results
+    // from providers that predate boundingBoxUnits.
+    const normalized = result.boundingBoxUnits
+      ? result.boundingBoxUnits === 'normalized'
+      : normalizedProvider ||
+        [box.x, box.y, box.width, box.height].every((value) => value >= 0 && value <= 1);
     const x = normalized ? box.x * imageWidth : box.x;
     const y = normalized ? box.y * imageHeight : box.y;
     const width = normalized ? box.width * imageWidth : box.width;

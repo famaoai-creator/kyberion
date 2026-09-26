@@ -12,7 +12,7 @@ import {
   safeLstat,
   safeStat,
 } from '@agent/core/secure-io';
-import { pathResolver } from '@agent/core/path-resolver';
+import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
@@ -123,17 +123,45 @@ export const DEFAULT_SYSTEM_RETRY = {
   jitter: true,
 };
 
+/**
+ * Scratch dir for raw screen frames awaiting redaction: inside the running
+ * mission (MISSION_ID) so raw pixels stay in its scope, else undefined (the
+ * redactor's shared tmp default). An invalid or unknown mission id falls back.
+ */
+export function screenRedactionWorkDir(
+  missionId: string | undefined = getRegisteredEnvText('MISSION_ID'),
+  findMissionPath: (id: string) => string | null = pathResolver.findMissionPath
+): string | undefined {
+  const raw = (missionId || '').trim();
+  if (!raw) return undefined;
+  let id: string;
+  try {
+    id = assertVolatileId('mission', raw);
+  } catch {
+    return undefined;
+  }
+  const missionPath = findMissionPath(id);
+  return missionPath ? path.join(missionPath, 'tmp', 'screen-redaction') : undefined;
+}
+
+function redactFrameInScope(workDir: string | undefined) {
+  return (frame: Parameters<typeof redactScreenVideoFrame>[0]) =>
+    redactScreenVideoFrame(frame, workDir ? { work_dir: workDir } : {});
+}
+
 export async function writeRedactedScreenFrames(
   bridge: ReturnType<typeof createScreenCaptureBridge>,
   bus: StubVideoFrameBus,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  workDir: string | undefined = screenRedactionWorkDir()
 ): Promise<void> {
+  const redact = redactFrameInScope(workDir);
   const redactingBus = {
     writeFrames: async (stream: AsyncIterable<any>) =>
       bus.writeFrames(
         (async function* () {
           for await (const frame of stream) {
-            const redacted = await redactScreenVideoFrame(frame);
+            const redacted = await redact(frame);
             if (!redacted || redacted.payload.byteLength === 0) {
               throw new Error('screen frame withheld: redaction_failed');
             }
@@ -210,7 +238,9 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         params,
         resolve
       );
-      const bridge = createScreenRecordingBridge({ frame_redactor: redactScreenVideoFrame });
+      const bridge = createScreenRecordingBridge({
+        frame_redactor: redactFrameInScope(screenRedactionWorkDir()),
+      });
       const probe = await bridge.probe();
       if (!probe.available) {
         throw new Error(

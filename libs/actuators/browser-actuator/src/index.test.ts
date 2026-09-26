@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => {
         currentUrl = url;
       }),
       click: vi.fn(async () => undefined),
+      mouse: { click: vi.fn(async () => undefined) },
       fill: vi.fn(async () => undefined),
       press: vi.fn(async () => undefined),
       waitForSelector: vi.fn(async () => undefined),
@@ -234,6 +235,14 @@ vi.mock('@playwright/test', async () => {
     },
   };
 });
+
+/** saveMarks redacts labels with the real PII rules; let the mocked fs see that file. */
+function exposePiiRules(): void {
+  mocks.safeExistsSync.mockImplementation(
+    (filePath: string) =>
+      mocks.fileStore.has(filePath) || filePath.endsWith('/knowledge-sync-rules.json')
+  );
+}
 
 describe('browser-actuator v3 contract', () => {
   beforeEach(async () => {
@@ -652,6 +661,139 @@ describe('browser-actuator v3 contract', () => {
 
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalled();
+  });
+
+  it('clicks a DOM-backed mark:<n> of the current snapshot through its @eN ref', async () => {
+    exposePiiRules();
+    const { handleAction } = await import('./index');
+    const { saveMarks } = await import('@agent/core/mark-target-resolver');
+    const { Jimp } = await import('jimp');
+    const flatPage = await new Jimp({
+      data: Buffer.alloc(32 * 32 * 4, 128),
+      width: 32,
+      height: 32,
+    }).getBuffer('image/png');
+    const snapshot = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-mark-ref',
+      steps: [{ type: 'capture', op: 'snapshot', params: {} }],
+      options: { headless: true },
+    });
+    const snapshotId = snapshot.context.last_snapshot_id;
+    expect(snapshotId).toMatch(/@/);
+    const saveRefMarks = (domSnapshotId: string) =>
+      saveMarks({
+        session_id: 'vision-marks-ref',
+        image: { width: 800, height: 600 },
+        image_dhash: '0000000000000000',
+        dom_snapshot_id: domSnapshotId,
+        marks: [
+          {
+            n: 1,
+            box: { x: 10, y: 10, width: 80, height: 20 },
+            center: { x: 50, y: 20 },
+            kind: 'control',
+            label: 'Submit',
+            sources: ['dom'],
+            ref: '@e1',
+          },
+        ],
+      });
+    const clickMark = () => {
+      mocks.page.screenshot.mockResolvedValueOnce(flatPage);
+      return handleAction({
+        action: 'pipeline',
+        session_id: 'browser-mark-ref',
+        steps: [
+          {
+            type: 'apply',
+            op: 'click_ref',
+            params: { ref: 'mark:1', mark_session_id: 'vision-marks-ref' },
+          },
+        ],
+        options: { headless: true },
+      });
+    };
+
+    saveRefMarks('tab-0@an-older-snapshot');
+    const stale = await clickMark();
+    expect(stale.status).toBe('failed');
+    expect(String(stale.results[0].error)).toContain('[MARK_STALE] mark 1 refers to @e1');
+    expect(mocks.page.click).not.toHaveBeenCalled();
+
+    saveRefMarks(snapshotId);
+    const result = await clickMark();
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.mouse.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks a pixel-only mark:<n> at its CSS-pixel center and refuses unknown marks', async () => {
+    exposePiiRules();
+    const { handleAction } = await import('./index');
+    const { saveMarks } = await import('@agent/core/mark-target-resolver');
+    saveMarks({
+      session_id: 'vision-marks-point',
+      image: { width: 1600, height: 1200 },
+      image_dhash: '0000000000000000',
+      scale: 2,
+      marks: [
+        {
+          n: 1,
+          box: { x: 400, y: 200, width: 100, height: 40 },
+          center: { x: 450, y: 220 },
+          kind: 'text',
+          label: 'Checkout',
+          sources: ['ocr'],
+        },
+      ],
+    });
+    const { Jimp } = await import('jimp');
+    const flatPage = await new Jimp({
+      data: Buffer.alloc(32 * 32 * 4, 128),
+      width: 32,
+      height: 32,
+    }).getBuffer('image/png');
+    const clickPoint = (params: Record<string, unknown> = {}) => {
+      mocks.page.screenshot.mockResolvedValueOnce(flatPage);
+      return handleAction({
+        action: 'pipeline',
+        session_id: 'browser-mark-point',
+        steps: [
+          {
+            type: 'apply',
+            op: 'click_ref',
+            params: { ref: 'mark:1', mark_session_id: 'vision-marks-point', ...params },
+          },
+        ],
+        options: { headless: true },
+      });
+    };
+    const risky = await clickPoint({ high_risk: true });
+    expect(risky.status).toBe('failed');
+    expect(String(risky.results[0].error)).toContain('[MARK_INVALID]');
+    expect(mocks.page.mouse.click).not.toHaveBeenCalled();
+
+    const result = await clickPoint();
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.mouse.click).toHaveBeenCalledWith(225, 110);
+    expect(mocks.page.click).not.toHaveBeenCalled();
+
+    mocks.page.screenshot.mockResolvedValueOnce(flatPage);
+    const stale = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-mark-point',
+      steps: [
+        {
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: 'mark:9', mark_session_id: 'vision-marks-point' },
+        },
+      ],
+      options: { headless: true },
+    });
+    expect(stale.status).toBe('failed');
+    expect(String(stale.results[0].error)).toContain('[MARK_STALE]');
   });
 
   it('reuses keep_alive snapshot refs across separate pipeline calls', async () => {

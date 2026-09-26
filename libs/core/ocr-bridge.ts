@@ -127,34 +127,41 @@ function firstRecord(value: unknown): Record<string, unknown> | undefined {
   return Array.isArray(value) && isRecord(value[0]) ? value[0] : undefined;
 }
 
+function finiteNumbers(record: Record<string, unknown>, keys: string[]): number[] | undefined {
+  const values = keys.map((key) => record[key]);
+  return values.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ? (values as number[])
+    : undefined;
+}
+
+/**
+ * native-ocr.swift emits `boundingBox: {x, y, width, height}` as 0..1
+ * fractions with a top-left origin; the legacy `bbox: {x0, y0, x1, y1}` corner
+ * form is still accepted. Either way the result declares normalized units.
+ */
 function parseAppleVisionLines(value: unknown): OcrResult['lines'] {
   if (!Array.isArray(value)) return undefined;
   return value.flatMap((entry) => {
     if (!isRecord(entry) || typeof entry.text !== 'string') return [];
     const confidence = typeof entry.confidence === 'number' ? entry.confidence : 0;
-    const bbox = isRecord(entry.bbox) ? entry.bbox : undefined;
-    const hasBoundingBox =
-      bbox &&
-      typeof bbox.x0 === 'number' &&
-      typeof bbox.y0 === 'number' &&
-      typeof bbox.x1 === 'number' &&
-      typeof bbox.y1 === 'number';
-    return [
-      {
-        text: entry.text,
-        confidence,
-        ...(hasBoundingBox
-          ? {
-              boundingBox: {
-                x: bbox.x0 as number,
-                y: bbox.y0 as number,
-                width: (bbox.x1 as number) - (bbox.x0 as number),
-                height: (bbox.y1 as number) - (bbox.y0 as number),
-              },
-            }
-          : {}),
-      },
-    ];
+    let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
+    const box = isRecord(entry.boundingBox)
+      ? finiteNumbers(entry.boundingBox, ['x', 'y', 'width', 'height'])
+      : undefined;
+    const corners = isRecord(entry.bbox)
+      ? finiteNumbers(entry.bbox, ['x0', 'y0', 'x1', 'y1'])
+      : undefined;
+    if (box) {
+      boundingBox = { x: box[0], y: box[1], width: box[2], height: box[3] };
+    } else if (corners) {
+      boundingBox = {
+        x: corners[0],
+        y: corners[1],
+        width: corners[2] - corners[0],
+        height: corners[3] - corners[1],
+      };
+    }
+    return [{ text: entry.text, confidence, ...(boundingBox ? { boundingBox } : {}) }];
   });
 }
 
@@ -375,6 +382,8 @@ export class AppleVisionOcrProvider implements OcrProvider {
             text: typeof parsed.text === 'string' ? parsed.text : '',
             confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
             lines: parseAppleVisionLines(parsed.lines),
+            // Vision reports 0..1 fractions of the image (native-ocr.swift flips to top-left).
+            boundingBoxUnits: 'normalized',
             elapsedMs: Date.now() - startedAt,
           });
         } catch (error: any) {

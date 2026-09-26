@@ -20,6 +20,8 @@ export interface RequireApprovalParams {
   hasHuman?: boolean;
   hasUI?: boolean;
   nonInteractive?: boolean;
+  /** Expiry of a newly created request; see ApprovalGateParams.expiresAt. */
+  expiresAt?: string;
 }
 
 export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGateResult {
@@ -38,5 +40,6 @@ export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGat
     ...(params.hasHuman !== undefined ? { hasHuman: params.hasHuman } : {}),
     ...(params.hasUI !== undefined ? { hasUI: params.hasUI } : {}),
     ...(params.nonInteractive !== undefined ? { nonInteractive: params.nonInteractive } : {}),
+    ...(params.expiresAt !== undefined ? { expiresAt: params.expiresAt } : {}),
   });
 }
