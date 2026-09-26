@@ -197,6 +197,23 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('/Metadata');
   });
 
+  it('reads non-ASCII XMP title and author back as UTF-8, not mojibake', async () => {
+    ensureDir(OUT);
+    await generateNativePdf(
+      {
+        version: '1.0.0',
+        generatedAt: new Date().toISOString(),
+        source: { format: 'markdown', body: 'XMP utf8', title: '取締役会資料' },
+        metadata: { title: '取締役会資料', author: '監査部' },
+      } as any,
+      OUT,
+      { compress: false, xmpMetadata: true }
+    );
+    const design = await distillPdfDesign(OUT);
+    expect(design.metadata?.title).toBe('取締役会資料');
+    expect(design.metadata?.author).toBe('監査部');
+  });
+
   it('should not emit XMP metadata when xmpMetadata is false', async () => {
     ensureDir(OUT);
     await generateNativePdf(

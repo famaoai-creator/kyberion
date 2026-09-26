@@ -1,12 +1,14 @@
 /**
- * Minimal deterministic HTML → Markdown conversion for ingest parsing.
+ * Minimal deterministic HTML → Markdown conversion — the one HTML→text path
+ * for reading files (`readDocument` format `html`, `pnpm kyberion read`) and
+ * the ingest ceremony (`ingest:parse_document` format `html`).
  *
  * turndown is NOT vendored in this repo (checked 2026-07-28:
  * `require.resolve('turndown')` fails), so this is a conservative,
  * dependency-free tag handler covering p / h1-h6 / ul / ol / li / table /
  * a / pre / code / strong / em / br. Everything else is stripped to its
- * text content. Output is deterministic: no locale-, platform- or
- * time-dependent behavior.
+ * text content; <head>, <script>, <style> and comments are dropped. Output is
+ * deterministic: no locale-, platform- or time-dependent behavior.
  */
 
 const BASIC_ENTITIES: Record<string, string> = {
@@ -137,4 +139,11 @@ export function htmlToMarkdown(html: string): string {
   out = out.replace(/@@KYB_PRE_(\d+)@@/g, (_, index: string) => preBlocks[Number(index)] ?? '');
 
   return out;
+}
+
+/** The document `<title>` (entities decoded, whitespace collapsed), if any. */
+export function extractHtmlTitle(html: string): string | undefined {
+  const match = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(String(html ?? ''));
+  const title = match ? decodeEntities(inlineText(match[1])) : '';
+  return title || undefined;
 }

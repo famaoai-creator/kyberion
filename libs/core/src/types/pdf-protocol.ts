@@ -94,10 +94,7 @@ export interface PdfHighlightAnnotation extends PdfAnnotationBase {
 }
 
 export type PdfAnnotation =
-  | PdfLinkAnnotation
-  | PdfTextAnnotation
-  | PdfShapeAnnotation
-  | PdfHighlightAnnotation;
+  PdfLinkAnnotation | PdfTextAnnotation | PdfShapeAnnotation | PdfHighlightAnnotation;
 
 // ─── Outline / Bookmarks (ISO 32000-2 §12.3.3) ────────────
 
@@ -178,12 +175,7 @@ export interface PdfStructElement {
 // ─── Page Label (ISO 32000-2 §12.4.2) ─────────────────────
 
 export type PdfPageLabelStyle =
-  | 'decimal'
-  | 'roman-upper'
-  | 'roman-lower'
-  | 'alpha-upper'
-  | 'alpha-lower'
-  | 'none';
+  'decimal' | 'roman-upper' | 'roman-lower' | 'alpha-upper' | 'alpha-lower' | 'none';
 
 export interface PdfPageLabel {
   startIndex: number;
@@ -224,6 +216,17 @@ export interface PdfPage {
   markedContent?: Array<{ mcid: number; tag: PdfStructTag; text: string }>;
   /** Optional Content Group memberships for layer control */
   layerName?: string;
+  /** OCR text of the page's images (set by readers that opt into OCR; unverified) */
+  imageOcr?: PdfImageOcr[];
+  /** Images that were OCR candidates but could not be read */
+  imageOcrSkipped?: Array<{ imagePath: string; reason: string }>;
+}
+
+export interface PdfImageOcr {
+  imagePath: string;
+  text: string;
+  confidence?: number;
+  provider?: string;
 }
 
 // ─── PDF Render Options ────────────────────────────────────
@@ -322,13 +325,7 @@ export interface PdfDesignProtocol {
 // ─── P3-1: AcroForms (ISO 32000-2 §12.7) ───────────────
 
 export type PdfFieldType =
-  | 'text'
-  | 'checkbox'
-  | 'radio'
-  | 'dropdown'
-  | 'listbox'
-  | 'button'
-  | 'signature';
+  'text' | 'checkbox' | 'radio' | 'dropdown' | 'listbox' | 'button' | 'signature';
 
 export interface PdfFormField {
   /** Unique field name */
@@ -379,12 +376,7 @@ export interface PdfLayer {
 
 export type PdfEncryptAlgorithm = 'AES256' | 'AES-GCM';
 export type PdfHashAlgorithm =
-  | 'SHA256'
-  | 'SHA384'
-  | 'SHA512'
-  | 'SHA3-256'
-  | 'SHA3-384'
-  | 'SHA3-512';
+  'SHA256' | 'SHA384' | 'SHA512' | 'SHA3-256' | 'SHA3-384' | 'SHA3-512';
 
 export interface PdfEncryptOptions {
   algorithm?: PdfEncryptAlgorithm; // default: AES256

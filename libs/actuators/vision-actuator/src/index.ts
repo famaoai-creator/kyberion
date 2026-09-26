@@ -15,6 +15,7 @@ import { describeImage as coreDescribeImage } from '@agent/core/image-descriptio
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
 import * as path from 'node:path';
 import {
   currentProcessArgv,
@@ -36,6 +37,13 @@ const LEGACY_MEDIA_GENERATION_ACTIONS = new Set([
   'record_screen',
   'run_workflow',
 ]);
+
+/**
+ * Legacy capture actions must never reach a raw service-preset capture
+ * command: they forward to media-generation's capture handler, which routes
+ * through system-actuator (ScreenCaptureBridge + screen-frame redaction).
+ */
+const LEGACY_CAPTURE_ACTIONS = new Set(['capture_screen', 'record_screen']);
 
 const VISION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/vision-actuator/manifest.json'
@@ -156,6 +164,9 @@ async function executeSingleAction(input: any) {
   logger.warn(
     `🎨 [VISION:LEGACY] "${action}" is a legacy route. Prefer media-generation-actuator.`
   );
+  if (LEGACY_CAPTURE_ACTIONS.has(action)) {
+    return await handleCaptureAction(action as 'capture_screen' | 'record_screen', params);
+  }
   return await retry(
     async () => executeServicePreset('media-generation', action, params),
     buildRetryOptions()
