@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildExecutionEnv,
   isRoleAssumptionAllowed,
@@ -12,7 +12,14 @@ import {
   withExecutionContextAsync,
 } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { buildSafeExecEnv, safeReaddir, safeReadFile } from './secure-io.js';
+import { policyEngine } from './policy-engine.js';
+import {
+  buildSafeExecEnv,
+  safeReaddir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { validateReadPermission } from './tier-guard.js';
 
 const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', 'MISSION_ID'] as const;
@@ -276,6 +283,33 @@ describe('S6 role normalization', () => {
       safeChild: 'mission_controller',
       persona: 'worker',
     });
+  });
+});
+
+describe('B2 persona authorization inputs', () => {
+  it('gives the secure-io policy gate the execution-scope persona', async () => {
+    const saved = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'worker';
+    const evaluate = vi.spyOn(policyEngine, 'evaluate');
+    const target = pathResolver.sharedTmp(`ra-b2-${process.pid}.txt`);
+    try {
+      await withExecutionContextAsync(
+        'mission_controller',
+        async () => {
+          await Promise.resolve();
+          safeWriteFile(target, 'b2');
+        },
+        'analyst'
+      );
+      expect(evaluate).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'file_write', agentId: 'analyst' })
+      );
+    } finally {
+      evaluate.mockRestore();
+      safeRmSync(target, { force: true });
+      if (saved === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = saved;
+    }
   });
 });
 
