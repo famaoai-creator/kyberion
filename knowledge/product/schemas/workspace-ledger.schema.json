@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "workspace-ledger.schema.json",
+  "title": "Workspace ledger",
+  "description": "WS-05: registered per-session workspaces (git worktrees, scratch directories, private git indexes). Only paths recorded here may ever be deleted by the workspace sweep or budget reclaim.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "pattern": "^ws-[a-z0-9-]+$" },
+      "path": { "type": "string", "minLength": 1 },
+      "kind": { "type": "string", "enum": ["git-worktree", "scratch-dir", "git-index"] },
+      "owner": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mission_id": { "type": "string", "minLength": 1 },
+          "task_id": { "type": "string", "minLength": 1 },
+          "session_id": { "type": "string", "minLength": 1 }
+        }
+      },
+      "repoRoot": { "type": "string", "minLength": 1 },
+      "createdAt": { "type": "string", "minLength": 1 },
+      "live": { "type": "boolean" },
+      "releasedAt": { "type": "string", "minLength": 1 },
+      "bytes": { "type": "number", "minimum": 0 },
+      "pid": { "type": "integer", "minimum": 1 },
+      "pidStartedAt": { "type": "string", "minLength": 1 },
+      "childPid": { "type": "integer", "minimum": 1 },
+      "childStartedAt": { "type": "string", "minLength": 1 },
+      "pendingReconcile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "repoRoot": { "type": "string", "minLength": 1 },
+          "fromSha": { "type": ["string", "null"] }
+        },
+        "required": ["repoRoot", "fromSha"]
+      }
+    },
+    "required": ["id", "path", "kind", "owner", "createdAt", "live"]
+  }
+}

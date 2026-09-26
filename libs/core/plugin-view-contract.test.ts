@@ -73,6 +73,8 @@ import {
 import {
   composePluginViewsA2UI,
   isPluginViewVisible,
+  PLUGIN_VIEW_CAPABILITY_ALLOWLIST,
+  pluginViewMaySendActions,
   listPluginViewsForViewer,
   loadPluginViews,
   parsePluginViewDeclaration,
@@ -84,6 +86,7 @@ import {
   type PluginViewDeclaration,
   type PluginViewViewer,
 } from './plugin-view-contract.js';
+import { PLUGIN_VIEW_FRAME_MAX_BYTES } from './plugin-view-frame.js';
 import {
   dispatchPluginViewAction,
   executeApprovedPluginViewAction,
@@ -95,7 +98,12 @@ import {
 } from './plugin-view-actions.js';
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
-const FIXTURE_FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json'];
+const FIXTURE_FILES = [
+  'plugin-manifest.json',
+  'index.mjs',
+  'views/status.a2ui.json',
+  'views/frame.html',
+];
 const TMP_ROOT = pathResolver.sharedTmp('plugin-view-contract-test');
 const cleanupPaths: string[] = [];
 
@@ -277,15 +285,51 @@ describe('validatePluginView (EP-05)', () => {
     );
   });
 
-  it('rejects sandboxed-iframe isolation and any capability (deny by default)', () => {
+  it('validates sandboxed-iframe views as HTML and denies unlisted capabilities', () => {
     const decl = fixtureDeclaration();
+    const frame = { ...decl, isolation: 'sandboxed-iframe' as const, document: 'views/f.html' };
+    expect(validatePluginView(frame, '<p>ok</p>', { providedOps: OPS })).toEqual([]);
+    // The document path must match the isolation.
     expectViewError(
       () =>
-        validatePluginView({ ...decl, isolation: 'sandboxed-iframe' }, fixtureDocument(), {
+        validatePluginView({ ...frame, document: decl.document }, '<p>ok</p>', {
           providedOps: OPS,
         }),
-      'PLUGIN_VIEW_UNSUPPORTED'
+      'PLUGIN_VIEW_INVALID'
     );
+    expectViewError(
+      () =>
+        validatePluginView({ ...decl, document: 'views/f.html' }, fixtureDocument(), {
+          providedOps: OPS,
+        }),
+      'PLUGIN_VIEW_INVALID'
+    );
+    for (const hostile of [
+      fixtureDocument(),
+      '<base href="/">',
+      '<img src="https://evil.example/x.png">',
+      "<script src = ' //evil.example/x.js'></script>",
+      '<a href="h&#116;tps://evil.example">x</a>',
+      '<img srcset="a.png 1x, http://evil.example/b.png 2x">',
+      '<meta http-equiv="refresh" content="0">',
+      'x'.repeat(PLUGIN_VIEW_FRAME_MAX_BYTES + 1),
+    ]) {
+      expectViewError(
+        () => validatePluginView(frame, hostile, { providedOps: OPS }),
+        'PLUGIN_VIEW_INVALID'
+      );
+    }
+    // Actions still target the plugin's own ops.
+    expectViewError(
+      () => validatePluginView(frame, '<p>ok</p>', { providedOps: ['permfixture:env'] }),
+      'PLUGIN_VIEW_ACTION_DENIED'
+    );
+    expect(PLUGIN_VIEW_CAPABILITY_ALLOWLIST).toEqual(['action.request']);
+    expect(
+      validatePluginView({ ...frame, capabilities: ['action.request'] }, '<p>ok</p>', {
+        providedOps: OPS,
+      })
+    ).toEqual([]);
     expectViewError(
       () =>
         validatePluginView({ ...decl, capabilities: ['clipboard.read'] }, fixtureDocument(), {
@@ -293,6 +337,22 @@ describe('validatePluginView (EP-05)', () => {
         }),
       'PLUGIN_VIEW_CAPABILITY_DENIED'
     );
+    expectViewError(
+      () =>
+        validatePluginView({ ...frame, capabilities: ['network.fetch'] }, '<p>ok</p>', {
+          providedOps: OPS,
+        }),
+      'PLUGIN_VIEW_CAPABILITY_DENIED'
+    );
+  });
+
+  it('lets only views with action.request and declared actions send actions', () => {
+    const decl = fixtureDeclaration();
+    expect(pluginViewMaySendActions(decl)).toBe(false);
+    expect(pluginViewMaySendActions({ ...decl, capabilities: ['action.request'] })).toBe(true);
+    expect(
+      pluginViewMaySendActions({ ...decl, capabilities: ['action.request'], actions: [] })
+    ).toBe(false);
   });
 
   it('requires action ops to be the plugin own ops and params schemas to be closed', () => {
@@ -432,8 +492,11 @@ describe('loadPluginViews (EP-05)', () => {
     expect(result.errors).toEqual([]);
     expect(result.views.map((view) => [view.pluginId, view.declaration.id])).toEqual([
       ['plugin-permissions-fixture', 'status'],
+      ['plugin-permissions-fixture', 'status_frame'],
     ]);
     expect(result.views[0].providedOps).toContain('permfixture:env');
+    expect(result.views[0].html).toBeUndefined();
+    expect(result.views[1]).toMatchObject({ messages: [], html: readFixture('views/frame.html') });
   });
 
   it('reads the Claude Code manifest location with the shared precedence', () => {
@@ -442,7 +505,10 @@ describe('loadPluginViews (EP-05)', () => {
     safeRmSync(path.join(dir, 'plugin-manifest.json'));
     safeMkdir(path.join(dir, '.claude-plugin'), { recursive: true });
     safeWriteFile(path.join(dir, '.claude-plugin/plugin.json'), manifest);
-    expect(loadPluginViews(dir).views.map((view) => view.declaration.id)).toEqual(['status']);
+    expect(loadPluginViews(dir).views.map((view) => view.declaration.id)).toEqual([
+      'status',
+      'status_frame',
+    ]);
 
     // With two candidates every reader picks the same one (installs refuse this).
     safeWriteFile(
@@ -466,9 +532,38 @@ describe('loadPluginViews (EP-05)', () => {
     );
     safeSymlinkSync(outside, path.join(dir, 'views/status.a2ui.json'));
     const result = loadPluginViews(dir);
-    expect(result.views).toEqual([]);
+    expect(result.views.map((view) => view.declaration.id)).toEqual(['status_frame']);
     expect(result.errors[0]).toMatchObject({ viewId: 'status', code: 'PLUGIN_VIEW_INVALID' });
     expect(result.errors[0].message).toContain('symlink');
+  });
+
+  it('applies the containment rules and strict UTF-8 to iframe documents', () => {
+    const frameErrors = (dir: string) =>
+      loadPluginViews(dir).errors.filter((error) => error.viewId === 'status_frame');
+    const outside = tracked(path.join(TMP_ROOT, `outside-${randomUUID()}.html`));
+    safeWriteFile(outside, readFixture('views/frame.html'));
+    const linked = fixtureCopy();
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(path.join(linked, 'views/frame.html'))
+    );
+    safeSymlinkSync(outside, path.join(linked, 'views/frame.html'));
+    expect(frameErrors(linked)[0]?.message).toContain('symlink');
+
+    const oversized = fixtureCopy({
+      'views/frame.html': 'x'.repeat(PLUGIN_VIEW_FRAME_MAX_BYTES + 1),
+    });
+    expect(frameErrors(oversized)[0]?.message).toContain(`exceeds ${PLUGIN_VIEW_FRAME_MAX_BYTES}`);
+
+    const binary = fixtureCopy();
+    safeWriteFile(
+      path.join(binary, 'views/frame.html'),
+      Buffer.from([0x3c, 0x70, 0x3e, 0xff, 0xfe])
+    );
+    expect(frameErrors(binary)[0]?.message).toContain('not valid UTF-8');
+
+    const remote = fixtureCopy({ 'views/frame.html': '<img src="https://evil.example/p.png">' });
+    expect(frameErrors(remote)[0]).toMatchObject({ code: 'PLUGIN_VIEW_INVALID' });
+    expect(loadPluginViews(remote).views.map((view) => view.declaration.id)).toEqual(['status']);
   });
 
   it('refuses a managed record that is not activatable without reading documents', () => {
@@ -603,6 +698,16 @@ describe('plugin view actions (EP-05)', () => {
     });
     expect(ids).toContain('pv1-probe');
   });
+
+  it('skips sandboxed-iframe views when composing the A2UI surface', () => {
+    const [status, frame] = loadPluginViews(FIXTURE_DIR).views;
+    expect(frame?.declaration.isolation).toBe('sandboxed-iframe');
+    const composed = composePluginViewsA2UI([frame!, status!], (key) => key);
+    const ids = composed.updateComponents.components.map((component) => component.id);
+    expect(ids[0]).toBe('pv0-section');
+    expect(ids).not.toContain('pv1-section');
+    expect(ids).toContain('pv0-probe');
+  });
 });
 
 describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
@@ -617,6 +722,7 @@ describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
     expect(listed.errors).toEqual([]);
     expect(listed.views.map((view) => `${view.pluginId}/${view.declaration.id}`)).toEqual([
       `${pluginId}/status`,
+      `${pluginId}/status_frame`,
     ]);
     // While active in-process, an agent action dispatches the plugin's own op.
     const dispatched = await dispatchPluginViewAction(
@@ -661,7 +767,7 @@ describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
     const edited = fixtureCopy({ 'views/status.a2ui.json': JSON.stringify(document) });
     const v2 = installApproved(pluginId, edited, managedRoot);
     const relisted = listPluginViewsForViewer(listManagedPlugins(managedRoot), publicReader);
-    expect(relisted.views).toHaveLength(1);
+    expect(relisted.views).toHaveLength(2);
     expect(relisted.views[0].contentDigest).toBe(v2.contentDigest);
     // The deactivated plugin is activated again from the re-approved copy.
     const reloaded = await reloadPlugin(pluginId, { managedRoot });

@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Callout, Section, Skeleton, Stack } from '@agent/shared-ui';
 import { ChronosA2UIRenderer } from './A2UIComponentLibrary';
 import { ChronosKbI18n } from './chronos-kb-i18n';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { uxMessage, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import {
   parseHeadlessA2UIResponse,
   type HeadlessA2UIComponent,
 } from '../lib/headless-a2ui-response';
+import { PluginViewFrame } from './PluginViewFrame';
+import { parsePluginViewFrames, type PluginViewFrameItem } from '../lib/plugin-view-frame-broker';
 import {
+  parsePluginHostSummary,
   parsePluginViewActionRequests,
+  pluginHostBadges,
   pluginViewActionExecuteBody,
   pluginViewActionRequestControl,
   pluginViewActionRequestTone,
   pluginViewActionStatusKey,
+  pluginViewActionUnavailableKey,
+  type PluginHostSummary,
   type PluginViewActionRequestItem,
 } from '../lib/plugin-view-action-requests';
 
@@ -25,7 +31,8 @@ import {
  * (`ChronosA2UIRenderer` → shared `@agent/shared-ui` renderer).
  * `source="plugin-views"` renders the EP-05 plugin views the viewer may see,
  * plus the human view actions queued for approval (FU-02): an approved one
- * can be executed once from here.
+ * can be executed once from here. PH-01/02: a badge shows the Chronos plugin
+ * host state and `sandboxed-iframe` views render in `PluginViewFrame`.
  */
 export function HeadlessA2UIWorkspace({
   tenant,
@@ -43,6 +50,8 @@ export function HeadlessA2UIWorkspace({
   const [components, setComponents] = useState<HeadlessA2UIComponent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionRequests, setActionRequests] = useState<PluginViewActionRequestItem[]>([]);
+  const [frames, setFrames] = useState<PluginViewFrameItem[]>([]);
+  const [host, setHost] = useState<PluginHostSummary>({ enabled: false });
   const [actionError, setActionError] = useState<string | null>(null);
   const [executing, setExecuting] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -66,12 +75,19 @@ export function HeadlessA2UIWorkspace({
         const raw: unknown = await response.json().catch(() => null);
         const payload = parseHeadlessA2UIResponse(raw);
         if (!payload) throw new Error('Invalid headless A2UI response');
-        return { payload, requests: pluginViews ? parsePluginViewActionRequests(raw) : [] };
+        return {
+          payload,
+          requests: pluginViews ? parsePluginViewActionRequests(raw) : [],
+          frames: pluginViews ? parsePluginViewFrames(raw) : [],
+          host: pluginViews ? parsePluginHostSummary(raw) : { enabled: false },
+        };
       })
-      .then(({ payload, requests }) => {
+      .then(({ payload, requests, frames: frameViews, host: hostSummary }) => {
         if (cancelled) return;
         setComponents(payload.data.a2ui.updateComponents.components);
         setActionRequests(requests);
+        setFrames(frameViews);
+        setHost(hostSummary);
         setError(null);
       })
       .catch((reason) => {
@@ -83,6 +99,8 @@ export function HeadlessA2UIWorkspace({
       cancelled = true;
     };
   }, [query, source, pluginViews, reloadToken]);
+
+  const reloadAfterFrameAction = useCallback(() => setReloadToken((token) => token + 1), []);
 
   const executeAction = async (item: PluginViewActionRequestItem) => {
     setExecuting(item.approvalRequestId);
@@ -142,11 +160,32 @@ export function HeadlessA2UIWorkspace({
           />
         ) : components === null ? (
           <Skeleton shape="card" lines={4} />
-        ) : pluginViews && components.length === 0 ? (
+        ) : pluginViews && components.length === 0 && frames.length === 0 ? (
           <Callout tone="info" title={uxText('view_empty', locale)} />
-        ) : (
+        ) : components.length > 0 || !pluginViews ? (
           <ChronosA2UIRenderer components={components} />
-        )}
+        ) : null}
+        {pluginViews && components !== null && !error ? (
+          <Stack direction="horizontal" gap="sm" align="center">
+            {pluginHostBadges(host).map((badge) => (
+              <Badge
+                key={badge.key}
+                tone={badge.tone}
+                label={uxMessage(badge.key, { n: badge.count ?? 0 }, badge.key, locale)}
+              />
+            ))}
+          </Stack>
+        ) : null}
+        {pluginViews && !error
+          ? frames.map((frame) => (
+              <PluginViewFrame
+                key={`${frame.pluginId}/${frame.viewId}`}
+                view={frame}
+                locale={locale}
+                onActionSubmitted={reloadAfterFrameAction}
+              />
+            ))
+          : null}
         {pluginViews && actionRequests.length > 0 ? (
           <Section
             title={uxText('view_action_requests_title', locale)}
@@ -171,7 +210,13 @@ export function HeadlessA2UIWorkspace({
                       }}
                     />
                   ) : pluginViewActionRequestControl(item) === 'not_executable' ? (
-                    <span>{uxText('view_action_not_executable', locale)}</span>
+                    <span>
+                      {uxTextOr(
+                        pluginViewActionUnavailableKey(item, host),
+                        uxText('view_action_not_executable', locale),
+                        locale
+                      )}
+                    </span>
                   ) : null}
                 </Stack>
               ))}

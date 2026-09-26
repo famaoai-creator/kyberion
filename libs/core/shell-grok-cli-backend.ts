@@ -17,7 +17,11 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import * as readline from 'node:readline';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -230,7 +234,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       ...permissionArgs,
       ...this.extraArgs,
     ];
-    return this.spawnCli(args, '', options?.signal);
+    return this.spawnCli(args, '', options?.signal, effectiveProfile);
   }
 
   private async dispatchNativeSubagent(
@@ -357,10 +361,17 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       ...permissionArgs,
       ...this.extraArgs,
     ];
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'grok' }), ...childDelegationEnv() },
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'grok',
+      sessionId: newDelegationSessionId('grok'),
+      ...(effectiveProfile ? { profile: effectiveProfile } : {}),
     });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -457,6 +468,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     } finally {
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      spawnEnv.dispose();
     }
   }
 
@@ -533,11 +545,23 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     return parsed.data;
   }
 
-  private spawnCli(args: string[], stdin: string, signal?: AbortSignal): Promise<string> {
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'grok' }), ...childDelegationEnv() },
+  private spawnCli(
+    args: string[],
+    stdin: string,
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'grok',
+      sessionId: newDelegationSessionId('grok'),
+      ...(profile ? { profile } : {}),
     });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {
@@ -571,6 +595,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[shell-grok-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;
