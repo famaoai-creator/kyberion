@@ -11,6 +11,7 @@
 
 import http from 'node:http';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { htmlToMarkdown, extractHtmlTitle } from '@agent/core/html-to-markdown';
 import {
   assertSupportedNodeEngine,
   loadBrowserActuator,
@@ -131,8 +132,7 @@ export async function inspectWithFetch(
   });
 
   const html = await resp.text();
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : '';
+  const title = extractHtmlTitle(html) ?? '';
 
   // Parse basic form elements
   const inputMatches = html.matchAll(/<(input|select|textarea)([^>]+)>/gi);
@@ -200,17 +200,7 @@ export async function inspectWithFetch(
     }
   }
 
-  let plainText = html;
-  while (/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)\s*>/gi.test(plainText)) {
-    plainText = plainText.replace(
-      /<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)\s*>/gi,
-      ' '
-    );
-  }
-  while (/<[^>]*>/g.test(plainText)) {
-    plainText = plainText.replace(/<[^>]*>/g, ' ');
-  }
-  plainText = plainText.replace(/\s+/g, ' ').trim();
+  const plainText = htmlToMarkdown(html).replace(/\s+/g, ' ').trim();
 
   return {
     mode: 'fetch',
