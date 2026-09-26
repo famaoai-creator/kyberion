@@ -49,6 +49,7 @@ import {
   createApprovalRequest,
   isApprovalRequestExpired,
   listApprovalRequests,
+  approvalRequestLogicalPath,
   loadApprovalRequest,
   recordApprovalApplyResult,
   type ApprovalRequestRecord,
@@ -884,6 +885,7 @@ export const PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PRUNED_PER_CALL = 50;
 const ACTION_REQUEST_TIME_KEY_LENGTH = 15;
 const ACTION_REQUEST_ENTRY = /^(\d{15})-[a-z0-9-]{1,128}\.json$/iu;
+const ACTION_REQUEST_ID = /^\d{15}-([a-z0-9-]{1,128})\.json$/iu;
 
 function actionTarget(resolved: ResolvedPluginViewAction): string {
   return `${resolved.view.pluginId}/${resolved.view.declaration.id}/${resolved.action.id}`;
@@ -1060,18 +1062,20 @@ export function prunePluginViewActionRequests(
   for (const { entry, time } of listActionRequestEntries().reverse()) {
     if (pruned >= limit || time > now - PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS) break;
     const logicalPath = `${ACTION_REQUEST_DIR}/${entry}`;
+    // The id comes from the file name (validated by ACTION_REQUEST_ENTRY),
+    // never from sidecar content, so a tampered sidecar cannot steer deletes.
+    const approvalRequestId = ACTION_REQUEST_ID.exec(entry)?.[1] ?? null;
     const sidecar = readGovernedArtifactJson<PluginViewActionRequestRecord>(logicalPath);
-    const approvalRequestId =
-      sidecar && typeof sidecar.approval_request_id === 'string'
-        ? sidecar.approval_request_id
-        : null;
-    const approval = approvalRequestId ? loadActionApproval(approvalRequestId) : null;
+    if (!approvalRequestId || sidecar?.approval_request_id !== approvalRequestId) continue;
+    const approval = loadActionApproval(approvalRequestId);
+    // Keep outcome-unknown requests (claimed, no recorded result) for the operator.
+    if (isActionClaimed(approvalRequestId) && !approval?.applyResult) continue;
+    // A missing approval is gone; an unreadable one is kept until it can be read.
+    if (!approval && actionApprovalExists(approvalRequestId)) continue;
     if (!isTerminalActionApproval(approval, now)) continue;
     withExecutionContext('mission_controller', () => {
       safeRmSync(resolveGovernedArtifactPath(logicalPath));
-      if (approvalRequestId) {
-        safeRmSync(resolveGovernedArtifactPath(actionClaimPath(approvalRequestId)));
-      }
+      safeRmSync(resolveGovernedArtifactPath(actionClaimPath(approvalRequestId)));
     });
     pruned += 1;
   }
@@ -1165,6 +1169,18 @@ export interface ExecutePluginViewActionContext {
   actorRole: string;
   surface: 'chronos' | 'api';
   now?: number;
+}
+
+function actionApprovalExists(approvalRequestId: string): boolean {
+  try {
+    return safeExistsSync(
+      resolveGovernedArtifactPath(
+        approvalRequestLogicalPath(PLUGIN_VIEW_APPROVAL_CHANNEL, approvalRequestId)
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 function loadActionApproval(approvalRequestId: string): ApprovalRequestRecord | null {
@@ -1268,6 +1284,10 @@ export async function executeApprovedPluginViewAction(
       `action '${action.id}' has agent authority and needs no approval`
     );
   }
+  // Detached snapshot of the params as submitted: preflight listeners get
+  // their own copy, so an in-place change to nested params can never reach
+  // the handler or the approval comparison.
+  const approvedParams = structuredClone(resolved.params);
   const approval = loadActionApproval(approvalRequestId);
   const deny = (error: PluginViewError): never => {
     auditActionExecution(
@@ -1320,14 +1340,18 @@ export async function executeApprovedPluginViewAction(
   let input: Record<string, unknown>;
   try {
     operation = activePluginOperation(resolved, { requireApprovedGrant: true });
-    input = await preflightActionInput(resolved);
+    input = await preflightActionInput({ ...resolved, params: structuredClone(approvedParams) });
   } catch (error) {
     if (error instanceof PluginViewError) return deny(error);
     throw error;
   }
   // A preflight listener (plugin-registered ones included) may not turn the
   // approved call into a different one.
-  if (!sameParams(input, resolved.params)) {
+  if (
+    !sameParams(input, approvedParams) ||
+    approval.accountability?.payloadHash !==
+      computePluginViewActionPayloadHash({ ...resolved, params: approvedParams })
+  ) {
     refuse(
       'PLUGIN_VIEW_APPROVAL_MISMATCH',
       `op preflight rewrote the params approved in '${approval.id}'`
@@ -1372,7 +1396,7 @@ export async function executeApprovedPluginViewAction(
   try {
     outcome = await operation.handler(
       operation.action,
-      { ...resolved.params },
+      structuredClone(approvedParams),
       {},
       operation.stepType
     );
