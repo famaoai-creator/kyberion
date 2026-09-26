@@ -16,9 +16,11 @@ import {
   resetReasoningBackend,
   restoreStubServedOps,
   snapshotStubServedOps,
+  stubReasoningBackend,
 } from './reasoning-backend.js';
 import { coreSeamCatalog } from './seam.js';
 import type { ScenarioDefinition } from './scenario-definition.js';
+import { getActiveScenarioRunId } from './scenario-run-scope.js';
 import { appendScenarioReasoning, type ScenarioSideEffectLog } from './scenario-side-effect-log.js';
 
 export const SCENARIO_FIXTURE_BACKEND_NAME = 'scenario-fixtures';
@@ -147,6 +149,54 @@ export function createScenarioFixtureBackend(
 }
 
 /**
+ * FU-01: route each call to `fixture` inside the scenario scope and to
+ * `fallback()` (the backend that was bound before the run, else the stub)
+ * everywhere else, so unrelated host reasoning is never fixture-answered.
+ */
+function scopeFixtureBackend(
+  fixture: ReasoningBackend,
+  fallback: () => ReasoningBackend,
+  inScope: () => boolean
+): ReasoningBackend {
+  const pick = (): ReasoningBackend => (inScope() ? fixture : fallback());
+  return {
+    get name() {
+      return pick().name;
+    },
+    getRuntimeInstructions: (options) =>
+      inScope() ? [] : (fallback().getRuntimeInstructions?.(options) ?? []),
+    getRuntimeProviderName: (options) =>
+      inScope() ? fixture.name : fallback().getRuntimeProviderName?.(options) || fallback().name,
+    resetSession: () => (inScope() ? undefined : fallback().resetSession?.()),
+    getNativeSubagentAdopter: () =>
+      inScope() ? null : (fallback().getNativeSubagentAdopter?.() ?? null),
+    requiresNativeSubagent: () =>
+      inScope() ? false : (fallback().requiresNativeSubagent?.() ?? false),
+    prompt: (prompt, options) => pick().prompt(prompt, options),
+    delegateTask: (instruction, context, options) =>
+      pick().delegateTask(instruction, context, options),
+    divergePersonas: (input, options) => pick().divergePersonas(input, options),
+    crossCritique: (input, options) => pick().crossCritique(input, options),
+    synthesizePersona: (input, options) => pick().synthesizePersona(input, options),
+    forkBranches: (input, options) => pick().forkBranches(input, options),
+    simulateBranches: (input, options) => pick().simulateBranches(input, options),
+    extractRequirements: (input, options) => pick().extractRequirements(input, options),
+    extractDesignSpec: (input, options) => pick().extractDesignSpec(input, options),
+    extractTestPlan: (input, options) => pick().extractTestPlan(input, options),
+    decomposeIntoTasks: (input, options) => pick().decomposeIntoTasks(input, options),
+  };
+}
+
+export interface ScenarioFixtureBackendInstallOptions {
+  /**
+   * FU-01: answer from fixtures only inside this scenario scope; calls made
+   * elsewhere go to the previously bound backend (or the stub). Unset keeps
+   * the unscoped behaviour (every call is fixture-answered).
+   */
+  scopeId?: string;
+}
+
+/**
  * Bind the fixture backend as the active reasoning backend. A backend that
  * was already bound is unbound for the run and re-bound (same implementation
  * and metadata) by the returned disposer. Unbinding goes through
@@ -155,7 +205,8 @@ export function createScenarioFixtureBackend(
  */
 export function installScenarioFixtureBackend(
   def: ScenarioDefinition,
-  log: ScenarioSideEffectLog
+  log: ScenarioSideEffectLog,
+  options: ScenarioFixtureBackendInstallOptions = {}
 ): () => void {
   const seam = coreSeamCatalog.get<ReasoningBackend>('reasoning-backend');
   const prior = seam?.list()[0];
@@ -169,7 +220,16 @@ export function installScenarioFixtureBackend(
       );
     }
   }
-  const backend = createScenarioFixtureBackend(def, log);
+  const fixtureBackend = createScenarioFixtureBackend(def, log);
+  const { scopeId } = options;
+  const backend =
+    scopeId === undefined
+      ? fixtureBackend
+      : scopeFixtureBackend(
+          fixtureBackend,
+          () => prior?.implementation ?? stubReasoningBackend,
+          () => getActiveScenarioRunId() === scopeId
+        );
   const unregister = registerReasoningBackend(backend, {
     provenance: 'builtin',
     source: 'libs/core/scenario-model-fixtures.ts',

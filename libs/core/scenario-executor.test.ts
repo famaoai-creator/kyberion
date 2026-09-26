@@ -258,4 +258,42 @@ describe('runScenario (ES-05)', () => {
     ]);
     expect(report.turns[0]?.checks[1]?.detail).toContain('unavailable');
   });
+
+  it('scopes the run: work outside it sees normal op resolution while turns see fixtures (FU-01)', async () => {
+    const resolve = () => {
+      try {
+        return resolveActuatorOperation('demo', 'apply')?.source ?? 'none';
+      } catch (error) {
+        return (error as Error).message.slice(0, 12);
+      }
+    };
+    let release!: () => void;
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    let entered!: () => void;
+    const turnEntered = new Promise<void>((done) => {
+      entered = done;
+    });
+    const outside = (async () => {
+      await turnEntered;
+      const seen = resolve();
+      release();
+      return seen;
+    })();
+    const base = fakeRunner();
+    let insideSeen = '';
+    const report = await runScenario(scenario(), {
+      seedNonce: `scope-${process.pid}`,
+      runPipeline: async (request) => {
+        entered();
+        await gate;
+        insideSeen = resolve();
+        return base(request);
+      },
+    });
+    expect(report.status).toBe('pass');
+    expect(insideSeen).toBe('scenario-fixture');
+    await expect(outside).resolves.toBe('[UNKNOWN_OP]');
+  });
 });
