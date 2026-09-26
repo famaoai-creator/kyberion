@@ -1,5 +1,7 @@
+import * as vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
+  OS_ACCESSIBILITY_ENUMERATE_SCRIPT,
   OS_ACCESSIBILITY_MAX_ELEMENTS,
   OsAccessibilityDetector,
   candidatesFromAccessibility,
@@ -299,5 +301,101 @@ describe('fusion with accessibility, pixel and OCR candidates', () => {
         sources: ['dom', 'accessibility'],
       }),
     ]);
+  });
+});
+
+/**
+ * Runs the real enumeration script against a fake System Events so its guard
+ * logic is covered without osascript: `processes` stand in for application
+ * processes, each with a front window holding one level of elements.
+ */
+function runEnumerateScript(
+  processes: Array<{ name: string; frontmost: boolean }>,
+  options: Record<string, unknown>
+) {
+  const level = {
+    role: () => ['AXButton'],
+    subrole: () => [null],
+    name: () => ['Go'],
+    description: () => [null],
+    position: () => [[1, 2]],
+    size: () => [[3, 4]],
+    // Like a JXA specifier: the deeper level resolves lazily and fails on read.
+    uiElements: {
+      role: () => {
+        throw new Error('no deeper level');
+      },
+    },
+  };
+  const toProcess = (entry: { name: string; frontmost: boolean }) => ({
+    name: () => entry.name,
+    frontmost: () => entry.frontmost,
+    windows: Object.assign([{ uiElements: level }], {}),
+  });
+  const context = vm.createContext({
+    ObjC: { import: () => undefined },
+    $: { NSScreen: { mainScreen: { frame: { size: { width: 1000, height: 600 } } } } },
+    Application: () => ({
+      applicationProcesses: {
+        whose: (query: { name?: string; frontmost?: boolean }) =>
+          processes
+            .filter((entry) =>
+              query.name !== undefined ? entry.name === query.name : entry.frontmost
+            )
+            .map(toProcess),
+      },
+    }),
+  });
+  vm.runInContext(OS_ACCESSIBILITY_ENUMERATE_SCRIPT, context);
+  const output = vm.runInContext(`run(${JSON.stringify([JSON.stringify(options)])})`, context);
+  return parseAccessibilitySnapshot(String(output));
+}
+
+describe('enumeration script', () => {
+  const base = { maxDepth: 3, maxScan: 10 };
+  const apps = [
+    { name: 'Terminal', frontmost: true },
+    { name: 'Finder', frontmost: false },
+  ];
+
+  it('reads the frontmost application by default', () => {
+    const snapshot = runEnumerateScript(apps, base);
+    expect(snapshot?.application).toBe('Terminal');
+    expect(snapshot?.elements).toEqual([
+      expect.objectContaining({ role: 'AXButton', title: 'Go', x: 1, y: 2, width: 3, height: 4 }),
+    ]);
+  });
+
+  it('returns no elements for a named application that is not frontmost', () => {
+    const snapshot = runEnumerateScript(apps, { ...base, application: 'Finder' });
+    expect(snapshot).toMatchObject({
+      application: 'Finder',
+      reason: 'not_frontmost',
+      elements: [],
+    });
+    expect(runEnumerateScript(apps, { ...base, application: 'Terminal' })?.elements).toHaveLength(
+      1
+    );
+  });
+
+  it('turns a not_frontmost snapshot into no candidates', async () => {
+    const run: AccessibilityCommandRunner = async () => ({
+      stdout: JSON.stringify({
+        screen: { width: 1000, height: 600 },
+        elements: [],
+        reason: 'not_frontmost',
+      }),
+      stderr: '',
+      status: 0,
+    });
+    const detector = new OsAccessibilityDetector({ run, platform: 'darwin' });
+    await expect(
+      detector.detect({
+        image_path: 's.png',
+        image_size: IMAGE,
+        live_screen: true,
+        application: 'Finder',
+      })
+    ).resolves.toEqual([]);
   });
 });

@@ -141,7 +141,9 @@ site's terms of service.
   `mark_elements` passes `display_origin` as the origin and an explicit
   `scale` as the scale; without them the origin is the main display's 0,0 and
   the scale is image width / main display width in points. `application`
-  selects the app (default: frontmost). Labels come from the title, else the
+  selects the app (default: frontmost); a named app that is not frontmost
+  yields no elements (`not_frontmost`), because its window is not what the
+  live screenshot shows. Labels come from the title, else the
   description, through the same PII filter as every mark label; text fields,
   text areas, combo and search fields are editable and never labelled. The
   permission probe (`AXIsProcessTrusted`) never prompts; without it, off
