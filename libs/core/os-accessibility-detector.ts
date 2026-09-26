@@ -19,7 +19,9 @@ import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-
  * describe the screen now, never an arbitrary image. It then maps global
  * logical points to screenshot pixels with `screen_origin` (default 0,0: the
  * main display) and `screen_scale` (default: image width / main display width
- * in points). Availability also requires the accessibility permission
+ * in points). The default scale is only right for the main display, so a
+ * screenshot with a non-zero `screen_origin` (another display) and no
+ * `screen_scale` makes the detector unavailable. Availability also requires the accessibility permission
  * (`AXIsProcessTrusted`, which never prompts); every check fails closed.
  *
  * Labels go through safeMarkLabel like every Set-of-Marks label, and editable
@@ -284,6 +286,20 @@ export function candidatesFromAccessibility(
   return candidates;
 }
 
+/**
+ * A screenshot away from the main display's origin (a secondary display) needs
+ * an explicit screen_scale: the default is derived from the main display.
+ */
+function needsExplicitScale(request: UiElementDetectionRequest): boolean {
+  const origin = request.screen_origin;
+  const offMain = !!origin && (origin.x !== 0 || origin.y !== 0);
+  const hasScale =
+    typeof request.screen_scale === 'number' &&
+    Number.isFinite(request.screen_scale) &&
+    request.screen_scale > 0;
+  return offMain && !hasScale;
+}
+
 export class OsAccessibilityDetector implements UiElementDetector {
   readonly id = 'os_accessibility';
   readonly kind = 'accessibility' as const;
@@ -320,14 +336,19 @@ export class OsAccessibilityDetector implements UiElementDetector {
     return trusted;
   }
 
+  /** Platform, live-screen and mapping checks that need no command. */
+  private canMap(request: UiElementDetectionRequest): boolean {
+    if (this.platform !== 'darwin' || request.live_screen !== true) return false;
+    return !needsExplicitScale(request);
+  }
+
   async isAvailable(request: UiElementDetectionRequest): Promise<boolean> {
-    if (this.platform !== 'darwin') return false;
-    if (request.live_screen !== true) return false;
+    if (!this.canMap(request)) return false;
     return this.permissionGranted();
   }
 
   async detect(request: UiElementDetectionRequest): Promise<SomCandidate[]> {
-    if (this.platform !== 'darwin' || request.live_screen !== true) return [];
+    if (!this.canMap(request)) return [];
     const options = {
       maxDepth: OS_ACCESSIBILITY_MAX_DEPTH,
       maxScan: OS_ACCESSIBILITY_MAX_SCAN,

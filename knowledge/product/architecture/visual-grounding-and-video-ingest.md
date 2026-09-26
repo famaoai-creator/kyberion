@@ -140,7 +140,9 @@ site's terms of service.
   fields, sliders, links, menu items, tabs, cells, …) and caps the result at 200. Points map to pixels as `(point - screen_origin) × screen_scale`:
   `mark_elements` passes `display_origin` as the origin and an explicit
   `scale` as the scale; without them the origin is the main display's 0,0 and
-  the scale is image width / main display width in points. `application`
+  the scale is image width / main display width in points. That default only
+  fits the main display: with a non-zero `display_origin` and no `scale` the
+  detector is unavailable. `application`
   selects the app (default: frontmost); a named app that is not frontmost
   yields no elements (`not_frontmost`), because its window is not what the
   live screenshot shows. Labels come from the title, else the

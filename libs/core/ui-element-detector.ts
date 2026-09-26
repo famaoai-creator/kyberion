@@ -55,7 +55,10 @@ export interface UiElementDetectionRequest {
   live_screen?: boolean;
   /** Top-left of the screenshot in global logical screen points. Default {x: 0, y: 0} (main display). */
   screen_origin?: { x: number; y: number };
-  /** Screenshot pixels per logical screen point. Default: image width / main display width in points. */
+  /**
+   * Screenshot pixels per logical screen point. Default: image width / main display width
+   * in points, which only fits the main display: required when screen_origin is not 0,0.
+   */
   screen_scale?: number;
   /** Application whose front window os_accessibility reads. Default: the frontmost application. */
   application?: string;
