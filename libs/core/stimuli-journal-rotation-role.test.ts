@@ -120,8 +120,14 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
 
   it('appends and rotates through appendStimulus inside the assumption', async () => {
     const { authority, journal } = await loadModules();
-    fs.writeFileSync(journalPath(), journalLines(200));
+    // Just over the real ceiling, so appendStimulus's own rotation fires.
+    const line = `${JSON.stringify({ id: 'msg-old', intent: 'probe', pad: 'x'.repeat(1000) })}\n`;
+    fs.writeFileSync(
+      journalPath(),
+      line.repeat(Math.ceil(journal.STIMULI_MAX_BYTES / Buffer.byteLength(line)) + 1)
+    );
     const before = fs.statSync(journalPath()).size;
+    expect(before).toBeGreaterThan(journal.STIMULI_MAX_BYTES);
     authority.withExecutionContext('mission_controller', () =>
       journal.appendStimulus({
         id: 'msg-appended',
@@ -136,6 +142,27 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     );
     const after = fs.readFileSync(journalPath(), 'utf8');
     expect(after).toContain('"msg-appended"');
-    expect(Buffer.byteLength(after)).toBeGreaterThan(before);
+    expect(Buffer.byteLength(after)).toBeLessThan(journal.STIMULI_MAX_BYTES);
+    expect(after.startsWith('{')).toBe(true);
+  });
+});
+
+describe('SB-01 the stimuli journal is not an authorization input', () => {
+  it('keeps dynamic-permission-guard and sensory-memory out of the authorization modules', () => {
+    const authorizationModules = [
+      'libs/core/tier-guard.ts',
+      'libs/core/secure-io.ts',
+      'libs/core/policy-engine.ts',
+      'libs/core/authority.ts',
+      'libs/core/operation-policy-gate.ts',
+    ];
+    for (const relative of authorizationModules) {
+      const file = path.join(REPO_ROOT, relative);
+      if (!fs.existsSync(file)) continue;
+      const source = fs.readFileSync(file, 'utf8');
+      expect(source, relative).not.toMatch(
+        /dynamic-permission-guard|sensory-memory|stimuli-journal/u
+      );
+    }
   });
 });
