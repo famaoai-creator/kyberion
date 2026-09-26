@@ -84,6 +84,11 @@
         }
       }
     },
+    "warnings_dropped": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of scope_lost warnings dropped after the run's warning log hit its cap (MAX_SCENARIO_WARNINGS)."
+    },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
     "duration_ms": { "type": "number" },

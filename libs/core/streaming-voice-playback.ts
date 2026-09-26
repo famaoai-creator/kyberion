@@ -257,8 +257,31 @@ export function probePcmAudioStreaming(): { available: boolean; reason?: string 
     : { available: true };
 }
 
-function pauseHandle(handle: PlaybackHandle | null, action: 'pause' | 'resume'): void {
-  (handle as Partial<PausablePlaybackHandle> | null)?.[action]?.();
+/**
+ * Pause `handle` in place when it exposes pause(). When pause() reports
+ * failure (e.g. SIGSTOP couldn't reach the child, see PlaybackHandle.pause)
+ * stop it instead and flag `stoppedForPause` so the caller replays from a
+ * fresh handle on resume() rather than assuming silence. A handle without
+ * pause() support at all is left alone — the gate already withholds chunks
+ * that have not reached it yet, same as before this fallback existed.
+ * Mirrors the segmented-voice-playback.ts stop-and-replay fallback.
+ */
+function pauseHandleOrStopForReplay(
+  handle: PlaybackHandle | null,
+  stoppedForPause: { current: boolean }
+): void {
+  if (!handle) return;
+  const pausable = handle as Partial<PausablePlaybackHandle>;
+  if (typeof pausable.pause !== 'function') return;
+  if (pausable.pause()) return;
+  if (!stoppedForPause.current) {
+    stoppedForPause.current = true;
+    void handle.stop();
+  }
+}
+
+function resumeHandle(handle: PlaybackHandle | null): void {
+  (handle as Partial<PausablePlaybackHandle> | null)?.resume?.();
 }
 
 export function streamVoicePlayback(
@@ -270,6 +293,8 @@ export function streamVoicePlayback(
   let ended = false;
   let cancelled = false;
   let currentPlayback: PlaybackHandle | null = null;
+  // Set when pause() stopped a non-pausable segment that must replay on resume.
+  const stoppedForPause = { current: false };
   let resolveCancellation: (() => void) | null = null;
   const cancellation = new Promise<void>((resolve) => {
     resolveCancellation = resolve;
@@ -281,6 +306,16 @@ export function streamVoicePlayback(
   let spoken = 0;
   let total = 0;
   let error: string | undefined;
+
+  const playSegment = (audio: StreamingSynthesizedAudio, index: number): PlaybackHandle => {
+    stoppedForPause.current = false;
+    return typeof audio === 'string'
+      ? (options.play ?? ((path) => playAudioFile(path)))(audio, index)
+      : (options.playStream ?? ((stream) => playPcmAudioStream(stream)))(
+          gateAudioStream(audio, gate),
+          index
+        );
+  };
 
   const waitForSegment = async (): Promise<string | null> => {
     for (;;) {
@@ -307,18 +342,21 @@ export function streamVoicePlayback(
         await Promise.race([gate.wait(), cancellation]);
         if (cancelled) break;
         options.onSegmentStart?.({ index, text: segment });
-        if (typeof audio === 'string') {
-          audioPaths.push(audio);
-          currentPlayback = (options.play ?? ((path) => playAudioFile(path)))(audio, index);
-        } else {
-          currentPlayback = (options.playStream ?? ((stream) => playPcmAudioStream(stream)))(
-            gateAudioStream(audio, gate),
-            index
-          );
-        }
+        if (typeof audio === 'string') audioPaths.push(audio);
+        currentPlayback = playSegment(audio, index);
         if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
-        const result = await currentPlayback.done;
+        let result = await currentPlayback.done;
         currentPlayback = null;
+        // pause() may have had to stop (rather than suspend) this segment;
+        // once resumed, replay it from a fresh handle instead of skipping it.
+        while (result.interrupted && stoppedForPause.current && !cancelled) {
+          stoppedForPause.current = false;
+          await Promise.race([gate.wait(), cancellation]);
+          if (cancelled) break;
+          currentPlayback = playSegment(audio, index);
+          result = await currentPlayback.done;
+          currentPlayback = null;
+        }
         if (!result.ok && !result.interrupted) {
           error = result.error || 'playback failed';
           break;
@@ -362,11 +400,11 @@ export function streamVoicePlayback(
     done,
     pause: () => {
       gate.pause();
-      pauseHandle(currentPlayback, 'pause');
+      pauseHandleOrStopForReplay(currentPlayback, stoppedForPause);
     },
     resume: () => {
       gate.resume();
-      pauseHandle(currentPlayback, 'resume');
+      resumeHandle(currentPlayback);
     },
     stop: async () => {
       if (cancelled) return done;
@@ -390,6 +428,9 @@ export function streamTtsAudioPlayback(
   let ended = false;
   let cancelled = false;
   let currentPlayback: PlaybackHandle | null = null;
+  // Set when pause() stopped a non-pausable player that must resume against
+  // the same (still-paused) audio stream instead of losing the rest of it.
+  const stoppedForPause = { current: false };
   let resolveCancellation: (() => void) | null = null;
   const cancellation = new Promise<void>((resolve) => {
     resolveCancellation = resolve;
@@ -416,19 +457,38 @@ export function streamTtsAudioPlayback(
   const run = async (): Promise<StreamingVoicePlaybackResult> => {
     try {
       const audio = gateAudioStream(options.synthesizeStream(text, options.voiceProfileId), gate);
-      currentPlayback = (
-        options.playStream ??
-        ((stream) =>
-          playPcmAudioStream(stream, {
-            onFirstChunk: () => {
-              if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
-            },
-          }))
-      )(audio, 0);
-      const result = await Promise.race([
+      const startPlayback = (): PlaybackHandle => {
+        stoppedForPause.current = false;
+        return (
+          options.playStream ??
+          ((stream) =>
+            playPcmAudioStream(stream, {
+              onFirstChunk: () => {
+                if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
+              },
+            }))
+        )(audio, 0);
+      };
+      currentPlayback = startPlayback();
+      let result = await Promise.race([
         currentPlayback.done,
         cancellation.then(() => ({ ok: true, interrupted: true }) as PlaybackResult),
       ]);
+      currentPlayback = null;
+      // pause() may have had to stop (rather than suspend) the player; once
+      // resumed, restart it against the same gated audio stream instead of
+      // ending playback early.
+      while (result.interrupted && stoppedForPause.current && !cancelled) {
+        stoppedForPause.current = false;
+        await Promise.race([gate.wait(), cancellation]);
+        if (cancelled) break;
+        currentPlayback = startPlayback();
+        result = await Promise.race([
+          currentPlayback.done,
+          cancellation.then(() => ({ ok: true, interrupted: true }) as PlaybackResult),
+        ]);
+        currentPlayback = null;
+      }
       if (firstAudioMs === null && result.ok && !result.interrupted)
         firstAudioMs = Date.now() - startedAt;
       if (!result.ok && !result.interrupted) error = result.error || 'streaming playback failed';
@@ -469,11 +529,11 @@ export function streamTtsAudioPlayback(
     done,
     pause: () => {
       gate.pause();
-      pauseHandle(currentPlayback, 'pause');
+      pauseHandleOrStopForReplay(currentPlayback, stoppedForPause);
     },
     resume: () => {
       gate.resume();
-      pauseHandle(currentPlayback, 'resume');
+      resumeHandle(currentPlayback);
     },
     stop: async () => {
       if (cancelled) return done;

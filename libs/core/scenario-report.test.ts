@@ -14,6 +14,7 @@ import {
   appendScenarioOp,
   appendScenarioWarning,
   createScenarioSideEffectLog,
+  MAX_SCENARIO_WARNINGS,
 } from './scenario-side-effect-log.js';
 
 const validate = compileSchema(
@@ -149,5 +150,37 @@ describe('scenario report (ES-05)', () => {
       wallMs: 0,
     });
     expect(clean).not.toHaveProperty('warnings');
+  });
+
+  it('surfaces a warnings_dropped count once the warning cap is hit (N5)', () => {
+    const log = createScenarioSideEffectLog();
+    for (let i = 0; i < MAX_SCENARIO_WARNINGS + 3; i += 1) {
+      appendScenarioWarning(log, { kind: 'scope_lost', op: 'demo:apply', source: 'pipeline' });
+    }
+    const report = buildScenarioReport({
+      def: scenario(),
+      runId: 'run-dropped',
+      status: 'pass',
+      log,
+      startedAtMs: 0,
+      finishedAtMs: 0,
+      wallMs: 0,
+    });
+    expect(report.warnings_dropped).toBe(3);
+    expect(validate(report)).toBe(true);
+    expect(renderScenarioReportMarkdown(report)).toContain(
+      '- warning cap reached: 3 warning(s) dropped'
+    );
+
+    const underCap = buildScenarioReport({
+      def: scenario(),
+      runId: 'run-under-cap',
+      status: 'pass',
+      log: createScenarioSideEffectLog(),
+      startedAtMs: 0,
+      finishedAtMs: 0,
+      wallMs: 0,
+    });
+    expect(underCap).not.toHaveProperty('warnings_dropped');
   });
 });
