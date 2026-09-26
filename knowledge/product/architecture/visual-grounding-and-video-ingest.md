@@ -109,12 +109,12 @@ site's terms of service.
   **redacted** copy of the screenshot.
 - Detectors (`seam-provider-selection/ui-element-detector.json`):
 
-  | Detector           | Boxes                                                                           | Available when                                                                                    |
-  | ------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-  | `browser_dom`      | browser snapshot rects of interactive elements, with `@eN` refs (exact)         | `dom_elements` of the same viewport are supplied                                                  |
-  | `os_accessibility` | OS accessibility tree rects of interactive elements in the front window (exact) | macOS, `live_screen: true` (the screenshot IS this machine's screen now) and `AXIsProcessTrusted` |
-  | `ocr_text`         | OCR text lines (`local_only` by default), labelled                              | always                                                                                            |
-  | `pixel_regions`    | edge / connected-component regions: unlabelled icons and buttons OCR misses     | the screenshot is a readable file                                                                 |
+  | Detector           | Boxes                                                                           | Available when                                                                                                                                                              |
+  | ------------------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `browser_dom`      | browser snapshot rects of interactive elements, with `@eN` refs (exact)         | `dom_elements` of the same viewport are supplied                                                                                                                            |
+  | `os_accessibility` | OS accessibility tree rects of interactive elements in the front window (exact) | macOS or Windows, `live_screen: true` (the screenshot IS this machine's screen now), and `AXIsProcessTrusted` (macOS) / a powershell.exe that loads UI Automation (Windows) |
+  | `ocr_text`         | OCR text lines (`local_only` by default), labelled                              | always                                                                                                                                                                      |
+  | `pixel_regions`    | edge / connected-component regions: unlabelled icons and buttons OCR misses     | the screenshot is a readable file                                                                                                                                           |
 
   Without `detectors`, `browser_dom` leads when it can run; otherwise the
   `grounding` fallback purpose ranks `os_accessibility` (when available), then
@@ -135,7 +135,7 @@ site's terms of service.
   inside it (a glyph inside its button), capped at 150 (at most 2000 components enter the merge; images over
   40 MP are skipped with a warning, before decoding when the size is known). Scores are 0.3–0.6
   (edge density); small near-square boxes are `icon`, others `control`.
-- `os_accessibility` runs a JXA script through System Events (one Apple event
+- On macOS, `os_accessibility` runs a JXA script through System Events (one Apple event
   per property per tree level, depth ≤ 12, ≤ 2000 elements scanned, 8 s
   timeout), keeps interactive roles (buttons, checkboxes, radios, pop-ups,
   fields, sliders, links, menu items, tabs, cells, …) and caps the result at 200. Points map to pixels as `(point - screen_origin) × screen_scale`:
@@ -150,10 +150,37 @@ site's terms of service.
   description, through the same PII filter as every mark label; text fields,
   text areas, combo and search fields are editable and never labelled. The
   permission probe (`AXIsProcessTrusted`) never prompts; without it, off
-  macOS, or without `live_screen`, the detector is simply unavailable. Windows
-  UI Automation is not wired yet (the Windows bridge only lists window
-  titles), so it is unavailable there. The command runner is injectable, so
-  tests never run `osascript`.
+  macOS and Windows, or without `live_screen`, the detector is simply
+  unavailable. The command runner is injectable, so hermetic tests never run
+  `osascript` or `powershell.exe`.
+- On Windows, `os_accessibility` runs a PowerShell script (passed with
+  `-EncodedCommand`; options travel in the child-only `KYBERION_UIA_OPTIONS`
+  environment variable, never in the script text) that uses .NET UI
+  Automation: the foreground window (`GetForegroundWindow` →
+  `AutomationElement.FromHandle`) is walked breadth-first over the control
+  view, one cached `FindAll(Children)` per node, with the same caps and 8 s
+  timeout plus a 5 s in-script walk budget (the rest covers PowerShell
+  start-up). A named `application` is matched against the foreground window's
+  process name (case-insensitive, `.exe` optional); any other process yields
+  `not_frontmost`. UIA control types map to the AX roles (Button → `AXButton`,
+  SplitButton → `AXMenuButton`, Edit → `AXTextField`, Document → `AXTextArea`,
+  ComboBox, CheckBox, RadioButton, Hyperlink → `AXLink`, MenuItem, TabItem →
+  `AXTab`, ListItem / DataItem / TreeItem → `AXCell`, Slider, Spinner →
+  `AXIncrementor`); a password field (`IsPassword`) is editable and never
+  labelled; offscreen elements are skipped. Availability is a cached,
+  non-prompting probe that powershell.exe loads UI Automation (UIA needs no
+  permission).
+- **Windows DPI**: `BoundingRectangle` is in physical pixels under per-monitor
+  DPI, so the script makes its thread per-monitor DPI aware
+  (`SetThreadDpiAwarenessContext`, falling back to `SetProcessDPIAware`) and
+  reports the primary monitor size from `GetSystemMetrics` in the same
+  physical pixels. The default scale (image width / screen width) is then 1
+  for a physical-resolution capture of the primary monitor and still correct
+  for a DPI-virtualised (logical-size) capture. Secondary monitors (non-zero
+  origin, possibly negative) keep the rule above: pass an explicit `scale`,
+  in screenshot pixels per physical pixel. The Windows path is exercised live
+  on the `windows-latest` CI job (`KYBERION_UIA_LIVE_SMOKE=1`: Notepad is
+  launched, focused, captured and enumerated).
 - Marks are stored in the session's volatile dir for 60 s, together with the
   image dHash. `system-actuator` (`target_mark`, used only when no coordinate
   is given) and `browser-actuator` (`click_ref: "mark:<n>"`) resolve
