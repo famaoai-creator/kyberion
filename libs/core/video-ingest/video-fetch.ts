@@ -7,10 +7,10 @@ import * as pathResolver from '../path-resolver.js';
 import {
   safeExecResultAsync,
   safeExistsSync,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
+  safeReadFileRange,
 } from '../secure-io.js';
 import type {
   VideoChapter,
@@ -127,30 +127,17 @@ export function sha256FileChunked(
   return hash.digest('hex');
 }
 
-/** Whole-file fallback reader used until a governed range read is available. */
-const wholeFileRangeReader = (maxBytes: number): VideoFileRangeReader => {
-  let cached: { path: string; data: Buffer } | null = null;
-  return (filePath, position, length) => {
-    if (!cached || cached.path !== filePath) {
-      cached = {
-        path: filePath,
-        data: safeReadFile(filePath, {
-          encoding: null,
-          maxSizeMB: Math.ceil(maxBytes / (1024 * 1024)),
-        }) as Buffer,
-      };
-    }
-    return cached.data.subarray(position, position + length);
-  };
-};
-
 export function fileContentKey(
   filePath: string,
   maxBytes: number,
   readRange?: VideoFileRangeReader
 ): string {
   const size = assertLocalVideoWithinLimits(filePath, maxBytes);
-  return sha256FileChunked(filePath, size, readRange ?? wholeFileRangeReader(maxBytes));
+  return sha256FileChunked(
+    filePath,
+    size,
+    readRange ?? ((p, position, length) => safeReadFileRange(p, position, length))
+  );
 }
 
 const EXTRACTOR_FAILURE_MARKERS = [

@@ -25,6 +25,7 @@ import {
   safeExecResult,
   assertSafeRepositoryPath,
   safeReadFile,
+  safeReadFileRange,
   safeReadFileTail,
   safeWriteFile,
   sanitizePath,
@@ -84,6 +85,27 @@ describe('secure-io core', () => {
       expect(() =>
         safeReadFile(path.join(process.cwd(), 'knowledge/personal/connections/slack.json'))
       ).toThrow('[SENSITIVE_PATH_DENIED]');
+    });
+  });
+
+  describe('safeReadFileRange', () => {
+    it('reads a bounded window and a short final window', () => {
+      const testFile = path.join(tmpDir, 'range.txt');
+      const content = '0123456789'.repeat(10);
+      fs.writeFileSync(testFile, content);
+      expect(safeReadFileRange(testFile, 5, 10).toString('utf8')).toBe(content.slice(5, 15));
+      expect(safeReadFileRange(testFile, 95, 10).toString('utf8')).toBe(content.slice(95));
+      expect(safeReadFileRange(testFile, 200, 10).length).toBe(0);
+    });
+
+    it('rejects invalid bounds and symlinks', () => {
+      const testFile = path.join(tmpDir, 'range-target.txt');
+      fs.writeFileSync(testFile, 'abc');
+      expect(() => safeReadFileRange(testFile, -1, 1)).toThrow('Invalid position');
+      expect(() => safeReadFileRange(testFile, 0, 0)).toThrow('Invalid length');
+      const link = path.join(tmpDir, 'range-link.txt');
+      fs.symlinkSync(testFile, link);
+      expect(() => safeReadFileRange(link, 0, 1)).toThrow('symbolic link');
     });
   });
 
