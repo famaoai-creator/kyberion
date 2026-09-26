@@ -15,6 +15,11 @@
  *      once directly and once with the environment surface_runtime gives every
  *      surface (`SYSTEM_ROLE=chronos_mirror_v2`, RA-03), because a SYSTEM_ROLE
  *      launch used to silently ignore Chronos's in-process role assumptions;
+ *      Before the launch it seeds the viewer token registry
+ *      (knowledge/personal/connections/chronos-access.json) through the
+ *      governed issuance helper with a runtime-generated token, and one request
+ *      authenticates with that registered token (TR-01: a SYSTEM_ROLE launch
+ *      used to reject every registered token as "registry unavailable");
  *   4. drives Playwright Chromium: plugin-views listing -> iframe view ->
  *      click inside the iframe -> host confirmation -> agent action
  *      dispatched; human action -> approval request -> CLI approval ->
@@ -33,6 +38,7 @@
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { approvalRequestLogicalPath } from '@agent/core/approval-store';
 import { readJson, readJsonLines } from '@agent/core/foundation';
@@ -59,6 +65,7 @@ export const VIEW_ID = 'panel';
 export const TENANT_SLUG = 'e2e-tenant';
 const FIXTURE_SOURCE = `plugins/fixtures/${PLUGIN_ID}`;
 const CHRONOS_DIR = 'presence/displays/chronos-mirror-v2';
+const REGISTRY_RELATIVE_PATH = 'knowledge/personal/connections/chronos-access.json';
 const VIEWS_ROUTE = '/api/headless/a2ui/plugin-views';
 /** Chronos page that renders the plugin-views workspace. */
 const VIEWS_PAGE = '/?section=surface';
@@ -263,6 +270,56 @@ function readAuditEntries(root: string): AuditRecordLike[] {
 // ---------------------------------------------------------------------------
 // Child processes
 // ---------------------------------------------------------------------------
+
+/**
+ * Module source a child node process runs (with KYBERION_ROOT = the hermetic
+ * root) to register a viewer token the production way: the same
+ * `issueChronosAccessToken` facade the Concierge members route calls, under
+ * the sovereign_concierge role that route assumes. The facade generates the
+ * token and stores only its SHA-256 hash; the plaintext is printed once.
+ */
+export function registryTokenIssueScript(coreDistDir: string, tenantSlug: string): string {
+  const moduleUrl = (name: string) =>
+    JSON.stringify(pathToFileURL(path.join(coreDistDir, name)).href);
+  return [
+    `const { withExecutionContext } = await import(${moduleUrl('authority.js')});`,
+    `const { issueChronosAccessToken } = await import(${moduleUrl('chronos-access-registry.js')});`,
+    `const issued = withExecutionContext('sovereign_concierge', () =>`,
+    `  issueChronosAccessToken({ role: 'readonly', tenantSlugs: [${JSON.stringify(tenantSlug)}] })`,
+    `);`,
+    `process.stdout.write('\\n' + JSON.stringify({ token: issued.token, role: issued.registration.role }) + '\\n');`,
+  ].join('\n');
+}
+
+/** Seeds the hermetic root's viewer token registry; returns the plaintext token. */
+function seedViewerTokenRegistry(root: string): string {
+  const result = safeExecResult(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      registryTokenIssueScript(pathResolver.rootResolve('libs/core/dist'), TENANT_SLUG),
+    ],
+    {
+      cwd: root,
+      env: { KYBERION_ROOT: root, KYBERION_REASONING_BACKEND: 'stub' },
+      timeoutMs: 60_000,
+    }
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `token registry seeding exited ${String(result.status)}: ${result.stderr.slice(-2000)}`
+    );
+  }
+  const issued = parseLastJsonObject(result.stdout);
+  if (typeof issued.token !== 'string' || !/^[0-9a-f]{64}$/u.test(issued.token)) {
+    throw new Error('token registry seeding printed no token');
+  }
+  if (!safeExistsSync(path.join(root, REGISTRY_RELATIVE_PATH))) {
+    throw new Error(`token registry seeding did not write ${REGISTRY_RELATIVE_PATH}`);
+  }
+  return issued.token;
+}
 
 function runKyberionCli(root: string, script: string, args: string[]): string {
   const result = safeExecResult(
@@ -576,6 +633,8 @@ async function scenario(
 
   await step('approve-install', () => approveViaOperatorCli(root, installApprovalId));
 
+  const registeredToken = await step('seed-token-registry', () => seedViewerTokenRegistry(root));
+
   const token = randomBytes(24).toString('hex');
   const server = await step('start-chronos', async () => {
     // The free port can be taken between probing and listening: retry once.
@@ -597,6 +656,34 @@ async function scenario(
         throw new Error(`Chronos exited during startup${portInUse ? ' (port in use twice)' : ''}`);
       }
       await started.stop();
+    }
+  });
+
+  // TR-01: requests authenticated only by the registered (registry) token, no
+  // cookie. Before the fix the SYSTEM_ROLE launch answered every token —
+  // registered or env — with 401 "Chronos viewer token registry is
+  // unavailable" once the registry existed. Checked before the listing wait
+  // so that regression fails fast with the server's own error.
+  const registeredAuth = { authorization: `Bearer ${registeredToken}` };
+  await step('registered-token-request', async () => {
+    const response = await fetch(`${server.baseUrl}${VIEWS_ROUTE}`, {
+      headers: registeredAuth,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (response.status !== 200) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`registered token GET returned ${response.status}: ${body.slice(0, 300)}`);
+    }
+    // The registration is readonly: a localadmin-only mutation is refused as
+    // forbidden (resolved but insufficient), not as unauthenticated.
+    const mutation = await fetch(`${server.baseUrl}${VIEWS_ROUTE}`, {
+      method: 'POST',
+      headers: { ...registeredAuth, 'content-type': 'application/json' },
+      body: JSON.stringify({ plugin_id: PLUGIN_ID, view_id: VIEW_ID, action_id: 'ping' }),
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    if (mutation.status !== 403) {
+      throw new Error(`registered readonly token POST returned ${mutation.status}, expected 403`);
     }
   });
 
@@ -641,6 +728,22 @@ async function scenario(
       throw new Error(`unexpected action authorities: ${JSON.stringify(authorities)}`);
     }
     return found;
+  });
+
+  await step('registered-token-listing', async () => {
+    const response = await fetch(`${server.baseUrl}${VIEWS_ROUTE}`, {
+      headers: registeredAuth,
+      signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
+    });
+    const body = (await response.json().catch(() => ({}))) as { data?: Listing };
+    if (
+      response.status !== 200 ||
+      !body.data?.views?.some((entry) => entry.plugin_id === PLUGIN_ID)
+    ) {
+      throw new Error(
+        `registered token listing (${response.status}) does not show the fixture view`
+      );
+    }
   });
 
   await step('frame-headers', async () => {
