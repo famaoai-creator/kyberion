@@ -1,6 +1,9 @@
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildExecutionEnv,
+  isRoleAssumptionAllowed,
+  resetRoleAssumptionPolicyCache,
   resolveAssumedRole,
   resolveExecutionPersona,
   resolveIdentityContext,
@@ -8,7 +11,8 @@ import {
   withExecutionContext,
   withExecutionContextAsync,
 } from './authority.js';
-import { buildSafeExecEnv } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { buildSafeExecEnv, safeReaddir, safeReadFile } from './secure-io.js';
 import { validateReadPermission } from './tier-guard.js';
 
 const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', 'MISSION_ID'] as const;
@@ -29,6 +33,7 @@ describe('RA-01 scoped role assumption', () => {
       original[key] = process.env[key];
       delete process.env[key];
     }
+    resetRoleAssumptionPolicyCache();
   });
 
   afterEach(() => {
@@ -36,6 +41,7 @@ describe('RA-01 scoped role assumption', () => {
       if (original[key] === undefined) delete process.env[key];
       else process.env[key] = original[key];
     }
+    resetRoleAssumptionPolicyCache();
   });
 
   it('lets an assumed role outrank SYSTEM_ROLE, then falls back to SYSTEM_ROLE', () => {
@@ -190,5 +196,100 @@ describe('RA-01 scoped role assumption', () => {
     const env = await a;
     expect(env.MISSION_ROLE).toBe('chronos_localadmin');
     expect(env.KYBERION_PERSONA).toBe('worker');
+  });
+});
+
+describe('RA-02 role assumption policy', () => {
+  const original: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  it('denies a role that is not listed for the SYSTEM_ROLE before running fn', () => {
+    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    let ran = false;
+    expect(() =>
+      withExecutionContext('system_configurator', () => {
+        ran = true;
+      })
+    ).toThrow(/\[ROLE_ASSUMPTION_DENIED\].*chronos_mirror_v2.*system_configurator/);
+    expect(ran).toBe(false);
+    expect(process.env.MISSION_ROLE).toBeUndefined();
+  });
+
+  it('denies from the async helper too', async () => {
+    process.env.SYSTEM_ROLE = 'slack_bridge';
+    await expect(withExecutionContextAsync('chronos_localadmin', async () => 1)).rejects.toThrow(
+      '[ROLE_ASSUMPTION_DENIED]'
+    );
+  });
+
+  it('always allows assuming the SYSTEM_ROLE itself', () => {
+    process.env.SYSTEM_ROLE = 'not_listed_system_role';
+    expect(withExecutionContext('not_listed_system_role', () => resolveRole())).toBe(
+      'not_listed_system_role'
+    );
+    expect(() => withExecutionContext('mission_controller', () => undefined)).toThrow(
+      '[ROLE_ASSUMPTION_DENIED]'
+    );
+  });
+
+  it('allows listed and shared core roles', () => {
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(true);
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_operator')).toBe(true);
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'mission_controller')).toBe(true);
+    expect(isRoleAssumptionAllowed('concierge', 'concierge_localadmin')).toBe(true);
+    expect(isRoleAssumptionAllowed('system_configurator', 'mission_controller')).toBe(true);
+    expect(isRoleAssumptionAllowed('slack_bridge', 'chronos_localadmin')).toBe(false);
+    expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(false);
+  });
+
+  it('leaves processes without SYSTEM_ROLE unrestricted', () => {
+    expect(withExecutionContext('system_configurator', () => resolveRole())).toBe(
+      'system_configurator'
+    );
+  });
+});
+
+describe('RA-02 policy coverage', () => {
+  it('lists every surface that surface_runtime launches with a SYSTEM_ROLE', () => {
+    const policy = JSON.parse(
+      String(
+        safeReadFile(pathResolver.knowledge('product/governance/role-assumption-policy.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as { system_roles: Record<string, unknown> };
+    const surfacesDir = pathResolver.knowledge('product/governance/surfaces');
+    const surfaceIds = safeReaddir(surfacesDir)
+      .filter((entry) => entry.endsWith('.json'))
+      .flatMap((entry) => {
+        const manifest = JSON.parse(
+          String(safeReadFile(path.join(surfacesDir, entry), { encoding: 'utf8' }))
+        ) as { surfaces?: Array<{ id: string }> };
+        return (manifest.surfaces ?? []).map((surface) => surface.id);
+      });
+    expect(surfaceIds.length).toBeGreaterThan(0);
+    // surface_runtime.ts: SYSTEM_ROLE = surfaceId.replace(/-/g, '_')
+    const missing = surfaceIds
+      .map((id) => id.replace(/-/g, '_'))
+      .filter((systemRole) => !(systemRole in policy.system_roles));
+    expect(missing).toEqual([]);
+    // package.json `surfaces` / `config-mission` scripts.
+    expect(policy.system_roles).toHaveProperty('surface_runtime');
+    expect(policy.system_roles).toHaveProperty('system_configurator');
   });
 });

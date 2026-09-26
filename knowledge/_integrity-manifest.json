@@ -3529,6 +3529,12 @@
       "type": "md"
     },
     {
+      "path": "product/governance/role-assumption-policy.json",
+      "tier": "public",
+      "size": 4352,
+      "type": "json"
+    },
+    {
       "path": "product/governance/role-authority-map.json",
       "tier": "public",
       "size": 3818,
@@ -11014,6 +11020,12 @@
       "path": "product/schemas/review-gate-result.schema.json",
       "tier": "public",
       "size": 757,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/role-assumption-policy.schema.json",
+      "tier": "public",
+      "size": 1598,
       "type": "json"
     },
     {

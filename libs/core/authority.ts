@@ -241,6 +241,8 @@ export function resolveAssumedRole(): string | undefined {
  *   2. `SYSTEM_ROLE` (set by surface_runtime / runtime launchers);
  *   3. `MISSION_ROLE`;
  *   4. a heuristic derived from the process argv[1] basename.
+ * When `SYSTEM_ROLE` is set, step 1 is bounded by the role assumption policy
+ * (RA-02, see {@link assertRoleAssumptionAllowed}).
  */
 export function resolveRole(): string | undefined {
   const assumedRole = resolveAssumedRole();
@@ -268,6 +270,96 @@ export function resolveExecutionPersona(): string | undefined {
   const scoped = scopedPersona();
   if (scoped.bound) return scoped.persona;
   return getRegisteredEnvText('KYBERION_PERSONA');
+}
+
+// ---------------------------------------------------------------------------
+// RA-02 role assumption policy
+//
+// Loaded through fs-primitives, not a governed catalog: defineCatalog reads
+// through secure-io, which consults this module (the TDZ cycle documented at
+// the top of this file). The JSON schema
+// (knowledge/product/schemas/role-assumption-policy.schema.json) is enforced
+// by the governance contract tests; this loader re-checks the shape it relies
+// on and fails closed when the file is missing or malformed.
+// ---------------------------------------------------------------------------
+
+export const ROLE_ASSUMPTION_POLICY_PATH = 'product/governance/role-assumption-policy.json';
+
+interface RoleAssumptionPolicy {
+  sharedCoreRoles: ReadonlySet<string>;
+  systemRoles: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+let cachedRoleAssumptionPolicy: { path: string; policy: RoleAssumptionPolicy | null } | null = null;
+
+function stringArrayField(record: JsonRecord, key: string): string[] | null {
+  const value = record[key];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) return null;
+  return value.map((item) => normalizeRoleName(item));
+}
+
+function parseRoleAssumptionPolicy(raw: JsonRecord | null): RoleAssumptionPolicy | null {
+  if (!raw || !isJsonRecord(raw.shared_core_roles) || !isJsonRecord(raw.system_roles)) {
+    return null;
+  }
+  const sharedCoreRoles = stringArrayField(raw.shared_core_roles, 'roles');
+  if (!sharedCoreRoles) return null;
+  const systemRoles = new Map<string, ReadonlySet<string>>();
+  for (const [systemRole, entry] of Object.entries(raw.system_roles)) {
+    if (!isJsonRecord(entry)) return null;
+    const mayAssume = stringArrayField(entry, 'may_assume');
+    if (!mayAssume) return null;
+    systemRoles.set(normalizeRoleName(systemRole), new Set(mayAssume));
+  }
+  return { sharedCoreRoles: new Set(sharedCoreRoles), systemRoles };
+}
+
+function loadRoleAssumptionPolicy(): RoleAssumptionPolicy | null {
+  const filePath = pathResolver.knowledge(ROLE_ASSUMPTION_POLICY_PATH);
+  if (cachedRoleAssumptionPolicy?.path === filePath) return cachedRoleAssumptionPolicy.policy;
+  let policy: RoleAssumptionPolicy | null = null;
+  try {
+    if (rawExistsSync(filePath)) {
+      policy = parseRoleAssumptionPolicy(parseJsonRecord(rawReadTextFile(filePath)));
+    }
+  } catch (err) {
+    logger.warn(`role assumption policy could not be read: ${err}`);
+    policy = null;
+  }
+  cachedRoleAssumptionPolicy = { path: filePath, policy };
+  return policy;
+}
+
+/** Test seam: drop the cached role assumption policy. */
+export function resetRoleAssumptionPolicyCache(): void {
+  cachedRoleAssumptionPolicy = null;
+}
+
+/**
+ * RA-02: may a process running as `systemRole` assume `role` in-process?
+ * Same role: always. Otherwise the role must be a shared core role or listed
+ * for the system role; a system role with no entry may only assume itself and
+ * a missing/malformed policy denies everything but the system role itself.
+ */
+export function isRoleAssumptionAllowed(systemRole: string, role: string): boolean {
+  const normalizedSystemRole = normalizeRoleName(systemRole.trim());
+  const normalizedRole = normalizeRoleName(role.trim());
+  if (normalizedRole === normalizedSystemRole) return true;
+  const policy = loadRoleAssumptionPolicy();
+  const allowed = policy?.systemRoles.get(normalizedSystemRole);
+  if (!policy || !allowed) return false;
+  return policy.sharedCoreRoles.has(normalizedRole) || allowed.has(normalizedRole);
+}
+
+function assertRoleAssumptionAllowed(role: string): void {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  if (!systemRole) return;
+  if (isRoleAssumptionAllowed(systemRole, role)) return;
+  throw new Error(
+    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole)} ` +
+      `may not assume role '${normalizeRoleName(role.trim())}'. Allowed assumptions are governed by ` +
+      `knowledge/${ROLE_ASSUMPTION_POLICY_PATH}.`
+  );
 }
 
 export function inferPersonaFromRole(role?: string): Persona {
@@ -322,6 +414,7 @@ function prepareExecutionContext(
   persona: Persona | undefined,
   tenantSlug: string | undefined
 ): PreparedExecutionContext {
+  assertRoleAssumptionAllowed(role);
   const resolvedPersona = persona || inferPersonaFromRole(role);
   // Mirror the env semantics below: a known persona is bound, an unknown one
   // with no explicit persona clears it, an explicit unknown keeps the outer one.
@@ -360,7 +453,9 @@ function applyExecutionEnv(role: string, persona: Persona | undefined, resolvedP
  * Run `fn` as `role` (and `persona`, default inferred from the role). The
  * assumption is carried in an AsyncLocalStorage scope that `resolveRole()`
  * and the persona resolution read first (RA-01), so it wins over SYSTEM_ROLE
- * and is isolated per async context.
+ * and is isolated per async context. Under SYSTEM_ROLE the role must be
+ * allowed by the role assumption policy (RA-02) or this throws
+ * `[ROLE_ASSUMPTION_DENIED]` before `fn` runs.
  */
 export function withExecutionContext<T>(
   role: string,
