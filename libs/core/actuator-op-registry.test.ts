@@ -19,7 +19,7 @@ function collectSourceFiles(dir: string): string[] {
   const entries = safeReaddir(dir);
   const files: string[] = [];
   for (const entry of entries) {
-    if (entry.startsWith('.')) continue;
+    if (entry.startsWith('.') || entry === 'node_modules' || entry === 'dist') continue;
     const abs = path.join(dir, entry);
     const stats = safeStat(abs);
     if (stats.isDirectory()) {
