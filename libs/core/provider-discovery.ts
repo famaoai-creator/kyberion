@@ -15,6 +15,7 @@ import {
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 
 /**
  * Provider Discovery v1.0
@@ -400,7 +401,8 @@ function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; std
 }
 
 function checkGemini(): ProviderInfo {
-  const which = run('which', ['gemini']);
+  const binary = resolveProviderCliCommand('gemini');
+  const which = run(binary, ['--version']);
   if (!which.ok)
     return {
       provider: 'gemini',
@@ -411,7 +413,7 @@ function checkGemini(): ProviderInfo {
       healthy: false,
     };
 
-  const ver = run('gemini', ['--version']);
+  const ver = which;
   const entry = capabilityEntryFor('gemini');
   return {
     provider: 'gemini',
@@ -426,16 +428,15 @@ function checkGemini(): ProviderInfo {
 }
 
 function checkClaude(): ProviderInfo {
-  const which = run('which', ['claude']);
+  const binary = resolveProviderCliCommand('claude');
+  const which = run(binary, ['--version']);
   // Use --version only — honor the same placeholder fallback as the runtime
   // shell backend so provider health and backend selection agree.
-  let command: string | undefined = which.ok ? 'claude' : undefined;
-  let ver = command ? run(command, ['--version']) : { ok: false, stdout: '' };
+  let ver = which;
   if (!ver.ok) {
     for (const candidate of resolveClaudeCliFallbackCandidates()) {
       const fallback = run(candidate, ['--version']);
       if (fallback.ok) {
-        command = candidate;
         ver = fallback;
         break;
       }
@@ -491,7 +492,7 @@ function checkCopilot(): ProviderInfo {
 }
 
 function checkCodex(): ProviderInfo {
-  const which = run('which', ['codex']);
+  const which = run(resolveProviderCliCommand('codex'), ['--help']);
   const installed = which.ok;
   const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
   const protocol: ProviderInfo['protocol'] =
@@ -511,7 +512,7 @@ function checkCodex(): ProviderInfo {
 }
 
 function checkAgy(): ProviderInfo {
-  const which = run('which', ['agy']);
+  const which = run(resolveProviderCliCommand('agy'), ['--help']);
   if (!which.ok)
     return {
       provider: 'agy',
@@ -536,7 +537,8 @@ function checkAgy(): ProviderInfo {
 }
 
 function checkGrok(): ProviderInfo {
-  const which = run('which', ['grok']);
+  const binary = resolveProviderCliCommand('grok');
+  const which = run(binary, ['--version']);
   if (!which.ok)
     return {
       provider: 'grok',
@@ -549,7 +551,7 @@ function checkGrok(): ProviderInfo {
 
   // Use --version only — a live headless LLM probe is too expensive for discovery.
   // Credential validity is checked at use-time.
-  const ver = run('grok', ['--version']);
+  const ver = which;
   const entry = capabilityEntryFor('grok');
   return {
     provider: 'grok',
@@ -564,14 +566,8 @@ function checkGrok(): ProviderInfo {
 }
 
 function checkCursor(): ProviderInfo {
-  const configuredBinary = getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN')?.trim();
-  const binary = configuredBinary || 'cursor-agent';
-  const version = configuredBinary
-    ? run(configuredBinary, ['--version'])
-    : (() => {
-        const which = run('which', [binary]);
-        return which.ok ? run(binary, ['--version']) : which;
-      })();
+  const binary = resolveProviderCliCommand('cursor');
+  const version = run(binary, ['--version']);
   if (!version.ok)
     return {
       provider: 'cursor',
@@ -596,14 +592,8 @@ function checkCursor(): ProviderInfo {
 }
 
 function checkOpencode(): ProviderInfo {
-  const configuredBinary = getRegisteredEnvText('KYBERION_OPENCODE_CLI_BIN')?.trim();
-  const binary = configuredBinary || 'opencode';
-  const version = configuredBinary
-    ? run(configuredBinary, ['--version'])
-    : (() => {
-        const which = run('which', [binary]);
-        return which.ok ? run(binary, ['--version']) : which;
-      })();
+  const binary = resolveProviderCliCommand('opencode');
+  const version = run(binary, ['--version']);
   if (!version.ok)
     return {
       provider: 'opencode',
@@ -628,14 +618,8 @@ function checkOpencode(): ProviderInfo {
 }
 
 function checkDevin(): ProviderInfo {
-  const configuredBinary = getRegisteredEnvText('KYBERION_DEVIN_CLI_BIN')?.trim();
-  const binary = configuredBinary || 'devin';
-  const version = configuredBinary
-    ? run(configuredBinary, ['--version'])
-    : (() => {
-        const which = run('which', [binary]);
-        return which.ok ? run(binary, ['--version']) : which;
-      })();
+  const binary = resolveProviderCliCommand('devin');
+  const version = run(binary, ['--version']);
   if (!version.ok)
     return {
       provider: 'devin',
