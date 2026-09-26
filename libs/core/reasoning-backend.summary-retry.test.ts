@@ -21,6 +21,7 @@ const LONG_REPORT = 'A detailed report with concrete evidence. '.repeat(10);
 const TEST_REASONING_SCOPE = {
   tier: 'public' as const,
   purpose: 'hermetic reasoning backend test',
+  training_use: 'training_eligible' as const,
 };
 
 function withTestReasoningScope<T>(fn: () => Promise<T>): Promise<T> {
