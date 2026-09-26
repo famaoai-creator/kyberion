@@ -126,7 +126,37 @@
           <p id="ai-page-summary-status" class="ai-status" aria-live="polite"></p>
           <pre id="ai-page-summary" class="draft-preview" hidden></pre>
         </div>
+        <div class="execution-inputs">
+          <p class="section-kicker">PAGE DISCOVERY & INSPECTION</p>
+          <p>
+            現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Kyberion CLIやエージェント連携用に取得・送信します。
+          </p>
+          <div class="intent-input-row" style="margin-bottom: 8px;">
+            <label for="inspect-port-input" style="font-size: 12px; color: var(--text-muted, #666); margin-right: 6px;">Port:</label>
+            <input
+              id="inspect-port-input"
+              type="number"
+              class="intent-input"
+              style="width: 80px; padding: 4px 8px; font-size: 12px;"
+              value="8788"
+              min="1024"
+              max="65535"
+            />
+          </div>
+          <div class="button-row">
+            <button id="inspect-page-button" class="secondary" type="button">
+              ページ構造を解析
+            </button>
+            <button id="inspect-send-cli-button" class="secondary" type="button" hidden>
+              Kyberion CLIへ送信
+            </button>
+          </div>
+          <p id="inspect-page-status" class="ai-status" aria-live="polite"></p>
+          <pre id="inspect-page-result" class="draft-preview" hidden></pre>
+        </div>
+
       </section>
+
 
       <section class="panel" data-panel="record">
         <p class="section-kicker">CAPTURE INTENT, NOT DATA</p>
