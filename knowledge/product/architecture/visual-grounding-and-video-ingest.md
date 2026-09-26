@@ -132,7 +132,8 @@ site's terms of service.
   boxes filtered by size (side ≥ 8 px, area ≥ 120 px², ≤ 60 % width /
   35 % height / 8 % area of the image) and aspect (≤ 20:1 wide, ≤ 4:1 tall),
   merged when IoU ≥ 0.6 or when a box ≥ 6 % the size of another lies ≥ 90 %
-  inside it (a glyph inside its button), capped at 150. Scores are 0.3–0.6
+  inside it (a glyph inside its button), capped at 150 (at most 2000 components enter the merge; images over
+  40 MP are skipped with a warning, before decoding when the size is known). Scores are 0.3–0.6
   (edge density); small near-square boxes are `icon`, others `control`.
 - `os_accessibility` runs a JXA script through System Events (one Apple event
   per property per tree level, depth ≤ 12, ≤ 2000 elements scanned, 8 s
