@@ -4,7 +4,7 @@ globalThis.__kyberionPiiScrub = (value) => {
   let text = String(value ?? '');
   const rules = [
     { id: "API_KEY", pattern: new RegExp("AIza[0-9A-Za-z-_]{35}", 'gu'), replacement: "[REDACTED:API_KEY]" },
-    { id: "CREDIT_CARD", pattern: new RegExp("(?<![0-9A-Fa-f])(?:\\d[ -]?){12,18}\\d(?![0-9A-Fa-f-])", 'gu'), replacement: "[REDACTED:CREDIT_CARD]" },
+    { id: "CREDIT_CARD", pattern: new RegExp("(?<![0-9A-Fa-f.])(?:\\d[ -]?){12,18}\\d(?![0-9A-Fa-f-])", 'gu'), replacement: "[REDACTED:CREDIT_CARD]" },
     { id: "EMAIL_ADDRESS", pattern: new RegExp("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", 'gu'), replacement: "[REDACTED:EMAIL_ADDRESS]" },
     { id: "GENERIC_SECRET", pattern: new RegExp("secret[:=]\\s*['\"][0-9A-Za-z-_]{16,}['\"]", 'gu'), replacement: "[REDACTED:GENERIC_SECRET]" },
     { id: "JP_BANK_ACCOUNT", pattern: new RegExp("(?:口座番号|口座|支店|普通|当座)\\D{0,10}\\d{7}(?!\\d)", 'gu'), replacement: "[REDACTED:JP_BANK_ACCOUNT]" },
