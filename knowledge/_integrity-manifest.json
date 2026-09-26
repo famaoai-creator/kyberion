@@ -937,6 +937,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/visual-grounding-and-video-ingest.md",
+      "tier": "public",
+      "size": 5959,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/voice-generation-absorption-plan.md",
       "tier": "public",
       "size": 3250,
@@ -1191,7 +1197,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 21695,
+      "size": 21827,
       "type": "json"
     },
     {
@@ -4647,7 +4653,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1440786,
+      "size": 1451917,
       "type": "json"
     },
     {
@@ -5013,7 +5019,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19705,
+      "size": 19847,
       "type": "json"
     },
     {
@@ -11811,7 +11817,7 @@
     {
       "path": "product/schemas/vision-action.schema.json",
       "tier": "public",
-      "size": 1489,
+      "size": 1765,
       "type": "json"
     },
     {

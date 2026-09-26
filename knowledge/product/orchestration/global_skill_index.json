@@ -47,7 +47,7 @@
       "path": "libs/actuators/browser-actuator",
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 2
     },
     {
@@ -215,7 +215,7 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "capability_count": 26
     },
     {
@@ -239,8 +239,8 @@
       "path": "libs/actuators/vision-actuator",
       "d": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
       "s": "implemented",
-      "version": "1.4.0",
-      "capability_count": 3
+      "version": "1.5.0",
+      "capability_count": 7
     },
     {
       "n": "voice-actuator",

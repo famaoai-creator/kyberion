@@ -121,7 +121,21 @@ function inspectTool(toolId: string): SetupRow {
   };
 }
 
-async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
+/**
+ * A managed_binary pin must be a real sha256. The all-zero placeholder (or any
+ * malformed digest) fails closed here, before any network access.
+ */
+export function assertPinnedSha256(toolId: string, version: string, sha256: unknown): string {
+  const digest = typeof sha256 === 'string' ? sha256.trim().toLowerCase() : '';
+  if (!/^[0-9a-f]{64}$/.test(digest) || /^0+$/.test(digest)) {
+    throw new Error(
+      `managed_binary sha256 for ${toolId} ${version} is not pinned (placeholder or malformed); fill in the upstream SHA2-256SUMS digest before installing`
+    );
+  }
+  return digest;
+}
+
+export async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   const artifact = resolveManagedBinaryArtifact(toolId);
   const target = resolveManagedBinaryPath(toolId);
   if (!artifact || !target) return null;
@@ -140,6 +154,7 @@ async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
     };
   }
 
+  const expectedSha256 = assertPinnedSha256(toolId, version, artifact.sha256);
   const payload = await secureFetch<ArrayBuffer>({
     url: artifact.url,
     method: 'GET',
@@ -148,9 +163,9 @@ async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   });
   const data = Buffer.from(payload);
   const digest = createHash('sha256').update(data).digest('hex');
-  if (digest !== artifact.sha256) {
+  if (digest !== expectedSha256) {
     throw new Error(
-      `managed_binary checksum mismatch for ${toolId} ${version}: expected ${artifact.sha256}, got ${digest}`
+      `managed_binary checksum mismatch for ${toolId} ${version}: expected ${expectedSha256}, got ${digest}`
     );
   }
   const staging = `${target}.download`;

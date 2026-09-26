@@ -169,6 +169,38 @@ describe('AppleVisionOcrProvider', () => {
     return fakeChild;
   }
 
+  it('keeps the normalized boundingBox that native-ocr.swift emits', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+
+    const promise = new AppleVisionOcrProvider().recognize({ path: 'test.png' });
+    fakeChild.stdout.emit(
+      'data',
+      JSON.stringify({
+        status: 'succeeded',
+        text: 'a\nb\nc',
+        confidence: 90,
+        lines: [
+          {
+            text: 'a',
+            confidence: 90,
+            boundingBox: { x: 0.25, y: 0.5, width: 0.5, height: 0.125 },
+          },
+          { text: 'b', confidence: 90, bbox: { x0: 0.1, y0: 0.2, x1: 0.3, y1: 0.4 } },
+          { text: 'c', confidence: 90, boundingBox: { x: 0.1, y: 'bad', width: 1, height: 1 } },
+        ],
+      })
+    );
+    fakeChild.emit('close', 0);
+
+    const result = await promise;
+    expect(result.boundingBoxUnits).toBe('normalized');
+    expect(result.lines?.[0].boundingBox).toEqual({ x: 0.25, y: 0.5, width: 0.5, height: 0.125 });
+    expect(result.lines?.[1].boundingBox?.x).toBeCloseTo(0.1);
+    expect(result.lines?.[1].boundingBox?.width).toBeCloseTo(0.2);
+    expect(result.lines?.[2].boundingBox).toBeUndefined();
+  });
+
   it('runs swift script to perform OCR on macOS', async () => {
     const fakeChild = createFakeChild();
     mocks.spawn.mockReturnValue(fakeChild);

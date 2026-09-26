@@ -28635,6 +28635,15 @@
               "click_count": {
                 "type": "number"
               },
+              "mark_session_id": {
+                "type": "string"
+              },
+              "marks_id": {
+                "type": "string"
+              },
+              "target_mark": {
+                "type": "string"
+              },
               "x": {
                 "type": "number"
               },
@@ -30636,6 +30645,378 @@
             {
               "path": "active/shared/tmp/example.png",
               "kind": "brief"
+            }
+          ]
+        },
+        {
+          "op": "fetch_video",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "string"
+              },
+              "max_keyframes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "transcript_preference": {
+                "type": "string",
+                "enum": ["auto", "subtitles_only", "stt_only"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "approval": {
+                "type": "object",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "channel": {
+                    "type": "string"
+                  },
+                  "correlation_id": {
+                    "type": "string"
+                  },
+                  "has_human": {
+                    "type": "boolean"
+                  },
+                  "has_ui": {
+                    "type": "boolean"
+                  },
+                  "non_interactive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["agent_id"],
+                "additionalProperties": false
+              },
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "url"
+                      },
+                      "url": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "url"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "file"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "path"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": ["url"]
+              },
+              {
+                "required": ["source"]
+              }
+            ]
+          },
+          "examples": [
+            {
+              "url": "https://www.youtube.com/watch?v=example",
+              "language": "en",
+              "approval": {
+                "agent_id": "kyberion:operator"
+              }
+            }
+          ]
+        },
+        {
+          "op": "mark_elements",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detectors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "dom_elements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "type": "string"
+                    },
+                    "bbox": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "width": {
+                          "type": "number"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["x", "y", "width", "height"]
+                    }
+                  },
+                  "required": ["ref"]
+                }
+              },
+              "dom_scale": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "scale": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "language": {
+                "type": "string"
+              },
+              "ocr_mode": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "max_marks": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": ["path", "session_id"]
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/screen.png",
+              "session_id": "example-session"
+            }
+          ]
+        },
+        {
+          "op": "describe_screen_delta",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grid": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "cols": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "rows": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["cols", "rows"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "tile_px": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_describe_per_call": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["public", "confidential", "personal"]
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["path", "session_id"]
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/screen.png",
+              "session_id": "example-session",
+              "grid": 4,
+              "max_describe_per_call": 4
+            }
+          ]
+        },
+        {
+          "op": "build_video_brief",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "string"
+              },
+              "max_keyframes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "transcript_preference": {
+                "type": "string",
+                "enum": ["auto", "subtitles_only", "stt_only"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "approval": {
+                "type": "object",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "channel": {
+                    "type": "string"
+                  },
+                  "correlation_id": {
+                    "type": "string"
+                  },
+                  "has_human": {
+                    "type": "boolean"
+                  },
+                  "has_ui": {
+                    "type": "boolean"
+                  },
+                  "non_interactive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["agent_id"],
+                "additionalProperties": false
+              },
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "url"
+                      },
+                      "url": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "url"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "file"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "path"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "input_tier": {
+                "type": "string",
+                "enum": ["public", "confidential", "personal"]
+              }
+            },
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": ["url"]
+              },
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["source"]
+              }
+            ]
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/example.mp4",
+              "max_keyframes": 8
+            },
+            {
+              "url": "https://www.youtube.com/watch?v=example",
+              "transcript_preference": "subtitles_only"
             }
           ]
         }
