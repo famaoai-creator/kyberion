@@ -9,6 +9,7 @@ import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   resolveActiveProviderPermissionArgs,
@@ -443,7 +444,9 @@ export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   modelOverride?: string
 ): GeminiCliBackend | null {
-  const bin = getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim();
+  const bin =
+    getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim() ||
+    resolveProviderCliCommand('gemini');
   const model =
     modelOverride ||
     getRegisteredEnvText('KYBERION_GEMINI_CLI_MODEL', { env })?.trim() ||

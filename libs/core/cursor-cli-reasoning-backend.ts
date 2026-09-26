@@ -13,6 +13,7 @@ import * as readline from 'node:readline';
 import { z } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildDelegationSpawnEnv,
@@ -695,7 +696,10 @@ export function probeCursorCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number; checkAuth?: boolean } = {}
 ): CursorCliAvailability {
-  const bin = options.bin?.trim() || envText(env, 'KYBERION_CURSOR_CLI_BIN')?.trim() || DEFAULT_BIN;
+  const bin =
+    options.bin?.trim() ||
+    envText(env, 'KYBERION_CURSOR_CLI_BIN')?.trim() ||
+    resolveProviderCliCommand('cursor');
   const timeoutMs = options.timeoutMs ?? 5_000;
   const checkAuth = options.checkAuth ?? true;
 
@@ -778,7 +782,7 @@ export function buildCursorCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[cursor-cli] backend unavailable (bin=${envText(env, 'KYBERION_CURSOR_CLI_BIN')?.trim() || DEFAULT_BIN}): ${availability.reason ?? 'failed health check'}`
+      `[cursor-cli] backend unavailable (bin=${envText(env, 'KYBERION_CURSOR_CLI_BIN')?.trim() || resolveProviderCliCommand('cursor')}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }

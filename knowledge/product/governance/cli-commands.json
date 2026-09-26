@@ -1809,6 +1809,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.managed.env",
+      "script": "managed-env",
+      "command": "managed env",
+      "noun": "managed",
+      "verb": "env",
+      "audience": "operator"
+    },
+    {
       "id": "script.seam.select",
       "module": "scripts/seam_selection.ts",
       "command": "seam select",

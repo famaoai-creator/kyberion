@@ -29,6 +29,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -343,7 +344,10 @@ export function probeDevinCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): DevinCliAvailability {
-  const bin = options.bin?.trim() || envText(env, 'KYBERION_DEVIN_CLI_BIN')?.trim() || DEFAULT_BIN;
+  const bin =
+    options.bin?.trim() ||
+    envText(env, 'KYBERION_DEVIN_CLI_BIN')?.trim() ||
+    resolveProviderCliCommand('devin');
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
@@ -400,7 +404,7 @@ export function buildDevinCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[devin-cli] backend unavailable (bin=${envText(env, 'KYBERION_DEVIN_CLI_BIN')?.trim() || DEFAULT_BIN}): ${availability.reason ?? 'failed health check'}`
+      `[devin-cli] backend unavailable (bin=${envText(env, 'KYBERION_DEVIN_CLI_BIN')?.trim() || resolveProviderCliCommand('devin')}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }

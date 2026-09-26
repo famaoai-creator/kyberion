@@ -46,6 +46,7 @@ export * from './music-generation-policy.js';
 export * from './tool-runtime-policy.js';
 
 export * from './tool-runtime-registry.js';
+export * from './provider-managed-env.js';
 
 export * from './tool-binary-resolvers.js';
 

@@ -24,6 +24,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -391,7 +392,9 @@ export function probeOpencodeCliAvailability(
   options: { bin?: string; timeoutMs?: number } = {}
 ): OpencodeCliAvailability {
   const bin =
-    options.bin?.trim() || envText(env, 'KYBERION_OPENCODE_CLI_BIN')?.trim() || DEFAULT_BIN;
+    options.bin?.trim() ||
+    envText(env, 'KYBERION_OPENCODE_CLI_BIN')?.trim() ||
+    resolveProviderCliCommand('opencode');
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
@@ -448,7 +451,7 @@ export function buildOpencodeCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[opencode-cli] backend unavailable (bin=${envText(env, 'KYBERION_OPENCODE_CLI_BIN')?.trim() || DEFAULT_BIN}): ${availability.reason ?? 'failed health check'}`
+      `[opencode-cli] backend unavailable (bin=${envText(env, 'KYBERION_OPENCODE_CLI_BIN')?.trim() || resolveProviderCliCommand('opencode')}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }

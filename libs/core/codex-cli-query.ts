@@ -6,6 +6,7 @@ import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveManagedProviderCliBinary } from './provider-managed-env.js';
 import { readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -372,7 +373,10 @@ function isNullSchema(node: unknown): boolean {
 export function buildCodexCliQueryOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): CodexCliQueryOptions {
-  const bin = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
+  const bin =
+    envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim() ||
+    resolveManagedProviderCliBinary('codex') ||
+    undefined;
   const model = envText(env, 'KYBERION_CODEX_CLI_MODEL')?.trim();
   const timeoutRaw = envText(env, 'KYBERION_CODEX_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
