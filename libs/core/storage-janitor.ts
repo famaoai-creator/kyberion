@@ -47,6 +47,11 @@ import {
   type RetentionStatusRule,
 } from './storage-retention-catalog.js';
 import {
+  sweepRegisteredWorkspaces,
+  type SweepWorkspacesOptions,
+  type SweepWorkspacesResult,
+} from './workspace-sweep.js';
+import {
   listSupervisorEventFiles,
   SUPERVISOR_EVENTS_FILE_PATTERN,
   SUPERVISOR_EVENTS_LEGACY_FILE,
@@ -161,6 +166,15 @@ export interface SweepDelegationChildrenResult {
   errors: string[];
 }
 
+export type { SweepWorkspacesOptions, SweepWorkspacesResult } from './workspace-sweep.js';
+
+export interface JanitorWorkspacesReport {
+  registered: number;
+  orphaned: number;
+  deleted: number;
+  unregisteredDirs: string[];
+}
+
 export interface JanitorReport {
   expiredTmp: number;
   deletedTmp: number;
@@ -181,6 +195,8 @@ export interface JanitorReport {
   deletedStatusRules: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
+  /** WS-07: ledger-registered workspace sweep (orphans deleted only through the ledger). */
+  workspaces: JanitorWorkspacesReport;
   /**
    * AL-01: repo-relative `active/shared/runtime/<subdir>` directories that
    * exist on disk but are skipped because no retention-catalog entry covers
@@ -1043,6 +1059,11 @@ export function sweepDelegationChildren(
   return { stale, killed, errors };
 }
 
+/** WS-07 workspace sweep with the janitor's retention audit wired in. */
+export function sweepWorkspaces(opts: SweepWorkspacesOptions): SweepWorkspacesResult {
+  return sweepRegisteredWorkspaces({ audit: appendRetentionAudit, ...opts });
+}
+
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
@@ -1150,6 +1171,20 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`delegation-children: ${err?.message ?? String(err)}`);
   }
 
+  let workspacesResult: SweepWorkspacesResult = {
+    registered: 0,
+    orphaned: [],
+    deleted: [],
+    unregisteredDirs: [],
+    errors: [],
+  };
+  try {
+    workspacesResult = sweepWorkspaces({ dryRun: opts.dryRun });
+    errors.push(...workspacesResult.errors.map((error) => `workspaces: ${error}`));
+  } catch (err: unknown) {
+    errors.push(`workspaces: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const report: JanitorReport = {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
@@ -1167,6 +1202,12 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedStatusRules: statusRulesResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
+    workspaces: {
+      registered: workspacesResult.registered,
+      orphaned: workspacesResult.orphaned.length,
+      deleted: workspacesResult.deleted.length,
+      unregisteredDirs: workspacesResult.unregisteredDirs,
+    },
     uncoveredRuntimeDirs,
     uncoveredEventStoreDirs,
     reviewRequiredDirs,

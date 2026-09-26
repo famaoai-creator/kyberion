@@ -19,6 +19,9 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { PluginHost } from '@agent/core/plugin-host';
+import { PluginViewError, pluginViewErrorStatus } from '@agent/core/plugin-view-contract';
+import type { VocabularyKey } from '@agent/core/t';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { PERSONAL_PADS_CLIENT_MODULES } from './client-runtime.js';
@@ -26,6 +29,13 @@ import { padsT } from './i18n.js';
 import { assertPadAdaptersComplete } from './adapters.js';
 import { executePadAction, getPadActionAvailability } from './actions.js';
 import { personalPadsPage } from './page.js';
+import {
+  ensurePadsPluginHost,
+  getPadPluginViews,
+  parsePadPluginViewActionInput,
+  pluginViewErrorMessageKey,
+  runPadPluginViewAction,
+} from './plugin-views.js';
 import { PERSONAL_PADS_SURFACE, type PersonalPadsSurface } from './surface.js';
 import {
   allowedPadTiers,
@@ -50,6 +60,14 @@ export interface PersonalPadsServerResult {
   scope: LocalPadContext['scope'];
   viewer_principal: string;
   listening: boolean;
+}
+
+/** PH-03b transport options (tests inject the host and the managed root). */
+export interface PersonalPadsPluginViewOptions {
+  /** Pads plugin host; default: `ensurePadsPluginHost` (null unless the env flag is on). */
+  pluginHost?: () => PluginHost | null;
+  /** Managed-plugins root override for view actions (tests). */
+  managedRoot?: string;
 }
 
 export interface PersonalPadsServerOptions {
@@ -207,8 +225,10 @@ export function createPersonalPadsServer(
   base: LocalPadContext,
   storageRoot: string,
   token: string,
-  surface: PersonalPadsSurface = PERSONAL_PADS_SURFACE
+  surface: PersonalPadsSurface = PERSONAL_PADS_SURFACE,
+  pluginViewOptions: PersonalPadsPluginViewOptions = {}
 ): http.Server {
+  const pluginHost = pluginViewOptions.pluginHost ?? (() => ensurePadsPluginHost(base));
   const activeCaptureCounts = new Map<string, number>();
   const acquireCapture = (padId: string, maxConcurrent: number): (() => void) | undefined => {
     const active = activeCaptureCounts.get(padId) ?? 0;
@@ -289,6 +309,35 @@ export function createPersonalPadsServer(
           content: surface.getSurfaceContract(locale).content,
           scope: context.scope,
         });
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/plugin-views') {
+        const views = (surface.getPluginViews ?? getPadPluginViews)(context, locale);
+        json(res, 200, { ...views, scope: context.scope });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/plugin-views/action') {
+        const body = parseSafeJsonInput(
+          await readLocalPadRequestBody(req, PERSONAL_PADS_MAX_BODY_BYTES),
+          'personal pads plugin view action'
+        ) as Record<string, unknown>;
+        try {
+          const outcome = await runPadPluginViewAction(
+            context,
+            parsePadPluginViewActionInput(body),
+            pluginHost(),
+            { managedRoot: pluginViewOptions.managedRoot }
+          );
+          json(res, 200, { outcome, scope: context.scope });
+        } catch (error) {
+          if (!(error instanceof PluginViewError)) throw error;
+          const messageKey = pluginViewErrorMessageKey(error);
+          json(res, pluginViewErrorStatus(error.code), {
+            error: padsT(locale)(messageKey as VocabularyKey),
+            code: error.code,
+            message_key: messageKey,
+          });
+        }
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/action-readiness') {
@@ -535,6 +584,8 @@ export async function runPersonalPadsServer(
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => resolve());
   });
+  // PH-03b: no-op unless KYBERION_PERSONAL_PADS_PLUGIN_HOST is set.
+  ensurePadsPluginHost(context);
   print({ ...preview, listening: true, token });
   return { ...preview, listening: true };
 }

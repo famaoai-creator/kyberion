@@ -302,7 +302,9 @@ export function DeliverablesWorkspace({
               alt={selected.kind}
               className="max-h-[28rem] w-full object-contain"
             />
-          ) : isPdfAsset(selected) && selectedUrl ? (
+          ) : isPdfAsset(selected) && selectedUrl?.startsWith('/api/') ? (
+            // Inline preview for same-origin documents only: the page CSP is
+            // `frame-src 'self'`; an external reference keeps the open link below.
             <iframe
               title={uxMessage(
                 'chronos_ws_preview_frame_title',

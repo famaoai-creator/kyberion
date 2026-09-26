@@ -24,7 +24,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -266,7 +270,11 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
       prompt,
     ];
 
-    const stdout = await this.spawnCli(args, options?.signal);
+    const stdout = await this.spawnCli(
+      args,
+      options?.signal,
+      resolveEffectiveProviderPermissionProfile('devin', options?.profile)
+    );
     const result = stdout.trim();
     if (!result) {
       throw new Error('[devin-cli] CLI returned no text');
@@ -274,11 +282,22 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
     return result;
   }
 
-  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'devin' }), ...childDelegationEnv() },
+  private spawnCli(
+    args: string[],
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'devin',
+      sessionId: newDelegationSessionId('devin'),
+      ...(profile ? { profile } : {}),
     });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {
@@ -311,6 +330,7 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[devin-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;

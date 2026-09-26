@@ -13643,6 +13643,21 @@
         "en": "Cancel",
         "ja": "キャンセル",
         "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "plugin_views_title": {
+        "en": "Plugin views",
+        "ja": "プラグインビュー",
+        "qps-ploc": "⟦Ṗŀůɠïñ ṽïėẇş ŀőř⟧"
+      },
+      "plugin_views_empty": {
+        "en": "No plugin views",
+        "ja": "プラグインビューはありません",
+        "qps-ploc": "⟦Ñő ṗŀůɠïñ ṽïėẇş ŀőřė⟧"
+      },
+      "plugin_view_action_in_chronos": {
+        "en": "Approve this action in Chronos",
+        "ja": "このアクションは Chronos で承認してください",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŧħïş ȧƈŧïőñ ïñ Ƈħřőñőş ŀőřėɱ ïṗşů⟧"
       }
     },
     "report_review": {
@@ -21126,6 +21141,91 @@
         "en": "Permissions fixture status",
         "ja": "権限フィクスチャの状態",
         "qps-ploc": "⟦Ṗėřɱïşşïőñş ƒïẋŧůřė şŧȧŧůş ŀőřėɱ ïṗ⟧"
+      },
+      "host_disabled": {
+        "en": "Plugin host disabled",
+        "ja": "プラグインホスト無効",
+        "qps-ploc": "⟦Ṗŀůɠïñ ħőşŧ ḓïşȧƀŀėḓ ŀőřėɱ ⟧"
+      },
+      "host_enabled": {
+        "en": "Plugin host enabled",
+        "ja": "プラグインホスト有効",
+        "qps-ploc": "⟦Ṗŀůɠïñ ħőşŧ ėñȧƀŀėḓ ŀőřėɱ ⟧"
+      },
+      "host_active": {
+        "en": "{n} plugins active",
+        "ja": "有効なプラグイン {n} 件",
+        "qps-ploc": "⟦{n} ṗŀůɠïñş ȧƈŧïṽė ŀőřėɱ⟧"
+      },
+      "host_refused": {
+        "en": "{n} plugins refused",
+        "ja": "拒否されたプラグイン {n} 件",
+        "qps-ploc": "⟦{n} ṗŀůɠïñş řėƒůşėḓ ŀőřėɱ ⟧"
+      },
+      "view_action_host_disabled": {
+        "en": "Cannot run here: the plugin host is disabled",
+        "ja": "プラグインホストが無効のため実行できません",
+        "qps-ploc": "⟦Ƈȧññőŧ řůñ ħėřė: ŧħė ṗŀůɠïñ ħőşŧ ïş ḓïşȧƀŀėḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "view_action_reload_pending": {
+        "en": "Approved, but the approved plugin copy is not running here yet (reload pending). Try again after the plugin host syncs.",
+        "ja": "承認済みですが、承認されたプラグインはまだここで動いていません(再読み込み待ち)。プラグインホストの同期後にもう一度実行してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ, ƀůŧ ŧħė ȧṗṗřőṽėḓ ṗŀůɠïñ ƈőṗẏ ïş ñőŧ řůññïñɠ ħėřė ẏėŧ (řėŀőȧḓ ṗėñḓïñɠ). Ŧřẏ ȧɠȧïñ ȧƒŧėř ŧħė ṗŀůɠïñ ħőşŧ şẏñƈş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "view_action_plugin_refused": {
+        "en": "Cannot run here: the plugin host refused this plugin or needs a restart to load it.",
+        "ja": "プラグインホストがこのプラグインを拒否したか、読み込みに再起動が必要なため実行できません。",
+        "qps-ploc": "⟦Ƈȧññőŧ řůñ ħėřė: ŧħė ṗŀůɠïñ ħőşŧ řėƒůşėḓ ŧħïş ṗŀůɠïñ őř ñėėḓş ȧ řėşŧȧřŧ ŧő ŀőȧḓ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "view_frame_label": {
+        "en": "Plugin content",
+        "ja": "プラグインコンテンツ",
+        "qps-ploc": "⟦Ṗŀůɠïñ ƈőñŧėñŧ ŀőřė⟧"
+      },
+      "view_frame_confirm_action": {
+        "en": "Allow this plugin to request this action?",
+        "ja": "このプラグインのアクション要求を許可しますか？",
+        "qps-ploc": "⟦Ȧŀŀőẇ ŧħïş ṗŀůɠïñ ŧő řėɋůėşŧ ŧħïş ȧƈŧïőñ? ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "view_frame_confirm_plugin": {
+        "en": "Plugin",
+        "ja": "プラグイン",
+        "qps-ploc": "⟦Ṗŀůɠïñ ŀőř⟧"
+      },
+      "view_frame_confirm_action_id": {
+        "en": "Action",
+        "ja": "アクション",
+        "qps-ploc": "⟦Ȧƈŧïőñ ŀőř⟧"
+      },
+      "view_frame_confirm_params": {
+        "en": "Parameters",
+        "ja": "パラメータ",
+        "qps-ploc": "⟦Ṗȧřȧɱėŧėřş ŀőř⟧"
+      },
+      "view_frame_confirm_human_note": {
+        "en": "This action needs a person's approval. Allowing it only creates an approval request; it runs after approval, from the Execute button.",
+        "ja": "この操作には人の承認が必要です。許可しても承認依頼が作成されるだけで、実行は承認後に「実行」ボタンから行います。",
+        "qps-ploc": "⟦Ŧħïş ȧƈŧïőñ ñėėḓş ȧ ṗėřşőñ'ş ȧṗṗřőṽȧŀ. Ȧŀŀőẇïñɠ ïŧ őñŀẏ ƈřėȧŧėş ȧñ ȧṗṗřőṽȧŀ řėɋůėşŧ; ïŧ řůñş ȧƒŧėř ȧṗṗřőṽȧŀ, ƒřőɱ ŧħė Ėẋėƈůŧė ƀůŧŧőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "view_frame_confirm_allow": {
+        "en": "Allow",
+        "ja": "許可する",
+        "qps-ploc": "⟦Ȧŀŀőẇ ŀőř⟧"
+      },
+      "view_frame_confirm_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "view_frame_navigated": {
+        "en": "This view tried to load different content and was stopped. Reopen it to load the approved content again.",
+        "ja": "このビューは別のコンテンツを読み込もうとしたため停止しました。承認済みのコンテンツを再度読み込むには開き直してください。",
+        "qps-ploc": "⟦Ŧħïş ṽïėẇ ŧřïėḓ ŧő ŀőȧḓ ḓïƒƒėřėñŧ ƈőñŧėñŧ ȧñḓ ẇȧş şŧőṗṗėḓ. Řėőṗėñ ïŧ ŧő ŀőȧḓ ŧħė ȧṗṗřőṽėḓ ƈőñŧėñŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "view_frame_reopen": {
+        "en": "Reopen view",
+        "ja": "ビューを開き直す",
+        "qps-ploc": "⟦Řėőṗėñ ṽïėẇ ŀőř⟧"
       }
     }
   }

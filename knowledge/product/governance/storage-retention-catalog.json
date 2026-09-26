@@ -351,6 +351,18 @@
       "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion."
     },
     {
+      "path": "active/shared/runtime/workspaces",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "WS-05 per-session workspaces and their ledger (workspace-ledger.ts). The generic TTL janitor never deletes here; the janitor workspace sweep (sweepWorkspaces) removes only ledger-registered orphans past the workspace-budget-policy.json orphan TTL, and unregistered directories are reported, never deleted."
+    },
+    {
+      "path": "active/shared/runtime/git-indexes",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "WS-01 private per-session git index files registered in the workspace ledger (kind git-index). Same contract as active/shared/runtime/workspaces: deleted only through the ledger sweep, never by TTL."
+    },
+    {
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",

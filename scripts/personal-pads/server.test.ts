@@ -186,6 +186,32 @@ describe('unified personal pads server', () => {
     }
   });
 
+  it('guards the plugin view routes with the desk token (PH-03)', async () => {
+    const context = createLocalPadContext({
+      serviceId: 'personal-pads',
+      sessionPrefix: 'plugin-views-token-test',
+      artifact_ref: 'local-pads',
+      viewer_principal: 'human:alice',
+      tier: 'public',
+    });
+    const server = createPersonalPadsServer(context, 'active/shared/tmp/personal-pads-test', 'tok');
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const listing = await fetch(`http://127.0.0.1:${port}/api/plugin-views`);
+      expect(listing.status).toBe(403);
+      const action = await fetch(`http://127.0.0.1:${port}/api/plugin-views/action`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-pads-token': 'wrong' },
+        body: JSON.stringify({ plugin_id: 'p', view_id: 'v', action_id: 'a' }),
+      });
+      expect(action.status).toBe(403);
+      expect(await action.json()).toEqual({ error: 'invalid local pads token' });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it('passes an injected surface contract through the shell seam', () => {
     const context = createLocalPadContext({
       serviceId: 'personal-pads',

@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
   safeRmSync: vi.fn(),
   spawnMock: vi.fn(),
   withWallClockBudgetMock: vi.fn((_opts: unknown, fn: () => Promise<unknown>) => fn()),
+  prepareSessionGitIndex: vi.fn(),
+  sessionIndexDispose: vi.fn(),
+}));
+
+// WS-02: the private git index is stubbed so no real index is ever copied.
+vi.mock('./session-git-index.js', () => ({
+  prepareSessionGitIndex: mocks.prepareSessionGitIndex,
 }));
 
 vi.mock('./secure-io.js', async () => {
@@ -251,6 +258,94 @@ describe('codex-cli-query', () => {
       const [, argv] = mocks.spawnMock.mock.calls[0];
       expect(argv).toEqual(expect.arrayContaining(['--model', 'gpt-5.6-luna']));
       expect(argv).toEqual(expect.arrayContaining(['-c', 'model_reasoning_effort=low']));
+    });
+  });
+
+  describe('private session git index (WS-02)', () => {
+    beforeEach(() => {
+      vi.stubEnv('KYBERION_SESSION_GIT_INDEX', '1');
+      mocks.safeReadFile.mockReset().mockReturnValue(JSON.stringify({ ok: true }));
+      mocks.safeLstat.mockReset().mockReturnValue({ isFile: () => true });
+      mocks.spawnMock.mockReset();
+      mocks.sessionIndexDispose.mockReset();
+      mocks.prepareSessionGitIndex.mockReset().mockImplementation(({ sessionId }) => ({
+        sessionId,
+        env: { GIT_INDEX_FILE: `/private/${sessionId}/index` },
+        dispose: mocks.sessionIndexDispose,
+      }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('workspace-write runs get a private GIT_INDEX_FILE in the query cwd, disposed on close', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        mode: 'workspace-write',
+        options: { bin: 'codex', cwd: 'fake/workspace' },
+      });
+
+      const [{ sessionId, cwd }] = mocks.prepareSessionGitIndex.mock.calls[0];
+      expect(sessionId).toMatch(/^codex-/);
+      expect(cwd).toBe('fake/workspace');
+      const [, , spawnOptions] = mocks.spawnMock.mock.calls[0];
+      expect(spawnOptions.env.GIT_INDEX_FILE).toBe(`/private/${sessionId}/index`);
+      expect(mocks.sessionIndexDispose).toHaveBeenCalled();
+    });
+
+    it('disposes the private index when spawn throws synchronously', async () => {
+      mocks.spawnMock.mockImplementationOnce(() => {
+        throw new Error('spawn EACCES');
+      });
+
+      await expect(
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          mode: 'workspace-write',
+          options: { bin: 'codex', cwd: 'fake/workspace' },
+        })
+      ).rejects.toThrow('spawn EACCES');
+      expect(mocks.prepareSessionGitIndex).toHaveBeenCalledTimes(1);
+      expect(mocks.sessionIndexDispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('read-only runs get no private index', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex' },
+      });
+
+      const [, , spawnOptions] = mocks.spawnMock.mock.calls[0];
+      expect(spawnOptions.env.GIT_INDEX_FILE).toBeUndefined();
+      expect(mocks.prepareSessionGitIndex).not.toHaveBeenCalled();
+    });
+
+    it('KYBERION_SESSION_GIT_INDEX=0 keeps implementer runs on the shared index', async () => {
+      vi.stubEnv('KYBERION_SESSION_GIT_INDEX', '0');
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        profile: 'implementer',
+        options: { bin: 'codex' },
+      });
+
+      const [, , spawnOptions] = mocks.spawnMock.mock.calls[0];
+      expect(spawnOptions.env.GIT_INDEX_FILE).toBeUndefined();
+      expect(mocks.prepareSessionGitIndex).not.toHaveBeenCalled();
     });
   });
 

@@ -26,6 +26,7 @@ import {
   assertSafeRepositoryPath,
   safeReadFile,
   safeReadFileTail,
+  safeStatfs,
   safeWriteFile,
   sanitizePath,
   validateUrl,
@@ -428,6 +429,19 @@ describe('secure-io core', () => {
 
       expect(env.CUSTOM_SECRET).toBe('explicit-only');
       expect(env.MISSION_ID).toBe('MSN-1');
+    });
+  });
+
+  describe('safeStatfs', () => {
+    it('reports free and total bytes for the volume holding a path', () => {
+      const result = safeStatfs(tmpDir);
+      expect(result.totalBytes).toBeGreaterThan(0);
+      expect(result.freeBytes).toBeGreaterThanOrEqual(0);
+      expect(result.freeBytes).toBeLessThanOrEqual(result.totalBytes);
+    });
+
+    it('throws for a missing path', () => {
+      expect(() => safeStatfs(path.join(tmpDir, 'missing', 'dir'))).toThrow();
     });
   });
 });

@@ -14,7 +14,11 @@ import { z } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -326,10 +330,13 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       ...this.extraArgs,
       prompt,
     ];
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'cursor' }), ...childDelegationEnv() },
-    });
+    const spawnEnv = this.buildSpawnEnv(options?.advisory ? 'planner' : undefined);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -405,6 +412,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     } finally {
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      spawnEnv.dispose();
     }
   }
 
@@ -556,7 +564,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     ];
 
     try {
-      return await this.spawnAndParse(args, options?.signal);
+      return await this.spawnAndParse(args, options?.signal, options?.profile);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (model !== 'auto' && isNamedModelUnavailableError(message)) {
@@ -566,14 +574,18 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         const fallbackArgs = args.map((arg, index) =>
           index > 0 && args[index - 1] === '--model' ? 'auto' : arg
         );
-        return this.spawnAndParse(fallbackArgs, options?.signal);
+        return this.spawnAndParse(fallbackArgs, options?.signal, options?.profile);
       }
       throw err;
     }
   }
 
-  private async spawnAndParse(args: string[], signal?: AbortSignal): Promise<string> {
-    const stdout = await this.spawnCli(args, signal);
+  private async spawnAndParse(
+    args: string[],
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    const stdout = await this.spawnCli(args, signal, profile);
     return this.parseEnvelope(stdout);
   }
 
@@ -615,11 +627,29 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     );
   }
 
-  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'cursor' }), ...childDelegationEnv() },
+  /** WS-02: the requested profile maps to the same effective one the argv uses. */
+  private buildSpawnEnv(profile?: ProviderPermissionProfileName) {
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('cursor', profile);
+    return buildDelegationSpawnEnv({
+      provider: 'cursor',
+      cwd: this.workspaceDir,
+      sessionId: newDelegationSessionId('cursor'),
+      ...(effectiveProfile ? { profile: effectiveProfile } : {}),
     });
+  }
+
+  private spawnCli(
+    args: string[],
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    const spawnEnv = this.buildSpawnEnv(profile);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {
@@ -652,6 +682,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[cursor-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;
