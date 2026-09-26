@@ -60,6 +60,7 @@ function createFakeDrawDeps(
     bytes?: Buffer;
     /** Write next to the target with this extension instead of at the target. */
     siblingExt?: string;
+    generateError?: string;
   } = {}
 ): FakeDrawDeps {
   const available = options.available ?? ['apple_playground', 'gemini_fast', 'codex_host_bridge'];
@@ -102,7 +103,12 @@ function createFakeDrawDeps(
     },
     async generate(request) {
       requests.push(request);
+      if (options.generateError) throw new Error(options.generateError);
       const info = pick(request)!;
+      // Like the real host bridges: an existing target is the host's output.
+      if (info.interactiveHandoff && safeExistsSync(request.targetPath!)) {
+        return { status: 'succeeded', provider: info.id, path: request.targetPath!, elapsedMs: 1 };
+      }
       if (info.interactiveHandoff) {
         throw new Error(
           `HOST_BRIDGE_IMAGE_GENERATION_REQUIRED: Codex host bridge is required. Please use your 'generate_image' tool.`
@@ -242,6 +248,43 @@ describe('pnpm kyberion draw', () => {
     });
   });
 
+  it('collects a hand-off only for an image saved after the request, with the same prompt', async () => {
+    const out = rel('fox.png');
+    const target = path.join(workDir, 'fox.png');
+    const argv = ['a', 'fox', '--out', out, '--allow-handoff'];
+    const deps = createFakeDrawDeps({ available: ['codex_host_bridge'] });
+    await expect(runDrawCommand(argv, () => {}, deps)).rejects.toMatchObject({
+      code: DRAW_HANDOFF_EXIT_CODE,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    safeWriteFile(target, pngBytes(64, 64));
+    await expect(
+      runDrawCommand(['a', 'wolf', '--out', out, '--allow-handoff'], () => {}, deps)
+    ).rejects.toThrow(/no hand-off was requested for it with this prompt/);
+    const collected = await runDrawCommand(argv, () => {}, deps);
+    expect(collected).toMatchObject({ status: 'succeeded', provider: 'codex_host_bridge' });
+    // The marker is consumed: the same file is not collected twice.
+    await expect(runDrawCommand(argv, () => {}, deps)).rejects.toThrow(/already exists/);
+  });
+
+  it('never collects a pre-existing --out as host output', async () => {
+    safeWriteFile(path.join(workDir, 'old.png'), pngBytes(8, 8));
+    const deps = createFakeDrawDeps({ available: ['codex_host_bridge'] });
+    await expect(
+      runDrawCommand(['x', '--out', rel('old.png'), '--allow-handoff'], () => {}, deps)
+    ).rejects.toThrow(/already exists and no hand-off was requested/);
+    expect(deps.requests).toHaveLength(0);
+  });
+
+  it('turns a dispatch-time consent denial into the consent hint', async () => {
+    const deps = createFakeDrawDeps({
+      generateError: '[IMAGE_REFERENCE_EGRESS_DENIED] gemini_image: consent names gemini_fast',
+    });
+    await expect(runDrawCommand(['x', '--out', rel('d.png')], () => {}, deps)).rejects.toThrow(
+      /--consent-provider gemini_image --consent-granted-by <who>/
+    );
+  });
+
   it('prints the plan under --dry-run without generating (no --out needed)', async () => {
     const deps = createFakeDrawDeps({ available: ['gemini_fast'] });
     const output: string[] = [];
@@ -369,9 +412,16 @@ describe('pnpm kyberion draw', () => {
     await expect(runDrawCommand(['x', '--out', '/tmp/a.png'], () => {}, deps)).rejects.toThrow(
       /must be inside the repository/
     );
+    for (const aspect of ['wide', '0:0', '16:0']) {
+      await expect(
+        runDrawCommand(['x', '--out', rel('a.png'), '--aspect', aspect], () => {}, deps)
+      ).rejects.toThrow(/--aspect must look like 16:9/);
+    }
+    const mislabeled = path.join(workDir, 'fake.jpg');
+    safeWriteFile(mislabeled, pngBytes(4, 4));
     await expect(
-      runDrawCommand(['x', '--out', rel('a.png'), '--aspect', 'wide'], () => {}, deps)
-    ).rejects.toThrow(/--aspect must look like 16:9/);
+      runDrawCommand(['x', '--out', rel('a.png'), '--ref', rel('fake.jpg')], () => {}, deps)
+    ).rejects.toThrow(/contains png data but its extension says image\/jpeg/);
     await expect(
       runDrawCommand(['x', '--out', rel('a.png'), '--provider', 'dalle'], () => {}, deps)
     ).rejects.toThrow(/unknown provider "dalle"/);

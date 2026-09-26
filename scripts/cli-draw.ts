@@ -17,14 +17,17 @@
  * provider needs a per-run consent naming it (see `--dry-run`).
  */
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeStat,
   safeUnlinkSync,
 } from '@agent/core/secure-io';
+import { readJsonIfPresent, writeJson } from '@agent/core/foundation';
 import type { ImageGenerationPlan } from '@agent/core/image-generation-bridge';
 import type {
   ImageEgressConsent,
@@ -64,7 +67,7 @@ export const DRAW_USAGE = `Usage: pnpm kyberion draw <prompt | --file <txt>> --o
 
 Generates an image from a prompt through the governed image-generation bridge.
 By default only providers that keep the data on this machine and finish unattended are used.
-  --out <file>              Image to write inside the repository (${DRAW_OUT_EXTENSIONS.join(' / ')})
+  --out <file>              Image to write inside the repository (${DRAW_OUT_EXTENSIONS.join(' / ')}); required unless --dry-run
   --file <txt>              Read the prompt from a file inside the repository
   --aspect <w:h>            Aspect ratio, e.g. 1:1, 16:9 (default 1:1)
   --style <id>              Native provider style (e.g. an Image Playground style)
@@ -248,11 +251,15 @@ function resolveReferences(refs: string[]): ImageReference[] {
     const absolute = resolveRepositoryInput('draw', file);
     assertExtension('draw', absolute, Object.keys(REFERENCE_MIME), '(--ref)');
     if (!safeExistsSync(absolute)) throw new ScriptExitError(1, `[draw] --ref ${file} not found`);
-    return {
-      path: path.relative(pathResolver.rootDir(), absolute),
-      mimeType: REFERENCE_MIME[path.extname(absolute).toLowerCase()]!,
-      role,
-    };
+    const mimeType = REFERENCE_MIME[path.extname(absolute).toLowerCase()]!;
+    const sniffed = sniffImageFormat(safeReadFile(absolute, { encoding: null }) as Buffer);
+    if (sniffed && `image/${sniffed}` !== mimeType) {
+      throw new ScriptExitError(
+        1,
+        `[draw] --ref ${file} contains ${sniffed} data but its extension says ${mimeType}; rename it`
+      );
+    }
+    return { path: path.relative(pathResolver.rootDir(), absolute), mimeType, role };
   });
 }
 
@@ -294,6 +301,40 @@ export function summarizeProviderError(message: string, maxLines = 3): string {
   return lines.length > maxLines ? `… ${tail}` : tail;
 }
 
+/**
+ * Host bridges treat an existing target as the host's output. Only collect
+ * one that was written after this command asked the host for it, with the
+ * same prompt — never a file that was already there.
+ */
+interface HandoffMarker {
+  target: string;
+  prompt: string;
+  provider: string;
+  requested_at_ms: number;
+}
+
+function handoffMarkerPath(target: string): string {
+  const key = createHash('sha256').update(path.resolve(target)).digest('hex').slice(0, 16);
+  return pathResolver.sharedTmp(`draw-handoff/${key}.json`);
+}
+
+function assertHandoffOutputFresh(target: string, out: string, prompt: string): void {
+  const markerPath = handoffMarkerPath(target);
+  const marker = readJsonIfPresent<HandoffMarker>(markerPath);
+  if (!marker || marker.target !== path.resolve(target) || marker.prompt !== prompt) {
+    throw new ScriptExitError(
+      1,
+      `[draw] ${out} already exists and no hand-off was requested for it with this prompt; remove it or choose another --out`
+    );
+  }
+  if (safeStat(target).mtimeMs <= marker.requested_at_ms) {
+    throw new ScriptExitError(
+      1,
+      `[draw] ${out} predates the hand-off request; the host agent has not saved a new image yet`
+    );
+  }
+}
+
 function isHostHandoff(message: string): boolean {
   return /HOST_(AGENT|BRIDGE)_IMAGE_GENERATION_REQUIRED/.test(message);
 }
@@ -317,6 +358,18 @@ function formatForExtension(ext: string): ImageFormat {
   return ext === '.png' ? 'png' : ext === '.webp' ? 'webp' : 'jpeg';
 }
 
+/** Remove a provider's intermediate only where draw put it: next to --out or in shared tmp. */
+function removeByproduct(produced: string, target: string): void {
+  const dir = path.dirname(path.resolve(produced));
+  const tmpRoot = pathResolver.sharedTmp();
+  if (
+    path.resolve(produced) !== path.resolve(target) &&
+    (dir === path.dirname(path.resolve(target)) || dir.startsWith(`${tmpRoot}${path.sep}`))
+  ) {
+    safeUnlinkSync(produced);
+  }
+}
+
 /**
  * Providers may write next to the target with their own extension (Image
  * Playground always writes PNG) or bytes that do not match it. Land the
@@ -334,14 +387,14 @@ async function landOutput(
     if (!got) warnings.push('could not recognise the generated image format; kept as written');
     if (path.resolve(produced) !== path.resolve(target)) {
       safeCopyFileSync(produced, target);
-      safeUnlinkSync(produced);
+      removeByproduct(produced, target);
     }
   } else {
     const workDir = createPerceptionWorkDir('draw');
     try {
       const source = path.join(workDir, `generated.${got === 'jpeg' ? 'jpg' : got}`);
       safeCopyFileSync(produced, source);
-      safeUnlinkSync(produced);
+      removeByproduct(produced, target);
       const quality = want === 'jpeg' ? ['-q:v', '2'] : [];
       try {
         await deps.runMedia('ffmpeg', [
@@ -404,7 +457,7 @@ export async function runDrawCommand(
   if (!args.file && args.words.length === 0) throw new ScriptExitError(1, DRAW_USAGE);
   const prompt = resolvePrompt(args);
   const target = args.dryRun && !args.out ? undefined : resolveOut(args.out);
-  if (args.aspect && !/^\d{1,2}:\d{1,2}$/.test(args.aspect)) {
+  if (args.aspect && !/^[1-9]\d?:[1-9]\d?$/.test(args.aspect)) {
     throw new ScriptExitError(1, `[draw] --aspect must look like 16:9, got "${args.aspect}"`);
   }
   if (Boolean(args.consentProvider) !== Boolean(args.consentGrantedBy)) {
@@ -502,13 +555,32 @@ export async function runDrawCommand(
 
   const out = path.relative(pathResolver.rootDir(), target!);
   safeMkdir(path.dirname(target!), { recursive: true });
+  if (request.allowHostHandoff && safeExistsSync(target!)) {
+    assertHandoffOutputFresh(target!, out, prompt);
+  }
   let generated: ImageGenerationResult;
   try {
     generated = await deps.generate(request);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const denied = /IMAGE_REFERENCE_EGRESS_DENIED\]\s*([\w-]+)/.exec(message);
+    if (denied) {
+      throw new ScriptExitError(
+        1,
+        `[draw] ${denied[1]} would receive the reference image(s) off this machine. ` +
+          `To consent for this run, add --consent-provider ${denied[1]} --consent-granted-by <who>.`
+      );
+    }
     if (!isHostHandoff(message))
       throw new ScriptExitError(1, `[draw] generation failed: ${summarizeProviderError(message)}`);
+    const marker: HandoffMarker = {
+      target: path.resolve(target!),
+      prompt,
+      provider: plan.provider_id,
+      requested_at_ms: Date.now(),
+    };
+    safeMkdir(path.dirname(handoffMarkerPath(target!)), { recursive: true });
+    writeJson(handoffMarkerPath(target!), marker);
     const result: DrawResult = {
       status: 'handoff',
       out,
@@ -534,6 +606,9 @@ export async function runDrawCommand(
     warnings.push(
       `generated by ${info?.displayName ?? generated.provider}: the prompt left this machine`
     );
+  }
+  if (info?.interactiveHandoff && safeExistsSync(handoffMarkerPath(target!))) {
+    safeUnlinkSync(handoffMarkerPath(target!));
   }
   const buffer = await landOutput(deps, generated.path, target!, warnings);
   const result: DrawResult = {

@@ -331,7 +331,7 @@ const IMAGE_REFERENCE_ROLES = new Set(['subject', 'style', 'consistency']);
  * user consent, which an ADF step cannot grant — so cloud reference runs fail
  * closed instead of silently generating without the references.
  */
-function resolveImageReferences(params: any): {
+function resolveImageReferences(params: Record<string, unknown> | undefined): {
   referenceImages?: Array<{
     path: string;
     mimeType: string;
@@ -349,7 +349,9 @@ function resolveImageReferences(params: any): {
       (typeof record.mime_type === 'string' && record.mime_type) ||
       (typeof record.mimeType === 'string' && record.mimeType) ||
       IMAGE_REFERENCE_MIME_BY_EXTENSION[path.extname(refPath).toLowerCase()];
-    if (!mimeType) throw new Error(`reference image type not supported: ${refPath}`);
+    if (!mimeType || !Object.values(IMAGE_REFERENCE_MIME_BY_EXTENSION).includes(mimeType)) {
+      throw new Error(`reference image type not supported (png / jpeg / webp): ${refPath}`);
+    }
     const role =
       typeof record.role === 'string' && IMAGE_REFERENCE_ROLES.has(record.role)
         ? (record.role as 'subject' | 'style' | 'consistency')
