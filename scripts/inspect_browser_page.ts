@@ -159,10 +159,11 @@ export async function inspectWithFetch(
   const buttonMatches = html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gi);
   const buttons: PageInspectionResult['buttons'] = [];
   for (const match of buttonMatches) {
-    const text = match[1]
-      .replace(/<[^>]+>/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    let text = match[1];
+    while (/<[^>]*>/g.test(text)) {
+      text = text.replace(/<[^>]*>/g, '');
+    }
+    text = text.replace(/\s+/g, ' ').trim();
     if (text) buttons.push({ text: text.slice(0, 50) });
   }
 
@@ -171,10 +172,11 @@ export async function inspectWithFetch(
   const headings: PageInspectionResult['headings'] = [];
   for (const match of headingMatches) {
     const level = match[1].toLowerCase();
-    const text = match[2]
-      .replace(/<[^>]+>/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    let text = match[2];
+    while (/<[^>]*>/g.test(text)) {
+      text = text.replace(/<[^>]*>/g, '');
+    }
+    text = text.replace(/\s+/g, ' ').trim();
     if (text) headings.push({ level, text: text.slice(0, 80) });
   }
 
@@ -182,22 +184,33 @@ export async function inspectWithFetch(
   const linkMatches = html.matchAll(/<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi);
   const links: PageInspectionResult['links'] = [];
   for (const match of linkMatches) {
-    const href = match[1];
-    const text = match[2]
-      .replace(/<[^>]+>/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (text && !href.startsWith('#') && !href.startsWith('javascript:')) {
+    const href = match[1].trim();
+    let text = match[2];
+    while (/<[^>]*>/g.test(text)) {
+      text = text.replace(/<[^>]*>/g, '');
+    }
+    text = text.replace(/\s+/g, ' ').trim();
+    const isSafeScheme =
+      href.startsWith('/') ||
+      href.startsWith('./') ||
+      href.startsWith('../') ||
+      /^https?:\/\//i.test(href);
+    if (text && isSafeScheme) {
       links.push({ text: text.slice(0, 50), href });
     }
   }
 
-  const plainText = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let plainText = html;
+  while (/<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)\s*>/gi.test(plainText)) {
+    plainText = plainText.replace(
+      /<(?:script|style)\b[^>]*>[\s\S]*?<\/(?:script|style)\s*>/gi,
+      ' '
+    );
+  }
+  while (/<[^>]*>/g.test(plainText)) {
+    plainText = plainText.replace(/<[^>]*>/g, ' ');
+  }
+  plainText = plainText.replace(/\s+/g, ' ').trim();
 
   return {
     mode: 'fetch',
@@ -280,7 +293,11 @@ export async function inspectWithBrowser(
             const links = Array.from(document.querySelectorAll('a[href]')).map(el => ({
               text: (el.innerText || '').replace(/\\s+/g, ' ').trim(),
               href: el.href
-            })).filter(x => x.text && x.text.length < 50 && !x.href.startsWith('javascript:')).slice(0, 20);
+            })).filter(x => {
+              if (!x.text || x.text.length >= 50) return false;
+              const h = String(x.href || '').trim();
+              return h.startsWith('/') || h.startsWith('./') || h.startsWith('../') || /^https?:\\/\\//i.test(h);
+            }).slice(0, 20);
             
             const textExcerpt = (document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400);
             
@@ -386,7 +403,11 @@ export async function inspectWithCdp(
             const links = Array.from(document.querySelectorAll('a[href]')).map(el => ({
               text: (el.innerText || '').replace(/\\s+/g, ' ').trim(),
               href: el.href
-            })).filter(x => x.text && x.text.length < 50 && !x.href.startsWith('javascript:')).slice(0, 25);
+            })).filter(x => {
+              if (!x.text || x.text.length >= 50) return false;
+              const h = String(x.href || '').trim();
+              return h.startsWith('/') || h.startsWith('./') || h.startsWith('../') || /^https?:\\/\\//i.test(h);
+            }).slice(0, 25);
             
             const textExcerpt = (document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 500);
             
