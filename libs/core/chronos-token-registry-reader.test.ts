@@ -109,22 +109,22 @@ describe('TR-01 chronos_token_registry_reader', () => {
     });
   });
 
-  it('may be assumed from Concierge and the surfaces that reach authn-providers', async () => {
+  it('may be assumed only by the surfaces that read the registry', async () => {
     const { authority, registry } = await loadModules();
-    for (const systemRole of [
-      'chronos_mirror_v2',
-      'concierge',
-      'computer_surface',
-      'presence_studio',
-    ]) {
+    for (const systemRole of ['chronos_mirror_v2', 'concierge']) {
       expect(
         authority.isRoleAssumptionAllowed(systemRole, registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE),
         systemRole
       ).toBe(true);
     }
-    expect(
-      authority.isRoleAssumptionAllowed('slack_bridge', registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE)
-    ).toBe(false);
+    // computer_surface / presence_studio pass `registrations: null` to the
+    // authn seam and never read the registry.
+    for (const systemRole of ['computer_surface', 'presence_studio', 'slack_bridge']) {
+      expect(
+        authority.isRoleAssumptionAllowed(systemRole, registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE),
+        systemRole
+      ).toBe(false);
+    }
   });
 
   it('grants nothing beyond reading that single file', async () => {
