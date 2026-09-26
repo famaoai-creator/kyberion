@@ -60,11 +60,13 @@ const registry: ScopeRegistry =
 const warnedRejectedRoles = new Set<string>();
 
 /**
- * Install the RA-02 validator (authority.ts). The first registration wins so a
- * later module instance cannot replace it.
+ * Install the RA-02 validator (authority.ts). Every authority instance
+ * registers the same policy check, so the latest registration wins; that keeps
+ * a re-evaluated module (tests resetting modules, dev reloads) from being
+ * judged by a stale instance's cache.
  */
 export function registerAssumedRoleValidator(validator: AssumedRoleValidator): void {
-  if (!registry.validator) registry.validator = validator;
+  registry.validator = validator;
 }
 
 /** Run `fn` inside a frozen copy of `scope`. Only authority.ts should call this. */
