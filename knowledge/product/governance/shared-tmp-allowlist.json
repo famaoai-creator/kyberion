@@ -408,6 +408,12 @@
       "note": "actuator input handoff file"
     },
     {
+      "file": "scripts/check_plugin_views_e2e.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "PE-02 hermetic Kyberion root of one E2E run; removed when the run ends"
+    },
+    {
       "file": "scripts/clipboard-inbox/server.ts",
       "count": 1,
       "classification": "legit-tmp",
