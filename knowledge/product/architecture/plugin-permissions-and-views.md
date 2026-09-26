@@ -213,7 +213,14 @@ disappeared, is no longer `activatable` or is out of scope. Eligible =
 other tenants' records are dropped by the listing and never digested or
 imported. Operations are registered process-wide, so the tenant allowlist is
 the isolation boundary (and the tenant is part of every action approval
-hash). Syncs are single-flight (requests during a run coalesce into one
+hash). Activation re-reads the record by id and refuses before import when
+its tenant or digests no longer match the listed record. Because operations
+are process-wide, **allowing more than one tenant in one host merges their
+trust**: an op of tenant A's plugin is callable from tenant B's paths in that
+process. Run one host (process) per tenant when tenants must stay isolated;
+Chronos logs a warning at boot when its allowlist has more than one tenant, and
+its plugin-views action path additionally requires the plugin's tenant to be in
+the viewer's tenant scope. Syncs are single-flight (requests during a run coalesce into one
 follow-up) and a per-record fingerprint gates lifecycle calls, so polling an
 unchanged directory never re-imports a module. Import failures are recorded as
 `refused` and never crash the surface. Every activate / deactivate / refuse is
@@ -290,12 +297,27 @@ action the view declares; one request may be in flight (`PLUGIN_VIEW_FRAME_BUSY`
 and at most 10 per minute are accepted (`PLUGIN_VIEW_FRAME_RATE_LIMITED`). Every
 accepted request opens a host confirm dialog showing the plugin, view, action
 and params (the Allow button arms after a short delay so a dialog that opens
-under the pointer cannot take a stray click); only then does the host send the
+under the pointer cannot take a stray click; focus moves to Cancel, Escape
+cancels and focus returns afterwards); only then does the host send the
 existing plugin-views `POST`. A `human` action therefore only becomes an
 approval request — execution stays on the host's Execute button after a person
 approves it. The frame receives `action.result { requestId, status, errorCode? }`
 with codes only. Replies are posted with target `*` (the only option for an
-opaque origin); they never carry data beyond these codes.
+opaque origin); they never carry data beyond these codes. String and key
+lengths are summed while the message is walked, so an oversize message is
+dropped before it is serialized. A locale change re-sends `init` on the same
+broker (the in-flight / rate-limit state is kept).
+
+Navigation: `event.source` survives a navigation of the frame, and a sandboxed
+frame can still navigate itself. The component reports every iframe `load` to
+the broker; the first is the approved document, any later one is a navigation:
+the broker is invalidated (every later message is dropped, a pending result is
+never posted, an Allow given before the navigation is void), the frame is
+removed and the view shows an error state until the user reopens it (a fresh
+frame element with a fresh broker). The Chronos pages' `frame-src 'self'` keeps
+any such navigation same-origin; a navigation during the approved document's
+parse (before its first `load`) is not detectable by load counting and is
+bounded by that policy.
 
 Personal pads (PH-03) compose only A2UI views, read-only: iframe views are
 reported as unsupported there, action references are stripped, and human
@@ -308,5 +330,7 @@ actions must be approved in Chronos.
 - The Chronos plugin host is opt-in; without it approved human view actions
   are listed with `executable: false` and cannot be executed from Chronos.
 - The iframe document can navigate its own frame (the sandbox has no
-  top-navigation, but self-navigation is not blockable by CSP); it keeps its
-  `contentWindow`, so every request it sends still passes the confirm dialog.
+  top-navigation, but self-navigation is not blockable by CSP). A navigation
+  after the first `load` invalidates the broker (§8); one during the approved
+  document's parse is only bounded by the parent's `frame-src 'self'`, and
+  every request still passes the confirm dialog.

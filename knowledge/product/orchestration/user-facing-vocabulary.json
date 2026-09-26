@@ -21071,6 +21071,16 @@
         "en": "Cancel",
         "ja": "キャンセル",
         "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "view_frame_navigated": {
+        "en": "This view tried to load different content and was stopped. Reopen it to load the approved content again.",
+        "ja": "このビューは別のコンテンツを読み込もうとしたため停止しました。承認済みのコンテンツを再度読み込むには開き直してください。",
+        "qps-ploc": "⟦Ŧħïş ṽïėẇ ŧřïėḓ ŧő ŀőȧḓ ḓïƒƒėřėñŧ ƈőñŧėñŧ ȧñḓ ẇȧş şŧőṗṗėḓ. Řėőṗėñ ïŧ ŧő ŀőȧḓ ŧħė ȧṗṗřőṽėḓ ƈőñŧėñŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "view_frame_reopen": {
+        "en": "Reopen view",
+        "ja": "ビューを開き直す",
+        "qps-ploc": "⟦Řėőṗėñ ṽïėẇ ŀőř⟧"
       }
     }
   }

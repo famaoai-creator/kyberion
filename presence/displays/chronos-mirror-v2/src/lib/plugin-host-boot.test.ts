@@ -72,6 +72,31 @@ describe('Chronos plugin host boot (PH-01)', () => {
     expect(chronosPluginHostStatus().enabled).toBe(true);
   });
 
+  it('warns that several allowed tenants share one trust domain', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { create, created } = fakeFactory();
+    ensureChronosPluginHost({
+      env: { KYBERION_CHRONOS_PLUGIN_HOST: '1', KYBERION_CHRONOS_PLUGIN_HOST_TENANTS: 'acme' },
+      create,
+      isKnownTenant: () => true,
+    });
+    expect(created[0].tenantAllow).toEqual(['acme']);
+    expect(warn).not.toHaveBeenCalled();
+
+    disposePluginHost(CHRONOS_PLUGIN_HOST_SURFACE);
+    ensureChronosPluginHost({
+      env: {
+        KYBERION_CHRONOS_PLUGIN_HOST: '1',
+        KYBERION_CHRONOS_PLUGIN_HOST_TENANTS: 'acme,globex',
+      },
+      create,
+      isKnownTenant: () => true,
+    });
+    expect(created[1].tenantAllow).toEqual(['acme', 'globex']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('trust domain');
+  });
+
   it('never throws when the host cannot boot', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const create = vi.fn(() => {

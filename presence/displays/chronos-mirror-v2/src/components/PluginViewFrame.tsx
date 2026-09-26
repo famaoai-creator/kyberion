@@ -6,11 +6,13 @@ import { uxText } from '../lib/ux-vocabulary';
 import {
   createPluginViewFrameBroker,
   PLUGIN_VIEW_FRAME_MIN_HEIGHT,
+  type PluginViewFrameBroker,
   type PluginViewFrameActionRequest,
   type PluginViewFrameActionResult,
   type PluginViewFrameItem,
 } from '../lib/plugin-view-frame-broker';
 import type { SupportedLocale } from '../lib/ux-vocabulary';
+import { bindConfirmDialogFocus } from '../lib/plugin-view-confirm-focus';
 
 const CONFIRM_ARM_DELAY_MS = 600;
 
@@ -58,6 +60,10 @@ async function submitPluginViewAction(
  * and no referrer; its document is served by the frame route with a sandbox
  * CSP. Messages go through `createPluginViewFrameBroker`; an action request
  * is shown in a host confirm dialog before the plugin-views POST.
+ *
+ * The first iframe `load` is the approved document; a later one means the
+ * frame navigated itself, so the broker is invalidated, the frame is removed
+ * and the user has to reopen the view (a fresh frame and a fresh broker).
  */
 export function PluginViewFrame({
   view,
@@ -72,12 +78,21 @@ export function PluginViewFrame({
   const [height, setHeight] = useState(PLUGIN_VIEW_FRAME_MIN_HEIGHT * 2);
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const [armed, setArmed] = useState(false);
+  const [navigated, setNavigated] = useState(false);
+  // Bumped on reopen: a new frame element and a new broker.
+  const [generation, setGeneration] = useState(0);
+  const brokerRef = useRef<PluginViewFrameBroker | null>(null);
+  const cancelRef = useRef<HTMLSpanElement | null>(null);
   const onSubmittedRef = useRef(onActionSubmitted);
   onSubmittedRef.current = onActionSubmitted;
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   // The broker (and its in-flight / rate-limit state) lives as long as the
-  // declared view does, not per render or per listing reload.
+  // declared view and its frame element do — not per render, listing reload
+  // or locale change.
   const capabilitiesKey = JSON.stringify(view.capabilities);
   const actionsKey = JSON.stringify(view.actions);
+  const frameKey = JSON.stringify([view.pluginId, view.viewId, capabilitiesKey, actionsKey]);
 
   useEffect(() => {
     const actions = JSON.parse(actionsKey) as PluginViewFrameItem['actions'];
@@ -87,7 +102,7 @@ export function PluginViewFrame({
       viewId: view.viewId,
       capabilities: JSON.parse(capabilitiesKey) as string[],
       actions,
-      locale,
+      locale: localeRef.current,
       frameWindow: () => frameRef.current?.contentWindow ?? null,
       // The sandboxed frame has an opaque origin, so '*' is the only target;
       // replies carry codes only.
@@ -103,18 +118,40 @@ export function PluginViewFrame({
       },
       onResize: setHeight,
     });
+    brokerRef.current = broker;
     const listener = (event: MessageEvent) => {
       broker.handleMessage({ source: event.source, data: event.data });
     };
     window.addEventListener('message', listener);
     return () => {
       window.removeEventListener('message', listener);
+      broker.invalidate();
+      if (brokerRef.current === broker) brokerRef.current = null;
       setPending((current) => {
         current?.resolve(false);
         return null;
       });
     };
-  }, [view.pluginId, view.viewId, capabilitiesKey, actionsKey, locale]);
+  }, [view.pluginId, view.viewId, capabilitiesKey, actionsKey, generation]);
+
+  useEffect(() => {
+    brokerRef.current?.setLocale(locale);
+  }, [locale]);
+
+  const onFrameLoad = () => {
+    const broker = brokerRef.current;
+    if (!broker || broker.frameLoaded()) return;
+    setNavigated(true);
+    setPending((current) => {
+      current?.resolve(false);
+      return null;
+    });
+  };
+
+  const reopen = () => {
+    setNavigated(false);
+    setGeneration((value) => value + 1);
+  };
 
   // A dialog that opens under the pointer must not take a click aimed
   // elsewhere: Allow is enabled only after a short delay.
@@ -130,6 +167,21 @@ export function PluginViewFrame({
     setPending(null);
   };
 
+  // Focus Cancel on open, Escape cancels, focus returns on close.
+  const isOpen = pending !== null;
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    return bindConfirmDialogFocus({
+      document,
+      initial: cancelRef.current?.querySelector('button') ?? null,
+      onEscape: () =>
+        setPending((current) => {
+          current?.resolve(false);
+          return null;
+        }),
+    });
+  }, [isOpen]);
+
   return (
     <section className="kb-section" aria-label={view.title}>
       <header className="kb-section__header">
@@ -137,22 +189,35 @@ export function PluginViewFrame({
           <h3 className="kb-section__title">{view.title}</h3>
         </div>
       </header>
-      <iframe
-        ref={frameRef}
-        src={view.frameUrl}
-        title={uxText('view_frame_label', locale)}
-        aria-label={uxText('view_frame_label', locale)}
-        sandbox="allow-scripts"
-        allow=""
-        referrerPolicy="no-referrer"
-        loading="lazy"
-        className="w-full"
-        style={{
-          height,
-          border: '1px solid var(--kb-ui-border)',
-          borderRadius: 'var(--kb-ui-radius-md)',
-        }}
-      />
+      {navigated ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2">
+          <p className="kb-section__description">{uxText('view_frame_navigated', locale)}</p>
+          <Button
+            label={uxText('view_frame_reopen', locale)}
+            variant="secondary"
+            onClick={reopen}
+          />
+        </div>
+      ) : (
+        <iframe
+          key={`${frameKey}#${generation}`}
+          ref={frameRef}
+          onLoad={onFrameLoad}
+          src={view.frameUrl}
+          title={uxText('view_frame_label', locale)}
+          aria-label={uxText('view_frame_label', locale)}
+          sandbox="allow-scripts"
+          allow=""
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          className="w-full"
+          style={{
+            height,
+            border: '1px solid var(--kb-ui-border)',
+            borderRadius: 'var(--kb-ui-radius-md)',
+          }}
+        />
+      )}
       {pending ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
@@ -166,9 +231,6 @@ export function PluginViewFrame({
             aria-modal="true"
             aria-labelledby="plugin-view-frame-confirm-title"
             onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') decide(false);
-            }}
           >
             <section className="kb-section" data-tone="accent">
               <header className="kb-section__header">
@@ -200,11 +262,13 @@ export function PluginViewFrame({
                 </dd>
               </dl>
               <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  label={uxText('view_frame_confirm_cancel', locale)}
-                  variant="secondary"
-                  onClick={() => decide(false)}
-                />
+                <span ref={cancelRef}>
+                  <Button
+                    label={uxText('view_frame_confirm_cancel', locale)}
+                    variant="secondary"
+                    onClick={() => decide(false)}
+                  />
+                </span>
                 <Button
                   label={uxText('view_frame_confirm_allow', locale)}
                   variant="primary"

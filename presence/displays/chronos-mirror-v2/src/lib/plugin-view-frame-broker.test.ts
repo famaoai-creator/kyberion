@@ -206,6 +206,87 @@ describe('plugin view frame broker (PH-02)', () => {
     expect(isPlainFrameData(deep)).toBe(false);
   });
 
+  it('ignores every message once the frame has navigated (second load)', async () => {
+    let release: (allowed: boolean) => void = () => undefined;
+    const { broker, replies, submit, onResize } = setup({
+      confirm: () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        }),
+    });
+    expect(broker.frameLoaded()).toBe(true);
+    const pending = broker.handleMessage(request('r1')) as { done: Promise<void> };
+    expect(pending).toMatchObject({ handled: true, kind: 'action.request' });
+
+    // Same window object, new (unreviewed) document.
+    expect(broker.frameLoaded()).toBe(false);
+    expect(broker.invalidated).toBe(true);
+    const ready = { source: frameWindow, data: { protocol: PROTOCOL, type: 'ready' } };
+    expect(broker.handleMessage(ready)).toEqual({ handled: false, reason: 'invalidated' });
+    expect(broker.handleMessage(request('r2'))).toEqual({ handled: false, reason: 'invalidated' });
+    expect(
+      broker.handleMessage({
+        source: frameWindow,
+        data: { protocol: PROTOCOL, type: 'resize', height: 500 },
+      })
+    ).toMatchObject({ reason: 'invalidated' });
+    // An allow given before the navigation is void; nothing is posted to the new document.
+    release(true);
+    await pending.done;
+    expect(submit).not.toHaveBeenCalled();
+    expect(onResize).not.toHaveBeenCalled();
+    expect(replies).toEqual([]);
+    expect(broker.frameLoaded()).toBe(false);
+  });
+
+  it('can be invalidated explicitly', () => {
+    const { broker, replies } = setup();
+    broker.invalidate();
+    expect(
+      broker.handleMessage({ source: frameWindow, data: { protocol: PROTOCOL, type: 'ready' } })
+    ).toEqual({ handled: false, reason: 'invalidated' });
+    expect(replies).toEqual([]);
+  });
+
+  it('rejects huge strings before serializing them', () => {
+    const { broker, confirm } = setup();
+    const huge = 'x'.repeat(PLUGIN_VIEW_FRAME_MAX_MESSAGE_BYTES * 64);
+    const stringify = vi.spyOn(JSON, 'stringify');
+    try {
+      expect(broker.handleMessage(request('r1', { params: { huge } }))).toEqual({
+        handled: false,
+        reason: 'oversize',
+      });
+      expect(broker.handleMessage(request('r1', { params: { [huge]: 1 } }))).toMatchObject({
+        reason: 'oversize',
+      });
+      expect(stringify).not.toHaveBeenCalled();
+    } finally {
+      stringify.mockRestore();
+    }
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('re-sends init on a locale change without resetting the rate limit', async () => {
+    const { broker, replies } = setup({ confirm: async () => false });
+    broker.setLocale('en');
+    expect(replies).toEqual([]);
+    broker.handleMessage({ source: frameWindow, data: { protocol: PROTOCOL, type: 'ready' } });
+    broker.setLocale('ja');
+    expect(replies).toEqual([
+      { protocol: PROTOCOL, type: 'init', locale: 'en' },
+      { protocol: PROTOCOL, type: 'init', locale: 'ja' },
+    ]);
+    for (let index = 1; index <= 10; index += 1) {
+      await (broker.handleMessage(request(`r${index}`)) as { done: Promise<void> }).done;
+    }
+    broker.setLocale('en');
+    expect(replies.at(-1)).toEqual({ protocol: PROTOCOL, type: 'init', locale: 'en' });
+    expect(broker.handleMessage(request('r11'))).toMatchObject({
+      rejected: 'PLUGIN_VIEW_FRAME_RATE_LIMITED',
+    });
+  });
+
   it('parses iframe views with same-origin frame URLs only', () => {
     const view = {
       plugin_id: 'plugin-a',

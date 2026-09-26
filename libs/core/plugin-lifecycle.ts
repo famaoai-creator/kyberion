@@ -92,8 +92,21 @@ export interface PluginChange {
   changedPaths?: string[];
 }
 
+/**
+ * What the caller vetted when it chose a record (e.g. the host's tenant-filtered
+ * listing). The freshly re-read record must match it, or activation is refused
+ * before import — a record swapped between listing and activation never runs.
+ */
+export interface ManagedPluginExpectation {
+  /** null = the caller vetted a tenant-less (shared) record. */
+  tenantSlug: string | null;
+  contentDigest?: string;
+  permissionsDigest?: string;
+}
+
 export type ActivatePluginInput =
-  { record: ManagedPluginRecord; entry?: string } | { authorization: SkillPluginAuthorization };
+  | { record: ManagedPluginRecord; entry?: string; expected?: ManagedPluginExpectation }
+  | { authorization: SkillPluginAuthorization };
 
 export interface PluginLifecycleOptions {
   /** Managed-plugins root override (tests). */
@@ -304,7 +317,22 @@ function resolveTarget(
     // read. By id, so no other managed copy is read or hashed.
     const fresh = loadManagedPlugin(input.record.pluginId, options.managedRoot);
     if (!fresh) throw denied(`managed plugin '${input.record.pluginId}' is not installed`);
-    return targetFromRecord(fresh, input, input.entry);
+    const { expected, ...source } = input;
+    if (expected) {
+      const mismatch =
+        (fresh.tenantSlug ?? null) !== expected.tenantSlug
+          ? 'tenant'
+          : fresh.contentDigest !== expected.contentDigest
+            ? 'content digest'
+            : fresh.permissionsDigest !== expected.permissionsDigest
+              ? 'permissions digest'
+              : undefined;
+      if (mismatch) {
+        throw denied(`'${fresh.pluginId}' ${mismatch} changed since it was listed`);
+      }
+    }
+    // The expectation is one-shot: a later reload re-verifies against its own.
+    return targetFromRecord(fresh, source, input.entry);
   }
   const authorization = input.authorization;
   if (!authorization.allowed) throw denied(`'${authorization.configuredPath}' is not authorized`);
