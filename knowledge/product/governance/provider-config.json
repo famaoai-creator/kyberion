@@ -9,7 +9,7 @@
     "claude": "claude-opus-5-5",
     "agy": "Gemini 3.8 Flash (Low)",
     "codex": "gpt-6-sol",
-    "grok": "grok-4.6",
+    "grok": "grok-4.7",
     "copilot": "auto",
     "cursor": "auto",
     "opencode": "opencode/muse-spark-1.3-contributor-free",
