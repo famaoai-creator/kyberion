@@ -3314,6 +3314,10 @@
     "./mark-target-resolver": {
       "types": "./dist/mark-target-resolver.d.ts",
       "default": "./dist/mark-target-resolver.js"
+    },
+    "./risky-op-approval-port": {
+      "types": "./dist/risky-op-approval-port.d.ts",
+      "default": "./dist/risky-op-approval-port.js"
     }
   },
   "dependencies": {
