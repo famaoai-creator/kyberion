@@ -457,9 +457,9 @@ export function defaultWaitForExtensionInspection(options: {
                 mode: 'extension',
               });
             }
-          } catch (err) {
+          } catch {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: String(err) }));
+            res.end(JSON.stringify({ ok: false, error: 'Invalid inspection payload' }));
           }
         });
         return;
@@ -474,7 +474,9 @@ export function defaultWaitForExtensionInspection(options: {
         `📡 [EXTENSION MODE] Listening on http://127.0.0.1:${port}/inspection\n` +
           `   1. Open Chrome with target page (e.g. JAL / ANA)\n` +
           `   2. Click Kyberion Browser Bridge icon -> Open Side Panel\n` +
+          // i18n-exempt: Chrome Extension button label literal for operator guidance
           `   3. Go to "Live" tab -> Click "このタブを接続"\n` +
+          // i18n-exempt: Chrome Extension button labels literal for operator guidance
           `   4. In "PAGE DISCOVERY & INSPECTION" -> Click "ページ構造を解析" -> Click "Kyberion CLIへ送信"\n` +
           `   (Note: If port is changed, ensure Port field matches ${port})`
       );
