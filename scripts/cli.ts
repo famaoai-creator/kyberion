@@ -1156,6 +1156,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'read',
   // Document authoring resolves design catalogs from disk; same cost profile.
   'write',
+  // Design diff distills two documents from disk; same cost profile.
+  'diff',
   // Perception commands bind only the bridges they need (OCR / STT / ffmpeg).
   'see',
   'listen',
@@ -1385,6 +1387,14 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runWriteCommand } = await import('./cli-write.js');
     await runWriteCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
+    return;
+  }
+
+  if (command === 'diff') {
+    // Fidelity check between two documents; stdout carries the diff summary (or --json).
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runDiffCommand } = await import('./cli-diff.js');
+    await runDiffCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
   }
 
