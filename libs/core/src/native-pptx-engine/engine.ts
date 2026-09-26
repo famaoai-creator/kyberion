@@ -797,15 +797,45 @@ function unescapeXml(str: string): string {
     .replace(/&amp;/g, '&');
 }
 
-const TEXT_NODE_RE = /<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g;
+function xmlBlocks(xml: string, tag: string): string[] {
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  const blocks: string[] = [];
+  let cursor = 0;
+  while (cursor < xml.length) {
+    const start = xml.indexOf(open, cursor);
+    if (start < 0) break;
+    const boundary = xml[start + open.length];
+    if (boundary !== '>' && !/\s/u.test(boundary ?? '')) {
+      cursor = start + open.length;
+      continue;
+    }
+    const openEnd = xml.indexOf('>', start + open.length);
+    if (openEnd < 0) break;
+    const closeStart = xml.indexOf(close, openEnd + 1);
+    if (closeStart < 0) break;
+    const closeEnd = closeStart + close.length;
+    blocks.push(xml.slice(start, closeEnd));
+    cursor = closeEnd;
+  }
+  return blocks;
+}
+
+function xmlBlockText(block: string, tag: string): string {
+  const openEnd = block.indexOf('>');
+  const closeStart = block.lastIndexOf(`</${tag}>`);
+  return openEnd >= 0 && closeStart > openEnd
+    ? unescapeXml(block.slice(openEnd + 1, closeStart))
+    : '';
+}
 
 function textNodes(xml: string): string[] {
-  return Array.from(xml.matchAll(TEXT_NODE_RE), (match) => unescapeXml(match[1]));
+  return xmlBlocks(xml, 'a:t').map((block) => xmlBlockText(block, 'a:t'));
 }
 
 /** Paragraph texts of a text body, one entry per non-empty <a:p>. */
 function paragraphTexts(xml: string): string[] {
-  return (xml.match(/<a:p>[\s\S]*?<\/a:p>|<a:p [\s\S]*?<\/a:p>/g) || [])
+  return xmlBlocks(xml, 'a:p')
     .map((paragraph) => textNodes(paragraph).join(''))
     .filter((text) => text.trim());
 }

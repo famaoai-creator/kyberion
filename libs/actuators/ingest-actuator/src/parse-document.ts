@@ -203,7 +203,10 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
         cells.push(
           isMergedSlave
             ? ''
-            : excelCellText(cell.value).replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|')
+            : excelCellText(cell.value)
+                .replace(/\r?\n/g, '<br>')
+                .replace(/\\/g, '\\\\')
+                .replace(/\|/g, '\\|')
         );
       }
       rows.push(cells);

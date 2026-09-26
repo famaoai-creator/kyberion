@@ -251,7 +251,7 @@ export function extractTablesFromPage(page: PdfPage): string | null {
 }
 
 function markdownTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
 }
 
 function clusterByAxis(

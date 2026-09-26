@@ -180,9 +180,8 @@ function validateJob(raw: unknown, knowledgeRoot: string): MeetingDigestJob {
     fail(`${where}: title_pattern is not a valid RegExp`);
   }
   if (!job.title_pattern) fail(`${where}: title_pattern is required`);
-  const targetDir = String(job.target_dir ?? '')
-    .replace(/\\/g, '/')
-    .replace(/\/+$/, '');
+  let targetDir = String(job.target_dir ?? '').replace(/\\/g, '/');
+  while (targetDir.endsWith('/')) targetDir = targetDir.slice(0, -1);
   if (
     !targetDir.startsWith(`${knowledgeRoot}/`) ||
     targetDir.split('/').some((segment) => segment === '..' || segment === '')
@@ -629,7 +628,7 @@ async function runJob(
       summary_status: status,
     };
     const frontmatterBlock = renderDigestFrontmatter(frontmatter);
-    const bodyMarkdown = body.replace(/^\n+/, '').replace(/\s+$/, '');
+    const bodyMarkdown = body.replace(/^\n+/, '').trimEnd();
     const action: MeetingPageAction = dryRun
       ? 'planned'
       : finalizeOnly
