@@ -29,8 +29,11 @@ import {
  * changes.
  *
  * Without an explicit detector list the governed selection policy ranks the
- * available detectors and the first one that finds anything wins. With an
- * explicit list every listed detector runs and the caller fuses the union.
+ * available detectors and the first one that finds anything wins; a detector
+ * that throws is logged, reported in `detectors_failed` and skipped. With an
+ * explicit list every listed detector runs and the caller fuses the union; a
+ * failure there still fails the call, because the caller asked for exactly
+ * those sources and a silently missing one would change the fused marks.
  */
 
 export type UiElementDetectorKind = 'dom' | 'ocr' | 'pixels' | 'accessibility' | 'model';
@@ -75,6 +78,8 @@ export interface DetectUiElementsOptions {
 export interface UiElementDetectionResult {
   candidates: SomCandidate[];
   detectors_run: string[];
+  /** Ranked detectors that threw and were skipped (policy selection only). */
+  detectors_failed?: string[];
   decision?: Pick<SeamProviderDecision, 'strategy' | 'ranked' | 'rationale'>;
 }
 
@@ -223,11 +228,29 @@ export async function detectUiElements(
     rationale: decision.rationale,
   };
   const run: string[] = [];
+  const failed: string[] = [];
+  const done = (candidates: SomCandidate[]): UiElementDetectionResult => ({
+    candidates,
+    detectors_run: run,
+    ...(failed.length > 0 ? { detectors_failed: failed } : {}),
+    decision: summary,
+  });
   for (const id of decision.ranked) {
-    const found = await detectorById(id).detect(request);
+    // A ranked detector is one option among several: if it fails, the next
+    // one still gets its turn instead of the whole call failing.
+    let found: SomCandidate[];
+    try {
+      found = await detectorById(id).detect(request);
+    } catch (error) {
+      failed.push(id);
+      logger.warn(
+        `[ui-element-detector] ${id} failed (${error instanceof Error ? error.message : String(error)}); trying the next detector`
+      );
+      continue;
+    }
     run.push(id);
-    if (found.length > 0) return { candidates: found, detectors_run: run, decision: summary };
+    if (found.length > 0) return done(found);
     logger.info(`[ui-element-detector] ${id} found no elements; trying the next detector`);
   }
-  return { candidates: [], detectors_run: run, decision: summary };
+  return done([]);
 }
