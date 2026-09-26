@@ -156,14 +156,23 @@ describe('OsAccessibilityDetector', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('requires the accessibility permission and caches only a granted probe', async () => {
+  it('requires the accessibility permission and caches granted probes longer than denials', async () => {
+    let now = 0;
     const denied = fakeRunner({ trusted: false });
-    const detector = new OsAccessibilityDetector({ run: denied.run, platform: 'darwin' });
+    const detector = new OsAccessibilityDetector({
+      run: denied.run,
+      platform: 'darwin',
+      now: () => now,
+    });
     expect(await detector.isAvailable(live)).toBe(false);
+    now = 4_000;
+    expect(await detector.isAvailable(live)).toBe(false);
+    expect(denied.calls).toHaveLength(1);
+    now = 6_000;
     expect(await detector.isAvailable(live)).toBe(false);
     expect(denied.calls).toHaveLength(2);
 
-    let now = 0;
+    now = 0;
     const granted = fakeRunner({ trusted: true });
     const cached = new OsAccessibilityDetector({
       run: granted.run,
