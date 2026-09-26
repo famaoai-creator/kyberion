@@ -105,7 +105,7 @@ Persona も同じスコープに従います（`resolveExecutionPersona()`）。
 - [`role-assumption-policy.json`](./role-assumption-policy.json) の `shared_core_roles`（`libs/core` が呼び出し元の代わりに内部で引き受けるロール）
 - 同ファイルの `system_roles.<system role>.may_assume`
 
-`system_roles` に載っていない `SYSTEM_ROLE` は自分自身しか引き受けられません。ポリシーファイルがない、または壊れている場合も同じです（fail closed）。`SYSTEM_ROLE` のないプロセスの挙動は変わりません。一覧は、各サーフェスのエントリポイントから静的に到達できる `withExecutionContext*` 呼び出し（ロールのリテラル引数と、governed artifact 用のロールラッパー）から導出しています。新しいサーフェスを追加したり、サーフェスから到達するコードで新しいロールを引き受けたりする場合は、このポリシーを更新してください（`libs/core/authority-role-assumption.test.ts` が、起動対象の全サーフェスにエントリがあることを検査します）。
+スコープのストアは `globalThis` から到達できるため、スコープを読む側（`resolveRole()`、Persona 解決、子プロセス env）は引き受けられたロールを読み出すたびにこのポリシーで再検査します。拒否されるロールを載せたスコープは警告（`[ROLE_ASSUMPTION_IGNORED]`）を出して無視されます。スコープのオブジェクトは凍結されており、書き込み口は `authority.ts` が使う `runInExecutionScope` だけです。`system_roles` に載っていない `SYSTEM_ROLE` は自分自身しか引き受けられません。ポリシーファイルがない、または壊れている場合も同じです（fail closed）。`SYSTEM_ROLE` のないプロセスの挙動は変わりません。一覧は、各サーフェスのエントリポイントから静的に到達できる `withExecutionContext*` 呼び出し（ロールのリテラル引数と、governed artifact 用のロールラッパー）から導出しています。新しいサーフェスを追加したり、サーフェスから到達するコードで新しいロールを引き受けたりする場合は、このポリシーを更新してください（`libs/core/authority-role-assumption.test.ts` が、起動対象の全サーフェスにエントリがあることを検査します）。
 
 ### C. Authority (特権)
 
