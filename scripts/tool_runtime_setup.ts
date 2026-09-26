@@ -16,6 +16,7 @@
 
 import { createHash } from 'node:crypto';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
 import {
   findInstalledManagedBinary,
@@ -154,7 +155,17 @@ export async function installManagedBinary(toolId: string): Promise<SetupRow | n
     };
   }
 
-  const expectedSha256 = assertPinnedSha256(toolId, version, artifact.sha256);
+  // An unpinned (placeholder) digest never downloads; defer to the
+  // package-manager install_backend instead of failing the whole setup.
+  let expectedSha256: string;
+  try {
+    expectedSha256 = assertPinnedSha256(toolId, version, artifact.sha256);
+  } catch (error) {
+    logger.warn(
+      `[tool-runtime-setup] skipping managed_binary for ${toolId}: ${error instanceof Error ? error.message : String(error)}; falling back to the install_backend`
+    );
+    return null;
+  }
   const payload = await secureFetch<ArrayBuffer>({
     url: artifact.url,
     method: 'GET',

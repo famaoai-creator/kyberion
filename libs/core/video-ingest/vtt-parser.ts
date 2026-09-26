@@ -68,15 +68,31 @@ function repeatedPrefixLength(lines: string[], recent: string[]): number {
   return 0;
 }
 
+export interface ParseVttOptions {
+  /** Drop rolling-caption repeats; only for automatic captions (manual subs keep genuine repeats). */
+  dedupeRolling?: boolean;
+}
+
 /**
- * Parse WebVTT into transcript segments. Rolling auto-captions repeat the
- * previous line at the top of each cue (and emit ~10ms transition cues that
- * only repeat it); those repeats are dropped so every spoken line appears once.
+ * Parse WebVTT into transcript segments. With `dedupeRolling`, rolling
+ * auto-captions that repeat the previous line at the top of each cue (and
+ * ~10ms transition cues that only repeat it) are collapsed so every spoken
+ * line appears once.
  */
-export function parseVtt(text: string): TranscriptSegment[] {
+export function parseVtt(text: string, options: ParseVttOptions = {}): TranscriptSegment[] {
   const segments: TranscriptSegment[] = [];
   const recent: string[] = [];
   for (const cue of parseCues(text)) {
+    if (!options.dedupeRolling) {
+      if (cue.lines.length > 0) {
+        segments.push({
+          start_sec: cue.start_sec,
+          end_sec: cue.end_sec,
+          text: cue.lines.join(' '),
+        });
+      }
+      continue;
+    }
     const fresh = cue.lines.slice(repeatedPrefixLength(cue.lines, recent));
     if (fresh.length === 0) {
       const last = segments[segments.length - 1];

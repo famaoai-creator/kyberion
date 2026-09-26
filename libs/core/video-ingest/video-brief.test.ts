@@ -2,19 +2,28 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReaddir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { resolveYtDlpBin } from '../tool-binary-resolvers.js';
 import type { EgressPolicyDecision } from '../egress-policy.js';
-import type { RiskyApprovalRequest } from '../risky-op-approval-port.js';
+import type { RiskyApprovalRequest, RiskyApprovalResult } from '../risky-op-approval-port.js';
 import {
   assertNoTierDowngrade,
   buildVideoBrief,
   resolveVideoCachePlacement,
+  tenantOfPath,
   tierOfPath,
+  videoFetchCorrelationId,
   type BuildVideoBriefOptions,
   type VideoCachePlacement,
 } from './video-brief.js';
-import { classifyYtDlpFailure, loadVideoIngestPolicy, urlContentKey } from './video-fetch.js';
+import {
+  classifyYtDlpFailure,
+  fileContentKey,
+  loadVideoIngestPolicy,
+  sha256FileChunked,
+  sha256Hex,
+  urlContentKey,
+} from './video-fetch.js';
 import { parseSceneTimes, planKeyframes } from './video-media.js';
 import type {
   VideoCommandResult,
@@ -51,10 +60,15 @@ const AUTO_VTT = [
 ].join('\n');
 
 interface FakeVideo {
-  duration?: number;
+  duration?: number | null;
+  is_live?: boolean;
+  requested_formats?: Array<{ filesize?: number }>;
   subtitles?: Record<string, string>;
   automatic_captions?: Record<string, string>;
   infoFailure?: string;
+  /** Files yt-dlp leaves in the -P directory (default: source.mp4). */
+  downloadFiles?: Record<string, string>;
+  downloadFailure?: string;
 }
 
 interface Call {
@@ -76,7 +90,9 @@ function fakeRunner(video: FakeVideo, calls: Call[]): VideoCommandRunner {
       return ok(
         JSON.stringify({
           title: 'Demo video',
-          duration: video.duration ?? 90,
+          ...(video.duration === null ? {} : { duration: video.duration ?? 90 }),
+          ...(video.is_live ? { is_live: true, live_status: 'is_live' } : {}),
+          ...(video.requested_formats ? { requested_formats: video.requested_formats } : {}),
           uploader: 'Uploader',
           language: 'en',
           chapters: [
@@ -89,9 +105,11 @@ function fakeRunner(video: FakeVideo, calls: Call[]): VideoCommandRunner {
       );
     }
     if (command === 'fake-yt-dlp') {
-      const template = args[args.indexOf('-o') + 1];
-      const dir = path.dirname(template);
-      safeWriteFile(path.join(dir, 'source.mp4'), 'media-bytes');
+      const dir = args[args.indexOf('-P') + 1];
+      for (const [name, body] of Object.entries(video.downloadFiles ?? { 'source.mp4': 'media' })) {
+        safeWriteFile(path.join(dir, name), body);
+      }
+      if (video.downloadFailure) return { stdout: '', stderr: video.downloadFailure, status: 1 };
       const lang = args.includes('--sub-langs') ? args[args.indexOf('--sub-langs') + 1] : null;
       if (lang) {
         const body = args.includes('--write-subs')
@@ -435,5 +453,348 @@ describe('governed registrations', () => {
     expect(resolveYtDlpBin()).toBe('/opt/kyberion/bin/yt-dlp-custom');
     vi.stubEnv('KYBERION_YTDLP_BIN', '');
     expect(resolveYtDlpBin()).toMatch(/yt-dlp$/);
+  });
+});
+
+const URL_B = 'https://www.youtube.com/watch?v=other999';
+
+function entryDirOf(placement: VideoCachePlacement, url: string): string {
+  return path.join(placement.root, urlContentKey(url, POLICY.download_format));
+}
+
+describe('remote fetch approval binding', () => {
+  it('derives the correlation id per fetch so an approval for URL A cannot authorize URL B', async () => {
+    const approved = new Set<string>();
+    const requests: RiskyApprovalRequest[] = [];
+    const requestApproval = (request: RiskyApprovalRequest): RiskyApprovalResult => {
+      requests.push(request);
+      return approved.has(request.correlationId ?? '')
+        ? { allowed: true, status: 'approved', requestId: 'APR-A' }
+        : { allowed: false, status: 'pending', requestId: `APR-${requests.length}` };
+    };
+    const first = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ runner: vi.fn<VideoCommandRunner>(), requestApproval })
+    );
+    expect(first.status).toBe('approval_required');
+    const keyA = urlContentKey(URL_, POLICY.download_format);
+    expect(requests[0]).toMatchObject({
+      opId: 'vision:fetch_video',
+      correlationId: videoFetchCorrelationId(keyA),
+      channel: 'system',
+      payload: {
+        url: 'https://www.youtube.com/watch?v=abc123',
+        format: POLICY.download_format,
+        max_bytes: POLICY.max_bytes,
+        max_duration_sec: POLICY.max_duration_sec,
+      },
+    });
+    approved.add(videoFetchCorrelationId(keyA));
+
+    // Caller-supplied correlation/presence fields are ignored.
+    const runner = vi.fn<VideoCommandRunner>();
+    const replay = await buildVideoBrief(
+      { kind: 'url', url: URL_B },
+      options({
+        runner,
+        requestApproval,
+        approval: {
+          agent_id: 'test-agent',
+          correlation_id: videoFetchCorrelationId(keyA),
+          channel: 'slack',
+          has_human: true,
+        } as unknown as BuildVideoBriefOptions['approval'],
+      })
+    );
+    expect(replay).toMatchObject({ status: 'approval_required' });
+    expect(runner).not.toHaveBeenCalled();
+    const last = requests[requests.length - 1];
+    expect(last.correlationId).toBe(
+      videoFetchCorrelationId(urlContentKey(URL_B, POLICY.download_format))
+    );
+    expect(last.channel).toBe('system');
+    expect(last).not.toHaveProperty('hasHuman');
+  });
+});
+
+describe('remote fetch safety', () => {
+  it('refuses live streams and unknown durations before downloading', async () => {
+    for (const [video, code] of [
+      [{ is_live: true }, 'LIVE_STREAM'],
+      [{ duration: null }, 'DURATION_UNKNOWN'],
+    ] as const) {
+      const calls: Call[] = [];
+      const outcome = await buildVideoBrief(
+        { kind: 'url', url: URL_ },
+        options({ runner: fakeRunner(video, calls) })
+      );
+      expect(outcome).toMatchObject({ status: 'failed', code });
+      expect(calls).toHaveLength(1);
+    }
+  });
+
+  it('probes with the download format and sums requested_formats for the size check', async () => {
+    const calls: Call[] = [];
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        runner: fakeRunner(
+          { requested_formats: [{ filesize: POLICY.max_bytes }, { filesize: 10 }] },
+          calls
+        ),
+      })
+    );
+    expect(outcome).toMatchObject({ status: 'failed', code: 'SIZE_EXCEEDED' });
+    const probe = calls[0].args;
+    expect(probe[probe.indexOf('-f') + 1]).toBe(POLICY.download_format);
+    expect(probe.indexOf('-f')).toBeLessThan(probe.indexOf('-J'));
+  });
+
+  it('downloads via -P with a relative template, ffmpeg location and a live filter', async () => {
+    const calls: Call[] = [];
+    const placement = freshPlacement();
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ cachePlacement: placement, runner: fakeRunner({}, calls) })
+    );
+    expect(outcome.status).toBe('ok');
+    const download = calls.find(
+      (call) => call.command === 'fake-yt-dlp' && !call.args.includes('-J')
+    );
+    const args = download?.args ?? [];
+    expect(args[args.indexOf('-P') + 1]).toBe(entryDirOf(placement, URL_));
+    expect(args[args.indexOf('-o') + 1]).toBe('source.%(ext)s');
+    expect(args[args.indexOf('--ffmpeg-location') + 1]).toBe('fake-ffmpeg');
+    expect(args[args.indexOf('--match-filter') + 1]).toBe('!is_live');
+  });
+
+  it('picks the merged output over leftover split streams', async () => {
+    const calls: Call[] = [];
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        runner: fakeRunner(
+          {
+            downloadFiles: {
+              'source.f137.mp4': 'video-only',
+              'source.f140.m4a': 'audio-only',
+              'source.mp4': 'merged',
+            },
+          },
+          calls
+        ),
+      })
+    );
+    expect(outcome.status).toBe('ok');
+    const thumbnail = calls.find(
+      (call) =>
+        call.args.includes('thumbnail.jpg') ||
+        call.args.some((arg) => arg.endsWith('thumbnail.jpg'))
+    );
+    expect(thumbnail?.args[thumbnail.args.indexOf('-i') + 1].endsWith('source.mp4')).toBe(true);
+  });
+
+  it('refuses when only split streams exist and removes them', async () => {
+    const placement = freshPlacement();
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        cachePlacement: placement,
+        runner: fakeRunner(
+          { downloadFiles: { 'source.f137.mp4': 'v', 'source.f140.m4a': 'a' } },
+          []
+        ),
+      })
+    );
+    expect(outcome).toMatchObject({ status: 'failed', code: 'TOOL_FAILED' });
+    if (outcome.status === 'failed') expect(outcome.message).toContain('split');
+    expect(safeReaddir(entryDirOf(placement, URL_)).filter((n) => n.startsWith('source.'))).toEqual(
+      []
+    );
+  });
+});
+
+describe('video cache retention', () => {
+  it('removes oversize or partial media from the cache entry on a failed download', async () => {
+    const placement = freshPlacement();
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        cachePlacement: placement,
+        policy: { ...POLICY, max_bytes: 16 },
+        runner: fakeRunner(
+          { downloadFiles: { 'source.mp4': 'x'.repeat(64), 'source.f1.mp4.part': 'p' } },
+          []
+        ),
+      })
+    );
+    expect(outcome).toMatchObject({ status: 'failed', code: 'SIZE_EXCEEDED' });
+    const entry = path.join(placement.root, urlContentKey(URL_, POLICY.download_format));
+    expect(safeReaddir(entry)).toEqual([]);
+  });
+
+  it('deletes downloaded source media after derivation unless keep_source', async () => {
+    const placement = freshPlacement();
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        cachePlacement: placement,
+        runner: fakeRunner({ subtitles: { en: MANUAL_VTT } }, []),
+      })
+    );
+    expect(outcome.status).toBe('ok');
+    const entry = entryDirOf(placement, URL_);
+    const names = safeReaddir(entry);
+    expect(names).not.toContain('source.mp4');
+    expect(names).toContain('source.en.vtt');
+    expect(names.some((name) => name.startsWith('brief-'))).toBe(true);
+
+    const kept = freshPlacement();
+    await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ cachePlacement: kept, keep_source: true, runner: fakeRunner({}, []) })
+    );
+    expect(safeExistsSync(path.join(entryDirOf(kept, URL_), 'source.mp4'))).toBe(true);
+  });
+
+  it('never deletes a local input file', async () => {
+    const file = path.join(TEST_ROOT, 'keep-local.mp4');
+    safeWriteFile(file, 'local-bytes');
+    const outcome = await buildVideoBrief(
+      { kind: 'file', path: file },
+      options({ runner: fakeRunner({}, []), transcript_preference: 'subtitles_only' })
+    );
+    expect(outcome.status).toBe('ok');
+    expect(safeExistsSync(file)).toBe(true);
+  });
+});
+
+describe('local content key hashing', () => {
+  it('hashes in bounded chunks and matches a whole-buffer digest', () => {
+    const data = Buffer.alloc(3 * 1024 * 1024 + 17);
+    for (let i = 0; i < data.length; i += 1) data[i] = (i * 31) % 251;
+    const lengths: number[] = [];
+    const digest = sha256FileChunked(
+      'fixture.mp4',
+      data.length,
+      (_file, position, length) => {
+        lengths.push(length);
+        return data.subarray(position, position + length);
+      },
+      1024 * 1024
+    );
+    expect(digest).toBe(sha256Hex(data));
+    expect(lengths).toEqual([1024 * 1024, 1024 * 1024, 1024 * 1024, 17]);
+  });
+
+  it('fileContentKey reads through the injected range reader', () => {
+    const file = path.join(TEST_ROOT, 'chunked.mp4');
+    const body = 'y'.repeat(4096);
+    safeWriteFile(file, body);
+    const reads: number[] = [];
+    const key = fileContentKey(file, 1024 * 1024, (_file, position, length) => {
+      reads.push(length);
+      return Buffer.from(body).subarray(position, position + length);
+    });
+    expect(key).toBe(sha256Hex(body));
+    expect(reads.length).toBeGreaterThan(0);
+  });
+});
+
+describe('manual subtitles through the brief', () => {
+  it('keeps genuine repeated lines from manual subtitles', async () => {
+    const vtt = [
+      'WEBVTT',
+      '',
+      '00:00:00.000 --> 00:00:01.000',
+      'Go!',
+      '',
+      '00:00:01.000 --> 00:00:02.000',
+      'Go!',
+      '',
+    ].join('\n');
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ runner: fakeRunner({ subtitles: { en: vtt } }, []) })
+    );
+    expect(outcome.status).toBe('ok');
+    if (outcome.status !== 'ok') return;
+    expect(outcome.brief.transcript?.segments.map((segment) => segment.text)).toEqual([
+      'Go!',
+      'Go!',
+    ]);
+  });
+});
+
+describe('video cache tenant placement', () => {
+  const root = pathResolver.rootDir();
+  // Tenant/mission fixtures live in governed confidential partitions.
+  const asMissionController = () => vi.stubEnv('MISSION_ROLE', 'mission_controller');
+
+  it('derives the owning tenant from repository paths', () => {
+    expect(tenantOfPath(path.join(root, 'knowledge/confidential/acme/v.mp4'))).toBe('acme');
+    expect(tenantOfPath(path.join(root, 'knowledge/confidential/common/v.mp4'))).toBeUndefined();
+    expect(tenantOfPath(path.join(root, 'active/projects/confidential/acme/x/v.mp4'))).toBe('acme');
+    expect(
+      tenantOfPath(path.join(root, 'active/missions/confidential/acme/MSN-X-1/evidence/v.mp4'))
+    ).toBe('acme');
+    expect(tenantOfPath(path.join(root, 'active/shared/tmp/v.mp4'))).toBeUndefined();
+    expect(resolveVideoCachePlacement({ tenant_slug: 'acme' }).tenant_slug).toBe('acme');
+  });
+
+  it("resolves a mission directory's tenant from its mission state", () => {
+    const missionId = `MSN-VIDEO-TENANT-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const missionDir = path.join(root, 'active/missions/confidential', missionId);
+    asMissionController();
+    try {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tenant_slug: 'globex' })
+      );
+      expect(tenantOfPath(path.join(missionDir, 'evidence/v.mp4'))).toBe('globex');
+    } finally {
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to cache tenant A's input under tenant B", async () => {
+    const slug = `vt${randomUUID().slice(0, 8)}`;
+    const tenantDir = path.join(root, 'active/projects/confidential', slug);
+    const file = path.join(tenantDir, 'clip.mp4');
+    asMissionController();
+    try {
+      safeMkdir(tenantDir, { recursive: true });
+      safeWriteFile(file, 'tenant-a-clip');
+      const runner = vi.fn<VideoCommandRunner>();
+      const other: VideoCachePlacement = {
+        scope: 'tenant',
+        root: path.join(TEST_ROOT, randomUUID()),
+        tier: 'confidential',
+        tenant_slug: 'other-tenant',
+      };
+      const mismatch = await buildVideoBrief(
+        { kind: 'file', path: file },
+        options({ runner, cachePlacement: other })
+      );
+      expect(mismatch).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
+      const tenantless = await buildVideoBrief(
+        { kind: 'file', path: file },
+        options({ runner, cachePlacement: { ...other, scope: 'mission', tenant_slug: undefined } })
+      );
+      expect(tenantless).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
+      expect(runner).not.toHaveBeenCalled();
+      const same = await buildVideoBrief(
+        { kind: 'file', path: file },
+        options({
+          runner: fakeRunner({}, []),
+          cachePlacement: { ...other, tenant_slug: slug },
+          transcript_preference: 'subtitles_only',
+        })
+      );
+      expect(same.status).toBe('ok');
+    } finally {
+      safeRmSync(tenantDir, { recursive: true, force: true });
+    }
   });
 });

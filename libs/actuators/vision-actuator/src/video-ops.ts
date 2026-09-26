@@ -25,6 +25,7 @@ export interface VideoOpParams {
   mission_id?: string;
   tenant_slug?: string;
   input_tier?: VideoTier;
+  keep_source?: boolean;
   approval?: VideoIngestApprovalContext;
 }
 
@@ -86,7 +87,16 @@ function briefOptions(params: VideoOpParams, op: string): BuildVideoBriefOptions
   }
   if (text(params.mission_id)) options.mission_id = text(params.mission_id);
   if (text(params.tenant_slug)) options.tenant_slug = text(params.tenant_slug);
-  if (params.approval && text(params.approval.agent_id)) options.approval = params.approval;
+  if (params.keep_source !== undefined) {
+    if (typeof params.keep_source !== 'boolean') {
+      throw new Error(`[VIDEO_INVALID_PARAMS] ${op} keep_source must be a boolean`);
+    }
+    options.keep_source = params.keep_source;
+  }
+  // Only the agent id is taken from params; correlation, channel and human
+  // presence are derived by core so an approval cannot be replayed.
+  const agentId = text(params.approval?.agent_id);
+  if (agentId) options.approval = { agent_id: agentId };
   return options;
 }
 

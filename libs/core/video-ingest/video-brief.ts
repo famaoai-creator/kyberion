@@ -23,6 +23,7 @@ import {
   loadVideoIngestPolicy,
   normalizeVideoUrl,
   probeLocalVideo,
+  removeSourceMedia,
   sha256Hex,
   urlContentKey,
   type SubtitleChoice,
@@ -58,6 +59,8 @@ export interface VideoCachePlacement {
   scope: 'mission' | 'tenant' | 'shared';
   root: string;
   tier: VideoTier;
+  /** Owning tenant; undefined for shared or tenant-less mission caches. */
+  tenant_slug?: string;
 }
 
 function repoRelative(absPath: string): string {
@@ -77,6 +80,54 @@ export function tierOfPath(filePath: string): VideoTier {
   return 'public';
 }
 
+/** `knowledge/confidential/{common,tenant-groups}` are shared, never a tenant. */
+const SHARED_TENANT_PREFIXES = new Set(['common', 'tenant-groups']);
+
+function missionStateTenant(missionDir: string): string | undefined {
+  const statePath = path.join(missionDir, 'mission-state.json');
+  if (!safeExistsSync(statePath)) return undefined;
+  try {
+    const state = parseSafeJsonInput(
+      safeReadFile(statePath, { encoding: 'utf8' }) as string,
+      'mission state'
+    );
+    if (!state || typeof state !== 'object') return undefined;
+    const record = state as Record<string, unknown>;
+    const slug = record.tenant_slug ?? record.tenant_id;
+    return typeof slug === 'string' && isValidTenantSlug(slug) ? slug : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Tenant owning a path: `knowledge/confidential/{slug}/`, the tenant volatile
+ * area `active/projects/{tier}/{slug}/`, a tenant-scoped mission directory
+ * `active/missions/{tier}/{slug}/{mission}/`, or the tenant recorded in a
+ * mission's state (`active/missions/{tier}/{mission}/`).
+ */
+export function tenantOfPath(filePath: string): string | undefined {
+  const rel = repoRelative(filePath);
+  const knowledge = /^knowledge\/confidential\/([^/]+)\//.exec(rel);
+  if (knowledge) {
+    const slug = knowledge[1];
+    return isValidTenantSlug(slug) && !SHARED_TENANT_PREFIXES.has(slug) ? slug : undefined;
+  }
+  const project = /^active\/projects\/(?:personal|confidential|public)\/([^/]+)(?:\/|$)/.exec(rel);
+  if (project) return isValidTenantSlug(project[1]) ? project[1] : undefined;
+  const mission = /^(active\/missions\/(?:personal|confidential|public))\/([^/]+)(?:\/|$)/.exec(
+    rel
+  );
+  if (mission) {
+    const segmentDir = path.join(pathResolver.rootDir(), mission[1], mission[2]);
+    const recorded = missionStateTenant(segmentDir);
+    if (recorded) return recorded;
+    if (safeExistsSync(path.join(segmentDir, 'mission-state.json'))) return undefined;
+    return isValidTenantSlug(mission[2]) ? mission[2] : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Mission-local when a mission is given, else the tenant's volatile area,
  * else the shared (public) cache.
@@ -86,10 +137,12 @@ export function resolveVideoCachePlacement(
 ): VideoCachePlacement {
   if (scope.mission_id) {
     const missionPath = pathResolver.volatile('mission', scope.mission_id);
+    const tenant = tenantOfPath(missionPath);
     return {
       scope: 'mission',
       root: path.join(missionPath, 'cache', 'video'),
       tier: tierOfPath(missionPath),
+      ...(tenant ? { tenant_slug: tenant } : {}),
     };
   }
   if (scope.tenant_slug) {
@@ -101,6 +154,7 @@ export function resolveVideoCachePlacement(
       scope: 'tenant',
       root: path.join(tenantPath, 'cache', 'video-ingest'),
       tier: 'confidential',
+      tenant_slug: scope.tenant_slug,
     };
   }
   return { scope: 'shared', root: pathResolver.shared('cache/video-ingest'), tier: 'public' };
@@ -116,13 +170,33 @@ export function assertNoTierDowngrade(inputTier: VideoTier, placement: VideoCach
   }
 }
 
+/** Refuse to cache one tenant's input under another tenant (or a tenant-less) cache. */
+export function assertSameTenant(
+  inputTenant: string | undefined,
+  placement: VideoCachePlacement
+): void {
+  if (inputTenant && inputTenant !== placement.tenant_slug) {
+    throw new VideoIngestError(
+      'TENANT_MISMATCH',
+      `input owned by tenant '${inputTenant}' cannot be cached in the ${placement.scope} cache${
+        placement.tenant_slug ? ` of tenant '${placement.tenant_slug}'` : ''
+      }; pass mission_id or tenant_slug of the owning tenant`
+    );
+  }
+}
+
+/**
+ * Only the requesting agent is caller-supplied. Correlation id, channel and
+ * human-presence are derived here so an approval cannot be replayed onto a
+ * different fetch.
+ */
 export interface VideoIngestApprovalContext {
   agent_id: string;
-  channel?: string;
-  correlation_id?: string;
-  has_human?: boolean;
-  has_ui?: boolean;
-  non_interactive?: boolean;
+}
+
+/** Approval correlation for one exact fetch (URL + format selector). */
+export function videoFetchCorrelationId(contentKey: string): string {
+  return `video-ingest:${contentKey}`;
 }
 
 export type VideoTranscribeFn = (
@@ -140,6 +214,8 @@ export interface BuildVideoBriefOptions {
   input_tier?: VideoTier;
   /** Required for an uncached remote fetch when the policy demands approval. */
   approval?: VideoIngestApprovalContext;
+  /** Keep downloaded remote media in the cache entry after derivation (default: delete). */
+  keep_source?: boolean;
   runner?: VideoCommandRunner;
   policy?: VideoIngestPolicy;
   cachePlacement?: VideoCachePlacement;
@@ -222,7 +298,12 @@ async function transcriptFor(
   warnings: string[]
 ): Promise<VideoTranscript | null> {
   if (prepared.subtitle && preference !== 'stt_only') {
-    const segments = parseVtt(safeReadFile(prepared.subtitle.path, { encoding: 'utf8' }) as string);
+    const segments = parseVtt(
+      safeReadFile(prepared.subtitle.path, { encoding: 'utf8' }) as string,
+      {
+        dedupeRolling: prepared.subtitle.origin === 'auto_subs',
+      }
+    );
     if (segments.length > 0) {
       return { origin: prepared.subtitle.origin, language: prepared.subtitle.lang, segments };
     }
@@ -283,6 +364,7 @@ async function buildVideoBriefUnchecked(
 
   let contentKey: string;
   let inputTier: VideoTier;
+  let inputTenant: string | undefined;
   let normalizedSource: VideoSource;
   let url: URL | null = null;
   let localPath: string | null = null;
@@ -304,6 +386,7 @@ async function buildVideoBriefUnchecked(
     const pathTier = tierOfPath(localPath);
     const declared = options.input_tier ?? 'public';
     inputTier = TIER_RANK[declared] > TIER_RANK[pathTier] ? declared : pathTier;
+    inputTenant = tenantOfPath(localPath);
     normalizedSource = { kind: 'file', path: repoRelative(localPath) };
     contentKey = '';
   }
@@ -315,6 +398,7 @@ async function buildVideoBriefUnchecked(
       tenant_slug: options.tenant_slug,
     });
   assertNoTierDowngrade(inputTier, placement);
+  assertSameTenant(inputTenant, placement);
   if (localPath) contentKey = fileContentKey(localPath, policy.max_bytes);
 
   const entryDir = path.join(placement.root, contentKey);
@@ -323,6 +407,7 @@ async function buildVideoBriefUnchecked(
   if (cached) return { status: 'ok', brief: { ...cached, cache_hit: true } };
 
   let prepared: PreparedMedia;
+  let downloadedMedia = false;
   if (url) {
     const decision = (options.evaluateEgress ?? evaluateEgressPolicy)(url.toString());
     if (decision.verdict === 'deny') {
@@ -338,18 +423,19 @@ async function buildVideoBriefUnchecked(
           `remote video fetch from ${url.hostname} requires approval (video-ingest-policy require_approval_for_remote)`
         );
       }
-      const approval = options.approval;
+      // The gate creates human_only requests bound to this op id and the
+      // payload hash; the payload pins the exact fetch (URL, format, limits).
       const decisionResult = (options.requestApproval ?? requireRiskyApproval)({
         opId: FETCH_VIDEO_APPROVAL_OP,
-        agentId: approval.agent_id,
-        correlationId: approval.correlation_id ?? `video-ingest:${contentKey}`,
-        channel: approval.channel ?? 'system',
-        ...(approval.has_human !== undefined ? { hasHuman: approval.has_human } : {}),
-        ...(approval.has_ui !== undefined ? { hasUI: approval.has_ui } : {}),
-        ...(approval.non_interactive !== undefined
-          ? { nonInteractive: approval.non_interactive }
-          : {}),
-        payload: { url: url.toString(), host: url.hostname, content_key: contentKey },
+        agentId: options.approval.agent_id,
+        correlationId: videoFetchCorrelationId(contentKey),
+        channel: 'system',
+        payload: {
+          url: url.toString(),
+          format: policy.download_format,
+          max_bytes: policy.max_bytes,
+          max_duration_sec: policy.max_duration_sec,
+        },
         draft: {
           title: `Remote video fetch: ${url.hostname}`,
           summary: `Download ${url.toString()} (metadata, subtitles, media) for video ingest.`,
@@ -364,7 +450,16 @@ async function buildVideoBriefUnchecked(
       }
     }
     const ytDlp = options.bins?.yt_dlp ?? resolveYtDlpBin();
-    const info = await fetchRemoteVideoInfo(runner, ytDlp, url.toString());
+    const info = await fetchRemoteVideoInfo(runner, ytDlp, url.toString(), policy.download_format);
+    if (info.is_live) {
+      throw new VideoIngestError('LIVE_STREAM', 'live or upcoming streams cannot be ingested');
+    }
+    if (!info.duration_known) {
+      throw new VideoIngestError(
+        'DURATION_UNKNOWN',
+        'remote video reports no duration; refusing to download an unbounded stream'
+      );
+    }
     if (info.metadata.duration_sec > policy.max_duration_sec) {
       throw new VideoIngestError(
         'DURATION_EXCEEDED',
@@ -386,7 +481,9 @@ async function buildVideoBriefUnchecked(
       format: policy.download_format,
       maxBytes: policy.max_bytes,
       subtitle,
+      ffmpegBin: options.bins?.ffmpeg ?? resolveFfmpegBin(),
     });
+    downloadedMedia = true;
     prepared = {
       metadata: info.metadata,
       chapters: info.chapters,
@@ -417,77 +514,84 @@ async function buildVideoBriefUnchecked(
     throw new VideoIngestError('INVALID_SOURCE', 'video source has neither a url nor a path');
   }
 
-  const ffmpeg = options.bins?.ffmpeg ?? resolveFfmpegBin();
-  let audioPath: string | undefined;
-  const transcript = await transcriptFor(
-    prepared,
-    preference,
-    async () => {
+  // Retention: derived artifacts (audio, frames, subtitles, brief) stay in
+  // the cache entry; downloaded source media is dropped after derivation —
+  // success or failure — unless keep_source. A local input is never touched.
+  try {
+    const ffmpeg = options.bins?.ffmpeg ?? resolveFfmpegBin();
+    let audioPath: string | undefined;
+    const transcript = await transcriptFor(
+      prepared,
+      preference,
+      async () => {
+        try {
+          audioPath = await extractAudioWav(
+            runner,
+            ffmpeg,
+            prepared.media_path,
+            path.join(entryDir, 'audio.wav')
+          );
+          return audioPath;
+        } catch (error) {
+          warnings.push(
+            `audio extraction failed: ${error instanceof Error ? error.message : String(error)}`
+          );
+          return null;
+        }
+      },
+      options.transcribe ?? defaultVideoTranscribe,
+      options.language,
+      warnings
+    );
+
+    const duration = prepared.metadata.duration_sec;
+    const thumbnailPath = await extractFrame(
+      runner,
+      ffmpeg,
+      prepared.media_path,
+      path.join(entryDir, 'thumbnail.jpg'),
+      Math.min(duration * 0.1, 10)
+    );
+
+    let sceneTimes: number[] = [];
+    if (maxKeyframes > 0) {
       try {
-        audioPath = await extractAudioWav(
+        sceneTimes = await detectSceneChanges(
           runner,
           ffmpeg,
           prepared.media_path,
-          path.join(entryDir, 'audio.wav')
+          policy.scene_threshold
         );
-        return audioPath;
       } catch (error) {
         warnings.push(
-          `audio extraction failed: ${error instanceof Error ? error.message : String(error)}`
+          `scene detection failed: ${error instanceof Error ? error.message : String(error)}`
         );
-        return null;
       }
-    },
-    options.transcribe ?? defaultVideoTranscribe,
-    options.language,
-    warnings
-  );
-
-  const duration = prepared.metadata.duration_sec;
-  const thumbnailPath = await extractFrame(
-    runner,
-    ffmpeg,
-    prepared.media_path,
-    path.join(entryDir, 'thumbnail.jpg'),
-    Math.min(duration * 0.1, 10)
-  );
-
-  let sceneTimes: number[] = [];
-  if (maxKeyframes > 0) {
-    try {
-      sceneTimes = await detectSceneChanges(
-        runner,
-        ffmpeg,
-        prepared.media_path,
-        policy.scene_threshold
-      );
-    } catch (error) {
-      warnings.push(
-        `scene detection failed: ${error instanceof Error ? error.message : String(error)}`
-      );
     }
-  }
-  const plan = planKeyframes({
-    duration_sec: duration,
-    chapters: prepared.chapters,
-    scene_times: sceneTimes,
-    interval_sec: policy.keyframe_interval_sec,
-    max_keyframes: maxKeyframes,
-  });
-  const keyframes = await extractKeyframes(runner, ffmpeg, prepared.media_path, entryDir, plan);
+    const plan = planKeyframes({
+      duration_sec: duration,
+      chapters: prepared.chapters,
+      scene_times: sceneTimes,
+      interval_sec: policy.keyframe_interval_sec,
+      max_keyframes: maxKeyframes,
+    });
+    const keyframes = await extractKeyframes(runner, ffmpeg, prepared.media_path, entryDir, plan);
 
-  const brief: VideoBrief = {
-    source: normalizedSource,
-    content_key: contentKey,
-    metadata: prepared.metadata,
-    chapters: prepared.chapters,
-    transcript,
-    keyframes: keyframes.map((frame) => ({ ...frame, path: repoRelative(frame.path) })),
-    thumbnail_path: repoRelative(thumbnailPath),
-    ...(audioPath ? { audio_path: repoRelative(audioPath) } : {}),
-    cache_hit: false,
-    warnings,
-  };
-  safeWriteFile(briefPath, `${JSON.stringify(brief, null, 2)}\n`);
-  return { status: 'ok', brief };
+    const brief: VideoBrief = {
+      source: normalizedSource,
+      content_key: contentKey,
+      metadata: prepared.metadata,
+      chapters: prepared.chapters,
+      transcript,
+      keyframes: keyframes.map((frame) => ({ ...frame, path: repoRelative(frame.path) })),
+      thumbnail_path: repoRelative(thumbnailPath),
+      ...(audioPath ? { audio_path: repoRelative(audioPath) } : {}),
+      cache_hit: false,
+      warnings,
+    };
+    safeWriteFile(briefPath, `${JSON.stringify(brief, null, 2)}\n`);
+    return { status: 'ok', brief };
+  } finally {
+    if (downloadedMedia && !options.keep_source) removeSourceMedia(entryDir);
+  }
 }

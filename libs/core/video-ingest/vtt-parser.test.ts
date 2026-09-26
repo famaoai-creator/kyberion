@@ -54,7 +54,7 @@ describe('parseVtt', () => {
       'fine thanks',
       '',
     ].join('\n');
-    expect(parseVtt(vtt)).toEqual([
+    expect(parseVtt(vtt, { dedupeRolling: true })).toEqual([
       { start_sec: 0, end_sec: 2.01, text: 'hello there' },
       { start_sec: 2.01, end_sec: 4.01, text: 'how are you' },
       { start_sec: 4.01, end_sec: 6, text: 'fine thanks' },
@@ -75,6 +75,32 @@ describe('parseVtt', () => {
       'yes',
       '',
     ].join('\n');
-    expect(parseVtt(vtt).map((segment) => segment.text)).toEqual(['yes', 'no', 'yes']);
+    expect(parseVtt(vtt, { dedupeRolling: true }).map((segment) => segment.text)).toEqual([
+      'yes',
+      'no',
+      'yes',
+    ]);
+  });
+
+  it('keeps genuine consecutive repeats in manual subtitles (no rolling dedupe)', () => {
+    const vtt = [
+      'WEBVTT',
+      '',
+      '00:00:00.000 --> 00:00:01.000',
+      'Go!',
+      '',
+      '00:00:01.000 --> 00:00:02.000',
+      'Go!',
+      '',
+      '00:00:02.000 --> 00:00:03.000',
+      'Go!',
+      'Now run',
+      '',
+    ].join('\n');
+    expect(parseVtt(vtt).map((segment) => segment.text)).toEqual(['Go!', 'Go!', 'Go! Now run']);
+    expect(parseVtt(vtt, { dedupeRolling: true }).map((segment) => segment.text)).toEqual([
+      'Go!',
+      'Now run',
+    ]);
   });
 });

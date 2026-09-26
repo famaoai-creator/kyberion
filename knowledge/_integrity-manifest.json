@@ -939,7 +939,7 @@
     {
       "path": "product/architecture/visual-grounding-and-video-ingest.md",
       "tier": "public",
-      "size": 5959,
+      "size": 7467,
       "type": "md"
     },
     {
@@ -4203,7 +4203,7 @@
     {
       "path": "product/governance/video-ingest-policy.json",
       "tier": "public",
-      "size": 858,
+      "size": 1034,
       "type": "json"
     },
     {
@@ -4653,7 +4653,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1451917,
+      "size": 1451153,
       "type": "json"
     },
     {
@@ -5019,7 +5019,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19847,
+      "size": 20607,
       "type": "json"
     },
     {

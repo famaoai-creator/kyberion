@@ -46,11 +46,6 @@ const VIDEO_APPROVAL_SCHEMA = {
   type: 'object',
   properties: {
     agent_id: { type: 'string', minLength: 1 },
-    channel: { type: 'string' },
-    correlation_id: { type: 'string' },
-    has_human: { type: 'boolean' },
-    has_ui: { type: 'boolean' },
-    non_interactive: { type: 'boolean' },
   },
   required: ['agent_id'],
   additionalProperties: false,
@@ -62,6 +57,7 @@ const VIDEO_COMMON_PROPERTIES = {
   transcript_preference: { type: 'string', enum: ['auto', 'subtitles_only', 'stt_only'] },
   mission_id: { type: 'string' },
   tenant_slug: { type: 'string' },
+  keep_source: { type: 'boolean' },
   approval: VIDEO_APPROVAL_SCHEMA,
 } as const;
 
