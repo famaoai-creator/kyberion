@@ -482,6 +482,21 @@ describe('OCR egress capability routing', () => {
     }),
   });
 
+  it('defaults the public OCR entry policy to local_only', async () => {
+    const router = new AdaptivePolicyRouter([cloud('llm_api'), local('apple_vision')]);
+    const candidates = await router.resolveCandidates({ path: 'test.png' });
+    expect(candidates.map((p) => p.id)).toEqual(['apple_vision']);
+  });
+
+  it('requires explicit training_eligible opt-in before external OCR is eligible', async () => {
+    const router = new AdaptivePolicyRouter([cloud('llm_api'), local('apple_vision')]);
+    const candidates = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+    });
+    expect(candidates.map((p) => p.id)).toContain('llm_api');
+  });
+
   it('excludes an external provider under local_only even when it is preferred', async () => {
     const router = new AdaptivePolicyRouter([cloud('llm_api'), local('apple_vision')]);
 

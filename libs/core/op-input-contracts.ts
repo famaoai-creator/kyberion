@@ -892,7 +892,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
     parse_document: {
       summary:
-        'Parse an unstructured document (docx/pdf/xlsx/html/slack_thread/markdown/text) into the unified ingest intermediate representation.',
+        'Parse an unstructured document (docx/pdf/xlsx/pptx/html/slack_thread/markdown/text) into the unified ingest intermediate representation.',
       examples: [
         {
           source_path: 'active/shared/tmp/report.docx',
@@ -912,8 +912,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           format: {
             type: 'string',
-            enum: ['docx', 'pdf', 'xlsx', 'html', 'slack_thread', 'markdown', 'text'],
+            enum: ['docx', 'pdf', 'xlsx', 'pptx', 'html', 'slack_thread', 'markdown', 'text'],
           },
+          ocr: { type: 'boolean' },
           source_path: { type: 'string', minLength: 1 },
           content_base64: { type: 'string', minLength: 1 },
           content_text: { type: 'string' },
@@ -1071,6 +1072,109 @@ const INPUT_CONTRACTS: ContractCatalog = {
           export_as: { type: 'string', minLength: 1 },
         },
         additionalProperties: true,
+      },
+    },
+    // Scheduled meeting-page digest. Generic: the tenant and the job arrive
+    // as params from a tenant-scoped pipeline ADF
+    // (knowledge/confidential/{tenant}/pipelines/), which chronos runs in a
+    // tenant-bound child process. Every landing goes through ingest:commit.
+    meeting_digest: {
+      summary:
+        'Meeting digest for one tenant job: re-check Confluence meeting pages modified within the lookback window, re-summarize pages whose version changed (structured reasoning output over untrusted-framed page content, confidential egress scope; the stub backend is refused), render the fixed digest format, land it via the ingest:commit ceremony (PII gate, untrusted wrap, asset ledger with the job approval id), and upsert the job index README. Pages younger than provisional_hours land as provisional and are finalized later without re-summarizing. dry_run fetches and summarizes without writing.',
+      examples: [
+        {
+          tenant_slug: 'acme-corp',
+          job: {
+            id: 'weekly-sync',
+            source_system: 'confluence',
+            source_params: { domain: 'acme', space_key: 'OPS', parent_page_ids: ['1000'] },
+            title_pattern: 'Weekly OPS MTG',
+            target_dir: 'knowledge/confidential/acme-corp/governance/weekly-sync',
+            title_prefix: 'Weekly sync',
+            tags: ['acme-corp', 'weekly-sync'],
+            ingested_by: 'chronos:meeting-digest',
+            approval: {
+              approval_id: 'APPROVAL-1',
+              approved_by: 'owner',
+              approved_at: '2026-09-24',
+            },
+          },
+          dry_run: true,
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['tenant_slug', 'job'],
+        properties: {
+          tenant_slug: {
+            type: 'string',
+            minLength: 1,
+            not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+          },
+          job: {
+            type: 'object',
+            required: [
+              'id',
+              'source_system',
+              'source_params',
+              'title_pattern',
+              'target_dir',
+              'title_prefix',
+              'tags',
+              'ingested_by',
+              'approval',
+            ],
+            properties: {
+              id: { type: 'string', minLength: 1 },
+              enabled: { type: 'boolean' },
+              source_system: { type: 'string', enum: ['confluence'] },
+              source_params: {
+                type: 'object',
+                required: ['domain', 'space_key', 'parent_page_ids'],
+                properties: {
+                  domain: { type: 'string', minLength: 1 },
+                  space_key: { type: 'string', minLength: 1 },
+                  parent_page_ids: {
+                    type: 'array',
+                    items: { type: 'string', minLength: 1 },
+                    minItems: 1,
+                  },
+                },
+                additionalProperties: false,
+              },
+              title_pattern: { type: 'string', minLength: 1 },
+              target_dir: { type: 'string', minLength: 1 },
+              title_prefix: { type: 'string', minLength: 1 },
+              tags: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 1 },
+              lookback_days: { type: 'number', minimum: 1 },
+              provisional_hours: { type: 'number', minimum: 0 },
+              training_use: {
+                type: 'string',
+                enum: ['local_only', 'zero_retention', 'training_eligible'],
+              },
+              ingested_by: { type: 'string', minLength: 1 },
+              approval: {
+                type: 'object',
+                required: ['approval_id', 'approved_by', 'approved_at'],
+                properties: {
+                  approval_id: { type: 'string', minLength: 1 },
+                  approved_by: { type: 'string', minLength: 1 },
+                  approved_at: { type: 'string', minLength: 1 },
+                  reason: { type: 'string' },
+                },
+                additionalProperties: false,
+              },
+              dry_run: { type: 'boolean' },
+            },
+            additionalProperties: false,
+          },
+          dry_run: { type: 'boolean' },
+          lookback_days: { type: 'number', minimum: 1 },
+          now: { type: 'string' },
+          auth: { type: 'string', enum: ['none', 'secret-guard'] },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: false,
       },
     },
     staleness_report: {

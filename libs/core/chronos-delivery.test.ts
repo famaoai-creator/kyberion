@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { enqueueChronosDelivery, renderChronosDeliveryMessage } from './chronos-delivery.js';
+import {
+  enqueueChronosDelivery,
+  renderChronosDeliveryMessage,
+  resolveChronosDeliveryChannel,
+  validateChronosDeliveryTarget,
+} from './chronos-delivery.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import {
   clearSurfaceOutboxMessage,
@@ -10,6 +15,7 @@ import {
 const createdMessageIds: string[] = [];
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   withExecutionContext('slack_bridge', () => {
     for (const messageId of createdMessageIds.splice(0)) {
       clearSurfaceOutboxMessage('slack', messageId);
@@ -119,5 +125,44 @@ describe('chronos-delivery', () => {
       '/active/shared/coordination/channels/slack/outbox/'
     );
     expect(message).toMatchObject({ channel: 'C123', thread_ts: '' });
+  });
+
+  it('resolves an allowlisted env channel reference and fails closed when unset', () => {
+    expect(
+      resolveChronosDeliveryChannel('env:KYBERION_OPERATOR_SLACK_DM', {
+        KYBERION_OPERATOR_SLACK_DM: ' U0TESTDM ',
+      })
+    ).toBe('U0TESTDM');
+    expect(resolveChronosDeliveryChannel('#ops', {})).toBe('#ops');
+    expect(() => resolveChronosDeliveryChannel('env:KYBERION_OPERATOR_SLACK_DM', {})).toThrow(
+      /\[CONFIG_MISSING\].*KYBERION_OPERATOR_SLACK_DM/
+    );
+    expect(() =>
+      validateChronosDeliveryTarget({ surface: 'slack', channel: 'env:SLACK_BOT_TOKEN' })
+    ).toThrow(/not allowlisted: SLACK_BOT_TOKEN/);
+    expect(
+      validateChronosDeliveryTarget({ surface: 'slack', channel: 'env:KYBERION_OPERATOR_SLACK_DM' })
+        .channel
+    ).toBe('env:KYBERION_OPERATOR_SLACK_DM');
+  });
+
+  it('refuses to enqueue an env channel delivery while the env var is unset', () => {
+    vi.stubEnv('KYBERION_OPERATOR_SLACK_DM', '');
+    expect(() =>
+      withExecutionContext('chronos_gateway', () =>
+        enqueueChronosDelivery({
+          scheduleId: 'env-dm-report',
+          pipelineName: 'Env DM report',
+          runId: 'run-env-unset',
+          status: 'succeeded',
+          target: { surface: 'slack', channel: 'env:KYBERION_OPERATOR_SLACK_DM' },
+        })
+      )
+    ).toThrow(/CONFIG_MISSING/);
+    expect(
+      listSurfaceOutboxMessages('slack').some(
+        (entry) => entry.correlation_id === 'chronos:env-dm-report:run-env-unset'
+      )
+    ).toBe(false);
   });
 });

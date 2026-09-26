@@ -22,7 +22,7 @@
     },
     {
       "op": "parse_document",
-      "description": "Parses docx/pdf/xlsx/html/slack_thread/markdown/text input into the unified ingest intermediate representation with a raw-bytes content_sha256",
+      "description": "Parses docx/pdf/xlsx/pptx/html/slack_thread/markdown/text input into the unified ingest intermediate representation with a raw-bytes content_sha256. docx/xlsx/pptx/pdf go through the native readers; ocr=true OCRs embedded images with local providers; password-protected Office files are rejected with an actionable error",
       "platforms": ["darwin", "linux"]
     },
     {
@@ -43,6 +43,11 @@
     {
       "op": "commit",
       "description": "DA-05 explicit ingest ceremony: lands a normalized knowledge card inside the tenant knowledge root (fail-closed path guard, ingest_commit authority role) and appends the append-only asset ledger record; re-ingests of the same source become supersede versions",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "meeting_digest",
+      "description": "Meeting digest for one tenant job declared in a tenant-scoped pipeline ADF: re-checks Confluence meeting pages modified within the lookback window, re-summarizes changed versions into a fixed structured digest (untrusted-framed input, confidential egress scope, refuses the stub backend), and lands digests plus the index README only through the ingest:commit ceremony; provisional vs final by page age",
       "platforms": ["darwin", "linux"]
     }
   ]

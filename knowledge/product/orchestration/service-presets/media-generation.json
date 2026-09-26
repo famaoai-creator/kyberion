@@ -101,18 +101,6 @@
           "description": "Generic ComfyUI workflow via CLI"
         }
       ]
-    },
-    "capture_screen": {
-      "type": "cli",
-      "command": "screencapture",
-      "args": ["-x", "-t", "jpg", "{{output}}"],
-      "description": "macOS Native Screen Capture"
-    },
-    "record_screen": {
-      "type": "cli",
-      "command": "ffmpeg",
-      "args": ["-f", "avfoundation", "-i", "1:0", "-t", "{{duration}}", "-y", "{{output}}"],
-      "description": "Screen Recording via FFmpeg"
     }
   }
 }

@@ -90,6 +90,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/embedding-backend.ts',
     consumers: ['libs/core/src/knowledge-index.ts'],
   },
+  'knowledge-adapter': {
+    declaration: 'libs/core/knowledge-adapter.ts',
+    consumers: ['libs/core/knowledge-adapter.ts'],
+  },
   'identity-context-resolver': {
     declaration: 'libs/core/identity-context-bridge.ts',
     consumers: ['libs/core/authority.ts', 'libs/core/tier-guard.ts'],

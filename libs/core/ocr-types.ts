@@ -1,4 +1,6 @@
 export type OcrRoutingMode = 'fast' | 'accurate' | 'balanced' | 'local_only' | 'privacy_first';
+export type OcrDataPolicy = 'local_only' | 'zero_retention' | 'training_eligible';
+export type OcrDataTier = 'public' | 'confidential' | 'personal';
 
 /**
  * Where a provider sends the image in order to read it. This is a capability of
@@ -27,6 +29,12 @@ export interface OcrRequest {
    * orders the eligible providers.
    */
   purpose?: string;
+  /** Highest tier represented by the image. Defaults to public for direct OCR calls. */
+  tier?: OcrDataTier;
+  /** Tenant owning the material; required by egress policy for non-public data. */
+  tenant_slug?: string;
+  /** Maximum provider data policy allowed for this request. Defaults to local_only. */
+  training_use?: OcrDataPolicy;
 }
 
 export interface OcrTextLine {
@@ -56,6 +64,8 @@ export interface OcrResult {
   elapsedMs: number;
   /** Egress of the provider that served this result, so callers can assert it. */
   providerDataEgress?: OcrDataEgress;
+  dataPolicy?: OcrDataPolicy;
+  tier?: OcrDataTier;
 }
 
 export interface OcrProvider {
@@ -67,6 +77,8 @@ export interface OcrProvider {
    * compute this from the resolved endpoint rather than hard-coding it.
    */
   readonly dataEgress: OcrDataEgress;
+  /** Provider's declared retention/training posture. */
+  readonly dataPolicy?: OcrDataPolicy;
   isAvailable(): Promise<boolean>;
   recognize(request: OcrRequest): Promise<OcrResult>;
 }

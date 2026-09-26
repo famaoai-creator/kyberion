@@ -106,7 +106,7 @@ describe('generate_op_registry discovery output', () => {
     ) as DiscoveryDocument;
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
     // Ratchet count regenerated via `pnpm generate:op-registry` against the
-    // ops actually registered on disk (main added 7 ops since this literal
+    // ops actually registered on disk (main added 10 ops since this literal
     // was last set); keep it in sync by regenerating rather than hand-editing
     // knowledge/product/orchestration/actuator-op-discovery.json.
     expect(operations).toHaveLength(582);

