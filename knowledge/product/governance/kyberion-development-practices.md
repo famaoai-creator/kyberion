@@ -112,9 +112,18 @@ see). Before calling such code done, run it once through its real entry
 point (CLI, janitor, worker, surface) against the real root. Wrap each
 synchronous disk call in `withExecutionContext(role, fn)` — it restores the
 context as soon as `fn` returns, so never wrap an `await`; use
-`withExecutionContextAsync` across awaits — it swaps the process-global
-`MISSION_ROLE` for the whole await, so concurrent async flows in one process
-see each other's role. Data a runtime role must read
+`withExecutionContextAsync` across awaits. The assumed role and persona live
+in an AsyncLocalStorage scope that outranks `SYSTEM_ROLE` and is isolated per
+async context. Only the synchronous helper mirrors it into the
+`MISSION_ROLE` / `KYBERION_PERSONA` env vars (a compatibility mirror for
+attribution labels); the async helper never does, so authorization code must
+resolve the role through `resolveRole()` / `resolveIdentityContext()` /
+`resolveExecutionPersona()`, never read the env, and child envs must come
+from `buildExecutionEnv()` / `buildSafeExecEnv()`.
+Under `SYSTEM_ROLE` (every surface launched by surface_runtime) a role must be
+allowed by `role-assumption-policy.json` or the assumption throws
+`[ROLE_ASSUMPTION_DENIED]` — see
+[AUTHORITY_MODEL §3.B2](./AUTHORITY_MODEL.md). Data a runtime role must read
 must live where that role can read it, and an unreadable overlay must warn,
 not drop silently.
 

@@ -16,6 +16,7 @@ import {
 } from './business-calendar.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { executionPersonaText } from './foundation/execution-scope.js';
 import {
   listOrganizationDecisions,
   listOrganizationIncidents,
@@ -568,7 +569,11 @@ export interface OrganizationDigestRun {
 export function runOrganizationDigest(
   options: RunOrganizationDigestOptions = {}
 ): OrganizationDigestRun {
-  const persona = getRegisteredEnvText('KYBERION_PERSONA', { env: options.env });
+  // An injected env is authoritative (tests, adapters); otherwise the
+  // execution scope's persona outranks the process-global env (B2).
+  const persona = options.env
+    ? getRegisteredEnvText('KYBERION_PERSONA', { env: options.env })
+    : executionPersonaText();
   if (persona !== 'sovereign') {
     throw new Error(
       `[POLICY_VIOLATION] The organization digest aggregates across tenants and requires KYBERION_PERSONA=sovereign (got ${persona || 'unset'}).`
