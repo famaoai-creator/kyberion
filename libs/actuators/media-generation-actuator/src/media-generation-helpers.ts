@@ -30,6 +30,7 @@ import {
 } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { isRecord } from '@agent/core/foundation';
 import type { GenerationJob } from '@agent/core/types/generation-job';
 import {
   getGenerationHistoryAdapter,
@@ -313,6 +314,49 @@ function resolveImageProviderPurpose(params: any): {
   const purpose = typeof params?.purpose === 'string' ? params.purpose.trim() : '';
   if (!purpose) return {};
   return { purpose, allowHostHandoff: params?.allow_host_handoff === true };
+}
+
+const IMAGE_REFERENCE_MIME_BY_EXTENSION: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+};
+const IMAGE_REFERENCE_ROLES = new Set(['subject', 'style', 'consistency']);
+
+/**
+ * `reference_images` (paths, or `{path, role?, mime_type?}`) → bridge
+ * references. The bridge applies the PA-10 gate: only providers that honour
+ * references are eligible, and a cloud provider additionally needs a per-run
+ * user consent, which an ADF step cannot grant — so cloud reference runs fail
+ * closed instead of silently generating without the references.
+ */
+function resolveImageReferences(params: any): {
+  referenceImages?: Array<{
+    path: string;
+    mimeType: string;
+    role?: 'subject' | 'style' | 'consistency';
+  }>;
+} {
+  const raw = params?.reference_images ?? params?.referenceImages;
+  if (!Array.isArray(raw) || raw.length === 0) return {};
+  const referenceImages = raw.map((entry: unknown) => {
+    const record: Record<string, unknown> =
+      typeof entry === 'string' ? { path: entry } : isRecord(entry) ? entry : {};
+    const refPath = typeof record.path === 'string' ? record.path.trim() : '';
+    if (!refPath) throw new Error('reference_images entries need a path');
+    const mimeType =
+      (typeof record.mime_type === 'string' && record.mime_type) ||
+      (typeof record.mimeType === 'string' && record.mimeType) ||
+      IMAGE_REFERENCE_MIME_BY_EXTENSION[path.extname(refPath).toLowerCase()];
+    if (!mimeType) throw new Error(`reference image type not supported: ${refPath}`);
+    const role =
+      typeof record.role === 'string' && IMAGE_REFERENCE_ROLES.has(record.role)
+        ? (record.role as 'subject' | 'style' | 'consistency')
+        : 'subject';
+    return { path: refPath, mimeType, role };
+  });
+  return { referenceImages };
 }
 
 /**
@@ -671,6 +715,7 @@ export {
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
   resolveImageProviderPurpose,
+  resolveImageReferences,
   isDirectMusicGenerationBackend,
   describeGeneratedBackend,
   musicBackendIdForProvider,
