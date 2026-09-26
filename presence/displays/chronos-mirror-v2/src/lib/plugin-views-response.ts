@@ -102,6 +102,10 @@ export function buildPluginViewsPayload(
       params: request.params,
       status: request.status,
       requested_at: request.requestedAt,
+      // Chronos does not activate plugins in-process (FU-02 known gap), so an
+      // approved request is usually not executable here.
+      executable: request.executable,
+      ...(request.unavailableReason ? { unavailable_reason: request.unavailableReason } : {}),
     })),
     a2ui: composePluginViewsA2UI(views, (key) => pluginViewTitle(key, locale)),
   };

@@ -1,6 +1,41 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  /** Third-party fs ceiling override (narrows the next install's grant). */
+  thirdPartyFs: null as Record<string, unknown> | null,
+  failApplyResult: false,
+}));
+
+vi.mock('./plugin-permissions.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./plugin-permissions.js')>();
+  return {
+    ...actual,
+    loadPluginPermissionPolicy: (policyPath?: string) => {
+      const base = actual.loadPluginPermissionPolicy(policyPath);
+      if (!mocks.thirdPartyFs) return base;
+      return {
+        ...base,
+        ceilings: {
+          ...base.ceilings,
+          'third-party': { ...base.ceilings['third-party'], fs: mocks.thirdPartyFs },
+        },
+      };
+    },
+  };
+});
+
+vi.mock('./approval-store.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./approval-store.js')>();
+  return {
+    ...actual,
+    recordApprovalApplyResult: (...args: Parameters<typeof actual.recordApprovalApplyResult>) => {
+      if (mocks.failApplyResult) throw new Error('approval store unavailable');
+      return actual.recordApprovalApplyResult(...args);
+    },
+  };
+});
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import type { A2UIMessage } from './a2ui.js';
@@ -17,9 +52,12 @@ import {
   refreshManagedPluginActivation,
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
+import { registerOpPreflightListener } from './op-preflight.js';
 import {
+  safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
@@ -38,7 +76,10 @@ import {
   executeApprovedPluginViewAction,
   isPluginViewVisible,
   listPluginViewActionRequests,
+  MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS,
   PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS,
+  PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS,
+  prunePluginViewActionRequests,
   listPluginViewsForViewer,
   loadPluginViews,
   parsePluginViewDeclaration,
@@ -61,10 +102,24 @@ function tracked(dirPath: string): string {
   return dirPath;
 }
 
+const ACTION_DIR = pathResolver.shared('coordination/channels/chronos/plugin-view-actions');
+const trackedActionIds: string[] = [];
+
 afterEach(() => {
   vi.restoreAllMocks();
   resetPluginLifecycleForTests();
+  mocks.thirdPartyFs = null;
+  mocks.failApplyResult = false;
   withExecutionContext('mission_controller', () => {
+    // Sidecars are named `<request time>-<approval id>.json`.
+    const ids = trackedActionIds.splice(0);
+    if (ids.length > 0 && safeExistsSync(ACTION_DIR)) {
+      for (const entry of safeReaddir(ACTION_DIR)) {
+        if (ids.some((id) => entry.endsWith(`-${id}.json`))) {
+          safeRmSync(path.join(ACTION_DIR, entry));
+        }
+      }
+    }
     while (cleanupPaths.length > 0) safeRmSync(cleanupPaths.pop() as string);
   });
 });
@@ -118,9 +173,15 @@ function installApproved(
   pluginId: string,
   sourcePath: string,
   managedRoot: string,
-  approve = true
+  approve = true,
+  tenantSlug?: string
 ): ManagedPluginRecord {
-  const record = installPluginManaged({ pluginId, sourcePath, managedRoot });
+  const record = installPluginManaged({
+    pluginId,
+    sourcePath,
+    managedRoot,
+    ...(tenantSlug ? { tenantSlug } : {}),
+  });
   if (!approve) return record;
   const pending = loadApprovalRequest(
     record.approvalChannel as string,
@@ -151,19 +212,19 @@ function newIds(prefix: string) {
 
 function trackActionRequest(id: string): void {
   tracked(pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`));
-  tracked(pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.json`));
+  trackedActionIds.push(id);
   tracked(
     pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
   );
 }
 
-function approveActionRequest(id: string): void {
+function approveActionRequest(id: string, decidedBy = 'human:approver'): void {
   const pending = loadApprovalRequest('chronos', id);
   decideApprovalRequest('mission_controller', {
     channel: 'chronos',
     requestId: id,
     decision: 'approved',
-    decidedBy: 'human:approver',
+    decidedBy,
     decidedByType: 'human',
     authenticated: true,
     payloadHash: pending?.accountability?.payloadHash,
@@ -613,9 +674,28 @@ describe('approved human view actions (FU-02)', () => {
   const executor = { executedBy: 'viewer-2', actorRole: 'localadmin', surface: 'api' as const };
   const requester = { requestedBy: 'viewer-1', actorRole: 'localadmin', surface: 'api' as const };
 
-  async function activeFixture(prefix: string) {
+  function spyAudit() {
+    return vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({
+          ...entry,
+          id: 'audit',
+          timestamp: '',
+          previousHash: '',
+          currentHash: '',
+        }) as AuditEntry
+    );
+  }
+
+  function auditedExecutions(audit: ReturnType<typeof spyAudit>) {
+    return audit.mock.calls
+      .map(([entry]) => entry)
+      .filter((entry) => entry.action.startsWith('plugin_view.action.'));
+  }
+
+  async function activeFixture(prefix: string, tenantSlug?: string) {
     const { pluginId, managedRoot } = newIds(prefix);
-    const record = installApproved(pluginId, fixtureCopy(), managedRoot);
+    const record = installApproved(pluginId, fixtureCopy(), managedRoot, true, tenantSlug);
     expect((await activatePlugin({ record }, { managedRoot })).ok).toBe(true);
     const view = () =>
       listPluginViewsForViewer(listManagedPlugins(managedRoot), publicReader).views[0];
@@ -655,7 +735,7 @@ describe('approved human view actions (FU-02)', () => {
       'PLUGIN_VIEW_APPROVAL_REQUIRED'
     );
     expect(listPluginViewActionRequests([view()])).toMatchObject([
-      { approvalRequestId: id, status: 'pending', params },
+      { approvalRequestId: id, status: 'pending', params, executable: false },
     ]);
 
     approveActionRequest(id);
@@ -676,7 +756,10 @@ describe('approved human view actions (FU-02)', () => {
       }),
       'PLUGIN_VIEW_APPROVAL_REQUIRED'
     );
-    expect(listPluginViewActionRequests([view()])[0].status).toBe('approved');
+    expect(listPluginViewActionRequests([view()])[0]).toMatchObject({
+      status: 'approved',
+      executable: true,
+    });
 
     const executed = await executeApprovedPluginViewAction(resolved(), id, executor);
     expect(executed).toEqual({ status: 'executed', handled: true, approvalRequestId: id });
@@ -708,8 +791,14 @@ describe('approved human view actions (FU-02)', () => {
         approval_request_id: id,
         requested_by: 'viewer-1',
         approved_by: 'human:approver',
+        self_approved: false,
       },
     });
+    // The claim is audited before the handler runs.
+    const all = auditedExecutions(audit);
+    const started = all.findIndex((entry) => entry.action === 'plugin_view.action.started');
+    expect(started).toBeGreaterThanOrEqual(0);
+    expect(all[started + 1]).toMatchObject({ result: 'completed' });
   });
 
   it('refuses an approval after the plugin is reinstalled with different content', async () => {
@@ -770,6 +859,7 @@ describe('approved human view actions (FU-02)', () => {
   });
 
   it('keeps the approval when the plugin is not active and refuses agent actions', async () => {
+    const audit = spyAudit();
     const view = loadPluginViews(FIXTURE_DIR).views[0];
     const params = { path: `active/shared/tmp/${randomUUID()}` };
     const id = await queue(view, params);
@@ -782,7 +872,11 @@ describe('approved human view actions (FU-02)', () => {
       ),
       'PLUGIN_VIEW_ACTION_UNAVAILABLE'
     );
-    expect(listPluginViewActionRequests([view])[0].status).toBe('approved');
+    expect(listPluginViewActionRequests([view])[0]).toMatchObject({
+      status: 'approved',
+      executable: false,
+      unavailableReason: 'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+    });
     await expectViewErrorAsync(
       executeApprovedPluginViewAction(resolvePluginViewAction(view, 'probe_env', {}), id, executor),
       'PLUGIN_VIEW_ACTION_DENIED'
@@ -795,5 +889,174 @@ describe('approved human view actions (FU-02)', () => {
       ),
       'PLUGIN_VIEW_NOT_FOUND'
     );
+    // Unavailable op and unknown approval are audited refusals.
+    expect(
+      auditedExecutions(audit).map((entry) => [entry.result, entry.reason.slice(0, 32)])
+    ).toEqual([
+      ['denied', '[PLUGIN_VIEW_ACTION_UNAVAILABLE]'],
+      ['denied', '[PLUGIN_VIEW_NOT_FOUND] approval'],
+    ]);
+  });
+
+  it('refuses when op preflight rewrites or blocks the approved params (audited)', async () => {
+    const audit = spyAudit();
+    const { view } = await activeFixture('views-exec-preflight');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+    const resolved = () => resolvePluginViewAction(view(), 'write_probe', params);
+
+    const rewrite = registerOpPreflightListener({
+      id: `fu02-rewrite-${randomUUID()}`,
+      run: (call) =>
+        call.op === 'permfixture:write' ? { repaired_input: { path: 'knowledge/x' } } : undefined,
+    });
+    try {
+      await expectViewErrorAsync(
+        executeApprovedPluginViewAction(resolved(), id, executor),
+        'PLUGIN_VIEW_APPROVAL_MISMATCH'
+      );
+    } finally {
+      rewrite();
+    }
+    const block = registerOpPreflightListener({
+      id: `fu02-block-${randomUUID()}`,
+      run: (call) =>
+        call.op === 'permfixture:write' ? { decision: 'block', reason: 'nope' } : undefined,
+    });
+    try {
+      await expectViewErrorAsync(
+        executeApprovedPluginViewAction(resolved(), id, executor),
+        'PLUGIN_VIEW_ACTION_DENIED'
+      );
+    } finally {
+      block();
+    }
+    // Neither refusal spent the approval.
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('approved');
+    expect(auditedExecutions(audit).map((entry) => entry.result)).toEqual(['denied', 'denied']);
+    expect((await executeApprovedPluginViewAction(resolved(), id, executor)).status).toBe(
+      'executed'
+    );
+  });
+
+  it('refuses while the running module does not run under the approved grant', async () => {
+    spyAudit();
+    const { pluginId, managedRoot, record, view } = await activeFixture('views-exec-grant');
+    // Same content re-approved with a narrower grant; the module is not reloaded.
+    mocks.thirdPartyFs = { mode: 'readonly', paths: [{ tier: 'public', prefix: 'docs' }] };
+    const narrowed = installApproved(pluginId, fixtureCopy(), managedRoot);
+    expect(narrowed.contentDigest).toBe(record.contentDigest);
+    expect(narrowed.permissionsDigest).not.toBe(record.permissionsDigest);
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+    const resolved = () => resolvePluginViewAction(view(), 'write_probe', params);
+
+    expect(listPluginViewActionRequests([view()])[0]).toMatchObject({
+      status: 'approved',
+      executable: false,
+      unavailableReason: 'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+    });
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolved(), id, executor),
+      'PLUGIN_VIEW_ACTION_UNAVAILABLE'
+    );
+    // Narrowing in place (config_apply) makes the approved grant the running one.
+    expect(await reloadPlugin(pluginId, { managedRoot })).toMatchObject({
+      ok: true,
+      mode: 'config_apply',
+    });
+    expect(listPluginViewActionRequests([view()])[0].executable).toBe(true);
+    const error = await executeApprovedPluginViewAction(resolved(), id, executor).then(
+      () => undefined,
+      (reason: unknown) => reason
+    );
+    expect(error).not.toBeInstanceOf(PluginViewError);
+  });
+
+  it('binds the approval to the tenant of the install', async () => {
+    spyAudit();
+    const { pluginId, managedRoot, view } = await activeFixture('views-exec-tenant', 'tenant-a');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+    expect(view().tenantSlug).toBe('tenant-a');
+    expect(listPluginViewActionRequests([view()])).toHaveLength(1);
+
+    // Same content and grant, reinstalled for another tenant.
+    installApproved(pluginId, fixtureCopy(), managedRoot, true, 'tenant-b');
+    expect(view().tenantSlug).toBe('tenant-b');
+    expect(listPluginViewActionRequests([view()])).toEqual([]);
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        resolvePluginViewAction(view(), 'write_probe', params),
+        id,
+        executor
+      ),
+      'PLUGIN_VIEW_APPROVAL_MISMATCH'
+    );
+  });
+
+  it('reports a claim without a recorded result as unknown, not as a failure', async () => {
+    const audit = spyAudit();
+    const { view } = await activeFixture('views-exec-record-fail');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id, 'human:viewer-2');
+    const resolved = () => resolvePluginViewAction(view(), 'write_probe', params);
+
+    mocks.failApplyResult = true;
+    const outcome = await executeApprovedPluginViewAction(resolved(), id, executor);
+    expect(outcome).toMatchObject({ status: 'executed', approvalRequestId: id });
+    expect(loadApprovalRequest('chronos', id)?.applyResult).toBeUndefined();
+    expect(listPluginViewActionRequests([view()])[0]).toMatchObject({
+      status: 'unknown',
+      executable: false,
+    });
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(resolved(), id, executor),
+      'PLUGIN_VIEW_APPROVAL_CONSUMED'
+    );
+    const entries = auditedExecutions(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.started', 'allowed'],
+      ['plugin_view.action.execute', 'completed'],
+      ['plugin_view.action.execute', 'denied'],
+    ]);
+    // The approver executed it: allowed, but recorded as self-approval.
+    expect(entries[1].metadata).toMatchObject({ self_approved: true });
+  });
+
+  it('scans only the newest sidecars and prunes old terminal ones', async () => {
+    expect(MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS).toBe(200);
+    const view = loadPluginViews(FIXTURE_DIR).views[0];
+    const id = await queue(view, { path: `active/shared/tmp/${randomUUID()}` });
+    expect(listPluginViewActionRequests([view], { maxScanned: 3 })).toHaveLength(1);
+
+    // Newer (future-dated) sidecars fill the scan window.
+    const junk = [0, 1, 2].map((index) => `900000000000000-fu02-junk-${randomUUID()}-${index}`);
+    withExecutionContext('mission_controller', () => {
+      for (const name of junk) safeWriteFile(path.join(ACTION_DIR, `${name}.json`), '{}');
+    });
+    junk.forEach((name) => tracked(path.join(ACTION_DIR, `${name}.json`)));
+    expect(listPluginViewActionRequests([view], { maxScanned: 3 })).toEqual([]);
+    expect(listPluginViewActionRequests([view], { maxScanned: 4 })).toHaveLength(1);
+
+    // An old sidecar whose approval is gone is pruned; the live request is kept.
+    const stale = path.join(ACTION_DIR, `000000000000001-${randomUUID()}.json`);
+    withExecutionContext('mission_controller', () =>
+      safeWriteFile(
+        stale,
+        JSON.stringify({ approval_request_id: '00000000-0000-4000-8000-000000000000' })
+      )
+    );
+    tracked(stale);
+    expect(PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(prunePluginViewActionRequests()).toBeGreaterThanOrEqual(1);
+    expect(safeExistsSync(stale)).toBe(false);
+    expect(listPluginViewActionRequests([view], { maxScanned: 4 })).toMatchObject([
+      { approvalRequestId: id },
+    ]);
   });
 });
