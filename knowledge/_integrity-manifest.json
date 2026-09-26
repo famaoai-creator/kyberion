@@ -939,7 +939,7 @@
     {
       "path": "product/architecture/visual-grounding-and-video-ingest.md",
       "tier": "public",
-      "size": 7467,
+      "size": 10505,
       "type": "md"
     },
     {
@@ -3675,7 +3675,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 19426,
+      "size": 19667,
       "type": "json"
     },
     {

@@ -25,8 +25,10 @@ import {
   safeExecResult,
   assertSafeRepositoryPath,
   safeReadFile,
+  MAX_RANGE_READ_BYTES,
   safeReadFileRange,
   safeReadFileTail,
+  safeRealpath,
   safeWriteFile,
   sanitizePath,
   validateUrl,
@@ -106,6 +108,28 @@ describe('secure-io core', () => {
       const link = path.join(tmpDir, 'range-link.txt');
       fs.symlinkSync(testFile, link);
       expect(() => safeReadFileRange(link, 0, 1)).toThrow('symbolic link');
+    });
+
+    it('refuses a window larger than the range cap', () => {
+      const testFile = path.join(tmpDir, 'range-cap.txt');
+      fs.writeFileSync(testFile, 'abc');
+      expect(safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES).toString('utf8')).toBe('abc');
+      expect(() => safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES + 1)).toThrow('exceeds the');
+    });
+  });
+
+  describe('safeRealpath', () => {
+    it('resolves symlinked parent directories, including for a missing leaf', () => {
+      const realDir = path.join(tmpDir, 'real');
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(path.join(realDir, 'a.txt'), 'a');
+      const linkDir = path.join(tmpDir, 'link');
+      fs.symlinkSync(realDir, linkDir);
+      const canonicalReal = fs.realpathSync.native(realDir);
+      expect(safeRealpath(path.join(linkDir, 'a.txt'))).toBe(path.join(canonicalReal, 'a.txt'));
+      expect(safeRealpath(path.join(linkDir, 'new', 'b.txt'))).toBe(
+        path.join(canonicalReal, 'new', 'b.txt')
+      );
     });
   });
 
