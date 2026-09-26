@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { decideApprovalRequest, loadApprovalRequest } from './approval-store.js';
@@ -29,6 +29,22 @@ import {
   type PluginHostAuditEntry,
   type PluginHostTimers,
 } from './plugin-host.js';
+
+// Pass-through spy: records every file read / directory walk so tests can prove
+// which managed copies were digested.
+const secureIoReads = vi.hoisted(() => [] as string[]);
+vi.mock('./secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./secure-io.js')>();
+  const safeReadFile = ((...args: Parameters<typeof actual.safeReadFile>) => {
+    secureIoReads.push(String(args[0]));
+    return actual.safeReadFile(...args);
+  }) as typeof actual.safeReadFile;
+  const safeReaddir = ((...args: Parameters<typeof actual.safeReaddir>) => {
+    secureIoReads.push(String(args[0]));
+    return actual.safeReaddir(...args);
+  }) as typeof actual.safeReaddir;
+  return { ...actual, safeReadFile, safeReaddir };
+});
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
 const TMP_ROOT = pathResolver.sharedTmp('plugin-host-test');
@@ -318,6 +334,30 @@ describe('plugin host sync (PH-01)', () => {
     await sharedOnly.syncNow();
     expect(isPluginActive(shared.pluginId)).toBe(true);
     expect(isPluginActive(own.pluginId)).toBe(false);
+  });
+
+  it("never digests or walks other tenants' managed copies", async () => {
+    const { managedRoot, id } = newRoot();
+    const own = install(id('tenant-a'), managedRoot, { tenantSlug: 'tenant-a' });
+    const foreign = install(id('tenant-b'), managedRoot, { tenantSlug: 'tenant-b' });
+    // Something else started the foreign plugin: the host stops it without reading it.
+    await activatePlugin({ record: foreign }, { managedRoot });
+    secureIoReads.length = 0;
+    const { host, audits } = hostFor(managedRoot, { tenantAllow: ['tenant-a'] });
+    await host.syncNow();
+    const inside = (dir: string) => (p: string) => p === dir || p.startsWith(`${dir}${path.sep}`);
+    // Only the record file is parsed (through the catalog loader); no content read or walk.
+    expect(secureIoReads.filter(inside(foreign.managedPath))).toEqual([]);
+    expect(secureIoReads.some(inside(own.managedPath))).toBe(true);
+    expect(isPluginActive(foreign.pluginId)).toBe(false);
+    expect(isPluginActive(own.pluginId)).toBe(true);
+    expect(audits).toContainEqual(
+      expect.objectContaining({
+        action: 'plugin_host.deactivate',
+        operation: foreign.pluginId,
+        reason: 'tenant_excluded',
+      })
+    );
   });
 
   it('coalesces concurrent sync requests into one follow-up run', async () => {
