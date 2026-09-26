@@ -31,6 +31,7 @@ import type {
   DocxDrawing,
   DocxAbstractNum,
   DocxNum,
+  DocxPassthroughPart,
 } from './types/docx-protocol.js';
 
 // ─── XML Helpers ────────────────────────────────────────────
@@ -817,6 +818,15 @@ function cleanObj(obj: Record<string, any>): Record<string, any> {
 
 // ─── Image Embedding ────────────────────────────────────────
 
+/** Word parts carried verbatim into the design for lossless round-trips. */
+const PASSTHROUGH_PART_PATHS = new Set([
+  'word/settings.xml',
+  'word/footnotes.xml',
+  'word/endnotes.xml',
+  'word/comments.xml',
+  'word/people.xml',
+]);
+
 export interface DistillDocxOptions {
   /**
    * Inline every picture as base64 `imageData` — a self-contained design for
@@ -1018,6 +1028,23 @@ export async function distillDocxDesign(
           ),
   });
 
+  // 9. Passthrough parts: content-bearing parts the protocol does not model
+  // natively (footnotes, endnotes, comments, settings, people, customXml) are
+  // carried verbatim so references from document.xml keep resolving after a
+  // round-trip. Legacy/environment parts (webSettings, thumbnails) are
+  // intentionally not carried.
+  const passthroughParts: DocxPassthroughPart[] = [];
+  for (const entryName of Object.keys(zip.files)) {
+    if (!PASSTHROUGH_PART_PATHS.has(entryName) && !entryName.startsWith('customXml/')) continue;
+    const entry = zip.file(entryName);
+    if (!entry || entry.dir) continue;
+    passthroughParts.push({
+      path: entryName,
+      content: await entry.async('string'),
+      encoding: 'utf8',
+    });
+  }
+
   return {
     version: '1.0.0',
     generatedAt: nowIso(),
@@ -1028,5 +1055,6 @@ export async function distillDocxDesign(
     sections,
     headersFooters,
     relationships,
+    ...(passthroughParts.length > 0 ? { passthroughParts } : {}),
   };
 }
