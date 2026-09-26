@@ -58,7 +58,15 @@ The WS items bound that shared state and the disk that per-session copies use.
      audit entry has result `failed`, the ledger entry records
      `pendingReconcile` (`repoRoot`, `fromSha`) and the directory is kept: a
      later `dispose` or the WS-07 sweep retries it, and neither budget
-     reclaim nor the sweep deletes the entry while it is pending.
+     reclaim nor the sweep deletes the entry while it is pending — unless the
+     pending reconcile is _abandoned_: a `fromSha` that no longer resolves to
+     a commit (`git cat-file -e <fromSha>^{commit}`; history rewritten or the
+     checkout gone) is abandoned immediately, and one still pending 3x the
+     orphan TTL after release is abandoned regardless, so a permanently stuck
+     reconcile does not leak the entry forever (audit result `abandoned`).
+     `describePendingReconcileAbandon` (`workspace-ledger.ts`) is the shared
+     decision the sweep, the budget and `retryPendingSharedIndexReconcile`
+     all use.
   2. Releases the ledger entry.
   3. Deletes the directory — unless the reconcile is pending, or the child
      (the recorded process, or its process group) is still alive (e.g. the wall-clock timeout path disposes right after `SIGKILL`).
@@ -144,10 +152,13 @@ The ledger is the only source of ownership: deletion goes through
 symlink-free and under an allowed root (`active/shared/runtime/workspaces/`,
 `.worktrees/`, `active/shared/runtime/git-indexes/`). Git worktrees are removed
 with `git worktree remove --force` on the owner path, never `rm`. Callers that
-decided on an earlier snapshot pass `guard.expect` (`live`, `createdAt`,
-`releasedAt`); the delete re-checks it under the ledger lock and refuses
-(`[WORKSPACE_CHANGED]`) when the record was re-registered or re-released in
-between — re-registering a path reuses its id. `guard.requireCleanWorktree`
+decided on an earlier snapshot pass `guard.expect`, a `WorkspaceRecordSnapshot`
+(`workspaceRecordSnapshot(record)`: `live`, `createdAt`, `releasedAt`,
+`childPid`, `childStartedAt`, `hasPendingReconcile`); the delete re-checks
+every one of those fields under the ledger lock and refuses
+(`[WORKSPACE_CHANGED]`) on any mismatch — re-registered, re-released, a child
+pid attached, or a pending reconcile recorded in between (re-registering a
+path reuses its id). `guard.requireCleanWorktree`
 refuses (`[WORKSPACE_DIRTY]`) a git worktree with `git status --porcelain`
 output or commits no branch, tag or remote reaches. That probe runs **before**
 the ledger lock is taken (15 s timeout per git call), so a slow tree never
@@ -171,7 +182,9 @@ and wall time. Near the cap it reclaims released workspaces oldest first,
 skipping any that fail to delete (vanished, changed, owner-only) instead of
 aborting the check. A released `git-index` whose delegated child is still
 alive (same check as the sweep) or whose reconcile is pending is never
-reclaimed. Git worktrees are never reclaimed inline — they wait for
+reclaimed inline — unless that pending reconcile is abandoned (see WS-01),
+in which case disk pressure reclaims it right away instead of waiting for
+the next sweep. Git worktrees are never reclaimed inline — they wait for
 the sweep's TTL and unsaved-work check. An unreadable free-space probe fails
 closed when a floor is configured.
 
@@ -190,7 +203,9 @@ A `git-index` whose child is still alive (`childPid` with a matching
 `childStartedAt`, or its process group) is never an orphan. Before selecting
 orphans the sweep (not in dry-run) retries every pending shared-index
 reconcile; an entry whose reconcile still fails is kept and reported as an
-error. Orphans are
+error, unless it is abandoned (see WS-01), in which case it is cleared and
+falls through to the normal orphan check like any other released entry.
+Orphans are
 deleted through the ledger with the snapshot guard and the clean-worktree
 check; surviving entries get their cached `bytes` refreshed. Unregistered
 directories under the roots are reported, never deleted.

@@ -14,7 +14,10 @@ import { knowledge } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeReaddir, safeStatfs } from './secure-io.js';
 import {
   deleteRegisteredWorkspace,
+  describePendingReconcileAbandon,
   listWorkspaces,
+  workspaceRecordSnapshot,
+  type PendingReconcileAbandonOptions,
   type WorkspaceLedgerOptions,
   type WorkspaceRecord,
 } from './workspace-ledger.js';
@@ -174,11 +177,15 @@ function nearestExistingDir(targetDir: string): string {
  * worktrees are left to the janitor sweep, which honours the orphan TTL and
  * refuses worktrees with unsaved work. A released git index is kept while
  * its delegated child still runs (dispose leaves it for exactly that reason)
- * or while its shared-index reconcile is still pending.
+ * or while its shared-index reconcile is still pending — unless that pending
+ * reconcile is abandoned (unresolvable base commit, or past the sweep's
+ * abandon age; see `describePendingReconcileAbandon`), in which case disk
+ * pressure reclaims it immediately instead of waiting for the next sweep.
  */
 function releasedOldestFirst(
   records: WorkspaceRecord[],
-  probe: ProcessIdentityProbe = {}
+  probe: ProcessIdentityProbe = {},
+  reconcileAbandon: PendingReconcileAbandonOptions = {}
 ): WorkspaceRecord[] {
   const key = (record: WorkspaceRecord) => Date.parse(record.releasedAt ?? record.createdAt) || 0;
   return records
@@ -188,7 +195,8 @@ function releasedOldestFirst(
         record.kind !== 'git-worktree' &&
         !(
           record.kind === 'git-index' &&
-          (record.pendingReconcile || isRecordedChildAlive(record, probe))
+          (isRecordedChildAlive(record, probe) ||
+            (record.pendingReconcile && !describePendingReconcileAbandon(record, reconcileAbandon)))
         )
     )
     .sort((a, b) => key(a) - key(b));
@@ -212,16 +220,18 @@ export function checkWorkspaceBudget(
     records.map((record) => [record.id, record.bytes ?? measure(record.path)] as const)
   );
   let usedBytes = [...sizes.values()].reduce((sum, bytes) => sum + bytes, 0);
-  const reclaimable = releasedOldestFirst(records, options.processProbe);
+  const reconcileAbandon: PendingReconcileAbandonOptions = {
+    maxAgeMs: policy.orphan_ttl_hours * 3 * 60 * 60 * 1000,
+    now: () => (options.now ? options.now() : new Date()).getTime(),
+  };
+  const reclaimable = releasedOldestFirst(records, options.processProbe, reconcileAbandon);
   const reclaimed: string[] = [];
 
   // One record that vanished, changed or refuses deletion never aborts the check.
   const reclaimOne = (): boolean => {
     for (let next = reclaimable.shift(); next; next = reclaimable.shift()) {
       try {
-        deleteRegisteredWorkspace(next.id, options, {
-          expect: { live: next.live, createdAt: next.createdAt, releasedAt: next.releasedAt },
-        });
+        deleteRegisteredWorkspace(next.id, options, { expect: workspaceRecordSnapshot(next) });
       } catch {
         continue;
       }

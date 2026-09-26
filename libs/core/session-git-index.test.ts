@@ -338,6 +338,49 @@ describe('dispose after a worker committed through its private index', () => {
     expect(audit).toHaveBeenLastCalledWith(expect.objectContaining({ result: 'completed' }));
   });
 
+  it('abandons a pending reconcile past 3x the orphan TTL and lets the sweep reclaim it', () => {
+    const lock = path.join(repo, '.git', 'index.lock');
+    const audit = vi.fn();
+    let clock = Date.parse('2026-09-26T00:00:00.000Z');
+    const localOptions: PrepareSessionGitIndexOptions = {
+      ...options,
+      audit,
+      reconcileRetry: { delaysMs: [], sleep: vi.fn() },
+      ledger: { ...options.ledger, now: () => new Date(clock) },
+    };
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-lock-forever' }, localOptions)!;
+    workerCommit(idx.env);
+    safeWriteFile(lock, '');
+    idx.dispose();
+    expect(listWorkspaces(localOptions.ledger)[0].pendingReconcile).toBeTruthy();
+
+    const HOUR = 60 * 60 * 1000;
+    const sweep = () =>
+      sweepRegisteredWorkspaces({
+        ledgerPath: localOptions.ledger?.ledgerPath,
+        allowedRoots: localOptions.ledger?.allowedRoots,
+        dryRun: false,
+        orphanTtlHours: 1,
+        now: () => clock,
+        processProbe: { isPidAlive: () => false },
+        reconcile: { audit, retry: { delaysMs: [], sleep: vi.fn() } },
+        measure: () => 0,
+      });
+
+    // The lock is never released: within the 3x-TTL grace window it stays pending.
+    clock += 3 * HOUR - 1;
+    const stillKept = sweep();
+    expect(stillKept.deleted).toEqual([]);
+    expect(listWorkspaces(localOptions.ledger)[0]?.pendingReconcile).toBeTruthy();
+
+    // Past the 3x-TTL grace window it is abandoned and reclaimed, lock or not.
+    clock += 2;
+    const abandoned = sweep();
+    expect(abandoned.deleted.map((record) => record.id)).toEqual([idx.workspaceId]);
+    expect(safeExistsSync(idx.indexPath)).toBe(false);
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ result: 'abandoned' }));
+  });
+
   it('does nothing when HEAD did not move', () => {
     const audit = vi.fn();
     const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-still' }, { ...options, audit })!;

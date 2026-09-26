@@ -86,7 +86,13 @@ export interface RegisterWorkspaceInput {
 }
 
 /** Fields a caller decided on; the delete re-checks them under the ledger lock. */
-export type WorkspaceRecordSnapshot = Pick<WorkspaceRecord, 'live' | 'createdAt' | 'releasedAt'>;
+export type WorkspaceRecordSnapshot = Pick<
+  WorkspaceRecord,
+  'live' | 'createdAt' | 'releasedAt' | 'childPid' | 'childStartedAt'
+> & {
+  /** Whether the record had a pending shared-index reconcile at snapshot time. */
+  hasPendingReconcile: boolean;
+};
 
 export interface DeleteWorkspaceGuard {
   /** Refuse ([WORKSPACE_CHANGED]) unless the locked record still matches this snapshot. */
@@ -357,6 +363,65 @@ export function listWorkspaces(options: WorkspaceLedgerOptions = {}): WorkspaceR
   return readLedger(options);
 }
 
+/** Snapshot of the fields `deleteRegisteredWorkspace`'s `guard.expect` re-checks under the lock. */
+export function workspaceRecordSnapshot(record: WorkspaceRecord): WorkspaceRecordSnapshot {
+  return {
+    live: record.live,
+    createdAt: record.createdAt,
+    releasedAt: record.releasedAt,
+    childPid: record.childPid,
+    childStartedAt: record.childStartedAt,
+    hasPendingReconcile: Boolean(record.pendingReconcile),
+  };
+}
+
+export interface PendingReconcileAbandonOptions {
+  /**
+   * Maximum time (ms) a pending reconcile is kept before it is abandoned on
+   * age alone; 0/undefined never abandons on age (but an unresolvable
+   * `fromSha` is still abandoned immediately).
+   */
+  maxAgeMs?: number;
+  now?: () => number;
+}
+
+function isReconcileBaseResolvable(repoRoot: string, fromSha: string): boolean {
+  return (
+    safeExecResult('git', ['cat-file', '-e', `${fromSha}^{commit}`], {
+      cwd: repoRoot,
+      timeoutMs: 10_000,
+    }).status === 0
+  );
+}
+
+/**
+ * Reason a `git-index` record's pending shared-index reconcile should be
+ * given up on instead of retried again, or null while it should still be
+ * retried. A `fromSha` that no longer resolves to a commit (history
+ * rewritten, checkout gone) can never reconcile and is abandoned
+ * immediately; otherwise a reconcile still pending `maxAgeMs` after the
+ * workspace was released has had every sweep's worth of retries and is
+ * abandoned so the record does not block reclaim forever.
+ */
+export function describePendingReconcileAbandon(
+  record: WorkspaceRecord,
+  options: PendingReconcileAbandonOptions = {}
+): string | null {
+  const pending = record.pendingReconcile;
+  if (!pending) return null;
+  if (pending.fromSha && !isReconcileBaseResolvable(pending.repoRoot, pending.fromSha)) {
+    return `base commit ${pending.fromSha} no longer resolves in ${pending.repoRoot}`;
+  }
+  const maxAgeMs = options.maxAgeMs;
+  if (!maxAgeMs || !record.releasedAt) return null;
+  const releasedMs = Date.parse(record.releasedAt);
+  if (!Number.isFinite(releasedMs)) return null;
+  const now = (options.now ?? Date.now)();
+  return releasedMs + maxAgeMs <= now
+    ? `pending reconcile still unresolved ${maxAgeMs}ms after release`
+    : null;
+}
+
 /** Delegated worker CLIs run with KYBERION_DELEGATION_DEPTH >= 1; the owner path is depth 0. */
 function isOwnerPath(): boolean {
   const depth = Number(getRegisteredEnvText('KYBERION_DELEGATION_DEPTH'));
@@ -367,7 +432,10 @@ function assertSnapshotMatches(record: WorkspaceRecord, expected: WorkspaceRecor
   if (
     record.live !== expected.live ||
     record.createdAt !== expected.createdAt ||
-    record.releasedAt !== expected.releasedAt
+    record.releasedAt !== expected.releasedAt ||
+    record.childPid !== expected.childPid ||
+    record.childStartedAt !== expected.childStartedAt ||
+    Boolean(record.pendingReconcile) !== expected.hasPendingReconcile
   ) {
     throw new Error(
       `[WORKSPACE_CHANGED] ${record.id} changed since it was selected for deletion (live=${String(record.live)}); skipped`
@@ -429,10 +497,6 @@ function removeWorkspaceFromDisk(record: WorkspaceRecord, resolved: string): boo
   return true;
 }
 
-function snapshotOf(record: WorkspaceRecord): WorkspaceRecordSnapshot {
-  return { live: record.live, createdAt: record.createdAt, releasedAt: record.releasedAt };
-}
-
 /**
  * `guard.requireCleanWorktree`: probe the worktree before taking the ledger
  * lock (git status on a large tree must not block every other ledger writer)
@@ -453,7 +517,7 @@ function probeWorktreeBeforeLock(
     const unsaved = describeUnsavedWorktreeWork(resolved);
     if (unsaved) throw new Error(`[WORKSPACE_DIRTY] ${resolved} kept: ${unsaved}`);
   }
-  return snapshotOf(record);
+  return workspaceRecordSnapshot(record);
 }
 
 /**

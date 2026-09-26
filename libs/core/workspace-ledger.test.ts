@@ -14,10 +14,12 @@ import {
   annotateWorkspace,
   createScratchWorkspace,
   deleteRegisteredWorkspace,
+  describePendingReconcileAbandon,
   listUnregisteredWorkspaceDirs,
   listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
+  workspaceRecordSnapshot,
   type WorkspaceLedgerOptions,
 } from './workspace-ledger.js';
 
@@ -205,11 +207,7 @@ describe('workspace-ledger', () => {
     expect(again.id).toBe(first.id);
     expect(() =>
       deleteRegisteredWorkspace(first.id, options, {
-        expect: {
-          live: snapshot.live,
-          createdAt: snapshot.createdAt,
-          releasedAt: snapshot.releasedAt,
-        },
+        expect: workspaceRecordSnapshot(snapshot),
       })
     ).toThrow('WORKSPACE_CHANGED');
     expect(safeExistsSync(path.join(dir, 'keep.txt'))).toBe(true);
@@ -217,7 +215,7 @@ describe('workspace-ledger', () => {
 
     const released = releaseWorkspace(first.id, options)!;
     deleteRegisteredWorkspace(first.id, options, {
-      expect: { live: false, createdAt: released.createdAt, releasedAt: released.releasedAt },
+      expect: workspaceRecordSnapshot(released),
     });
     expect(safeExistsSync(dir)).toBe(false);
   });
@@ -296,5 +294,112 @@ describe('workspace-ledger', () => {
   it('rejects a ledger that violates the schema', () => {
     safeWriteFile(options.ledgerPath!, JSON.stringify([{ id: 'bad', path: 'x' }]));
     expect(() => listWorkspaces(options)).toThrow('Invalid catalog workspace-ledger');
+  });
+
+  it('refuses a snapshot-guarded delete when a pending reconcile was recorded in between', () => {
+    const dir = path.join(base, 'git-indexes', 'race-pending');
+    safeWriteFile(path.join(dir, 'index'), 'idx');
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    const released = releaseWorkspace(record.id, options)!;
+    const snapshot = workspaceRecordSnapshot(released);
+    expect(snapshot.hasPendingReconcile).toBe(false);
+    // Another occupant's dispose records a pending reconcile in between.
+    annotateWorkspace(record.id, { pendingReconcile: { repoRoot: base, fromSha: null } }, options);
+    expect(() => deleteRegisteredWorkspace(record.id, options, { expect: snapshot })).toThrow(
+      'WORKSPACE_CHANGED'
+    );
+    expect(safeExistsSync(dir)).toBe(true);
+    expect(listWorkspaces(options)).toHaveLength(1);
+  });
+
+  it('refuses a snapshot-guarded delete when a child pid was recorded in between', () => {
+    const dir = path.join(base, 'git-indexes', 'race-child');
+    safeWriteFile(path.join(dir, 'index'), 'idx');
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    const released = releaseWorkspace(record.id, options)!;
+    const snapshot = workspaceRecordSnapshot(released);
+    annotateWorkspace(record.id, { childPid: 999, childStartedAt: 'child-999' }, options);
+    expect(() => deleteRegisteredWorkspace(record.id, options, { expect: snapshot })).toThrow(
+      'WORKSPACE_CHANGED'
+    );
+    expect(safeExistsSync(dir)).toBe(true);
+  });
+});
+
+describe('describePendingReconcileAbandon', () => {
+  it('returns null without a pending reconcile', () => {
+    const record = registerWorkspace(
+      { path: path.join(base, 'workspaces', 'none'), kind: 'scratch-dir', owner: {} },
+      options
+    );
+    expect(describePendingReconcileAbandon(record)).toBeNull();
+  });
+
+  it('abandons immediately when the base commit no longer resolves', () => {
+    const repo = path.join(base, 'repo');
+    safeMkdir(repo, { recursive: true });
+    git(repo, ['init', '-q']);
+    const dir = path.join(base, 'git-indexes', 'gone');
+    safeWriteFile(path.join(dir, 'index'), 'idx');
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    releaseWorkspace(record.id, options);
+    const pendingRecord = annotateWorkspace(
+      record.id,
+      { pendingReconcile: { repoRoot: repo, fromSha: '0'.repeat(40) } },
+      options
+    )!;
+    expect(describePendingReconcileAbandon(pendingRecord)).toMatch(/no longer resolves/);
+  });
+
+  it('keeps a resolvable base commit pending until it exceeds the maximum age', () => {
+    const repo = path.join(base, 'repo');
+    safeMkdir(repo, { recursive: true });
+    git(repo, ['init', '-q']);
+    git(repo, [
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@example.invalid',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'init',
+    ]);
+    const sha = git(repo, ['rev-parse', 'HEAD']).trim();
+    const dir = path.join(base, 'git-indexes', 'aging');
+    safeWriteFile(path.join(dir, 'index'), 'idx');
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    const released = releaseWorkspace(record.id, options)!;
+    const pendingRecord = annotateWorkspace(
+      record.id,
+      { pendingReconcile: { repoRoot: repo, fromSha: sha } },
+      options
+    )!;
+    const releasedMs = Date.parse(released.releasedAt!);
+    const maxAgeMs = 3 * 60 * 60 * 1000;
+    expect(
+      describePendingReconcileAbandon(pendingRecord, {
+        maxAgeMs,
+        now: () => releasedMs + maxAgeMs - 1,
+      })
+    ).toBeNull();
+    expect(
+      describePendingReconcileAbandon(pendingRecord, { maxAgeMs, now: () => releasedMs + maxAgeMs })
+    ).toMatch(/still unresolved/);
+  });
+
+  it('never abandons on age while still live (no releasedAt yet)', () => {
+    const dir = path.join(base, 'git-indexes', 'live-pending');
+    safeWriteFile(path.join(dir, 'index'), 'idx');
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    const pendingRecord = annotateWorkspace(
+      record.id,
+      { pendingReconcile: { repoRoot: base, fromSha: null } },
+      options
+    )!;
+    expect(
+      describePendingReconcileAbandon(pendingRecord, { maxAgeMs: 1, now: () => Date.now() + 1e9 })
+    ).toBeNull();
   });
 });
