@@ -87,12 +87,13 @@ dispatches.
 ### yt-dlp pinning
 
 `knowledge/product/governance/tool-runtimes/yt_dlp.json` pins a managed
-`yt-dlp` binary for each platform. **The sha256 values are placeholders (all
-zeros)**, so the managed install never downloads: `scripts/tool_runtime_setup.ts`
-skips the managed binary with a warning and falls back to the brew/winget
-`install_backend`. To enable managed installs,
-copy the real digests from the release's `SHA2-256SUMS` into the registry. Until
-then, use `KYBERION_YTDLP_BIN`, the brew/winget backends, or a system `yt-dlp`.
+`yt-dlp` binary for each platform (release 2026.08.19). The sha256 values are
+the digests from that release's `SHA2-256SUMS` (the macOS binary was downloaded
+and re-hashed to confirm on 2026-09-26), and `scripts/tool_runtime_setup.ts`
+refuses the download on any mismatch. An all-zero or malformed digest is still
+treated as "not pinned": the managed binary is skipped with a warning and the
+brew/winget `install_backend` is used instead. When bumping the version, copy
+the new digests from the release's `SHA2-256SUMS`.
 yt-dlp is Unlicense. The caller is responsible for complying with the source
 site's terms of service.
 

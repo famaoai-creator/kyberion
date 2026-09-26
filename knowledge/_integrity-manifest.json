@@ -963,7 +963,7 @@
     {
       "path": "product/architecture/visual-grounding-and-video-ingest.md",
       "tier": "public",
-      "size": 10505,
+      "size": 10585,
       "type": "md"
     },
     {
@@ -4203,7 +4203,7 @@
     {
       "path": "product/governance/tool-runtimes/yt_dlp.json",
       "tier": "public",
-      "size": 3210,
+      "size": 3200,
       "type": "json"
     },
     {
