@@ -350,6 +350,55 @@ function label(key: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Run state: abort (timeout / signal) and teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * What one run started. `Promise.race` cannot cancel the scenario, so once
+ * the run is aborted every step refuses to start (no writes into a removed
+ * root) and a server or browser that finishes starting afterwards is torn
+ * down at once instead of being adopted.
+ */
+export class E2eRun {
+  aborted = false;
+  server?: ChronosServer;
+  browser?: Browser;
+
+  assertActive(): void {
+    if (this.aborted) throw new Error('the run was aborted');
+  }
+
+  async adoptServer(server: ChronosServer): Promise<ChronosServer> {
+    if (this.aborted) {
+      await server.stop().catch(() => undefined);
+      this.assertActive();
+    }
+    this.server = server;
+    return server;
+  }
+
+  async adoptBrowser(browser: Browser): Promise<Browser> {
+    if (this.aborted) {
+      await browser.close().catch(() => undefined);
+      this.assertActive();
+    }
+    this.browser = browser;
+    return browser;
+  }
+
+  /** Aborts the run and stops what it started (idempotent). */
+  async teardown(): Promise<void> {
+    this.aborted = true;
+    const { browser, server } = this;
+    this.browser = undefined;
+    // stop() signals the server synchronously, before the first await.
+    const serverStopped = server?.stop().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+    await serverStopped;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The scenario
 // ---------------------------------------------------------------------------
 
@@ -415,15 +464,14 @@ async function confirmInHost(page: Page, actionId: string): Promise<void> {
   await dialog.waitFor({ state: 'hidden', timeout: STEP_TIMEOUT_MS });
 }
 
-async function scenario(
-  root: string,
-  timings: E2eStepTiming[],
-  track: { server?: ChronosServer; browser?: Browser }
-): Promise<string> {
+async function scenario(root: string, timings: E2eStepTiming[], run: E2eRun): Promise<string> {
   const step = async <T>(name: string, fn: () => Promise<T> | T): Promise<T> => {
     const started = Date.now();
     try {
-      return await fn();
+      run.assertActive();
+      const value = await fn();
+      run.assertActive();
+      return value;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`[${name}] ${message}`);
@@ -471,8 +519,9 @@ async function scenario(
 
   const token = randomBytes(24).toString('hex');
   const server = await step('start-chronos', async () => {
-    const started = startChronos(root, await freeLoopbackPort(), token);
-    track.server = started;
+    const port = await freeLoopbackPort();
+    run.assertActive();
+    const started = await run.adoptServer(startChronos(root, port, token));
     await waitFor('Chronos /api/healthz', async () => {
       if (started.exited()) throw new Error('Chronos exited during startup');
       const response = await fetch(`${started.baseUrl}/api/healthz`).catch(() => null);
@@ -481,8 +530,9 @@ async function scenario(
     return started;
   });
 
-  const browser = await step('launch-browser', () => chromium.launch({ headless: true }));
-  track.browser = browser;
+  const browser = await step('launch-browser', async () =>
+    run.adoptBrowser(await chromium.launch({ headless: true }))
+  );
   const context = await browser.newContext({ locale: 'en-US' });
   await context.addCookies([
     {
@@ -651,17 +701,28 @@ export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginView
   const runId = `${Date.now()}-${randomBytes(4).toString('hex')}`;
   const root = pathResolver.sharedTmp(`plugin-views-e2e/${runId}`);
   const timings: E2eStepTiming[] = [];
-  const track: { server?: ChronosServer; browser?: Browser } = {};
+  const run = new E2eRun();
   const started = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Ctrl-C / SIGTERM: stop the server and browser, remove the root, then
+  // re-raise the signal with its default handling.
+  const onSignal = (signal: NodeJS.Signals) => {
+    void run.teardown(); // sends the server SIGTERM synchronously
+    if (!options.keepRoot) removeRoot(root);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    process.kill(process.pid, signal);
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
   try {
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`plugin views E2E timed out after ${options.timeoutMs}ms`)),
-        options.timeoutMs
-      );
+      timer = setTimeout(() => {
+        run.aborted = true;
+        reject(new Error(`plugin views E2E timed out after ${options.timeoutMs}ms`));
+      }, options.timeoutMs);
     });
-    const approvalRequestId = await Promise.race([scenario(root, timings, track), timeout]);
+    const approvalRequestId = await Promise.race([scenario(root, timings, run), timeout]);
     return {
       schema: 'pe-02-plugin-views-e2e/v1',
       passed: true,
@@ -673,7 +734,7 @@ export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginView
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const tail = track.server?.logTail().trim();
+    const tail = run.server?.logTail().trim();
     throw new ScriptExitError(
       1,
       [
@@ -684,15 +745,28 @@ export async function runPluginViewsE2e(argv: string[] = []): Promise<PluginView
     );
   } finally {
     if (timer) clearTimeout(timer);
-    await track.browser?.close().catch(() => undefined);
-    await track.server?.stop().catch(() => undefined);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    const server = run.server;
+    await run.teardown();
     if (options.keepRoot) {
-      if (track.server && safeExistsSync(root)) {
-        safeWriteFile(path.join(root, 'chronos.log'), track.server.logTail());
+      if (server && safeExistsSync(root)) {
+        safeWriteFile(path.join(root, 'chronos.log'), server.logTail());
       }
     } else {
-      safeRmSync(root);
+      removeRoot(root);
     }
+  }
+}
+
+/** Removes the hermetic root; a failure is reported, never thrown over the run's own error. */
+function removeRoot(root: string): void {
+  try {
+    safeRmSync(root);
+  } catch (error) {
+    console.warn(
+      `[check:plugin-views-e2e] could not remove ${root}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
