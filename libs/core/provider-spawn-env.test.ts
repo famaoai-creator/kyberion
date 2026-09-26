@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const sessionIndexMocks = vi.hoisted(() => ({
   prepareSessionGitIndex: vi.fn(),
   dispose: vi.fn(),
+  attachChild: vi.fn(),
 }));
 
 vi.mock('./session-git-index.js', () => ({
@@ -15,6 +16,7 @@ import {
   disposeOnChildExit,
   isSessionGitIndexEnabled,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 
 const fakeBaseEnv = (): NodeJS.ProcessEnv =>
@@ -32,10 +34,12 @@ const fakeBaseEnv = (): NodeJS.ProcessEnv =>
 beforeEach(() => {
   sessionIndexMocks.prepareSessionGitIndex.mockReset();
   sessionIndexMocks.dispose.mockReset();
+  sessionIndexMocks.attachChild.mockReset();
   sessionIndexMocks.prepareSessionGitIndex.mockImplementation(({ sessionId }) => ({
     sessionId,
     env: { GIT_INDEX_FILE: `/private/index/${sessionId}` },
     dispose: sessionIndexMocks.dispose,
+    attachChild: sessionIndexMocks.attachChild,
   }));
 });
 
@@ -141,5 +145,35 @@ describe('disposeOnChildExit', () => {
 
   it('mints provider-prefixed session ids', () => {
     expect(newDelegationSessionId('grok')).toMatch(/^grok-[0-9a-f-]{36}$/);
+  });
+});
+
+describe('spawnWithDelegationEnv', () => {
+  const implementerEnv = () =>
+    buildDelegationSpawnEnv({
+      provider: 'codex',
+      sessionId: 's-spawn',
+      profile: 'implementer',
+      baseEnv: fakeBaseEnv(),
+    });
+
+  it('disposes the private index when spawn throws synchronously', () => {
+    const spawnEnv = implementerEnv();
+    expect(() =>
+      spawnWithDelegationEnv(spawnEnv, () => {
+        throw new Error('ENOENT');
+      })
+    ).toThrow('ENOENT');
+    expect(sessionIndexMocks.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the child pid and hands it to dispose on close', () => {
+    const spawnEnv = implementerEnv();
+    const child = Object.assign(new EventEmitter(), { pid: 4242 });
+    expect(spawnWithDelegationEnv(spawnEnv, () => child)).toBe(child);
+    expect(sessionIndexMocks.attachChild).toHaveBeenCalledWith(4242);
+    expect(sessionIndexMocks.dispose).not.toHaveBeenCalled();
+    child.emit('close', 0);
+    expect(sessionIndexMocks.dispose).toHaveBeenCalledWith({ childPid: 4242 });
   });
 });

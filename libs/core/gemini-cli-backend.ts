@@ -17,8 +17,8 @@ import {
 } from './provider-permission-profiles.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
@@ -407,11 +407,12 @@ export class GeminiCliBackend implements ReasoningBackend {
         sessionId: newDelegationSessionId('gemini'),
         ...(profile ? { profile } : {}),
       });
-      const child = spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: spawnEnv.env,
-      });
-      disposeOnChildExit(child, spawnEnv);
+      const child = spawnWithDelegationEnv(spawnEnv, () =>
+        spawn(this.bin, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: spawnEnv.env,
+        })
+      );
       let stdout = '';
       let stderr = '';
       const timer = setTimeout(() => {
@@ -485,11 +486,12 @@ export async function runGeminiCliQuery<T>(params: {
       provider: 'gemini',
       sessionId: newDelegationSessionId('gemini'),
     });
-    const child = spawn(bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let out = '';
     let err = '';
     const timer = setTimeout(() => {

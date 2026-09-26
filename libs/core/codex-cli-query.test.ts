@@ -298,6 +298,24 @@ describe('codex-cli-query', () => {
       expect(mocks.sessionIndexDispose).toHaveBeenCalled();
     });
 
+    it('disposes the private index when spawn throws synchronously', async () => {
+      mocks.spawnMock.mockImplementationOnce(() => {
+        throw new Error('spawn EACCES');
+      });
+
+      await expect(
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          mode: 'workspace-write',
+          options: { bin: 'codex', cwd: 'fake/workspace' },
+        })
+      ).rejects.toThrow('spawn EACCES');
+      expect(mocks.prepareSessionGitIndex).toHaveBeenCalledTimes(1);
+      expect(mocks.sessionIndexDispose).toHaveBeenCalledTimes(1);
+    });
+
     it('read-only runs get no private index', async () => {
       mocks.spawnMock.mockReturnValueOnce(createChild());
 

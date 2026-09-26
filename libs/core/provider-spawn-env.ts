@@ -34,6 +34,8 @@ export interface DelegationSpawnEnv {
   env: NodeJS.ProcessEnv;
   /** Release per-spawn resources (the private index). Idempotent. */
   dispose(): void;
+  /** Record the spawned child so its private index is not deleted while it runs. */
+  attachChild?(pid: number | undefined): void;
 }
 
 /** A fresh session id for a provider CLI spawn that has none of its own. */
@@ -68,10 +70,35 @@ export function buildDelegationSpawnEnv(input: BuildDelegationSpawnEnvInput): De
     ...(input.cwd ? { cwd: input.cwd } : {}),
   });
   if (!index) return { env, dispose: () => undefined };
+  let childPid: number | undefined;
   return {
     env: { ...env, ...index.env },
-    dispose: () => index.dispose(),
+    attachChild: (pid) => {
+      childPid = pid;
+      index.attachChild?.(pid);
+    },
+    dispose: () => index.dispose(childPid !== undefined ? { childPid } : undefined),
   };
+}
+
+/**
+ * Spawn a provider child with `spawnEnv`: disposes it when `spawnFn` throws
+ * synchronously (then rethrows), otherwise records the child's pid and
+ * disposes once it has closed or failed to start.
+ */
+export function spawnWithDelegationEnv<
+  C extends { pid?: number; once(event: 'close' | 'error', listener: () => void): unknown },
+>(spawnEnv: DelegationSpawnEnv, spawnFn: () => C): C {
+  let child: C;
+  try {
+    child = spawnFn();
+  } catch (error) {
+    spawnEnv.dispose();
+    throw error;
+  }
+  spawnEnv.attachChild?.(child.pid);
+  disposeOnChildExit(child, spawnEnv);
+  return child;
 }
 
 /**

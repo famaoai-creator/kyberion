@@ -26,8 +26,8 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
@@ -292,11 +292,12 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
       sessionId: newDelegationSessionId('devin'),
       ...(profile ? { profile } : {}),
     });
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {

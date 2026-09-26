@@ -11,8 +11,8 @@ import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import {
   resolveEffectiveProviderPermissionProfile,
@@ -189,12 +189,13 @@ class CodexCliQuery {
       sessionId: newDelegationSessionId('codex'),
       ...(profile ? { profile } : {}),
     });
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-      cwd: this.cwd,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+        cwd: this.cwd,
+      })
+    );
 
     return withWallClockBudget(
       {

@@ -16,8 +16,8 @@ import { z } from 'zod';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
@@ -252,11 +252,14 @@ export class CursorCliSessionAdapter {
       provider: 'cursor',
       sessionId: newDelegationSessionId('cursor'),
     });
-    const child = this.spawnProcess(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    }) as ChildProcessWithoutNullStreams;
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(
+      spawnEnv,
+      () =>
+        this.spawnProcess(this.bin, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: spawnEnv.env,
+        }) as ChildProcessWithoutNullStreams
+    );
 
     return withWallClockBudget(
       {

@@ -951,7 +951,7 @@
     {
       "path": "product/architecture/workspace-isolation.md",
       "tier": "public",
-      "size": 6333,
+      "size": 10011,
       "type": "md"
     },
     {
@@ -2943,7 +2943,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 10867,
+      "size": 11032,
       "type": "md"
     },
     {

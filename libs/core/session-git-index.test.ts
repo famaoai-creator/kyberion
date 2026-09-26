@@ -18,8 +18,12 @@ let base: string;
 let repo: string;
 let options: PrepareSessionGitIndexOptions;
 
-function git(cwd: string, args: string[], env?: Record<string, string>): string {
-  const result = safeExecResult('git', args, { cwd, ...(env ? { env } : {}) });
+function git(cwd: string, args: string[], env?: Record<string, string>, input?: string): string {
+  const result = safeExecResult('git', args, {
+    cwd,
+    ...(env ? { env } : {}),
+    ...(input !== undefined ? { input } : {}),
+  });
   if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
   return result.stdout;
 }
@@ -130,17 +134,106 @@ describe('prepareSessionGitIndex', () => {
     expect(prepareSessionGitIndex({ cwd: repo, sessionId: '../escape' }, options)).toBeNull();
   });
 
-  it('resolves a linked worktree index through --git-path', () => {
+  it('seeds a linked worktree from its own HEAD', () => {
     const worktree = path.join(base, 'wt');
     git(repo, ['worktree', 'add', '-q', '-b', 'wt-branch', worktree]);
     safeWriteFile(path.join(worktree, 'only-in-wt.txt'), 'wt\n');
     git(worktree, ['add', 'only-in-wt.txt']);
+    git(worktree, ['commit', '-q', '-m', 'wt only']);
 
     const idx = prepareSessionGitIndex({ cwd: worktree, sessionId: 's-wt' }, options)!;
     expect(idx.repoRoot).toBe(git(worktree, ['rev-parse', '--show-toplevel']).trim());
-    // Seeded from the worktree's own index, not the main checkout's.
-    expect(stagedNames(worktree, idx.env)).toEqual(['only-in-wt.txt']);
-    expect(stagedNames(repo)).toEqual([]);
+    expect(idx.baselineSha).toBe(git(worktree, ['rev-parse', 'HEAD']).trim());
+    expect(git(worktree, ['ls-files'], idx.env)).toContain('only-in-wt.txt');
+    expect(stagedNames(worktree, idx.env)).toEqual([]);
+  });
+
+  it('seeds from HEAD, never from work other sessions staged in the shared index', () => {
+    safeWriteFile(path.join(repo, 'other.txt'), 'other\n');
+    git(repo, ['add', 'other.txt']);
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-seed' }, options)!;
+    expect(stagedNames(repo, idx.env)).toEqual([]);
+  });
+
+  it('records the registering process and the attached child in the ledger', () => {
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-pid' },
+      { ...options, processProbe: { startMarker: () => 'marker-1' } }
+    )!;
+    idx.attachChild(4321);
+    expect(listWorkspaces(options.ledger)[0]).toMatchObject({
+      pid: process.pid,
+      pidStartedAt: 'marker-1',
+      childPid: 4321,
+    });
+  });
+
+  it('keeps the index while the child may still run and deletes it on a later dispose', () => {
+    let childRunning = true;
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-child' },
+      { ...options, processProbe: { isPidAlive: () => childRunning, startMarker: () => 'm' } }
+    )!;
+    idx.dispose({ childPid: 999 });
+    expect(safeExistsSync(idx.indexPath)).toBe(true);
+    expect(listWorkspaces(options.ledger)[0]).toMatchObject({ live: false, childPid: 999 });
+
+    childRunning = false;
+    idx.dispose({ childPid: 999 });
+    expect(safeExistsSync(path.dirname(idx.indexPath))).toBe(false);
+    expect(listWorkspaces(options.ledger)).toEqual([]);
+  });
+});
+
+describe('dispose after a worker committed through its private index', () => {
+  it("keeps the worker commit in the owner's next commit without clobbering owner-staged work", () => {
+    const audit = vi.fn();
+    const idx = prepareSessionGitIndex(
+      { cwd: repo, sessionId: 's-worker-commit' },
+      {
+        ...options,
+        audit,
+      }
+    )!;
+    // The worker edits README.md and adds a.txt, then commits with its private index.
+    safeWriteFile(path.join(repo, 'a.txt'), 'worker\n');
+    safeWriteFile(path.join(repo, 'README.md'), 'worker readme\n');
+    git(repo, ['add', 'a.txt', 'README.md'], idx.env);
+    git(repo, ['commit', '-q', '-m', 'worker commit'], idx.env);
+    const workerCommit = git(repo, ['rev-parse', 'HEAD']).trim();
+
+    // Meanwhile the owner staged its own README.md in the shared index.
+    const ownerReadme = git(
+      repo,
+      ['hash-object', '-w', '--stdin'],
+      undefined,
+      'owner readme\n'
+    ).trim();
+    git(repo, ['update-index', '--cacheinfo', `100644,${ownerReadme},README.md`]);
+
+    idx.dispose();
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({ toSha: workerCommit, updated: ['a.txt'], skipped: ['README.md'] })
+    );
+
+    safeWriteFile(path.join(repo, 'b.txt'), 'owner\n');
+    git(repo, ['add', 'b.txt']);
+    git(repo, ['commit', '-q', '-m', 'owner commit']);
+    const tree = git(repo, ['ls-tree', '-r', '--name-only', 'HEAD']).split('\n').filter(Boolean);
+    expect(tree.sort()).toEqual(['README.md', 'a.txt', 'b.txt']);
+    expect(git(repo, ['show', 'HEAD:a.txt'])).toBe('worker\n');
+    expect(git(repo, ['show', 'HEAD:README.md'])).toBe('owner readme\n');
+    expect(git(repo, ['diff', '--name-only', 'HEAD~1', 'HEAD']).trim().split('\n').sort()).toEqual([
+      'README.md',
+      'b.txt',
+    ]);
+  });
+
+  it('does nothing when HEAD did not move', () => {
+    const audit = vi.fn();
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-still' }, { ...options, audit })!;
+    idx.dispose();
+    expect(audit).not.toHaveBeenCalled();
   });
 });
 
@@ -159,6 +252,34 @@ describe('commitFromSessionIndex', () => {
     expect(result.sha).toBe(git(repo, ['rev-parse', 'HEAD']).trim());
     expect(git(repo, ['show', '--name-only', '--format=', 'HEAD']).trim()).toBe('a.txt');
     expect(stagedNames(repo)).toEqual([]);
+  });
+
+  it('never commits work another session staged in the shared index', () => {
+    safeWriteFile(path.join(repo, 'other.txt'), 'other\n');
+    git(repo, ['add', 'other.txt']);
+    safeWriteFile(path.join(repo, 'a.txt'), 'a\n');
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-isolated' }, options)!;
+    git(repo, ['add', 'a.txt'], idx.env);
+    const result = commitFromSessionIndex(idx, 'feat: a');
+    expect(result.paths).toEqual(['a.txt']);
+    expect(git(repo, ['show', '--name-only', '--format=', 'HEAD']).trim()).toBe('a.txt');
+    expect(stagedNames(repo)).toEqual(['other.txt']);
+  });
+
+  it('fails closed when HEAD moves between the check and the ref update', () => {
+    safeWriteFile(path.join(repo, 'a.txt'), 'a\n');
+    const idx = prepareSessionGitIndex({ cwd: repo, sessionId: 's-race' }, options)!;
+    git(repo, ['add', 'a.txt'], idx.env);
+    let raced = '';
+    expect(() =>
+      commitFromSessionIndex(idx, 'feat: a', {
+        beforeRefUpdate: () => {
+          git(repo, ['commit', '-q', '--allow-empty', '-m', 'someone else']);
+          raced = git(repo, ['rev-parse', 'HEAD']).trim();
+        },
+      })
+    ).toThrow(/SESSION_INDEX_STALE/);
+    expect(git(repo, ['rev-parse', 'HEAD']).trim()).toBe(raced);
   });
 
   it('refuses a stale baseline after HEAD moved', () => {

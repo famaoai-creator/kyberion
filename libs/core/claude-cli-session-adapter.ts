@@ -31,8 +31,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
@@ -292,20 +292,22 @@ export class ClaudeCliSessionAdapter {
         profile: this.profile,
       });
       try {
-        child = this.spawnProcess(this.bin, this.buildArgs(), {
-          cwd: this.cwd,
-          env: spawnEnv.env,
-          stdio: 'pipe',
-          shell: false,
-        }) as ChildProcessWithoutNullStreams;
+        // Turn timeouts shut the session down, so close covers them too.
+        child = spawnWithDelegationEnv(
+          spawnEnv,
+          () =>
+            this.spawnProcess(this.bin, this.buildArgs(), {
+              cwd: this.cwd,
+              env: spawnEnv.env,
+              stdio: 'pipe',
+              shell: false,
+            }) as ChildProcessWithoutNullStreams
+        );
       } catch (error) {
-        spawnEnv.dispose();
         reject(this.unavailable(`claude CLI session failed to start: ${describe(error)}`));
         return;
       }
       this.child = child;
-      // Turn timeouts shut the session down, so close covers them too.
-      disposeOnChildExit(child, spawnEnv);
 
       child.stdout.on('data', (chunk: Buffer | string) => this.consumeStdout(String(chunk)));
       child.stderr.on('data', (chunk: Buffer | string) => {

@@ -16,8 +16,8 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
@@ -331,11 +331,12 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       prompt,
     ];
     const spawnEnv = this.buildSpawnEnv(options?.advisory ? 'planner' : undefined);
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -643,11 +644,12 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     profile?: ProviderPermissionProfileName
   ): Promise<string> {
     const spawnEnv = this.buildSpawnEnv(profile);
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {

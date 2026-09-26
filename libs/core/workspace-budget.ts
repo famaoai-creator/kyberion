@@ -74,8 +74,31 @@ export function loadWorkspaceBudgetPolicy(
   };
 }
 
-/** Size of a path in bytes, never following symbolic links. Missing paths count as 0. */
-export function measureWorkspaceBytes(targetPath: string): number {
+export interface MeasureWorkspaceLimits {
+  /** Stop after visiting this many entries (the result is then a lower bound). */
+  maxEntries?: number;
+  /** Stop after this many milliseconds (the result is then a lower bound). */
+  maxMs?: number;
+  clock?: () => number;
+}
+
+export const DEFAULT_MEASURE_MAX_ENTRIES = 200_000;
+export const DEFAULT_MEASURE_MAX_MS = 5_000;
+
+/**
+ * Size of a path in bytes, never following symbolic links. Missing paths
+ * count as 0. The walk is bounded by entry count and wall time so a huge tree
+ * (node_modules) cannot stall a spawn; a bounded result is a lower bound.
+ */
+export function measureWorkspaceBytes(
+  targetPath: string,
+  limits: MeasureWorkspaceLimits = {}
+): number {
+  const maxEntries = limits.maxEntries ?? DEFAULT_MEASURE_MAX_ENTRIES;
+  const maxMs = limits.maxMs ?? DEFAULT_MEASURE_MAX_MS;
+  const clock = limits.clock ?? Date.now;
+  const deadline = clock() + maxMs;
+  let visited = 0;
   let stat;
   try {
     stat = safeLstat(targetPath);
@@ -88,6 +111,7 @@ export function measureWorkspaceBytes(targetPath: string): number {
   let total = 0;
   const pending = [targetPath];
   while (pending.length > 0) {
+    if (visited >= maxEntries || clock() > deadline) break;
     const dir = pending.pop() as string;
     let names: string[];
     try {
@@ -96,6 +120,8 @@ export function measureWorkspaceBytes(targetPath: string): number {
       continue;
     }
     for (const name of names) {
+      if (visited >= maxEntries) break;
+      visited += 1;
       const child = path.join(dir, name);
       try {
         const childStat = safeLstat(child);
@@ -140,14 +166,22 @@ function nearestExistingDir(targetDir: string): string {
   return current;
 }
 
+/**
+ * Released workspaces eligible for inline reclaim, oldest first. Git
+ * worktrees are left to the janitor sweep, which honours the orphan TTL and
+ * refuses worktrees with unsaved work.
+ */
 function releasedOldestFirst(records: WorkspaceRecord[]): WorkspaceRecord[] {
   const key = (record: WorkspaceRecord) => Date.parse(record.releasedAt ?? record.createdAt) || 0;
-  return records.filter((record) => !record.live).sort((a, b) => key(a) - key(b));
+  return records
+    .filter((record) => !record.live && record.kind !== 'git-worktree')
+    .sort((a, b) => key(a) - key(b));
 }
 
 /**
  * Decide whether a workspace of `expectedBytes` may be created in `targetDir`.
  * Fails closed when a free-disk floor is configured but free space is unreadable.
+ * Uses each record's cached `bytes`; only records without one are measured.
  */
 export function checkWorkspaceBudget(
   targetDir: string,
@@ -158,18 +192,28 @@ export function checkWorkspaceBudget(
   const measure = options.measure ?? measureWorkspaceBytes;
   const statfs = options.statfs ?? safeStatfs;
   const records = listWorkspaces(options);
-  const sizes = new Map(records.map((record) => [record.id, measure(record.path)]));
+  const sizes = new Map(
+    records.map((record) => [record.id, record.bytes ?? measure(record.path)] as const)
+  );
   let usedBytes = [...sizes.values()].reduce((sum, bytes) => sum + bytes, 0);
   const reclaimable = releasedOldestFirst(records);
   const reclaimed: string[] = [];
 
+  // One record that vanished, changed or refuses deletion never aborts the check.
   const reclaimOne = (): boolean => {
-    const next = reclaimable.shift();
-    if (!next) return false;
-    deleteRegisteredWorkspace(next.id, options);
-    usedBytes -= sizes.get(next.id) ?? 0;
-    reclaimed.push(next.id);
-    return true;
+    for (let next = reclaimable.shift(); next; next = reclaimable.shift()) {
+      try {
+        deleteRegisteredWorkspace(next.id, options, {
+          expect: { live: next.live, createdAt: next.createdAt, releasedAt: next.releasedAt },
+        });
+      } catch {
+        continue;
+      }
+      usedBytes -= sizes.get(next.id) ?? 0;
+      reclaimed.push(next.id);
+      return true;
+    }
+    return false;
   };
 
   const cap = policy.disk_cap_bytes;

@@ -3,8 +3,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
@@ -162,18 +162,21 @@ export class AgySdkAdapter {
         cwd: this.options.cwd,
         sessionId: newDelegationSessionId('agy'),
       });
-      child = (this.options.spawnProcess ?? spawn)(python, [script], {
-        cwd: this.options.cwd,
-        env: {
-          ...spawnEnv.env,
-          KYBERION_AGY_SDK_CWD: this.options.cwd,
-          PYTHONUNBUFFERED: '1',
-          ...(sdkApiKey ? { KYBERION_AGY_SDK_API_KEY: sdkApiKey } : {}),
-        },
-        stdio: 'pipe',
-        shell: false,
-      }) as ChildProcessWithoutNullStreams;
-      disposeOnChildExit(child, spawnEnv);
+      child = spawnWithDelegationEnv(
+        spawnEnv,
+        () =>
+          (this.options.spawnProcess ?? spawn)(python, [script], {
+            cwd: this.options.cwd,
+            env: {
+              ...spawnEnv.env,
+              KYBERION_AGY_SDK_CWD: this.options.cwd,
+              PYTHONUNBUFFERED: '1',
+              ...(sdkApiKey ? { KYBERION_AGY_SDK_API_KEY: sdkApiKey } : {}),
+            },
+            stdio: 'pipe',
+            shell: false,
+          }) as ChildProcessWithoutNullStreams
+      );
       this.process = child;
       this.bootChild = child;
       this.runtimeInfo = {
