@@ -3047,6 +3047,10 @@
       "types": "./dist/work-coordination-import-catalog.d.ts",
       "default": "./dist/work-coordination-import-catalog.js"
     },
+    "./video-ingest": {
+      "types": "./dist/video-ingest/index.d.ts",
+      "default": "./dist/video-ingest/index.js"
+    },
     "./work-integrations/github-issues": {
       "types": "./dist/work-integrations/github-issues.d.ts",
       "default": "./dist/work-integrations/github-issues.js"
