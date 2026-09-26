@@ -107,7 +107,10 @@ const PERMISSION_SCRIPT =
 // Walks one tree level per iteration: `spec.uiElements.<prop>()` returns the
 // property of every element at that depth in a single Apple event, nested one
 // array per level, so flattening each column the same way keeps them aligned.
-const ENUMERATE_SCRIPT = `function run(argv) {
+// A named application must also be frontmost: its front window is only what
+// the live screenshot shows when the app is in front, so a background app's
+// rects would land on another app's pixels ('not_frontmost', no elements).
+export const OS_ACCESSIBILITY_ENUMERATE_SCRIPT = `function run(argv) {
   var opts = JSON.parse(argv[0] || '{}');
   ObjC.import('AppKit');
   var frame = $.NSScreen.mainScreen.frame;
@@ -119,6 +122,7 @@ const ENUMERATE_SCRIPT = `function run(argv) {
   if (procs.length === 0) { out.reason = 'no_process'; return JSON.stringify(out); }
   var proc = procs[0];
   out.application = proc.name();
+  if (opts.application && proc.frontmost() !== true) { out.reason = 'not_frontmost'; return JSON.stringify(out); }
   if (proc.windows.length === 0) { out.reason = 'no_window'; return JSON.stringify(out); }
   var flat = function (value, depth) {
     var list = [value];
@@ -331,7 +335,7 @@ export class OsAccessibilityDetector implements UiElementDetector {
     };
     const result = await this.run(
       'osascript',
-      ['-l', 'JavaScript', '-e', ENUMERATE_SCRIPT, JSON.stringify(options)],
+      ['-l', 'JavaScript', '-e', OS_ACCESSIBILITY_ENUMERATE_SCRIPT, JSON.stringify(options)],
       { timeoutMs: OS_ACCESSIBILITY_TIMEOUT_MS, maxOutputMB: 4 }
     );
     if (result.status !== 0) {
