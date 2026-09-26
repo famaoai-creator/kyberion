@@ -440,17 +440,35 @@ function prepareExecutionContext(
 }
 
 /**
- * Backwards-compatible env mirror of the scoped assumption, for code that
- * still reads MISSION_ROLE / KYBERION_PERSONA directly. Correctness must not
- * depend on it: concurrent async contexts share one process env.
+ * Backwards-compatible env mirror of a SYNCHRONOUS assumption, for code that
+ * still reads MISSION_ROLE / KYBERION_PERSONA directly (attribution labels,
+ * children spawned from a raw `process.env`). Only the sync helper mirrors:
+ * nothing else can run while a synchronous `fn` runs, so its write/restore
+ * pair cannot interleave with another context. The async helper never
+ * mirrors (B1) — interleaved async contexts would restore each other's values.
+ * Returns what was written so the restore never clobbers a value `fn` set.
  */
-function applyExecutionEnv(role: string, persona: Persona | undefined, resolvedPersona: Persona) {
+function applyExecutionEnv(
+  role: string,
+  persona: Persona | undefined,
+  resolvedPersona: Persona
+): { role: string; persona: string | undefined } {
   setRegisteredEnv('MISSION_ROLE', role);
   if (resolvedPersona !== 'unknown') {
     setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
   } else if (persona === undefined) {
     setRegisteredEnv('KYBERION_PERSONA', undefined);
   }
+  return { role, persona: getRegisteredEnvText('KYBERION_PERSONA') };
+}
+
+/** Restore one mirrored variable unless something else changed it since we wrote it. */
+function restoreMirroredEnv(
+  key: 'MISSION_ROLE' | 'KYBERION_PERSONA',
+  written: string | undefined,
+  previous: string | undefined
+): void {
+  if (getRegisteredEnvText(key) === written) setRegisteredEnv(key, previous);
 }
 
 /**
@@ -470,21 +488,23 @@ export function withExecutionContext<T>(
   const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
+  const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
     return executionScopeStorage.run(prepared.scope, fn);
   } finally {
-    setRegisteredEnv('MISSION_ROLE', previousRole);
-    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
+    restoreMirroredEnv('MISSION_ROLE', written.role, previousRole);
+    restoreMirroredEnv('KYBERION_PERSONA', written.persona, previousPersona);
   }
 }
 
 /**
- * Async counterpart of withExecutionContext. The synchronous helper restores
- * process context as soon as an async callback returns its Promise, which is
- * too early for governed writes after the first await. The scoped assumption
- * follows `fn` across awaits; the env mirror is process-global and is only
- * restored when `fn` settles.
+ * Async counterpart of withExecutionContext: the scoped assumption follows
+ * `fn` across awaits. It deliberately does NOT mirror the role/persona into
+ * `process.env` (B1): concurrent async contexts would interleave the
+ * write/restore pairs and leave MISSION_ROLE / KYBERION_PERSONA wrong for the
+ * rest of the process. Read the role with `resolveRole()` /
+ * `resolveIdentityContext()` / `resolveExecutionPersona()`, and build child
+ * envs with `buildExecutionEnv()` / `buildSafeExecEnv()`, which follow the scope.
  */
 export async function withExecutionContextAsync<T>(
   role: string,
@@ -493,15 +513,7 @@ export async function withExecutionContextAsync<T>(
   tenantSlug?: string
 ): Promise<T> {
   const prepared = prepareExecutionContext(role, persona, tenantSlug);
-  const previousRole = getRegisteredEnvText('MISSION_ROLE');
-  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
-  try {
-    return await executionScopeStorage.run(prepared.scope, fn);
-  } finally {
-    setRegisteredEnv('MISSION_ROLE', previousRole);
-    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
-  }
+  return await executionScopeStorage.run(prepared.scope, fn);
 }
 
 function resolveSudoScope(): string[] | undefined {
