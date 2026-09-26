@@ -180,7 +180,16 @@ function inspectPageDOM() {
           href: a.href,
         };
       })
-      .filter((x) => x.text && x.text.length < 50 && !x.href.startsWith('javascript:'))
+      .filter((x) => {
+        if (!x.text || x.text.length >= 50) return false;
+        const href = String(x.href || '').trim();
+        return (
+          href.startsWith('/') ||
+          href.startsWith('./') ||
+          href.startsWith('../') ||
+          /^https?:\/\//i.test(href)
+        );
+      })
       .slice(0, 25);
 
     const rawExcerpt = (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 500);
