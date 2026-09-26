@@ -216,6 +216,47 @@
         "caption": 10,
         "subtitle": 16
       }
+    },
+    "deloitte-consulting": {
+      "name": "Deloitte-style Consulting",
+      "description": "Consulting-deck palette: monochrome base + single signature green accent (#86BC25). Restrained color use, clean structure, executive-readable. Dark-green accent_text (#2C5234) keeps text-role contrast >=4.5:1 on white.",
+      "colors": {
+        "primary": "#000000",
+        "secondary": "#53565A",
+        "accent": "#86BC25",
+        "background": "#ffffff",
+        "text": "#1A1A1A",
+        "accent_text": "#2C5234",
+        "surface": "#F3F3F1",
+        "muted_text": "#757575",
+        "border": "#D0D0CE",
+        "success": "#43B02A",
+        "warning": "#FFCD00",
+        "danger": "#DA291C"
+      },
+      "fonts": {
+        "heading": "Noto Sans JP, sans-serif",
+        "body": "Noto Sans JP, sans-serif"
+      },
+      "spacing": {
+        "xxs": 0.042,
+        "xs": 0.083,
+        "sm": 0.125,
+        "md": 0.167,
+        "lg": 0.25,
+        "xl": 0.333,
+        "xxl": 0.417,
+        "xxxl": 0.5
+      },
+      "typography": {
+        "display": 40,
+        "headline": 28,
+        "title": 20,
+        "body": 12,
+        "label": 11,
+        "caption": 10,
+        "subtitle": 16
+      }
     }
   }
 }
