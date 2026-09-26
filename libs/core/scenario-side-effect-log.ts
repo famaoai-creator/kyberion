@@ -83,7 +83,19 @@ export interface ScenarioSideEffectLog {
 
 type WithoutSeq<T> = T extends unknown ? Omit<T, 'seq'> : never;
 
+/**
+ * Warnings are diagnostics, not side effects (see the module doc comment),
+ * so unrelated host noise during a run must never shift the seq of an op,
+ * approval, write or reasoning record a golden trajectory compares against.
+ * They get their own counter, and their own cap: a run that generates
+ * unbounded warnings (e.g. a runaway host process) must not grow the log
+ * without limit — records beyond the cap are dropped and only counted.
+ */
+export const MAX_SCENARIO_WARNINGS = 1000;
+
 const seqCounters = new WeakMap<ScenarioSideEffectLog, number>();
+const warningSeqCounters = new WeakMap<ScenarioSideEffectLog, number>();
+const warningsDroppedCounters = new WeakMap<ScenarioSideEffectLog, number>();
 
 export function createScenarioSideEffectLog(): ScenarioSideEffectLog {
   const log: ScenarioSideEffectLog = {
@@ -94,6 +106,8 @@ export function createScenarioSideEffectLog(): ScenarioSideEffectLog {
     warnings: [],
   };
   seqCounters.set(log, 0);
+  warningSeqCounters.set(log, 0);
+  warningsDroppedCounters.set(log, 0);
   return log;
 }
 
@@ -101,6 +115,17 @@ function nextSeq(log: ScenarioSideEffectLog): number {
   const next = (seqCounters.get(log) ?? 0) + 1;
   seqCounters.set(log, next);
   return next;
+}
+
+function nextWarningSeq(log: ScenarioSideEffectLog): number {
+  const next = (warningSeqCounters.get(log) ?? 0) + 1;
+  warningSeqCounters.set(log, next);
+  return next;
+}
+
+/** Number of scope_lost warnings dropped after the log hit MAX_SCENARIO_WARNINGS. */
+export function scenarioWarningsDropped(log: ScenarioSideEffectLog): number {
+  return warningsDroppedCounters.get(log) ?? 0;
 }
 
 export function appendScenarioOp(
@@ -143,7 +168,11 @@ export function appendScenarioWarning(
   log: ScenarioSideEffectLog,
   record: WithoutSeq<ScenarioWarningRecord>
 ): ScenarioWarningRecord {
-  const entry = { seq: nextSeq(log), ...record };
-  log.warnings.push(entry);
+  const entry = { seq: nextWarningSeq(log), ...record };
+  if (log.warnings.length < MAX_SCENARIO_WARNINGS) {
+    log.warnings.push(entry);
+  } else {
+    warningsDroppedCounters.set(log, scenarioWarningsDropped(log) + 1);
+  }
   return entry;
 }
