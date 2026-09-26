@@ -83,7 +83,7 @@ function buildTestFn(entry: RuleFileEntry): (m: string, code?: string | number) 
 const errorClassifierCatalog = defineCatalog<ErrorClassifierRulesFile>({
   id: 'error-classifier-rules',
   path: () => pathResolver.knowledge('product/governance/error-classifier-rules.json'),
-  schema: 'knowledge/product/schemas/error-classifier-rules.schema.json',
+  schema: pathResolver.knowledge('product/schemas/error-classifier-rules.schema.json'),
 });
 
 let _cachedRules: ClassifierRule[] | null = null;

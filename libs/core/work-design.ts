@@ -348,7 +348,7 @@ export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
 const outcomeCatalog = defineCatalog<OutcomeCatalogFile>({
   id: 'outcome-catalog',
   path: OUTCOME_CATALOG_PATH,
-  schema: 'knowledge/product/schemas/outcome-catalog.schema.json',
+  schema: pathResolver.knowledge('product/schemas/outcome-catalog.schema.json'),
 });
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
