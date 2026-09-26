@@ -687,8 +687,15 @@
       ]
     },
     "vision": {
-      "capture": ["describe_image", "inspect_image", "ocr_image"],
-      "transform": [],
+      "capture": [
+        "describe_image",
+        "describe_screen_delta",
+        "fetch_video",
+        "inspect_image",
+        "mark_elements",
+        "ocr_image"
+      ],
+      "transform": ["build_video_brief"],
       "apply": []
     },
     "voice": {
