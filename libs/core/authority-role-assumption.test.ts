@@ -207,6 +207,17 @@ describe('RA-01 scoped role assumption', () => {
     expect(resolveRole()).toBe('outer_role');
   });
 
+  it('keeps the scoped role across awaits when the sync helper gets an async fn (S4)', async () => {
+    process.env.MISSION_ROLE = 'outer_role';
+    const seen = await withExecutionContext('mission_controller', async () => {
+      await new Promise((r) => setTimeout(r, 1));
+      return { role: resolveRole(), envRole: process.env.MISSION_ROLE };
+    });
+    // The scope follows the promise; the env mirror was restored when fn returned.
+    expect(seen).toEqual({ role: 'mission_controller', envRole: 'outer_role' });
+    expect(resolveRole()).toBe('outer_role');
+  });
+
   it('does not restore the sync env mirror over a value fn wrote itself', () => {
     process.env.MISSION_ROLE = 'outer_role';
     withExecutionContext('mission_controller', () => {
