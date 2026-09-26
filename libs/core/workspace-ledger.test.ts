@@ -11,6 +11,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import {
+  annotateWorkspace,
   createScratchWorkspace,
   deleteRegisteredWorkspace,
   listUnregisteredWorkspaceDirs,
@@ -189,6 +190,94 @@ describe('workspace-ledger', () => {
     expect(safeExistsSync(worktree)).toBe(false);
     expect(git(repo, ['worktree', 'list', '--porcelain'])).not.toContain(worktree);
     expect(listWorkspaces(options)).toEqual([]);
+  });
+
+  it('refuses a snapshot-guarded delete when the record was re-registered in between', () => {
+    const dir = path.join(base, 'workspaces', 'race');
+    safeWriteFile(path.join(dir, 'keep.txt'), 'keep');
+    const first = registerWorkspace({ path: dir, kind: 'scratch-dir', owner: {} }, options);
+    const snapshot = releaseWorkspace(first.id, options)!;
+    // Another session reuses the path (same id) before the reclaimer acts.
+    const again = registerWorkspace(
+      { path: dir, kind: 'scratch-dir', owner: { session_id: 's-new' } },
+      options
+    );
+    expect(again.id).toBe(first.id);
+    expect(() =>
+      deleteRegisteredWorkspace(first.id, options, {
+        expect: {
+          live: snapshot.live,
+          createdAt: snapshot.createdAt,
+          releasedAt: snapshot.releasedAt,
+        },
+      })
+    ).toThrow('WORKSPACE_CHANGED');
+    expect(safeExistsSync(path.join(dir, 'keep.txt'))).toBe(true);
+    expect(listWorkspaces(options)).toHaveLength(1);
+
+    const released = releaseWorkspace(first.id, options)!;
+    deleteRegisteredWorkspace(first.id, options, {
+      expect: { live: false, createdAt: released.createdAt, releasedAt: released.releasedAt },
+    });
+    expect(safeExistsSync(dir)).toBe(false);
+  });
+
+  it('keeps a git worktree with uncommitted or unreachable work when a clean tree is required', () => {
+    const repo = path.join(base, 'repo');
+    safeMkdir(repo, { recursive: true });
+    git(repo, ['init', '-q']);
+    const commit = (cwd: string, message: string) =>
+      git(cwd, [
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        message,
+      ]);
+    commit(repo, 'init');
+    const worktree = path.join(base, 'worktrees', 'wt-dirty');
+    git(repo, ['worktree', 'add', '-q', '--detach', worktree]);
+    const record = registerWorkspace(
+      { path: worktree, kind: 'git-worktree', owner: {}, repoRoot: repo },
+      options
+    );
+
+    safeWriteFile(path.join(worktree, 'wip.txt'), 'wip');
+    expect(() =>
+      deleteRegisteredWorkspace(record.id, options, { requireCleanWorktree: true })
+    ).toThrow(/WORKSPACE_DIRTY.*uncommitted/);
+    safeRmSync(path.join(worktree, 'wip.txt'));
+
+    commit(worktree, 'detached work');
+    expect(() =>
+      deleteRegisteredWorkspace(record.id, options, { requireCleanWorktree: true })
+    ).toThrow(/WORKSPACE_DIRTY.*not reachable/);
+    expect(safeExistsSync(worktree)).toBe(true);
+
+    git(worktree, ['branch', 'keep-work']);
+    deleteRegisteredWorkspace(record.id, options, { requireCleanWorktree: true });
+    expect(safeExistsSync(worktree)).toBe(false);
+  });
+
+  it('records the registering process and annotates cached bytes and the child pid', () => {
+    const dir = path.join(base, 'git-indexes', 'sess');
+    const record = registerWorkspace(
+      { path: dir, kind: 'git-index', owner: {}, pid: 4242, pidStartedAt: 'marker', bytes: 7 },
+      options
+    );
+    expect(record).toMatchObject({ pid: 4242, pidStartedAt: 'marker', bytes: 7 });
+    expect(annotateWorkspace(record.id, { bytes: 9, childPid: 77 }, options)).toMatchObject({
+      bytes: 9,
+      childPid: 77,
+    });
+    expect(releaseWorkspace(record.id, options, { bytes: 11 })).toMatchObject({ bytes: 11 });
+    const reused = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    expect(reused.pid).toBeUndefined();
+    expect(reused.childPid).toBeUndefined();
   });
 
   it('reports unregistered directories without deleting them', () => {

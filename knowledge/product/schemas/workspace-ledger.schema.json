@@ -24,7 +24,10 @@
       "createdAt": { "type": "string", "minLength": 1 },
       "live": { "type": "boolean" },
       "releasedAt": { "type": "string", "minLength": 1 },
-      "bytes": { "type": "number", "minimum": 0 }
+      "bytes": { "type": "number", "minimum": 0 },
+      "pid": { "type": "integer", "minimum": 1 },
+      "pidStartedAt": { "type": "string", "minLength": 1 },
+      "childPid": { "type": "integer", "minimum": 1 }
     },
     "required": ["id", "path", "kind", "owner", "createdAt", "live"]
   }
