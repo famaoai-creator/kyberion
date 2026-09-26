@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -77,6 +78,55 @@ const policyCatalog = defineCatalog<EgressPolicyFile>({
   schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
 });
 
+/**
+ * Tenant egress overlay: an operator-owned egress policy file inside the BOUND
+ * tenant's confidential root (knowledge/confidential/{tenant}/...), named by
+ * KYBERION_TENANT_EGRESS_POLICY_PATH. Only that tenant's
+ * `tenant_allowed_providers` / `tenant_allowed_domains` entries are merged
+ * (union) onto the governed policy — an overlay can approve destinations for
+ * its own tenant's material and nothing else: it cannot change mode, blocked
+ * domains, the general allowlist, or any other tenant's entries. Unbound
+ * processes (no KYBERION_TENANT) never read an overlay. Set per process by
+ * the chronos tenant runner, so tenant approvals stay out of the public tier.
+ */
+let tenantOverlayRootForTests: string | null = null;
+
+/** Test seam: resolve overlay tenant roots under a fixture root instead of the repository root. */
+export function _setTenantEgressOverlayRootForTests(root: string | null): void {
+  tenantOverlayRootForTests = root;
+}
+
+function getTenantEgressOverlayPath(): { path: string; tenant: string } | null {
+  const configured = getRegisteredEnvText('KYBERION_TENANT_EGRESS_POLICY_PATH')?.trim();
+  const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+  if (!configured || !tenant || !isValidTenantSlug(tenant)) return null;
+  const root = tenantOverlayRootForTests ?? pathResolver.rootDir();
+  const absolute = path.resolve(root, configured);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative.startsWith(`knowledge/confidential/${tenant}/`) || !relative.endsWith('.json')) {
+    throw new Error(
+      `[EGRESS_OVERLAY_SCOPE] tenant egress overlay must be a JSON file inside knowledge/confidential/${tenant}/: ${relative}`
+    );
+  }
+  return { path: assertSafeRepositoryPath(absolute), tenant };
+}
+
+const tenantOverlayCatalog = defineCatalog<EgressPolicyFile>({
+  id: 'tenant-egress-policy-overlay',
+  path: () => getTenantEgressOverlayPath()?.path ?? DEFAULT_POLICY_PATH,
+  schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
+});
+
+function mergeTenantEntries(
+  base: Record<string, string[]>,
+  overlay: Record<string, string[]> | undefined,
+  tenant: string
+): Record<string, string[]> {
+  const extra = Array.isArray(overlay?.[tenant]) ? overlay![tenant] : [];
+  if (extra.length === 0) return base;
+  return { ...base, [tenant]: [...new Set([...(base[tenant] ?? []), ...extra])] };
+}
+
 function getEgressPolicyPath(): string {
   const configured =
     getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
@@ -96,6 +146,7 @@ export function _resetEgressPolicyCacheForTests(): void {
   cachedPolicy = null;
   cachedAllowedDomains = null;
   policyCatalog.reset();
+  tenantOverlayCatalog.reset();
   securityPolicyCatalog.reset();
   _resetProviderEndpointDomainsForTests();
 }
@@ -221,11 +272,12 @@ export function evaluateAudienceEgress(
 
 export function loadEgressPolicy(): EgressPolicyFile {
   const policyPath = getEgressPolicyPath();
-  if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
+  const overlayRef = getTenantEgressOverlayPath();
+  const cacheKey = overlayRef ? `${policyPath}+${overlayRef.path}` : policyPath;
+  if (cachedPolicy && cachedPolicyPath === cacheKey) return cachedPolicy;
   const parsed = policyCatalog.load();
   const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
-  cachedPolicyPath = policyPath;
-  cachedPolicy = {
+  const policy: EgressPolicyFile = {
     version: parsed.version || '1',
     mode:
       modeOverride === 'enforce'
@@ -251,6 +303,32 @@ export function loadEgressPolicy(): EgressPolicyFile {
       ? { link_allowed_domains: parsed.link_allowed_domains }
       : {}),
   };
+  if (overlayRef) {
+    const overlay = tenantOverlayCatalog.load();
+    const foreign = [
+      ...Object.keys(overlay.tenant_allowed_providers ?? {}),
+      ...Object.keys(overlay.tenant_allowed_domains ?? {}),
+    ].filter((key) => key !== overlayRef.tenant);
+    if (foreign.length > 0) {
+      throw new Error(
+        `[EGRESS_OVERLAY_SCOPE] tenant egress overlay for '${overlayRef.tenant}' may only list its own tenant (found: ${[...new Set(foreign)].join(', ')})`
+      );
+    }
+    policy.tenant_allowed_providers = mergeTenantEntries(
+      policy.tenant_allowed_providers ?? {},
+      overlay.tenant_allowed_providers,
+      overlayRef.tenant
+    );
+    policy.tenant_allowed_domains = mergeTenantEntries(
+      policy.tenant_allowed_domains ?? {},
+      overlay.tenant_allowed_domains,
+      overlayRef.tenant
+    );
+  }
+  // Cache only a fully merged policy: a rejected overlay must never leave a
+  // base-only policy cached under the overlay key.
+  cachedPolicyPath = cacheKey;
+  cachedPolicy = policy;
   return cachedPolicy;
 }
 

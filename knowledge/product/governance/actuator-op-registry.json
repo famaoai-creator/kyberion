@@ -11,6 +11,7 @@
     "glob_files",
     "goto",
     "list",
+    "organization_digest",
     "pptx_extract",
     "pulse_status",
     "read",
@@ -72,6 +73,7 @@
     "mouse_click",
     "move",
     "notify",
+    "organization_record_run",
     "pdf_render",
     "pptx_render",
     "press",
@@ -284,6 +286,7 @@
     },
     "core": {
       "capture": [
+        "organization_digest",
         "run_first_win_lifecycle",
         "run_health_degradation_watch",
         "run_tenant_drift_watch",
@@ -296,6 +299,7 @@
         "capture_avatar_photo",
         "generate_avatar",
         "grant_voice_consent",
+        "organization_record_run",
         "programmatic_tool_call",
         "ptc",
         "register_avatar",
@@ -363,7 +367,7 @@
     "ingest": {
       "capture": ["parse_document", "sync_source"],
       "transform": ["dedup", "normalize_card", "staleness_report"],
-      "apply": ["commit"]
+      "apply": ["commit", "meeting_digest"]
     },
     "ios": {
       "capture": [
