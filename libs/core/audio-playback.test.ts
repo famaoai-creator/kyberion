@@ -139,6 +139,53 @@ describe('audio playback', () => {
       expect(child.kill).not.toHaveBeenCalled();
     });
 
+    it('pause() reports false when SIGSTOP cannot be delivered (S11)', () => {
+      const child = createFakeChild();
+      child.kill = vi.fn((signal: NodeJS.Signals) => signal !== 'SIGSTOP');
+      spawnMock.mockImplementationOnce(() => child);
+      const handle = playAudioFile('/tmp/whatever.wav', { command: ['afplay'] });
+
+      expect(handle.pause?.()).toBe(false);
+    });
+
+    it('pause() reports true on success and while already paused (S11)', () => {
+      const child = createFakeChild();
+      spawnMock.mockImplementationOnce(() => child);
+      const handle = playAudioFile('/tmp/whatever.wav', { command: ['afplay'] });
+
+      expect(handle.pause?.()).toBe(true);
+      expect(handle.pause?.()).toBe(true);
+    });
+
+    it('SIGCONTs and kills a paused child on process exit (S11)', () => {
+      const child = createFakeChild();
+      spawnMock.mockImplementationOnce(() => child);
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+      try {
+        const handle = playAudioFile('/tmp/whatever.wav', { command: ['afplay'] });
+
+        expect(onSpy).not.toHaveBeenCalledWith('exit', expect.any(Function));
+        handle.pause?.();
+        expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+        const exitHandler = onSpy.mock.calls.find(([event]) => event === 'exit')?.[1] as (
+          ...args: unknown[]
+        ) => void;
+
+        child.kill.mockClear();
+        exitHandler();
+        expect(child.kill.mock.calls.map(([signal]) => signal)).toEqual(['SIGCONT', 'SIGKILL']);
+
+        // Cleanup removes the hook once the player is done, so a long-lived
+        // host process doesn't accumulate one listener per playback.
+        closeFakeChild(child, 0);
+        expect(offSpy).toHaveBeenCalledWith('exit', exitHandler);
+      } finally {
+        onSpy.mockRestore();
+        offSpy.mockRestore();
+      }
+    });
+
     it('does not expose pause/resume on win32', () => {
       const child = createFakeChild();
       spawnMock.mockImplementationOnce(() => child);

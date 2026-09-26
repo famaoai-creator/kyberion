@@ -617,7 +617,20 @@ export function createPluginGrantBinding(
         ) as object,
       get: (_target, property) => {
         const value: unknown = guard(() => Reflect.get(fn, property, fn));
-        if (property === 'prototype') return value;
+        if (property === 'prototype') {
+          // Ordinary function targets: `target` is `fn` itself, and a
+          // class's `prototype` is non-configurable and non-writable, so a
+          // wrapped value would violate the Proxy get invariant (and break
+          // `instanceof`); reported raw here regardless of whether `fn` is
+          // actually a class, to stay safe without inspecting it.
+          // Plugin Proxy shadow targets: `target` is the throwaway
+          // `pluginFunctionShadow`, whose own `prototype` is an ordinary
+          // function's (writable), so the invariant does not constrain the
+          // trap result — wrapping it is safe and keeps property access on
+          // the prototype (e.g. `wrapped.prototype.method()`) inside the
+          // grant like every other reflected value.
+          return pluginProxy ? wrapResult(value) : value;
+        }
         const own = Reflect.getOwnPropertyDescriptor(target, property);
         if (own && !own.configurable && 'value' in own && !own.writable) return own.value;
         return wrapResult(value);
@@ -675,7 +688,10 @@ export function createPluginGrantBinding(
     /**
      * Collection (and over-budget data) members are copied once and the copy
      * is reused while it is still current (copyIsCurrent), so
-     * `wrapper.tools === wrapper.tools` and loops stay linear.
+     * `wrapper.tools === wrapper.tools`. Every read still re-validates the
+     * memo (copyIsCurrent re-scans the raw and copy items), so revalidation
+     * cost is O(size) per read for over-budget data — the copy is reused,
+     * not the scan.
      */
     const wrapMemberValue = (property: PropertyKey, member: unknown): unknown => {
       if (member === null || typeof member !== 'object' || produced.has(member)) {
