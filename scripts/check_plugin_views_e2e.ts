@@ -302,7 +302,17 @@ function seedViewerTokenRegistry(root: string): string {
     ],
     {
       cwd: root,
-      env: { KYBERION_ROOT: root, KYBERION_REASONING_BACKEND: 'stub' },
+      // Deterministic identity: nothing inherited from the operator's shell
+      // may widen or redirect the issuance (the role comes from the script).
+      env: {
+        KYBERION_ROOT: root,
+        KYBERION_REASONING_BACKEND: 'stub',
+        MISSION_ID: '',
+        MISSION_ROLE: '',
+        KYBERION_PERSONA: '',
+        KYBERION_SUDO: '',
+        SYSTEM_ROLE: '',
+      },
       timeoutMs: 60_000,
     }
   );
