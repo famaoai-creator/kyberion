@@ -1466,7 +1466,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "xAI Grok API model id. Defaults to grok-4.6 when omitted.",
+      "description": "xAI Grok API model id. Defaults to grok-4.7 when omitted. grok-4.7-build-fast is not a public API model.",
       "documented": true
     },
     {
@@ -1498,7 +1498,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Model name passed to the Grok Build CLI backend.",
+      "description": "Model name passed to the Grok Build CLI backend. Defaults to grok-4.7. Set grok-4.7-build-fast for the faster serving tier (twice the grok-4.7 token rates; not in the free tier).",
       "documented": true
     },
     {
