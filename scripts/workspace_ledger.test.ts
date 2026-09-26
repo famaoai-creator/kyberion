@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { registerWorkspace, releaseWorkspace } from '@agent/core/workspace-ledger';
 import { ScriptExitError } from './lib/harness.js';
 import {
@@ -78,7 +77,7 @@ describe('workspace_ledger CLI', () => {
     expect(result.dryRun).toBe(true);
     expect(result.orphaned).toHaveLength(1);
     expect(result.deleted).toEqual([]);
-    expect(fs.existsSync(orphanPath)).toBe(true);
+    expect(safeExistsSync(orphanPath)).toBe(true);
     expect(String(printed[0])).toContain('--apply');
   });
 
@@ -91,9 +90,9 @@ describe('workspace_ledger CLI', () => {
     ) as WorkspaceGcResult;
     expect(result.dryRun).toBe(false);
     expect(result.deleted).toHaveLength(1);
-    expect(fs.existsSync(orphanPath)).toBe(false);
-    expect(fs.existsSync(livePath)).toBe(true);
-    expect(fs.existsSync(stray)).toBe(true);
+    expect(safeExistsSync(orphanPath)).toBe(false);
+    expect(safeExistsSync(livePath)).toBe(true);
+    expect(safeExistsSync(stray)).toBe(true);
   });
 
   it('rejects unknown verbs, unknown arguments and --apply with --dry-run', () => {
