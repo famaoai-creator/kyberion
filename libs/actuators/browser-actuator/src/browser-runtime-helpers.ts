@@ -63,6 +63,8 @@ export interface BrowserSnapshotElement {
   focused?: boolean;
   value_redacted?: boolean;
   selector: string;
+  /** Viewport CSS pixels at capture time (Set-of-Marks grounding). */
+  bbox?: { x: number; y: number; width: number; height: number };
 }
 
 interface BrowserSnapshot {
@@ -731,6 +733,7 @@ async function captureSnapshotElements(
       ready_state: document.readyState,
       elements: visible.slice(0, max).map((node, index) => {
         const el = node as HTMLElement;
+        const rect = el.getBoundingClientRect();
         const role = el.getAttribute('role');
         const aria = el.getAttribute('aria-label');
         const placeholder = el.getAttribute('placeholder');
@@ -794,6 +797,12 @@ async function captureSnapshotElements(
             el instanceof HTMLTextAreaElement ||
             el instanceof HTMLSelectElement,
           selector: segments.length ? segments.join(' > ') : 'body',
+          bbox: {
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
         };
       }),
     };
