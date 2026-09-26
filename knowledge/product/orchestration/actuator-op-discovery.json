@@ -30671,27 +30671,15 @@
               "tenant_slug": {
                 "type": "string"
               },
+              "keep_source": {
+                "type": "boolean"
+              },
               "approval": {
                 "type": "object",
                 "properties": {
                   "agent_id": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "channel": {
-                    "type": "string"
-                  },
-                  "correlation_id": {
-                    "type": "string"
-                  },
-                  "has_human": {
-                    "type": "boolean"
-                  },
-                  "has_ui": {
-                    "type": "boolean"
-                  },
-                  "non_interactive": {
-                    "type": "boolean"
                   }
                 },
                 "required": ["agent_id"],
@@ -30927,27 +30915,15 @@
               "tenant_slug": {
                 "type": "string"
               },
+              "keep_source": {
+                "type": "boolean"
+              },
               "approval": {
                 "type": "object",
                 "properties": {
                   "agent_id": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "channel": {
-                    "type": "string"
-                  },
-                  "correlation_id": {
-                    "type": "string"
-                  },
-                  "has_human": {
-                    "type": "boolean"
-                  },
-                  "has_ui": {
-                    "type": "boolean"
-                  },
-                  "non_interactive": {
-                    "type": "boolean"
                   }
                 },
                 "required": ["agent_id"],
