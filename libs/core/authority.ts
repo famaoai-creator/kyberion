@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { AsyncLocalStorage } from 'node:async_hooks';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
 // here created a cycle (secure-io → tier-guard/policy-engine → authority →
@@ -14,6 +13,14 @@ import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
+import {
+  currentExecutionScope,
+  executionPersonaText,
+  registerAssumedRoleValidator,
+  runInExecutionScope,
+  scopedAssumedRole,
+  type ExecutionScope,
+} from './foundation/execution-scope.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -87,10 +94,6 @@ function optionalStringFieldIsValid(record: JsonRecord, key: string): boolean {
 }
 
 let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
-const executionScopeStorage = new AsyncLocalStorage<{
-  tenantBound: boolean;
-  tenantSlug?: string;
-}>();
 
 function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
@@ -218,9 +221,36 @@ function isAuthority(value: string): value is Authority {
   );
 }
 
+function normalizeRoleName(role: string): string {
+  return role.toLowerCase().replace(/\s+/g, '_');
+}
+
+/**
+ * RA-01: the role assumed in-process by the innermost
+ * `withExecutionContext` / `withExecutionContextAsync`, if any. In-process
+ * only — it can never come from an inherited environment variable.
+ */
+export function resolveAssumedRole(): string | undefined {
+  const assumed = scopedAssumedRole();
+  return assumed ? normalizeRoleName(assumed) : undefined;
+}
+
+/**
+ * Role resolution precedence (RA-01):
+ *   1. the role assumed in-process by withExecutionContext* (scoped, per
+ *      async context; never inherited from the environment);
+ *   2. `SYSTEM_ROLE` (set by surface_runtime / runtime launchers);
+ *   3. `MISSION_ROLE`;
+ *   4. a heuristic derived from the process argv[1] basename.
+ * When `SYSTEM_ROLE` is set, step 1 is bounded by the role assumption policy
+ * (RA-02, see {@link assertRoleAssumptionAllowed}).
+ */
 export function resolveRole(): string | undefined {
+  const assumedRole = resolveAssumedRole();
+  if (assumedRole) return assumedRole;
+
   const envRole = getRegisteredEnvText('SYSTEM_ROLE') || getRegisteredEnvText('MISSION_ROLE');
-  if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
+  if (envRole) return normalizeRoleName(envRole);
 
   const argv1 = process.argv[1] || '';
   const procName = path.basename(argv1, path.extname(argv1)).toLowerCase().replace(/[-]/g, '_');
@@ -229,6 +259,140 @@ export function resolveRole(): string | undefined {
   if (procName.includes('surface_runtime')) return 'surface_runtime';
   if (procName.includes('orchestrator')) return 'orchestrator';
   return procName || undefined;
+}
+
+/**
+ * The persona of the current execution: the persona bound by the innermost
+ * withExecutionContext* when it decided one, else `KYBERION_PERSONA`.
+ * Use this (not the raw env var) for authorization decisions — the env var is
+ * process-global and races between concurrent async contexts.
+ */
+export function resolveExecutionPersona(): string | undefined {
+  return executionPersonaText();
+}
+
+// ---------------------------------------------------------------------------
+// RA-02 role assumption policy
+//
+// Loaded through fs-primitives, not a governed catalog: defineCatalog reads
+// through secure-io, which consults this module (the TDZ cycle documented at
+// the top of this file). The JSON schema
+// (knowledge/product/schemas/role-assumption-policy.schema.json) is enforced
+// by the governance contract tests; this loader re-checks the shape it relies
+// on and fails closed when the file is missing or malformed.
+// ---------------------------------------------------------------------------
+
+export const ROLE_ASSUMPTION_POLICY_PATH = 'product/governance/role-assumption-policy.json';
+
+interface RoleAssumptionPolicy {
+  sharedCoreRoles: ReadonlySet<string>;
+  systemRoles: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+/** A missing or malformed policy is re-read after this long instead of cached forever (S5). */
+export const ROLE_ASSUMPTION_POLICY_RETRY_MS = 60_000;
+
+let cachedRoleAssumptionPolicy: {
+  path: string;
+  policy: RoleAssumptionPolicy | null;
+  loadedAt: number;
+} | null = null;
+
+function stringArrayField(record: JsonRecord, key: string): string[] | null {
+  const value = record[key];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) return null;
+  return value.map((item) => normalizeRoleName(item));
+}
+
+function parseRoleAssumptionPolicy(raw: JsonRecord | null): RoleAssumptionPolicy | null {
+  if (!raw || !isJsonRecord(raw.shared_core_roles) || !isJsonRecord(raw.system_roles)) {
+    return null;
+  }
+  const sharedCoreRoles = stringArrayField(raw.shared_core_roles, 'roles');
+  if (!sharedCoreRoles) return null;
+  const systemRoles = new Map<string, ReadonlySet<string>>();
+  for (const [systemRole, entry] of Object.entries(raw.system_roles)) {
+    if (!isJsonRecord(entry)) return null;
+    const mayAssume = stringArrayField(entry, 'may_assume');
+    if (!mayAssume) return null;
+    systemRoles.set(normalizeRoleName(systemRole), new Set(mayAssume));
+  }
+  return { sharedCoreRoles: new Set(sharedCoreRoles), systemRoles };
+}
+
+function loadRoleAssumptionPolicy(): RoleAssumptionPolicy | null {
+  const filePath = pathResolver.knowledge(ROLE_ASSUMPTION_POLICY_PATH);
+  const cached = cachedRoleAssumptionPolicy;
+  if (
+    cached?.path === filePath &&
+    (cached.policy || Date.now() - cached.loadedAt < ROLE_ASSUMPTION_POLICY_RETRY_MS)
+  ) {
+    return cached.policy;
+  }
+  let policy: RoleAssumptionPolicy | null = null;
+  try {
+    if (!rawExistsSync(filePath)) {
+      logger.warn(
+        `role assumption policy is missing at ${filePath}; SYSTEM_ROLE processes may only assume their own role (re-checked every ${ROLE_ASSUMPTION_POLICY_RETRY_MS / 1000}s)`
+      );
+    } else {
+      policy = parseRoleAssumptionPolicy(parseJsonRecord(rawReadTextFile(filePath)));
+      if (!policy) {
+        logger.warn(
+          `role assumption policy at ${filePath} is malformed; SYSTEM_ROLE processes may only assume their own role`
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn(`role assumption policy could not be read: ${err}`);
+    policy = null;
+  }
+  cachedRoleAssumptionPolicy = { path: filePath, policy, loadedAt: Date.now() };
+  return policy;
+}
+
+/** Test seam: drop the cached role assumption policy. */
+export function resetRoleAssumptionPolicyCache(): void {
+  cachedRoleAssumptionPolicy = null;
+}
+
+/**
+ * RA-02: may a process running as `systemRole` assume `role` in-process?
+ * Same role: always. Otherwise the role must be a shared core role or listed
+ * for the system role; a system role with no entry may only assume itself and
+ * a missing/malformed policy denies everything but the system role itself.
+ */
+export function isRoleAssumptionAllowed(systemRole: string, role: string): boolean {
+  const normalizedSystemRole = normalizeRoleName(systemRole.trim());
+  const normalizedRole = normalizeRoleName(role.trim());
+  if (normalizedRole === normalizedSystemRole) return true;
+  const policy = loadRoleAssumptionPolicy();
+  const allowed = policy?.systemRoles.get(normalizedSystemRole);
+  if (!policy || !allowed) return false;
+  return policy.sharedCoreRoles.has(normalizedRole) || allowed.has(normalizedRole);
+}
+
+/**
+ * S1: the read-time check the execution-scope readers apply to every scoped
+ * role, so a scope run directly on the (globalThis-reachable) storage cannot
+ * bypass RA-02.
+ */
+function isScopedRoleAccepted(role: string): boolean {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  return !systemRole || isRoleAssumptionAllowed(systemRole, role);
+}
+
+registerAssumedRoleValidator(isScopedRoleAccepted);
+
+function assertRoleAssumptionAllowed(role: string): void {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  if (!systemRole) return;
+  if (isRoleAssumptionAllowed(systemRole, role)) return;
+  throw new Error(
+    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole)} ` +
+      `may not assume role '${normalizeRoleName(role.trim())}'. Allowed assumptions are governed by ` +
+      `knowledge/${ROLE_ASSUMPTION_POLICY_PATH}.`
+  );
 }
 
 export function inferPersonaFromRole(role?: string): Persona {
@@ -242,12 +406,27 @@ export function inferPersonaFromRole(role?: string): Persona {
   return fromMap || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }
 
+/**
+ * Environment for a child process. With an explicit `role` the child runs as
+ * that role; without one, a child built from the live `process.env` inherits
+ * the role/persona assumed by the current execution scope (RA-01) instead of
+ * whatever a concurrent context last wrote into the process-global env.
+ */
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   role?: string,
   persona?: Persona
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
+  if (!role && !persona && baseEnv === process.env) {
+    const scope = currentExecutionScope();
+    if (scope?.assumedRole) {
+      nextEnv.MISSION_ROLE = scope.assumedRole;
+      if (typeof scope.assumedPersona === 'string') nextEnv.KYBERION_PERSONA = scope.assumedPersona;
+      else if (scope.assumedPersona === null) delete nextEnv.KYBERION_PERSONA;
+      return nextEnv;
+    }
+  }
   if (role) nextEnv.MISSION_ROLE = role;
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
@@ -258,36 +437,112 @@ export function buildExecutionEnv(
   return nextEnv;
 }
 
+interface PreparedExecutionContext {
+  /** The role normalized once, so the scope, the env mirror and children agree. */
+  role: string;
+  scope: ExecutionScope;
+  resolvedPersona: Persona;
+}
+
+function prepareExecutionContext(
+  role: string,
+  persona: Persona | undefined,
+  tenantSlug: string | undefined
+): PreparedExecutionContext {
+  const normalizedRole = normalizeRoleName(role.trim());
+  assertRoleAssumptionAllowed(normalizedRole);
+  const resolvedPersona = persona || inferPersonaFromRole(normalizedRole);
+  // Mirror the env semantics below: a known persona is bound, an unknown one
+  // with no explicit persona clears it, an explicit unknown keeps the outer one.
+  const assumedPersona: string | null | undefined =
+    resolvedPersona !== 'unknown'
+      ? resolvedPersona
+      : persona === undefined
+        ? null
+        : currentExecutionScope()?.assumedPersona;
+  return {
+    role: normalizedRole,
+    resolvedPersona,
+    scope: {
+      tenantBound: tenantSlug !== undefined,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      assumedRole: normalizedRole,
+      assumedPersona,
+    },
+  };
+}
+
+/**
+ * Backwards-compatible env mirror of a SYNCHRONOUS assumption, for code that
+ * still reads MISSION_ROLE / KYBERION_PERSONA directly (attribution labels,
+ * children spawned from a raw `process.env`). Only the sync helper mirrors:
+ * nothing else can run while a synchronous `fn` runs, so its write/restore
+ * pair cannot interleave with another context. The async helper never
+ * mirrors (B1) — interleaved async contexts would restore each other's values.
+ * Returns what was written so the restore never clobbers a value `fn` set.
+ */
+function applyExecutionEnv(
+  role: string,
+  persona: Persona | undefined,
+  resolvedPersona: Persona
+): { role: string; persona: string | undefined } {
+  setRegisteredEnv('MISSION_ROLE', role);
+  if (resolvedPersona !== 'unknown') {
+    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
+  } else if (persona === undefined) {
+    setRegisteredEnv('KYBERION_PERSONA', undefined);
+  }
+  return { role, persona: getRegisteredEnvText('KYBERION_PERSONA') };
+}
+
+/** Restore one mirrored variable unless something else changed it since we wrote it. */
+function restoreMirroredEnv(
+  key: 'MISSION_ROLE' | 'KYBERION_PERSONA',
+  written: string | undefined,
+  previous: string | undefined
+): void {
+  if (getRegisteredEnvText(key) === written) setRegisteredEnv(key, previous);
+}
+
+/**
+ * Run `fn` as `role` (and `persona`, default inferred from the role). The
+ * assumption is carried in an AsyncLocalStorage scope that `resolveRole()`
+ * and the persona resolution read first (RA-01), so it wins over SYSTEM_ROLE
+ * and is isolated per async context. Under SYSTEM_ROLE the role must be
+ * allowed by the role assumption policy (RA-02) or this throws
+ * `[ROLE_ASSUMPTION_DENIED]` before `fn` runs.
+ *
+ * S4: if `fn` returns a Promise, the scoped role follows that promise's
+ * continuations (AsyncLocalStorage semantics) until it settles, while the env
+ * mirror is restored as soon as `fn` returns. Prefer
+ * {@link withExecutionContextAsync} for async work; it makes that explicit.
+ */
 export function withExecutionContext<T>(
   role: string,
   fn: () => T,
   persona?: Persona,
   tenantSlug?: string
 ): T {
+  const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  setRegisteredEnv('MISSION_ROLE', role);
-  const resolvedPersona = persona || inferPersonaFromRole(role);
-  if (resolvedPersona !== 'unknown') {
-    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
-  } else if (persona === undefined) {
-    setRegisteredEnv('KYBERION_PERSONA', undefined);
-  }
+  const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
-    return executionScopeStorage.run(
-      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
-      fn
-    );
+    return runInExecutionScope(prepared.scope, fn);
   } finally {
-    setRegisteredEnv('MISSION_ROLE', previousRole);
-    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
+    restoreMirroredEnv('MISSION_ROLE', written.role, previousRole);
+    restoreMirroredEnv('KYBERION_PERSONA', written.persona, previousPersona);
   }
 }
 
 /**
- * Async counterpart of withExecutionContext. The synchronous helper restores
- * process context as soon as an async callback returns its Promise, which is
- * too early for governed writes after the first await.
+ * Async counterpart of withExecutionContext: the scoped assumption follows
+ * `fn` across awaits. It deliberately does NOT mirror the role/persona into
+ * `process.env` (B1): concurrent async contexts would interleave the
+ * write/restore pairs and leave MISSION_ROLE / KYBERION_PERSONA wrong for the
+ * rest of the process. Read the role with `resolveRole()` /
+ * `resolveIdentityContext()` / `resolveExecutionPersona()`, and build child
+ * envs with `buildExecutionEnv()` / `buildSafeExecEnv()`, which follow the scope.
  */
 export async function withExecutionContextAsync<T>(
   role: string,
@@ -295,24 +550,8 @@ export async function withExecutionContextAsync<T>(
   persona?: Persona,
   tenantSlug?: string
 ): Promise<T> {
-  const previousRole = getRegisteredEnvText('MISSION_ROLE');
-  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  setRegisteredEnv('MISSION_ROLE', role);
-  const resolvedPersona = persona || inferPersonaFromRole(role);
-  if (resolvedPersona !== 'unknown') {
-    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
-  } else if (persona === undefined) {
-    setRegisteredEnv('KYBERION_PERSONA', undefined);
-  }
-  try {
-    return await executionScopeStorage.run(
-      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
-      fn
-    );
-  } finally {
-    setRegisteredEnv('MISSION_ROLE', previousRole);
-    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
-  }
+  const prepared = prepareExecutionContext(role, persona, tenantSlug);
+  return await runInExecutionScope(prepared.scope, fn);
 }
 
 function resolveSudoScope(): string[] | undefined {
@@ -423,12 +662,12 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
   const missionId = getRegisteredEnvText('MISSION_ID');
-  const envPersona = getRegisteredEnvText('KYBERION_PERSONA');
+  const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
   let persona: Persona = normalizePersona(envPersona);
   const authorities: Authority[] = [];
-  const executionScope = executionScopeStorage.getStore();
+  const executionScope = currentExecutionScope();
   let tenantSlug: string | undefined = normalizeTenantSlug(
     tenantOverride ??
       (executionScope?.tenantBound
