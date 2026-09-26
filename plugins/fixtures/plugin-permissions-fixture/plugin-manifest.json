@@ -1,7 +1,7 @@
 {
   "plugin_id": "plugin-permissions-fixture",
   "version": "1.0.0",
-  "description": "EP-03/EP-04/EP-05 test fixture: ops that exercise governed host probes under the plugin grant, plus one declarative A2UI view.",
+  "description": "EP-03/EP-04/EP-05 test fixture: ops that exercise governed host probes under the plugin grant, plus one declarative A2UI view and one sandboxed-iframe view.",
   "provides": {
     "ops": [
       "permfixture:write",
@@ -52,6 +52,29 @@
         "lifecycle": {
           "refresh": "on_open"
         }
+      },
+      {
+        "id": "status_frame",
+        "titleKey": "plugin:fixture_status_view_title",
+        "document": "views/frame.html",
+        "isolation": "sandboxed-iframe",
+        "capabilities": ["action.request"],
+        "roleGate": {
+          "minRole": "readonly",
+          "tiers": ["public"]
+        },
+        "actions": [
+          {
+            "id": "probe_env",
+            "authority": "agent",
+            "op": "permfixture:env",
+            "paramsSchema": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        ]
       }
     ]
   },

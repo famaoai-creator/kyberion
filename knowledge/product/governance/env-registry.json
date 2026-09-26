@@ -4060,6 +4060,33 @@
       "documented": true
     },
     {
+      "name": "KYBERION_WORKSPACE_DISK_CAP_BYTES",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Total bytes allowed across ledger-registered workspaces (worktrees, scratch dirs, private git indexes); overrides workspace-budget-policy.json disk_cap_bytes; 0 disables the cap. Default 21474836480 (20 GiB).",
+      "documented": true,
+      "subsystem": "storage"
+    },
+    {
+      "name": "KYBERION_WORKSPACE_MIN_FREE_BYTES",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Free-disk floor on the workspace volume; a new workspace is denied (fail-closed if free space is unreadable) when it would drop free space below this. Overrides min_free_bytes; 0 disables. Default 2147483648 (2 GiB).",
+      "documented": true,
+      "subsystem": "storage"
+    },
+    {
+      "name": "KYBERION_WORKSPACE_ORPHAN_TTL_HOURS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Hours a released (or owner-terminal) registered workspace is kept before the janitor workspace sweep deletes it. Overrides orphan_ttl_hours. Default 24.",
+      "documented": true,
+      "subsystem": "storage"
+    },
+    {
       "name": "KYBERION_XCODEBUILD_BIN",
       "category": "path",
       "type": "path",
