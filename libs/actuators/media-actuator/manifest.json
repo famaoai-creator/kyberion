@@ -1,7 +1,7 @@
 {
   "actuator_id": "media-actuator",
   "version": "1.2.0",
-  "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
+  "description": "Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows.",
   "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -39,15 +39,27 @@
     "capture": [
       {
         "op": "pptx_slide_text",
-        "note": "Extract slide text from a PPTX file into context. Set params.ocr=true or params.ocr.enabled=true to OCR slide images through the local OCR router."
+        "note": "Extract per-slide text from a PPTX in presentation order (position; slide_index stays the slideN.xml number) with hidden, shapes_text (newline-separated paragraphs), tables, notes_text, image_parts and concatenated. Set params.ocr=true or params.ocr.enabled=true to OCR slide images through the local OCR router; EMF/WMF are rasterized via LibreOffice first and unreadable images are listed in ocr_skipped."
       },
       {
         "op": "pptx_extract",
         "note": "Extract full PPTX design protocol (slides + master theme + raw passthrough) into context. Set params.ocr=true or params.ocr.enabled=true to attach OCR results for slide images."
       },
       {
+        "op": "pdf_extract",
+        "note": "Extract a PdfDesignProtocol with the native PDF engine (per-page text merged with pdf-parse text, positioned elements, placed images extracted to a per-document dir under active/shared/tmp/native-pdf/images/). Set params.ocr=true or params.ocr={ language, mode, min_area_ratio } to OCR each page's placed images (tables, charts; images under 3% of the page are skipped) into page.imageOcr."
+      },
+      {
+        "op": "document_digest",
+        "note": "Read pdf/pptx/xlsx/docx/html/txt/md into LLM-ready Markdown through the shared document reader (@agent/core/document-reader — same output as `pnpm kyberion read` and ingest) (tables, headings, line breaks; docx pictures as _[image: media/x.png]_ markers). params.ocr OCRs embedded images of pdf/pptx/docx; reader warnings land in <export_as>_warnings."
+      },
+      {
+        "op": "docx_extract",
+        "note": "Extract a DocxDesignProtocol with the native docx reader. Pictures are written as files and referenced by drawing.imagePath (per-document dir under active/shared/tmp/native-docx/images/, or params.image_dir). Set params.embed_images=true for a self-contained design with inline base64 imageData."
+      },
+      {
         "op": "xlsx_extract",
-        "note": "Extract full XLSX design protocol (sheets + styles + raw passthrough) into context."
+        "note": "Extract full XLSX design protocol (sheets + styles + raw passthrough) into context. Pass params.sheet / params.range / params.values_only for a slim values-only projection."
       },
       {
         "op": "json_read",

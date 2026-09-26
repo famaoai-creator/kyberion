@@ -15,7 +15,9 @@ import {
   extractPptxSlides,
   protocolToMarkdown,
 } from '@agent/core/media-contracts';
+import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from '@agent/core/visual-raster';
 import { recognizeDocumentImage } from './media-ocr.js';
+import { inferDocumentFormat, ocrPdfDesignImages, readDocument } from '@agent/core/document-reader';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 import { projectXlsxDesign } from './xlsx-extract-projection.js';
 import * as path from 'node:path';
@@ -141,21 +143,49 @@ interface DocumentOcrOptions {
   mode?: 'fast' | 'accurate' | 'balanced' | 'local_only' | 'privacy_first';
 }
 
+/** Key joining distilled design slides to extracted slides: the slide part name. */
+function pptxSlideKey(slide: any, index: number): string {
+  return typeof slide?.id === 'string' && slide.id ? slide.id : `slide${index + 1}.xml`;
+}
+
+/**
+ * OCR every image on every slide. Vector images (EMF/WMF — pasted Excel
+ * ranges, charts) are rasterized through LibreOffice first because OCR
+ * engines cannot read them; images that still cannot be read are reported in
+ * `ocr_skipped` so a missing figure never reads as a slide without one.
+ */
 async function collectPptxImageOcr(
   design: any,
   options: DocumentOcrOptions = {}
-): Promise<Map<number, any>> {
-  const bySlide = new Map<number, any>();
+): Promise<Map<string, any>> {
+  const bySlide = new Map<string, any>();
   const slides = Array.isArray(design?.slides) ? design.slides : [];
   for (const [index, slide] of slides.entries()) {
-    const imageElements = Array.isArray(slide?.elements)
-      ? slide.elements.filter((element: any) => element?.type === 'image' && element?.imagePath)
-      : [];
+    const imagePaths: string[] = Array.from(
+      new Set(
+        (Array.isArray(slide?.elements) ? slide.elements : [])
+          .filter((element: any) => element?.type === 'image' && element?.imagePath)
+          .map((element: any) => String(element.imagePath))
+      )
+    );
     const results: any[] = [];
-    for (const image of imageElements) {
+    const skipped: Array<{ imagePath: string; reason: string }> = [];
+    for (const imagePath of imagePaths) {
+      let ocrPath = imagePath;
+      if (VECTOR_IMAGE_EXTENSIONS.has(path.extname(imagePath).toLowerCase())) {
+        const raster = rasterizeVectorImage({
+          sourcePath: imagePath,
+          outDir: path.join(path.dirname(imagePath), 'rasterized'),
+        });
+        if (!raster.available || !raster.png_path) {
+          skipped.push({ imagePath, reason: raster.unavailable_reason || 'rasterize failed' });
+          continue;
+        }
+        ocrPath = raster.png_path;
+      }
       try {
         const result = await recognizeDocumentImage({
-          path: image.imagePath,
+          path: ocrPath,
           language: options.language || 'jpn+eng',
           mode: options.mode || 'local_only',
         });
@@ -165,24 +195,31 @@ async function collectPptxImageOcr(
             confidence: result.confidence,
             text: result.text.trim(),
             lines: result.lines,
-            imagePath: image.imagePath,
+            imagePath,
+            ...(ocrPath !== imagePath ? { rasterizedPath: ocrPath } : {}),
           });
         }
       } catch (error: any) {
+        skipped.push({ imagePath, reason: String(error?.message || error) });
         logger.warn(
           `[MEDIA_CAPTURE] PPTX image OCR failed on slide ${index + 1}: ${error.message}`
         );
       }
     }
-    if (results.length === 0) continue;
-    const ocrText = Array.from(new Set(results.map((result) => result.text))).join('\n\n');
-    bySlide.set(index + 1, {
-      ocr_text: ocrText,
-      ocr_results: results,
-      ocr_provider: results.map((result) => result.provider).join(','),
-      ocr_confidence: Math.round(
-        results.reduce((sum, result) => sum + Number(result.confidence || 0), 0) / results.length
-      ),
+    if (results.length === 0 && skipped.length === 0) continue;
+    bySlide.set(pptxSlideKey(slide, index), {
+      ...(results.length > 0
+        ? {
+            ocr_text: Array.from(new Set(results.map((result) => result.text))).join('\n\n'),
+            ocr_results: results,
+            ocr_provider: results.map((result) => result.provider).join(','),
+            ocr_confidence: Math.round(
+              results.reduce((sum, result) => sum + Number(result.confidence || 0), 0) /
+                results.length
+            ),
+          }
+        : {}),
+      ...(skipped.length > 0 ? { ocr_skipped: skipped } : {}),
     });
   }
   return bySlide;
@@ -195,11 +232,34 @@ async function augmentPptxDesignWithImageOcr(
   const cloned = cloneJsonValue(design);
   const ocrBySlide = await collectPptxImageOcr(design, options);
   for (const [index, slide] of (cloned.slides || []).entries()) {
-    const ocr = ocrBySlide.get(index + 1);
+    const ocr = ocrBySlide.get(pptxSlideKey(slide, index));
     if (ocr) slide.ocr = ocr;
   }
   return cloned;
 }
+/** OCR each PDF page's placed images — delegated to the shared document reader. */
+async function augmentPdfDesignWithImageOcr(
+  design: any,
+  options: DocumentOcrOptions & { min_area_ratio?: number } = {}
+): Promise<any> {
+  const cloned = cloneJsonValue(design);
+  await ocrPdfDesignImages(cloned, {
+    ...(options.language ? { ocrLanguage: options.language } : {}),
+    ...(options.mode ? { ocrMode: options.mode as any } : {}),
+    ...(options.min_area_ratio !== undefined ? { minAreaRatio: options.min_area_ratio } : {}),
+  });
+  return cloned;
+}
+
+function pdfOcrOptions(params: any): (DocumentOcrOptions & { min_area_ratio?: number }) | null {
+  if (params.ocr !== true && params.ocr?.enabled !== true) return null;
+  return {
+    language: params.ocr?.language,
+    mode: params.ocr?.mode,
+    min_area_ratio: params.ocr?.min_area_ratio,
+  };
+}
+
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -237,9 +297,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           language: params.ocr?.language,
           mode: params.ocr?.mode,
         });
+        // Join on the slide part name: extracted slides are in presentation
+        // order while the distilled design follows file numbering.
         slides = slides.map((slide) => ({
           ...slide,
-          ...(ocrBySlide.get(slide.slide_index) || {}),
+          ...(ocrBySlide.get(path.posix.basename(slide.entry_name)) || {}),
         }));
       }
       return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
@@ -264,7 +326,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'docx_extract': {
       const docxPath = resolveMediaInputPath(params.path, resolve, 'docx_extract');
-      const docxDesign = await docxUtils.distillDocxDesign(docxPath);
+      // Pictures are written as files (imagePath) unless embed_images asks
+      // for a self-contained design with inline base64.
+      const docxDesign = await docxUtils.distillDocxDesign(docxPath, {
+        embedImages: params.embed_images === true,
+        ...(params.image_dir ? { imageDir: String(resolve(params.image_dir)) } : {}),
+      });
       return { ...ctx, [params.export_as || 'last_docx_design']: docxDesign };
     }
     case 'pdf_extract': {
@@ -278,6 +345,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           `[MEDIA_CAPTURE] pdf_extract cleaner text fallback unavailable: ${error.message}`
         );
       }
+      const ocrOptions = pdfOcrOptions(params);
+      if (ocrOptions) pdfDesign = await augmentPdfDesignWithImageOcr(pdfDesign, ocrOptions);
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
     }
     case 'pdf_split': {
@@ -583,7 +652,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'document_digest': {
       // Extract a document and return concise LLM-friendly Markdown.
-      // Supports: pdf, pptx, xlsx, docx (auto-detected from extension).
+      // Supports: pdf, pptx, xlsx, docx, html/htm, txt/md/markdown (auto-detected from extension).
       // params: { path: string, export_as?: string }
       // If a pre-extracted protocol exists in context via params.from, use that directly.
       const exportKey = params.export_as || 'last_document_digest';
@@ -597,36 +666,21 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         const markdown = safeReadFile(filePath, { encoding: 'utf8' });
         return { ...ctx, [exportKey]: markdown };
       }
-      let protocol: any;
-      switch (ext) {
-        case '.pdf': {
-          protocol = await distillPdfDesign(filePath, { aesthetic: false });
-          try {
-            const extractedText = await mediaPdfHelpers.extractCleanerPdfText(filePath);
-            protocol = mediaPdfHelpers.mergeCleanerPdfText(protocol, extractedText);
-          } catch {
-            /* fallback to native extraction */
-          }
-          break;
-        }
-        case '.pptx': {
-          const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/digest_${Date.now()}`);
-          protocol = await pptxUtils.distillPptxDesign(filePath, assetsDir);
-          break;
-        }
-        case '.xlsx': {
-          protocol = await xlsxUtils.distillXlsxDesign(filePath);
-          break;
-        }
-        case '.docx': {
-          protocol = await docxUtils.distillDocxDesign(filePath);
-          break;
-        }
-        default:
-          throw new Error(`document_digest: unsupported format "${ext}"`);
-      }
-      const md = protocolToMarkdown(protocol);
-      return { ...ctx, [exportKey]: md };
+      // pdf / pptx / docx / xlsx / html (and .markdown): the shared document
+      // reader — the same path as `pnpm kyberion read` and the ingest ceremony.
+      const format = inferDocumentFormat(filePath);
+      if (!format) throw new Error(`document_digest: unsupported format "${ext}"`);
+      const ocr = pdfOcrOptions(params);
+      const result = await readDocument(filePath, format, {
+        ocr: Boolean(ocr),
+        ...(ocr?.language ? { ocrLanguage: ocr.language } : {}),
+        ...(ocr?.mode ? { ocrMode: ocr.mode as any } : {}),
+      });
+      return {
+        ...ctx,
+        [exportKey]: result.markdown,
+        ...(result.warnings.length ? { [`${exportKey}_warnings`]: result.warnings } : {}),
+      };
     }
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);

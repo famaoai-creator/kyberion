@@ -5,8 +5,21 @@
  */
 
 import type { PdfDesignProtocol, PdfPage, PdfLayoutElement } from './types/pdf-protocol.js';
-import type { DocxDesignProtocol, DocxBlockContent, DocxParagraph, DocxRun, DocxTable, DocxTableRow } from './types/docx-protocol.js';
-import type { XlsxDesignProtocol, XlsxWorksheet, XlsxCell } from './types/xlsx-protocol.js';
+import type {
+  DocxDesignProtocol,
+  DocxBlockContent,
+  DocxParagraph,
+  DocxRun,
+  DocxTable,
+  DocxTableRow,
+} from './types/docx-protocol.js';
+import type {
+  XlsxDesignProtocol,
+  XlsxWorksheet,
+  XlsxCell,
+  XlsxCellStyle,
+} from './types/xlsx-protocol.js';
+import { formatXlsxNumber } from './xlsx-number-format.js';
 import type { PptxDesignProtocol, PptxSlide, PptxElement } from './types/pptx-protocol.js';
 
 // ─── Public API ──────────────────────────────────────────────
@@ -16,7 +29,7 @@ import type { PptxDesignProtocol, PptxSlide, PptxElement } from './types/pptx-pr
  * Auto-detects the protocol type from its shape.
  */
 export function protocolToMarkdown(
-  protocol: PdfDesignProtocol | DocxDesignProtocol | XlsxDesignProtocol | PptxDesignProtocol,
+  protocol: PdfDesignProtocol | DocxDesignProtocol | XlsxDesignProtocol | PptxDesignProtocol
 ): string {
   if (isPdf(protocol)) return pdfToMarkdown(protocol);
   if (isDocx(protocol)) return docxToMarkdown(protocol);
@@ -61,7 +74,7 @@ export function pdfToMarkdown(protocol: PdfDesignProtocol): string {
       lines.push(page.text.trim(), '');
     }
     // Links from annotations
-    const links = (page.annotations ?? []).filter(a => a.type === 'Link' && 'uri' in a && a.uri);
+    const links = (page.annotations ?? []).filter((a) => a.type === 'Link' && 'uri' in a && a.uri);
     if (links.length) {
       for (const link of links) {
         if ('uri' in link && link.uri) {
@@ -110,7 +123,7 @@ export function xlsxToMarkdown(protocol: XlsxDesignProtocol): string {
     if (protocol.sheets.length > 1) {
       lines.push(`## ${sheet.name}`, '');
     }
-    renderXlsxSheet(sheet, protocol.sharedStrings, lines);
+    renderXlsxSheet(sheet, protocol.sharedStrings, lines, protocol.styles?.cellXfs ?? []);
     lines.push('');
   }
 
@@ -133,24 +146,52 @@ export function pptxToMarkdown(protocol: PptxDesignProtocol): string {
 // ─── Type Guards ────────────────────────────────────────────
 
 function isPdf(p: unknown): p is PdfDesignProtocol {
-  return p != null && typeof p === 'object' && 'content' in p && 'source' in p && typeof (p as PdfDesignProtocol).source?.format === 'string';
+  return (
+    p != null &&
+    typeof p === 'object' &&
+    'content' in p &&
+    'source' in p &&
+    typeof (p as PdfDesignProtocol).source?.format === 'string'
+  );
 }
 
 function isDocx(p: unknown): p is DocxDesignProtocol {
-  return p != null && typeof p === 'object' && 'body' in p && 'styles' in p && Array.isArray((p as DocxDesignProtocol).body);
+  return (
+    p != null &&
+    typeof p === 'object' &&
+    'body' in p &&
+    'styles' in p &&
+    Array.isArray((p as DocxDesignProtocol).body)
+  );
 }
 
 function isXlsx(p: unknown): p is XlsxDesignProtocol {
-  return p != null && typeof p === 'object' && 'sheets' in p && 'sharedStrings' in p && Array.isArray((p as XlsxDesignProtocol).sheets);
+  return (
+    p != null &&
+    typeof p === 'object' &&
+    'sheets' in p &&
+    'sharedStrings' in p &&
+    Array.isArray((p as XlsxDesignProtocol).sheets)
+  );
 }
 
 function isPptx(p: unknown): p is PptxDesignProtocol {
-  return p != null && typeof p === 'object' && 'slides' in p && 'canvas' in p && Array.isArray((p as PptxDesignProtocol).slides);
+  return (
+    p != null &&
+    typeof p === 'object' &&
+    'slides' in p &&
+    'canvas' in p &&
+    Array.isArray((p as PptxDesignProtocol).slides)
+  );
 }
 
 // ─── PDF Helpers ────────────────────────────────────────────
 
-function renderOutline(item: { title: string; children?: { title: string; children?: any[] }[] }, depth: number, lines: string[]) {
+function renderOutline(
+  item: { title: string; children?: { title: string; children?: any[] }[] },
+  depth: number,
+  lines: string[]
+) {
   lines.push(`${'  '.repeat(depth)}- ${item.title}`);
   if (item.children) {
     for (const child of item.children) {
@@ -164,7 +205,7 @@ function renderOutline(item: { title: string; children?: { title: string; childr
  * Groups text elements by Y-coordinate (rows) and X-coordinate (columns).
  */
 export function extractTablesFromPage(page: PdfPage): string | null {
-  const elements = (page.elements ?? []).filter(e => e.type === 'text' && e.text?.trim());
+  const elements = (page.elements ?? []).filter((e) => e.type === 'text' && e.text?.trim());
   if (elements.length < 4) return null; // Need enough elements to form a table
 
   // Cluster by Y position (rows) with tolerance
@@ -173,19 +214,19 @@ export function extractTablesFromPage(page: PdfPage): string | null {
   if (rows.length < 2) return null;
 
   // Check if rows have consistent column count (table signature)
-  const colCounts = rows.map(r => r.length);
+  const colCounts = rows.map((r) => r.length);
   const medianCols = colCounts.sort((a, b) => a - b)[Math.floor(colCounts.length / 2)];
   if (medianCols < 2) return null;
 
   // Check that at least 60% of rows have the median column count (±1)
-  const consistentRows = colCounts.filter(c => Math.abs(c - medianCols) <= 1).length;
+  const consistentRows = colCounts.filter((c) => Math.abs(c - medianCols) <= 1).length;
   if (consistentRows / rows.length < 0.6) return null;
 
   // Build Markdown table
   const lines: string[] = [];
   for (let i = 0; i < rows.length; i++) {
-    const cells = rows[i].sort((a, b) => a.x - b.x).map(e => (e.text ?? '').trim());
-    lines.push(`| ${cells.join(' | ')} |`);
+    const cells = rows[i].sort((a, b) => a.x - b.x).map((e) => (e.text ?? '').trim());
+    lines.push(`| ${cells.map(markdownTableCell).join(' | ')} |`);
     if (i === 0) {
       lines.push(`|${cells.map(() => '---').join('|')}|`);
     }
@@ -193,13 +234,24 @@ export function extractTablesFromPage(page: PdfPage): string | null {
 
   // Also include any remaining non-table text
   const tableElementSet = new Set(rows.flat());
-  const remaining = elements.filter(e => !tableElementSet.has(e));
-  const extraText = remaining.map(e => (e.text ?? '').trim()).filter(Boolean).join('\n');
+  const remaining = elements.filter((e) => !tableElementSet.has(e));
+  const extraText = remaining
+    .map((e) => (e.text ?? '').trim())
+    .filter(Boolean)
+    .join('\n');
 
   return lines.join('\n') + (extraText ? '\n\n' + extraText : '');
 }
 
-function clusterByAxis(elements: PdfLayoutElement[], axis: 'x' | 'y', tolerance: number): PdfLayoutElement[][] {
+function markdownTableCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+}
+
+function clusterByAxis(
+  elements: PdfLayoutElement[],
+  axis: 'x' | 'y',
+  tolerance: number
+): PdfLayoutElement[][] {
   const sorted = [...elements].sort((a, b) => a[axis] - b[axis]);
   const clusters: PdfLayoutElement[][] = [];
   let current: PdfLayoutElement[] = [sorted[0]];
@@ -237,7 +289,7 @@ function renderDocxBlock(block: DocxBlockContent, lines: string[], protocol: Doc
 }
 
 function renderDocxParagraph(para: DocxParagraph, lines: string[], protocol: DocxDesignProtocol) {
-  const text = extractDocxParagraphText(para);
+  const text = extractDocxParagraphText(para, protocol);
   if (!text.trim()) {
     lines.push('');
     return;
@@ -263,20 +315,20 @@ function renderDocxParagraph(para: DocxParagraph, lines: string[], protocol: Doc
   lines.push(text, '');
 }
 
-function extractDocxParagraphText(para: DocxParagraph): string {
+function extractDocxParagraphText(para: DocxParagraph, protocol?: DocxDesignProtocol): string {
   const parts: string[] = [];
   for (const item of para.content) {
     if (item.type === 'run') {
-      parts.push(extractDocxRunText(item.run));
+      parts.push(extractDocxRunText(item.run, protocol));
     } else if (item.type === 'hyperlink') {
-      const linkText = item.hyperlink.runs.map(r => extractDocxRunText(r)).join('');
+      const linkText = item.hyperlink.runs.map((r) => extractDocxRunText(r, protocol)).join('');
       if (linkText) parts.push(linkText);
     }
   }
   return parts.join('');
 }
 
-function extractDocxRunText(run: DocxRun): string {
+function extractDocxRunText(run: DocxRun, protocol?: DocxDesignProtocol): string {
   const parts: string[] = [];
   for (const c of run.content) {
     switch (c.type) {
@@ -287,7 +339,15 @@ function extractDocxRunText(run: DocxRun): string {
         parts.push('\t');
         break;
       case 'break':
-        if (c.breakType === 'textWrapping') parts.push('\n');
+        if (!c.breakType || c.breakType === 'textWrapping') parts.push('\n');
+        break;
+      case 'drawing':
+        if (c.drawing?.imageRId || c.drawing?.imageData) {
+          const target = c.drawing.imageRId
+            ? protocol?.relationships?.find((rel) => rel.id === c.drawing.imageRId)?.target
+            : undefined;
+          parts.push(`_[image: ${target || c.drawing.name || 'embedded'}]_`);
+        }
         break;
     }
   }
@@ -307,7 +367,7 @@ function detectHeadingLevel(para: DocxParagraph, protocol: DocxDesignProtocol): 
   // Check style name
   const styleId = para.pPr?.pStyle;
   if (styleId) {
-    const styleDef = protocol.styles.definitions.find(s => s.styleId === styleId);
+    const styleDef = protocol.styles.definitions.find((s) => s.styleId === styleId);
     if (styleDef) {
       const match = styleDef.name.match(/^[Hh]eading\s*(\d)/);
       if (match) return parseInt(match[1], 10);
@@ -315,31 +375,41 @@ function detectHeadingLevel(para: DocxParagraph, protocol: DocxDesignProtocol): 
       const jaMatch = styleDef.name.match(/見出し\s*(\d)/);
       if (jaMatch) return parseInt(jaMatch[1], 10);
     }
+    const idMatch = styleId.match(/^heading\s*(\d)$/i);
+    if (idMatch) return parseInt(idMatch[1], 10);
   }
   return 0;
 }
 
-function findNumberingDef(numId: number, ilvl: number, protocol: DocxDesignProtocol): string | null {
+function findNumberingDef(
+  numId: number,
+  ilvl: number,
+  protocol: DocxDesignProtocol
+): string | null {
   if (!protocol.numbering) return null;
-  const num = protocol.numbering.nums.find(n => n.numId === numId);
+  const num = protocol.numbering.nums.find((n) => n.numId === numId);
   if (!num) return null;
-  const abstractNum = protocol.numbering.abstractNums.find(a => a.abstractNumId === num.abstractNumId);
+  const abstractNum = protocol.numbering.abstractNums.find(
+    (a) => a.abstractNumId === num.abstractNumId
+  );
   if (!abstractNum) return null;
-  const level = abstractNum.levels.find(l => l.ilvl === ilvl);
+  const level = abstractNum.levels.find((l) => l.ilvl === ilvl);
   return level?.numFmt ?? null;
 }
+
+export const DOCX_IMAGE_MARKER = /_\[image: ([^\]]+)\]_/g;
 
 function renderDocxTable(table: DocxTable, lines: string[], protocol: DocxDesignProtocol) {
   if (!table.rows.length) return;
 
-  const allRows = table.rows.map(row => extractDocxTableRowCells(row, protocol));
-  const maxCols = Math.max(...allRows.map(r => r.length));
+  const allRows = table.rows.map((row) => extractDocxTableRowCells(row, protocol));
+  const maxCols = Math.max(...allRows.map((r) => r.length));
 
   for (let i = 0; i < allRows.length; i++) {
     const cells = allRows[i];
     // Pad to maxCols
     while (cells.length < maxCols) cells.push('');
-    lines.push(`| ${cells.join(' | ')} |`);
+    lines.push(`| ${cells.map(markdownTableCell).join(' | ')} |`);
     if (i === 0) {
       lines.push(`|${cells.map(() => '---').join('|')}|`);
     }
@@ -348,17 +418,22 @@ function renderDocxTable(table: DocxTable, lines: string[], protocol: DocxDesign
 }
 
 function extractDocxTableRowCells(row: DocxTableRow, protocol: DocxDesignProtocol): string[] {
-  return row.cells.map(cell => {
+  return row.cells.map((cell) => {
     const parts = cell.content
       .filter((b): b is DocxBlockContent & { type: 'paragraph' } => b.type === 'paragraph')
-      .map(b => extractDocxParagraphText(b.paragraph).trim());
+      .map((b) => extractDocxParagraphText(b.paragraph, protocol).trim());
     return parts.join(' ');
   });
 }
 
 // ─── XLSX Helpers ───────────────────────────────────────────
 
-function renderXlsxSheet(sheet: XlsxWorksheet, sharedStrings: string[], lines: string[]) {
+function renderXlsxSheet(
+  sheet: XlsxWorksheet,
+  sharedStrings: string[],
+  lines: string[],
+  cellXfs: XlsxCellStyle[] = []
+) {
   if (!sheet.rows.length) {
     lines.push('(Empty sheet)');
     return;
@@ -386,7 +461,7 @@ function renderXlsxSheet(sheet: XlsxWorksheet, sharedStrings: string[], lines: s
     const cells: string[] = new Array(colCount).fill('');
     for (const cell of row.cells) {
       const colIdx = cellRefToColIndex(cell.ref);
-      cells[colIdx] = resolveXlsxCellValue(cell, sharedStrings);
+      cells[colIdx] = resolveXlsxCellValue(cell, sharedStrings, cellXfs);
     }
     tableRows.push(cells);
   }
@@ -395,19 +470,30 @@ function renderXlsxSheet(sheet: XlsxWorksheet, sharedStrings: string[], lines: s
 
   // Render as Markdown table
   for (let i = 0; i < tableRows.length; i++) {
-    lines.push(`| ${tableRows[i].join(' | ')} |`);
+    lines.push(`| ${tableRows[i].map(markdownTableCell).join(' | ')} |`);
     if (i === 0) {
       lines.push(`|${tableRows[i].map(() => '---').join('|')}|`);
     }
   }
 }
 
-function resolveXlsxCellValue(cell: XlsxCell, sharedStrings: string[]): string {
+function resolveXlsxCellValue(
+  cell: XlsxCell,
+  sharedStrings: string[],
+  cellXfs: XlsxCellStyle[] = []
+): string {
   if (cell.type === 's' && typeof cell.value === 'number') {
     return sharedStrings[cell.value] ?? '';
   }
   if (cell.richText) {
-    return cell.richText.map(r => r.text).join('');
+    return cell.richText.map((r) => r.text).join('');
+  }
+  const isNumeric = cell.type === undefined || cell.type === 'n';
+  const numeric = typeof cell.value === 'number' ? cell.value : Number(cell.value);
+  if (isNumeric && cell.value !== '' && cell.value != null && Number.isFinite(numeric)) {
+    const formatCode =
+      cell.styleIndex !== undefined ? cellXfs[cell.styleIndex]?.numFmt?.formatCode : undefined;
+    return formatXlsxNumber(numeric, formatCode);
   }
   if (cell.value != null) return String(cell.value);
   return '';
@@ -455,7 +541,7 @@ function renderPptxElement(el: PptxElement, lines: string[]) {
       const data = el.tableData ?? el.rows;
       if (!data?.length) break;
       for (let i = 0; i < data.length; i++) {
-        const cells = (data[i] as (string | number | boolean | null)[]).map(c => String(c ?? ''));
+        const cells = (data[i] as (string | number | boolean | null)[]).map((c) => String(c ?? ''));
         lines.push(`| ${cells.join(' | ')} |`);
         if (i === 0) {
           lines.push(`|${cells.map(() => '---').join('|')}|`);
@@ -482,7 +568,7 @@ function renderPptxElement(el: PptxElement, lines: string[]) {
 
 function extractPptxElementText(el: PptxElement): string {
   if (el.textRuns?.length) {
-    return el.textRuns.map(r => r.text).join('');
+    return el.textRuns.map((r) => r.text).join('');
   }
   return el.text ?? '';
 }
