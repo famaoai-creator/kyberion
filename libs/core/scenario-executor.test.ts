@@ -5,9 +5,15 @@ import { nowIso } from './foundation/time.js';
 import { runOpPreflight } from './op-preflight.js';
 import { pathResolver } from './path-resolver.js';
 import { runInScenarioScope } from './scenario-run-scope.js';
+import {
+  appendScenarioOp,
+  appendScenarioWarning,
+  createScenarioSideEffectLog,
+} from './scenario-side-effect-log.js';
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
 import {
   runScenario,
+  scenarioLogHighWaterSeq,
   type ScenarioPipelineRunner,
   type ScenarioPipelineRunRequest,
 } from './scenario-executor.js';
@@ -75,6 +81,18 @@ function fakeRunner(
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) safeRmSync(root, { recursive: true, force: true });
+});
+
+describe('scenarioLogHighWaterSeq', () => {
+  it('ignores warning records so host noise cannot shift turn windows', () => {
+    const log = createScenarioSideEffectLog();
+    appendScenarioOp(log, { op: 'demo:apply', stage: 'apply', outcome: 'ok' });
+    appendScenarioOp(log, { op: 'demo:apply', stage: 'apply', outcome: 'ok' });
+    for (let i = 0; i < 5; i += 1) {
+      appendScenarioWarning(log, { kind: 'scope_lost', op: 'host:noise', source: 'op-dispatch' });
+    }
+    expect(scenarioLogHighWaterSeq(log)).toBe(2);
+  });
 });
 
 describe('runScenario (ES-05)', () => {

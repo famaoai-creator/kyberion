@@ -153,12 +153,12 @@ function gateReason(
   return null;
 }
 
-function maxSeq(log: ScenarioSideEffectLog): number {
+/** Highest side-effect seq so far; bounds each turn's window of records. */
+export function scenarioLogHighWaterSeq(log: ScenarioSideEffectLog): number {
   return Math.max(
     0,
-    ...[log.ops, log.approvals, log.writes, log.reasoning, log.warnings].map(
-      (list) => list.at(-1)?.seq ?? 0
-    )
+    // Warnings use their own counter (host noise must not shift turn windows).
+    ...[log.ops, log.approvals, log.writes, log.reasoning].map((list) => list.at(-1)?.seq ?? 0)
   );
 }
 
@@ -295,11 +295,14 @@ export async function runScenario(
       await active.runInScope(async () => {
         for (const [index, turn] of def.turns.entries()) {
           const turnStartMs = ctx.clock.now();
-          const window: ScenarioSeqWindow = { fromSeq: maxSeq(active.log) + 1, toSeq: 0 };
+          const window: ScenarioSeqWindow = {
+            fromSeq: scenarioLogHighWaterSeq(active.log) + 1,
+            toSeq: 0,
+          };
           trace.startSpan('scenario.turn', { index, kind: turn.kind });
           const outcome = await runTurn(turn, index, def, ctx, active, trace, options, served);
           active.snapshotWrites();
-          window.toSeq = maxSeq(active.log) + 1;
+          window.toSeq = scenarioLogHighWaterSeq(active.log) + 1;
           if (turn.kind === 'pipeline') turnResponses.set(index, outcome.response);
           if (turn.kind === 'intent') {
             transcript.push(

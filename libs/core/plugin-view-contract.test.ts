@@ -942,6 +942,21 @@ describe('approved human view actions (FU-02)', () => {
     );
   });
 
+  it('refuses (audited) params that are not plain data', async () => {
+    const audit = spyAudit();
+    const view = loadPluginViews(FIXTURE_DIR).views[0];
+    const resolved = resolvePluginViewAction(view, 'write_probe', { path: 'active/shared/tmp/x' });
+    await expectViewErrorAsync(
+      executeApprovedPluginViewAction(
+        { ...resolved, params: { path: 'active/shared/tmp/x', fn: () => 1 } },
+        randomUUID(),
+        executor
+      ),
+      'PLUGIN_VIEW_INVALID'
+    );
+    expect(auditedExecutions(audit).map((entry) => entry.result)).toEqual(['denied']);
+  });
+
   it('refuses in-place param changes by preflight listeners without touching the submitted params (N1)', async () => {
     spyAudit();
     const { view } = await activeFixture('views-exec-inplace');
