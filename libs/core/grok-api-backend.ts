@@ -19,7 +19,7 @@ import {
 import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
 
 export const GROK_API_DEFAULT_BASE_URL = 'https://api.x.ai/v1';
-export const GROK_API_DEFAULT_MODEL = 'grok-4.6';
+export const GROK_API_DEFAULT_MODEL = 'grok-4.7';
 
 export function resolveGrokApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
   return (
