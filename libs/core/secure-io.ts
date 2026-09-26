@@ -276,6 +276,45 @@ export interface SafeReadTailResult {
  * `fs.readFileSync` (which would otherwise silently follow a symlink or
  * surface a confusing low-level error for a directory).
  */
+/**
+ * Reads `length` bytes starting at `position` (fewer at end of file) with the
+ * same governance as a full read: repository-scoped, no symlinks, regular
+ * files only. Lets callers hash or scan large files in bounded chunks.
+ */
+export function safeReadFileRange(filePath: string, position: number, length: number): Buffer {
+  if (!Number.isInteger(position) || position < 0) {
+    throw new Error(`Invalid position for range read: ${position}`);
+  }
+  if (!Number.isInteger(length) || length <= 0) {
+    throw new Error(`Invalid length for range read: ${length}`);
+  }
+  const resolved = assertReadableRepositoryFile(filePath, 'range');
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`File not found: ${resolved}`);
+  }
+  if (fs.lstatSync(resolved).isSymbolicLink()) {
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
+  }
+  const fd = fs.openSync(resolved, 'r');
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new Error(`Not a regular file: ${resolved}`);
+    }
+    const readLength = Math.max(0, Math.min(length, stat.size - position));
+    const buffer = Buffer.alloc(readLength);
+    let offset = 0;
+    while (offset < readLength) {
+      const read = fs.readSync(fd, buffer, offset, readLength - offset, position + offset);
+      if (read <= 0) break;
+      offset += read;
+    }
+    return offset === readLength ? buffer : buffer.subarray(0, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTailResult {
   if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
     throw new Error(`Invalid maxBytes for tail read: ${maxBytes}`);
