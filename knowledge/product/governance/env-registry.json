@@ -634,6 +634,22 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CHRONOS_PLUGIN_HOST",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CHRONOS_PLUGIN_HOST_TENANTS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CLAUDE_AGENT_TOOLS",
       "category": "runtime",
       "type": "string",
@@ -2652,6 +2668,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_PERSONAL_PADS_PLUGIN_HOST",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Run an in-process plugin host in the personal-pads server (tenant-less plugins plus the pads server tenant) so authority:agent plugin view actions can be dispatched from the desk; human actions stay Chronos-only. Default off.",
+      "documented": true,
+      "subsystem": "plugins"
+    },
+    {
       "name": "KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
@@ -2690,6 +2715,14 @@
       "required": false,
       "description": "Optional runtime setting for pipeline fallback active; leave unset to use the built-in configuration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_PLUGIN_HOST_POLL_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_PREFIX",
@@ -3124,6 +3157,14 @@
       "required": false,
       "description": "Optional path override for service runtime registry path; keep it inside governed repository or runtime storage.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_SESSION_GIT_INDEX",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",

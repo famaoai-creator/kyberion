@@ -297,7 +297,7 @@
     {
       "path": "product/architecture/co-session-coordination.md",
       "tier": "public",
-      "size": 7656,
+      "size": 7842,
       "type": "md"
     },
     {
@@ -723,7 +723,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 12094,
+      "size": 19104,
       "type": "md"
     },
     {
@@ -946,6 +946,12 @@
       "path": "product/architecture/work-inventory-discovery-stage.md",
       "tier": "public",
       "size": 14322,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/workspace-isolation.md",
+      "tier": "public",
+      "size": 6333,
       "type": "md"
     },
     {
@@ -1593,7 +1599,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 150063,
+      "size": 151267,
       "type": "json"
     },
     {
@@ -2937,7 +2943,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 10039,
+      "size": 10867,
       "type": "md"
     },
     {
@@ -6297,7 +6303,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 993598,
+      "size": 998693,
       "type": "json"
     },
     {

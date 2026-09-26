@@ -11,8 +11,9 @@
  *     activatable (pending approval, tampered, broken) or is out of scope.
  *
  * Eligible = `activatable` and either tenant-less (shared) or bound to a tenant
- * in `tenantAllow`. Records of other tenants are skipped as soon as they are
- * listed — the host never activates, digests or imports them. Operations are
+ * in `tenantAllow`. Records of other tenants are dropped by the listing itself
+ * after parsing their record file — the host never activates, digests or
+ * imports them, and activation re-verifies only the target copy by id. Operations are
  * registered process-wide, so the tenant allowlist is the isolation boundary.
  *
  * Syncs are single-flight: requests while a sync runs coalesce into exactly
@@ -40,6 +41,7 @@ import {
   isManagedPluginActivationAllowed,
   listManagedPlugins,
   type ManagedPluginRecord,
+  type ManagedPluginRecordHeader,
 } from './plugin-managed-install.js';
 import { resolveTenant } from './tenant-registry.js';
 
@@ -190,7 +192,15 @@ export function createPluginHost(options: CreatePluginHostOptions): PluginHost {
   const pollMs = resolvePluginHostPollMs(options.pollMs);
   const timers = options.timers ?? defaultTimers;
   const now = options.now ?? (() => new Date());
-  const listRecords = options.listRecords ?? (() => listManagedPlugins(options.managedRoot));
+  // Headers of other tenants' records dropped by the last default listing.
+  let excluded: ManagedPluginRecordHeader[] = [];
+  const listRecords =
+    options.listRecords ??
+    (() =>
+      listManagedPlugins(options.managedRoot, {
+        tenantAllow: [...tenantAllow],
+        onExcluded: (header) => excluded.push(header),
+      }));
   const lifecycleOptions = { managedRoot: options.managedRoot };
   const audit = options.audit ?? ((entry: PluginHostAuditEntry) => void auditChain.record(entry));
 
@@ -325,6 +335,7 @@ export function createPluginHost(options: CreatePluginHostOptions): PluginHost {
 
   async function runSync(): Promise<void> {
     let records: ManagedPluginRecord[];
+    excluded = [];
     try {
       records = listRecords();
       lastSyncErrorCode = undefined;
@@ -337,6 +348,10 @@ export function createPluginHost(options: CreatePluginHostOptions): PluginHost {
       return;
     }
     const seen = new Set<string>();
+    for (const header of excluded) {
+      // Another tenant: stop it if something started it.
+      release(header.pluginId, 'tenant_excluded', header.tenantSlug);
+    }
     for (const entry of records) {
       if (!isEligibleScope(entry)) {
         // Another tenant: never read further; stop it if something started it.

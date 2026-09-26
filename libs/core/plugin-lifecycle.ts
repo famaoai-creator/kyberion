@@ -31,7 +31,7 @@ import { derivePluginTrustLabel, isPathContainedIn } from './plugin-source-trust
 import {
   computePluginContentDigest,
   isManagedPluginActivationAllowed,
-  listManagedPlugins,
+  loadManagedPlugin,
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import { permissionsDigest, type PluginPermissionGrant } from './plugin-permissions.js';
@@ -300,19 +300,16 @@ function resolveTarget(
   options: PluginLifecycleOptions
 ): ActivationTarget {
   if ('record' in input) {
-    // Always re-read the record: activation status and digests are verified on read.
-    const fresh = listManagedPlugins(options.managedRoot).find(
-      (record) => record.pluginId === input.record.pluginId
-    );
+    // Always re-read the record: activation status and digests are verified on
+    // read. By id, so no other managed copy is read or hashed.
+    const fresh = loadManagedPlugin(input.record.pluginId, options.managedRoot);
     if (!fresh) throw denied(`managed plugin '${input.record.pluginId}' is not installed`);
     return targetFromRecord(fresh, input, input.entry);
   }
   const authorization = input.authorization;
   if (!authorization.allowed) throw denied(`'${authorization.configuredPath}' is not authorized`);
   if (authorization.managedPluginId) {
-    const record = listManagedPlugins(options.managedRoot).find(
-      (candidate) => candidate.pluginId === authorization.managedPluginId
-    );
+    const record = loadManagedPlugin(authorization.managedPluginId, options.managedRoot);
     if (!record) throw denied(`managed plugin '${authorization.managedPluginId}' is not installed`);
     return targetFromRecord(
       record,
@@ -493,9 +490,7 @@ function revocationReason(
     'record' in source ? source.record.pluginId : source.authorization.managedPluginId;
   if (!managedId) return undefined;
   try {
-    const record = listManagedPlugins(options.managedRoot).find(
-      (candidate) => candidate.pluginId === managedId
-    );
+    const record = loadManagedPlugin(managedId, options.managedRoot);
     if (!record) return 'managed install was removed';
     if (record.activationStatus === 'pending_approval') {
       const approval =
