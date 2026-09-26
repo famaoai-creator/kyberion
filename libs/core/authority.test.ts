@@ -123,13 +123,16 @@ describe('resolveIdentityContext', () => {
 
     const inside = await withExecutionContextAsync('mission_controller', async () => {
       await Promise.resolve();
+      const identity = resolveIdentityContext();
       return {
-        role: process.env.MISSION_ROLE,
-        persona: process.env.KYBERION_PERSONA,
+        role: identity.role,
+        persona: identity.persona,
+        // B1: the async helper keeps the assumption in scope only.
+        envRole: process.env.MISSION_ROLE,
       };
     });
 
-    expect(inside).toEqual({ role: 'mission_controller', persona: 'worker' });
+    expect(inside).toEqual({ role: 'mission_controller', persona: 'worker', envRole: undefined });
     expect(process.env.MISSION_ROLE).toBeUndefined();
     expect(process.env.KYBERION_PERSONA).toBeUndefined();
   });

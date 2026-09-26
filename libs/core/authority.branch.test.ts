@@ -87,6 +87,40 @@ describe('authority branch coverage', () => {
     }
   });
 
+  it('warns on a missing role assumption policy and re-reads it after 60 s (S5)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-27T00:00:00Z'), toFake: ['Date'] });
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const policyPath = '/repo/knowledge/product/governance/role-assumption-policy.json';
+      let present = false;
+      mocks.rawExistsSync.mockImplementation((p: string) => p === policyPath && present);
+      mocks.rawReadTextFile.mockImplementation((p: string) =>
+        p === policyPath
+          ? JSON.stringify({
+              shared_core_roles: { roles: [] },
+              system_roles: { chronos_mirror_v2: { may_assume: ['chronos_localadmin'] } },
+            })
+          : '{}'
+      );
+      const { isRoleAssumptionAllowed } = await import('./authority.js');
+
+      expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(false);
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining('role assumption policy is missing')
+      );
+
+      present = true; // restored on disk, still inside the retry window
+      vi.setSystemTime(new Date('2026-09-27T00:00:30Z'));
+      expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(false);
+
+      vi.setSystemTime(new Date('2026-09-27T00:01:01Z'));
+      expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(true);
+    } finally {
+      stderr.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('resolves persona from mission-state when env persona is unknown', async () => {
     process.env.MISSION_ID = 'MSN-1';
     process.env.MISSION_ROLE = 'chronos_gateway';
