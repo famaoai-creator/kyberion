@@ -304,6 +304,35 @@ Rules (`libs/core/plugin-view-contract.ts`,
 permissions and one view). Design and threat model:
 [plugin-permissions-and-views](../knowledge/product/architecture/plugin-permissions-and-views.md).
 
+## End-to-end check (PE-01 / PE-02)
+
+`plugins/fixtures/plugin-view-e2e-fixture/` is a minimal third-party plugin:
+one `sandboxed-iframe` view (`views/panel.html`) that asks the host to run an
+`agent` action (`ping`) and a `human` action (`stamp`) over `postMessage`.
+Both handlers are harmless; the host records the observable outcome.
+
+```bash
+pnpm build                               # dist scripts + the Chronos production build
+pnpm exec playwright install chromium    # once
+pnpm kyberion check plugin-views-e2e     # ~15 s; --keep-root keeps the hermetic root
+```
+
+`scripts/check_plugin_views_e2e.ts` builds a hermetic Kyberion root under
+`active/shared/tmp/plugin-views-e2e/<run>/` (never the real `active/` or
+`knowledge/`), installs the fixture with `plugin_install --tenant` from outside
+that root's `plugins/` tree (so it is third-party), approves the install with
+the operator CLI, and starts `next start` on a free loopback port with
+`KYBERION_CHRONOS_PLUGIN_HOST` enabled for that one tenant and a random
+localadmin token. Playwright Chromium then lists the plugin views, opens the
+iframe view, clicks inside it, confirms in the host dialog, and runs the agent
+action and the human action (approval request, CLI approval, Execute in
+Chronos, a second execution refused with 409). It asserts on data only: the
+listing, the frame response headers, what the sandboxed document observed
+(opaque origin, `connect-src` violation), the approval records and the audit
+chain. The browser, the server and the hermetic root are removed also on
+failure or on the overall timeout (100 s); a failure prints the step timings
+and the Chronos log tail. CI runs it in the `first-win-clean-clone` job.
+
 ## Release notes (EP-01 to EP-05)
 
 Upgrading a host that already has managed plugins:
