@@ -147,6 +147,29 @@ describe('ui-element-detector seam', () => {
     ).rejects.toThrow(/UI_ELEMENT_DETECTOR_UNAVAILABLE/);
   });
 
+  it('skips a ranked detector that throws and keeps walking; an explicit list still fails', async () => {
+    const { ocr } = fakeOcr([
+      { text: 'Fallback', confidence: 80, boundingBox: { x: 0, y: 0, width: 0.1, height: 0.1 } },
+    ]);
+    useDetectors(ocr);
+    registerUiElementDetector({
+      id: 'browser_dom',
+      kind: 'dom',
+      isAvailable: async () => true,
+      detect: async () => {
+        throw new Error('snapshot unreadable');
+      },
+    });
+    const result = await detectUiElements({ image_path: 's.png', image_size: IMAGE });
+    expect(result.decision?.ranked).toEqual(['browser_dom', 'ocr_text']);
+    expect(result.detectors_run).toEqual(['ocr_text']);
+    expect(result.detectors_failed).toEqual(['browser_dom']);
+    expect(result.candidates).toEqual([expect.objectContaining({ label: 'Fallback' })]);
+    await expect(
+      detectUiElements({ image_path: 's.png', image_size: IMAGE }, { detectors: ['browser_dom'] })
+    ).rejects.toThrow(/snapshot unreadable/);
+  });
+
   it('ranks by purpose', async () => {
     useDetectors(fakeOcr().ocr);
     const result = await detectUiElements(
