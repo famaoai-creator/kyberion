@@ -1,0 +1,79 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "ui-element-detector",
+      "default_provider": "browser_dom",
+      "fallback_purpose": "coverage",
+      "traits": {
+        "precision": "How exactly a detected box matches a real clickable element (and carries a stable ref).",
+        "coverage": "How many kinds of screens the detector can read: any pixels versus only a live browser page.",
+        "latency": "Wall-clock per detect() call.",
+        "privacy": "How little the screenshot travels: on-machine detection scores highest."
+      },
+      "providers": {
+        "browser_dom": {
+          "traits": {
+            "precision": 1,
+            "coverage": 0.3,
+            "latency": 0.95,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "precision": "declared",
+            "coverage": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/ui-element-detector.ts (BrowserDomDetector: boxes are the browser snapshot's getBoundingClientRect of interactive elements with @eN refs; only available when a browser snapshot of the same viewport is supplied)"
+          ]
+        },
+        "ocr_text": {
+          "traits": {
+            "precision": 0.55,
+            "coverage": 0.9,
+            "latency": 0.5,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "precision": "declared",
+            "coverage": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/ui-element-detector.ts (OcrTextDetector: text lines from the ocr-provider seam in mode 'local_only' by default; finds labelled controls on any screenshot but not unlabelled icons)"
+          ]
+        }
+      },
+      "purposes": {
+        "precision": {
+          "description": "Click targets must be exact; prefer detectors whose boxes are real elements with stable refs.",
+          "weights": {
+            "precision": 1
+          }
+        },
+        "coverage": {
+          "description": "Any screen (native apps, remote desktops, images): prefer detectors that read pixels.",
+          "weights": {
+            "coverage": 1
+          }
+        },
+        "speed": {
+          "description": "Interactive loops where marking latency matters most.",
+          "weights": {
+            "latency": 1
+          }
+        },
+        "privacy": {
+          "description": "Prefer the screenshot to stay on this machine.",
+          "weights": {
+            "privacy": 1
+          }
+        }
+      }
+    }
+  ]
+}

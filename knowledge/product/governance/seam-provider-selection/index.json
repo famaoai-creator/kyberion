@@ -4,6 +4,7 @@
     "browser-automation-runtime",
     "image-generation-provider",
     "ocr-provider",
+    "ui-element-detector",
     "speech-to-text-bridge",
     "voice-tts-engine",
     "streaming-tts-bridge",

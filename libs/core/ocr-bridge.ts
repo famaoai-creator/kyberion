@@ -369,6 +369,8 @@ export class AppleVisionOcrProvider implements OcrProvider {
             text: typeof parsed.text === 'string' ? parsed.text : '',
             confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
             lines: parseAppleVisionLines(parsed.lines),
+            // Vision reports 0..1 fractions of the image (native-ocr.swift flips to top-left).
+            boundingBoxUnits: 'normalized',
             elapsedMs: Date.now() - startedAt,
           });
         } catch (error: any) {
