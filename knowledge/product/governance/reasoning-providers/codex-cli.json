@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["CODEX_CLI", "CODEX_VERSION"]
+      "env_keys": ["CODEX_CLI", "CODEX_VERSION"],
+      "cost_tier": "free"
     }
   ]
 }

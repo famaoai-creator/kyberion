@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["KYBERION_NEMOTRON_URL"]
+      "env_keys": ["KYBERION_NEMOTRON_URL"],
+      "cost_tier": "metered"
     }
   ]
 }

@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text", "image"]
       },
-      "env_keys": ["ANTHROPIC_API_KEY"]
+      "env_keys": ["ANTHROPIC_API_KEY"],
+      "cost_tier": "metered"
     }
   ]
 }

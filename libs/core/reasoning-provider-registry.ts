@@ -25,12 +25,21 @@ export interface ReasoningProviderCapabilities {
   input_modalities: readonly BackendInputModality[];
 }
 
+/**
+ * Billing shape of a completed request. 'free' = local runtime or flat-rate
+ * subscription CLI (a revoked speculative request costs nothing extra);
+ * 'metered' = per-token/per-request billing. Optional on the descriptor;
+ * callers treat a missing value as 'metered' (fail closed on cost).
+ */
+export type ReasoningProviderCostTier = 'free' | 'metered';
+
 export interface ReasoningProviderDescriptor {
   mode: ReasoningBackendMode;
   provider: string;
   module: string;
   capabilities: ReasoningProviderCapabilities;
   env_keys: string[];
+  cost_tier?: ReasoningProviderCostTier;
 }
 
 export interface ReasoningProviderRuntimeBundle {
@@ -148,6 +157,10 @@ function isInputModality(value: unknown): value is BackendInputModality {
   return typeof value === 'string' && INPUT_MODALITIES.has(value as BackendInputModality);
 }
 
+function isReasoningProviderCostTier(value: unknown): value is ReasoningProviderCostTier {
+  return value === 'free' || value === 'metered';
+}
+
 function parseInputModalities(
   rawCapabilities: Record<string, unknown>
 ): readonly BackendInputModality[] | null {
@@ -191,6 +204,11 @@ export function parseReasoningProviderDescriptor(
   if (requiredBooleanCapabilities.some((entry) => typeof entry !== 'boolean')) return null;
   const inputModalities = parseInputModalities(rawCapabilities);
   if (!inputModalities) return null;
+  const rawCostTier = value.cost_tier;
+  if (rawCostTier !== undefined && !isReasoningProviderCostTier(rawCostTier)) {
+    return null;
+  }
+  const costTier = isReasoningProviderCostTier(rawCostTier) ? rawCostTier : undefined;
   const descriptor: ReasoningProviderDescriptor = {
     mode: value.mode as ReasoningBackendMode,
     provider: value.provider.trim(),
@@ -203,6 +221,7 @@ export function parseReasoningProviderDescriptor(
       input_modalities: inputModalities,
     },
     env_keys: value.env_keys.map((entry) => entry.trim()),
+    ...(costTier !== undefined ? { cost_tier: costTier } : {}),
   };
   // The prompt-reconstruction invariant is documented until PI-05 supplies
   // the durable request log; descriptor validation remains runtime-owned.
