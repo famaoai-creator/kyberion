@@ -1,0 +1,150 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/media/dt-solana-audit-proposal.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "media:json_read",
+      "params": {
+        "path": "knowledge/confidential/sbidt/security-audit/proposal-storyline-solana-traceability.adf.json",
+        "export_as": "proposal_storyline"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "media:proposal_content_from_storyline",
+      "params": {
+        "from": "proposal_storyline",
+        "export_as": "proposal_content_data"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "set",
+      "params": {
+        "key": "active_theme",
+        "value": {
+          "name": "SBI DigiTrust Corporate",
+          "colors": {
+            "primary": "#1B4F9C",
+            "secondary": "#0E2E5E",
+            "accent": "#00A0B0",
+            "background": "#FFFFFF",
+            "text": "#000000"
+          },
+          "fonts": {
+            "heading": "Meiryo UI, Century Gothic",
+            "body": "Meiryo UI, Century Gothic"
+          }
+        }
+      }
+    },
+    {
+      "type": "transform",
+      "op": "set",
+      "params": {
+        "key": "active_canvas",
+        "value": {
+          "w": 13.333,
+          "h": 7.5
+        }
+      }
+    },
+    {
+      "type": "transform",
+      "op": "set",
+      "params": {
+        "key": "active_pptx_master",
+        "value": {
+          "masterOnlyCount": 1,
+          "elements": [
+            {
+              "type": "shape",
+              "shapeType": "trapezoid",
+              "pos": {
+                "x": 0,
+                "y": 0,
+                "w": 10.61,
+                "h": 0.74
+              },
+              "style": {
+                "fill": "1B4F9C",
+                "color": "FFFFFF",
+                "fontSize": 1
+              },
+              "text": ""
+            },
+            {
+              "type": "text",
+              "pos": {
+                "x": 0.23,
+                "y": 7.12,
+                "w": 4.6,
+                "h": 0.25
+              },
+              "text": "Copyright 2026 SBI DigiTrust Co., Ltd. All Rights Reserved",
+              "style": {
+                "fontSize": 7,
+                "color": "595959",
+                "fontFamily": "Century Gothic"
+              }
+            },
+            {
+              "type": "text",
+              "pos": {
+                "x": 0.23,
+                "y": 7.05,
+                "w": 0.79,
+                "h": 0.26
+              },
+              "text": "Confidential",
+              "style": {
+                "fontSize": 7,
+                "color": "595959",
+                "fontFamily": "Century Gothic",
+                "border": {
+                  "color": "FC121B",
+                  "pt": 0.5
+                }
+              }
+            },
+            {
+              "type": "text",
+              "pos": {
+                "x": 12.47,
+                "y": 7.05,
+                "w": 0.81,
+                "h": 0.4
+              },
+              "text": "",
+              "placeholderType": "slideNumber",
+              "style": {
+                "fontSize": 9,
+                "color": "888888",
+                "align": "right"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "transform",
+      "op": "media:merge_content",
+      "params": {
+        "content_data": "{{proposal_content_data}}",
+        "output_format": "pptx"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "design_from": "last_pptx_design",
+        "path": "knowledge/confidential/sbidt/security-audit/SBIデジトラスト_Solanaセキュリティチェック提案書_20260916.pptx"
+      }
+    }
+  ]
+}

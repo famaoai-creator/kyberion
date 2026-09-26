@@ -73,6 +73,13 @@ export function pdfToMarkdown(protocol: PdfDesignProtocol): string {
     } else if (page.text.trim()) {
       lines.push(page.text.trim(), '');
     }
+    const ocrTexts = (page.imageOcr ?? []).map((ocr) => ocr.text.trim()).filter(Boolean);
+    if (ocrTexts.length) {
+      lines.push('Image text (OCR — unverified):', '', '```text', ...ocrTexts, '```', '');
+    }
+    if (page.imageOcrSkipped?.length) {
+      lines.push(`_Unreadable images: ${page.imageOcrSkipped.length}_`, '');
+    }
     // Links from annotations
     const links = (page.annotations ?? []).filter((a) => a.type === 'Link' && 'uri' in a && a.uri);
     if (links.length) {
