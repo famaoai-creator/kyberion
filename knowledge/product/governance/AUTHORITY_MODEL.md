@@ -89,7 +89,7 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 
 Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受けで決まった Persona が `KYBERION_PERSONA` より優先されます。
 
-環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
+環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。同期版に Promise を返す `fn` を渡した場合、スコープのロールはその Promise の継続（`await` の後）にも引き継がれますが、環境変数のミラーは `fn` が返った時点で元に戻ります。非同期の処理には `withExecutionContextAsync` を使ってください。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
 
 認可の入力になる Persona は実行スコープから解決します: secure-io の policy-engine 判定（`file_write` / `execute_command` の `agentId`）、`operation-policy-gate`、`organization-digest` の sovereign 判定は `executionPersonaText()` / `resolveExecutionPersona()` を使います。`MISSION_ROLE` / `KYBERION_PERSONA` を今も直接読む既知の箇所は、監査・トレースの帰属ラベル、または CLI の操作者 ID 照合だけです（非同期の引き受けの中では外側の値になります）:
 

@@ -489,6 +489,11 @@ function restoreMirroredEnv(
  * and is isolated per async context. Under SYSTEM_ROLE the role must be
  * allowed by the role assumption policy (RA-02) or this throws
  * `[ROLE_ASSUMPTION_DENIED]` before `fn` runs.
+ *
+ * S4: if `fn` returns a Promise, the scoped role follows that promise's
+ * continuations (AsyncLocalStorage semantics) until it settles, while the env
+ * mirror is restored as soon as `fn` returns. Prefer
+ * {@link withExecutionContextAsync} for async work; it makes that explicit.
  */
 export function withExecutionContext<T>(
   role: string,
