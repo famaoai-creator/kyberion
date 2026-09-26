@@ -951,7 +951,7 @@
     {
       "path": "product/architecture/workspace-isolation.md",
       "tier": "public",
-      "size": 10011,
+      "size": 11887,
       "type": "md"
     },
     {
@@ -12117,7 +12117,7 @@
     {
       "path": "product/schemas/workspace-ledger.schema.json",
       "tier": "public",
-      "size": 1464,
+      "size": 1819,
       "type": "json"
     },
     {
