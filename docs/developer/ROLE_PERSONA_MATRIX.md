@@ -18,11 +18,11 @@ Yes: the design direction is to keep **service names out of `persona`, `role`, a
 
 ## Core terms
 
-| Term | Meaning |
-|---|---|
-| Persona | Broad trust envelope and operating mode. It is the coarse identity used by policy and tier checks. |
-| Authority role | Concrete job function for execution-time write scopes and surface boundaries. |
-| Permission | The actual path or authority grant enforced by tier-guard and secure-io. |
+| Term           | Meaning                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| Persona        | Broad trust envelope and operating mode. It is the coarse identity used by policy and tier checks. |
+| Authority role | Concrete job function for execution-time write scopes and surface boundaries.                      |
+| Permission     | The actual path or authority grant enforced by tier-guard and secure-io.                           |
 
 ## Rule of thumb
 
@@ -62,47 +62,48 @@ If you need to explain this to someone else, use this phrasing:
 
 ## Persona matrix
 
-| Persona | What it is for | Common roles that resolve to it |
-|---|---|---|
-| `sovereign` | Highest local operator envelope. Used for onboarding, customer overlay creation, and direct repo or knowledge changes that need broad write scope. | `sovereign_concierge` |
-| `ecosystem_architect` | Repo architecture and core evolution envelope. Used when the change is about the platform itself. | `ecosystem_architect` |
-| `worker` | Execution envelope for mission and surface roles. Most operational roles land here. | `mission_controller`, `software_developer`, `slack_bridge`, `chronos_gateway`, `chronos_operator`, `chronos_localadmin`, `surface_runtime`, `infrastructure_sentinel`, `service_actuator` |
-| `analyst` | Read-heavy inspection, governance review, and knowledge maintenance. | `knowledge_steward`, `ruthless_auditor`, `cyber_security` |
-| `mission_owner` | Mission-state label / contextual assignment. It is not a write grant by itself. | Derived from mission metadata, not from an execution role |
-| `unknown` | Fallback when the role or persona cannot be resolved. Treat as insufficient until proven otherwise. | Anything not recognized by the mapping |
+| Persona               | What it is for                                                                                                                                     | Common roles that resolve to it                                                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sovereign`           | Highest local operator envelope. Used for onboarding, customer overlay creation, and direct repo or knowledge changes that need broad write scope. | `sovereign_concierge`                                                                                                                                                                     |
+| `ecosystem_architect` | Repo architecture and core evolution envelope. Used when the change is about the platform itself.                                                  | `ecosystem_architect`                                                                                                                                                                     |
+| `worker`              | Execution envelope for mission and surface roles. Most operational roles land here.                                                                | `mission_controller`, `software_developer`, `slack_bridge`, `chronos_gateway`, `chronos_operator`, `chronos_localadmin`, `surface_runtime`, `infrastructure_sentinel`, `service_actuator` |
+| `analyst`             | Read-heavy inspection, governance review, and knowledge maintenance.                                                                               | `knowledge_steward`, `ruthless_auditor`, `cyber_security`                                                                                                                                 |
+| `mission_owner`       | Mission-state label / contextual assignment. It is not a write grant by itself.                                                                    | Derived from mission metadata, not from an execution role                                                                                                                                 |
+| `unknown`             | Fallback when the role or persona cannot be resolved. Treat as insufficient until proven otherwise.                                                | Anything not recognized by the mapping                                                                                                                                                    |
 
 ## Role matrix
 
-| Role | Default persona | What it does | What it does not imply |
-|---|---|---|---|
-| `sovereign_concierge` | `sovereign` | Customer creation, onboarding, identity sync, and customer overlay setup. | It does not imply Slack ingress, Chronos control, or mission execution authority. |
-| `mission_controller` | `worker` | Mission lifecycle, checkpoints, coordination, and observability. | It does not imply code-authoring authority. |
-| `software_developer` | `worker` | Implementation work on tests, product code, and actuator surfaces. | It does not imply mission control or customer onboarding by itself. |
-| `knowledge_steward` | `analyst` | Governed knowledge maintenance, including customer overlay knowledge trees. | It does not imply broad sovereign repo write access. |
-| `slack_bridge` | `worker` | Slack ingress / egress and channel observability. | It does not imply managed runtime supervision. |
-| `chronos_gateway` | `worker` | Chronos control surface and terminal routing. | It does not imply read-only operator mode or Slack transport. |
-| `chronos_operator` | `worker` | Read-only Chronos visibility and runtime observability. | It does not imply write access to Chronos coordination scopes. |
-| `chronos_localadmin` | `worker` | Local Chronos administration for deterministic coordination and runtime control. | It does not imply Slack-specific transport authority. |
-| `surface_runtime` | `worker` | Reconciliation and supervision of managed runtime surfaces. | It does not imply Slack transport or channel ingress. |
-| `infrastructure_sentinel` | `worker` | Coordination and observability for infrastructure-backed surfaces. | It does not imply mission lifecycle control. |
-| `service_actuator` | not auto-inferred | Service integration helper for connection documents and auth-grant aware reads. | It does not imply a persona default or broad write permissions. |
-| `ruthless_auditor` | `analyst` | Audit and forensic review. | It does not imply operator write access. |
-| `cyber_security` | `analyst` | Security analysis and security knowledge maintenance. | It does not imply customer onboarding authority. |
-| `nexus_daemon` | not auto-inferred | Bridge daemon / runtime coordination helper for the nexus surface. | It does not imply a persona default or general authoring rights. |
-| `run_pipeline` | not auto-inferred | Pipeline execution authority used by governed scripts. | It does not imply human-facing runtime or Slack control. |
-| `run_super_pipeline` | not auto-inferred | Higher-order pipeline execution authority for super-pipelines. | It does not imply ordinary developer authoring rights. |
+| Role                            | Default persona   | What it does                                                                                                                                                  | What it does not imply                                                                                     |
+| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `sovereign_concierge`           | `sovereign`       | Customer creation, onboarding, identity sync, and customer overlay setup.                                                                                     | It does not imply Slack ingress, Chronos control, or mission execution authority.                          |
+| `mission_controller`            | `worker`          | Mission lifecycle, checkpoints, coordination, and observability.                                                                                              | It does not imply code-authoring authority.                                                                |
+| `software_developer`            | `worker`          | Implementation work on tests, product code, and actuator surfaces.                                                                                            | It does not imply mission control or customer onboarding by itself.                                        |
+| `knowledge_steward`             | `analyst`         | Governed knowledge maintenance, including customer overlay knowledge trees.                                                                                   | It does not imply broad sovereign repo write access.                                                       |
+| `slack_bridge`                  | `worker`          | Slack ingress / egress and channel observability.                                                                                                             | It does not imply managed runtime supervision.                                                             |
+| `chronos_gateway`               | `worker`          | Chronos control surface and terminal routing.                                                                                                                 | It does not imply read-only operator mode or Slack transport.                                              |
+| `chronos_operator`              | `worker`          | Read-only Chronos visibility and runtime observability.                                                                                                       | It does not imply write access to Chronos coordination scopes.                                             |
+| `chronos_localadmin`            | `worker`          | Local Chronos administration for deterministic coordination and runtime control.                                                                              | It does not imply Slack-specific transport authority.                                                      |
+| `chronos_token_registry_reader` | `worker`          | Reads the Chronos viewer token registry (`knowledge/personal/connections/chronos-access.json`) so a surface can resolve a bearer/cookie viewer token (TR-01). | It grants no other personal-tier read and no write; it does not imply viewer, operator or admin authority. |
+| `surface_runtime`               | `worker`          | Reconciliation and supervision of managed runtime surfaces.                                                                                                   | It does not imply Slack transport or channel ingress.                                                      |
+| `infrastructure_sentinel`       | `worker`          | Coordination and observability for infrastructure-backed surfaces.                                                                                            | It does not imply mission lifecycle control.                                                               |
+| `service_actuator`              | not auto-inferred | Service integration helper for connection documents and auth-grant aware reads.                                                                               | It does not imply a persona default or broad write permissions.                                            |
+| `ruthless_auditor`              | `analyst`         | Audit and forensic review.                                                                                                                                    | It does not imply operator write access.                                                                   |
+| `cyber_security`                | `analyst`         | Security analysis and security knowledge maintenance.                                                                                                         | It does not imply customer onboarding authority.                                                           |
+| `nexus_daemon`                  | not auto-inferred | Bridge daemon / runtime coordination helper for the nexus surface.                                                                                            | It does not imply a persona default or general authoring rights.                                           |
+| `run_pipeline`                  | not auto-inferred | Pipeline execution authority used by governed scripts.                                                                                                        | It does not imply human-facing runtime or Slack control.                                                   |
+| `run_super_pipeline`            | not auto-inferred | Higher-order pipeline execution authority for super-pipelines.                                                                                                | It does not imply ordinary developer authoring rights.                                                     |
 
 ## Current surface-instance catalog
 
 These are runtime surface ids already present in the repo. They are not automatically policy roles.
 
-| Surface instance | Family | Notes |
-|---|---|---|
-| `slack-bridge` | messaging bridge | Slack ingress / egress and governed observability. |
-| `imessage-bridge` | messaging bridge | Managed macOS Messages bridge for declared iMessage sending. |
-| `telegram-bridge` | messaging bridge | Telegram ingress / egress and governed observability. |
-| `terminal-bridge` | runtime bridge | Background terminal bridge for runtime sessions. |
-| `nexus-daemon` | coordination bridge | Runtime daemon for the nexus surface. |
+| Surface instance  | Family              | Notes                                                        |
+| ----------------- | ------------------- | ------------------------------------------------------------ |
+| `slack-bridge`    | messaging bridge    | Slack ingress / egress and governed observability.           |
+| `imessage-bridge` | messaging bridge    | Managed macOS Messages bridge for declared iMessage sending. |
+| `telegram-bridge` | messaging bridge    | Telegram ingress / egress and governed observability.        |
+| `terminal-bridge` | runtime bridge      | Background terminal bridge for runtime sessions.             |
+| `nexus-daemon`    | coordination bridge | Runtime daemon for the nexus surface.                        |
 
 ## How to explain the common confusion
 
