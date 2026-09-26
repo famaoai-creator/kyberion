@@ -280,8 +280,12 @@ Rules (`libs/core/plugin-view-contract.ts`,
 - Only a display-only subset of `ui:*` components is allowed; props are
   validated against the catalog schema; no `href`, raw HTML, script URLs or
   event-handler props; every `*Key` must exist in the user-facing vocabulary.
-- `sandboxed-iframe` isolation is reserved (`[PLUGIN_VIEW_UNSUPPORTED]`) and
-  every capability is denied for now.
+- A `sandboxed-iframe` view instead declares one self-contained `views/*.html`
+  document, served with a strict CSP (`sandbox allow-scripts`,
+  `connect-src 'none'`, …). Its only capability is `action.request` over
+  postMessage, and every request goes through the host confirmation and the
+  same approval path. Details:
+  `knowledge/product/architecture/plugin-permissions-and-views.md` §8.
 - Actions may only target the plugin's own `provides.ops`; `paramsSchema`
   must set `additionalProperties: false` on every object. The document may
   only reference declared actions. `authority: "human"` queues a human-only
