@@ -486,7 +486,12 @@ export async function executeApprovedPluginViewAction(
   // Detached snapshot of the params as submitted: preflight listeners get
   // their own copy, so an in-place change to nested params can never reach
   // the handler or the approval comparison.
-  const approvedParams = structuredClone(resolved.params);
+  let clonedParams: Record<string, unknown> | undefined;
+  try {
+    clonedParams = structuredClone(resolved.params);
+  } catch {
+    clonedParams = undefined; // refused (audited) below
+  }
   const approval = loadActionApproval(approvalRequestId);
   const deny = (error: PluginViewError): never => {
     auditActionExecution(
@@ -501,6 +506,10 @@ export async function executeApprovedPluginViewAction(
   };
   const refuse = (code: PluginViewErrorCode, message: string): never =>
     deny(new PluginViewError(code, message));
+  if (!clonedParams) {
+    return refuse('PLUGIN_VIEW_INVALID', 'action params are not plain data');
+  }
+  const approvedParams = clonedParams;
   if (!approval) {
     return refuse(
       'PLUGIN_VIEW_NOT_FOUND',
