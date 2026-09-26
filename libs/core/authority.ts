@@ -289,7 +289,14 @@ interface RoleAssumptionPolicy {
   systemRoles: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
-let cachedRoleAssumptionPolicy: { path: string; policy: RoleAssumptionPolicy | null } | null = null;
+/** A missing or malformed policy is re-read after this long instead of cached forever (S5). */
+export const ROLE_ASSUMPTION_POLICY_RETRY_MS = 60_000;
+
+let cachedRoleAssumptionPolicy: {
+  path: string;
+  policy: RoleAssumptionPolicy | null;
+  loadedAt: number;
+} | null = null;
 
 function stringArrayField(record: JsonRecord, key: string): string[] | null {
   const value = record[key];
@@ -315,17 +322,32 @@ function parseRoleAssumptionPolicy(raw: JsonRecord | null): RoleAssumptionPolicy
 
 function loadRoleAssumptionPolicy(): RoleAssumptionPolicy | null {
   const filePath = pathResolver.knowledge(ROLE_ASSUMPTION_POLICY_PATH);
-  if (cachedRoleAssumptionPolicy?.path === filePath) return cachedRoleAssumptionPolicy.policy;
+  const cached = cachedRoleAssumptionPolicy;
+  if (
+    cached?.path === filePath &&
+    (cached.policy || Date.now() - cached.loadedAt < ROLE_ASSUMPTION_POLICY_RETRY_MS)
+  ) {
+    return cached.policy;
+  }
   let policy: RoleAssumptionPolicy | null = null;
   try {
-    if (rawExistsSync(filePath)) {
+    if (!rawExistsSync(filePath)) {
+      logger.warn(
+        `role assumption policy is missing at ${filePath}; SYSTEM_ROLE processes may only assume their own role (re-checked every ${ROLE_ASSUMPTION_POLICY_RETRY_MS / 1000}s)`
+      );
+    } else {
       policy = parseRoleAssumptionPolicy(parseJsonRecord(rawReadTextFile(filePath)));
+      if (!policy) {
+        logger.warn(
+          `role assumption policy at ${filePath} is malformed; SYSTEM_ROLE processes may only assume their own role`
+        );
+      }
     }
   } catch (err) {
     logger.warn(`role assumption policy could not be read: ${err}`);
     policy = null;
   }
-  cachedRoleAssumptionPolicy = { path: filePath, policy };
+  cachedRoleAssumptionPolicy = { path: filePath, policy, loadedAt: Date.now() };
   return policy;
 }
 
