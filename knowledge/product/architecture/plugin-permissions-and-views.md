@@ -176,15 +176,37 @@ refusal — plugin not active, op unavailable, preflight rejection or block —
 which is audited without a `started` entry, since the call never started). A
 `dispatchId` generated once per call correlates the pair the way
 `approvalRequestId` does for a human action's execution. Every entry carries
-`plugin_id`, `view_id`, `action_id`, `authority: 'agent'`, the requesting
-principal (`requested_by` / `agentId`), `actor_role`, `surface`, the content
-and permissions digests, and a `params_digest` (a stable hash of the params);
-raw params are never written to the audit chain, the same as a human action's
-own audit entries, which carry no params either (only the approval record's
-`details` field holds them, gated separately by the approval store). A
-recording failure is logged and swallowed, the same policy
-`executeApprovedPluginViewAction` follows for a human action: it never turns
-a successful or failed dispatch into something else.
+`plugin_id`, `view_id`, `action_id`, `authority: 'agent'` (a human action's
+own entries now carry `authority: 'human'` too, for the same vocabulary), the
+requesting principal (`requested_by` / `agentId`), `actor_role`, `surface`,
+the content and permissions digests, a `dispatch_id` (same value as the
+top-level `correlationId`) and a `params_digest`; a `completed` entry
+(either authority) additionally carries `handled` (the op handler's own
+`{ handled }` result).
+
+Raw params are never written to the audit chain — the same as a human
+action's own audit entries, which carry no params either (only the approval
+record's `details` field holds them, gated separately by the approval store).
+`params_digest` (and the human path's payload hash) is a stable, **unsalted**
+hash used only to correlate calls carrying the same params; it is not a
+confidentiality mechanism, so a plugin's params must not be assumed hidden
+because only their digest is audited.
+
+`reason` (the audit chain's free-text field) can be plugin-authored text this
+module never validated — a thrown handler `Error.message`, or an op-preflight
+listener's `reason` — either of which could otherwise echo back the very
+params the call carried. Before it is recorded it is redacted with the same
+helper the audit forwarder already applies to outbound entries
+(`redactSensitiveString`, `network.ts`) and bounded to 500 chars, for both the
+human and the agent path.
+
+Both audit paths are **best-effort (fail-open)**: a recording failure is
+logged and swallowed, the same policy for the human and the agent path — it
+never turns a successful or failed dispatch into something else, and it never
+blocks the action either. An audit gap therefore does not by itself mean the
+action did not run; other governed state (the approval's `applyResult` for a
+human action, the plugin's own handler contract) remains the source of truth
+for the outcome.
 
 Executing an approved human action (FU-02): the same `POST` with
 `approval_request_id`. Chronos shows the requests of visible views to
