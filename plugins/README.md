@@ -287,6 +287,14 @@ Rules (`libs/core/plugin-view-contract.ts`,
   only reference declared actions. `authority: "human"` queues a human-only
   approval request; `authority: "agent"` dispatches only where the plugin is
   active in-process.
+- Once a person approves a `human` action, a localadmin executes it once
+  (`POST` with the same `plugin_id` / `view_id` / `action_id` / `params` plus
+  `approval_request_id`, or the Execute button in the Chronos plugin-views
+  screen). The approval is bound to the plugin, view, action, op, params,
+  content digest and grant digest, expires after 24 hours, and runs through
+  the same op preflight and grant as an agent action (409 when the plugin is
+  not active in the serving process). A second execution is 409 and every
+  attempt is written to the audit chain.
 - Views are served (Chronos `GET /api/headless/a2ui/plugin-views`) only for
   `activatable` managed plugins whose digest still matches; the viewer's role,
   tier and tenant are evaluated server-side and a `tier` / `tenant` query can
