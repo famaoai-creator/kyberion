@@ -567,6 +567,20 @@ describe('plugin grant binding and comparison', () => {
     expect(getActiveSandboxPolicy()).toBeUndefined();
   });
 
+  it('wraps a plugin Proxy function prototype so it runs under the grant (S9)', () => {
+    // The shadow target's own `prototype` is writable, so wrapping the
+    // reported value is invariant-safe (unlike the raw-prototype case for
+    // ordinary function/class targets covered above).
+    function tool(): void {}
+    (tool as unknown as { prototype: Record<string, unknown> }).prototype.run = () =>
+      validateUrl('https://example.com');
+    const binding = createPluginGrantBinding('proxy-function-prototype', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({ make: () => new Proxy(tool, {}) });
+    const made = api.make() as unknown as { prototype: { run: () => string } };
+    expect(() => made.prototype.run()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
   it('runs `in` on a function wrapper under the grant when its prototype is a plugin Proxy (FU-05)', () => {
     const attempts: string[] = [];
     function tool(): void {}

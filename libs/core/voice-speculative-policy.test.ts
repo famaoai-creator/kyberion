@@ -82,6 +82,19 @@ describe('costTierForReasoningMode', () => {
     expect(costTierForReasoningMode('some-mode')).toBe('metered');
   });
 
+  it('fails closed to metered when the registry throws (invalid descriptor on disk) (S12)', () => {
+    getReasoningProviderDescriptorMock.mockImplementationOnce(() => {
+      throw new Error('[REASONING_PROVIDER_REGISTRY_INVALID] provider entry 0 is not valid');
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(costTierForReasoningMode('claude-cli')).toBe('metered');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('fails closed to metered for an unknown mode or no mode at all', () => {
     getReasoningProviderDescriptorMock.mockReturnValueOnce(undefined);
     expect(costTierForReasoningMode('something-new')).toBe('metered');

@@ -54,7 +54,7 @@ export interface StreamingVoicePlaybackController {
 
 /** A playback handle that can additionally hold and release its output. */
 export interface PausablePlaybackHandle extends PlaybackHandle {
-  pause(): void;
+  pause(): boolean;
   resume(): void;
 }
 
@@ -228,7 +228,11 @@ export function playPcmAudioStream(
 
   return {
     done,
-    pause: () => gate.pause(),
+    // Gating the input feed (not an OS-level suspend) always succeeds.
+    pause: () => {
+      gate.pause();
+      return true;
+    },
     resume: () => gate.resume(),
     stop: async () => {
       interrupted = true;

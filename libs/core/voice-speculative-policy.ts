@@ -12,6 +12,18 @@ import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js
 
 export const SPECULATIVE_REPLY_ENV = 'KYBERION_VOICE_SPECULATIVE_REPLY';
 
+let warnedRegistryLoadFailure = false;
+function warnRegistryLoadFailureOnce(error: unknown): void {
+  if (warnedRegistryLoadFailure) return;
+  warnedRegistryLoadFailure = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[voice-speculative-policy] reasoning provider registry failed to load; treating cost tier as 'metered' (fail closed). ${
+      (error as Error)?.message || String(error)
+    }`
+  );
+}
+
 export type VoicePowerSource = 'ac' | 'battery' | 'unknown';
 export type VoiceCostTier = 'free' | 'metered';
 
@@ -44,15 +56,22 @@ export function detectVoicePowerSource(options: DetectPowerSourceOptions = {}): 
 /**
  * Cost tier of a reasoning backend mode, sourced from the governed reasoning
  * provider registry's `cost_tier` field (local runtimes and subscription
- * CLIs are 'free'; per-token API backends are 'metered'). An unknown mode or
- * a descriptor missing `cost_tier` fails closed as 'metered'.
+ * CLIs are 'free'; per-token API backends are 'metered'). An unknown mode, a
+ * descriptor missing `cost_tier`, or a registry that fails to load (e.g. an
+ * invalid descriptor on disk) all fail closed as 'metered' — a broken
+ * registry must not crash voice startup.
  */
 export function costTierForReasoningMode(
   mode: ReasoningBackendMode | string | null | undefined
 ): VoiceCostTier {
   if (!mode) return 'metered';
-  const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
-  return descriptor?.cost_tier ?? 'metered';
+  try {
+    const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
+    return descriptor?.cost_tier ?? 'metered';
+  } catch (error) {
+    warnRegistryLoadFailureOnce(error);
+    return 'metered';
+  }
 }
 
 export interface SpeculativeReplyPolicy {
