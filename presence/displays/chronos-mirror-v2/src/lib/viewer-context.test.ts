@@ -174,6 +174,46 @@ describe('viewer-context', () => {
       'viewer project scope denied'
     );
   });
+  it('TR-01: reads the token registry under the narrow reader role, not SYSTEM_ROLE', async () => {
+    const { createHash, randomBytes } = await import('node:crypto');
+    const token = randomBytes(24).toString('hex');
+    const rolesDuringRead: string[] = [];
+    vi.doMock('@agent/core/chronos-access-registry', async () => {
+      const actual = await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+        '@agent/core/chronos-access-registry'
+      );
+      const { resolveRole } = await import('@agent/core/authority');
+      return {
+        ...actual,
+        readChronosTokenRegistrations: () => {
+          rolesDuringRead.push(resolveRole() ?? '');
+          return [
+            {
+              token_hash: createHash('sha256').update(token).digest('hex'),
+              role: 'readonly',
+              tenant_slugs: ['tenant-a'],
+            },
+          ];
+        },
+      };
+    });
+    vi.stubEnv('SYSTEM_ROLE', 'chronos_mirror_v2');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    const { resolveViewerContext } = await import('./viewer-context.js');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+    const req = new NextRequest('https://chronos.example/api/workitems', {
+      headers: { authorization: `Bearer ${token}`, 'x-forwarded-for': '203.0.113.10' },
+    });
+    expect(resolveChronosAccessRole(req)).toBe('readonly');
+    expect(resolveViewerContext(req)).toMatchObject({
+      role: 'readonly',
+      tenantSlugs: ['tenant-a'],
+      source: 'token',
+    });
+    expect(rolesDuringRead.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(rolesDuringRead)).toEqual(new Set(['chronos_token_registry_reader']));
+  });
+
   it('masks personal for a registered localadmin that omits tier_access instead of rejecting it', async () => {
     const { resolveViewerTierAccess } = await import('./viewer-context.js');
     expect(resolveViewerTierAccess('localadmin')).toEqual(['confidential', 'public']);
