@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { withExecutionContextAsync } from './authority.js';
 import * as path from 'node:path';
 
 const auditRecords = vi.hoisted(() => [] as Array<Record<string, unknown>>);
@@ -404,6 +405,23 @@ describe('organization digest', () => {
     expect(step.produces).toMatchObject({ channel: 'organization_digest', sensitive: true });
     // Chronos delivery still reads the live context, not the journal.
     expect(pipeline.schedule.deliver_to.template).toBe('{{context.organization_digest.text}}');
+  });
+
+  it('gates on the execution-scope persona, not the process env (B2)', async () => {
+    const saved = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'sovereign';
+    try {
+      await expect(
+        withExecutionContextAsync(
+          'mission_controller',
+          async () => runOrganizationDigest(),
+          'worker'
+        )
+      ).rejects.toThrow(/requires KYBERION_PERSONA=sovereign \(got worker\)/);
+    } finally {
+      if (saved === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = saved;
+    }
   });
 
   it('refuses cross-tenant aggregation without the sovereign persona', () => {

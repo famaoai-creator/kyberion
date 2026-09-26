@@ -211,4 +211,6 @@ PE で見つかり、PR-A で直した不具合:
 - `KYBERION_CHRONOS_PLUGIN_HOST_TENANTS` の tenant 検証が、personal tier の tenant registry を読めない実行 role のまま行われ、すべての tenant を未知として捨てていた。検証は `chronos_localadmin` role で読む。
 - 承認要求の作成(`createApprovalRequest` → work-design の outcome catalog)を含む 3 つの governed catalog が、schema を cwd 相対で解決していた。Chronos は自分のパッケージディレクトリを cwd に動くため、Chronos からの承認要求の作成が常に失敗していた(human action がキューされない)。schema は Kyberion root 基準で解決する。
 
-残課題: surface runtime 経由の起動は `SYSTEM_ROLE=chronos_mirror_v2` を注入するが、`resolveRole()` は `SYSTEM_ROLE` を `MISSION_ROLE` より優先するため、`withExecutionContext` による role 切り替え(viewer context、承認ストアの `mission_controller` 書き込み、上記の tenant 検証)がその起動方法では効かない。PE の E2E は `SYSTEM_ROLE` なしで起動しており、この経路は未検証。
+~~残課題: surface runtime 経由の起動は `SYSTEM_ROLE=chronos_mirror_v2` を注入するが、`resolveRole()` は `SYSTEM_ROLE` を `MISSION_ROLE` より優先するため、`withExecutionContext` による role 切り替え(viewer context、承認ストアの `mission_controller` 書き込み、上記の tenant 検証)がその起動方法では効かない。PE の E2E は `SYSTEM_ROLE` なしで起動しており、この経路は未検証。~~
+
+解決済み(MSN-CHRONOS-ROLE-AUDIT-20260927 PR-A): `withExecutionContext*` が引き受けた role / persona を AsyncLocalStorage のスコープで持ち、`resolveRole()` はそれを `SYSTEM_ROLE` より先に使う(RA-01、並行リクエスト間の env 競合も解消)。`SYSTEM_ROLE` のあるプロセスが引き受けられる role は `role-assumption-policy.json` で制限する(RA-02、それ以外は `[ROLE_ASSUMPTION_DENIED]`)。plugin-views E2E は Chronos を直接起動と surface runtime と同じ env(`SYSTEM_ROLE=chronos_mirror_v2`)の両方で検証する(RA-03。変更前は surface runtime モードで tenant 検証が失敗し、変更後は両モードとも通る)。詳細は [AUTHORITY_MODEL §3.B2](../../../knowledge/product/governance/AUTHORITY_MODEL.md)。

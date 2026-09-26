@@ -25,7 +25,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { loadAuthorityRoleIndex } from './authority-role-registry.js';
 import { auditChain } from './audit-chain.js';
-import { resolveRole } from './authority.js';
+import { resolveAssumedRole, resolveRole } from './authority.js';
 import { createLogger } from './logger.js';
 import { withLock } from './src/lock-utils.js';
 import {
@@ -148,6 +148,15 @@ function assertCanonicalAuthorityRole(role: string): void {
   }
 }
 
+/**
+ * The execution role a trigger is bound to: an in-process
+ * withExecutionContext* assumption first (RA-01, scoped per async context),
+ * then MISSION_ROLE, then the general role resolution.
+ */
+function resolveActiveTriggerRole(): string | undefined {
+  return resolveAssumedRole() || getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
+}
+
 function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerAuthoritySnapshot {
   const normalized = normalizeAuthority(authority);
   assertCanonicalAuthorityRole(normalized.authority_role);
@@ -162,7 +171,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
       `[POLICY_VIOLATION] Trigger authority level does not match role registry: role=${normalized.authority_role} expected=${governedLevel} received=${normalized.level}`
     );
   }
-  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
+  const activeRole = resolveActiveTriggerRole();
   if (activeRole && activeRole !== normalized.authority_role) {
     throw new Error(
       `[POLICY_VIOLATION] Trigger authority is not bound to the active execution role: active=${activeRole} requested=${normalized.authority_role}`
@@ -185,7 +194,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
  * Throws when no role is bound, because an unattributable trigger must not run.
  */
 export function resolveCurrentTriggerAuthority(tenantSlug?: string): TriggerAuthoritySnapshot {
-  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
+  const activeRole = resolveActiveTriggerRole();
   if (!activeRole) {
     throw new Error('[AUTHORITY_UNBOUND] Trigger execution requires an active MISSION_ROLE.');
   }

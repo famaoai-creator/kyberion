@@ -44,7 +44,7 @@ import { getRegisteredEnvBool, isVitestProcess } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from './agent-identity.js';
-import { withExecutionContext } from './authority.js';
+import { resolveAssumedRole, resolveExecutionPersona, withExecutionContext } from './authority.js';
 import { frontDeskRoleAuthority } from './front-desk-roles.js';
 import { isValidMemberId } from './member-id-grammar.js';
 import {
@@ -84,6 +84,22 @@ import {
 
 function envText(deps: AuthnResolveDeps | undefined, name: string): string | undefined {
   return authnEnvText(deps, name);
+}
+
+/**
+ * RA-01: the ambient in-process agent hint. With injected deps.env (tests,
+ * adapters) the env is authoritative; otherwise the withExecutionContext*
+ * scope outranks the process-global env mirror, which races between
+ * concurrent async contexts.
+ */
+function ambientPersona(deps: AuthnResolveDeps | undefined): string | undefined {
+  return deps?.env ? envText(deps, 'KYBERION_PERSONA') : resolveExecutionPersona();
+}
+
+function ambientMissionRole(deps: AuthnResolveDeps | undefined): string | undefined {
+  return deps?.env
+    ? envText(deps, 'MISSION_ROLE')
+    : resolveAssumedRole() || envText(deps, 'MISSION_ROLE');
 }
 
 function envBool(deps: AuthnResolveDeps | undefined, name: string): boolean {
@@ -430,8 +446,8 @@ const agentContextProvider: AuthnProvider = {
       ctx.actorHint?.trim() ||
       ctx.persona?.trim() ||
       ctx.missionRole?.trim() ||
-      envText(deps, 'KYBERION_PERSONA')?.trim() ||
-      envText(deps, 'MISSION_ROLE')?.trim();
+      ambientPersona(deps)?.trim() ||
+      ambientMissionRole(deps)?.trim();
     if (!hinted) {
       return { eligible: false, unmet: ['no agent identity hint (persona/missionRole/actorHint)'] };
     }
@@ -444,8 +460,8 @@ const agentContextProvider: AuthnProvider = {
       ctx.actorHint?.trim() ||
       ctx.persona?.trim() ||
       ctx.missionRole?.trim() ||
-      envText(deps, 'KYBERION_PERSONA')?.trim() ||
-      envText(deps, 'MISSION_ROLE')?.trim() ||
+      ambientPersona(deps)?.trim() ||
+      ambientMissionRole(deps)?.trim() ||
       '';
     const nhiId = parseNhiId(hint) ? hint : deriveAgentNhiId(hint);
     if (!nhiId) return null;

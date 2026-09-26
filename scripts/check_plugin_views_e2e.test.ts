@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   E2eRun,
   frameHeaderMismatches,
@@ -7,17 +9,67 @@ import {
   parseE2eArgs,
   parseLastJsonObject,
   PLUGIN_ID,
+  surfaceRuntimeLaunchEnv,
   TENANT_SLUG,
 } from './check_plugin_views_e2e.js';
 
 describe('check_plugin_views_e2e helpers (PE-02)', () => {
   it('parses flags with a bounded overall timeout', () => {
-    expect(parseE2eArgs([])).toEqual({ keepRoot: false, timeoutMs: 100_000 });
+    expect(parseE2eArgs([])).toEqual({
+      keepRoot: false,
+      timeoutMs: 100_000,
+      launchModes: ['direct', 'surface-runtime'],
+    });
     expect(parseE2eArgs(['--keep-root', '--timeout-ms', '60000'])).toEqual({
       keepRoot: true,
       timeoutMs: 60_000,
+      launchModes: ['direct', 'surface-runtime'],
     });
     expect(() => parseE2eArgs(['--timeout-ms', '5'])).toThrow(/--timeout-ms/);
+  });
+
+  it('selects one launch mode or both (RA-03)', () => {
+    expect(parseE2eArgs(['--launch-mode', 'surface-runtime']).launchModes).toEqual([
+      'surface-runtime',
+    ]);
+    expect(parseE2eArgs(['--launch-mode', 'direct']).launchModes).toEqual(['direct']);
+    expect(parseE2eArgs(['--launch-mode', 'both']).launchModes).toEqual([
+      'direct',
+      'surface-runtime',
+    ]);
+    expect(() => parseE2eArgs(['--launch-mode', 'docker'])).toThrow(/--launch-mode/);
+  });
+
+  it('mirrors the environment surface_runtime gives the Chronos surface', () => {
+    const runtimeSource = String(
+      safeReadFile(pathResolver.rootResolve('scripts/surface_runtime.ts'), { encoding: 'utf8' })
+    );
+    expect(runtimeSource).toContain(
+      "SYSTEM_ROLE: surfaceId.replace(/-/g, '_'), // Inject role for secure-io"
+    );
+    expect(runtimeSource).toContain('AUTHORIZED_SCOPE: serviceId,');
+    const [manifest] = (
+      JSON.parse(
+        String(
+          safeReadFile(
+            pathResolver.rootResolve(
+              'knowledge/product/governance/surfaces/chronos-mirror-v2.json'
+            ),
+            { encoding: 'utf8' }
+          )
+        )
+      ) as { surfaces: Array<{ id: string; service_id?: string; env?: Record<string, string> }> }
+    ).surfaces;
+    const pkg = JSON.parse(
+      String(safeReadFile(pathResolver.rootResolve('package.json'), { encoding: 'utf8' }))
+    ) as { scripts: Record<string, string> };
+    expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime');
+    expect(manifest.env ?? {}).toEqual({});
+    expect(surfaceRuntimeLaunchEnv()).toEqual({
+      KYBERION_PERSONA: 'worker',
+      AUTHORIZED_SCOPE: manifest.service_id || manifest.id,
+      SYSTEM_ROLE: manifest.id.replace(/-/g, '_'),
+    });
   });
 
   it('reads the last JSON object a CLI printed after its logs', () => {
