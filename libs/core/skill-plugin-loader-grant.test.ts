@@ -49,7 +49,7 @@ afterEach(() => {
 describe('official managed installs on the skill path (N3)', () => {
   it('runs under the approved record grant, including tenant narrowing', async () => {
     const managedRoot = tracked(
-      pathResolver.shared(`plugins/managed-test-${process.pid}-tenant-grant-${randomUUID()}`)
+      pathResolver.sharedTmp(`plugins/managed-test-${process.pid}-tenant-grant-${randomUUID()}`)
     );
     const record = installPluginManaged({
       pluginId: `tenant-grant-${process.pid}`,

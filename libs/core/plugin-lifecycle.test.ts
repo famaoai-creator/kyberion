@@ -107,7 +107,7 @@ function newIds(prefix: string) {
   const id = `${process.pid}-${randomUUID()}`;
   return {
     pluginId: `${prefix}-${id}`.slice(0, 60),
-    managedRoot: tracked(pathResolver.shared(`plugins/managed-test-lifecycle-${id}`)),
+    managedRoot: tracked(pathResolver.sharedTmp(`plugins/managed-test-lifecycle-${id}`)),
   };
 }
 

@@ -288,7 +288,7 @@ describe('governed plugin contributions', () => {
 });
 
 describe('plugin grant enforcement on contributions (EP-03)', () => {
-  const unmanagedRoot = pathResolver.shared(`plugins/managed-test-contrib-${randomUUID()}`);
+  const unmanagedRoot = pathResolver.sharedTmp(`plugins/managed-test-contrib-${randomUUID()}`);
   const probeHandler: ActuatorOperationHandler = async (_op, params, context) => {
     const probe = params.probe as () => unknown;
     return { handled: true, ctx: { ...context, result: await probe() } };

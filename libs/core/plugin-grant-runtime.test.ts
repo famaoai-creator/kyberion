@@ -731,7 +731,7 @@ describe('plugin grant binding and comparison', () => {
 });
 
 describe('resolvePluginExecutionGrant policy for undeclared permissions', () => {
-  const managedRoot = pathResolver.shared(`plugins/managed-test-grant-${randomUUID()}`);
+  const managedRoot = pathResolver.sharedTmp(`plugins/managed-test-grant-${randomUUID()}`);
 
   it('gives an undeclared third-party plugin the empty grant', () => {
     const resolved = resolvePluginExecutionGrant(
