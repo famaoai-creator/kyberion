@@ -21,6 +21,7 @@ import {
   scopedAssumedRole,
   type ExecutionScope,
 } from './foundation/execution-scope.js';
+import { traceRoleAssumption } from './role-assumption-trace.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -387,10 +388,12 @@ registerAssumedRoleValidator(isScopedRoleAccepted);
 
 function assertRoleAssumptionAllowed(role: string): void {
   const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
-  if (!systemRole) return;
-  if (isRoleAssumptionAllowed(systemRole, role)) return;
+  const allowed = !systemRole || isRoleAssumptionAllowed(systemRole, role);
+  // RN-01: opt-in observation (KYBERION_ROLE_ASSUMPTION_TRACE); a no-op when unset.
+  traceRoleAssumption(systemRole, role, allowed);
+  if (allowed) return;
   throw new Error(
-    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole)} ` +
+    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole ?? '')} ` +
       `may not assume role '${normalizeRoleName(role.trim())}'. Allowed assumptions are governed by ` +
       `knowledge/${ROLE_ASSUMPTION_POLICY_PATH}.`
   );

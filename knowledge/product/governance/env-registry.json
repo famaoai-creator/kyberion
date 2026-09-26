@@ -2987,6 +2987,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ROLE_ASSUMPTION_TRACE",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Opt-in JSONL trace of in-process role assumption decisions (system role, assumed role, allowed, calling module) used to narrow role-assumption-policy.json; must be under active/shared/tmp/ or active/shared/runtime/, otherwise ignored. Unset disables tracing.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_ROOT",
       "category": "path",
       "type": "path",
