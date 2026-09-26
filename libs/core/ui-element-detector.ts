@@ -28,7 +28,7 @@ import {
  * explicit list every listed detector runs and the caller fuses the union.
  */
 
-export type UiElementDetectorKind = 'dom' | 'ocr' | 'pixels' | 'model';
+export type UiElementDetectorKind = 'dom' | 'ocr' | 'pixels' | 'accessibility' | 'model';
 
 export interface UiElementDetectionRequest {
   image_path: string;
@@ -40,6 +40,17 @@ export interface UiElementDetectionRequest {
   language?: string;
   /** OCR routing mode for ocr_text. Default 'local_only': screenshots stay on this machine. */
   ocr_mode?: OcrRoutingMode;
+  /**
+   * The screenshot is a capture of this machine's live screen, taken just now.
+   * Enables os_accessibility; never set it for an arbitrary or stored image.
+   */
+  live_screen?: boolean;
+  /** Top-left of the screenshot in global logical screen points. Default {x: 0, y: 0} (main display). */
+  screen_origin?: { x: number; y: number };
+  /** Screenshot pixels per logical screen point. Default: image width / main display width in points. */
+  screen_scale?: number;
+  /** Application whose front window os_accessibility reads. Default: the frontmost application. */
+  application?: string;
 }
 
 export interface UiElementDetector {
