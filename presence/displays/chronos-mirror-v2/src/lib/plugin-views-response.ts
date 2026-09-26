@@ -1,19 +1,21 @@
 import { listManagedPlugins, type ManagedPluginRecord } from '@agent/core/plugin-managed-install';
 import {
   composePluginViewsA2UI,
-  dispatchPluginViewAction,
-  executeApprovedPluginViewAction,
-  listPluginViewActionRequests,
   listPluginViewsForViewer,
   PluginViewError,
   pluginViewErrorStatus,
   resolvePluginViewAction,
   type LoadedPluginView,
-  type PluginViewActionOutcome,
-  type PluginViewActionRequestSummary,
   type PluginViewFilter,
   type PluginViewViewer,
 } from '@agent/core/plugin-view-contract';
+import {
+  dispatchPluginViewAction,
+  executeApprovedPluginViewAction,
+  listPluginViewActionRequests,
+  type PluginViewActionOutcome,
+  type PluginViewActionRequestSummary,
+} from '@agent/core/plugin-view-actions';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { toSurfaceAuthorizationContext, type ViewerContext } from './viewer-context';
 

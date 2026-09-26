@@ -72,14 +72,7 @@ import {
 } from './plugin-lifecycle.js';
 import {
   composePluginViewsA2UI,
-  dispatchPluginViewAction,
-  executeApprovedPluginViewAction,
   isPluginViewVisible,
-  listPluginViewActionRequests,
-  MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS,
-  PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS,
-  PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS,
-  prunePluginViewActionRequests,
   listPluginViewsForViewer,
   loadPluginViews,
   parsePluginViewDeclaration,
@@ -91,6 +84,15 @@ import {
   type PluginViewDeclaration,
   type PluginViewViewer,
 } from './plugin-view-contract.js';
+import {
+  dispatchPluginViewAction,
+  executeApprovedPluginViewAction,
+  listPluginViewActionRequests,
+  MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS,
+  PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS,
+  PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS,
+  prunePluginViewActionRequests,
+} from './plugin-view-actions.js';
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
 const FIXTURE_FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json'];
