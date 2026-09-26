@@ -86,7 +86,7 @@ If you need to explain this to someone else, use this phrasing:
 | `chronos_gateway` | `worker` | Chronos control surface and terminal routing. | It does not imply read-only operator mode or Slack transport. |
 | `chronos_operator` | `worker` | Read-only Chronos visibility and runtime observability. | It does not imply write access to Chronos coordination scopes. |
 | `chronos_localadmin` | `worker` | Local Chronos administration for deterministic coordination and runtime control. | It does not imply Slack-specific transport authority. |
-| `chronos_token_registry_reader` | `worker` | Reads the Chronos viewer token registry (`knowledge/personal/connections/chronos-access.json`) so a surface can resolve a bearer/cookie viewer token (TR-01). | It grants no other personal-tier read and no write; it does not imply viewer, operator or admin authority. |
+| `chronos_token_registry_reader` | `worker` | Reads the Chronos viewer token registry (`knowledge/personal/connections/chronos-access.json`) so a surface can resolve a bearer/cookie viewer token (TR-01). | It grants no other personal-tier read and no role write grant (persona `worker`, so only worker / `default_allow` write paths remain); it does not imply viewer, operator or admin authority. |
 | `surface_runtime` | `worker` | Reconciliation and supervision of managed runtime surfaces. | It does not imply Slack transport or channel ingress. |
 | `infrastructure_sentinel` | `worker` | Coordination and observability for infrastructure-backed surfaces. | It does not imply mission lifecycle control. |
 | `service_actuator` | not auto-inferred | Service integration helper for connection documents and auth-grant aware reads. | It does not imply a persona default or broad write permissions. |
