@@ -14,6 +14,8 @@ import {
   deleteRegisteredWorkspace,
   listUnregisteredWorkspaceDirs,
   listWorkspaces,
+  workspaceRecordSnapshot,
+  type PendingReconcileAbandonOptions,
   type WorkspaceLedgerOptions,
   type WorkspaceOwner,
   type WorkspaceRecord,
@@ -42,7 +44,7 @@ export interface SweepWorkspacesOptions extends Omit<WorkspaceLedgerOptions, 'no
   /** Test seam: size probe used to refresh cached `bytes` of surviving records. */
   measure?: (targetPath: string) => number;
   /** Test seam: audit sink / retry schedule for pending shared-index reconciles. */
-  reconcile?: RunReconcileOptions;
+  reconcile?: RunReconcileOptions & PendingReconcileAbandonOptions;
 }
 
 export interface SweepWorkspacesResult {
@@ -84,7 +86,10 @@ function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
  * records without a pid: after the TTL); a git index whose delegated child
  * still runs is never an orphan. A git index with a pending shared-index
  * reconcile is reconciled first (not in dry-run) and kept while that keeps
- * failing. Orphans are deleted only through
+ * failing; a reconcile whose base commit no longer resolves is abandoned
+ * immediately, and one still pending 3x the orphan TTL after release is
+ * abandoned too (both audited with result `abandoned`), so the record
+ * becomes reclaimable instead of leaking forever. Orphans are deleted only through
  * `deleteRegisteredWorkspace`, which re-checks every path invariant and the
  * record snapshot under the ledger lock and keeps git worktrees with unsaved
  * work; directories without a ledger record are reported, never deleted.
@@ -131,15 +136,25 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     return Number.isFinite(ts) && ts + ttlMs <= nowMs;
   };
   const probe = opts.processProbe ?? {};
+  // A reconcile that keeps failing (e.g. another git process holds
+  // index.lock forever) is abandoned once it has been pending for 3x the
+  // orphan TTL, so it eventually becomes reclaimable instead of leaking.
+  const reconcileOptions: RunReconcileOptions & PendingReconcileAbandonOptions = {
+    ...opts.reconcile,
+    maxAgeMs: opts.reconcile?.maxAgeMs ?? ttlMs * 3,
+    now: opts.reconcile?.now ?? (() => nowMs),
+  };
   const stillPending = new Set<string>();
+  let touchedPending = false;
   for (const record of records) {
     if (record.kind !== 'git-index' || !record.pendingReconcile) continue;
     if (opts.dryRun) {
       stillPending.add(record.id);
       continue;
     }
+    touchedPending = true;
     try {
-      if (retryPendingSharedIndexReconcile(record, ledger, opts.reconcile)) continue;
+      if (retryPendingSharedIndexReconcile(record, ledger, reconcileOptions)) continue;
       errors.push(`workspace ${record.id}: shared index reconcile pending; kept`);
     } catch (err: unknown) {
       errors.push(
@@ -147,6 +162,17 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
       );
     }
     stillPending.add(record.id);
+  }
+  if (touchedPending) {
+    // retryPendingSharedIndexReconcile may have cleared a pendingReconcile
+    // (retried or abandoned) on the ledger; refresh so the orphan check and
+    // the delete-time snapshot below reflect that, not the stale copy above.
+    try {
+      records = listWorkspaces(ledger);
+    } catch (err: unknown) {
+      errors.push(`read: ${errorMessage(err)}`);
+      return { ...empty(), registered: records.length };
+    }
   }
   const orphanReason = (record: WorkspaceRecord): string | null => {
     if (stillPending.has(record.id)) return null;
@@ -179,11 +205,7 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
           record.id,
           { ...ledger, now: () => new Date(nowMs) },
           {
-            expect: {
-              live: record.live,
-              createdAt: record.createdAt,
-              releasedAt: record.releasedAt,
-            },
+            expect: workspaceRecordSnapshot(record),
             requireCleanWorktree: true,
           }
         );

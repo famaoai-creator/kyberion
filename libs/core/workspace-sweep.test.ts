@@ -139,6 +139,25 @@ describe('sweepRegisteredWorkspaces', () => {
     expect(alive('someone-else').orphaned.map((r) => r.id)).toEqual([idx.id]);
   });
 
+  it('abandons a pending reconcile whose base commit no longer resolves and reclaims the git index', () => {
+    const idx = gitIndex('unresolvable');
+    releaseWorkspace(idx.id, ledger);
+    // `base` is not a git repository, so this fromSha can never resolve —
+    // abandoned immediately, even though it is otherwise past the orphan TTL.
+    annotateWorkspace(
+      idx.id,
+      { pendingReconcile: { repoRoot: base, fromSha: '0'.repeat(40) } },
+      ledger
+    );
+    clock = T0 + 25 * HOUR;
+    const audit = vi.fn();
+    const result = sweepRegisteredWorkspaces(sweepOptions({ reconcile: { audit } }));
+    expect(result.errors).toEqual([]);
+    expect(result.deleted.map((r) => r.id)).toEqual([idx.id]);
+    expect(safeExistsSync(idx.path)).toBe(false);
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ result: 'abandoned' }));
+  });
+
   it('refuses to delete a record re-registered after the sweep took its snapshot', () => {
     const reused = registerWorkspace(
       { path: path.join(base, 'workspaces', 'reused'), kind: 'scratch-dir', owner: {} },

@@ -23,10 +23,13 @@ import { checkWorkspaceBudget, type WorkspaceBudgetOptions } from './workspace-b
 import {
   annotateWorkspace,
   deleteRegisteredWorkspace,
+  describePendingReconcileAbandon,
   GIT_INDEXES_ROOT_SUBPATH,
   listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
+  workspaceRecordSnapshot,
+  type PendingReconcileAbandonOptions,
   type WorkspaceLedgerOptions,
   type WorkspaceOwner,
   type WorkspaceRecord,
@@ -89,7 +92,7 @@ export interface SharedIndexReconcileAudit {
   fromSha: string | null;
   /** HEAD the shared index was moved to; null when the failure left it unknown. */
   toSha: string | null;
-  result: 'completed' | 'failed';
+  result: 'completed' | 'failed' | 'abandoned';
   /** Paths whose shared-index entry was moved to the new HEAD. */
   updated: string[];
   /** Paths left alone because the shared index held other staged work for them. */
@@ -281,11 +284,16 @@ function defaultReconcileAudit(entry: SharedIndexReconcileAudit): void {
     agentId: 'session-git-index',
     action: 'shared_index_reconcile',
     operation: 'dispose',
-    result: entry.result,
+    // The audit chain's result vocabulary has no `abandoned` entry; record it
+    // as `failed` there (the `reason` and `metadata.result` below keep the
+    // distinction for anyone reading the chain).
+    result: entry.result === 'abandoned' ? 'failed' : entry.result,
     reason:
       entry.result === 'completed'
         ? `HEAD moved from ${entry.fromSha ?? '(none)'} to ${entry.toSha ?? '(unknown)'} during session ${entry.sessionId}`
-        : `shared index not reconciled after session ${entry.sessionId}: ${entry.error ?? 'unknown error'}`,
+        : entry.result === 'abandoned'
+          ? `shared index reconcile abandoned after session ${entry.sessionId}: ${entry.error ?? 'unknown reason'}`
+          : `shared index not reconciled after session ${entry.sessionId}: ${entry.error ?? 'unknown error'}`,
     metadata: { ...entry },
   });
 }
@@ -339,16 +347,37 @@ export function runSharedIndexReconcile(
 
 /**
  * Complete the pending reconcile recorded on a git-index ledger entry (janitor
- * sweep / a later dispose). Returns true when nothing is pending any more.
+ * sweep / a later dispose). Returns true when nothing is pending any more —
+ * either because it reconciled, or because it was abandoned (audited with
+ * result `abandoned`; see `describePendingReconcileAbandon`).
  */
 export function retryPendingSharedIndexReconcile(
   record: WorkspaceRecord,
   ledger: WorkspaceLedgerOptions = {},
-  options: RunReconcileOptions = {}
+  options: RunReconcileOptions & PendingReconcileAbandonOptions = {}
 ): boolean {
   const pending = record.pendingReconcile;
   if (!pending) return true;
   const sessionId = record.owner.session_id ?? record.id;
+  const abandonReason = describePendingReconcileAbandon(record, options);
+  if (abandonReason) {
+    const audit = options.audit ?? defaultReconcileAudit;
+    try {
+      audit({
+        sessionId,
+        fromSha: pending.fromSha,
+        toSha: null,
+        result: 'abandoned',
+        updated: [],
+        skipped: [],
+        error: abandonReason,
+      });
+    } catch (error) {
+      logger.warn(`reconcile audit failed: ${errorText(error)}`);
+    }
+    annotateWorkspace(record.id, { pendingReconcile: null }, ledger);
+    return true;
+  }
   if (!runSharedIndexReconcile(pending.repoRoot, pending.fromSha, sessionId, options).ok) {
     return false;
   }
@@ -511,12 +540,12 @@ export function prepareSessionGitIndex(
             return;
           }
           finished = true;
+          // settleInherited() may have annotated the record (cleared a pending
+          // reconcile) after `released` was captured; re-read it so the
+          // snapshot the delete re-checks under the lock reflects that.
+          const finalRecord = currentRecord() ?? released;
           deleteRegisteredWorkspace(id, ledger, {
-            expect: {
-              live: released.live,
-              createdAt: released.createdAt,
-              releasedAt: released.releasedAt,
-            },
+            expect: workspaceRecordSnapshot(finalRecord),
           });
         } catch (error) {
           finished = true;
