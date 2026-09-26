@@ -1243,6 +1243,10 @@
       "types": "./dist/calendar-workflow.d.ts",
       "default": "./dist/calendar-workflow.js"
     },
+    "./calendar-slot-planner": {
+      "types": "./dist/calendar-slot-planner.d.ts",
+      "default": "./dist/calendar-slot-planner.js"
+    },
     "./fs-utils": {
       "types": "./dist/fs-utils.d.ts",
       "default": "./dist/fs-utils.js"

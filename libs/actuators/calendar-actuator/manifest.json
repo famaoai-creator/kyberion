@@ -1,6 +1,6 @@
 {
   "actuator_id": "calendar-actuator",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws)",
   "contract_schema": "knowledge/product/schemas/calendar-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -32,8 +32,23 @@
       "platforms": ["darwin", "linux", "win32"]
     },
     {
+      "op": "find_slots",
+      "description": "Derives available slots from free/busy windows, timezone, working hours, and business calendar",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
       "op": "create_event",
       "description": "Creates a new event through the selected calendar backend",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "update_event",
+      "description": "Reschedules or updates an event, including its reminder, through an adapter capability",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "delete_event",
+      "description": "Deletes an event through an adapter capability",
       "platforms": ["darwin", "linux", "win32"]
     }
   ]
