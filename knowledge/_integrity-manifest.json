@@ -1533,7 +1533,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 51864,
+      "size": 53496,
       "type": "json"
     },
     {
@@ -4977,7 +4977,7 @@
     {
       "path": "product/orchestration/browser-discovery-playbook.md",
       "tier": "public",
-      "size": 5405,
+      "size": 7022,
       "type": "md"
     },
     {
@@ -5067,7 +5067,7 @@
     {
       "path": "product/orchestration/data-ingestion-protocol.md",
       "tier": "public",
-      "size": 4889,
+      "size": 5842,
       "type": "md"
     },
     {

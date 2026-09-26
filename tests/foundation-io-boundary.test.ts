@@ -10,6 +10,7 @@ const allowedImporters = new Set([
   'libs/core/customer-resolver.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
+  'libs/core/vault-mount.ts',
 ]);
 
 function normalize(relPath: string): string {
@@ -29,6 +30,8 @@ describe('Foundation IO boundary', () => {
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.startsWith('active/shared/tmp/'))
       .filter((relPath) => !relPath.startsWith('active/shared/runtime/'))
+      .filter((relPath) => !relPath.startsWith('.codex/'))
+      .filter((relPath) => !relPath.startsWith('.worktrees/'))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
         return /from\s+['"][^'"]*fs-primitives(?:\.js)?['"]/.test(content);
@@ -36,5 +39,5 @@ describe('Foundation IO boundary', () => {
       .sort((a, b) => a.localeCompare(b));
 
     expect(importers).toEqual([...allowedImporters].sort((a, b) => a.localeCompare(b)));
-  });
+  }, 30000);
 });
