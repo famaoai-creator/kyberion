@@ -349,6 +349,10 @@ export function streamVoicePlayback(
         currentPlayback = null;
         // pause() may have had to stop (rather than suspend) this segment;
         // once resumed, replay it from a fresh handle instead of skipping it.
+        // Stop-and-replay only restores file segments: an AsyncIterable stream is
+        // closed by the stopped handle, so a replay of it ends immediately. The
+        // default PCM player never reports a failed pause, so this only affects
+        // injected players whose pause() can fail.
         while (result.interrupted && stoppedForPause.current && !cancelled) {
           stoppedForPause.current = false;
           await Promise.race([gate.wait(), cancellation]);
