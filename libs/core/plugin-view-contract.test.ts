@@ -1228,3 +1228,166 @@ describe('approved human view actions (FU-02)', () => {
     ]);
   });
 });
+
+describe('agent view action dispatch is audited (AU-01)', () => {
+  function spyAudit() {
+    return vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({
+          ...entry,
+          id: 'audit',
+          timestamp: '',
+          previousHash: '',
+          currentHash: '',
+        }) as AuditEntry
+    );
+  }
+
+  function auditedDispatches(audit: ReturnType<typeof spyAudit>) {
+    return audit.mock.calls
+      .map(([entry]) => entry)
+      .filter((entry) => entry.action.startsWith('plugin_view.action.'));
+  }
+
+  /** A copy of the fixture with one extra agent action whose op always throws. */
+  function fixtureCopyWithFailingOp(): string {
+    const manifest = JSON.parse(readFixture('plugin-manifest.json'));
+    manifest.provides.ops.push('permfixture:fail');
+    manifest.provides.views[0].actions.push({
+      id: 'probe_fail',
+      authority: 'agent',
+      op: 'permfixture:fail',
+      paramsSchema: { type: 'object', properties: {}, additionalProperties: false },
+    });
+    const index = readFixture('index.mjs').replace(
+      '  );\n};\n',
+      [
+        '  );\n',
+        "  api.registerOperation('permfixture:fail', {\n",
+        "    stepType: 'apply',\n",
+        '    handler: async () => {\n',
+        "      throw new Error('permfixture:fail always throws');\n",
+        '    },\n',
+        '  });\n',
+        '};\n',
+      ].join('')
+    );
+    return fixtureCopy({
+      'plugin-manifest.json': JSON.stringify(manifest, null, 2),
+      'index.mjs': index,
+    });
+  }
+
+  async function activeFixtureView(
+    prefix: string,
+    sourcePath: string
+  ): Promise<{ pluginId: string; view: () => LoadedPluginView }> {
+    const { pluginId, managedRoot } = newIds(prefix);
+    const record = installApproved(pluginId, sourcePath, managedRoot);
+    expect((await activatePlugin({ record }, { managedRoot })).ok).toBe(true);
+    const view = () =>
+      listPluginViewsForViewer(listManagedPlugins(managedRoot), publicReader).views[0];
+    return { pluginId, view };
+  }
+
+  const dispatchContext = (requestedBy: string) => ({
+    requestedBy,
+    actorRole: 'localadmin' as const,
+    surface: 'api' as const,
+  });
+
+  it('audits started + completed for a successful dispatch, with a params digest instead of raw params', async () => {
+    const { pluginId, view } = await activeFixtureView('views-agent-completed', fixtureCopy());
+    const audit = spyAudit();
+    const outcome = await dispatchPluginViewAction(
+      resolvePluginViewAction(view(), 'probe_env', {}),
+      dispatchContext('agent:runtime-1')
+    );
+    expect(outcome).toEqual({ status: 'dispatched', handled: true });
+
+    const entries = auditedDispatches(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.started', 'allowed'],
+      ['plugin_view.action.execute', 'completed'],
+    ]);
+    expect(entries[0].correlationId).toBe(entries[1].correlationId);
+    expect(entries[1]).toMatchObject({
+      agentId: 'agent:runtime-1',
+      operation: 'permfixture:env',
+      metadata: {
+        plugin_id: pluginId,
+        view_id: 'status',
+        action_id: 'probe_env',
+        authority: 'agent',
+        requested_by: 'agent:runtime-1',
+        actor_role: 'localadmin',
+        surface: 'api',
+      },
+    });
+    expect(entries[1].metadata?.params_digest).toEqual(expect.any(String));
+    // Raw params never reach the audit chain, only their digest.
+    expect(JSON.stringify(entries[1])).not.toMatch(/"params"/u);
+  });
+
+  it('audits started + failed when the op handler throws', async () => {
+    const { view } = await activeFixtureView('views-agent-failed', fixtureCopyWithFailingOp());
+    const audit = spyAudit();
+    await expect(
+      dispatchPluginViewAction(
+        resolvePluginViewAction(view(), 'probe_fail', {}),
+        dispatchContext('agent:runtime-2')
+      )
+    ).rejects.toThrow('permfixture:fail always throws');
+
+    const entries = auditedDispatches(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.started', 'allowed'],
+      ['plugin_view.action.execute', 'failed'],
+    ]);
+    expect(entries[1].reason).toContain('permfixture:fail always throws');
+    expect(entries[0].correlationId).toBe(entries[1].correlationId);
+  });
+
+  it('audits a denied outcome without a started entry when the plugin is not active (op unavailable)', async () => {
+    const view = loadPluginViews(FIXTURE_DIR).views[0];
+    const audit = spyAudit();
+    await expectViewErrorAsync(
+      dispatchPluginViewAction(
+        resolvePluginViewAction(view, 'probe_env', {}),
+        dispatchContext('agent:runtime-3')
+      ),
+      'PLUGIN_VIEW_ACTION_UNAVAILABLE'
+    );
+    const entries = auditedDispatches(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.execute', 'denied'],
+    ]);
+    expect(entries[0].reason).toContain('PLUGIN_VIEW_ACTION_UNAVAILABLE');
+  });
+
+  it('audits a denied outcome without a started entry when op preflight blocks the call', async () => {
+    const { view } = await activeFixtureView('views-agent-denied', fixtureCopy());
+    const block = registerOpPreflightListener({
+      id: `au01-block-${randomUUID()}`,
+      run: (call) =>
+        call.op === 'permfixture:env' ? { decision: 'block', reason: 'grant denied' } : undefined,
+    });
+    const audit = spyAudit();
+    try {
+      await expectViewErrorAsync(
+        dispatchPluginViewAction(
+          resolvePluginViewAction(view(), 'probe_env', {}),
+          dispatchContext('agent:runtime-4')
+        ),
+        'PLUGIN_VIEW_ACTION_DENIED'
+      );
+    } finally {
+      block();
+    }
+    const entries = auditedDispatches(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.execute', 'denied'],
+    ]);
+    expect(entries[0].reason).toContain('grant denied');
+  });
+});
