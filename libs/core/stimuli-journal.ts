@@ -1,3 +1,4 @@
+import { withExecutionContext } from './authority.js';
 import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
@@ -14,6 +15,26 @@ import type { NerveMessage } from './nerve-bridge.js';
 const logger = createLogger('stimuli-journal');
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+
+/**
+ * SB-01: the journal's own store-writer role. Its writes (append + rotation)
+ * used to run under whatever role was current, so a caller inside another
+ * in-process assumption (e.g. mission_controller under SYSTEM_ROLE=slack_bridge,
+ * including async continuations of that scope) was denied — and nerve-bridge
+ * swallows the error. infrastructure_sentinel is a shared core role (allowed
+ * under every SYSTEM_ROLE, role-assumption-policy.json) that already owns the
+ * nerve/mesh bus stores and is granted presence/bridge/runtime/.
+ *
+ * Because every caller now writes as the same role, a journal record says
+ * nothing about who produced it: `from` / `node_id` / `intent` are
+ * self-declared. The journal must therefore never become an authorization
+ * input — e.g. dynamic-permission-guard's contextual grants (keyed on a
+ * recent stimulus intent/keyword via sensory-memory) must stay unwired from
+ * tier-guard / secure-io / policy-engine until the writer is authenticated
+ * (signed or attributed records). stimuli-journal-rotation-role.test.ts
+ * pins that no authorization module imports it.
+ */
+export const STIMULI_JOURNAL_WRITER_ROLE = 'infrastructure_sentinel';
 
 export function resolveStimuliJournalPath(filePath: string = STIMULI_PATH): string {
   return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
@@ -164,6 +185,10 @@ export function loadRecentStimuli(
  * detects it via size regression and fingerprint change and restarts cleanly.
  */
 export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTES): boolean {
+  return withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => rotateStimuliJournal(maxBytes));
+}
+
+function rotateStimuliJournal(maxBytes: number): boolean {
   const stimuliPath = safeStimuliPath();
   if (!isRegularStimuliJournalPath(stimuliPath)) return false;
   let size = 0;
@@ -189,8 +214,10 @@ export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTE
 }
 
 export function appendStimulus(stimulus: NerveMessage): void {
-  appendJsonLine(safeStimuliPath(), stimulus);
-  rotateStimuliJournalIfNeeded();
+  withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => {
+    appendJsonLine(safeStimuliPath(), stimulus);
+    rotateStimuliJournal(STIMULI_MAX_BYTES);
+  });
 }
 
 export function stimuliJournalPath(): string {

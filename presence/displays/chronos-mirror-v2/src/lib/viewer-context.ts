@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { auditChain } from '@agent/core/audit-chain';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
+  CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   readChronosTokenRegistrations,
   type ChronosTokenRegistration,
 } from '@agent/core/chronos-access-registry';
@@ -52,7 +53,12 @@ export class ViewerContextError extends Error {
 
 function loadRegistry(): ChronosTokenRegistration[] | null {
   try {
-    return readChronosTokenRegistrations();
+    // TR-01: Chronos runs as SYSTEM_ROLE=chronos_mirror_v2, which cannot read
+    // the personal tier; the registry is read under the narrow reader role
+    // whose only grant is chronos-access.json.
+    return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+      readChronosTokenRegistrations()
+    );
   } catch {
     throw new ViewerContextError(401, 'Chronos viewer token registry is unavailable.');
   }

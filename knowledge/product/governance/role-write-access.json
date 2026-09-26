@@ -93,6 +93,9 @@
         "active/audit/"
       ]
     },
+    "chronos_token_registry_reader": {
+      "allow": []
+    },
     "surface_runtime": {
       "allow": [
         "active/shared/runtime/",

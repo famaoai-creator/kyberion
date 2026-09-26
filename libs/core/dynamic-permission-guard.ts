@@ -2,6 +2,12 @@
  * libs/core/dynamic-permission-guard.ts
  * Kyberion Autonomous Nerve System (KANS) - Dynamic Permission Guard v1.0
  * [CORE COMPONENT - DIRECT FS AUTHORIZED]
+ *
+ * NOT an authorization input today: nothing wires `dynamicPermGuard` into
+ * tier-guard / secure-io / policy-engine. Its conditions come from the stimuli
+ * journal, whose records are unauthenticated (every writer appends as the
+ * journal's shared store-writer role, SB-01), so wiring it in would let any
+ * in-process writer mint a grant. Authenticate the stimulus writer first.
  */
 
 import * as path from 'node:path';

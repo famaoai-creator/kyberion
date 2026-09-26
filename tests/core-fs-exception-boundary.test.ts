@@ -19,6 +19,8 @@ const allowedCoreFsImports = [
   'libs/core/recovery-policy.test.ts',
   'libs/core/browser-extension-bridge.test.ts',
   'libs/core/chrome-extension-meeting-driver.test.ts',
+  // TR-01: hermetic KYBERION_ROOT with a personal-tier registry fixture.
+  'libs/core/chronos-token-registry-reader.test.ts',
   'libs/core/cli-subagent-team.e2e.test.ts',
   'libs/core/data-vault.test.ts',
   'libs/core/creative-design-resolver.test.ts',
@@ -82,6 +84,8 @@ const allowedCoreFsImports = [
   'libs/core/src/pipeline-engine.test.ts',
   'libs/core/src/pipeline-fragments-catalog.test.ts',
   'libs/core/src/pipeline-preview.test.ts',
+  // SB-01: hermetic KYBERION_ROOT with a stimuli journal fixture.
+  'libs/core/stimuli-journal-rotation-role.test.ts',
   'libs/core/storage-janitor.test.ts',
   // AL-01 catalog loader test: raw fs for temp catalog fixtures.
   'libs/core/storage-retention-catalog.test.ts',

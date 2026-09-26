@@ -1,5 +1,8 @@
 # Role / Persona Matrix
 
+<!-- prettier-ignore-start -->
+<!-- Compact tables: tests/role-persona-matrix-contract.test.ts pins their exact rows. -->
+
 This document is the operational reference for answering a simple question:
 
 > "If this role exists, what does it imply, and what does it not imply?"
@@ -83,6 +86,7 @@ If you need to explain this to someone else, use this phrasing:
 | `chronos_gateway` | `worker` | Chronos control surface and terminal routing. | It does not imply read-only operator mode or Slack transport. |
 | `chronos_operator` | `worker` | Read-only Chronos visibility and runtime observability. | It does not imply write access to Chronos coordination scopes. |
 | `chronos_localadmin` | `worker` | Local Chronos administration for deterministic coordination and runtime control. | It does not imply Slack-specific transport authority. |
+| `chronos_token_registry_reader` | `worker` | Reads the Chronos viewer token registry (`knowledge/personal/connections/chronos-access.json`) so a surface can resolve a bearer/cookie viewer token (TR-01). | It grants no other personal-tier read and no role write grant (persona `worker`, so only worker / `default_allow` write paths remain); it does not imply viewer, operator or admin authority. |
 | `surface_runtime` | `worker` | Reconciliation and supervision of managed runtime surfaces. | It does not imply Slack transport or channel ingress. |
 | `infrastructure_sentinel` | `worker` | Coordination and observability for infrastructure-backed surfaces. | It does not imply mission lifecycle control. |
 | `service_actuator` | not auto-inferred | Service integration helper for connection documents and auth-grant aware reads. | It does not imply a persona default or broad write permissions. |
@@ -133,3 +137,5 @@ When designing a new workflow:
 2. Pick the smallest role that owns that surface.
 3. Add a second role only if the workflow really crosses a second surface boundary.
 4. If you need both read and write, verify the write scope explicitly instead of assuming the role implies it.
+
+<!-- prettier-ignore-end -->

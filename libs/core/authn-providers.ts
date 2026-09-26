@@ -34,6 +34,7 @@ import {
 
 import { agentActor, humanActor, parseActorRef, serviceActor } from './actor.js';
 import {
+  CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   findChronosTokenRegistration,
   matchesChronosToken,
   readChronosTokenRegistrations,
@@ -275,7 +276,10 @@ const envTokenProvider: AuthnProvider = {
 
 function loadRegistrations(deps?: AuthnResolveDeps) {
   if (deps?.registrations !== undefined) return deps.registrations;
-  return withExecutionContext('sovereign_concierge', () => readChronosTokenRegistrations());
+  // TR-01: least privilege — the reader role's only grant is chronos-access.json.
+  return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+    readChronosTokenRegistrations()
+  );
 }
 
 const registryTokenProvider: AuthnProvider = {

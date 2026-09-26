@@ -4,7 +4,9 @@ import {
   extractSurfaceBearerToken,
   resolveSurfaceViewerToken,
 } from '@agent/core/surface-mutation-guard';
+import { withExecutionContext } from '@agent/core/authority';
 import {
+  CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   findChronosTokenRegistration,
   readChronosTokenRegistrations,
   type ChronosAccessRole,
@@ -35,7 +37,12 @@ export { matchesChronosToken } from '@agent/core/chronos-access-registry';
 
 function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
   try {
-    return readChronosTokenRegistrations() || [];
+    // TR-01: read under the narrow registry reader role (see viewer-context.ts).
+    return (
+      withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+        readChronosTokenRegistrations()
+      ) || []
+    );
   } catch {
     return [];
   }
