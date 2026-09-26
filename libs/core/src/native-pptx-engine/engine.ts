@@ -797,70 +797,203 @@ function unescapeXml(str: string): string {
     .replace(/&amp;/g, '&');
 }
 
+function xmlBlocks(xml: string, tag: string): string[] {
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  const blocks: string[] = [];
+  let cursor = 0;
+  while (cursor < xml.length) {
+    const start = xml.indexOf(open, cursor);
+    if (start < 0) break;
+    const boundary = xml[start + open.length];
+    if (boundary !== '>' && !/\s/u.test(boundary ?? '')) {
+      cursor = start + open.length;
+      continue;
+    }
+    const openEnd = xml.indexOf('>', start + open.length);
+    if (openEnd < 0) break;
+    const closeStart = xml.indexOf(close, openEnd + 1);
+    if (closeStart < 0) break;
+    const closeEnd = closeStart + close.length;
+    blocks.push(xml.slice(start, closeEnd));
+    cursor = closeEnd;
+  }
+  return blocks;
+}
+
+function xmlBlockText(block: string, tag: string): string {
+  const openEnd = block.indexOf('>');
+  const closeStart = block.lastIndexOf(`</${tag}>`);
+  return openEnd >= 0 && closeStart > openEnd
+    ? unescapeXml(block.slice(openEnd + 1, closeStart))
+    : '';
+}
+
+function textNodes(xml: string): string[] {
+  return xmlBlocks(xml, 'a:t').map((block) => xmlBlockText(block, 'a:t'));
+}
+
+/** Paragraph texts of a text body, one entry per non-empty <a:p>. */
+function paragraphTexts(xml: string): string[] {
+  return xmlBlocks(xml, 'a:p')
+    .map((paragraph) => textNodes(paragraph).join(''))
+    .filter((text) => text.trim());
+}
+
 /**
- * Extract concatenated text per shape from raw slide XML.
- * Groups <a:t> text by their parent <p:sp>/<p:grpSp> shape,
- * returning one string per text-bearing shape (matching extractObjects order).
+ * Extract text per shape from raw slide XML.
+ * Groups <a:t> text by their parent <p:sp> shape, returning one string per
+ * text-bearing shape (matching extractObjects order). Paragraphs inside a
+ * shape are separated by newlines so bullet lists and agendas stay readable.
  */
 function extractTextFromSlideXml(xml: string): string[] {
   const results: string[] = [];
-  // Match each shape's <p:txBody> and concatenate its <a:t> nodes
   const shapes = xml.match(/<p:sp[ >][\s\S]*?<\/p:sp>/g) || [];
   for (const shape of shapes) {
     const txBody = shape.match(/<p:txBody>[\s\S]*?<\/p:txBody>/);
     if (!txBody) continue;
-    const textParts = txBody[0].match(/<a:t>([^<]*)<\/a:t>/g);
-    if (!textParts || textParts.length === 0) continue;
-    const combined = textParts.map((t) => unescapeXml(t.replace(/<\/?a:t>/g, ''))).join('');
+    const combined = paragraphTexts(txBody[0]).join('\n');
     if (combined.trim()) results.push(combined);
   }
   return results;
 }
 
+/** Tables (<a:tbl> inside graphic frames) as rows of cell text. */
+function extractTablesFromSlideXml(xml: string): string[][][] {
+  return (xml.match(/<a:tbl>[\s\S]*?<\/a:tbl>/g) || [])
+    .map((table) =>
+      (table.match(/<a:tr[ >][\s\S]*?<\/a:tr>/g) || []).map((row) =>
+        (row.match(/<a:tc[ >][\s\S]*?<\/a:tc>|<a:tc\/>/g) || []).map((cell) =>
+          paragraphTexts(cell).join('\n')
+        )
+      )
+    )
+    .filter((rows) => rows.some((row) => row.some((cell) => cell.trim())));
+}
+
+function relationshipTargets(zip: AdmZip, relsEntryName: string): Map<string, string> {
+  const targets = new Map<string, string>();
+  const rels = zip.getEntry(relsEntryName)?.getData().toString('utf8') || '';
+  for (const tag of rels.match(/<Relationship\b[^>]*>/g) || []) {
+    const id = tag.match(/\bId="([^"]+)"/)?.[1];
+    const target = tag.match(/\bTarget="([^"]+)"/)?.[1];
+    if (id && target) targets.set(id, target);
+  }
+  return targets;
+}
+
+/** Resolve a relationship target relative to the part that owns it. */
+function resolvePartTarget(ownerEntryName: string, target: string): string {
+  if (target.startsWith('/')) return target.slice(1);
+  return path.posix.normalize(path.posix.join(path.posix.dirname(ownerEntryName), target));
+}
+
+/** Slide entry names in presentation order (ppt/presentation.xml sldIdLst). */
+function presentationSlideOrder(zip: AdmZip): string[] {
+  const presentation = zip.getEntry('ppt/presentation.xml')?.getData().toString('utf8') || '';
+  const targets = relationshipTargets(zip, 'ppt/_rels/presentation.xml.rels');
+  return Array.from(presentation.matchAll(/<p:sldId\b[^>]*\br:id="([^"]+)"/g))
+    .map((match) => targets.get(match[1]))
+    .filter((target): target is string => Boolean(target))
+    .map((target) => resolvePartTarget('ppt/presentation.xml', target));
+}
+
+function slideNotesText(zip: AdmZip, slideEntryName: string): string {
+  const relsName = `ppt/slides/_rels/${path.posix.basename(slideEntryName)}.rels`;
+  const rels = zip.getEntry(relsName)?.getData().toString('utf8') || '';
+  const notesTag = (rels.match(/<Relationship\b[^>]*>/g) || []).find((tag) =>
+    /\/notesSlide"/.test(tag)
+  );
+  const target = notesTag?.match(/\bTarget="([^"]+)"/)?.[1];
+  if (!target) return '';
+  const notesXml = zip
+    .getEntry(resolvePartTarget(slideEntryName, target))
+    ?.getData()
+    .toString('utf8');
+  if (!notesXml) return '';
+  // Only the body placeholder carries the speaker notes; the slide-image and
+  // slide-number placeholders are skipped.
+  const bodyShapes = (notesXml.match(/<p:sp[ >][\s\S]*?<\/p:sp>/g) || []).filter((shape) =>
+    /<p:ph\b[^>]*\btype="body"/.test(shape)
+  );
+  return bodyShapes
+    .flatMap((shape) => paragraphTexts(shape))
+    .join('\n')
+    .trim();
+}
+
+/** Image parts referenced by the slide's pictures (r:embed), in document order. */
+function slideImageParts(zip: AdmZip, slideEntryName: string, slideXml: string): string[] {
+  const targets = relationshipTargets(
+    zip,
+    `ppt/slides/_rels/${path.posix.basename(slideEntryName)}.rels`
+  );
+  const parts = Array.from(slideXml.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g))
+    .map((match) => targets.get(match[1]))
+    .filter((target): target is string => Boolean(target) && !/^https?:/i.test(target!))
+    .map((target) => resolvePartTarget(slideEntryName, target));
+  return Array.from(new Set(parts));
+}
+
 export interface ExtractedSlide {
   slide_index: number; // 1-based, matches slide file name
   entry_name: string; // e.g., "ppt/slides/slide4.xml"
+  position: number; // 1-based position in presentation order
+  hidden: boolean; // <p:sld show="0">
   text_runs: string[]; // every <a:t> text node in document order
-  shapes_text: string[]; // one concatenated string per text-bearing shape
-  concatenated: string; // all text joined with newlines
+  shapes_text: string[]; // one string per text-bearing shape, paragraphs newline-separated
+  tables: string[][][]; // tables as rows of cell text
+  notes_text: string; // speaker notes
+  image_parts: string[]; // package part names of images placed on the slide (e.g. "ppt/media/image4.emf")
+  concatenated: string; // shape text and table rows joined with newlines
 }
 
 /**
  * Read a PPTX and return per-slide text data. Read-only.
- * Slide ordering follows the slide{N}.xml numeric suffix.
+ * Slides are returned in presentation order (ppt/presentation.xml); slides
+ * the presentation does not list follow in slide{N}.xml numeric order.
+ * `slide_index` keeps naming the slide file, `position` is the deck order.
+ * Accepts a file path or the raw PPTX bytes.
  */
-export function extractPptxSlides(sourcePath: string): ExtractedSlide[] {
-  if (!safeExistsSync(sourcePath)) {
-    throw new Error(`extractPptxSlides: source file does not exist: ${sourcePath}`);
+export function extractPptxSlides(source: string | Buffer): ExtractedSlide[] {
+  if (typeof source === 'string' && !safeExistsSync(source)) {
+    throw new Error(`extractPptxSlides: source file does not exist: ${source}`);
   }
-  const zip = new AdmZip(sourcePath);
+  const zip = new AdmZip(source);
+  const fileNumber = (entryName: string) =>
+    parseInt(entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
   const slideEntries = zip
     .getEntries()
     .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'))
-    .sort((a, b) => {
-      const aNum = parseInt(a.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
-      const bNum = parseInt(b.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
-      return aNum - bNum;
-    });
+    .sort((a, b) => fileNumber(a.entryName) - fileNumber(b.entryName));
+  const order = presentationSlideOrder(zip);
+  const rank = (entryName: string) => {
+    const index = order.indexOf(entryName);
+    return index === -1 ? order.length + fileNumber(entryName) : index;
+  };
+  slideEntries.sort((a, b) => rank(a.entryName) - rank(b.entryName));
 
   const results: ExtractedSlide[] = [];
   for (const entry of slideEntries) {
     const xml = entry.getData().toString('utf8');
-    const idxMatch = entry.entryName.match(/slide(\d+)\.xml$/);
-    const slideIndex = idxMatch ? parseInt(idxMatch[1], 10) : results.length + 1;
-
-    const runs = (xml.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((t) =>
-      unescapeXml(t.replace(/<\/?a:t>/g, ''))
-    );
+    const slideIndex = fileNumber(entry.entryName) || results.length + 1;
     const shapesText = extractTextFromSlideXml(xml);
-    const concatenated = shapesText.join('\n');
+    const tables = extractTablesFromSlideXml(xml);
+    const tableLines = tables.flatMap((rows) =>
+      rows.map((row) => row.map((cell) => cell.replace(/\n/g, ' ')).join('\t'))
+    );
 
     results.push({
       slide_index: slideIndex,
       entry_name: entry.entryName,
-      text_runs: runs,
+      position: results.length + 1,
+      hidden: /<p:sld\b[^>]*\bshow="(?:0|false)"/.test(xml),
+      text_runs: textNodes(xml),
       shapes_text: shapesText,
-      concatenated,
+      tables,
+      notes_text: slideNotesText(zip, entry.entryName),
+      image_parts: slideImageParts(zip, entry.entryName, xml),
+      concatenated: [...shapesText, ...tableLines].join('\n'),
     });
   }
   return results;
@@ -928,7 +1061,6 @@ export function filterPptxSlides(
     oldRelsEntry: `ppt/slides/_rels/slide${oldIdx}.xml.rels`,
     newRelsEntry: `ppt/slides/_rels/slide${i + 1}.xml.rels`,
   }));
-
 
   // Snapshot of content we must carry forward, then delete all slide artifacts
   // from the zip before re-inserting with new numbering. We cannot do in-place

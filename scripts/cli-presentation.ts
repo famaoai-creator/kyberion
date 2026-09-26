@@ -24,7 +24,6 @@ export async function withPresentationOutputPrinter<T>(
     activePrint = previousPrint;
   }
 }
-
 function printText(value: unknown = ''): void {
   const rendered = typeof value === 'string' ? value : String(value);
   activePrint(rendered.endsWith('\n') ? rendered.slice(0, -1) : rendered);
@@ -69,6 +68,12 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText(t('cli_help_mobile_profiles', locale));
   printText(t('cli_help_web_profiles', locale));
   printText(t('cli_help_run', locale));
+  printText(t('cli_help_read', locale));
+  printText(t('cli_help_write', locale));
+  printText(t('cli_help_see', locale));
+  printText(t('cli_help_listen', locale));
+  printText(t('cli_help_speak', locale));
+  printText(t('cli_help_watch', locale));
   printText('');
   printText(t('cli_help_sec_pipelines', locale));
   printText(t('cli_help_preview', locale));

@@ -76,6 +76,8 @@ export interface OrganizationOperationalState {
   tier: OrganizationTier;
   tenant_slug?: string;
   status: 'draft' | 'active' | 'paused' | 'archived';
+  /** Parent organization in the same tier and tenant; subsidiaries share the parent's tenant. */
+  parent_organization_id?: string;
   purpose_ref?: string;
   active_project_ids?: string[];
   active_operation_ids?: string[];
@@ -194,6 +196,8 @@ export interface OrganizationOperationRecord {
     event_ref?: string;
     timezone?: string;
   };
+  /** Completion deadline per period, on the Japanese bank business-day calendar. */
+  deadline?: OrganizationOperationDeadline;
   automation_boundary: {
     allowed_actions: string[];
     approval_required_actions: string[];
@@ -211,6 +215,20 @@ export interface OrganizationOperationRecord {
   updated_at: string;
   source_refs?: string[];
   metadata?: Record<string, unknown>;
+}
+
+export interface OrganizationOperationDeadline {
+  kind: 'business_day_of_month';
+  /** 1-based business day of the month, e.g. 2 = second business day. */
+  business_day: number;
+  /** Wall-clock HH:MM in the trigger timezone. */
+  time: string;
+  /**
+   * When this deadline (business_day/time) took effect. Periods whose deadline
+   * passed before it are `untracked`; later unrelated edits do not move it.
+   * Absent on legacy records, which fall back to the operation's updated_at.
+   */
+  deadline_effective_from?: string;
 }
 
 export interface OrganizationOperationState {

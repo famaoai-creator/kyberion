@@ -87,8 +87,15 @@ function ensureRegularAssetLedgerFile(filePath: string): void {
   }
 }
 
-/** Path seam mirroring TenantRegistryPathOptions (hermetic tests pass a fixture rootDir/env). */
-export type IngestLedgerPathOptions = TenantRegistryPathOptions;
+/**
+ * Path seam mirroring TenantRegistryPathOptions (hermetic tests pass a fixture rootDir/env).
+ *
+ * `knowledgeRoot` carries a tenant knowledge root the caller already resolved
+ * through the tenant registry. A narrowly-scoped writer (ingest:commit runs
+ * under the `ingest_commit` role, which cannot read the personal-tier tenant
+ * profiles) passes it so ledger access never re-reads the registry.
+ */
+export type IngestLedgerPathOptions = TenantRegistryPathOptions & { knowledgeRoot?: string };
 
 function assertTenantSlug(slug: string): void {
   if (!isValidTenantSlug(slug) && slug !== COMMON_TENANT_SLUG) {
@@ -126,7 +133,7 @@ export function tenantIngestKnowledgeRoot(
   const knowledgeRoot =
     tenantSlug === COMMON_TENANT_SLUG
       ? `knowledge/confidential/${COMMON_TENANT_SLUG}`
-      : resolveTenant(tenantSlug, options).knowledge_root;
+      : options.knowledgeRoot || resolveTenant(tenantSlug, options).knowledge_root;
   const repositoryRoot = options.rootDir ?? pathResolver.rootDir();
   assertSafeRepositoryPath(path.resolve(repositoryRoot, knowledgeRoot), {
     allowMissingLeaf: true,
@@ -136,9 +143,11 @@ export function tenantIngestKnowledgeRoot(
 
 /** Absolute path of the tenant's assets.jsonl ledger. */
 export function assetLedgerPath(tenantSlug: string, options: IngestLedgerPathOptions = {}): string {
-  const rootDir = assertSafeRepositoryPath(options.rootDir ?? pathResolver.rootDir(), {
-    allowMissingLeaf: true,
-  });
+  // The repository root itself is not a "repository-local resource" (its
+  // relative path is empty), so only a fixture rootDir is validated here.
+  const rootDir = options.rootDir
+    ? assertSafeRepositoryPath(options.rootDir, { allowMissingLeaf: true })
+    : pathResolver.rootDir();
   const knowledgeRoot = tenantIngestKnowledgeRoot(tenantSlug, options);
   return assertSafeRepositoryPath(
     path.join(rootDir, knowledgeRoot, INGEST_LEDGER_DIRNAME, 'assets.jsonl'),

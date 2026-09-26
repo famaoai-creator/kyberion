@@ -40,7 +40,7 @@ describe('kyberion home procedure inspection trust boundary', () => {
     const output: unknown[] = [];
     try {
       await main(['--help'], (value) => output.push(value));
-      expect(output).toHaveLength(59);
+      expect(output).toHaveLength(66);
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
