@@ -892,7 +892,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
     parse_document: {
       summary:
-        'Parse an unstructured document (docx/pdf/xlsx/html/slack_thread/markdown/text) into the unified ingest intermediate representation.',
+        'Parse an unstructured document (docx/pdf/xlsx/pptx/html/slack_thread/markdown/text) into the unified ingest intermediate representation.',
       examples: [
         {
           source_path: 'active/shared/tmp/report.docx',
@@ -912,8 +912,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           format: {
             type: 'string',
-            enum: ['docx', 'pdf', 'xlsx', 'html', 'slack_thread', 'markdown', 'text'],
+            enum: ['docx', 'pdf', 'xlsx', 'pptx', 'html', 'slack_thread', 'markdown', 'text'],
           },
+          ocr: { type: 'boolean' },
           source_path: { type: 'string', minLength: 1 },
           content_base64: { type: 'string', minLength: 1 },
           content_text: { type: 'string' },
@@ -1068,6 +1069,72 @@ const INPUT_CONTRACTS: ContractCatalog = {
           transform_chain: { type: 'array', items: { type: 'string' } },
           visible_to: { type: 'array', items: { type: 'string' } },
           now: { type: 'string' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    // Scheduled meeting-page digest. Generic: the tenant and the job arrive
+    // as params from a tenant-scoped pipeline ADF
+    // (knowledge/confidential/{tenant}/pipelines/), which chronos runs in a
+    // tenant-bound child process. Every landing goes through ingest:commit.
+    meeting_digest: {
+      summary:
+        'Meeting digest for one tenant job: re-check Confluence meeting pages modified within the lookback window, re-summarize pages whose version changed (structured reasoning output over untrusted-framed page content, confidential egress scope; the stub backend is refused), render the fixed digest format, land it via the ingest:commit ceremony (PII gate, untrusted wrap, asset ledger with the job approval id), and upsert the job index README. Pages younger than provisional_hours land as provisional and are finalized later without re-summarizing. dry_run fetches and summarizes without writing.',
+      examples: [
+        {
+          tenant_slug: 'acme-corp',
+          job: {
+            id: 'weekly-sync',
+            source_system: 'confluence',
+            source_params: { domain: 'acme', space_key: 'OPS', parent_page_ids: ['1000'] },
+            title_pattern: 'Weekly OPS MTG',
+            target_dir: 'knowledge/confidential/acme-corp/governance/weekly-sync',
+            title_prefix: 'Weekly sync',
+            tags: ['acme-corp', 'weekly-sync'],
+            ingested_by: 'chronos:meeting-digest',
+            approval: {
+              approval_id: 'APPROVAL-1',
+              approved_by: 'owner',
+              approved_at: '2026-09-24',
+            },
+          },
+          dry_run: true,
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['tenant_slug', 'job'],
+        properties: {
+          tenant_slug: {
+            type: 'string',
+            minLength: 1,
+            not: { enum: ['public', 'confidential', 'personal', 'shared'] },
+          },
+          job: {
+            type: 'object',
+            required: ['id'],
+            properties: {
+              id: { type: 'string', minLength: 1 },
+              enabled: { type: 'boolean' },
+              source_system: { type: 'string', enum: ['confluence'] },
+              source_params: { type: 'object' },
+              title_pattern: { type: 'string' },
+              target_dir: { type: 'string' },
+              title_prefix: { type: 'string' },
+              tags: { type: 'array', items: { type: 'string' } },
+              lookback_days: { type: 'number', minimum: 1 },
+              provisional_hours: { type: 'number', minimum: 0 },
+              ingested_by: { type: 'string' },
+              approval: { type: 'object' },
+              dry_run: { type: 'boolean' },
+            },
+            additionalProperties: true,
+          },
+          dry_run: { type: 'boolean' },
+          lookback_days: { type: 'number', minimum: 1 },
+          now: { type: 'string' },
+          auth: { type: 'string', enum: ['none', 'secret-guard'] },
           export_as: { type: 'string', minLength: 1 },
         },
         additionalProperties: true,

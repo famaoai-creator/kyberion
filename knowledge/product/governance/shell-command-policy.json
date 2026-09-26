@@ -92,6 +92,38 @@
       "id": "base64-decode",
       "command_regex": ["\\bbase64\\s+-d\\b", "\\bbase64\\s+--decode\\b"],
       "reason": "Base64 decode is blocked when used as shell obfuscation."
+    },
+    {
+      "id": "document-hand-extraction",
+      "command_regex": [
+        "\\b(?:unzip|zipinfo|bsdtar|7zz?|7za|ditto)\\b[^\\n|;&]*\\.(?:docx|docm|xlsx|xlsm|pptx|pptm)\\b",
+        "\\b(?:pdftotext|pdftoppm|pdfimages|pdftohtml|pdftocairo)\\b[^\\n|;&]*\\.pdf\\b",
+        "\\bmutool\\s+(?:draw|convert|extract|show)\\b",
+        "\\bpython[0-9.]*\\b[^\\n]*\\b(?:import|from)\\s+(?:docx|openpyxl|pptx|PyPDF2|pypdf|fitz|pymupdf|pdfplumber|pdfminer|xlrd|mammoth)\\b",
+        "\\b(?:textutil|strings)\\b[^\\n|;&]*(?:\\.(?:pdf|docx|docm|xlsx|xlsm|pptx|pptm))\\b",
+        "\\b(?:soffice|libreoffice)\\b[^\\n]*--convert-to\\s+(?:txt|csv|html|md)\\b"
+      ],
+      "reason": "Reading office / PDF files by hand (unzip, pdftotext, python-docx, …) is blocked — use the actuator: `pnpm kyberion read <file> [--ocr]` (Markdown on stdout, `--json` for structure), or `pnpm ingest --tenant <slug> --file <file> [--ocr]` to land tenant knowledge. Copy external files into active/shared/tmp/<job>/ first. See knowledge/product/orchestration/document-file-reading-playbook.md."
+    },
+    {
+      "id": "media-hand-perception",
+      "command_regex": [
+        "(?:^|[;&|(]\\s*)tesseract\\s",
+        "(?:^|[;&|(]\\s*)(?:whisper|whisper-cli|whisper-cpp|mlx_whisper|faster-whisper|insanely-fast-whisper)\\s",
+        "\\bwhisperkit-cli\\s+transcribe\\b",
+        "\\bpython[0-9.]*\\b[^\\n]*\\b(?:import|from)\\s+(?:pytesseract|easyocr|paddleocr|whisper|faster_whisper|mlx_whisper|speech_recognition|cv2|moviepy|librosa)\\b",
+        "\\bffmpeg\\b[^\\n|;&]*%0?[0-9]*d\\.(?:png|jpe?g|webp|bmp)\\b"
+      ],
+      "reason": "Perceiving media by hand (tesseract, whisper, ffmpeg frame dumps, pytesseract / cv2 scripts, …) is blocked — use the perception commands: `pnpm kyberion see <image>` (local OCR, `--describe`), `pnpm kyberion listen <audio>` (speech-to-text, `--timestamps`), `pnpm kyberion watch <video>` (keyframe OCR + transcript), `pnpm kyberion read <file>` (pdf/office/html/md). Copy external files into active/shared/tmp/<job>/ first. See knowledge/product/orchestration/perception-playbook.md."
+    },
+    {
+      "id": "gui-hand-automation",
+      "command_regex": [
+        "(?:^|[;&|(]\\s*)(?:osascript|cliclick|xdotool|screencapture|say)\\s",
+        "\\bpython[0-9.]*\\b[^\\n]*\\b(?:import|from)\\s+(?:pyautogui|pynput|playwright|Quartz|AppKit|pyobjc)\\b",
+        "\\bnode\\b[^\\n]*\\s-(?:e|-eval)\\b[^\\n]*\\bplaywright\\b"
+      ],
+      "reason": "Automating the GUI or speaking by hand (osascript, cliclick, xdotool, screencapture, say, pyautogui / pynput, ad-hoc Playwright) is blocked — the governed executors apply redaction and approval: web page → browser-actuator (`pnpm kyberion browser run`), desktop app / OS → system-actuator `computer_interaction`, screen capture → `system:screenshot`, speech → `pnpm kyberion speak <text> [--out <file>]`. See knowledge/product/orchestration/action-playbook.md."
     }
   ]
 }

@@ -60,6 +60,10 @@
     },
     "_meta_tenant_providers": {
       "type": "string"
+    },
+    "_meta_rationale": {
+      "type": "string",
+      "description": "Why the approvals in this file were granted (e.g. the contracted plan and its training terms). Used by tenant egress overlays."
     }
   },
   "required": []

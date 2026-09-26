@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, presence, layer]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-09-25
 ---
 
 # Presence Layer: Sensors, Displays, and Intervention
@@ -89,22 +89,16 @@ Chronos Mirror v2 may hold a cached runtime handle for UX efficiency, but it sho
 
 Provides the Agent with the ability to capture and interpret the physical state of the workspace.
 
-### 5.1. Modular Driver Architecture
+- **Capture**: `system:screenshot` / `system:record_screen` (system-actuator, through
+  `ScreenCaptureBridge` with screen-frame redaction) are canonical. The
+  `media-generation` / `vision` capture ops are compatibility forwarders to them.
+  Page captures use `browser:screenshot`; devices use `android:capture_screen` /
+  `ios:capture_screen`.
+- **Interpretation**: `pnpm kyberion see <image>` / `watch <video>` (local OCR) —
+  see `orchestration/perception-playbook.md`.
 
-Visual sensing uses a **Driver Strategy Pattern** for cross-platform support:
-
-- **Orchestrator (`presence/sensors/visual-sensor.js`)**: Detects OS and delegates to drivers.
-- **Drivers**:
-  - `macos-driver.js`: Uses native `screencapture`.
-  - _Linux/Windows drivers planned._
-
-### 5.2. CLI Usage
-
-Manual capture trigger:
-
-```bash
-pnpm kyberion system visual-capture [screen|window]
-```
+The former `presence/sensors/visual-sensor.js` driver and the
+`pnpm kyberion system visual-capture` command no longer exist.
 
 ## 6. 🛡️ Service Management & Watchdog
 

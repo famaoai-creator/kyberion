@@ -112,7 +112,7 @@
       "d": "DA-03/DA-04/DA-05 ingest pipeline: unstructured internal documents (docx/pdf/xlsx/html/slack threads) into governed knowledge cards — incremental sync_source change-listing (watermark store), parse/normalize/dedup capture-transforms, plus the explicit ingest:commit ceremony (Hybrid Sovereign Ledger asset records, supersede, staleness detection)",
       "s": "implemented",
       "version": "1.2.0",
-      "capability_count": 6
+      "capability_count": 7
     },
     {
       "n": "ios-actuator",
@@ -125,7 +125,7 @@
     {
       "n": "media-actuator",
       "path": "libs/actuators/media-actuator",
-      "d": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
+      "d": "Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows.",
       "s": "implemented",
       "version": "1.2.0",
       "capability_count": 1

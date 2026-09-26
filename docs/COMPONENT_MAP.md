@@ -333,11 +333,11 @@ The authoritative architecture reference is:
 
 ## Knowledge tiers
 
-| Tier         | Path                                | Purpose                                                                                                                    |
-| ------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Personal     | `knowledge/personal/`               | Identity, private preferences, private missions, tenant profiles (`tenants/`)                                              |
-| Confidential | `knowledge/confidential/`           | Sensitive organizational knowledge, scoped per tenant: `{tenant-slug}/` roots, `tenant-groups/` shared prefixes, `common/` |
-| Public       | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge                                                                      |
+| Tier         | Path                                | Purpose                                                                                                                                                                                                  |
+| ------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Personal     | `knowledge/personal/`               | Identity, private preferences, private missions, tenant profiles (`tenants/`)                                                                                                                            |
+| Confidential | `knowledge/confidential/`           | Sensitive organizational knowledge, scoped per tenant: `{tenant-slug}/` roots; tenant-group shares under `shared/{group}/` (members listed in `tenant-groups/{group}.json`); `common/` is sovereign-only |
+| Public       | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge                                                                                                                                                    |
 
 The charter assumes strict isolation between these tiers. Within the confidential tier, tenant scope is a second isolation axis: cross-tenant access is deny-unless-brokered and audited (`knowledge/product/architecture/multi-tenant-operations.md`). Organization operating-model state follows the same tiers under `active/organizations/{tier}/{tenant}/{organization}/state/`.
 

@@ -6130,7 +6130,10 @@
             "properties": {
               "format": {
                 "type": "string",
-                "enum": ["docx", "pdf", "xlsx", "html", "slack_thread", "markdown", "text"]
+                "enum": ["docx", "pdf", "xlsx", "pptx", "html", "slack_thread", "markdown", "text"]
+              },
+              "ocr": {
+                "type": "boolean"
               },
               "source_path": {
                 "type": "string",
@@ -6560,6 +6563,121 @@
               },
               "ingested_by": "ecosystem_architect",
               "transform_chain": ["parse_document:docx", "normalize_card"]
+            }
+          ]
+        },
+        {
+          "op": "meeting_digest",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["tenant_slug", "job"],
+            "properties": {
+              "tenant_slug": {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "enum": ["public", "confidential", "personal", "shared"]
+                }
+              },
+              "job": {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "source_system": {
+                    "type": "string",
+                    "enum": ["confluence"]
+                  },
+                  "source_params": {
+                    "type": "object"
+                  },
+                  "title_pattern": {
+                    "type": "string"
+                  },
+                  "target_dir": {
+                    "type": "string"
+                  },
+                  "title_prefix": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "lookback_days": {
+                    "type": "number",
+                    "minimum": 1
+                  },
+                  "provisional_hours": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "ingested_by": {
+                    "type": "string"
+                  },
+                  "approval": {
+                    "type": "object"
+                  },
+                  "dry_run": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
+              "lookback_days": {
+                "type": "number",
+                "minimum": 1
+              },
+              "now": {
+                "type": "string"
+              },
+              "auth": {
+                "type": "string",
+                "enum": ["none", "secret-guard"]
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true,
+            "x-kyberion-contract": "inferred-legacy"
+          },
+          "examples": [
+            {
+              "tenant_slug": "acme-corp",
+              "job": {
+                "id": "weekly-sync",
+                "source_system": "confluence",
+                "source_params": {
+                  "domain": "acme",
+                  "space_key": "OPS",
+                  "parent_page_ids": ["1000"]
+                },
+                "title_pattern": "Weekly OPS MTG",
+                "target_dir": "knowledge/confidential/acme-corp/governance/weekly-sync",
+                "title_prefix": "Weekly sync",
+                "tags": ["acme-corp", "weekly-sync"],
+                "ingested_by": "chronos:meeting-digest",
+                "approval": {
+                  "approval_id": "APPROVAL-1",
+                  "approved_by": "owner",
+                  "approved_at": "2026-09-24"
+                }
+              },
+              "dry_run": true
             }
           ]
         }
