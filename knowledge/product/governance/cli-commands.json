@@ -747,6 +747,14 @@
       "audience": "dev"
     },
     {
+      "id": "script.check.plugin-views-e2e",
+      "module": "scripts/check_plugin_views_e2e.ts",
+      "command": "check plugin-views-e2e",
+      "noun": "check",
+      "verb": "plugin-views-e2e",
+      "audience": "dev"
+    },
+    {
       "id": "script.service.recording",
       "module": "scripts/service_recording.ts",
       "command": "service recording",
