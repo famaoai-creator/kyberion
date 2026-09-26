@@ -1,5 +1,6 @@
 import { auditChain } from './audit-chain.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { executionPersonaText } from './foundation/execution-scope.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
 import { consumeTenantBudget, TenantRateLimitExceededError } from './tenant-rate-limiter.js';
@@ -31,7 +32,7 @@ export function assertOperationPolicy(input: {
   message?: string;
   context?: Record<string, unknown>;
 }): PolicyDecision {
-  const agentId = getRegisteredEnvText('KYBERION_PERSONA') || 'unknown';
+  const agentId = executionPersonaText() || 'unknown';
   const ring = Number(getRegisteredEnvText('KYBERION_AGENT_RING'));
   const decision = policyEngine.evaluate({
     agentId,

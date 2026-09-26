@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { getRegisteredEnvText } from './env.js';
 
 /**
  * RA-01: the in-process execution scope set by `withExecutionContext` /
@@ -61,4 +62,16 @@ export function scopedPersona(): { bound: boolean; persona?: string } {
   return scope.assumedPersona === null
     ? { bound: true }
     : { bound: true, persona: scope.assumedPersona };
+}
+
+/**
+ * The persona of the current execution (B2): the persona bound by the
+ * innermost withExecutionContext* when it decided one, else
+ * `KYBERION_PERSONA`. Authorization inputs (policy-engine agentId, persona
+ * gates) must use this rather than the raw env var, which the async helper
+ * never mirrors and which is shared by every async context in the process.
+ */
+export function executionPersonaText(): string | undefined {
+  const scoped = scopedPersona();
+  return scoped.bound ? scoped.persona : getRegisteredEnvText('KYBERION_PERSONA');
 }
