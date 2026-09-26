@@ -3282,6 +3282,10 @@
     "./plugin-view-contract": {
       "types": "./dist/plugin-view-contract.d.ts",
       "default": "./dist/plugin-view-contract.js"
+    },
+    "./plugin-view-actions": {
+      "types": "./dist/plugin-view-actions.d.ts",
+      "default": "./dist/plugin-view-actions.js"
     }
   },
   "dependencies": {
