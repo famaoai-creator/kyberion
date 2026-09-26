@@ -225,6 +225,17 @@ describe('OsAccessibilityDetector', () => {
     });
   });
 
+  it('is unavailable on a secondary display without an explicit scale', async () => {
+    const { run, calls } = fakeRunner();
+    const detector = new OsAccessibilityDetector({ run, platform: 'darwin' });
+    const secondary = { ...live, screen_origin: { x: 1920, y: 0 } };
+    expect(await detector.isAvailable(secondary)).toBe(false);
+    expect(await detector.detect(secondary)).toEqual([]);
+    expect(calls).toHaveLength(0);
+    expect(await detector.isAvailable({ ...secondary, screen_scale: 2 })).toBe(true);
+    expect(await detector.isAvailable({ ...live, screen_origin: { x: 0, y: 0 } })).toBe(true);
+  });
+
   it('fails with a coded error when enumeration fails', async () => {
     const { run } = fakeRunner({ enumerateStatus: 1 });
     await expect(
