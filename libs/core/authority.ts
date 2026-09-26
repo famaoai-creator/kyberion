@@ -405,6 +405,8 @@ export function buildExecutionEnv(
 }
 
 interface PreparedExecutionContext {
+  /** The role normalized once, so the scope, the env mirror and children agree. */
+  role: string;
   scope: ExecutionScope;
   resolvedPersona: Persona;
 }
@@ -414,8 +416,9 @@ function prepareExecutionContext(
   persona: Persona | undefined,
   tenantSlug: string | undefined
 ): PreparedExecutionContext {
-  assertRoleAssumptionAllowed(role);
-  const resolvedPersona = persona || inferPersonaFromRole(role);
+  const normalizedRole = normalizeRoleName(role.trim());
+  assertRoleAssumptionAllowed(normalizedRole);
+  const resolvedPersona = persona || inferPersonaFromRole(normalizedRole);
   // Mirror the env semantics below: a known persona is bound, an unknown one
   // with no explicit persona clears it, an explicit unknown keeps the outer one.
   const assumedPersona: string | null | undefined =
@@ -425,11 +428,12 @@ function prepareExecutionContext(
         ? null
         : currentExecutionScope()?.assumedPersona;
   return {
+    role: normalizedRole,
     resolvedPersona,
     scope: {
       tenantBound: tenantSlug !== undefined,
       ...(tenantSlug ? { tenantSlug } : {}),
-      assumedRole: role,
+      assumedRole: normalizedRole,
       assumedPersona,
     },
   };
@@ -466,7 +470,7 @@ export function withExecutionContext<T>(
   const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  applyExecutionEnv(role, persona, prepared.resolvedPersona);
+  applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
     return executionScopeStorage.run(prepared.scope, fn);
   } finally {
@@ -491,7 +495,7 @@ export async function withExecutionContextAsync<T>(
   const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  applyExecutionEnv(role, persona, prepared.resolvedPersona);
+  applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
     return await executionScopeStorage.run(prepared.scope, fn);
   } finally {
