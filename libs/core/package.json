@@ -1503,6 +1503,10 @@
       "types": "./dist/tool-runtime-registry.d.ts",
       "default": "./dist/tool-runtime-registry.js"
     },
+    "./provider-managed-env": {
+      "types": "./dist/provider-managed-env.d.ts",
+      "default": "./dist/provider-managed-env.js"
+    },
     "./tool-binary-resolvers": {
       "types": "./dist/tool-binary-resolvers.d.ts",
       "default": "./dist/tool-binary-resolvers.js"
