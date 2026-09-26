@@ -24,23 +24,44 @@ dispatches.
 
 - A `VideoBrief` holds metadata, chapters, a transcript, keyframes, a
   thumbnail and optional audio. The transcript comes from manual subtitles,
-  then auto subtitles (rolling caption lines are deduplicated), then a
+  then auto subtitles (rolling caption lines are deduplicated only for auto
+  captions; manual subtitles keep genuine repeats), then a
   speech-to-text bridge that declares segment timestamps.
 - Remote hosts must be in `knowledge/product/governance/video-ingest-policy.json`
   `allowed_hosts`, and the URL is also checked against the egress policy.
   `require_approval_for_remote` (default true) sends every uncached remote
   fetch through the risky-op approval gate (`vision:fetch_video`). If the
   caller passes no `approval` context, or approval is still pending, the op
-  returns `status: approval_required` instead of failing. Other failures throw
+  returns `status: approval_required` instead of failing. Only `agent_id` is
+  taken from the op params: the correlation id is always
+  `video-ingest:<content key>`, the channel is `system`, and the gate's
+  `human_only` request is bound to `vision:fetch_video` and the payload hash of
+  `{url, format, max_bytes, max_duration_sec}`, so an approval for one URL can
+  never authorize another. Live/upcoming streams (`LIVE_STREAM`) and remote
+  videos without a known duration (`DURATION_UNKNOWN`) are refused before any
+  download. The metadata probe uses the same `-f` selector as the download, so
+  the size check matches the actual selection. Other failures throw
   `[VIDEO_<CODE>]`. For example, `[VIDEO_EXTRACTOR_OUTDATED]` includes a
   remediation to bump and reinstall yt-dlp. The actuator never updates yt-dlp
   itself.
-- Cache: content key = sha256(normalized URL + format) or sha256(file bytes).
+- Cache: content key = sha256(normalized URL + format) or sha256(file bytes,
+  hashed in fixed-size chunks).
   The cache goes to the mission when `mission_id` is given, else the tenant's
   volatile area when `tenant_slug` is given, else
   `active/shared/cache/video-ingest/` (public). A local file is never cached in
-  a lower tier than its input (`TIER_DOWNGRADE`). A cache hit runs no external
-  command.
+  a lower tier than its input (`TIER_DOWNGRADE`), and a local file owned by a
+  tenant (`knowledge/confidential/{slug}/`, `active/projects/{tier}/{slug}/`, a
+  tenant-scoped mission dir, or a mission whose state records a tenant) is only
+  cached under that same tenant (`TENANT_MISMATCH`). A cache hit runs no
+  external command.
+- Download: yt-dlp writes into the cache entry with `-P <entry> -o
+'source.%(ext)s'`, `--ffmpeg-location` from the resolver and
+  `--match-filter '!is_live'`. The merged `source.<ext>` is used; if only split
+  streams (`source.f<id>.<ext>`) remain the fetch fails.
+- Retention: a failed or oversize download removes its partial media from the
+  cache entry. After derivation the downloaded source media is deleted (derived
+  audio, frames, subtitles and the brief stay) unless `keep_source: true`. A
+  local input file is never deleted.
 - External binaries (`yt-dlp`, `ffmpeg`, `ffprobe`) resolve through
   `libs/core/tool-binary-resolvers.ts` (`KYBERION_YTDLP_BIN`,
   `KYBERION_FFMPEG_BIN`, `KYBERION_FFPROBE_BIN`, then the managed binary, then
@@ -50,8 +71,9 @@ dispatches.
 
 `knowledge/product/governance/tool-runtimes/yt_dlp.json` pins a managed
 `yt-dlp` binary for each platform. **The sha256 values are placeholders (all
-zeros)**, so a managed install fails closed: `scripts/tool_runtime_setup.ts`
-refuses an all-zero checksum before any download. To enable managed installs,
+zeros)**, so the managed install never downloads: `scripts/tool_runtime_setup.ts`
+skips the managed binary with a warning and falls back to the brew/winget
+`install_backend`. To enable managed installs,
 copy the real digests from the release's `SHA2-256SUMS` into the registry. Until
 then, use `KYBERION_YTDLP_BIN`, the brew/winget backends, or a system `yt-dlp`.
 yt-dlp is Unlicense. The caller is responsible for complying with the source

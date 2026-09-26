@@ -52,12 +52,12 @@ describe('tool_runtime_setup managed_binary pin', () => {
     }
   );
 
-  it('fails closed on an all-zero pin before any download', async () => {
+  it('skips an all-zero pin without downloading so the install_backend fallback runs', async () => {
     mocks.resolveManagedBinaryArtifact.mockReturnValue({
       url: 'https://example.invalid/tool',
       sha256: '0'.repeat(64),
     });
-    await expect(installManagedBinary('yt_dlp')).rejects.toThrow('is not pinned');
+    await expect(installManagedBinary('yt_dlp')).resolves.toBeNull();
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 });

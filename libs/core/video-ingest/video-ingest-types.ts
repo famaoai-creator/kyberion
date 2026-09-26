@@ -92,9 +92,12 @@ export type VideoIngestFailureCode =
   | 'HOST_NOT_ALLOWED'
   | 'EGRESS_DENIED'
   | 'DURATION_EXCEEDED'
+  | 'DURATION_UNKNOWN'
+  | 'LIVE_STREAM'
   | 'SIZE_EXCEEDED'
   | 'EXTRACTOR_OUTDATED'
   | 'TIER_DOWNGRADE'
+  | 'TENANT_MISMATCH'
   | 'TOOL_FAILED';
 
 export type VideoIngestOutcome =

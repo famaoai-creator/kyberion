@@ -9,6 +9,7 @@ import {
   safeExistsSync,
   safeReadFile,
   safeReaddir,
+  safeRmSync,
   safeStat,
 } from '../secure-io.js';
 import type {
@@ -100,13 +101,56 @@ export function assertLocalVideoWithinLimits(filePath: string, maxBytes: number)
   return stat.size;
 }
 
-export function fileContentKey(filePath: string, maxBytes: number): string {
-  assertLocalVideoWithinLimits(filePath, maxBytes);
-  const data = safeReadFile(filePath, {
-    encoding: null,
-    maxSizeMB: Math.ceil(maxBytes / (1024 * 1024)),
-  }) as Buffer;
-  return sha256Hex(data);
+/** Reads `length` bytes at `position`; may return fewer at end of file. */
+export type VideoFileRangeReader = (filePath: string, position: number, length: number) => Buffer;
+
+export const VIDEO_HASH_CHUNK_BYTES = 8 * 1024 * 1024;
+
+/** sha256 over fixed-size chunks so a large local video is never held in memory at once. */
+export function sha256FileChunked(
+  filePath: string,
+  size: number,
+  readRange: VideoFileRangeReader,
+  chunkBytes: number = VIDEO_HASH_CHUNK_BYTES
+): string {
+  const hash = createHash('sha256');
+  let position = 0;
+  while (position < size) {
+    const chunk = readRange(filePath, position, Math.min(chunkBytes, size - position));
+    if (chunk.length === 0) break;
+    hash.update(chunk);
+    position += chunk.length;
+  }
+  if (position !== size) {
+    throw new VideoIngestError('TOOL_FAILED', `${filePath} changed while hashing`);
+  }
+  return hash.digest('hex');
+}
+
+/** Whole-file fallback reader used until a governed range read is available. */
+const wholeFileRangeReader = (maxBytes: number): VideoFileRangeReader => {
+  let cached: { path: string; data: Buffer } | null = null;
+  return (filePath, position, length) => {
+    if (!cached || cached.path !== filePath) {
+      cached = {
+        path: filePath,
+        data: safeReadFile(filePath, {
+          encoding: null,
+          maxSizeMB: Math.ceil(maxBytes / (1024 * 1024)),
+        }) as Buffer,
+      };
+    }
+    return cached.data.subarray(position, position + length);
+  };
+};
+
+export function fileContentKey(
+  filePath: string,
+  maxBytes: number,
+  readRange?: VideoFileRangeReader
+): string {
+  const size = assertLocalVideoWithinLimits(filePath, maxBytes);
+  return sha256FileChunked(filePath, size, readRange ?? wholeFileRangeReader(maxBytes));
 }
 
 const EXTRACTOR_FAILURE_MARKERS = [
@@ -165,6 +209,9 @@ function textOf(value: unknown): string | undefined {
 
 export interface RemoteVideoInfo {
   metadata: VideoMetadata;
+  /** False when yt-dlp reported no usable duration (live or unknown length). */
+  duration_known: boolean;
+  is_live: boolean;
   chapters: VideoChapter[];
   language?: string;
   approx_bytes?: number;
@@ -196,10 +243,29 @@ function parseChapters(raw: unknown, durationSec: number): VideoChapter[] {
   return chapters.sort((a, b) => a.start_sec - b.start_sec);
 }
 
+function formatBytes(format: Record<string, unknown>): number | undefined {
+  return numberOf(format.filesize) ?? numberOf(format.filesize_approx);
+}
+
+/** Sum of a merged selection's streams; undefined unless every stream reports a size. */
+function requestedFormatsBytes(raw: unknown): number | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  let total = 0;
+  for (const entry of raw) {
+    const bytes = isRecord(entry) ? formatBytes(entry) : undefined;
+    if (bytes === undefined) return undefined;
+    total += bytes;
+  }
+  return total;
+}
+
 export function parseYtDlpInfo(stdout: string): RemoteVideoInfo {
   const info = parseSafeJsonInput(stdout, 'yt-dlp info');
   if (!isRecord(info)) throw new VideoIngestError('TOOL_FAILED', 'yt-dlp info is not an object');
-  const duration = numberOf(info.duration) ?? 0;
+  const rawDuration = numberOf(info.duration);
+  const duration = rawDuration ?? 0;
+  const liveStatus = textOf(info.live_status);
+  const approxBytes = formatBytes(info) ?? requestedFormatsBytes(info.requested_formats);
   return {
     metadata: {
       title: textOf(info.title) ?? 'untitled',
@@ -207,11 +273,15 @@ export function parseYtDlpInfo(stdout: string): RemoteVideoInfo {
       ...(textOf(info.uploader) ? { uploader: textOf(info.uploader) } : {}),
       ...(textOf(info.license) ? { license: textOf(info.license) } : {}),
     },
+    duration_known: rawDuration !== undefined && rawDuration > 0,
+    is_live:
+      info.is_live === true ||
+      liveStatus === 'is_live' ||
+      liveStatus === 'is_upcoming' ||
+      liveStatus === 'post_live',
     chapters: parseChapters(info.chapters, duration),
     ...(textOf(info.language) ? { language: textOf(info.language) } : {}),
-    ...((numberOf(info.filesize) ?? numberOf(info.filesize_approx))
-      ? { approx_bytes: numberOf(info.filesize) ?? numberOf(info.filesize_approx) }
-      : {}),
+    ...(approxBytes ? { approx_bytes: approxBytes } : {}),
     manual_sub_langs: subtitleLangs(info.subtitles),
     auto_sub_langs: subtitleLangs(info.automatic_captions),
   };
@@ -245,12 +315,15 @@ export function chooseSubtitleTrack(info: RemoteVideoInfo, wanted: string): Subt
 
 const YT_DLP_BASE_ARGS = ['--ignore-config', '--no-update', '--no-playlist', '--no-warnings'];
 
+/** Probe with the same `-f` selector the download uses so size checks match the selection. */
 export async function fetchRemoteVideoInfo(
   runner: VideoCommandRunner,
   ytDlpBin: string,
-  url: string
+  url: string,
+  format?: string
 ): Promise<RemoteVideoInfo> {
-  const result = await runVideoTool(runner, 'yt-dlp', ytDlpBin, [...YT_DLP_BASE_ARGS, '-J', url], {
+  const args = [...YT_DLP_BASE_ARGS, ...(format ? ['-f', format] : []), '-J', url];
+  const result = await runVideoTool(runner, 'yt-dlp', ytDlpBin, args, {
     timeoutMs: 120_000,
     maxOutputMB: 50,
   });
@@ -262,27 +335,82 @@ export interface RemoteDownload {
   subtitle_path?: string;
 }
 
-function isMediaFile(name: string): boolean {
-  if (!name.startsWith('source.')) return false;
-  return !['.vtt', '.part', '.json', '.ytdl', '.tmp'].some((ext) => name.endsWith(ext));
+const NON_MEDIA_EXTENSIONS = new Set(['vtt', 'part', 'json', 'ytdl', 'tmp', 'temp']);
+
+/** Final (merged) output: exactly `source.<ext>`; split streams are `source.f<id>.<ext>`. */
+function isFinalMediaFile(name: string): boolean {
+  const match = /^source\.([A-Za-z0-9]+)$/.exec(name);
+  return Boolean(match && !NON_MEDIA_EXTENSIONS.has(match[1].toLowerCase()));
 }
 
+function isSplitStreamFile(name: string): boolean {
+  return /^source\.f[A-Za-z0-9-]+\.[A-Za-z0-9]+$/.test(name);
+}
+
+function isSourceMediaArtifact(name: string): boolean {
+  return name.startsWith('source.') && !name.endsWith('.vtt');
+}
+
+/** Remove downloaded source media (final, split, partial) from a cache entry; subtitles stay. */
+export function removeSourceMedia(workDir: string): string[] {
+  if (!safeExistsSync(workDir)) return [];
+  const removed = safeReaddir(workDir).filter(isSourceMediaArtifact).sort();
+  for (const name of removed) safeRmSync(path.join(workDir, name), { force: true });
+  return removed;
+}
+
+/**
+ * Download into `workDir` as `source.<ext>`. Any failure (tool error, size
+ * limit, missing or only split output) removes the partial media from the
+ * cache entry before the error propagates.
+ */
 export async function downloadRemoteVideo(
   runner: VideoCommandRunner,
   ytDlpBin: string,
   url: string,
   workDir: string,
-  options: { format: string; maxBytes: number; subtitle?: SubtitleChoice | null }
+  options: {
+    format: string;
+    maxBytes: number;
+    subtitle?: SubtitleChoice | null;
+    ffmpegBin?: string;
+  }
 ): Promise<RemoteDownload> {
+  try {
+    return await downloadRemoteVideoUnchecked(runner, ytDlpBin, url, workDir, options);
+  } catch (error) {
+    removeSourceMedia(workDir);
+    throw error;
+  }
+}
+
+async function downloadRemoteVideoUnchecked(
+  runner: VideoCommandRunner,
+  ytDlpBin: string,
+  url: string,
+  workDir: string,
+  options: {
+    format: string;
+    maxBytes: number;
+    subtitle?: SubtitleChoice | null;
+    ffmpegBin?: string;
+  }
+): Promise<RemoteDownload> {
+  // -P keeps the (possibly '%'-containing) cache path out of the output template.
   const args = [
     ...YT_DLP_BASE_ARGS,
     '--no-progress',
+    '--match-filter',
+    '!is_live',
+    ...(options.ffmpegBin ? ['--ffmpeg-location', options.ffmpegBin] : []),
     '-f',
     options.format,
     '--max-filesize',
     String(options.maxBytes),
+    '-P',
+    workDir,
     '-o',
-    path.join(workDir, 'source.%(ext)s'),
+    'source.%(ext)s',
   ];
   if (options.subtitle) {
     args.push(
@@ -299,13 +427,19 @@ export async function downloadRemoteVideo(
     maxOutputMB: 20,
   });
   const names = safeExistsSync(workDir) ? safeReaddir(workDir).sort() : [];
-  const media = names.find(isMediaFile);
+  const media = names.find(isFinalMediaFile);
   if (!media) {
     const output = `${result.stdout}\n${result.stderr}`;
     if (output.includes('max-filesize')) {
       throw new VideoIngestError(
         'SIZE_EXCEEDED',
         `remote video exceeds max_bytes ${options.maxBytes}`
+      );
+    }
+    if (names.some(isSplitStreamFile)) {
+      throw new VideoIngestError(
+        'TOOL_FAILED',
+        'yt-dlp left only split audio/video streams (merge failed; check --ffmpeg-location)'
       );
     }
     throw new VideoIngestError('TOOL_FAILED', 'yt-dlp finished without producing a media file');
