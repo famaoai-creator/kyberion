@@ -81,6 +81,11 @@ export interface FlowChannel {
   channel: string;
   /** Optional data type hint for documentation and future validation. */
   type?: string;
+  /**
+   * The channel carries confidential content: the run journal records only a
+   * hash/length marker for it, and resume re-executes the step.
+   */
+  sensitive?: boolean;
 }
 
 export interface PipelineAdfStep {

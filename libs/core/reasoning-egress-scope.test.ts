@@ -94,7 +94,7 @@ describe('assertReasoningEgressAllowed', () => {
   });
 
   it('permits public material to any backend', () => {
-    withReasoningPayloadScope({ tier: 'public' }, () => {
+    withReasoningPayloadScope({ tier: 'public', training_use: 'training_eligible' }, () => {
       expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
       expect(() => assertReasoningEgressAllowed('agy-cli')).not.toThrow();
     });
@@ -107,15 +107,29 @@ describe('assertReasoningEgressAllowed', () => {
   });
 
   it('permits confidential material to a provider approved for that tenant', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'approved-tenant' }, () => {
-      expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'approved-tenant', training_use: 'training_eligible' },
+      () => {
+        expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
+      }
+    );
   });
 
   it('permits confidential material to a local backend', () => {
     withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
       expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
     });
+  });
+
+  it('does not treat an undeclared remote backend as zero-retention', () => {
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'approved-tenant', training_use: 'zero_retention' },
+      () => {
+        expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(
+          /no zero_retention declaration/
+        );
+      }
+    );
   });
 
   it('allows a provider-neutral local adapter name when its endpoint is local', () => {

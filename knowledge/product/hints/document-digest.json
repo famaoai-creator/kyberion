@@ -1,23 +1,21 @@
 {
   "topic": "Document digest and summarization",
-  "description": "Extracts and summarizes document content for LLM understanding using protocolToMarkdown. Supports PDFs, Office documents, and other formats by converting them to markdown digests for analysis.",
+  "description": "Extracts document content for LLM understanding with the native engines (pdf/pptx/docx/xlsx) and protocolToMarkdown. Keeps tables, headings and line breaks; docx pictures become image markers. Pass ocr=true for PDFs whose figures are pasted images.",
   "tags": ["読んで", "要約", "確認", "内容", "digest", "summarize", "understand", "read"],
   "confidence": 0.8,
   "hints": {
     "steps_hint": [
-      "Extract document content from source file",
-      "Convert to markdown digest via protocolToMarkdown",
-      "Analyze and summarize the extracted content"
+      "Copy the source into a unique active/shared/tmp/<job>/ dir (inputs must be inside the repo)",
+      "Read it: `pnpm kyberion read <file> [--ocr]` from a shell, or media:document_digest (ocr=true) in a pipeline — never a hand-written parser",
+      "Analyze and summarize the Markdown; act on `> [read]` warnings and re-check OCR figures against the source"
     ],
     "actuator": "media-actuator",
     "ops": ["document_digest"],
-    "use_cases": [
-      "ドキュメント要約・理解",
-      "PDF/Office 文書の内容確認",
-      "長文資料の要点抽出"
-    ],
+    "use_cases": ["ドキュメント要約・理解", "PDF/Office 文書の内容確認", "長文資料の要点抽出"],
     "keywords": ["読んで", "要約", "確認", "内容", "digest", "summarize", "understand", "read"],
     "pattern": "A",
-    "_comment": "Pattern A: fully automatable. No browser interaction needed; media-actuator handles document extraction directly."
+    "_comment": "Pattern A: fully automatable. No browser interaction needed; media-actuator handles document extraction directly.",
+    "related_ops": ["pdf_extract", "pptx_slide_text", "docx_extract", "xlsx_extract"],
+    "playbook": "knowledge/product/orchestration/document-file-reading-playbook.md"
   }
 }

@@ -78,10 +78,30 @@ function moduleResolvable(moduleName: string): boolean {
 }
 
 let cachedCapabilities: RasterCapabilities | null = null;
+let cachedSofficeBin: string | null | undefined;
+
+/**
+ * LibreOffice entry points, most portable first. The macOS app bundle is
+ * probed too because a drag-installed LibreOffice.app never puts `soffice` on
+ * PATH — without it the host looks like it has no LibreOffice at all.
+ */
+const SOFFICE_CANDIDATES = [
+  'soffice',
+  'libreoffice',
+  '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+] as const;
+
+/** The LibreOffice binary to invoke, or undefined when none is installed. */
+export function resolveSofficeBinary(options: { refresh?: boolean } = {}): string | undefined {
+  if (cachedSofficeBin === undefined || options.refresh) {
+    cachedSofficeBin = SOFFICE_CANDIDATES.find((candidate) => commandExists(candidate)) ?? null;
+  }
+  return cachedSofficeBin ?? undefined;
+}
 
 export function detectRasterCapabilities(options: { refresh?: boolean } = {}): RasterCapabilities {
   if (cachedCapabilities && !options.refresh) return cachedCapabilities;
-  const hasSoffice = commandExists('soffice') || commandExists('libreoffice');
+  const hasSoffice = resolveSofficeBinary(options) !== undefined;
   const hasPdfRaster = commandExists('pdftoppm');
   const hasHtmlRaster = moduleResolvable('playwright');
   const missing: string[] = [];
@@ -94,6 +114,7 @@ export function detectRasterCapabilities(options: { refresh?: boolean } = {}): R
 
 export function _resetRasterCapabilitiesCacheForTests(): void {
   cachedCapabilities = null;
+  cachedSofficeBin = undefined;
 }
 
 /** Human-readable install hint, surfaced to the operator on degradation. */
@@ -307,7 +328,7 @@ export function rasterizeDocument(input: RasterizeDocumentInput): RasterResult {
   const profileDir = path.join(workDir, 'lo-profile');
   safeMkdir(profileDir, { recursive: true });
 
-  const sofficeBin = commandExists('soffice') ? 'soffice' : 'libreoffice';
+  const sofficeBin = resolveSofficeBinary() ?? 'soffice';
   // A conversion failure is a degradation, not a crash: the caller asked for a
   // review and must get back "could not look at it", not an exception that
   // takes down the surrounding pipeline.
@@ -490,4 +511,68 @@ export async function rasterizeHtml(input: RasterizeHtmlInput): Promise<RasterRe
     return { available: false, images: [], unavailable_reason: 'no HTML sources produced images' };
   }
   return { available: true, images, backend: 'playwright' };
+}
+
+/** Vector image formats OCR engines cannot read directly. */
+export const VECTOR_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['.emf', '.wmf']);
+
+export interface RasterizeVectorImageResult {
+  available: boolean;
+  png_path?: string;
+  unavailable_reason?: string;
+}
+
+/**
+ * Convert a vector image (EMF/WMF — what Office stores for pasted Excel
+ * ranges and charts) to PNG via headless LibreOffice so OCR can read it.
+ * Absence of LibreOffice is a reported degradation, never an exception.
+ */
+export function rasterizeVectorImage(input: {
+  sourcePath: string;
+  outDir: string;
+}): RasterizeVectorImageResult {
+  const sourcePath = assertSafeRepositoryPath(input.sourcePath);
+  const extension = path.extname(sourcePath).toLowerCase();
+  if (!VECTOR_IMAGE_EXTENSIONS.has(extension)) {
+    return { available: false, unavailable_reason: `not a vector image: ${extension}` };
+  }
+  const sofficeBin = resolveSofficeBinary();
+  if (!sofficeBin) {
+    return {
+      available: false,
+      unavailable_reason: `cannot rasterize ${path.basename(sourcePath)}: missing soffice. Install ${rasterInstallHint(['soffice'])} to enable it.`,
+    };
+  }
+  const outDir = assertSafeRepositoryPath(input.outDir, { allowMissingLeaf: true });
+  const profileDir = path.join(outDir, 'lo-profile');
+  safeMkdir(profileDir, { recursive: true });
+  try {
+    safeExec(
+      sofficeBin,
+      [
+        '--headless',
+        '--norestore',
+        `-env:UserInstallation=file://${profileDir}`,
+        '--convert-to',
+        'png',
+        '--outdir',
+        outDir,
+        sourcePath,
+      ],
+      { timeoutMs: 120_000, cwd: pathResolver.rootDir() }
+    );
+  } catch (error: any) {
+    return {
+      available: false,
+      unavailable_reason: `LibreOffice could not convert ${path.basename(sourcePath)}: ${error?.message || error}`,
+    };
+  }
+  const pngPath = path.join(outDir, `${path.basename(sourcePath, extension)}.png`);
+  if (!safeExistsSync(pngPath)) {
+    return {
+      available: false,
+      unavailable_reason: `LibreOffice produced no PNG for ${path.basename(sourcePath)}`,
+    };
+  }
+  return { available: true, png_path: pngPath };
 }

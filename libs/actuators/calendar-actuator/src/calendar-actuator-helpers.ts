@@ -16,7 +16,14 @@ import {
 } from './calendar-backend.js';
 
 export type CalendarAction = {
-  op: 'list_calendars' | 'list_events' | 'query_freebusy' | 'create_event';
+  op:
+    | 'list_calendars'
+    | 'list_events'
+    | 'query_freebusy'
+    | 'find_slots'
+    | 'create_event'
+    | 'update_event'
+    | 'delete_event';
   params?: CalendarParams;
 };
 
@@ -61,6 +68,43 @@ function missingRequiredFields(action: CalendarAction): string[] {
     }
     if (!params.end_date?.trim()) {
       missing.push('params.end_date (例: "2026-07-25T18:00:00+09:00")');
+    }
+    return missing;
+  }
+  if (action.op === 'find_slots') {
+    const missing: string[] = [];
+    if (!params.start_date?.trim()) missing.push('params.start_date');
+    if (!params.end_date?.trim()) missing.push('params.end_date');
+    if (!Number.isInteger(params.duration_minutes) || Number(params.duration_minutes) < 1) {
+      missing.push('params.duration_minutes');
+    }
+    return missing;
+  }
+  if (action.op === 'update_event' || action.op === 'delete_event') {
+    const missing: string[] = [];
+    if (!params.event_id?.trim()) missing.push('params.event_id');
+    if (!params.calendar_id?.trim() && !params.calendar_names?.some((name) => name.trim())) {
+      missing.push('params.calendar_id or params.calendar_names[0]');
+    }
+    if (
+      action.op === 'update_event' &&
+      params.reminder_minutes_before_start !== undefined &&
+      (!Number.isInteger(params.reminder_minutes_before_start) ||
+        params.reminder_minutes_before_start < 0)
+    ) {
+      missing.push('params.reminder_minutes_before_start (non-negative integer)');
+    }
+    if (
+      action.op === 'update_event' &&
+      params.title === undefined &&
+      params.start_date === undefined &&
+      params.end_date === undefined &&
+      params.description === undefined &&
+      params.location === undefined &&
+      params.attendees === undefined &&
+      params.reminder_minutes_before_start === undefined
+    ) {
+      missing.push('one event field to update');
     }
     return missing;
   }
@@ -161,7 +205,10 @@ export async function handleAction(
     valid.op === 'list_calendars'
       ? uniqueSelections(resolveSelections(params, registry))
       : resolveSelections(params, registry);
-  if (valid.op === 'create_event' && selections.length !== 1) {
+  if (
+    ['create_event', 'update_event', 'delete_event'].includes(valid.op) &&
+    selections.length !== 1
+  ) {
     throw new Error(
       'calendar-actuator: create_event requires exactly one backend/calendar target; use calendar_targets with one entry'
     );
@@ -203,9 +250,43 @@ export async function handleAction(
         result = values.flat();
         break;
       }
+      case 'find_slots': {
+        const values = await Promise.all(
+          selections.map(async ({ adapter, params: selectedParams }) => {
+            if (!adapter.findSlots) {
+              throw new Error(
+                `calendar-actuator: backend '${adapter.id}' does not provide the temporal slot capability`
+              );
+            }
+            return annotate(adapter, await adapter.findSlots(selectedParams));
+          })
+        );
+        result = values;
+        break;
+      }
       case 'create_event': {
         const [{ adapter, params: selectedParams }] = selections;
         result = annotate(adapter, await adapter.createEvent(selectedParams));
+        break;
+      }
+      case 'update_event': {
+        const [{ adapter, params: selectedParams }] = selections;
+        if (!adapter.updateEvent) {
+          throw new Error(
+            `calendar-actuator: backend '${adapter.id}' does not provide the event update capability`
+          );
+        }
+        result = annotate(adapter, await adapter.updateEvent(selectedParams));
+        break;
+      }
+      case 'delete_event': {
+        const [{ adapter, params: selectedParams }] = selections;
+        if (!adapter.deleteEvent) {
+          throw new Error(
+            `calendar-actuator: backend '${adapter.id}' does not provide the event delete capability`
+          );
+        }
+        result = annotate(adapter, await adapter.deleteEvent(selectedParams));
         break;
       }
       default: {

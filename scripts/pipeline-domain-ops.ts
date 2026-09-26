@@ -38,6 +38,12 @@ import { runCapturePhoto } from './capture_photo.js';
 import { runGenerateAvatar } from './generate_avatar.js';
 import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
+import { runOrganizationDigest } from '@agent/core/organization-digest';
+import { normalizeLocale } from '@agent/core/locale-normalize';
+import {
+  parseOrganizationRecordRunParams,
+  recordOrganizationOperationRunWithDefaults,
+} from '@agent/core/organization-operation-run-recording';
 
 function sourceValue(params: Record<string, unknown>, ctx: Record<string, unknown>): unknown {
   const source = typeof params.source === 'string' ? params.source : '';
@@ -802,4 +808,43 @@ export async function runInlineOAuthSetup(
   if (!service) throw new Error('core:run_oauth_setup requires service_name');
   await runOAuthSetupForService(service);
   return exportValue(params, step, { status: 'succeeded', service_id: service }, ctx);
+}
+
+/** core:organization_digest — sovereign-only cross-tenant organization digest. */
+export function runInlineOrganizationDigest(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const timezone = String(resolveVars(params.timezone ?? '', ctx)).trim() || undefined;
+  const rawLocale = String(resolveVars(params.locale ?? '', ctx)).trim();
+  const locale = rawLocale ? normalizeLocale(rawLocale) : null;
+  if (rawLocale && !locale) {
+    throw new Error(`core:organization_digest: unsupported locale ${rawLocale}`);
+  }
+  const result = runOrganizationDigest({
+    ...(timezone ? { timezone } : {}),
+    ...(locale ? { locale } : {}),
+  });
+  return exportValue(params, step, { ...result.digest, text: result.text }, ctx);
+}
+
+/** core:organization_record_run — record one completed organization operation run. */
+export function runInlineOrganizationRecordRun(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const resolved = Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [
+      key,
+      Array.isArray(value)
+        ? value.map((entry) => resolveVars(entry, ctx))
+        : resolveVars(value, ctx),
+    ])
+  );
+  const result = recordOrganizationOperationRunWithDefaults(
+    parseOrganizationRecordRunParams(resolved)
+  );
+  return exportValue(params, step, result, ctx);
 }

@@ -650,6 +650,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CHRONOS_SCHEDULES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_CLAUDE_AGENT_TOOLS",
       "category": "runtime",
       "type": "string",
@@ -2587,6 +2595,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_OPERATOR_SLACK_DM",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional Slack channel or member id for the sovereign operator's DM; Chronos schedules reference it as deliver_to.channel \"env:KYBERION_OPERATOR_SLACK_DM\" (e.g. organization-daily-digest) and delivery fails closed while it is unset, so the id never lives in a checked-in pipeline.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_OPS_ALERT_WEBHOOK_URL",
       "category": "provider",
       "type": "string",
@@ -3632,6 +3648,15 @@
       "description": "Optional governed root for tenant design assets used by the Chronos tenant-design route; viewer-resolved tenant scope still controls which customer data is selected.",
       "documented": true,
       "subsystem": "surface"
+    },
+    {
+      "name": "KYBERION_TENANT_EGRESS_POLICY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Per-process tenant egress overlay: a JSON egress policy inside knowledge/confidential/{KYBERION_TENANT}/ whose own-tenant tenant_allowed_providers/tenant_allowed_domains entries are merged onto the governed policy. Ignored without KYBERION_TENANT; set by the chronos tenant runner from the pipeline's runtime.egress_policy_ref, never by hand.",
+      "subsystem": "governance",
+      "documented": true
     },
     {
       "name": "KYBERION_TENANT_ID",

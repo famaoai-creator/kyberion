@@ -17,21 +17,31 @@ const recordSpy = vi.fn((entry: any) => ({ id: 'AUD-TEST-1', ...entry }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: (e: any) => recordSpy(e) } }));
 vi.mock('./shell-command-policy.js', () => ({
   evaluateShellCommandPolicy: (command: string) =>
-    command.includes('pnpm install')
+    command.startsWith('pdftotext')
       ? {
-          verdict: 'require_approval',
+          verdict: 'deny',
           command,
-          executable: 'pnpm',
-          args: ['install'],
-          reason: 'Shell command requires approval under Kyberion governance.',
-        }
-      : {
-          verdict: 'allow',
-          command,
-          executable: 'ls',
+          executable: 'pdftotext',
           args: [],
-          reason: 'Allowed by shell command policy.',
-        },
+          matchedRuleId: 'document-hand-extraction',
+          reason:
+            'Reading office / PDF files by hand is blocked — use `pnpm kyberion read <file>`.',
+        }
+      : command.includes('pnpm install')
+        ? {
+            verdict: 'require_approval',
+            command,
+            executable: 'pnpm',
+            args: ['install'],
+            reason: 'Shell command requires approval under Kyberion governance.',
+          }
+        : {
+            verdict: 'allow',
+            command,
+            executable: 'ls',
+            args: [],
+            reason: 'Allowed by shell command policy.',
+          },
 }));
 
 import {
@@ -39,6 +49,7 @@ import {
   buildStopContext,
   buildUserPromptSubmitContext,
   evaluatePreToolUse,
+  evaluatePreToolUseShellDeny,
   recordPostToolUse,
 } from './claude-code-hook.js';
 
@@ -53,6 +64,22 @@ describe('claude-code-hook — PreToolUse tier-guard', () => {
     });
     expect(denied.hookSpecificOutput.permissionDecision).toBe('deny');
     expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('approval');
+  });
+
+  it('deny-only Bash gate blocks hand-rolled document extraction and stays silent otherwise', () => {
+    const denied = evaluatePreToolUseShellDeny({
+      tool_name: 'Bash',
+      tool_input: { command: 'pdftotext -layout active/shared/tmp/job/final.pdf -' },
+    });
+    expect(denied?.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(denied?.hookSpecificOutput.permissionDecisionReason).toContain('pnpm kyberion read');
+    // Not allowlisted, but not denied either: defer to Claude Code's own prompts.
+    expect(
+      evaluatePreToolUseShellDeny({ tool_name: 'Bash', tool_input: { command: 'pnpm install' } })
+    ).toBeNull();
+    expect(
+      evaluatePreToolUseShellDeny({ tool_name: 'Write', tool_input: { file_path: 'a.ts' } })
+    ).toBeNull();
   });
 
   it('allows writes to ordinary source paths (public tier — not gated)', () => {

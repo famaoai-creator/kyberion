@@ -45,6 +45,7 @@ const INFERABLE_EXTENSIONS = new Set([
   '.docx',
   '.pdf',
   '.xlsx',
+  '.pptx',
   '.html',
   '.htm',
   '.md',

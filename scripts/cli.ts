@@ -40,6 +40,7 @@ import {
   nowIso,
   parseSafeJsonInput,
   readTextFile,
+  setRegisteredEnv,
 } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
@@ -1151,6 +1152,18 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'packet',
   'approvals',
   'project-trust',
+  // Document reading needs no reasoning / embedding / voice runtime.
+  'read',
+  // Document authoring resolves design catalogs from disk; same cost profile.
+  'write',
+  // Perception commands bind only the bridges they need (OCR / STT / ffmpeg).
+  'see',
+  'listen',
+  'watch',
+  'memory',
+  // speak routes through the voice actuator's engine registry, not the
+  // bootstrapped python voice bridge / reasoning backends.
+  'speak',
 ]);
 
 /**
@@ -1339,6 +1352,15 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
+  if (command === 'memory') {
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runMemoryCommand } = await import('./cli-memory.js');
+    await runMemoryCommand(
+      [firstArg, ...restArgs].filter((arg): arg is string => arg !== undefined)
+    );
+    return;
+  }
+
   if (command === 'task') {
     await withWorkflowOutputPrinter(print, () => handleTaskCommand(firstArg, restArgs, locale));
     return;
@@ -1346,6 +1368,49 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
   if (command === 'offboard') {
     await withWorkflowOutputPrinter(print, () => handleOffboardCommand(firstArg, restArgs, locale));
+    return;
+  }
+
+  if (command === 'read') {
+    // stdout carries the document; keep runtime logs out of it. Errors still
+    // print, and reader caveats arrive as `> [read]` warnings. --verbose keeps logs.
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runReadCommand } = await import('./cli-read.js');
+    await runReadCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
+    return;
+  }
+
+  if (command === 'write') {
+    // Inverse of `read`: stdout carries the summary (or --json), not runtime logs.
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runWriteCommand } = await import('./cli-write.js');
+    await runWriteCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
+    return;
+  }
+
+  if (command === 'see' || command === 'listen' || command === 'watch') {
+    // Same contract as `read`: stdout carries the content, caveats arrive as
+    // `> [<command>]` lines, --verbose keeps runtime logs.
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+    if (command === 'see') {
+      const { runSeeCommand } = await import('./cli-see.js');
+      await runSeeCommand(commandArgs, printText);
+    } else if (command === 'listen') {
+      const { runListenCommand } = await import('./cli-listen.js');
+      await runListenCommand(commandArgs, printText);
+    } else {
+      const { runWatchCommand } = await import('./cli-watch.js');
+      await runWatchCommand(commandArgs, printText);
+    }
+    return;
+  }
+
+  if (command === 'speak') {
+    // Output is audio; stdout carries only the `[speak]` summary (or --json).
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runSpeakCommand } = await import('./cli-speak.js');
+    await runSpeakCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
   }
 

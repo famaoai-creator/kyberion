@@ -226,6 +226,25 @@
         "body": { "required": true, "type": "object" }
       }
     },
+    "calendar_events_patch": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "events", "patch", "--params", "{{params}}", "--json", "{{body}}"],
+      "description": "Update a Google Calendar event.",
+      "parameters": {
+        "params": { "required": true, "type": "object" },
+        "body": { "required": true, "type": "object" }
+      }
+    },
+    "calendar_events_delete": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "events", "delete", "--params", "{{params}}"],
+      "description": "Delete a Google Calendar event.",
+      "parameters": {
+        "params": { "required": true, "type": "object" }
+      }
+    },
     "meet_spaces_create": {
       "type": "cli",
       "command": "gws",

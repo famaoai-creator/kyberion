@@ -29,6 +29,15 @@
             "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" PreToolUse"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" PreToolUseShellDeny"
+          }
+        ]
       }
     ],
     "Stop": [

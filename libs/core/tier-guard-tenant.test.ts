@@ -268,7 +268,9 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
     const result = validateWritePermission(target);
     if (!result.allowed) {
-      expect(result.reason).not.toMatch(/tenant\.group_scope_violation|tenant\.group_unknown/);
+      // Group membership passed, so no tenant-scope rule may deny it either:
+      // the `shared` path segment is not a tenant.
+      expect(result.reason).not.toMatch(/tenant\.[a-z_]+/);
     }
   });
 

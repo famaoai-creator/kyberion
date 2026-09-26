@@ -61,6 +61,36 @@
       ],
       "description": "Create a Microsoft 365 calendar event."
     },
+    "calendar_events_update": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "patch",
+        "--url",
+        "@graph/{{calendarPath}}/events/{{eventId}}",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Update a Microsoft 365 calendar event."
+    },
+    "calendar_events_delete": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "delete",
+        "--url",
+        "@graph/{{calendarPath}}/events/{{eventId}}",
+        "--output",
+        "json"
+      ],
+      "description": "Delete a Microsoft 365 calendar event."
+    },
     "outlook_messages_list": {
       "type": "cli",
       "command": "m365",
