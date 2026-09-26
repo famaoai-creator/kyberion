@@ -178,6 +178,47 @@
           }
         }
       }
+    },
+    "dads-standard": {
+      "theme": "dads",
+      "profiles": ["project-charter", "requirements-definition", "test-plan"],
+      "branding": {
+        "tone": "public-sector",
+        "brand_name": "DADS"
+      },
+      "metadata": {
+        "source_type": "design-md",
+        "source_repo": "https://design.digital.go.jp/dads/",
+        "source_path": "foundations/",
+        "slug": "dads",
+        "category": "Government",
+        "description": "Digital Agency Design System (Japan) aligned system: Noto Sans JP, accessible contrast (text >=4.5:1, borders >=3:1), Std-16+ body scale, Blue-900 primary.",
+        "prompt_guide": [
+          "WCAG/JIS X 8341 contrast: text >=4.5:1 on its background, non-text >=3:1",
+          "Body text >=16px (>=11pt print equivalent); line-height 150-170% for body, 140-150% headings",
+          "Sans-serif first (Noto Sans JP); no italic for Japanese body text",
+          "Semantic colors: success green / error red / warning yellow-ochre only for status"
+        ]
+      }
+    },
+    "consulting-strategy": {
+      "theme": "deloitte-consulting",
+      "profiles": ["consulting-strategy"],
+      "branding": {
+        "tone": "consulting",
+        "brand_name": "Strategy"
+      },
+      "metadata": {
+        "source_type": "profile",
+        "slug": "consulting-strategy",
+        "category": "Consulting",
+        "description": "Deloitte-style consulting strategy deck: monochrome + single green accent, structured sections (challenge/approach/framework/recommendation), one message per slide.",
+        "prompt_guide": [
+          "One message per slide — the heading IS the message (action title, not topic title)",
+          "Restrained palette: black/white/gray + single green accent; no decorative color",
+          "Prefer structured visuals (matrix/pyramid/process/table) over paragraphs"
+        ]
+      }
     }
   }
 }
