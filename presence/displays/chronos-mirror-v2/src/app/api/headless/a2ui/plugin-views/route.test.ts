@@ -5,7 +5,14 @@ import { NextRequest } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { auditChain, type AuditEntry } from '@agent/core/audit-chain';
 import { activatePlugin, resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
 
@@ -50,6 +57,9 @@ const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permission
 const FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json'];
 const TMP_ROOT = pathResolver.sharedTmp('chronos-plugin-views-route-test');
 const cleanup: string[] = [];
+const ACTION_DIR = pathResolver.shared('coordination/channels/chronos/plugin-view-actions');
+/** Sidecars are named `<request time>-<approval id>.json`. */
+const trackedActionIds: string[] = [];
 
 function viewer(overrides: Record<string, unknown> = {}) {
   return {
@@ -76,7 +86,13 @@ type PluginViewsResponseBody = {
     errors?: unknown[];
     outcome?: { status: string; approvalRequestId?: string; handled?: boolean };
     message_key?: string;
-    action_requests?: Array<{ approval_request_id: string; status: string; params: unknown }>;
+    action_requests?: Array<{
+      approval_request_id: string;
+      status: string;
+      params: unknown;
+      executable: boolean;
+      unavailable_reason?: string;
+    }>;
   };
 };
 
@@ -155,6 +171,14 @@ afterEach(() => {
   vi.restoreAllMocks();
   resetPluginLifecycleForTests();
   withExecutionContext('mission_controller', () => {
+    const ids = trackedActionIds.splice(0);
+    if (ids.length > 0 && safeExistsSync(ACTION_DIR)) {
+      for (const entry of safeReaddir(ACTION_DIR)) {
+        if (ids.some((id) => entry.endsWith(`-${id}.json`))) {
+          safeRmSync(path.join(ACTION_DIR, entry));
+        }
+      }
+    }
     while (cleanup.length > 0) safeRmSync(cleanup.pop() as string);
   });
 });
@@ -241,9 +265,9 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
     expect(queued.body.data.outcome.status).toBe('approval_required');
     const requestId = queued.body.data.outcome.approvalRequestId as string;
     cleanup.push(
-      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${requestId}.json`),
-      pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${requestId}.json`)
+      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${requestId}.json`)
     );
+    trackedActionIds.push(requestId);
 
     const unknown = await act({ plugin_id: record.pluginId, view_id: 'status', action_id: 'nope' });
     expect(unknown).toMatchObject({
@@ -287,9 +311,9 @@ describe('POST /api/headless/a2ui/plugin-views execute (FU-02)', () => {
   function trackActionRequest(id: string) {
     cleanup.push(
       pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`),
-      pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.json`),
       pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
     );
+    trackedActionIds.push(id);
   }
 
   function approve(id: string) {
@@ -354,13 +378,25 @@ describe('POST /api/headless/a2ui/plugin-views execute (FU-02)', () => {
       body: { error: 'PLUGIN_VIEW_APPROVAL_REQUIRED' },
     });
     expect((await listViews()).body.data.action_requests).toMatchObject([
-      { approval_request_id: id, status: 'pending', params },
+      { approval_request_id: id, status: 'pending', params, executable: false },
     ]);
     approve(id);
 
-    // Approved but the plugin is not active in this process: 409, approval kept.
+    // Approved but the plugin is not active in this process: not executable
+    // (the UI shows why instead of an Execute button); executing is 409.
+    expect((await listViews()).body.data.action_requests).toMatchObject([
+      {
+        approval_request_id: id,
+        status: 'approved',
+        executable: false,
+        unavailable_reason: 'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+      },
+    ]);
     expect((await execute(record, id, params)).body.error).toBe('PLUGIN_VIEW_ACTION_UNAVAILABLE');
     expect((await activatePlugin({ record }, { managedRoot: state.managedRoot })).ok).toBe(true);
+    const [executable] = (await listViews()).body.data.action_requests;
+    expect(executable).toMatchObject({ status: 'approved', executable: true });
+    expect(executable.unavailable_reason).toBeUndefined();
 
     expect((await execute(record, id, { path: 'active/shared/tmp/changed' })).status).toBe(403);
     state.viewer = viewer({ role: 'readonly' });
