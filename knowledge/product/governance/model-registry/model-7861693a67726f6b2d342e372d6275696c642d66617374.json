@@ -1,0 +1,22 @@
+{
+  "model_id": "xai:grok-4.7-build-fast",
+  "provider": "xai",
+  "family": "grok-4",
+  "status": "approved",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "secondary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "very_high",
+  "latency_band": "medium",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "long_context"],
+  "notes": "Grok 4.7 Fast serving tier. Same model as grok-4.7 on faster infrastructure, at twice the standard token rates: $4.00 / $1.00 cached / $12.00 per 1M tokens below 200k prompt tokens, and $6.00 / $1.50 / $18.00 above 200k. Grok Build model id grok-4.7-build-fast. Available in Grok Build and Cursor only; not on the public xAI API and excluded from the Grok Build free tier. latency_band stays medium so task routing does not prefer this 2x SKU over the standard flagship."
+}
