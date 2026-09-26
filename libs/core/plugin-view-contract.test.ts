@@ -940,6 +940,36 @@ describe('approved human view actions (FU-02)', () => {
     );
   });
 
+  it('refuses in-place param changes by preflight listeners without touching the submitted params (N1)', async () => {
+    spyAudit();
+    const { view } = await activeFixture('views-exec-inplace');
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(view(), params);
+    approveActionRequest(id);
+    const resolved = resolvePluginViewAction(view(), 'write_probe', params);
+    const submitted = resolved.params;
+    const mutate = registerOpPreflightListener({
+      id: `fu02-inplace-${randomUUID()}`,
+      run: (call) => {
+        if (call.op === 'permfixture:write') {
+          (call.params as Record<string, unknown>).path = 'knowledge/confidential/x';
+        }
+        return undefined;
+      },
+    });
+    try {
+      await expectViewErrorAsync(
+        executeApprovedPluginViewAction(resolved, id, executor),
+        'PLUGIN_VIEW_APPROVAL_MISMATCH'
+      );
+    } finally {
+      mutate();
+    }
+    // The listener only ever saw a detached copy, and the approval is not spent.
+    expect(submitted).toEqual(params);
+    expect(listPluginViewActionRequests([view()])[0].status).toBe('approved');
+  });
+
   it('refuses while the running module does not run under the approved grant', async () => {
     spyAudit();
     const { pluginId, managedRoot, record, view } = await activeFixture('views-exec-grant');
@@ -1044,17 +1074,32 @@ describe('approved human view actions (FU-02)', () => {
     expect(listPluginViewActionRequests([view], { maxScanned: 4 })).toHaveLength(1);
 
     // An old sidecar whose approval is gone is pruned; the live request is kept.
-    const stale = path.join(ACTION_DIR, `000000000000001-${randomUUID()}.json`);
-    withExecutionContext('mission_controller', () =>
-      safeWriteFile(
-        stale,
-        JSON.stringify({ approval_request_id: '00000000-0000-4000-8000-000000000000' })
-      )
-    );
+    const staleId = randomUUID();
+    const stale = path.join(ACTION_DIR, `000000000000001-${staleId}.json`);
+    // A tampered sidecar whose content names another id is never pruned by it.
+    const tampered = path.join(ACTION_DIR, `000000000000002-${randomUUID()}.json`);
+    withExecutionContext('mission_controller', () => {
+      safeWriteFile(stale, JSON.stringify({ approval_request_id: staleId }));
+      safeWriteFile(tampered, JSON.stringify({ approval_request_id: '../../../x' }));
+    });
     tracked(stale);
+    tracked(tampered);
+    // Claimed without a recorded result (outcome unknown): kept for the operator.
+    const unknownId = randomUUID();
+    const unknown = path.join(ACTION_DIR, `000000000000003-${unknownId}.json`);
+    const unknownClaim = path.join(ACTION_DIR, `${unknownId}.claim.json`);
+    withExecutionContext('mission_controller', () => {
+      safeWriteFile(unknown, JSON.stringify({ approval_request_id: unknownId }));
+      safeWriteFile(unknownClaim, '{}');
+    });
+    tracked(unknown);
+    tracked(unknownClaim);
     expect(PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
     expect(prunePluginViewActionRequests()).toBeGreaterThanOrEqual(1);
     expect(safeExistsSync(stale)).toBe(false);
+    expect(safeExistsSync(tampered)).toBe(true);
+    expect(safeExistsSync(unknown)).toBe(true);
+    expect(safeExistsSync(unknownClaim)).toBe(true);
     expect(listPluginViewActionRequests([view], { maxScanned: 4 })).toMatchObject([
       { approvalRequestId: id },
     ]);
