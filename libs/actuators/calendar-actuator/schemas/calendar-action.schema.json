@@ -4,7 +4,17 @@
   "type": "object",
   "required": ["op"],
   "properties": {
-    "op": { "enum": ["list_calendars", "list_events", "query_freebusy", "create_event"] },
+    "op": {
+      "enum": [
+        "list_calendars",
+        "list_events",
+        "query_freebusy",
+        "find_slots",
+        "create_event",
+        "update_event",
+        "delete_event"
+      ]
+    },
     "params": {
       "type": "object",
       "properties": {
@@ -45,7 +55,26 @@
         "time_zone": { "type": "string", "minLength": 1 },
         "query": { "type": "string" },
         "with_meet": { "type": "boolean" },
-        "conference_request_id": { "type": "string", "minLength": 1 }
+        "event_id": { "type": "string", "minLength": 1 },
+        "reminder_minutes_before_start": { "type": "integer", "minimum": 0 },
+        "send_updates": { "enum": ["all", "externalOnly", "none"] },
+        "conference_request_id": { "type": "string", "minLength": 1 },
+        "duration_minutes": { "type": "integer", "minimum": 1 },
+        "slot_step_minutes": { "type": "integer", "minimum": 1 },
+        "business_calendar": { "enum": ["none", "japanese_bank"] },
+        "working_hours": {
+          "type": "object",
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "string" },
+            "end": { "type": "string" },
+            "weekdays": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0, "maximum": 6 }
+            }
+          },
+          "additionalProperties": false
+        }
       }
     }
   }

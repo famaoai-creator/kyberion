@@ -17,6 +17,7 @@ import {
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
+  safeCreateExclusiveFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -304,11 +305,24 @@ function matchesOrganizationRecordScope(
   );
 }
 
+/** Thrown by an exclusive save when the target record already exists. */
+export class OrganizationRecordExistsError extends Error {
+  readonly code = 'ORGANIZATION_RECORD_EXISTS';
+  constructor(
+    label: string,
+    readonly filePath: string
+  ) {
+    super(`[ORGANIZATION_RECORD] ${label} already exists: ${filePath}`);
+    this.name = 'OrganizationRecordExistsError';
+  }
+}
+
 export function saveValidated<T>(
   record: T,
   schemaPath: string,
   filePath: string,
-  label: string
+  label: string,
+  options: { exclusive?: boolean } = {}
 ): string {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (safeExistsSync(safeFilePath) && !safeLstat(safeFilePath).isFile()) {
@@ -321,6 +335,19 @@ export function saveValidated<T>(
   }).validate(record, safeFilePath);
   const parent = path.dirname(safeFilePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+  if (options.exclusive) {
+    // An atomic create (O_EXCL): two writers racing for the same record id
+    // cannot both succeed, and neither silently overwrites the other.
+    try {
+      safeCreateExclusiveFileSync(safeFilePath, JSON.stringify(validated, null, 2));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') {
+        throw new OrganizationRecordExistsError(label, safeFilePath);
+      }
+      throw error;
+    }
+    return safeFilePath;
+  }
   safeWriteFile(safeFilePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
   return safeFilePath;
 }
@@ -840,6 +867,76 @@ export function transitionOrganizationLifecycle(input: {
   return next;
 }
 
+/**
+ * A parent must live in the same tier and tenant: a subsidiary that does not
+ * warrant its own tenant is recorded under its parent's tenant, and a parent
+ * link is never a cross-tenant reference.
+ */
+export function assertOrganizationParent(input: {
+  organizationId: string;
+  parentOrganizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+}): void {
+  assertOrganizationId(input.parentOrganizationId);
+  if (input.parentOrganizationId === input.organizationId) {
+    throw new Error(`Organization '${input.organizationId}' cannot be its own parent.`);
+  }
+  const scope = { tier: input.tier, tenantSlug: input.tenantSlug, rootDir: input.rootDir };
+  const seen = new Set([input.organizationId]);
+  let cursor: string | undefined = input.parentOrganizationId;
+  while (cursor) {
+    const ancestor = loadOrganizationOperationalState(cursor, scope);
+    if (!ancestor) {
+      throw new Error(
+        `Parent organization '${cursor}' not found in ${input.tier} / ${input.tenantSlug || 'shared'}.`
+      );
+    }
+    if (seen.has(cursor)) {
+      throw new Error(
+        `Parent link '${input.organizationId}' -> '${input.parentOrganizationId}' would form a cycle.`
+      );
+    }
+    seen.add(cursor);
+    cursor = ancestor.parent_organization_id;
+  }
+}
+
+export function setOrganizationParent(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+  parentOrganizationId: string | null;
+}): OrganizationOperationalState {
+  const current = loadOrganizationOperationalState(input.organizationId, input);
+  if (!current) throw new Error(`Organization not found: ${input.organizationId}`);
+  if (input.parentOrganizationId) {
+    assertOrganizationParent({ ...input, parentOrganizationId: input.parentOrganizationId });
+  }
+  const { parent_organization_id: _previous, ...rest } = current;
+  const next: OrganizationOperationalState = {
+    ...rest,
+    ...(input.parentOrganizationId ? { parent_organization_id: input.parentOrganizationId } : {}),
+    updated_at: nowIso(),
+  };
+  saveOrganizationOperationalState(next, { rootDir: input.rootDir });
+  auditChain.record({
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    action: 'organization.parent_set',
+    operation: `parent_set:${input.organizationId}`,
+    result: 'completed',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: {
+      organization_id: input.organizationId,
+      previous_parent_organization_id: current.parent_organization_id ?? null,
+      parent_organization_id: input.parentOrganizationId,
+    },
+  });
+  return next;
+}
+
 export type OrganizationRetireKind = 'domain' | 'capability' | 'service' | 'operation' | 'cadence';
 
 export function loadOrganizationOperationalState(
@@ -1140,15 +1237,30 @@ export function listOrganizationRecordFiles(
   const tenantSlug = recordQueryTenant(query.tenantSlug || getRegisteredEnvText('KYBERION_TENANT'));
   const tiers = recordQueryTiers(query.tier);
   return tiers.flatMap((tier) => {
+    // Scope to the organization's own state directory. A substring match on
+    // the path would also match the tenant segment, pulling a sibling
+    // organization's records in whenever the tenant slug equals the id.
+    if (query.organizationId) {
+      return organizationRecordFiles(
+        path.join(
+          pathResolver.organizationStateDir(
+            query.organizationId,
+            tier,
+            tenantSlug,
+            query.rootDir || pathResolver.rootDir()
+          ),
+          kind
+        ),
+        fileName
+      );
+    }
     const organizationRoot = path.resolve(
       query.rootDir || pathResolver.rootDir(),
       'active/organizations',
       tier,
       tenantSlug
     );
-    return organizationRecordFiles(organizationRoot, fileName).filter((filePath) =>
-      query.organizationId ? filePath.includes(`/${query.organizationId}/`) : true
-    );
+    return organizationRecordFiles(organizationRoot, fileName);
   });
 }
 

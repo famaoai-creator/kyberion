@@ -21,6 +21,7 @@ import {
   buildOrganizationProjectLink,
   buildOrganizationCadence,
   buildOrganizationDecision,
+  listOrganizationDomains,
   loadOrganizationCatalog,
   reconcileOrganizationCatalog,
   reconcileOrganizationState,
@@ -35,6 +36,7 @@ import {
   saveOrganizationPurpose,
   saveOrganizationService,
   saveOrganizationServiceState,
+  setOrganizationParent,
   organizationRecordFiles,
   organizationOperationalStatePath,
 } from './organization-operating-model-persistence.js';
@@ -682,6 +684,104 @@ describe('organization operating model', () => {
     });
   });
 
+  it('scopes records to one organization when a subsidiary shares its parent tenant', () => {
+    const rootDir = pathResolver.sharedTmp(`organization-parent-scope-test-${process.pid}`);
+    // The parent id equals the tenant slug, so a substring match on the path
+    // would also match the subsidiary's files under the same tenant.
+    const parentTenant = 'tenant-parent-scope';
+    const parentId = parentTenant;
+    const childId = 'subsidiary-org';
+    const scope = { tier: 'confidential' as const, tenantSlug: parentTenant, rootDir };
+    process.env.KYBERION_TENANT = parentTenant;
+    safeRmSync(rootDir, { recursive: true, force: true });
+    try {
+      const state = (id: string, name: string): OrganizationOperationalState => ({
+        organization_id: id,
+        name,
+        tier: 'confidential',
+        tenant_slug: parentTenant,
+        status: 'active',
+        updated_at: '2026-09-24T00:00:00.000Z',
+      });
+      saveOrganizationOperationalState(state(parentId, 'Parent'), { rootDir });
+      saveOrganizationOperationalState(state(childId, 'Subsidiary'), { rootDir });
+      const domain = (id: string): OrganizationDomainRecord => ({
+        version: '1.0.0',
+        domain_id: 'shared-domain',
+        organization_id: id,
+        name: 'Shared Domain',
+        owner_role: 'operator',
+        capability_ids: [],
+        service_ids: [],
+        tier: 'confidential',
+        tenant_slug: parentTenant,
+        status: 'active',
+        updated_at: '2026-09-24T00:00:00.000Z',
+      });
+      saveOrganizationDomain(domain(parentId), { rootDir });
+      saveOrganizationDomain(domain(childId), { rootDir });
+
+      expect(
+        listOrganizationDomains({ organizationId: parentId, ...scope }).map(
+          (entry) => entry.organization_id
+        )
+      ).toEqual([parentId]);
+      expect(
+        listOrganizationDomains({ organizationId: childId, ...scope }).map(
+          (entry) => entry.organization_id
+        )
+      ).toEqual([childId]);
+
+      const linked = setOrganizationParent({
+        organizationId: childId,
+        parentOrganizationId: parentId,
+        ...scope,
+      });
+      expect(linked.parent_organization_id).toBe(parentId);
+      expect(loadOrganizationOperationalState(childId, scope)?.parent_organization_id).toBe(
+        parentId
+      );
+      expect(() =>
+        setOrganizationParent({ organizationId: parentId, parentOrganizationId: childId, ...scope })
+      ).toThrow(/cycle/);
+      expect(() =>
+        setOrganizationParent({ organizationId: childId, parentOrganizationId: childId, ...scope })
+      ).toThrow(/own parent/);
+      expect(() =>
+        setOrganizationParent({
+          organizationId: childId,
+          parentOrganizationId: 'missing-parent',
+          ...scope,
+        })
+      ).toThrow(/not found/);
+      expect(() =>
+        buildOrganizationScaffold({
+          organizationId: 'another-subsidiary',
+          name: 'Another',
+          parentOrganizationId: 'missing-parent',
+          ...scope,
+        })
+      ).toThrow(/not found/);
+      expect(
+        buildOrganizationScaffold({
+          organizationId: 'another-subsidiary',
+          name: 'Another',
+          parentOrganizationId: parentId,
+          ...scope,
+        }).state.parent_organization_id
+      ).toBe(parentId);
+
+      const cleared = setOrganizationParent({
+        organizationId: childId,
+        parentOrganizationId: null,
+        ...scope,
+      });
+      expect(cleared).not.toHaveProperty('parent_organization_id');
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it('authors an organization end-to-end via the builder functions', () => {
     const now = '2026-08-08T00:00:00.000Z';
     const scaffold = buildOrganizationScaffold(
@@ -929,10 +1029,15 @@ describe('organization operating model', () => {
         serviceId: 'svc-authoring',
         triggerKind: 'schedule',
         triggerExpression: '0 9 * * 1',
+        triggerTimezone: 'Asia/Tokyo',
       },
       now
     );
-    expect(operation.trigger).toEqual({ kind: 'schedule', expression: '0 9 * * 1' });
+    expect(operation.trigger).toEqual({
+      kind: 'schedule',
+      expression: '0 9 * * 1',
+      timezone: 'Asia/Tokyo',
+    });
     expect(() =>
       buildOrganizationOperationRecord(
         {
@@ -945,10 +1050,27 @@ describe('organization operating model', () => {
           tenantSlug,
           triggerKind: 'schedule',
           triggerExpression: '0 0 31 2 *',
+          triggerTimezone: 'Asia/Tokyo',
         },
         now
       )
     ).toThrow(/no realizable occurrence/);
+    expect(() =>
+      buildOrganizationOperationRecord(
+        {
+          organizationId,
+          operationId: 'op-authoring-no-timezone',
+          name: 'No timezone',
+          operationType: 'scheduled',
+          ownerRole: 'organization_owner',
+          tier: 'confidential',
+          tenantSlug,
+          triggerKind: 'schedule',
+          triggerExpression: '0 9 * * 1',
+        },
+        now
+      )
+    ).toThrow(/requires --timezone/);
     saveOrganizationOperation(operation);
 
     // A decision must be traceable to the body that made it: reconciliation

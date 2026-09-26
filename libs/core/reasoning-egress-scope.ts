@@ -24,6 +24,8 @@ import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
 
 const logger = createLogger('reasoning-egress');
 
+export type ReasoningTrainingUse = 'local_only' | 'zero_retention' | 'training_eligible';
+
 export interface ReasoningPayloadScope {
   /** Most sensitive tier represented in what will be sent. */
   tier: 'public' | 'confidential' | 'personal';
@@ -31,6 +33,8 @@ export interface ReasoningPayloadScope {
   tenant_slug?: string;
   /** What is being sent, recorded on denial. */
   purpose?: string;
+  /** Maximum provider data-use posture. Defaults to local_only. */
+  training_use?: ReasoningTrainingUse;
 }
 
 const scopeStorage = new AsyncLocalStorage<ReasoningPayloadScope>();
@@ -46,6 +50,10 @@ export function getReasoningPayloadScope(): ReasoningPayloadScope | undefined {
 
 export function isLocalReasoningBackend(backendName: string): boolean {
   return isLocalOnlyReasoningBackend(backendName);
+}
+
+function reasoningDataPolicy(backendName: string): ReasoningTrainingUse {
+  return isLocalReasoningBackend(backendName) ? 'local_only' : 'training_eligible';
 }
 
 /**
@@ -130,10 +138,23 @@ export function assertReasoningEgressAllowedAtEndpoint(
     }
     return;
   }
-  if (scope.tier === 'public') return;
   // A local endpoint is safe even when the adapter uses a provider-neutral
   // runtime name such as `openai-compatible`.
   if (localEndpoint) return;
+  if ((scope.training_use ?? 'local_only') === 'local_only') {
+    throw new ReasoningEgressDeniedError(
+      `training_use 'local_only' forbids sending ${scope.tier} material to external backend ${backendName}`
+    );
+  }
+  if (
+    scope.training_use === 'zero_retention' &&
+    reasoningDataPolicy(backendName) === 'training_eligible'
+  ) {
+    throw new ReasoningEgressDeniedError(
+      `backend ${backendName} has no zero_retention declaration; use training_eligible explicitly or configure an attested provider policy`
+    );
+  }
+  if (scope.tier === 'public') return;
 
   const decision = evaluateEgressPolicy(endpoint, {
     tier: scope.tier,
