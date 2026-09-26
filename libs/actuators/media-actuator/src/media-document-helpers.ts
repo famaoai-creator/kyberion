@@ -853,6 +853,17 @@ export function buildUnifiedDocumentBrief(
       evidence: source.evidence || data.evidence || payload.evidence || [],
       required_sections:
         source.required_sections || data.required_sections || payload.required_sections || [],
+      design_system_id:
+        source.design_system_id || data.design_system_id || payload.design_system_id,
+      design_reference: source.design_reference || data.design_reference,
+      branding: source.branding || data.branding || payload.branding,
+      deck_mode: source.deck_mode || data.deck_mode || payload.deck_mode,
+      slide_pattern_id: source.slide_pattern_id || data.slide_pattern_id,
+      slide_pattern_pack_id: source.slide_pattern_pack_id || data.slide_pattern_pack_id,
+      slide_pattern_selection_policy:
+        source.slide_pattern_selection_policy ||
+        data.slide_pattern_selection_policy ||
+        payload.slide_pattern_selection_policy,
       payload,
     };
   }
@@ -867,6 +878,10 @@ export function buildUnifiedDocumentBrief(
       locale: source.locale || data.locale || 'en-US',
       layout_template_id: source.layout_template_id || data.layout_template_id,
       theme: source.theme || data.theme || source.payload?.theme || data.payload?.theme,
+      design_system_id:
+        source.design_system_id || data.design_system_id || source.payload?.design_system_id,
+      design_reference: source.design_reference || data.design_reference,
+      branding: source.branding || data.branding || source.payload?.branding,
       payload: source.payload || data.payload || data,
     };
   }
@@ -883,6 +898,11 @@ export function buildUnifiedDocumentBrief(
     theme: source.theme || data.theme || source.payload?.theme || data.payload?.theme,
     title: source.title || data.title,
     summary: source.summary || data.summary,
+    date: source.date || data.date,
+    design_system_id:
+      source.design_system_id || data.design_system_id || source.payload?.design_system_id,
+    design_reference: source.design_reference || data.design_reference,
+    branding: source.branding || data.branding || source.payload?.branding,
     payload: source.payload || data.payload || data,
   };
 }

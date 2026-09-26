@@ -68,7 +68,12 @@ export async function selectDeckTheme(input: SelectDeckThemeInput): Promise<stri
     if (input.catalog.some((entry) => entry.id === choice)) {
       return choice;
     }
-    logger.warn(
+    // An empty choice means the reasoning backend produced nothing parseable
+    // (stub/offline is expected) — that's not an anomaly worth warning on.
+    // A non-empty out-of-catalog pick is the real signal worth keeping.
+    const log = choice ? logger.warn : logger.info;
+    log.call(
+      logger,
       `selected theme "${choice}" is not in the catalog — using default ${input.defaultTheme}`
     );
     return input.defaultTheme;
