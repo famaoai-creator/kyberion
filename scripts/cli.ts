@@ -1160,6 +1160,7 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'see',
   'listen',
   'watch',
+  'memory',
   // speak routes through the voice actuator's engine registry, not the
   // bootstrapped python voice bridge / reasoning backends.
   'speak',
@@ -1347,6 +1348,15 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   if (command === 'calendar') {
     await withWorkflowOutputPrinter(print, () =>
       handleCalendarWorkflowCommand(firstArg, restArgs, locale)
+    );
+    return;
+  }
+
+  if (command === 'memory') {
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runMemoryCommand } = await import('./cli-memory.js');
+    await runMemoryCommand(
+      [firstArg, ...restArgs].filter((arg): arg is string => arg !== undefined)
     );
     return;
   }

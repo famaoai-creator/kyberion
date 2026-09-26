@@ -46,7 +46,10 @@ describe('purpose-driven OCR provider selection', () => {
       makeProvider('llm_api', 'external'),
     ]);
 
-    const candidates = await router.resolveCandidates({ path: 'test.png' });
+    const candidates = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+    });
 
     expect(candidates.map((p) => p.id)).toEqual(['apple_vision', 'llm_api']);
     expect(record).not.toHaveBeenCalled();
@@ -60,6 +63,7 @@ describe('purpose-driven OCR provider selection', () => {
 
     const candidates = await router.resolveCandidates({
       path: 'test.png',
+      training_use: 'training_eligible',
       purpose: 'accuracy',
       providerPreference: ['llm_api'],
     });
@@ -74,10 +78,18 @@ describe('purpose-driven OCR provider selection', () => {
       makeProvider('llm_api', 'external'),
     ]);
 
-    const byPrivacy = await router.resolveCandidates({ path: 'test.png', purpose: 'privacy' });
+    const byPrivacy = await router.resolveCandidates({
+      path: 'test.png',
+      purpose: 'privacy',
+      training_use: 'training_eligible',
+    });
     expect(byPrivacy.map((p) => p.id)).toEqual(['apple_vision', 'llm_api']);
 
-    const byAccuracy = await router.resolveCandidates({ path: 'test.png', purpose: 'accuracy' });
+    const byAccuracy = await router.resolveCandidates({
+      path: 'test.png',
+      purpose: 'accuracy',
+      training_use: 'training_eligible',
+    });
     expect(byAccuracy.map((p) => p.id)).toEqual(['llm_api', 'apple_vision']);
 
     expect(record).toHaveBeenCalledWith(
@@ -96,6 +108,7 @@ describe('purpose-driven OCR provider selection', () => {
 
     const candidates = await router.resolveCandidates({
       path: 'test.png',
+      training_use: 'training_eligible',
       mode: 'local_only',
       purpose: 'accuracy',
     });
@@ -121,7 +134,11 @@ describe('purpose-driven OCR provider selection', () => {
       makeProvider('llm_api', 'external'),
     ]);
 
-    const candidates = await router.resolveCandidates({ path: 'test.png', purpose: 'accuracy' });
+    const candidates = await router.resolveCandidates({
+      path: 'test.png',
+      purpose: 'accuracy',
+      training_use: 'training_eligible',
+    });
 
     expect(candidates.map((p) => p.id)).toEqual(['llm_api']);
   });
@@ -150,7 +167,10 @@ describe('purpose-driven OCR provider selection', () => {
       makeProvider('llm_api', 'external'),
     ]);
 
-    const before = await router.resolveCandidates({ path: 'test.png' });
+    const before = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+    });
     expect(before.map((p) => p.id)).toEqual(['apple_vision', 'llm_api']);
     expect(record).not.toHaveBeenCalled();
 
@@ -164,7 +184,10 @@ describe('purpose-driven OCR provider selection', () => {
     // Rule changes are audited too; assertions below are about selection.
     record.mockClear();
 
-    const after = await router.resolveCandidates({ path: 'test.png' });
+    const after = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+    });
     expect(after[0]!.id).toBe('llm_api');
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -192,6 +215,7 @@ describe('purpose-driven OCR provider selection', () => {
 
     const candidates = await router.resolveCandidates({
       path: 'test.png',
+      training_use: 'training_eligible',
       providerPreference: ['apple_vision'],
     });
     expect(candidates[0]!.id).toBe('apple_vision');
@@ -216,6 +240,7 @@ describe('purpose-driven OCR provider selection', () => {
 
     const jaCandidates = await router.resolveCandidates({
       path: 'test.png',
+      training_use: 'training_eligible',
       purpose: 'accuracy',
       language: 'ja',
     });
@@ -231,6 +256,7 @@ describe('purpose-driven OCR provider selection', () => {
       path: 'test.png',
       purpose: 'accuracy',
       language: 'en',
+      training_use: 'training_eligible',
     });
     expect(enCandidates[0]!.id).toBe('llm_api');
     expect(record).toHaveBeenCalledWith(
@@ -255,11 +281,19 @@ describe('purpose-driven OCR provider selection', () => {
     // Rule changes are audited too; assertions below are about selection.
     record.mockClear();
 
-    const en = await router.resolveCandidates({ path: 'test.png', language: 'en' });
+    const en = await router.resolveCandidates({
+      path: 'test.png',
+      language: 'en',
+      training_use: 'training_eligible',
+    });
     expect(en.map((p) => p.id)).toEqual(['apple_vision', 'llm_api']);
     expect(record).not.toHaveBeenCalled();
 
-    const ja = await router.resolveCandidates({ path: 'test.png', language: 'ja' });
+    const ja = await router.resolveCandidates({
+      path: 'test.png',
+      language: 'ja',
+      training_use: 'training_eligible',
+    });
     expect(ja[0]!.id).toBe('llm_api');
   });
 });

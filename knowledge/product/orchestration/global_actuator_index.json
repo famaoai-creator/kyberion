@@ -100,9 +100,17 @@
       "path": "libs/actuators/calendar-actuator",
       "d": "Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws)",
       "s": "implemented",
-      "version": "1.2.0",
-      "capability_count": 4,
-      "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
+      "version": "1.4.0",
+      "capability_count": 7,
+      "ops": [
+        "create_event",
+        "delete_event",
+        "find_slots",
+        "list_calendars",
+        "list_events",
+        "query_freebusy",
+        "update_event"
+      ],
       "contract_schema": "knowledge/product/schemas/calendar-action.schema.json",
       "prerequisites_summary": "-"
     },

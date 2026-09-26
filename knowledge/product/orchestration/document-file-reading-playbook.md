@@ -45,8 +45,11 @@ the ingest ceremony is the only sanctioned way into
   tables and metadata.
 - `ocr: true` (or `{ enabled, language, mode, min_area_ratio }`) OCRs the images on
   each page — pasted tables, charts, screenshots. Images under 3% of the page (logos)
-  are skipped. Local providers only by default (`mode: 'local_only'`, Apple Vision /
-  tesseract).
+  are skipped. OCR is local-only by default (`training_use: 'local_only'`, Apple Vision /
+  tesseract). A caller handling an invoice or other PII-bearing document may declare
+  `tier: 'confidential'` or `tier: 'personal'` and retain the OCR result in that tier.
+  Remote OCR requires an explicit `training_use` (`zero_retention` or
+  `training_eligible`), a tenant slug, and normal tenant egress approval.
 - Scanned PDFs (one full-page image per page): `media:pdf_to_pptx_design` with
   `hints.features.fullPageImageOcrOverlay: true`. This overlay does **not** fire for
   partial-page images; use `ocr: true` above for those.

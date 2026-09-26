@@ -91,6 +91,8 @@ export interface MeetingDigestJob {
   tags: string[];
   lookback_days?: number;
   provisional_hours?: number;
+  /** Summary provider data-use ceiling. Defaults to local_only. */
+  training_use?: 'local_only' | 'zero_retention' | 'training_eligible';
   /** Identity recorded on every ledger record. */
   ingested_by: string;
   /** Standing operator authorization for this automated ceremony. */
@@ -189,6 +191,14 @@ function validateJob(raw: unknown, knowledgeRoot: string): MeetingDigestJob {
   }
   if (!String(job.title_prefix ?? '').trim()) fail(`${where}: title_prefix is required`);
   if (!Array.isArray(job.tags) || job.tags.length === 0) fail(`${where}: tags are required`);
+  if (
+    job.training_use !== undefined &&
+    job.training_use !== 'local_only' &&
+    job.training_use !== 'zero_retention' &&
+    job.training_use !== 'training_eligible'
+  ) {
+    fail(`${where}: training_use must be local_only, zero_retention, or training_eligible`);
+  }
   if (!String(job.ingested_by ?? '').trim()) fail(`${where}: ingested_by is required`);
   const approval = job.approval ?? ({} as MeetingDigestJob['approval']);
   if (!approval.approval_id || !approval.approved_by || !approval.approved_at) {
@@ -359,6 +369,7 @@ async function resolveBackend(input: MeetingDigestInput): Promise<ReasoningBacke
 async function askStructured<T>(
   backend: ReasoningBackend,
   tenantSlug: string,
+  trainingUse: 'local_only' | 'zero_retention' | 'training_eligible',
   sourceLabel: string,
   untrustedData: string,
   instruction: (priorError?: string) => string,
@@ -367,7 +378,12 @@ async function askStructured<T>(
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const raw = await withReasoningPayloadScope(
-      { tier: 'confidential', tenant_slug: tenantSlug, purpose: 'ingest:meeting_digest' },
+      {
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        purpose: 'ingest:meeting_digest',
+        training_use: trainingUse,
+      },
       () =>
         delegateTaskWithUntrustedData(
           backend,
@@ -388,6 +404,7 @@ async function askStructured<T>(
 async function summarizePage(
   backend: ReasoningBackend,
   tenantSlug: string,
+  trainingUse: 'local_only' | 'zero_retention' | 'training_eligible',
   page: FetchedPage,
   meetingDate: string,
   pageMarkdown: string
@@ -395,6 +412,7 @@ async function summarizePage(
   return askStructured(
     backend,
     tenantSlug,
+    trainingUse,
     `confluence:page:${page.id}`,
     pageMarkdown.slice(0, MAX_PAGE_CHARS),
     (priorError) => summaryInstruction(meetingDate, priorError),
@@ -405,6 +423,7 @@ async function summarizePage(
 async function regenerateOpenIssues(
   backend: ReasoningBackend,
   tenantSlug: string,
+  trainingUse: 'local_only' | 'zero_retention' | 'training_eligible',
   previous: OpenIssue[],
   latestDate: string,
   latest: MeetingDigestSummary
@@ -425,6 +444,7 @@ async function regenerateOpenIssues(
   return askStructured(
     backend,
     tenantSlug,
+    trainingUse,
     `meeting-digest:open-issues:${latestDate}`,
     data,
     (priorError) =>
@@ -579,7 +599,14 @@ async function runJob(
       body = stripProvisionalNote(existing.body);
     } else {
       backend ??= await resolveBackend(input);
-      summary = await summarizePage(backend, tenantSlug, page, candidate.date, ir.text_markdown);
+      summary = await summarizePage(
+        backend,
+        tenantSlug,
+        job.training_use || 'local_only',
+        page,
+        candidate.date,
+        ir.text_markdown
+      );
       body = renderDigestBody(summary, {
         title_prefix: job.title_prefix,
         meeting_date: candidate.date,
@@ -673,6 +700,7 @@ async function runJob(
       openIssues = await regenerateOpenIssues(
         backend,
         tenantSlug,
+        job.training_use || 'local_only',
         readOpenIssues(existingReadme),
         newest.date,
         newest.summary

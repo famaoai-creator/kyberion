@@ -22,11 +22,14 @@ import {
 import { safeWriteFile } from '@agent/core/secure-io';
 import { ScriptExitError } from './lib/harness.js';
 
-export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--json] [--out <file>] [--images <dir>]
+export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
 
 Reads a ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(' / ')} file with the native engines and prints Markdown.
 HTML is converted to Markdown (<title> as the heading; scripts/styles dropped); Markdown / text are printed as-is.
-  --ocr         Also OCR embedded images (slides/pages/pictures; pdf/pptx/docx) with local providers only
+  --ocr         Also OCR embedded images (slides/pages/pictures; pdf/pptx/docx); local_only is the default
+  --tier <tier> Classify OCR input as public, confidential, or personal (PII may remain in that tier)
+  --tenant <slug> Tenant owning classified input; required for approved external egress
+  --training-use <policy> local_only (default), zero_retention, or training_eligible
   --json        Print {format, title, tables, warnings, markdown} as JSON
   --out <file>  Write the Markdown (or JSON) to a file inside the repository instead of stdout
   --verbose     Keep runtime logs (they go to stdout; off by default so stdout is the document)
@@ -45,6 +48,9 @@ interface ReadArgs {
   json: boolean;
   out?: string;
   images?: string;
+  tier?: 'public' | 'confidential' | 'personal';
+  tenant?: string;
+  trainingUse?: 'local_only' | 'zero_retention' | 'training_eligible';
   help: boolean;
 }
 
@@ -66,6 +72,31 @@ function parseReadArgs(argv: string[]): ReadArgs {
       args.images = argv[index + 1];
       index += 1;
       if (!args.images) throw new ScriptExitError(1, '--images requires a directory');
+    } else if (value === '--tier') {
+      const tier = argv[index + 1];
+      index += 1;
+      if (tier !== 'public' && tier !== 'confidential' && tier !== 'personal') {
+        throw new ScriptExitError(1, '--tier must be public, confidential, or personal');
+      }
+      args.tier = tier;
+    } else if (value === '--tenant') {
+      args.tenant = argv[index + 1];
+      index += 1;
+      if (!args.tenant) throw new ScriptExitError(1, '--tenant requires a slug');
+    } else if (value === '--training-use') {
+      const policy = argv[index + 1];
+      index += 1;
+      if (
+        policy !== 'local_only' &&
+        policy !== 'zero_retention' &&
+        policy !== 'training_eligible'
+      ) {
+        throw new ScriptExitError(
+          1,
+          '--training-use must be local_only, zero_retention, or training_eligible'
+        );
+      }
+      args.trainingUse = policy;
     } else if (value.startsWith('--')) throw new ScriptExitError(1, `Unknown option: ${value}`);
     else if (!args.file) args.file = value;
     else throw new ScriptExitError(1, `Unexpected argument: ${value}`);
@@ -129,6 +160,9 @@ export async function runReadCommand(
   }
   const result = await readDocument(absolute, format, {
     ocr: args.ocr,
+    ...(args.tier ? { tier: args.tier } : {}),
+    ...(args.tenant ? { tenantSlug: args.tenant } : {}),
+    ...(args.trainingUse ? { trainingUse: args.trainingUse } : {}),
     ...(args.images ? { imagesDir: args.images } : {}),
   });
   const rendered = renderReadResult(result, args.json);

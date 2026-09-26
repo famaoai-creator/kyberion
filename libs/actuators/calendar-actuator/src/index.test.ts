@@ -61,6 +61,14 @@ describe('calendar-actuator: input validation', () => {
     ).rejects.toThrow(/missing required fields.*params.start_date.*params.end_date/i);
   });
 
+  it('requires a range and duration for temporal slot planning', async () => {
+    await expect(
+      handleAction({ op: 'find_slots' as const, params: { backend: 'gws' } })
+    ).rejects.toThrow(
+      /missing required fields.*params.start_date.*params.end_date.*params.duration_minutes/i
+    );
+  });
+
   it('allows a user-selected registered adapter to aggregate multiple calendar targets', async () => {
     const outlookAdapter: CalendarBackendAdapter = {
       id: 'outlook',
@@ -78,7 +86,22 @@ describe('calendar-actuator: input validation', () => {
         },
       ]),
       queryFreeBusy: vi.fn().mockResolvedValue([]),
+      findSlots: vi.fn().mockResolvedValue({
+        slots: [
+          {
+            start: '2026-07-25T01:00:00.000Z',
+            end: '2026-07-25T02:00:00.000Z',
+            timezone: 'Asia/Tokyo',
+          },
+        ],
+      }),
       createEvent: vi.fn().mockResolvedValue({ status: 'success', title: 'Event' }),
+      updateEvent: vi
+        .fn()
+        .mockResolvedValue({ status: 'success', title: 'Updated event', id: 'event-1' }),
+      deleteEvent: vi
+        .fn()
+        .mockResolvedValue({ status: 'success', event_id: 'event-1', calendar_id: 'work' }),
     };
     const registry = new CalendarBackendRegistry([outlookAdapter]);
 
@@ -99,6 +122,48 @@ describe('calendar-actuator: input validation', () => {
       expect.objectContaining({ backend: 'outlook', calendar: 'work' }),
       expect.objectContaining({ backend: 'outlook', calendar: 'personal' }),
     ]);
+
+    await expect(
+      handleAction(
+        {
+          op: 'find_slots',
+          params: {
+            backend: 'outlook',
+            calendar_names: ['work'],
+            start_date: '2026-07-25T00:00:00+09:00',
+            end_date: '2026-07-26T00:00:00+09:00',
+            duration_minutes: 60,
+          },
+        },
+        registry
+      )
+    ).resolves.toEqual([expect.objectContaining({ backend: 'outlook', slots: expect.any(Array) })]);
+
+    await expect(
+      handleAction(
+        {
+          op: 'update_event',
+          params: {
+            backend: 'outlook',
+            calendar_id: 'work',
+            event_id: 'event-1',
+            start_date: '2026-07-25T11:00:00+09:00',
+            reminder_minutes_before_start: 15,
+          },
+        },
+        registry
+      )
+    ).resolves.toEqual(expect.objectContaining({ backend: 'outlook', id: 'event-1' }));
+
+    await expect(
+      handleAction(
+        {
+          op: 'delete_event',
+          params: { backend: 'outlook', calendar_id: 'work', event_id: 'event-1' },
+        },
+        registry
+      )
+    ).resolves.toEqual(expect.objectContaining({ backend: 'outlook', event_id: 'event-1' }));
   });
 });
 

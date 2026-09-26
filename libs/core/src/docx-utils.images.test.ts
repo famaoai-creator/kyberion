@@ -51,13 +51,19 @@ function docxWithPicture(marker: string): Buffer {
   return zip.toBuffer();
 }
 
-function drawings(design: any): any[] {
-  const found: any[] = [];
-  const walk = (node: any): void => {
+type UnknownRecord = Record<string, unknown>;
+type DrawingRecord = { imagePath: string; imageData?: string };
+
+function drawings(design: UnknownRecord): DrawingRecord[] {
+  const found: DrawingRecord[] = [];
+  const walk = (node: unknown): void => {
     if (Array.isArray(node)) return node.forEach(walk);
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'drawing') found.push(node.drawing);
-    Object.values(node).forEach(walk);
+    const record = node as UnknownRecord;
+    if (record.type === 'drawing' && record.drawing && typeof record.drawing === 'object') {
+      found.push(record.drawing as DrawingRecord);
+    }
+    Object.values(record).forEach(walk);
   };
   walk(design.body);
   return found;

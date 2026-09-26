@@ -172,7 +172,7 @@ describe('document-reader', () => {
         generatedAt: '2026-01-01T00:00:00.000Z',
         source: { format: 'markdown', body: 'Quarterly revenue grew.', title: 'Quarterly Review' },
         metadata: { title: 'Quarterly Review', author: 'Jane Example' },
-      } as any,
+      } as unknown as Parameters<typeof generateNativePdf>[0],
       pdfPath,
       { compress: false, xmpMetadata: true }
     );

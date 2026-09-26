@@ -43,6 +43,28 @@ export interface CalendarEventCreateInput {
   with_meet?: boolean;
 }
 
+export interface CalendarEventUpdateInput {
+  attendees?: string[];
+  provider?: CalendarProvider;
+  calendar_id?: string;
+  description?: string;
+  end?: string;
+  event_id: string;
+  location?: string;
+  reminder_minutes_before_start?: number;
+  send_updates?: 'all' | 'externalOnly' | 'none';
+  start?: string;
+  summary?: string;
+  time_zone?: string;
+}
+
+export interface CalendarEventDeleteInput {
+  provider?: CalendarProvider;
+  calendar_id?: string;
+  event_id: string;
+  send_updates?: 'all' | 'externalOnly' | 'none';
+}
+
 export interface CalendarEventSummary {
   end: string;
   hangout_link: string;
@@ -104,6 +126,12 @@ export interface CalendarEventCreateResult {
   created_event: CalendarEventSummary;
   ok: boolean;
   with_meet: boolean;
+}
+
+export interface CalendarEventDeleteResult {
+  calendar_id: string;
+  event_id: string;
+  ok: boolean;
 }
 
 export async function readM365AuthStatus(): Promise<{
@@ -426,4 +454,66 @@ export async function createCalendarEvent(
       bridge.provider_id === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
     ),
   };
+}
+
+export async function updateCalendarEvent(
+  input: CalendarEventUpdateInput
+): Promise<CalendarEventCreateResult> {
+  const bridge = resolveCalendarProvider(input.provider);
+  if (!bridge.updateEvent)
+    throw new Error('calendar provider does not provide event update capability');
+  const calendarId = input.calendar_id?.trim() || 'primary';
+  const eventId = input.event_id.trim();
+  if (!eventId) throw new Error('event_id is required');
+  if (
+    input.reminder_minutes_before_start !== undefined &&
+    (!Number.isInteger(input.reminder_minutes_before_start) ||
+      input.reminder_minutes_before_start < 0)
+  ) {
+    throw new Error('reminder_minutes_before_start must be a non-negative integer');
+  }
+  const timeZone = input.time_zone?.trim() || '';
+  const attendees = input.attendees?.map((attendee) => attendee.trim()).filter(Boolean);
+  const response = await bridge.updateEvent({
+    calendarId,
+    eventId,
+    ...(input.summary !== undefined ? { summary: input.summary.trim() } : {}),
+    ...(input.description !== undefined ? { description: input.description.trim() } : {}),
+    ...(input.location !== undefined ? { location: input.location.trim() } : {}),
+    ...(input.start?.trim()
+      ? { start: normalizeRfc3339Value(input.start, timeZone || undefined) }
+      : {}),
+    ...(input.end?.trim() ? { end: normalizeRfc3339Value(input.end, timeZone || undefined) } : {}),
+    ...(attendees ? { attendees } : {}),
+    ...(input.reminder_minutes_before_start !== undefined
+      ? { reminderMinutesBeforeStart: input.reminder_minutes_before_start }
+      : {}),
+    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+  });
+
+  return {
+    ok: true,
+    calendar_id: calendarId,
+    with_meet: false,
+    created_event: requireCalendarEvent(
+      bridge.provider_id === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
+    ),
+  };
+}
+
+export async function deleteCalendarEvent(
+  input: CalendarEventDeleteInput
+): Promise<CalendarEventDeleteResult> {
+  const bridge = resolveCalendarProvider(input.provider);
+  if (!bridge.deleteEvent)
+    throw new Error('calendar provider does not provide event delete capability');
+  const calendarId = input.calendar_id?.trim() || 'primary';
+  const eventId = input.event_id.trim();
+  if (!eventId) throw new Error('event_id is required');
+  await bridge.deleteEvent({
+    calendarId,
+    eventId,
+    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+  });
+  return { ok: true, calendar_id: calendarId, event_id: eventId };
 }
