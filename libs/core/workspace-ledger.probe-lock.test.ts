@@ -45,6 +45,7 @@ import {
   listWorkspaces,
   registerWorkspace,
   releaseWorkspace,
+  workspaceRecordSnapshot,
   type WorkspaceLedgerOptions,
 } from './workspace-ledger.js';
 
@@ -110,7 +111,7 @@ describe('deleteRegisteredWorkspace clean-tree probe', () => {
     expect(() =>
       deleteRegisteredWorkspace(record.id, options, {
         requireCleanWorktree: true,
-        expect: { live: false, createdAt: released.createdAt, releasedAt: released.releasedAt },
+        expect: workspaceRecordSnapshot(released),
       })
     ).toThrow('WORKSPACE_CHANGED');
     expect(safeExistsSync(worktree)).toBe(true);

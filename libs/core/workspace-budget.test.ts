@@ -217,6 +217,22 @@ describe('workspace-budget', () => {
     expect(safeExistsSync(dir)).toBe(true);
   });
 
+  it('reclaims a git index whose pending reconcile is abandoned (base commit no longer resolves)', () => {
+    const dir = path.join(base, 'workspaces', 'abandoned');
+    safeWriteFile(path.join(dir, 'index'), 'x'.repeat(900));
+    const record = registerWorkspace({ path: dir, kind: 'git-index', owner: {} }, options);
+    releaseWorkspace(record.id, options);
+    // `base` is not a git repository, so this fromSha can never resolve.
+    annotateWorkspace(
+      record.id,
+      { pendingReconcile: { repoRoot: base, fromSha: '0'.repeat(40) } },
+      options
+    );
+    const result = checkWorkspaceBudget(base, 200, options);
+    expect(result).toMatchObject({ allowed: true, reclaimed: [record.id] });
+    expect(safeExistsSync(dir)).toBe(false);
+  });
+
   it('loads the governed policy and applies env overrides', () => {
     expect(loadWorkspaceBudgetPolicy({})).toEqual(DEFAULT_WORKSPACE_BUDGET_POLICY);
     expect(
