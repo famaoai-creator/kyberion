@@ -197,9 +197,22 @@ async function handleMessage(message, sender) {
       return analyzeObservation(message.procedureId, message.question);
     case 'bridge:apply-repair':
       return applyRepair(message.procedureId);
+    case 'bridge:inspect-page':
+      return inspectCurrentPage();
     default:
       throw new Error('Unsupported Browser Bridge message.');
   }
+}
+
+async function inspectCurrentPage() {
+  const state = await loadState();
+  const tabId = state.connected?.tabId;
+  if (tabId === undefined || tabId === null) {
+    throw new Error('先に Live タブから現在のページを接続してください。');
+  }
+  const result = await chrome.tabs.sendMessage(tabId, { type: 'bridge:inspect-page' });
+  if (!result?.ok) throw new Error(result?.error || 'ページの解析に失敗しました。');
+  return { inspection: result.inspection };
 }
 
 async function connectActiveTab() {

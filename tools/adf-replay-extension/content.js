@@ -104,7 +104,108 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse(verifyGolden(message.conditions || []));
     return;
   }
+  if (message?.type === 'bridge:inspect-page') {
+    sendResponse(inspectPageDOM());
+    return;
+  }
 });
+
+function inspectPageDOM() {
+  try {
+    const title = document.title || '';
+    const finalUrl = window.location.href;
+
+    const inputs = Array.from(
+      document.querySelectorAll('input, select, textarea, button[type="submit"]')
+    )
+      .map((el) => {
+        const inp = el;
+        const rawLabel =
+          (inp.labels && inp.labels[0] ? inp.labels[0].innerText.trim() : '') ||
+          inp.getAttribute('aria-label') ||
+          undefined;
+        const tag = inp.tagName.toLowerCase();
+        const type = inp.type ? String(inp.type).toLowerCase() : undefined;
+        // Never capture values. If password or sensitive, scrub placeholder and label.
+        const label = rawLabel ? safeText(rawLabel) : undefined;
+        const placeholder = inp.placeholder ? safeText(inp.placeholder) : undefined;
+        const name = inp.name ? safeText(inp.name) : undefined;
+        const id = inp.id ? safeText(inp.id) : undefined;
+
+        return {
+          tag,
+          type,
+          name,
+          id,
+          placeholder,
+          label,
+          required: inp.required || undefined,
+        };
+      })
+      .filter((x) => x.name || x.id || x.placeholder || x.label)
+      .slice(0, 30);
+
+    const buttons = Array.from(
+      document.querySelectorAll('button, [role="button"], a.btn, a[class*="button"]')
+    )
+      .map((el) => {
+        const btn = el;
+        const rawText = (btn.innerText || btn.getAttribute('aria-label') || '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const text = rawText ? safeText(rawText) : '';
+        return {
+          text,
+          id: btn.id ? safeText(btn.id) : undefined,
+          className: btn.className ? String(btn.className).slice(0, 40) : undefined,
+          disabled: Boolean(btn.disabled),
+        };
+      })
+      .filter((x) => x.text && x.text.length < 60)
+      .slice(0, 30);
+
+    const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
+      .map((el) => ({
+        level: el.tagName.toLowerCase(),
+        text: safeText((el.innerText || '').replace(/\s+/g, ' ').trim()),
+      }))
+      .filter((x) => x.text)
+      .slice(0, 20);
+
+    const links = Array.from(document.querySelectorAll('a[href]'))
+      .map((el) => {
+        const a = el;
+        return {
+          text: safeText((a.innerText || '').replace(/\s+/g, ' ').trim()),
+          href: a.href,
+        };
+      })
+      .filter((x) => x.text && x.text.length < 50 && !x.href.startsWith('javascript:'))
+      .slice(0, 25);
+
+    const rawExcerpt = (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    const textExcerpt = safeText(rawExcerpt);
+
+    return {
+      ok: true,
+      inspection: {
+        mode: 'extension',
+        url: finalUrl,
+        title: safeText(title),
+        headings,
+        inputs,
+        buttons,
+        links,
+        textExcerpt,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
 
 // Post-execution golden-scenario verification (#3): check each success condition
 // against the live DOM. Kinds we cannot check in-page do not claim success but
