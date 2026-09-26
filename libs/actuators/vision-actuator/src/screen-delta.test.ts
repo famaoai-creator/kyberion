@@ -71,4 +71,25 @@ describe('handleDescribeScreenDelta scope', () => {
       state_dir: path.join(missionPath, 'tmp', 'vision-state'),
     });
   });
+
+  it("refuses a tenant_slug that is not the mission's tenant", async () => {
+    const missionPath = path.join(pathResolver.rootDir(), 'active/missions/public/MSN-P');
+    const describeDelta = vi.fn(async () => deltaResult);
+    await expect(
+      handleDescribeScreenDelta(
+        {
+          path: 'active/shared/tmp/screen.png',
+          session_id: 's1',
+          mission_id: 'MSN-P',
+          tenant_slug: 'acme',
+        },
+        {
+          describeDelta,
+          resolveMissionPath: () => missionPath,
+          resolveMissionTenant: () => 'globex',
+        }
+      )
+    ).rejects.toThrow("[VISION_TIER_SCOPE] tenant 'acme' does not own mission 'MSN-P'");
+    expect(describeDelta).not.toHaveBeenCalled();
+  });
 });

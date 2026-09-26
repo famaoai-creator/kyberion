@@ -75,4 +75,37 @@ describe('handleDescribeImage', () => {
     ).rejects.toThrow('[VISION_TIER_SCOPE] personal');
     expect(describeFn).not.toHaveBeenCalled();
   });
+
+  it("refuses a tenant_slug that is not the mission's tenant", async () => {
+    const { describeFn } = recorder();
+    const missionPath = path.join(pathResolver.rootDir(), 'active/missions/confidential/MSN-D');
+    const redactCopy = vi.fn(async () => ({ path: '/redacted.png', dispose: () => {} }));
+    const deps = {
+      describe: describeFn,
+      redactCopy,
+      resolveMissionPath: () => missionPath,
+      resolveMissionTenant: () => 'globex',
+    };
+    await expect(
+      handleDescribeImage(
+        { path: 'active/shared/tmp/chart.png', mission_id: 'MSN-D', tenant_slug: 'acme' },
+        deps
+      )
+    ).rejects.toThrow("[VISION_TIER_SCOPE] tenant 'acme' does not own mission 'MSN-D'");
+    await expect(
+      handleDescribeImage(
+        { path: 'active/shared/tmp/chart.png', mission_id: 'MSN-D', tenant_slug: 'acme' },
+        { ...deps, resolveMissionTenant: () => undefined }
+      )
+    ).rejects.toThrow('tenant-less mission');
+    expect(describeFn).not.toHaveBeenCalled();
+    await handleDescribeImage(
+      { path: 'active/shared/tmp/chart.png', mission_id: 'MSN-D', tenant_slug: 'globex' },
+      deps
+    );
+    expect(describeFn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tenant_slug: 'globex' })
+    );
+  });
 });

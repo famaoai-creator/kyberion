@@ -2,7 +2,14 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReaddir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { resolveYtDlpBin } from '../tool-binary-resolvers.js';
 import type { EgressPolicyDecision } from '../egress-policy.js';
 import type { RiskyApprovalRequest, RiskyApprovalResult } from '../risky-op-approval-port.js';
@@ -462,6 +469,16 @@ function entryDirOf(placement: VideoCachePlacement, url: string): string {
   return path.join(placement.root, urlContentKey(url, POLICY.download_format));
 }
 
+/** Correlation id the brief derives for a normalized URL under a policy. */
+function correlationFor(url: string, policy: VideoIngestPolicy = POLICY): string {
+  return videoFetchCorrelationId(urlContentKey(url, policy.download_format), {
+    url,
+    format: policy.download_format,
+    max_bytes: policy.max_bytes,
+    max_duration_sec: policy.max_duration_sec,
+  });
+}
+
 describe('remote fetch approval binding', () => {
   it('derives the correlation id per fetch so an approval for URL A cannot authorize URL B', async () => {
     const approved = new Set<string>();
@@ -477,10 +494,10 @@ describe('remote fetch approval binding', () => {
       options({ runner: vi.fn<VideoCommandRunner>(), requestApproval })
     );
     expect(first.status).toBe('approval_required');
-    const keyA = urlContentKey(URL_, POLICY.download_format);
+    const corrA = correlationFor('https://www.youtube.com/watch?v=abc123');
     expect(requests[0]).toMatchObject({
       opId: 'vision:fetch_video',
-      correlationId: videoFetchCorrelationId(keyA),
+      correlationId: corrA,
       channel: 'system',
       payload: {
         url: 'https://www.youtube.com/watch?v=abc123',
@@ -489,7 +506,7 @@ describe('remote fetch approval binding', () => {
         max_duration_sec: POLICY.max_duration_sec,
       },
     });
-    approved.add(videoFetchCorrelationId(keyA));
+    approved.add(corrA);
 
     // Caller-supplied correlation/presence fields are ignored.
     const runner = vi.fn<VideoCommandRunner>();
@@ -500,7 +517,7 @@ describe('remote fetch approval binding', () => {
         requestApproval,
         approval: {
           agent_id: 'test-agent',
-          correlation_id: videoFetchCorrelationId(keyA),
+          correlation_id: corrA,
           channel: 'slack',
           has_human: true,
         } as unknown as BuildVideoBriefOptions['approval'],
@@ -509,11 +526,48 @@ describe('remote fetch approval binding', () => {
     expect(replay).toMatchObject({ status: 'approval_required' });
     expect(runner).not.toHaveBeenCalled();
     const last = requests[requests.length - 1];
-    expect(last.correlationId).toBe(
-      videoFetchCorrelationId(urlContentKey(URL_B, POLICY.download_format))
-    );
+    expect(last.correlationId).toBe(correlationFor(URL_B));
     expect(last.channel).toBe('system');
     expect(last).not.toHaveProperty('hasHuman');
+  });
+});
+
+describe('remote fetch approval lifetime', () => {
+  function capture() {
+    const requests: RiskyApprovalRequest[] = [];
+    const requestApproval = (request: RiskyApprovalRequest): RiskyApprovalResult => {
+      requests.push(request);
+      return { allowed: false, status: 'pending', requestId: `APR-${requests.length}` };
+    };
+    return { requests, requestApproval };
+  }
+
+  it('asks again under a new correlation when the policy limits change', async () => {
+    const { requests, requestApproval } = capture();
+    await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ runner: vi.fn<VideoCommandRunner>(), requestApproval })
+    );
+    const raised = { ...POLICY, max_bytes: POLICY.max_bytes * 2 };
+    await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ runner: vi.fn<VideoCommandRunner>(), requestApproval, policy: raised })
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[0].correlationId).not.toBe(requests[1].correlationId);
+    expect(requests[1].correlationId).toBe(
+      correlationFor('https://www.youtube.com/watch?v=abc123', raised)
+    );
+  });
+
+  it('stamps a 24h expiry so a rejected or stale request does not lock the URL', async () => {
+    const { requests, requestApproval } = capture();
+    const now = Date.parse('2026-09-26T00:00:00.000Z');
+    await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ runner: vi.fn<VideoCommandRunner>(), requestApproval, now: () => now })
+    );
+    expect(requests[0].expiresAt).toBe('2026-09-27T00:00:00.000Z');
   });
 });
 
@@ -657,6 +711,61 @@ describe('video cache retention', () => {
     expect(safeExistsSync(path.join(entryDirOf(kept, URL_), 'source.mp4'))).toBe(true);
   });
 
+  it('serializes runs on one cache entry so a second run cannot delete media mid-derivation', async () => {
+    const placement = freshPlacement();
+    let releaseFirst: () => void = () => undefined;
+    const firstDerivation = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let downloads = 0;
+    let mediaSeenByFfmpeg = true;
+    const base = fakeRunner({ subtitles: { en: MANUAL_VTT } }, []);
+    const runner: VideoCommandRunner = async (command, args, opts) => {
+      if (command === 'fake-yt-dlp' && !args.includes('-J')) downloads += 1;
+      if (command === 'fake-ffmpeg' && args.includes('-ss')) {
+        await firstDerivation;
+        const input = args[args.indexOf('-i') + 1];
+        if (!safeExistsSync(input)) mediaSeenByFfmpeg = false;
+      }
+      return base(command, args, opts);
+    };
+    const first = buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ cachePlacement: placement, runner })
+    );
+    const second = buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ cachePlacement: placement, runner })
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    releaseFirst();
+    const [a, b] = await Promise.all([first, second]);
+    expect(a.status).toBe('ok');
+    expect(b).toMatchObject({ status: 'ok', brief: { cache_hit: true } });
+    expect(downloads).toBe(1);
+    expect(mediaSeenByFfmpeg).toBe(true);
+  });
+
+  it('reuses kept source media instead of deleting it on a failed re-download', async () => {
+    const placement = freshPlacement();
+    const entry = entryDirOf(placement, URL_);
+    safeMkdir(entry, { recursive: true });
+    safeWriteFile(path.join(entry, 'source.mp4'), 'kept-media');
+    const calls: Call[] = [];
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({
+        cachePlacement: placement,
+        runner: fakeRunner({ downloadFailure: 'HTTP Error 403: Forbidden' }, calls),
+      })
+    );
+    expect(outcome.status).toBe('ok');
+    expect(calls.some((call) => call.command === 'fake-yt-dlp' && !call.args.includes('-J'))).toBe(
+      false
+    );
+    expect(safeExistsSync(path.join(entry, 'source.mp4'))).toBe(true);
+  });
+
   it('never deletes a local input file', async () => {
     const file = path.join(TEST_ROOT, 'keep-local.mp4');
     safeWriteFile(file, 'local-bytes');
@@ -796,5 +905,104 @@ describe('video cache tenant placement', () => {
     } finally {
       safeRmSync(tenantDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('video cache fail-closed classification', () => {
+  const root = pathResolver.rootDir();
+  const asMissionController = () => vi.stubEnv('MISSION_ROLE', 'mission_controller');
+
+  it('classifies tier and tenant partitions case-insensitively', () => {
+    expect(tierOfPath(path.join(root, 'Knowledge/Confidential/ACME/v.mp4'))).toBe('confidential');
+    expect(tierOfPath(path.join(root, 'active/Projects/PERSONAL/acme/v.mp4'))).toBe('personal');
+    expect(tenantOfPath(path.join(root, 'knowledge/CONFIDENTIAL/Acme/v.mp4'))).toBe('acme');
+    expect(tenantOfPath(path.join(root, 'active/projects/Confidential/ACME/x/v.mp4'))).toBe('acme');
+    expect(tenantOfPath(path.join(root, 'knowledge/confidential/Common/v.mp4'))).toBeUndefined();
+  });
+
+  it('fails closed when a tenant-scoped partition has no resolvable tenant', () => {
+    for (const rel of [
+      'knowledge/confidential/v.mp4',
+      'knowledge/confidential/Not_A_Slug/v.mp4',
+      'knowledge/confidential/confidential/v.mp4',
+      'active/projects/confidential/x_y/v.mp4',
+      'active/missions/personal/@bad/v.mp4',
+    ]) {
+      expect(() => tenantOfPath(path.join(root, rel)), rel).toThrow(/TENANT_UNRESOLVED/);
+    }
+    // Public partitions are not tenant-scoped.
+    expect(tenantOfPath(path.join(root, 'active/projects/public/x_y/v.mp4'))).toBeUndefined();
+    expect(() => tierOfPath('/definitely/outside/the/repo.mp4')).toThrow(/TIER_UNRESOLVED/);
+  });
+
+  it('fails closed on a confidential mission whose state names an invalid tenant', () => {
+    const missionId = `MSN-VIDEO-BADTENANT-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const missionDir = path.join(root, 'active/missions/confidential', missionId);
+    asMissionController();
+    try {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tenant_slug: 'Not A Slug' })
+      );
+      expect(() => tenantOfPath(path.join(missionDir, 'evidence/v.mp4'))).toThrow(
+        /TENANT_UNRESOLVED/
+      );
+    } finally {
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies through a symlinked parent directory and refuses a cross-tenant cache', async () => {
+    const slug = `vl${randomUUID().slice(0, 8)}`;
+    const tenantDir = path.join(root, 'active/projects/confidential', slug);
+    const linkDir = path.join(TEST_ROOT, `link-${randomUUID()}`);
+    asMissionController();
+    try {
+      safeMkdir(tenantDir, { recursive: true });
+      safeWriteFile(path.join(tenantDir, 'clip.mp4'), 'tenant-clip');
+      safeSymlinkSync(tenantDir, linkDir);
+      const viaLink = path.join(linkDir, 'clip.mp4');
+      expect(tierOfPath(viaLink)).toBe('confidential');
+      expect(tenantOfPath(viaLink)).toBe(slug);
+      const runner = vi.fn<VideoCommandRunner>();
+      const outcome = await buildVideoBrief(
+        { kind: 'file', path: viaLink },
+        options({
+          runner,
+          cachePlacement: {
+            scope: 'tenant',
+            root: path.join(TEST_ROOT, randomUUID()),
+            tier: 'confidential',
+            tenant_slug: 'other-tenant',
+          },
+        })
+      );
+      expect(outcome).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
+      expect(runner).not.toHaveBeenCalled();
+    } finally {
+      safeRmSync(linkDir, { force: true });
+      safeRmSync(tenantDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('video cache mission placement', () => {
+  it('rejects a malformed mission id before touching the filesystem', () => {
+    for (const id of ['..', '../x', 'a/../../b', '--help']) {
+      expect(() => resolveVideoCachePlacement({ mission_id: id }), id).toThrow(/INVALID_SOURCE/);
+    }
+  });
+
+  it('rejects a mission that does not exist', async () => {
+    const missionId = `MSN-VIDEO-NOPE-${randomUUID().slice(0, 8).toUpperCase()}`;
+    expect(() => resolveVideoCachePlacement({ mission_id: missionId })).toThrow(
+      /INVALID_SOURCE.*does not exist/
+    );
+    const outcome = await buildVideoBrief(
+      { kind: 'url', url: URL_ },
+      options({ cachePlacement: undefined, mission_id: missionId, runner: vi.fn() })
+    );
+    expect(outcome).toMatchObject({ status: 'failed', code: 'INVALID_SOURCE' });
   });
 });

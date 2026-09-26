@@ -46,6 +46,8 @@ export interface SomCandidate {
   score: number;
   /** Browser snapshot ref (e.g. `@e3`) when the candidate is a DOM element. */
   ref?: string;
+  /** Editable field: never labelled, and absorbs no OCR text (it may be typed input). */
+  editable?: boolean;
 }
 
 export interface SomMark {
@@ -79,6 +81,7 @@ interface WorkingCandidate {
   label?: string;
   score: number;
   ref?: string;
+  editable: boolean;
   sources: Set<SomSource>;
   order: number;
 }
@@ -141,7 +144,9 @@ export function safeMarkLabel(label: string | null | undefined): string | undefi
 
 function absorb(into: WorkingCandidate, from: WorkingCandidate): void {
   for (const source of from.sources) into.sources.add(source);
-  if (!into.label && from.label) into.label = from.label;
+  if (from.editable) into.editable = true;
+  if (into.editable) into.label = undefined;
+  else if (!into.label && from.label) into.label = from.label;
   if (!into.ref && from.ref) into.ref = from.ref;
 }
 
@@ -221,9 +226,10 @@ export function fuseSetOfMarks(
     working.push({
       box,
       kind: candidate.kind,
-      label: safeMarkLabel(candidate.label),
+      label: candidate.editable ? undefined : safeMarkLabel(candidate.label),
       score: Number.isFinite(candidate.score) ? candidate.score : 0,
       ref: candidate.ref,
+      editable: candidate.editable === true,
       sources: new Set([candidate.source]),
       order,
     });
@@ -296,7 +302,22 @@ export interface DomCandidateOptions {
   scale?: number;
 }
 
-/** Browser snapshot elements as control candidates in image pixels. */
+const EDITABLE_TAGS = new Set(['input', 'textarea']);
+const EDITABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton']);
+
+/** Inputs, textareas and contenteditable elements show what the user typed. */
+export function isEditableDomElement(element: SomDomElement): boolean {
+  if (element.editable === true) return true;
+  const tag = typeof element.tag === 'string' ? element.tag.trim().toLowerCase() : '';
+  const role = typeof element.role === 'string' ? element.role.trim().toLowerCase() : '';
+  return EDITABLE_TAGS.has(tag) || EDITABLE_ROLES.has(role);
+}
+
+/**
+ * Browser snapshot elements as control candidates in image pixels. Editable
+ * fields carry no label regardless of content: their name or text can be the
+ * value the user typed.
+ */
 export function candidatesFromDomSnapshot(
   elements: readonly SomDomElement[],
   options: DomCandidateOptions = {}
@@ -311,7 +332,10 @@ export function candidatesFromDomSnapshot(
       width: element.bbox.width * scale,
       height: element.bbox.height * scale,
     };
-    const label = safeMarkLabel(element.name) ?? safeMarkLabel(element.text);
+    const editable = isEditableDomElement(element);
+    const label = editable
+      ? undefined
+      : (safeMarkLabel(element.name) ?? safeMarkLabel(element.text));
     candidates.push({
       box,
       source: 'dom',
@@ -319,6 +343,7 @@ export function candidatesFromDomSnapshot(
       ...(label ? { label } : {}),
       score: 1,
       ref: element.ref,
+      ...(editable ? { editable: true } : {}),
     });
   }
   return candidates;

@@ -37,6 +37,7 @@ import {
   listApprovalRequests,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
+  type ApprovalRequestRecord,
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 
@@ -172,6 +173,81 @@ describe('enforceApprovalGate', () => {
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({ result: 'denied', reason: 'Existing request is expired' })
     );
+  });
+
+  describe('renewable requests (expiresAt)', () => {
+    const past = () => new Date(Date.now() - 60_000).toISOString();
+    const future = () => new Date(Date.now() + 60_000).toISOString();
+    const asRecord = (record: Partial<ApprovalRequestRecord>) => record as ApprovalRequestRecord;
+    const requireApproval = () => {
+      mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+      mockResolveDecisionRightsMatrix.mockReturnValue(null);
+      mockEvaluateDecisionRights.mockReturnValue(null);
+      mockCreateRequest.mockReturnValue(asRecord({ id: 'req-fresh' }));
+    };
+
+    it('opens a fresh request once a rejected request has lapsed', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-old',
+          correlationId: 'corr-123',
+          status: 'rejected',
+          expiresAt: past(),
+        }),
+      ]);
+      const expiresAt = future();
+      const result = enforceApprovalGate({ ...baseParams, expiresAt });
+      expect(result).toMatchObject({ allowed: false, requestId: 'req-fresh' });
+      expect(mockCreateRequest).toHaveBeenCalledWith(
+        'mission_controller',
+        expect.objectContaining({ correlationId: 'corr-123', expiresAt })
+      );
+    });
+
+    it('opens a fresh request once an approval has lapsed, never reusing it', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-old',
+          correlationId: 'corr-123',
+          status: 'approved',
+          expiresAt: past(),
+        }),
+      ]);
+      const result = enforceApprovalGate({ ...baseParams, expiresAt: future() });
+      expect(result).toMatchObject({ allowed: false, requestId: 'req-fresh' });
+    });
+
+    it('keeps blocking on a rejection that has not lapsed', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-old',
+          correlationId: 'corr-123',
+          status: 'rejected',
+          expiresAt: future(),
+        }),
+      ]);
+      const result = enforceApprovalGate({ ...baseParams, expiresAt: future() });
+      expect(result).toMatchObject({ allowed: false, requestId: 'req-old' });
+      expect(mockCreateRequest).not.toHaveBeenCalled();
+    });
+
+    it('keeps the legacy binding for callers that do not opt in', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-old',
+          correlationId: 'corr-123',
+          status: 'rejected',
+          expiresAt: past(),
+        }),
+      ]);
+      const result = enforceApprovalGate(baseParams);
+      expect(result).toMatchObject({ allowed: false, requestId: 'req-old' });
+      expect(mockCreateRequest).not.toHaveBeenCalled();
+    });
   });
 
   it('blocks when an existing request is pending', () => {

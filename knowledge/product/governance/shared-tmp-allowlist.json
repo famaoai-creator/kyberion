@@ -66,6 +66,12 @@
       "note": "legacy project-os fallback root scan (read location); moved from orchestrator-helpers.ts"
     },
     {
+      "file": "libs/actuators/system-actuator/src/system-mark-target.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "throwaway screen capture hashed to verify a Set-of-Marks click, deleted in finally"
+    },
+    {
       "file": "libs/actuators/voice-actuator/src/index.ts",
       "count": 7,
       "classification": "migrate-candidate",

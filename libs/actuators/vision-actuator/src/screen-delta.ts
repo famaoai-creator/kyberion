@@ -10,9 +10,11 @@ import {
 } from '@agent/core/dirty-tile-describer';
 import type { PayloadTier } from '@agent/core/image-description-bridge';
 import {
+  assertMissionTenant,
   requireVisionSessionId,
   resolveVisionScope,
   type MissionPathResolver,
+  type MissionTenantResolver,
 } from './vision-scope.js';
 
 /**
@@ -44,6 +46,7 @@ export interface DescribeScreenDeltaOpDeps {
   ) => Promise<ScreenDeltaResult>;
   describer?: Omit<DirtyTileDescriberDeps, 'work_dir' | 'state_dir'>;
   resolveMissionPath?: MissionPathResolver;
+  resolveMissionTenant?: MissionTenantResolver;
 }
 
 export async function handleDescribeScreenDelta(
@@ -76,6 +79,7 @@ export async function handleDescribeScreenDelta(
     },
     deps.resolveMissionPath
   );
+  const tenantSlug = assertMissionTenant(scope, params.tenant_slug, deps.resolveMissionTenant);
   const tier = scope.tier;
   const scopeDirs = scope.mission_path
     ? {
@@ -93,7 +97,7 @@ export async function handleDescribeScreenDelta(
     ...(params.max_describe_per_call !== undefined
       ? { max_describe_per_call: params.max_describe_per_call }
       : {}),
-    ...(params.tenant_slug ? { tenant_slug: params.tenant_slug } : {}),
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
   };
   const result = await (deps.describeDelta ?? describeScreenDelta)(input, {
     ...(deps.describer ?? {}),

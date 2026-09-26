@@ -10,7 +10,12 @@ import {
   createRedactedImageCopy,
   type RedactedImageCopy,
 } from '@agent/core/screen-frame-redaction';
-import { resolveVisionScope, type MissionPathResolver } from './vision-scope.js';
+import {
+  assertMissionTenant,
+  resolveVisionScope,
+  type MissionPathResolver,
+  type MissionTenantResolver,
+} from './vision-scope.js';
 
 type ImageDescriptionRequest = Parameters<typeof coreDescribeImage>[0];
 type ImageDescriptionResult = Awaited<ReturnType<typeof coreDescribeImage>>;
@@ -37,6 +42,7 @@ export interface DescribeImageOpDeps {
   ) => Promise<ImageDescriptionResult>;
   redactCopy?: (inputPath: string, options: { work_dir?: string }) => Promise<RedactedImageCopy>;
   resolveMissionPath?: MissionPathResolver;
+  resolveMissionTenant?: MissionTenantResolver;
 }
 
 export async function handleDescribeImage(
@@ -62,7 +68,7 @@ export async function handleDescribeImage(
     ? path.join(scope.mission_path, 'tmp', 'vision-describe')
     : undefined;
   const redactCopy = deps.redactCopy ?? createRedactedImageCopy;
-  const tenantSlug = typeof params.tenant_slug === 'string' ? params.tenant_slug.trim() : '';
+  const tenantSlug = assertMissionTenant(scope, params.tenant_slug, deps.resolveMissionTenant);
   const result = await (deps.describe ?? coreDescribeImage)(
     { path: logicalPath, kind: params.kind },
     {

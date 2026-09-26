@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
 import { inferImagePayloadTier, type PayloadTier } from '@agent/core/image-description-bridge';
+import { tenantOfPath } from '@agent/core/video-ingest';
 
 /**
  * Tier and scope for perception ops that write derived artifacts (crops,
@@ -86,6 +87,41 @@ export function resolveVisionScope(
   }
   tier = stricterTier(tier, inferImagePayloadTier(missionPath));
   return { tier, mission_id: missionId, mission_path: missionPath };
+}
+
+/** Tenant owning a mission directory; throws when it cannot be determined. */
+export type MissionTenantResolver = (missionPath: string) => string | undefined;
+
+export const defaultMissionTenantResolver: MissionTenantResolver = (missionPath) =>
+  tenantOfPath(missionPath);
+
+/**
+ * A tenant named alongside a mission must be that mission's own tenant, so a
+ * caller cannot bill or route one tenant's mission pixels under another.
+ * Returns the tenant to pass on (undefined when none was given).
+ */
+export function assertMissionTenant(
+  scope: VisionScope,
+  tenantSlug: unknown,
+  resolveTenant: MissionTenantResolver = defaultMissionTenantResolver
+): string | undefined {
+  const requested = typeof tenantSlug === 'string' ? tenantSlug.trim() : '';
+  if (!requested) return undefined;
+  if (!scope.mission_path) return requested;
+  let owner: string | undefined;
+  try {
+    owner = resolveTenant(scope.mission_path);
+  } catch (error) {
+    throw new Error(`[VISION_TIER_SCOPE] ${(error as Error).message}`);
+  }
+  if (owner !== requested) {
+    throw new Error(
+      `[VISION_TIER_SCOPE] tenant '${requested}' does not own mission '${scope.mission_id}' (${
+        owner ? `tenant '${owner}'` : 'tenant-less mission'
+      })`
+    );
+  }
+  return requested;
 }
 
 /** True when target is scopeDir itself or lies below it. */

@@ -338,6 +338,13 @@ function isSourceMediaArtifact(name: string): boolean {
   return name.startsWith('source.') && !name.endsWith('.vtt');
 }
 
+/** Final source media a previous keep_source run left in a cache entry, if any. */
+export function findKeptSourceMedia(workDir: string): string | undefined {
+  if (!safeExistsSync(workDir)) return undefined;
+  const media = safeReaddir(workDir).sort().find(isFinalMediaFile);
+  return media ? path.join(workDir, media) : undefined;
+}
+
 /** Remove downloaded source media (final, split, partial) from a cache entry; subtitles stay. */
 export function removeSourceMedia(workDir: string): string[] {
   if (!safeExistsSync(workDir)) return [];

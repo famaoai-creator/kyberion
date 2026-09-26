@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   MarkTargetError,
   loadMarks,
@@ -6,6 +7,7 @@ import {
   type ResolveMarkTargetOptions,
 } from '@agent/core/mark-target-resolver';
 import { dhashFile } from '@agent/core/image-dhash';
+import { pathResolver } from '@agent/core/path-resolver';
 import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
 import { safeLstat, safeRmSync } from '@agent/core/secure-io';
 
@@ -16,10 +18,12 @@ import { safeLstat, safeRmSync } from '@agent/core/secure-io';
  * points (the marks' display scale is applied by the resolver).
  *
  * A mark is clicked only after the current screen is compared with the marked
- * screenshot: the caller's `current_dhash`, else a fresh capture of the marks'
- * display through the governed screen-capture bridge (hashed, then deleted).
- * Marks from a secondary display are shifted by its recorded origin, and
- * refused when that origin is unknown.
+ * screenshot, always through a fresh capture of the marks' display by the
+ * governed screen-capture bridge (hashed, then deleted). A caller-supplied
+ * hash is never trusted: mark_elements returns the marked image's hash, so
+ * echoing it back would defeat the staleness check. Marks from a secondary
+ * display are shifted by its recorded origin, and refused when that origin is
+ * unknown.
  */
 
 export interface SystemMarkTargetInput {
@@ -29,8 +33,6 @@ export interface SystemMarkTargetInput {
   target_mark?: unknown;
   mark_session_id?: unknown;
   marks_id?: unknown;
-  /** dHash of the screen right now, when the caller already captured it. */
-  current_dhash?: unknown;
 }
 
 export type MarkResolver = (
@@ -59,17 +61,27 @@ function explicitCoordinate(input: SystemMarkTargetInput): { x: number; y: numbe
   return { x: Number(input.x || 0), y: Number(input.y || 0) };
 }
 
+/** Throwaway capture path: unique per check, removed even when capture throws after writing. */
+export function markCheckCapturePath(): string {
+  return pathResolver.sharedTmp(`mark-target-checks/${randomUUID()}.png`);
+}
+
 export const hashCurrentScreen: CurrentScreenHasher = async ({ display_index }) => {
-  const capture = await createScreenCaptureBridge().captureScreenshot(
-    display_index !== undefined ? { display_index } : {}
-  );
+  const savePath = markCheckCapturePath();
+  let captured: string | undefined;
   try {
-    if (!safeLstat(capture.save_path).isFile()) {
+    const capture = await createScreenCaptureBridge().captureScreenshot({
+      save_path: savePath,
+      ...(display_index !== undefined ? { display_index } : {}),
+    });
+    captured = capture.save_path;
+    if (!safeLstat(captured).isFile()) {
       throw new Error('current screen capture is not a regular file');
     }
-    return await dhashFile(capture.save_path);
+    return await dhashFile(captured);
   } finally {
-    safeRmSync(capture.save_path, { force: true });
+    safeRmSync(savePath, { force: true });
+    if (captured && captured !== savePath) safeRmSync(captured, { force: true });
   }
 };
 
@@ -96,19 +108,17 @@ export async function resolveSystemClickCoordinate(
     throw new MarkTargetError('MARK_INVALID', `${targetMark} needs mark_session_id or session_id`);
   }
 
-  let currentDhash = optionalString(input.current_dhash);
-  if (!currentDhash) {
-    const displayIndex = (deps.markedDisplayIndex ?? storedDisplayIndex)(sessionId);
-    try {
-      currentDhash = await (deps.hashCurrentScreen ?? hashCurrentScreen)(
-        displayIndex !== undefined ? { display_index: displayIndex } : {}
-      );
-    } catch (error) {
-      throw new MarkTargetError(
-        'MARK_STALE',
-        `cannot capture the current screen to verify ${targetMark}: ${(error as Error).message}`
-      );
-    }
+  const displayIndex = (deps.markedDisplayIndex ?? storedDisplayIndex)(sessionId);
+  let currentDhash: string;
+  try {
+    currentDhash = await (deps.hashCurrentScreen ?? hashCurrentScreen)(
+      displayIndex !== undefined ? { display_index: displayIndex } : {}
+    );
+  } catch (error) {
+    throw new MarkTargetError(
+      'MARK_STALE',
+      `cannot capture the current screen to verify ${targetMark}: ${(error as Error).message}`
+    );
   }
 
   const resolved = await (deps.resolver ?? resolveMarkTarget)(targetMark, {

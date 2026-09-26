@@ -15,6 +15,12 @@ export interface RiskyApprovalRequest {
     summary: string;
     severity?: 'low' | 'medium' | 'high';
   };
+  /**
+   * ISO expiry for a newly created request. Opts into renewable requests: once
+   * a matched request (pending, rejected or approved) lapses it no longer binds
+   * the correlation id, and the next call opens a fresh request.
+   */
+  expiresAt?: string;
 }
 
 export interface RiskyApprovalResult {
