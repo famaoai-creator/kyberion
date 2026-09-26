@@ -4951,6 +4951,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/browser-discovery-playbook.md",
+      "tier": "public",
+      "size": 5405,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/browser-execution-presets.json",
       "tier": "public",
       "size": 278,

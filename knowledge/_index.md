@@ -354,6 +354,7 @@
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
 - [Browser Automation Best Practices (Omni-Browser v2)](./product/orchestration/browser-automation-best-practices.md) (public | Ecosystem Architect)
+- [Browser Discovery & Inspection Playbook](./product/orchestration/browser-discovery-playbook.md) (public | Kyberion Engineering)
 - [Capability Bundle Progressive Disclosure](./product/orchestration/capability-bundle-progressive-disclosure.md) (public | Ecosystem Architect)
 - [Capability Verb Inventory (which capabilities have one verb, which do not)](./product/orchestration/capability-verb-inventory.md) (public | Ecosystem Architect)
 - [Code Documentation And Video Production Playbook](./product/orchestration/code-documentation-production-playbook.md) (public | Unknown)
