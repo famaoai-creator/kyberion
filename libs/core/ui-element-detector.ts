@@ -1,6 +1,8 @@
 import { logger } from './core.js';
 import { ocrImage } from './ocr-bridge.js';
 import type { OcrRequest, OcrResult, OcrRoutingMode } from './ocr-types.js';
+import { OsAccessibilityDetector } from './os-accessibility-detector.js';
+import { PixelRegionDetector } from './pixel-region-detector.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 import {
   resolveSeamProviderDecision,
@@ -19,16 +21,22 @@ import {
  * `ui-element-detector` seam: sources of Set-of-Marks candidate boxes.
  *
  * Built-ins are `browser_dom` (rects of the browser snapshot, exact and
- * ref-carrying) and `ocr_text` (text lines of any screenshot, the fallback).
- * A pixel detector (YOLO / OmniParser style tool runtime) registers here as
- * another provider with kind 'model'; nothing else changes.
+ * ref-carrying), `os_accessibility` (rects of the OS accessibility tree, exact,
+ * only for this machine's live screen), `ocr_text` (text lines of any
+ * screenshot) and `pixel_regions` (edge-based control/icon regions of any
+ * screenshot, unlabelled). A model detector (YOLO / OmniParser style tool
+ * runtime) registers here as another provider with kind 'model'; nothing else
+ * changes.
  *
  * Without an explicit detector list the governed selection policy ranks the
- * available detectors and the first one that finds anything wins. With an
- * explicit list every listed detector runs and the caller fuses the union.
+ * available detectors and the first one that finds anything wins; a detector
+ * that throws is logged, reported in `detectors_failed` and skipped. With an
+ * explicit list every listed detector runs and the caller fuses the union; a
+ * failure there still fails the call, because the caller asked for exactly
+ * those sources and a silently missing one would change the fused marks.
  */
 
-export type UiElementDetectorKind = 'dom' | 'ocr' | 'model';
+export type UiElementDetectorKind = 'dom' | 'ocr' | 'pixels' | 'accessibility' | 'model';
 
 export interface UiElementDetectionRequest {
   image_path: string;
@@ -40,6 +48,20 @@ export interface UiElementDetectionRequest {
   language?: string;
   /** OCR routing mode for ocr_text. Default 'local_only': screenshots stay on this machine. */
   ocr_mode?: OcrRoutingMode;
+  /**
+   * The screenshot is a capture of this machine's live screen, taken just now.
+   * Enables os_accessibility; never set it for an arbitrary or stored image.
+   */
+  live_screen?: boolean;
+  /** Top-left of the screenshot in global logical screen points. Default {x: 0, y: 0} (main display). */
+  screen_origin?: { x: number; y: number };
+  /**
+   * Screenshot pixels per logical screen point. Default: image width / main display width
+   * in points, which only fits the main display: required when screen_origin is not 0,0.
+   */
+  screen_scale?: number;
+  /** Application whose front window os_accessibility reads. Default: the frontmost application. */
+  application?: string;
 }
 
 export interface UiElementDetector {
@@ -59,6 +81,8 @@ export interface DetectUiElementsOptions {
 export interface UiElementDetectionResult {
   candidates: SomCandidate[];
   detectors_run: string[];
+  /** Ranked detectors that threw and were skipped (policy selection only). */
+  detectors_failed?: string[];
   decision?: Pick<SeamProviderDecision, 'strategy' | 'ranked' | 'rationale'>;
 }
 
@@ -138,7 +162,12 @@ export class OcrTextDetector implements UiElementDetector {
 export function ensureBuiltinUiElementDetectors(): void {
   if (builtinsRegistered) return;
   const registered = new Set(listUiElementDetectors().map((detector) => detector.id));
-  for (const detector of [new BrowserDomDetector(), new OcrTextDetector()]) {
+  for (const detector of [
+    new BrowserDomDetector(),
+    new OcrTextDetector(),
+    new OsAccessibilityDetector(),
+    new PixelRegionDetector(),
+  ]) {
     if (!registered.has(detector.id)) registerUiElementDetector(detector);
   }
   builtinsRegistered = true;
@@ -202,11 +231,29 @@ export async function detectUiElements(
     rationale: decision.rationale,
   };
   const run: string[] = [];
+  const failed: string[] = [];
+  const done = (candidates: SomCandidate[]): UiElementDetectionResult => ({
+    candidates,
+    detectors_run: run,
+    ...(failed.length > 0 ? { detectors_failed: failed } : {}),
+    decision: summary,
+  });
   for (const id of decision.ranked) {
-    const found = await detectorById(id).detect(request);
+    // A ranked detector is one option among several: if it fails, the next
+    // one still gets its turn instead of the whole call failing.
+    let found: SomCandidate[];
+    try {
+      found = await detectorById(id).detect(request);
+    } catch (error) {
+      failed.push(id);
+      logger.warn(
+        `[ui-element-detector] ${id} failed (${error instanceof Error ? error.message : String(error)}); trying the next detector`
+      );
+      continue;
+    }
     run.push(id);
-    if (found.length > 0) return { candidates: found, detectors_run: run, decision: summary };
+    if (found.length > 0) return done(found);
     logger.info(`[ui-element-detector] ${id} found no elements; trying the next detector`);
   }
-  return { candidates: [], detectors_run: run, decision: summary };
+  return done([]);
 }

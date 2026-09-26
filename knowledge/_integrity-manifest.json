@@ -963,7 +963,7 @@
     {
       "path": "product/architecture/visual-grounding-and-video-ingest.md",
       "tier": "public",
-      "size": 10585,
+      "size": 14880,
       "type": "md"
     },
     {
@@ -3621,7 +3621,7 @@
     {
       "path": "product/governance/seam-provider-selection/ui-element-detector.json",
       "tier": "public",
-      "size": 2706,
+      "size": 4613,
       "type": "json"
     },
     {
@@ -4713,7 +4713,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1474076,
+      "size": 1474271,
       "type": "json"
     },
     {
