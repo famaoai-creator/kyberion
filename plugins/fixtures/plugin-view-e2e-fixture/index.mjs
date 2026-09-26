@@ -5,9 +5,11 @@ const EXPECTED = { 'viewe2e:ping': ['note', 'e2e-ping'], 'viewe2e:stamp': ['labe
 
 const op = (name) => ({
   stepType: 'apply',
-  handler: async (_op, params, context) => {
+  handler: async (_op, params) => {
     const [key, value] = EXPECTED[name];
-    return { handled: params?.[key] === value, ctx: context };
+    const handled = params?.[key] === value;
+    // Only a small result: the host context never flows back into records.
+    return { handled, ctx: { result: { handled } } };
   },
 });
 
