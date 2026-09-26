@@ -191,6 +191,7 @@ describe('AppleVisionOcrProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.text).toBe('apple vision text');
     expect(result.confidence).toBe(98.5);
+    expect(result.boundingBoxUnits).toBe('normalized');
     expect(mocks.spawn).toHaveBeenCalledWith(
       'swift',
       expect.arrayContaining([

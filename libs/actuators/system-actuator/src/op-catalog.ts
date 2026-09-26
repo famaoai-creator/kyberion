@@ -391,6 +391,9 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
     properties: {
       button: { type: 'string' },
       click_count: { type: 'number' },
+      mark_session_id: { type: 'string' },
+      marks_id: { type: 'string' },
+      target_mark: { type: 'string' },
       x: { type: 'number' },
       y: { type: 'number' },
     },

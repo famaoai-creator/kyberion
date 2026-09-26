@@ -3543,7 +3543,7 @@
     {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 443,
+      "size": 470,
       "type": "json"
     },
     {
@@ -3574,6 +3574,12 @@
       "path": "product/governance/seam-provider-selection/streaming-tts-bridge.json",
       "tier": "public",
       "size": 2779,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/ui-element-detector.json",
+      "tier": "public",
+      "size": 2706,
       "type": "json"
     },
     {
@@ -8229,7 +8235,7 @@
     {
       "path": "product/schemas/computer-interaction.schema.json",
       "tier": "public",
-      "size": 6424,
+      "size": 6977,
       "type": "json"
     },
     {
