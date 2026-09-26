@@ -11,10 +11,10 @@ import {
 import { executeServicePreset } from '@agent/core/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ocrImage as coreOcrImage } from '@agent/core/ocr-bridge';
-import { describeImage as coreDescribeImage } from '@agent/core/image-description-bridge';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { handleDescribeImage } from './describe-image.js';
 import { handleMarkElements } from './mark-elements.js';
 import { handleDescribeScreenDelta } from './screen-delta.js';
 import { handleBuildVideoBrief, handleFetchVideo } from './video-ops.js';
@@ -129,28 +129,12 @@ async function ocrImage(params: any) {
   };
 }
 
-async function describeImage(params: any) {
-  const logicalPath = String(params.path || '');
-  if (!logicalPath) throw new Error('describe_image requires params.path');
-  resolveVisionRepositoryPath(logicalPath);
-  const result = await coreDescribeImage({
-    path: logicalPath,
-    kind: params.kind,
-  });
-  return {
-    status: result.status,
-    path: logicalPath,
-    description: result.description,
-    provider: result.provider,
-  };
-}
-
 async function executeSingleAction(input: any) {
   const action = input.action;
   const params = input.params || {};
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
-  if (action === 'describe_image') return describeImage(params);
+  if (action === 'describe_image') return handleDescribeImage(params);
   if (action === 'fetch_video') return handleFetchVideo(params);
   if (action === 'build_video_brief') return handleBuildVideoBrief(params);
   if (action === 'mark_elements') {

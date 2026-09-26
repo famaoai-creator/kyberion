@@ -4653,7 +4653,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1451153,
+      "size": 1451547,
       "type": "json"
     },
     {
@@ -5019,7 +5019,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 20607,
+      "size": 19847,
       "type": "json"
     },
     {

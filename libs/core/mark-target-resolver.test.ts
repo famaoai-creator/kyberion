@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Jimp } from 'jimp';
+import * as path from 'node:path';
+import { withExecutionContextAsync } from './authority.js';
 import {
   MARKS_TTL_MS,
   clearMarks,
+  missionMarksStatePath,
   isMarkTarget,
   loadMarks,
   marksStatePath,
@@ -11,13 +14,14 @@ import {
   saveMarks,
 } from './mark-target-resolver.js';
 import { dhashFile } from './image-dhash.js';
-import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { missionDir, pathResolver } from './path-resolver.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SomMark } from './set-of-marks.js';
 
 const sessions: string[] = [];
 const files: string[] = [];
 const T0 = 1_700_000_000_000;
+const HASH = '0f0f0f0f0f0f0f0f';
 
 function sessionId(label: string): string {
   const id = `mark-target-test-${label}-${process.pid}`;
@@ -51,7 +55,7 @@ function save(id: string, extra: { scale?: number; image_dhash?: string } = {}) 
     session_id: id,
     marks: MARKS,
     image: { width: 800, height: 600 },
-    image_dhash: extra.image_dhash ?? '0f0f0f0f0f0f0f0f',
+    image_dhash: extra.image_dhash ?? HASH,
     scale: extra.scale,
     now: () => T0,
     marks_id: 'marks-1',
@@ -112,7 +116,7 @@ describe('resolveMarkTarget', () => {
     const id = sessionId('ref');
     save(id);
     await expect(
-      resolveMarkTarget('mark:1', { session_id: id, now: () => T0 + 1 })
+      resolveMarkTarget('mark:1', { session_id: id, now: () => T0 + 1, current_dhash: HASH })
     ).resolves.toEqual({ n: 1, marks_id: 'marks-1', x: 140, y: 50, ref: '@e4', label: 'Search' });
   });
 
@@ -127,6 +131,7 @@ describe('resolveMarkTarget', () => {
       session_id: id,
       scale: override,
       now: () => T0,
+      current_dhash: HASH,
     });
     expect({ x: resolved.x, y: resolved.y }).toEqual(expected);
     expect(resolved.ref).toBeUndefined();
@@ -139,9 +144,9 @@ describe('resolveMarkTarget', () => {
   ])('refuses %s with MARK_STALE', async (_name, extra) => {
     const id = sessionId(`stale-${_name.length}`);
     save(id);
-    await expect(resolveMarkTarget('mark:1', { session_id: id, ...extra })).rejects.toThrow(
-      /^\[MARK_STALE\]/
-    );
+    await expect(
+      resolveMarkTarget('mark:1', { session_id: id, current_dhash: HASH, ...extra })
+    ).rejects.toThrow(/^\[MARK_STALE\]/);
   });
 
   it('accepts a current screen within the dHash tolerance', async () => {
@@ -163,9 +168,9 @@ describe('resolveMarkTarget', () => {
       /^\[MARK_STALE\] no marks/
     );
     save(id);
-    await expect(resolveMarkTarget('mark:9', { session_id: id, now: () => T0 })).rejects.toThrow(
-      /^\[MARK_STALE\] mark 9 is not in marks/
-    );
+    await expect(
+      resolveMarkTarget('mark:9', { session_id: id, now: () => T0, current_dhash: HASH })
+    ).rejects.toThrow(/^\[MARK_STALE\] mark 9 is not in marks/);
     await expect(resolveMarkTarget('@e1', { session_id: id })).rejects.toThrow(/^\[MARK_INVALID\]/);
   });
 
@@ -181,5 +186,112 @@ describe('resolveMarkTarget', () => {
     await expect(
       resolveMarkTarget('mark:1', { session_id: id, now: () => T0, current_image_path: changed })
     ).rejects.toThrow(/^\[MARK_STALE\] the screen changed/);
+  });
+});
+
+describe('screen verification is mandatory', () => {
+  it('refuses to resolve without a current screen hash', async () => {
+    const id = sessionId('no-hash');
+    save(id);
+    await expect(resolveMarkTarget('mark:1', { session_id: id, now: () => T0 })).rejects.toThrow(
+      /^\[MARK_STALE\] cannot verify the current screen/
+    );
+    await expect(
+      resolveMarkTarget('mark:1', { session_id: id, now: () => T0, current_dhash: 'nope' })
+    ).rejects.toThrow(/^\[MARK_STALE\] the current screen hash is malformed/);
+  });
+
+  it('returns the DOM snapshot and display the marks were taken from', async () => {
+    const id = sessionId('snapshot');
+    saveMarks({
+      session_id: id,
+      marks: MARKS,
+      image: { width: 800, height: 600 },
+      image_dhash: HASH,
+      now: () => T0,
+      marks_id: 'marks-s',
+      dom_snapshot_id: 'tab-1@2026-01-01T00:00:00.000Z',
+      display: { index: 1, origin: { x: 1440, y: 0 } },
+    });
+    await expect(
+      resolveMarkTarget('mark:1', { session_id: id, now: () => T0, current_dhash: HASH })
+    ).resolves.toMatchObject({
+      dom_snapshot_id: 'tab-1@2026-01-01T00:00:00.000Z',
+      display: { index: 1, origin: { x: 1440, y: 0 } },
+    });
+  });
+});
+
+describe('marks labels and scope', () => {
+  it('strips labels that screen redaction would mask before storing them', () => {
+    const id = sessionId('labels');
+    saveMarks({
+      session_id: id,
+      marks: [
+        { ...MARKS[0], label: 'carol@example.com' },
+        { ...MARKS[1], label: 'Card 4111 1111 1111 1111' },
+      ],
+      image: { width: 800, height: 600 },
+      image_dhash: HASH,
+    });
+    const stored = String(safeReadFile(marksStatePath(id), { encoding: 'utf8' }));
+    expect(stored).not.toMatch(/example\.com|4111 1111/);
+    expect(loadMarks(id)?.marks.map((mark) => mark.label)).toEqual([undefined, undefined]);
+  });
+
+  it.each(['a/b', '../escape', 'a..b'])('rejects session id %j instead of normalizing it', (id) => {
+    expect(() => marksStatePath(id)).toThrow(/^\[MARK_INVALID\] .*invalid session id/);
+  });
+
+  it('refuses non-public marks without an existing mission', () => {
+    const id = sessionId('tier');
+    const base = {
+      session_id: id,
+      marks: MARKS,
+      image: { width: 1, height: 1 },
+      image_dhash: HASH,
+    };
+    expect(() => saveMarks({ ...base, tier: 'confidential' })).toThrow(
+      /^\[MARK_INVALID\] confidential marks need a mission_id/
+    );
+    expect(() =>
+      saveMarks({ ...base, tier: 'confidential', mission_id: `MSN-MISSING-${process.pid}` })
+    ).toThrow(/^\[MARK_INVALID\] mission .* does not exist/);
+    expect(loadMarks(id)).toBeUndefined();
+  });
+
+  it('keeps mission-scoped marks in the mission dir and only a pointer in the session', async () => {
+    await withExecutionContextAsync('mission_controller', async () => {
+      const missionId = `MSN-MARKS-${process.pid}`;
+      const missionPath = missionDir(missionId, 'confidential');
+      safeWriteFile(path.join(missionPath, 'mission-state.json'), '{}');
+      const id = sessionId('mission');
+      try {
+        const record = saveMarks({
+          session_id: id,
+          marks: MARKS,
+          image: { width: 800, height: 600 },
+          image_dhash: HASH,
+          now: () => T0,
+          marks_id: 'marks-m',
+          tier: 'confidential',
+          mission_id: missionId,
+        });
+        expect(missionMarksStatePath(missionId, id).startsWith(missionPath + path.sep)).toBe(true);
+        const pointer = String(safeReadFile(marksStatePath(id), { encoding: 'utf8' }));
+        expect(pointer).not.toMatch(/Search|Settings|image_dhash/);
+        expect(loadMarks(id)).toEqual(record);
+        await expect(
+          resolveMarkTarget('mark:2', { session_id: id, now: () => T0, current_dhash: HASH })
+        ).resolves.toMatchObject({ n: 2, marks_id: 'marks-m', label: 'Settings' });
+
+        // A non-public record planted directly in the session dir is not trusted.
+        safeWriteFile(marksStatePath(id), JSON.stringify(record));
+        expect(loadMarks(id)).toBeUndefined();
+      } finally {
+        clearMarks(id);
+        safeRmSync(missionPath, { recursive: true, force: true });
+      }
+    });
   });
 });

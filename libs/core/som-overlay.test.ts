@@ -106,6 +106,15 @@ describe('buildSomSvg', () => {
     expect(svg).toContain('stroke="#e6194b"');
     expect(svg).not.toContain('<close>');
   });
+
+  it('omits titles for labels that screen redaction would mask', () => {
+    const svg = buildSomSvg({ width: 200, height: 100 }, [
+      mark(1, 10, 30, 50, 20, 'bob.jones@example.com'),
+      mark(2, 100, 30, 50, 20, 'Pay 4111 1111 1111 1111'),
+    ]);
+    expect(svg).not.toContain('<title>');
+    expect(svg).not.toMatch(/example\.com|4111 1111/);
+  });
 });
 
 describe('renderSomOverlay', () => {
@@ -151,5 +160,45 @@ describe('renderSomOverlay', () => {
       )
     ).rejects.toThrow('ocr down');
     expect(safeReaddir(path.join(dir, 'fail-out'))).toEqual([]);
+  });
+
+  it('keeps the raw work copy in work_dir, never next to the output', async () => {
+    const source = await writeGreyImage('scoped.png', 32, 32);
+    const output = path.join(dir, 'scoped-out', 'scoped.marked.png');
+    const workDir = path.join(dir, 'scoped-work');
+    const seen: string[] = [];
+    await renderSomOverlay(
+      {
+        image_path: source,
+        marks: [mark(1, 0, 0, 10, 10)],
+        output_path: output,
+        work_dir: workDir,
+      },
+      {
+        redact: async (inputPath, outputPath) => {
+          seen.push(path.dirname(inputPath), path.dirname(outputPath));
+          await blackoutRedact(inputPath, outputPath);
+        },
+      }
+    );
+    expect(seen).toEqual([workDir, workDir]);
+    expect(safeReaddir(workDir)).toEqual([]);
+  });
+
+  it.each([
+    ['output_path', (source: string) => ({ output_path: source })],
+    [
+      'svg_output_path',
+      (source: string) => ({ output_path: path.join(dir, 'o.png'), svg_output_path: source }),
+    ],
+  ])('refuses a %s that would overwrite the screenshot', async (_name, target) => {
+    const source = await writeGreyImage('same.png', 16, 16);
+    await expect(
+      renderSomOverlay(
+        { image_path: source, marks: [], ...target(source) },
+        { redact: blackoutRedact }
+      )
+    ).rejects.toThrow('[SOM_OVERLAY_OUTPUT]');
+    expect(safeExistsSync(source)).toBe(true);
   });
 });
