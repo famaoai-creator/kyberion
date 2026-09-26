@@ -172,6 +172,99 @@ describe('scenario fixture reasoning backend (ES-04)', () => {
     expect(getReasoningBackend()).toBe(prior);
   });
 
+  it('with a scopeId keeps every optional capability of the prior backend outside the scope', async () => {
+    const calls: string[] = [];
+    const prior = {
+      ...stubReasoningBackend,
+      name: 'prior-backend',
+      supportsVision: true,
+      async *streamPrompt(prompt: string) {
+        calls.push(`stream:${prompt}`);
+        yield 'prior ';
+        yield 'stream';
+      },
+      async generateWithTools(prompt: string) {
+        calls.push(`tools:${prompt}`);
+        return { text: 'prior tools', toolCalls: [] };
+      },
+      async promptWithImages(prompt: string) {
+        calls.push(`images:${prompt}`);
+        return 'prior vision';
+      },
+      delegateTaskHandle(instruction: string) {
+        calls.push(`handle:${instruction}`);
+        return { delegation_id: 'd-1', join: async () => 'prior handle' };
+      },
+    } as ReasoningBackend;
+    registerReasoningBackend(prior, { provenance: 'builtin', source: 'test' });
+    const log = createScenarioSideEffectLog();
+    const dispose = installScenarioFixtureBackend(scenario(), log, { scopeId: 'run-a' });
+    const collect = async (stream: AsyncIterable<string>) => {
+      const parts: string[] = [];
+      for await (const part of stream) parts.push(part);
+      return parts.join('');
+    };
+    const image = [{ path: '/x.png', media_type: 'image/png' as const }];
+    try {
+      const backend = getReasoningBackend();
+      expect(backend.supportsVision).toBe(true);
+      await expect(collect(backend.streamPrompt!('host'))).resolves.toBe('prior stream');
+      await expect(backend.generateWithTools!('host', [])).resolves.toMatchObject({
+        text: 'prior tools',
+      });
+      await expect(backend.promptWithImages!('host', image)).resolves.toBe('prior vision');
+      await expect(backend.delegateTaskHandle!('host').join()).resolves.toBe('prior handle');
+      expect(calls).toEqual(['stream:host', 'tools:host', 'images:host', 'handle:host']);
+
+      await runInScenarioScope('run-a', async () => {
+        expect(backend.supportsVision).toBe(false);
+        await expect(collect(backend.streamPrompt!('please summarize ticket-1'))).resolves.toBe(
+          'summary text'
+        );
+        await expect(backend.generateWithTools!('summarize', [])).rejects.toThrow(
+          '[SCENARIO_FIXTURE_MISS]'
+        );
+        await expect(backend.promptWithImages!('summarize', image)).rejects.toThrow(
+          '[SCENARIO_FIXTURE_MISS]'
+        );
+        expect(backend.delegateTaskHandle).toBeUndefined();
+        await expect(backend.delegateTask('summarize')).resolves.toBe('generic summary');
+      });
+      expect(calls).toHaveLength(4);
+      expect(log.reasoning.map((r) => [r.method, r.outcome])).toEqual([
+        ['prompt', 'fixture'],
+        ['generateWithTools', 'miss'],
+        ['promptWithImages', 'miss'],
+        ['delegateTask', 'fixture'],
+      ]);
+    } finally {
+      dispose();
+    }
+  });
+
+  it('with a scopeId omits optional methods the prior backend lacks', () => {
+    const { streamPrompt, generateWithTools, promptWithImages, ...plain } = {
+      ...stubReasoningBackend,
+    } as ReasoningBackend;
+    void streamPrompt;
+    void generateWithTools;
+    void promptWithImages;
+    const prior = { ...plain, name: 'plain', delegateTaskHandle: undefined } as ReasoningBackend;
+    registerReasoningBackend(prior, { provenance: 'builtin', source: 'test' });
+    const dispose = installScenarioFixtureBackend(scenario(), createScenarioSideEffectLog(), {
+      scopeId: 'run-a',
+    });
+    try {
+      const backend = getReasoningBackend();
+      expect(backend.streamPrompt).toBeUndefined();
+      expect(backend.generateWithTools).toBeUndefined();
+      expect(backend.promptWithImages).toBeUndefined();
+      expect(backend.delegateTaskHandle).toBeUndefined();
+    } finally {
+      dispose();
+    }
+  });
+
   it('with a scopeId and nothing bound before, calls outside the scope get the stub', async () => {
     const dispose = installScenarioFixtureBackend(scenario(), createScenarioSideEffectLog(), {
       scopeId: 'run-a',

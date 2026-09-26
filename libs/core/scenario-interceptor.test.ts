@@ -392,6 +392,20 @@ describe('scenario scope isolation (FU-01)', () => {
     expect(interceptor.log.ops.map((r) => [r.op, r.stage])).toEqual([['system:exec', 'unstubbed']]);
     expect(interceptor.log.approvals.map((r) => r.op)).toEqual(['secret:grant']);
     expect(interceptor.log.reasoning).toEqual([]);
+    // ...but surfaced as scope_lost (approval probes are not dispatches).
+    expect(interceptor.log.warnings.map((r) => [r.kind, r.op, r.source])).toEqual([
+      ['scope_lost', 'system:exec', 'op-dispatch'],
+      ['scope_lost', 'demo:apply_thing', 'pipeline'],
+    ]);
+  });
+
+  it('records no scope_lost warning outside the simulated profile', async () => {
+    const { interceptor } = setup(
+      scenario({ lane: 'live-only', executionProfile: 'provider-qualified' })
+    );
+    resolveActuatorOperation('system', 'exec');
+    await runOpPreflight({ op: 'demo:apply_thing', params: {}, source: 'pipeline' });
+    expect(interceptor.log.warnings).toEqual([]);
   });
 
   it('keeps nested async work started inside a turn in scope', async () => {
