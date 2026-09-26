@@ -28,7 +28,7 @@ import {
  * explicit list every listed detector runs and the caller fuses the union.
  */
 
-export type UiElementDetectorKind = 'dom' | 'ocr' | 'model';
+export type UiElementDetectorKind = 'dom' | 'ocr' | 'pixels' | 'model';
 
 export interface UiElementDetectionRequest {
   image_path: string;
