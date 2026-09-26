@@ -34,6 +34,7 @@ import {
   getPasskeyAuthenticatorId,
   getOrCreatePageCdpSession,
 } from './browser-passkey-helpers.js';
+import { listBrowserProfiles, resolveBrowserProfile } from './browser-profile-manager.js';
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -137,6 +138,17 @@ export async function executePipeline(
   );
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;
+
+  if (options.profile || options.profile_name || options.profile_email) {
+    const resolved = resolveBrowserProfile({
+      provider: options.browser_channel === 'chrome' ? 'chrome' : undefined,
+      profile: String(options.profile || options.profile_name || options.profile_email),
+    });
+    if (resolved) {
+      options.user_data_dir = options.user_data_dir || resolved.userDataDir;
+      options.profile_directory = options.profile_directory || resolved.profileDirectory;
+    }
+  }
 
   const userDataDir = resolveBrowserRepositoryPath(
     options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId)
@@ -1417,9 +1429,14 @@ async function opApply(
         /* ignore */
       }
 
+      const allDiscovered = listBrowserProfiles({
+        provider: (params.provider as any) || 'all',
+      });
+
       const profilesList = {
         managed: managedProfiles,
         native: nativeProfiles,
+        profiles: allDiscovered,
       };
 
       if (params.export_as) {

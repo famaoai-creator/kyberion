@@ -13,6 +13,7 @@ import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSandboxWriteAllowed } from './sandbox-policy.js';
+import { isAllowedVaultMountPath } from './vault-mount.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -726,6 +727,9 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
 
   if (isOutsideProjectRoot(relativePath)) {
+    if (isAllowedVaultMountPath(resolvedPath)) {
+      return { allowed: true };
+    }
     return {
       allowed: false,
       reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'`,
