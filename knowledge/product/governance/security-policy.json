@@ -497,6 +497,10 @@
         "active/audit/"
       ]
     },
+    "chronos_token_registry_reader": {
+      "allow_read": ["knowledge/personal/connections/chronos-access.json"],
+      "allow_write": []
+    },
     "generation_scheduler": {
       "allow_read": ["knowledge/personal/tenants/"],
       "allow_write": []

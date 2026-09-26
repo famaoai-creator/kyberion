@@ -46,6 +46,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_gateway: 'worker',
   chronos_operator: 'worker',
   chronos_localadmin: 'worker',
+  chronos_token_registry_reader: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
