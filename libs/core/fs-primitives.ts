@@ -82,3 +82,11 @@ export function rawLstatSync(targetPath: string): fs.Stats {
 export function rawReaddir(targetPath: string): string[] {
   return fs.readdirSync(targetPath);
 }
+
+export function rawReadlinkSync(targetPath: string): string {
+  return fs.readlinkSync(targetPath);
+}
+
+export function rawSymlinkSync(target: string, linkPath: string): void {
+  fs.symlinkSync(target, assertFoundationWritePath(linkPath));
+}
