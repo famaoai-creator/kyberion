@@ -519,15 +519,26 @@ async function scenario(root: string, timings: E2eStepTiming[], run: E2eRun): Pr
 
   const token = randomBytes(24).toString('hex');
   const server = await step('start-chronos', async () => {
-    const port = await freeLoopbackPort();
-    run.assertActive();
-    const started = await run.adoptServer(startChronos(root, port, token));
-    await waitFor('Chronos /api/healthz', async () => {
-      if (started.exited()) throw new Error('Chronos exited during startup');
-      const response = await fetch(`${started.baseUrl}/api/healthz`).catch(() => null);
-      return response?.ok ?? false;
-    });
-    return started;
+    // The free port can be taken between probing and listening: retry once.
+    for (let attempt = 1; ; attempt += 1) {
+      const port = await freeLoopbackPort();
+      run.assertActive();
+      const started = await run.adoptServer(startChronos(root, port, token));
+      const state = await waitFor('Chronos /api/healthz', async () => {
+        if (started.exited()) return 'exited';
+        // Bounded: a port taken by another listener may accept and never answer.
+        const response = await fetch(`${started.baseUrl}/api/healthz`, {
+          signal: AbortSignal.timeout(2_000),
+        }).catch(() => null);
+        return response?.ok ? 'ready' : null;
+      });
+      if (state === 'ready') return started;
+      const portInUse = /EADDRINUSE/u.test(started.logTail());
+      if (!portInUse || attempt >= 2) {
+        throw new Error(`Chronos exited during startup${portInUse ? ' (port in use twice)' : ''}`);
+      }
+      await started.stop();
+    }
   });
 
   const browser = await step('launch-browser', async () =>
