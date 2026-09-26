@@ -32,6 +32,7 @@ import {
   applyPluginChange,
   deactivatePlugin,
   disposeContribution,
+  getActivePluginPermissionsDigest,
   isPluginActive,
   listOwned,
   ownerOf,
@@ -106,7 +107,7 @@ function newIds(prefix: string) {
   const id = `${process.pid}-${randomUUID()}`;
   return {
     pluginId: `${prefix}-${id}`.slice(0, 60),
-    managedRoot: tracked(pathResolver.shared(`plugins/managed-test-lifecycle-${id}`)),
+    managedRoot: tracked(pathResolver.sharedTmp(`plugins/managed-test-lifecycle-${id}`)),
   };
 }
 
@@ -352,6 +353,17 @@ describe('plugin lifecycle e2e with the permissions fixture (EP-03/EP-04)', () =
     expect(isPluginActive(pluginId)).toBe(true);
     expect(ownerOf('ops', 'permfixture:write')).toBe(pluginId);
     await expect(runOp('env', {}, probe)).resolves.toEqual({});
+  });
+
+  it('exposes the digest of the grant the active module runs under', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-grant-digest');
+    const record = installApproved(pluginId, fixtureSource(), managedRoot);
+    expect(getActivePluginPermissionsDigest(pluginId)).toBeUndefined();
+    await activatePlugin({ record }, { managedRoot });
+    expect(record.permissionsDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(getActivePluginPermissionsDigest(pluginId)).toBe(record.permissionsDigest);
+    deactivatePlugin(pluginId);
+    expect(getActivePluginPermissionsDigest(pluginId)).toBeUndefined();
   });
 
   function withFsPermission(source: string, fs: Record<string, unknown>): string {

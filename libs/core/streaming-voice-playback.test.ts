@@ -140,6 +140,83 @@ describe('streamVoicePlayback', () => {
     expect(played).toEqual([]);
   });
 
+  it('falls back to stop-and-replay when pause() reports failure (N4)', async () => {
+    const played: string[] = [];
+    let stops = 0;
+    const controller = streamVoicePlayback({
+      synthesize: async (segment) => `/tmp/${segment}.wav`,
+      play: (path) => {
+        played.push(path);
+        if (played.length > 1) return immediateHandle();
+        let resolveDone: (r: PlaybackResult) => void = () => undefined;
+        const done = new Promise<PlaybackResult>((resolve) => {
+          resolveDone = resolve;
+        });
+        return {
+          done,
+          // SIGSTOP failed to reach the child; pause() reports it instead of
+          // the caller assuming silence.
+          pause: () => false,
+          stop: async () => {
+            stops += 1;
+            resolveDone({ ok: true, interrupted: true });
+            return done;
+          },
+        };
+      },
+    });
+    controller.push('a');
+    controller.end();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(played).toEqual(['/tmp/a.wav']);
+
+    controller.pause?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(stops).toBe(1);
+
+    controller.resume?.();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/a.wav', '/tmp/a.wav']);
+    expect(result.metrics.segments_spoken).toBe(1);
+  });
+
+  it('does not stop a handle that simply has no pause() support', async () => {
+    const played: string[] = [];
+    let stops = 0;
+    let resolveDone: (r: PlaybackResult) => void = () => undefined;
+    const controller = streamVoicePlayback({
+      synthesize: async (segment) => `/tmp/${segment}.wav`,
+      play: (path) => {
+        played.push(path);
+        const done = new Promise<PlaybackResult>((resolve) => {
+          resolveDone = resolve;
+        });
+        return {
+          done,
+          stop: async () => {
+            stops += 1;
+            resolveDone({ ok: true, interrupted: true });
+            return done;
+          },
+        };
+      },
+    });
+    controller.push('a');
+    controller.end();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    controller.pause?.();
+    controller.resume?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(stops).toBe(0);
+
+    resolveDone({ ok: true, interrupted: false });
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/a.wav']);
+  });
+
   it('pause() buffers PCM chunks of the streaming TTS path until resume()', async () => {
     const played: number[] = [];
     const controller = streamTtsAudioPlayback({
@@ -166,6 +243,59 @@ describe('streamVoicePlayback', () => {
     controller.end();
     const result = await controller.done;
     expect(result.completed).toBe(true);
+    expect(played).toEqual([2]);
+  });
+
+  it('falls back to stop-and-restart the streaming TTS path when pause() reports failure (N4)', async () => {
+    const played: number[] = [];
+    let stops = 0;
+    let calls = 0;
+    const controller = streamTtsAudioPlayback({
+      voiceProfileId: 'voice-profile',
+      synthesizeStream: async function* (text) {
+        for await (const _segment of text) {
+          yield { format, payload: new Uint8Array([1, 2]), ts_ms: 0 };
+        }
+      },
+      playStream: (stream) => {
+        calls += 1;
+        if (calls === 1) {
+          let resolveDone: (r: PlaybackResult) => void = () => undefined;
+          const done = new Promise<PlaybackResult>((resolve) => {
+            resolveDone = resolve;
+          });
+          return {
+            done,
+            // SIGSTOP failed to reach the child; pause() reports it instead
+            // of the caller assuming silence.
+            pause: () => false,
+            stop: async () => {
+              stops += 1;
+              resolveDone({ ok: true, interrupted: true });
+              return done;
+            },
+          };
+        }
+        const done = (async () => {
+          for await (const chunk of stream) played.push(chunk.payload.byteLength);
+          return { ok: true, interrupted: false } as PlaybackResult;
+        })();
+        return { done, stop: async () => ({ ok: true, interrupted: true }) };
+      },
+    });
+
+    controller.pause?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(stops).toBe(1);
+    expect(played).toEqual([]);
+
+    controller.resume?.();
+    controller.push('一つ目。');
+    controller.end();
+
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(calls).toBe(2);
     expect(played).toEqual([2]);
   });
 });

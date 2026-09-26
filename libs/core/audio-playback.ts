@@ -19,6 +19,25 @@ export interface PlaybackHandle {
   done: Promise<PlaybackResult>;
   /** Stop playback immediately (SIGTERM, then SIGKILL after 1.5s). Idempotent. */
   stop(): Promise<PlaybackResult>;
+  /**
+   * Suspend the player in place (SIGSTOP on POSIX) so resume() continues the
+   * same segment instead of restarting it. Present only when the platform
+   * supports it (POSIX); absent on win32, where callers fall back to
+   * stop-and-replay.
+   *
+   * Returns true when the process is now suspended (including if it already
+   * was), false when SIGSTOP could not be delivered — callers must not
+   * assume silence and should fall back to stop-and-replay in that case.
+   *
+   * SIGSTOP is delivered to the spawned child process only. A custom
+   * `command` that wraps the real player in a shell (e.g. `sh -c '...'`)
+   * suspends the shell, not any grandchild it spawned, so audio can keep
+   * playing — pause() reports success (the shell stopped) even though
+   * sound is not actually silenced in that case.
+   */
+  pause?(): boolean;
+  /** Resume a player suspended by pause() (SIGCONT on POSIX). */
+  resume?(): void;
 }
 
 export interface PlaybackResult {
@@ -109,12 +128,20 @@ export function resolveAudioPlaybackCommand(audioPath = '{file}'): string[] | nu
   return adapter ? adapter.command(audioPath) : null;
 }
 
+/** True when `handle` exposes in-place pause()/resume() (see PlaybackHandle). */
+export function isPausablePlaybackHandle(
+  handle: PlaybackHandle
+): handle is PlaybackHandle & { pause(): boolean; resume(): void } {
+  return typeof handle.pause === 'function' && typeof handle.resume === 'function';
+}
+
 export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): PlaybackHandle {
   const argv = buildArgv(audioPath, opts);
   const child = spawn(argv[0], argv.slice(1), { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let settled = false;
   let interrupted = false;
+  let paused = false;
   let stderrTail = '';
   child.stderr?.on('data', (data: Buffer) => {
     stderrTail = `${stderrTail}${data.toString()}`.slice(-1000);
@@ -125,9 +152,21 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
     resolveDone = resolve;
   });
 
+  // Best-effort: registered only once a pause actually suspends the child, so
+  // a host process exiting while playback is stopped doesn't leave the
+  // player permanently stuck (it would otherwise never see SIGTERM/SIGKILL
+  // dispatched after node has already begun tearing down).
+  let exitHookInstalled = false;
+  const exitHook = (): void => {
+    if (!paused) return;
+    sendSignal('SIGCONT');
+    sendSignal('SIGKILL');
+  };
+
   const settle = (result: PlaybackResult): void => {
     if (settled) return;
     settled = true;
+    if (exitHookInstalled) process.off('exit', exitHook);
     resolveDone(result);
   };
 
@@ -150,11 +189,26 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
     );
   });
 
-  return {
+  /** Send a POSIX signal to the player; false/caught when it can't be delivered (already gone). */
+  const sendSignal = (signal: NodeJS.Signals): boolean => {
+    try {
+      return child.kill(signal);
+    } catch {
+      return false;
+    }
+  };
+
+  const handle: PlaybackHandle = {
     done,
     stop: async () => {
       if (!settled) {
         interrupted = true;
+        // A suspended (SIGSTOPped) process never sees SIGTERM, so resume it
+        // first — otherwise it can't exit and stop() would hang until SIGKILL.
+        if (paused) {
+          sendSignal('SIGCONT');
+          paused = false;
+        }
         child.kill('SIGTERM');
         const killTimer = setTimeout(() => {
           try {
@@ -169,4 +223,27 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
       return done;
     },
   };
+
+  // Pause-in-place is a POSIX signal trick (SIGSTOP/SIGCONT); win32 has no
+  // equivalent, so callers keep the stop-and-replay fallback there.
+  if (process.platform !== 'win32') {
+    handle.pause = () => {
+      if (settled) return false;
+      if (paused) return true;
+      if (!sendSignal('SIGSTOP')) return false;
+      paused = true;
+      if (!exitHookInstalled) {
+        exitHookInstalled = true;
+        process.on('exit', exitHook);
+      }
+      return true;
+    };
+    handle.resume = () => {
+      if (settled || !paused) return;
+      sendSignal('SIGCONT');
+      paused = false;
+    };
+  }
+
+  return handle;
 }

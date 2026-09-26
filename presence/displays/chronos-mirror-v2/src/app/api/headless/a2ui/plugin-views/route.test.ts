@@ -5,7 +5,16 @@ import { NextRequest } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { auditChain, type AuditEntry } from '@agent/core/audit-chain';
+import { activatePlugin, resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
 
 const state = vi.hoisted(() => ({
   managedRoot: '',
@@ -48,6 +57,9 @@ const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permission
 const FILES = ['plugin-manifest.json', 'index.mjs', 'views/status.a2ui.json'];
 const TMP_ROOT = pathResolver.sharedTmp('chronos-plugin-views-route-test');
 const cleanup: string[] = [];
+const ACTION_DIR = pathResolver.shared('coordination/channels/chronos/plugin-view-actions');
+/** Sidecars are named `<request time>-<approval id>.json`. */
+const trackedActionIds: string[] = [];
 
 function viewer(overrides: Record<string, unknown> = {}) {
   return {
@@ -72,7 +84,15 @@ type PluginViewsResponseBody = {
     views?: unknown[];
     a2ui?: { updateComponents?: { components?: unknown[] } };
     errors?: unknown[];
-    outcome?: { status: string; approvalRequestId?: string };
+    outcome?: { status: string; approvalRequestId?: string; handled?: boolean };
+    message_key?: string;
+    action_requests?: Array<{
+      approval_request_id: string;
+      status: string;
+      params: unknown;
+      executable: boolean;
+      unavailable_reason?: string;
+    }>;
   };
 };
 
@@ -94,9 +114,9 @@ function fixtureSource(mutateManifest?: (manifest: FixtureManifest) => void): st
 
 function install(
   sourcePath: string,
-  options: { tenantSlug?: string; approve?: boolean } = {}
+  options: { tenantSlug?: string; approve?: boolean; pluginId?: string } = {}
 ): ManagedPluginRecord {
-  const pluginId = `pv-route-${randomUUID()}`.slice(0, 40);
+  const pluginId = options.pluginId ?? `pv-route-${randomUUID()}`.slice(0, 40);
   const record = installPluginManaged({
     pluginId,
     sourcePath,
@@ -148,7 +168,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  resetPluginLifecycleForTests();
   withExecutionContext('mission_controller', () => {
+    const ids = trackedActionIds.splice(0);
+    if (ids.length > 0 && safeExistsSync(ACTION_DIR)) {
+      for (const entry of safeReaddir(ACTION_DIR)) {
+        if (ids.some((id) => entry.endsWith(`-${id}.json`))) {
+          safeRmSync(path.join(ACTION_DIR, entry));
+        }
+      }
+    }
     while (cleanup.length > 0) safeRmSync(cleanup.pop() as string);
   });
 });
@@ -237,6 +267,7 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
     cleanup.push(
       pathResolver.shared(`coordination/channels/chronos/approvals/requests/${requestId}.json`)
     );
+    trackedActionIds.push(requestId);
 
     const unknown = await act({ plugin_id: record.pluginId, view_id: 'status', action_id: 'nope' });
     expect(unknown).toMatchObject({
@@ -273,5 +304,161 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
     });
     expect(status).toBe(403);
     expect(body.error).toBe('PLUGIN_VIEW_DENIED');
+  });
+});
+
+describe('POST /api/headless/a2ui/plugin-views execute (FU-02)', () => {
+  function trackActionRequest(id: string) {
+    cleanup.push(
+      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`),
+      pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
+    );
+    trackedActionIds.push(id);
+  }
+
+  function approve(id: string) {
+    const pending = loadApprovalRequest('chronos', id);
+    decideApprovalRequest('mission_controller', {
+      channel: 'chronos',
+      requestId: id,
+      decision: 'approved',
+      decidedBy: 'human:approver',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: pending?.accountability?.payloadHash,
+      effectBinding: pending?.accountability?.effectBinding,
+    });
+  }
+
+  async function queue(record: ManagedPluginRecord, params: Record<string, unknown>) {
+    const queued = await act({
+      plugin_id: record.pluginId,
+      view_id: 'status',
+      action_id: 'write_probe',
+      params,
+    });
+    expect(queued.status).toBe(202);
+    const id = queued.body.data.outcome.approvalRequestId as string;
+    trackActionRequest(id);
+    return id;
+  }
+
+  function execute(record: ManagedPluginRecord, id: string, params: Record<string, unknown>) {
+    return act({
+      plugin_id: record.pluginId,
+      view_id: 'status',
+      action_id: 'write_probe',
+      params,
+      approval_request_id: id,
+    });
+  }
+
+  function spyAudit() {
+    return vi.spyOn(auditChain, 'record').mockImplementation(
+      (entry) =>
+        ({
+          ...entry,
+          id: 'audit',
+          timestamp: '',
+          previousHash: '',
+          currentHash: '',
+        }) as AuditEntry
+    );
+  }
+
+  it('executes an approved action once, after approval only, for a localadmin', async () => {
+    const audit = spyAudit();
+    state.viewer = viewer({ role: 'localadmin' });
+    const record = install(fixtureSource());
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(record, params);
+
+    expect(await execute(record, id, params)).toMatchObject({
+      status: 409,
+      body: { error: 'PLUGIN_VIEW_APPROVAL_REQUIRED' },
+    });
+    expect((await listViews()).body.data.action_requests).toMatchObject([
+      { approval_request_id: id, status: 'pending', params, executable: false },
+    ]);
+    approve(id);
+
+    // Approved but the plugin is not active in this process: not executable
+    // (the UI shows why instead of an Execute button); executing is 409.
+    expect((await listViews()).body.data.action_requests).toMatchObject([
+      {
+        approval_request_id: id,
+        status: 'approved',
+        executable: false,
+        unavailable_reason: 'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+      },
+    ]);
+    expect((await execute(record, id, params)).body.error).toBe('PLUGIN_VIEW_ACTION_UNAVAILABLE');
+    expect((await activatePlugin({ record }, { managedRoot: state.managedRoot })).ok).toBe(true);
+    const [executable] = (await listViews()).body.data.action_requests;
+    expect(executable).toMatchObject({ status: 'approved', executable: true });
+    expect(executable.unavailable_reason).toBeUndefined();
+
+    expect((await execute(record, id, { path: 'active/shared/tmp/changed' })).status).toBe(403);
+    state.viewer = viewer({ role: 'readonly' });
+    expect((await execute(record, id, params)).status).toBe(403);
+    expect((await listViews()).body.data.action_requests).toEqual([]);
+
+    state.viewer = viewer({ role: 'localadmin', principalId: 'viewer-2' });
+    const executed = await execute(record, id, params);
+    expect(executed).toMatchObject({
+      status: 200,
+      body: {
+        data: {
+          outcome: { status: 'executed', handled: true, approvalRequestId: id },
+          message_key: 'plugin:view_action_executed',
+        },
+      },
+    });
+    expect(await execute(record, id, params)).toMatchObject({
+      status: 409,
+      body: {
+        error: 'PLUGIN_VIEW_APPROVAL_CONSUMED',
+        error_key: 'plugin:view_error_approval_consumed',
+      },
+    });
+    expect((await listViews()).body.data.action_requests).toMatchObject([
+      { approval_request_id: id, status: 'executed' },
+    ]);
+    const completed = audit.mock.calls
+      .map(([entry]) => entry)
+      .filter(
+        (entry) => entry.action === 'plugin_view.action.execute' && entry.result === 'completed'
+      );
+    expect(completed).toHaveLength(1);
+    expect(completed[0]).toMatchObject({ agentId: 'viewer-2', correlationId: id });
+  });
+
+  it('refuses another tenant viewer and a reinstalled plugin', async () => {
+    spyAudit();
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-a'] });
+    const record = install(fixtureSource(), { tenantSlug: 'tenant-a' });
+    const params = { path: `active/shared/tmp/${randomUUID()}` };
+    const id = await queue(record, params);
+    approve(id);
+
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-b'] });
+    expect((await execute(record, id, params)).status).toBe(404);
+    expect((await listViews()).body.data.action_requests).toEqual([]);
+
+    state.viewer = viewer({ role: 'localadmin', tenantSlugs: ['tenant-a'] });
+    const reinstalled = install(
+      fixtureSource((manifest) => {
+        (manifest as FixtureManifest & { version?: string }).version = '1.0.1';
+      }),
+      { tenantSlug: 'tenant-a', pluginId: record.pluginId }
+    );
+    expect(reinstalled.contentDigest).not.toBe(record.contentDigest);
+    expect(await execute(reinstalled, id, params)).toMatchObject({
+      status: 403,
+      body: { error: 'PLUGIN_VIEW_APPROVAL_MISMATCH' },
+    });
+    expect((await listViews()).body.data.action_requests).toMatchObject([
+      { approval_request_id: id, status: 'stale' },
+    ]);
   });
 });

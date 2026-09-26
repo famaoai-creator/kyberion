@@ -20857,6 +20857,96 @@
         "ja": "操作をプラグインに送りました。",
         "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ẇȧş şėñŧ ŧő ŧħė ṗŀůɠïñ. ŀőřėɱ ïṗşůɱ⟧"
       },
+      "view_action_executed": {
+        "en": "The approved action ran.",
+        "ja": "承認済みの操作を実行しました。",
+        "qps-ploc": "⟦Ŧħė ȧṗṗřőṽėḓ ȧƈŧïőñ řȧñ. ŀőřėɱ ï⟧"
+      },
+      "view_action_execute": {
+        "en": "Execute",
+        "ja": "実行",
+        "qps-ploc": "⟦Ėẋėƈůŧė ŀőř⟧"
+      },
+      "view_action_execute_failed": {
+        "en": "The action could not be executed.",
+        "ja": "操作を実行できませんでした。",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ƈőůŀḓ ñőŧ ƀė ėẋėƈůŧėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "view_action_requests_title": {
+        "en": "Actions awaiting a person",
+        "ja": "人の承認が必要な操作",
+        "qps-ploc": "⟦Ȧƈŧïőñş ȧẇȧïŧïñɠ ȧ ṗėřşőñ ŀőřėɱ ïṗ⟧"
+      },
+      "view_action_requests_description": {
+        "en": "Actions a plugin view asked a person to approve. An approved action can be executed once.",
+        "ja": "プラグインビューが人の承認を求めた操作です。承認済みの操作は 1 回だけ実行できます。",
+        "qps-ploc": "⟦Ȧƈŧïőñş ȧ ṗŀůɠïñ ṽïėẇ ȧşķėḓ ȧ ṗėřşőñ ŧő ȧṗṗřőṽė. Ȧñ ȧṗṗřőṽėḓ ȧƈŧïőñ ƈȧñ ƀė ėẋėƈůŧėḓ őñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "view_action_status_pending": {
+        "en": "Waiting for approval",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ ŀőřėɱ ⟧"
+      },
+      "view_action_status_approved": {
+        "en": "Approved",
+        "ja": "承認済み",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "view_action_status_rejected": {
+        "en": "Rejected",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "view_action_status_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
+      },
+      "view_action_status_executed": {
+        "en": "Executed",
+        "ja": "実行済み",
+        "qps-ploc": "⟦Ėẋėƈůŧėḓ ŀőř⟧"
+      },
+      "view_action_status_failed": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "view_action_status_stale": {
+        "en": "Plugin changed",
+        "ja": "プラグイン変更済み",
+        "qps-ploc": "⟦Ṗŀůɠïñ ƈħȧñɠėḓ ŀőřė⟧"
+      },
+      "view_action_status_closed": {
+        "en": "Closed",
+        "ja": "終了",
+        "qps-ploc": "⟦Ƈŀőşėḓ ŀőř⟧"
+      },
+      "view_action_status_unknown": {
+        "en": "Outcome unknown",
+        "ja": "結果不明",
+        "qps-ploc": "⟦Őůŧƈőɱė ůñķñőẇñ ŀőřė⟧"
+      },
+      "view_action_not_executable": {
+        "en": "Approved, but it cannot run here: the plugin is not active in the Chronos server process. Run it where the plugin is active.",
+        "ja": "承認済みですが、ここでは実行できません。Chronos のサーバープロセスではプラグインが動いていません。プラグインが動いている場所で実行してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ, ƀůŧ ïŧ ƈȧññőŧ řůñ ħėřė: ŧħė ṗŀůɠïñ ïş ñőŧ ȧƈŧïṽė ïñ ŧħė Ƈħřőñőş şėřṽėř ṗřőƈėşş. Řůñ ïŧ ẇħėřė ŧħė ṗŀůɠïñ ïş ȧƈŧïṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "view_error_approval_required": {
+        "en": "A person has not approved this action yet, or the approval expired.",
+        "ja": "この操作はまだ人に承認されていないか、承認の期限が切れています。",
+        "qps-ploc": "⟦Ȧ ṗėřşőñ ħȧş ñőŧ ȧṗṗřőṽėḓ ŧħïş ȧƈŧïőñ ẏėŧ, őř ŧħė ȧṗṗřőṽȧŀ ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "view_error_approval_consumed": {
+        "en": "This approval was already used. Request the action again.",
+        "ja": "この承認はすでに使用済みです。もう一度操作を依頼してください。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ ẇȧş ȧŀřėȧḓẏ ůşėḓ. Řėɋůėşŧ ŧħė ȧƈŧïőñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "view_error_approval_mismatch": {
+        "en": "The approval does not match this action: the plugin, its permissions or the input changed.",
+        "ja": "承認内容がこの操作と一致しません(プラグイン、権限、または入力が変わりました)。",
+        "qps-ploc": "⟦Ŧħė ȧṗṗřőṽȧŀ ḓőėş ñőŧ ɱȧŧƈħ ŧħïş ȧƈŧïőñ: ŧħė ṗŀůɠïñ, ïŧş ṗėřɱïşşïőñş őř ŧħė ïñṗůŧ ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "permission_narrowed": {
         "en": "Some requested permissions were reduced to what policy allows for {trust} plugins.",
         "ja": "要求された権限の一部を、{trust} プラグインに許可された範囲まで縮小しました。",

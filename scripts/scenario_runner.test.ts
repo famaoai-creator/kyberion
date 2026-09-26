@@ -125,6 +125,17 @@ describe('scenario runner CLI (ES-05)', () => {
     );
   });
 
+  it('shows report warning counts in the summary line', () => {
+    const text = formatScenarioSummary({
+      ok: true,
+      counts: { pass: 1, fail: 0, skipped: 0, lane_skipped: 0, error: 0 },
+      scenarios: [
+        { file: 'x.json', scenario_id: 'leaky', run_id: 'r', status: 'pass', warnings: 2 },
+      ],
+    });
+    expect(text).toContain('PASS         leaky (2 warning(s), see report)');
+  });
+
   it('exits 1 when a scenario fails, 0 when only skips happen', async () => {
     const failing = writeScenario(
       'fail.json',

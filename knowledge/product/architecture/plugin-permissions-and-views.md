@@ -3,7 +3,7 @@ title: Plugin Permissions, Lifecycle and Views
 category: Architecture
 tags: [plugins, permissions, approval, digest, sandbox, lifecycle, a2ui, views, security]
 importance: 7
-last_updated: 2026-09-24
+last_updated: 2026-09-26
 ---
 
 # Plugin Permissions, Lifecycle and Views
@@ -140,16 +140,58 @@ authorized against the viewer first and can only narrow.
 Actions (`POST`): `chronos.plugin_view.action` is a localadmin write
 operation. Unknown actions are 404, an op the plugin does not provide is 403,
 invalid params are 400, a non-activatable plugin is 403. `authority: human`
-creates a human-only approval request (bound to plugin, content digest, view,
-action, op and params) in the Chronos approval queue; `authority: agent`
-dispatches through op preflight only when the owning plugin is active in the
-serving process, otherwise 409 — the web surface never imports plugin code.
+creates a human-only approval request (bound to plugin, content digest, grant
+digest, view, action, op and params; expires after 24 hours) in the Chronos
+approval queue; `authority: agent` dispatches through op preflight only when
+the owning plugin is active in the serving process, otherwise 409 — the web
+surface never imports plugin code.
+
+Executing an approved human action (FU-02): the same `POST` with
+`approval_request_id`. Chronos shows the requests of visible views to
+localadmin viewers; each carries `executable` (approved, and the approved copy
+runs in the serving process under the approved grant) and, when an approved
+request cannot run there, `unavailable_reason`. Only an executable request
+gets an Execute button; otherwise Chronos explains why. The executor needs
+localadmin and must see the view (another tenant's plugin is 404). The server
+recomputes the payload hash from the current plugin (tenant, content + grant
+digest), view, action and params and refuses (403) anything the approval does
+not cover, so changed params, a reinstalled plugin or the same package
+reinstalled for another tenant cannot reuse it; requests are listed only for
+the view of the same tenant. The approval must be approved by an authenticated
+human and unexpired (otherwise 409). Execution also requires the module
+running in this process to be the approved copy (activation content digest)
+under the approved grant (the active binding's grant digest equals the
+record's `permissionsDigest`; a legacy unwrapped plugin never qualifies); a
+re-approved package or grant must be reloaded first (409). Op preflight may
+not rewrite the approved params (403); the handler always receives exactly
+the approved params. Every check and the op preflight run before the approval
+is claimed, so a refusal never spends it; the claim is an exclusive create
+next to the request, so a second execution is 409. A `plugin_view.action.started`
+audit event is written after the claim and before the handler; the result is
+then recorded on the approval (`applyResult`) and audited
+(`plugin_view.action.execute`). Every refusal — unknown approval, unavailable
+op, digest mismatch, preflight denial — is audited too. A recording failure
+never turns a success into a failure or masks the handler's error; a claim
+without a recorded result (crash mid-execution) is listed as `unknown`, never
+as executed, and cannot be executed again.
+
+Self-approval policy: the requester may also approve and execute (Kyberion is
+commonly run by a single localadmin operator). It is not blocked; every audit
+event carries `self_approved: true` when the approver is also the requester or
+the executor, so reviews can find it.
+
+Request sidecars are named by request time; a listing reads only the newest
+200, and queueing a new request prunes sidecars older than 7 days whose
+approval is terminal.
 
 ## 7. Known gaps
 
-- Approved `human` view actions are recorded but not yet executed by a
-  follow-up dispatcher; the approval is the audit record of intent.
 - View text props are literal plugin strings (the catalog has no key props);
   only keys are vocabulary-checked.
 - `sandboxed-iframe`, view capabilities and personal-pads composition are
   follow-ups (plan §8).
+- Nothing activates plugins inside the Chronos server process (only the
+  `plugin_install` CLI activates them, in its own process), so approved human
+  view actions are listed with `executable: false` and cannot be executed from
+  Chronos yet. Activating approved plugins inside the Chronos process is a
+  follow-up.
