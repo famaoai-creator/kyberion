@@ -18,8 +18,10 @@ import {
 import {
   CHRONOS_PLUGIN_HOST_SURFACE,
   chronosPluginHostStatus,
+  CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS,
   ensureChronosPluginHost,
   isChronosPluginHostEnabled,
+  resetChronosPluginHostBootFailure,
 } from './plugin-host-boot';
 
 function fakeFactory() {
@@ -40,6 +42,7 @@ function fakeFactory() {
 
 afterEach(() => {
   disposePluginHost(CHRONOS_PLUGIN_HOST_SURFACE);
+  resetChronosPluginHostBootFailure();
   vi.restoreAllMocks();
 });
 
@@ -138,5 +141,31 @@ describe('Chronos plugin host boot (PH-01)', () => {
       ensureChronosPluginHost({ env: { KYBERION_CHRONOS_PLUGIN_HOST: 'true' }, create })
     ).toBeNull();
     expect(getPluginHost(CHRONOS_PLUGIN_HOST_SURFACE)).toBeUndefined();
+  });
+
+  it('remembers a boot failure for the backoff period instead of retrying per request', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const create = vi.fn(() => {
+      throw new Error('boom');
+    });
+    let clock = 1_000_000;
+    const options = {
+      env: { KYBERION_CHRONOS_PLUGIN_HOST: 'true' },
+      create,
+      isKnownTenant: () => true,
+      now: () => clock,
+    };
+    expect(ensureChronosPluginHost(options)).toBeNull();
+    clock += CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS - 1;
+    expect(ensureChronosPluginHost(options)).toBeNull();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    clock += 1;
+    const { create: working, start } = fakeFactory();
+    expect(ensureChronosPluginHost({ ...options, create: working })).not.toBeNull();
+    expect(working).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

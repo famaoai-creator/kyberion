@@ -36,6 +36,23 @@ export interface EnsureChronosPluginHostOptions {
   create?: typeof createPluginHost;
   /** Tenant registry lookup override (tests). */
   isKnownTenant?: (slug: string) => boolean;
+  /** Clock override (tests). */
+  now?: () => number;
+}
+
+/** After a boot failure, no new boot is attempted (or logged) for this long. */
+export const CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS = 60_000;
+
+// On globalThis like the host itself, so every route bundle shares it.
+const BOOT_FAILURE_KEY = Symbol.for('kyberion.pluginHostBootFailure.chronos');
+
+function bootFailedAt(): number | undefined {
+  return (globalThis as Record<symbol, unknown>)[BOOT_FAILURE_KEY] as number | undefined;
+}
+
+/** Forgets a remembered boot failure (tests / operator retry). */
+export function resetChronosPluginHostBootFailure(): void {
+  delete (globalThis as Record<symbol, unknown>)[BOOT_FAILURE_KEY];
 }
 
 /**
@@ -65,16 +82,29 @@ export function isChronosPluginHostEnabled(env?: EnvSource): boolean {
  * Returns the started Chronos plugin host, creating it on first use.
  * Idempotent; returns null (and creates nothing) when the flag is off. A boot
  * failure is logged and also returns null: nothing runs, so view actions stay
- * unavailable (fail closed) while the rest of Chronos keeps working.
+ * unavailable (fail closed) while the rest of Chronos keeps working. The
+ * failure is remembered for `CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS`, so the
+ * plugin-views requests in that window neither retry nor log again.
  */
 export function ensureChronosPluginHost(
   options: EnsureChronosPluginHostOptions = {}
 ): PluginHost | null {
   if (!isChronosPluginHostEnabled(options.env)) return null;
+  const now = options.now ?? Date.now;
+  const failedAt = bootFailedAt();
+  if (failedAt !== undefined && now() - failedAt < CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS) {
+    return null;
+  }
   try {
-    return getOrCreateChronosPluginHost(options);
+    const host = getOrCreateChronosPluginHost(options);
+    resetChronosPluginHostBootFailure();
+    return host;
   } catch (error) {
-    console.warn('[chronos-mirror-v2] plugin host: boot failed', error);
+    (globalThis as Record<symbol, unknown>)[BOOT_FAILURE_KEY] = now();
+    console.warn(
+      `[chronos-mirror-v2] plugin host: boot failed; retrying after ${CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS / 1000}s`,
+      error
+    );
     return null;
   }
 }

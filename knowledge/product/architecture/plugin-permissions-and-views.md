@@ -234,7 +234,10 @@ plugin operations in registries the route handlers never see.
 
 Chronos: the plugin-views routes call `ensureChronosPluginHost()`, which is
 idempotent and a no-op unless `KYBERION_CHRONOS_PLUGIN_HOST` is set; the host
-starts with the first plugin-views request. `KYBERION_CHRONOS_PLUGIN_HOST_TENANTS`
+starts with the first plugin-views request, so every plugin op in Chronos (not
+only view actions) stays inactive until that request. A boot failure is
+remembered for 60 s: plugin-views requests in that window neither retry nor
+log it again. `KYBERION_CHRONOS_PLUGIN_HOST_TENANTS`
 is a comma list of tenants (each must resolve in the tenant registry, read as
 `chronos_localadmin` because the registry is personal-tier; reserved
 scope names are rejected; unset = only tenant-less shared plugins);
