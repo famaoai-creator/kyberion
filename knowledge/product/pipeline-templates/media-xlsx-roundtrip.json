@@ -1,0 +1,73 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "media-xlsx-roundtrip",
+  "version": "1.0.0",
+  "name": "XLSX Roundtrip Reproduction",
+  "description": "Reproduce an XLSX from its extracted design: xlsx_extract distills the workbook into an XlsxDesignProtocol (sheets, cells, styles, merges, formulas), persists it as JSON, and xlsx_render writes it back to a new .xlsx. Use this for reproduction/round-trip fidelity — authoring new spreadsheets goes through media:generate_document with a semantic brief instead. Override paths via --context: {\"source_xlsx_path\": \"...\", \"roundtrip_xlsx_path\": \"...\", \"design_path\": \"...\"}.",
+  "_usage_note": "The extract step also supports sheet/range/values_only projection params for token-efficient partial reads — leave them unset for full-fidelity round-trips.",
+  "context": {
+    "mission_id": "MSN-XLSX-ROUNDTRIP",
+    "preflight_cmd": "pnpm --version",
+    "source_xlsx_path": "active/shared/tmp/xlsx-roundtrip/input.xlsx",
+    "design_path": "active/shared/tmp/xlsx-roundtrip/design.json",
+    "roundtrip_xlsx_path": "active/shared/tmp/xlsx-roundtrip/roundtrip.xlsx"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "extract_xlsx_design",
+      "role": "source",
+      "op": "media:xlsx_extract",
+      "produces": {
+        "channel": "source_xlsx_design",
+        "type": "XlsxDesign"
+      },
+      "params": {
+        "path": "{{source_xlsx_path}}",
+        "export_as": "source_xlsx_design"
+      }
+    },
+    {
+      "id": "persist_design",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "source_xlsx_design",
+      "produces": {
+        "channel": "design_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "path": "{{design_path}}",
+        "format": "json",
+        "content": "{{source_xlsx_design}}"
+      }
+    },
+    {
+      "id": "render_roundtrip_xlsx",
+      "role": "sink",
+      "op": "media:xlsx_render",
+      "consumes": "source_xlsx_design",
+      "produces": {
+        "channel": "roundtrip_xlsx_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "source_xlsx_design",
+        "path": "{{roundtrip_xlsx_path}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "XLSX roundtrip completed: {{source_xlsx_path}} -> {{roundtrip_xlsx_path}} (design: {{design_path}})"
+      }
+    }
+  ]
+}
