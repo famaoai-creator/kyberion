@@ -4,6 +4,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { safeWriteFile, safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './cron-utils.js';
 
 // ---------------------------------------------------------------------------
@@ -263,6 +264,25 @@ export function listScheduledPipelines(
  * For cron triggers, matches the cron expression against `now`.
  * For interval triggers, checks elapsed time since lastRun.
  */
+/**
+ * Operator allowlist for this host: when KYBERION_CHRONOS_SCHEDULES lists
+ * schedule ids (comma-separated), only those run. Registration still mirrors
+ * every pipeline's `schedule`, so enabling another job is an env change, not
+ * an edit to the pipeline files. Unset means every enabled schedule runs; a
+ * set value that names no id (e.g. "," or blanks) fails closed and runs none.
+ */
+export function scheduleAllowedByOperator(
+  scheduleId: string,
+  allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
+): boolean {
+  if (allowlist === undefined || allowlist === '') return true;
+  const ids = allowlist
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return ids.includes(scheduleId);
+}
+
 export function isScheduledPipelineDue(
   schedule: ScheduledPipeline,
   timezone?: string,
@@ -270,6 +290,7 @@ export function isScheduledPipelineDue(
   options: PipelineSchedulerOptions = {}
 ): boolean {
   if (!schedule.enabled) return false;
+  if (!scheduleAllowedByOperator(schedule.id)) return false;
   if (runLockActive(schedule.runLock, now, runLockTtlMs(options))) return false;
 
   if (schedule.trigger.type === 'interval') {

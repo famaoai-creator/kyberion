@@ -19,6 +19,7 @@ knowledge/product/pipeline-templates/
 - `pipelines/` contains only pipelines that operate Kyberion itself — health checks, self-repair, onboarding, capability assimilation, chaos tests.
 - User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
 - Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
+- A tenant pipeline that declares `schedule` in `knowledge/confidential/{tenant}/pipelines/*.json` (direct children only) is picked up by chronos for **registered, operational** tenants. It runs in a child process bound to that tenant (`KYBERION_TENANT`, `KYBERION_TENANT_SCOPE_REQUIRED=1`, role `chronos_tenant_runner`) and only after an authenticated human approved its current content via `pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust` (any edit invalidates the approval). Symlinked paths are refused. Run-time needs (credential scope, reasoning backend, tenant egress overlay) are declared in the ADF `runtime` block and injected only into that child process, bounded by `{knowledge_root}/governance/pipeline-runtime-allowlist.json`; the daemon needs no `AUTHORIZED_SCOPE`. Details: [tenant-bound-runtime-probing](../knowledge/product/governance/tenant-bound-runtime-probing.md).
 
 **Workflow composition:**
 
@@ -47,13 +48,13 @@ node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<
 
 Pipelines are declarative wiring plus a governance envelope (trace, replay, budgets, guardrails). Keep logic in the layer that owns it (→ [LAYERED_EXECUTION_PLAN](../docs/developer/improvement-plans-2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)):
 
-| Belongs in the pipeline                                  | Belongs in a typed actuator op (TypeScript)                                   |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Sequential step wiring, `produces`/`consumes` channels   | State-driven loops (repeat until a computed condition, accumulate-and-decide) |
-| Data-driven `core:foreach` over a known list             | Computation, data shaping, sorting/dedup                                      |
-| Scenario-level `core:if` (e.g. include a login fragment) | Result verification ("did the actuator really succeed?")                      |
-| Approval gates, budgets, `on_error` strategy             | Waiting/retry semantics (auto-wait belongs to the op, like browser ops)       |
-| Semantic briefs handed to `reasoning:*`/`wisdom:*`       | Anything you are tempted to write inside `core:transform` `script`            |
+| Belongs in the pipeline                                                                                         | Belongs in a typed actuator op (TypeScript)                                   |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Sequential step wiring, `produces`/`consumes` channels (`sensitive: true` keeps a value out of the run journal) | State-driven loops (repeat until a computed condition, accumulate-and-decide) |
+| Data-driven `core:foreach` over a known list                                                                    | Computation, data shaping, sorting/dedup                                      |
+| Scenario-level `core:if` (e.g. include a login fragment)                                                        | Result verification ("did the actuator really succeed?")                      |
+| Approval gates, budgets, `on_error` strategy                                                                    | Waiting/retry semantics (auto-wait belongs to the op, like browser ops)       |
+| Semantic briefs handed to `reasoning:*`/`wisdom:*`                                                              | Anything you are tempted to write inside `core:transform` `script`            |
 
 Rules of thumb:
 
@@ -119,6 +120,12 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 | `assimilate-harness-capability`      | —                                                                | Ingest a harness-style capability bundle                                                                                                                                                                                                                                                                           |
 | `license-injection-inner`            | —                                                                | Inner stage of license key injection                                                                                                                                                                                                                                                                               |
 | `license-injection-outer`            | —                                                                | Outer stage of license key injection                                                                                                                                                                                                                                                                               |
+
+### Organization Operations
+
+| Pipeline                    | pnpm shortcut                                                                                      | Description                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `organization-daily-digest` | `KYBERION_PERSONA=sovereign pnpm run pipeline -- --input pipelines/organization-daily-digest.json` | `core:organization_digest` across every organization and tenant (confidential + public): overdue / due-today operations, business-day deadlines, pending decisions, service observation windows, open incidents. Sovereign-only, audited per run; `schedule.cron` daily 08:30 Asia/Tokyo, delivered to the operator DM via `deliver_to.channel: "env:KYBERION_OPERATOR_SLACK_DM"` |
 
 ### Verification
 

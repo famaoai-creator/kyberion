@@ -5,11 +5,13 @@
  *
  * Ops:
  *   sync_source      (capture)   — DA-03 incremental change-listing (watermark → preset → work list)
- *   parse_document   (capture)   — docx/pdf/xlsx/html/slack_thread/markdown/text → unified IR
+ *   parse_document   (capture)   — docx/pdf/xlsx/pptx/html/slack_thread/markdown/text → unified IR
  *   normalize_card   (transform) — IR → { target_path, frontmatter, body_markdown, card_markdown }
  *   dedup            (transform) — content-hash registry check + registration
  *   staleness_report (transform) — ledger vs current-source comparison (side-effect free)
  *   commit           (apply)     — DA-05 explicit ingest ceremony: card landing + asset ledger
+ *   meeting_digest   (apply)     — scheduled meeting-page digest: tenant-declared jobs →
+ *                                  fetch → parse → structured summary → commit (only writer)
  *
  * ingest:commit is the ONLY op here that writes into knowledge/ (under the
  * narrowly-scoped ingest_commit authority role, fail-closed path guard).
@@ -27,6 +29,7 @@ import { dedupContent, type DedupInput } from './dedup.js';
 import { normalizeCard, type NormalizeCardInput } from './normalize-card.js';
 import { parseDocument, type ParseDocumentInput } from './parse-document.js';
 import { syncSource, type SyncSourceInput } from './sync-source.js';
+import { runMeetingDigest, type MeetingDigestInput } from './meeting-digest.js';
 
 export {
   DEFAULT_INGEST_REGISTRY_PATH,
@@ -61,6 +64,12 @@ export {
   type IngestScrubOverride,
 } from './commit.js';
 export {
+  runMeetingDigest,
+  type MeetingDigestInput,
+  type MeetingDigestJob,
+  type MeetingDigestJobResult,
+} from './meeting-digest.js';
+export {
   extractConfluenceCursor,
   syncSource,
   type SyncSourceInput,
@@ -71,7 +80,13 @@ export {
 } from './sync-source.js';
 
 type IngestOp =
-  'sync_source' | 'parse_document' | 'normalize_card' | 'dedup' | 'staleness_report' | 'commit';
+  | 'sync_source'
+  | 'parse_document'
+  | 'normalize_card'
+  | 'dedup'
+  | 'staleness_report'
+  | 'commit'
+  | 'meeting_digest';
 
 interface IngestParams extends Record<string, unknown> {
   export_as?: string;
@@ -140,6 +155,12 @@ async function executeOp(
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'commit';
       return { ...ctx, [exportAs]: result };
     }
+    case 'meeting_digest': {
+      logger.info(`[INGEST] Running meeting digest job for tenant ${String(params.tenant_slug)}`);
+      const result = await runMeetingDigest(params as unknown as MeetingDigestInput);
+      const exportAs = typeof params.export_as === 'string' ? params.export_as : 'meeting_digest';
+      return { ...ctx, [exportAs]: result };
+    }
     default:
       throw new Error(`ingest-actuator: unknown op: ${String(op)}`);
   }
@@ -185,6 +206,7 @@ export const INGEST_ACTUATOR_OPS = [
   'dedup',
   'staleness_report',
   'commit',
+  'meeting_digest',
 ] as const;
 
 export const actuator = defineCatalogBackedActuator({

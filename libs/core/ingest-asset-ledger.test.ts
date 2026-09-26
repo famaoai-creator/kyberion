@@ -117,6 +117,22 @@ describe('ingest-asset-ledger (DA-05)', () => {
     expect(() => assetLedgerPath('ghost-co', options)).toThrow(/has no profile/);
   });
 
+  it('uses a pre-resolved knowledgeRoot without re-reading the tenant registry', () => {
+    // ingest:commit runs under ingest_commit, which cannot read the
+    // personal-tier tenant profiles; an unregistered slug proves no lookup ran.
+    expect(
+      assetLedgerPath('ghost-co', { ...options, knowledgeRoot: 'knowledge/confidential/ghost-co' })
+    ).toBe(path.join(fixtureRoot, 'knowledge/confidential/ghost-co/_ledger/assets.jsonl'));
+  });
+
+  it('resolves the ledger path against the real repository root when no rootDir is given', () => {
+    // Regression: the repo root itself has an empty relative path and used to
+    // be rejected as "outside the repository root", breaking every real ingest.
+    expect(assetLedgerPath('common', { env: EMPTY_ENV })).toBe(
+      path.join(pathResolver.rootDir(), 'knowledge/confidential/common/_ledger/assets.jsonl')
+    );
+  });
+
   it('appends validated records and rejects malformed ones fail-closed', () => {
     appendAssetRecord('acme-corp', makeRecord(), options);
     expect(() =>

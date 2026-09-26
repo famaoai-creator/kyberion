@@ -132,6 +132,8 @@
     "scripts/test-insession.ts": 1,
     "scripts/virtual_office.ts": 41,
     "libs/actuators/calendar-actuator/src/calendar-actuator-helpers.ts": 1,
+    "libs/actuators/ingest-actuator/src/meeting-digest-format.ts": 10,
+    "libs/actuators/ingest-actuator/src/meeting-digest.ts": 18,
     "libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts": 1,
     "libs/actuators/media-actuator/src/media-layout-runtime.ts": 4,
     "libs/actuators/media-actuator/src/media-pdf-helpers.ts": 5,

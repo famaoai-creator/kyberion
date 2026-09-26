@@ -64,6 +64,17 @@
       "allowed_actuators": ["presence-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "chronos_tenant_runner": {
+      "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_commit role); writes are limited to that tenant's audit/trace mirrors.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "customer/${KYBERION_TENANT}/logs/audit/",
+        "customer/${KYBERION_TENANT}/logs/traces/"
+      ],
+      "scope_classes": ["operations_runtime", "audit"],
+      "allowed_actuators": ["ingest-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
     "cyber_security": {
       "description": "Security review authority for threat modeling, vulnerability analysis, and mission veto power.",
       "default_persona": "cyber_security",

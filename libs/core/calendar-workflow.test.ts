@@ -11,9 +11,11 @@ vi.mock('./service-engine.js', () => ({
 
 import {
   createCalendarEvent,
+  deleteCalendarEvent,
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
+  updateCalendarEvent,
 } from './calendar-workflow.js';
 
 describe('calendar-workflow helpers', () => {
@@ -299,6 +301,51 @@ describe('calendar-workflow helpers', () => {
     });
     expect(result.with_meet).toBe(true);
     expect(result.created_event.hangout_link).toBe('https://teams.microsoft.com/l/meetup-join/xyz');
+  });
+
+  it('updates a Google event through the provider seam, including a reminder', async () => {
+    mocks.executeServicePreset.mockResolvedValue({
+      id: 'event-3',
+      summary: 'Rescheduled planning',
+      start: { dateTime: '2026-06-22T15:00:00+09:00' },
+      end: { dateTime: '2026-06-22T16:00:00+09:00' },
+    });
+
+    const result = await updateCalendarEvent({
+      calendar_id: 'primary',
+      event_id: 'event-3',
+      summary: 'Rescheduled planning',
+      start: '2026-06-22T15:00:00+09:00',
+      end: '2026-06-22T16:00:00+09:00',
+      reminder_minutes_before_start: 15,
+    });
+
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'google-workspace',
+      'calendar_events_patch',
+      expect.objectContaining({
+        params: { calendarId: 'primary', eventId: 'event-3' },
+        body: expect.objectContaining({
+          summary: 'Rescheduled planning',
+          reminders: {
+            useDefault: false,
+            overrides: [{ method: 'popup', minutes: 15 }],
+          },
+        }),
+      })
+    );
+    expect(result.created_event.id).toBe('event-3');
+  });
+
+  it('deletes an M365 event through the provider seam', async () => {
+    mocks.executeServicePreset.mockResolvedValue({});
+
+    await expect(
+      deleteCalendarEvent({ provider: 'm365', calendar_id: 'primary', event_id: 'event-4' })
+    ).resolves.toEqual({ ok: true, calendar_id: 'primary', event_id: 'event-4' });
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith('m365', 'calendar_events_delete', {
+      params: { calendarPath: 'me', eventId: 'event-4' },
+    });
   });
 
   it('drops malformed provider records and rejects malformed create responses', async () => {

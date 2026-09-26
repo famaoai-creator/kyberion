@@ -183,6 +183,16 @@ describe('Kyberion CLI helpers', () => {
     expect(shouldBootstrapRuntime(['--help'])).toBe(false);
     expect(shouldBootstrapRuntime(['list'])).toBe(false);
     expect(shouldBootstrapRuntime(['list', '--check'])).toBe(true);
+    // Document reading must stay fast and keep stdout clean.
+    expect(shouldBootstrapRuntime(['read', 'deck.pptx'])).toBe(false);
+    // Authoring resolves design catalogs from disk; no reasoning backend either.
+    expect(shouldBootstrapRuntime(['write', 'brief.json'])).toBe(false);
+    // Perception commands bind only the OCR / STT / ffmpeg bridges they use.
+    expect(shouldBootstrapRuntime(['see', 'shot.png'])).toBe(false);
+    expect(shouldBootstrapRuntime(['listen', 'memo.m4a'])).toBe(false);
+    expect(shouldBootstrapRuntime(['watch', 'demo.mp4'])).toBe(false);
+    // speak uses the voice actuator's engine registry, not the python voice bridge.
+    expect(shouldBootstrapRuntime(['speak', 'hello'])).toBe(false);
     expect(shouldBootstrapRuntime(['task', 'plan', 'hello'])).toBe(true);
     expect(shouldBootstrapRuntime(['task', 'scenario', 'list'])).toBe(false);
   });

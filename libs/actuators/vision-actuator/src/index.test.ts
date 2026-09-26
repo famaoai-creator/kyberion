@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   loggerWarn: vi.fn(),
   recognize: vi.fn(),
   describeImage: vi.fn(),
+  systemAction: vi.fn(),
+}));
+
+vi.mock('@actuator/system', () => ({
+  handleAction: mocks.systemAction,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
@@ -75,6 +80,59 @@ describe('vision-actuator legacy facade', () => {
       workflow_path: 'active/shared/tmp/legacy.json',
     });
     expect(result).toEqual({ prompt_id: 'legacy' });
+  });
+
+  it('forwards legacy capture_screen to the redacted system screenshot path, not the preset', async () => {
+    mocks.systemAction.mockResolvedValue({ screenshot_path: '/repo/active/shared/tmp/s.jpg' });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'capture_screen',
+      params: { output: 'active/shared/tmp/s.jpg' },
+    });
+
+    expect(mocks.loggerWarn).toHaveBeenCalled();
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+    expect(mocks.systemAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'pipeline',
+        steps: [
+          expect.objectContaining({
+            op: 'screenshot',
+            params: expect.objectContaining({ capture_mode: 'screen' }),
+          }),
+        ],
+      })
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ compatibility_forwarded_to: 'system-actuator:screenshot' })
+    );
+  });
+
+  it('forwards legacy record_screen to the redacted system record_screen path, not the preset', async () => {
+    mocks.systemAction.mockResolvedValue({
+      media_recording: { status: 'succeeded', output_path: '/repo/active/shared/tmp/r.mp4' },
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'record_screen',
+      params: { output: 'active/shared/tmp/r.mp4', duration: 1 },
+    });
+
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+    expect(mocks.systemAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'pipeline',
+        steps: [expect.objectContaining({ op: 'record_screen' })],
+      })
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        path: '/repo/active/shared/tmp/r.mp4',
+        compatibility_forwarded_to: 'system-actuator:record_screen',
+      })
+    );
   });
 
   it('rejects non-legacy actions while vision is narrowed to perception', async () => {
