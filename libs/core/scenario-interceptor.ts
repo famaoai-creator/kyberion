@@ -16,6 +16,13 @@
  *    profiles it records the request and defers to the canonical handler;
  *  - the fixture reasoning backend (ES-04, optional);
  *  - write detection by before/after snapshots of the run root.
+ *
+ * FU-01: every seam above acts only inside this run's async scope
+ * (`runInScope`, see scenario-run-scope.ts). Calls from anywhere else in the
+ * process see the normal op resolution, the canonical approval handler and
+ * the previously bound reasoning backend, and are not recorded. A risky
+ * approval is granted only to a request made while a fixture handler serves
+ * that same op.
  */
 
 import * as crypto from 'node:crypto';
@@ -42,6 +49,12 @@ import type {
 } from './scenario-definition.js';
 import { installScenarioFixtureBackend } from './scenario-model-fixtures.js';
 import type { ScenarioRunContext } from './scenario-run-context.js';
+import {
+  getActiveScenarioRunId,
+  getServingScenarioFixtureOp,
+  runInScenarioScope,
+  runServingScenarioFixture,
+} from './scenario-run-scope.js';
 import {
   appendScenarioApproval,
   appendScenarioOp,
@@ -88,6 +101,10 @@ export interface ScenarioInterceptorOptions {
 
 export interface ScenarioInterceptor {
   readonly log: ScenarioSideEffectLog;
+  /** Async-scope id this interceptor's seams answer to (unique per install). */
+  readonly scopeId: string;
+  /** Run `fn` inside this run's scope; seams ignore calls made outside it. */
+  runInScope<T>(fn: () => T): T;
   setApprovalDecision(op: string, decision: ScenarioApprovalDecision): void;
   getApprovalDecision(op: string): ScenarioApprovalDecision;
   /** Diff the run root against the previous snapshot and append write records. */
@@ -173,29 +190,32 @@ export function installScenarioInterceptor(
   const preflightRecords = new WeakMap<object, ScenarioOpRecord>();
   let baseline = snapshotRunRoot(ctx.runRoot);
   let disposed = false;
+  const scopeId = `${ctx.runId}:${crypto.randomBytes(8).toString('hex')}`;
+  const inScope = (): boolean => getActiveScenarioRunId() === scopeId;
 
   const decisionFor = (op: string): ScenarioApprovalDecision => decisions.get(op) ?? 'pending';
   const fixtureFor = (op: string): ScenarioOpFixture | undefined =>
     Object.hasOwn(def.fixtures.ops, op) ? def.fixtures.ops[op] : undefined;
 
   function fixtureHandler(op: string, fixture: ScenarioOpFixture): ActuatorOperationHandler {
-    return async (_action, params, context, stepType) => {
-      const record = { op, stage: 'apply' as const, params: sanitizeParams(params), stepType };
-      if (fixture.error !== undefined) {
-        appendScenarioOp(log, { ...record, outcome: 'error', error: fixture.error });
-        throw new Error(fixture.error);
-      }
-      appendScenarioOp(log, { ...record, outcome: 'ok' });
-      const exportKey = typeof params.export_as === 'string' ? params.export_as : undefined;
-      return {
-        handled: true,
-        ctx: {
-          ...context,
-          ...(fixture.ctx_patch ?? {}),
-          ...(exportKey && fixture.result !== undefined ? { [exportKey]: fixture.result } : {}),
-        },
-      };
-    };
+    return (_action, params, context, stepType) =>
+      runServingScenarioFixture(op, async () => {
+        const record = { op, stage: 'apply' as const, params: sanitizeParams(params), stepType };
+        if (fixture.error !== undefined) {
+          appendScenarioOp(log, { ...record, outcome: 'error', error: fixture.error });
+          throw new Error(fixture.error);
+        }
+        appendScenarioOp(log, { ...record, outcome: 'ok' });
+        const exportKey = typeof params.export_as === 'string' ? params.export_as : undefined;
+        return {
+          handled: true,
+          ctx: {
+            ...context,
+            ...(fixture.ctx_patch ?? {}),
+            ...(exportKey && fixture.result !== undefined ? { [exportKey]: fixture.result } : {}),
+          },
+        };
+      });
   }
 
   try {
@@ -204,6 +224,7 @@ export function installScenarioInterceptor(
         id: SCENARIO_CAPTURE_LISTENER_ID,
         order: Number.MIN_SAFE_INTEGER,
         run: (call) => {
+          if (!inScope()) return undefined;
           const record = appendScenarioOp(log, {
             op: call.op,
             stage: 'preflight',
@@ -231,6 +252,7 @@ export function installScenarioInterceptor(
     // order (see op-preflight.ts N6 fix); it only ever reads that decision.
     disposers.push(
       registerOpPreflightOutcomeObserver((call, result) => {
+        if (!inScope()) return;
         const record = preflightRecords.get(opPreflightCallKey(call));
         if (record && result.decision === 'allow') record.admitted = true;
       })
@@ -239,6 +261,7 @@ export function installScenarioInterceptor(
     disposers.push(
       registerScenarioOpOverride({
         resolve(request: ScenarioOpOverrideRequest) {
+          if (!inScope()) return undefined;
           const fixture = fixtureFor(request.op);
           if (fixture) return { handler: fixtureHandler(request.op, fixture) };
           if (def.executionProfile !== 'simulated' || passthrough.has(request.op)) {
@@ -252,6 +275,7 @@ export function installScenarioInterceptor(
           );
         },
         approvalGranted(request: ScenarioOpOverrideRequest) {
+          if (!inScope()) return false;
           return fixtureFor(request.op) !== undefined && decisionFor(request.op) === 'approved';
         },
       })
@@ -259,6 +283,7 @@ export function installScenarioInterceptor(
 
     disposers.push(
       overrideRiskyApprovalHandler((params): RiskyApprovalResult | undefined => {
+        if (!inScope()) return undefined;
         const decision = decisionFor(params.opId);
         appendScenarioApproval(log, {
           op: params.opId,
@@ -270,11 +295,15 @@ export function installScenarioInterceptor(
         // canonical (human) approval path may answer.
         if (def.executionProfile !== 'simulated') return undefined;
         if (decision === 'approved') {
-          if (fixtureFor(params.opId)) return { allowed: true, status: 'approved' };
+          // Only a request raised while a fixture serves this very op may be
+          // granted; anything else could be a real effect.
+          if (fixtureFor(params.opId) && getServingScenarioFixtureOp() === params.opId) {
+            return { allowed: true, status: 'approved' };
+          }
           return {
             allowed: false,
             status: 'pending',
-            message: `[SCENARIO_APPROVAL_UNFIXTURED] ${params.opId} has no fixture; a scenario approval cannot admit a real effect`,
+            message: `[SCENARIO_APPROVAL_UNFIXTURED] ${params.opId} was not requested by a fixture-served dispatch; a scenario approval cannot admit a real effect`,
           };
         }
         return {
@@ -289,7 +318,7 @@ export function installScenarioInterceptor(
     );
 
     if (options.installReasoning !== false) {
-      disposers.push(installScenarioFixtureBackend(def, log));
+      disposers.push(installScenarioFixtureBackend(def, log, { scopeId }));
     }
   } catch (error) {
     try {
@@ -302,6 +331,8 @@ export function installScenarioInterceptor(
 
   return {
     log,
+    scopeId,
+    runInScope: (fn) => runInScenarioScope(scopeId, fn),
     setApprovalDecision(op, decision) {
       if (!APPROVAL_DECISIONS.has(decision)) {
         throw new Error(`[SCENARIO_INVALID_APPROVAL_DECISION] ${String(decision)}`);

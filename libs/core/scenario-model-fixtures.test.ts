@@ -13,6 +13,7 @@ import {
   installScenarioFixtureBackend,
   SCENARIO_FIXTURE_BACKEND_NAME,
 } from './scenario-model-fixtures.js';
+import { runInScenarioScope } from './scenario-run-scope.js';
 import { createScenarioSideEffectLog } from './scenario-side-effect-log.js';
 
 function scenario(overrides: Partial<ScenarioDefinition> = {}): ScenarioDefinition {
@@ -139,5 +140,50 @@ describe('scenario fixture reasoning backend (ES-04)', () => {
     expect(getReasoningBackend().name).toBe(SCENARIO_FIXTURE_BACKEND_NAME);
     dispose();
     expect(getReasoningBackend()).toBe(stubReasoningBackend);
+  });
+
+  it('with a scopeId answers from fixtures only inside that scope (FU-01)', async () => {
+    const prior = {
+      ...stubReasoningBackend,
+      name: 'prior-backend',
+      prompt: async () => 'prior answer',
+      getRuntimeProviderName: () => 'prior-provider',
+    } as ReasoningBackend;
+    registerReasoningBackend(prior, { provenance: 'builtin', source: 'test' });
+    const log = createScenarioSideEffectLog();
+    const dispose = installScenarioFixtureBackend(scenario(), log, { scopeId: 'run-a' });
+    try {
+      const backend = getReasoningBackend();
+      await expect(backend.prompt('please summarize ticket-42')).resolves.toBe('prior answer');
+      expect(backend.name).toBe('prior-backend');
+      expect(backend.getRuntimeProviderName?.()).toBe('prior-provider');
+      await expect(
+        runInScenarioScope('run-b', () => backend.prompt('please summarize ticket-42'))
+      ).resolves.toBe('prior answer');
+      await runInScenarioScope('run-a', async () => {
+        await expect(backend.prompt('please summarize ticket-42')).resolves.toBe('summary text');
+        expect(backend.name).toBe(SCENARIO_FIXTURE_BACKEND_NAME);
+        expect(backend.getRuntimeProviderName?.()).toBe(SCENARIO_FIXTURE_BACKEND_NAME);
+      });
+      expect(log.reasoning.map((r) => r.outcome)).toEqual(['fixture']);
+    } finally {
+      dispose();
+    }
+    expect(getReasoningBackend()).toBe(prior);
+  });
+
+  it('with a scopeId and nothing bound before, calls outside the scope get the stub', async () => {
+    const dispose = installScenarioFixtureBackend(scenario(), createScenarioSideEffectLog(), {
+      scopeId: 'run-a',
+    });
+    try {
+      const before = getStubServedOps().length;
+      await expect(getReasoningBackend().delegateTask('host work')).resolves.toEqual(
+        expect.any(String)
+      );
+      expect(getStubServedOps().length).toBe(before + 1);
+    } finally {
+      dispose();
+    }
   });
 });

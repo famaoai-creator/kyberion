@@ -89,7 +89,9 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
     const trace = new TraceContext('scenario-test');
     const addEvent = vi.spyOn(trace, 'addEvent');
 
-    const result = await runValidatedSteps(twoSteps, {}, { quiet: true, hasHuman: false, trace });
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(twoSteps, {}, { quiet: true, hasHuman: false, trace })
+    );
 
     expect(result.status).toBe('succeeded');
     expect(real).not.toHaveBeenCalled();
@@ -121,10 +123,18 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
 
   it('fails an unstubbed op closed before any inline or real dispatch', async () => {
     const interceptor = install(scenario());
-    const result = await runValidatedSteps(
-      [{ id: 'exec', op: 'system:exec', params: { command: 'touch', args: ['should-not-exist'] } }],
-      {},
-      { quiet: true, hasHuman: false }
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(
+        [
+          {
+            id: 'exec',
+            op: 'system:exec',
+            params: { command: 'touch', args: ['should-not-exist'] },
+          },
+        ],
+        {},
+        { quiet: true, hasHuman: false }
+      )
     );
     expect(result.status).toBe('failed');
     expect(result.results[0].error).toContain('[SCENARIO_UNSTUBBED_OP] system:exec');
@@ -141,7 +151,9 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
     const rejected = install(
       scenario({ seed: { approvals: [{ op: 'scenariodemo:apply', decision: 'rejected' }] } })
     );
-    const denied = await runValidatedSteps(gated, {}, { quiet: true, hasHuman: false });
+    const denied = await rejected.runInScope(() =>
+      runValidatedSteps(gated, {}, { quiet: true, hasHuman: false })
+    );
     expect(denied.status).toBe('failed');
     expect(denied.results[0].error).toContain('[OP_PREFLIGHT_BLOCK]');
     expect(rejected.log.ops.filter((r) => r.stage === 'apply')).toEqual([]);
@@ -149,7 +161,9 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
       { op: 'scenariodemo:apply', kind: 'requested', decision: 'rejected' },
     ]);
     rejected.setApprovalDecision('scenariodemo:apply', 'approved');
-    const approved = await runValidatedSteps(gated, {}, { quiet: true, hasHuman: false });
+    const approved = await rejected.runInScope(() =>
+      runValidatedSteps(gated, {}, { quiet: true, hasHuman: false })
+    );
     expect(approved.status).toBe('succeeded');
     expect(rejected.log.ops.filter((r) => r.stage === 'apply')).toHaveLength(1);
     expect(rejected.log.ops.at(-2)).toMatchObject({ stage: 'preflight', approvalGranted: true });
@@ -163,17 +177,19 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
         seed: { approvals: [{ op: 'core:run_pipeline', decision: 'approved' }] },
       })
     );
-    const result = await runValidatedSteps(
-      [
-        {
-          id: 'nested',
-          op: 'core:run_pipeline',
-          params: { input: 'pipelines/vital-check.json' },
-          budget: { approval_required: true },
-        },
-      ],
-      {},
-      { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(
+        [
+          {
+            id: 'nested',
+            op: 'core:run_pipeline',
+            params: { input: 'pipelines/vital-check.json' },
+            budget: { approval_required: true },
+          },
+        ],
+        {},
+        { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+      )
     );
     expect(result.status).toBe('succeeded');
     expect(nestedRunner).not.toHaveBeenCalled();
@@ -185,11 +201,19 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
 
   it('leaves an unfixtured core:run_pipeline on its normal path in the simulated profile', async () => {
     const nestedRunner = vi.fn(async () => ({ status: 'succeeded', results: [], context: {} }));
-    install(scenario());
-    const result = await runValidatedSteps(
-      [{ id: 'nested', op: 'core:run_pipeline', params: { input: 'pipelines/vital-check.json' } }],
-      {},
-      { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+    const interceptor = install(scenario());
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(
+        [
+          {
+            id: 'nested',
+            op: 'core:run_pipeline',
+            params: { input: 'pipelines/vital-check.json' },
+          },
+        ],
+        {},
+        { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+      )
     );
     expect(result.status).toBe('succeeded');
     expect(nestedRunner).toHaveBeenCalledTimes(1);
@@ -207,10 +231,12 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
             : undefined,
       })
     );
-    const result = await runValidatedSteps(
-      [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
-      {},
-      { quiet: true, hasHuman: false }
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(
+        [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
+        {},
+        { quiet: true, hasHuman: false }
+      )
     );
     expect(result.status).toBe('failed');
     expect(
@@ -239,10 +265,12 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
 
   it('counts an admitted passthrough op as called', async () => {
     const interceptor = install(scenario());
-    const result = await runValidatedSteps(
-      [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
-      {},
-      { quiet: true, hasHuman: false }
+    const result = await interceptor.runInScope(() =>
+      runValidatedSteps(
+        [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
+        {},
+        { quiet: true, hasHuman: false }
+      )
     );
     expect(result.status).toBe('succeeded');
     expect(
@@ -253,5 +281,22 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
         { runRoot: '' }
       ).pass
     ).toBe(true);
+  });
+
+  it('leaves pipelines run outside the scenario scope on their normal path (FU-01)', async () => {
+    const real = registerSpyOp('apply');
+    const interceptor = install(
+      scenario({ seed: { approvals: [{ op: 'scenariodemo:apply', decision: 'approved' }] } })
+    );
+    const gated = [{ ...twoSteps[1], params: {}, budget: { approval_required: true } }];
+    const outside = await runValidatedSteps([twoSteps[1]], {}, { quiet: true, hasHuman: false });
+    expect(outside.status).toBe('succeeded');
+    expect(real).toHaveBeenCalledTimes(1);
+    // The scenario's approval decision is not visible to out-of-scope work either.
+    const outsideGated = await runValidatedSteps(gated, {}, { quiet: true, hasHuman: false });
+    expect(outsideGated.status).toBe('failed');
+    expect(real).toHaveBeenCalledTimes(1);
+    expect(interceptor.log.ops).toEqual([]);
+    expect(interceptor.log.approvals).toEqual([]);
   });
 });
