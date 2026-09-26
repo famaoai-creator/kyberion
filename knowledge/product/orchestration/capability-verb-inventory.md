@@ -16,7 +16,7 @@ tags:
   ]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-09-26
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, knowledge_steward, mission_controller, operator]
 phase_affinity: [alignment]
 ---
@@ -51,7 +51,7 @@ moves the branching into the CLI.
 | Brief → document    | `media:generate_document`               | `pnpm kyberion write`  | unified                  |
 | Document ↔ document | `media:*_extract` design distillers     | `pnpm kyberion diff`   | unified                  |
 | Image → text        | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | unified                  |
-| Prompt → image      | `media-generation:generate_image`       | —                      | **no verb**              |
+| Prompt → image      | `media-generation:generate_image`       | `pnpm kyberion draw`   | unified                  |
 | Audio → text        | `voice:transcribe`                      | `pnpm kyberion listen` | unified                  |
 | Text → audio        | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | unified                  |
 | Video → timeline    | frames + transcript composition         | `pnpm kyberion watch`  | unified                  |
@@ -77,10 +77,22 @@ with volatile keys (`generatedAt`, extracted image paths) ignored. It is the
 verification half of a reproduction run — extract → render via the
 `media-docx-roundtrip` template, then `pnpm kyberion diff <source> <output>`.
 
-The image and video rows are **not** ready for the same treatment: `generate_image`
-goes out to a provider (an egress decision, unlike local document rendering), and video
-has two engines (`video-composition:*` for narrated composition, `generate_video` for
-model generation) with no unifier to hide the choice.
+`draw` is the inverse of `see`. The unifier is the image-generation bridge
+(`generateImage` / `planImageGeneration` in `libs/core/image-generation-bridge.ts`),
+which already hides the provider behind one router. What kept the row empty was the
+egress decision, so the verb owns exactly that and nothing else: by default only
+providers that keep the data on this machine and finish unattended are eligible;
+`--allow-cloud` adds cloud providers and `--allow-handoff` adds host-agent hand-off as
+a last resort (exit 100, rerun collects). The gate is an explicit provider allowlist
+(`ImageGenerationRequest.allowedProviders`) that the router enforces on every selection
+path — `mode: 'local_only'` alone is not enough, because host bridges run locally but
+forward the request to the host agent's model. Reference images (`--ref`) follow PA-10:
+a cloud or hand-off provider needs a per-run consent naming it, and `--dry-run` shows
+which provider that would be before anything is sent.
+
+The video row is still **not** ready for the same treatment: it has two engines
+(`video-composition:*` for narrated composition, `generate_video` for model generation)
+with no unifier to hide the choice.
 
 ## 3. Inputs that are not files
 

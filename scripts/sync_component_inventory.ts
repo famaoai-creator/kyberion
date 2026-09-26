@@ -282,6 +282,9 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     '| Speech output (TTS: speak or write an audio file) | `voice-actuator` (`generate_voice`, `speak_local`); CLI `pnpm kyberion speak` | Inverse of `pnpm kyberion listen`. Streaming TTS for meetings / realtime voice lives in the streaming-tts bridges, not here. |'
   );
   lines.push(
+    '| Image generation (prompt → image) | `media-generation-actuator` (`generate_image`); CLI `pnpm kyberion draw` | Inverse of `pnpm kyberion see`. Local, unattended providers by default; `--allow-cloud` / `--allow-handoff` opt in and `--ref` needs per-run consent for them. |'
+  );
+  lines.push(
     '| One-shot OS command / shell | `system-actuator` (`pipeline` → `system:exec`, `system:shell`) | Use `process-actuator` instead if the command must be supervised or outlive the calling step. |'
   );
   lines.push(

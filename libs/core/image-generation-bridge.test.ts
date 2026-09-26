@@ -259,6 +259,34 @@ describe('AdaptivePolicyRouter', () => {
     expect(candidates.map((c) => c.id)).toContain('local_flux');
   });
 
+  it('enforces allowedProviders on preference, mode chain and plan paths', async () => {
+    const provider = (id: string, extra: Partial<ImageGenerationProvider> = {}) =>
+      ({
+        id,
+        executionLocality: 'local',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+        ...extra,
+      }) as ImageGenerationProvider;
+    const router = new AdaptivePolicyRouter([
+      provider('cursor_host_bridge', { requiresInteractiveHandoff: true, dataEgress: 'cloud' }),
+      provider('apple_playground'),
+      provider('local_flux'),
+    ]);
+    const request = {
+      prompt: 'x',
+      providerPreference: ['cursor_host_bridge'],
+      allowedProviders: ['local_flux'],
+    };
+    expect((await router.resolveCandidateChain(request)).map((c) => c.id)).toEqual(['local_flux']);
+    expect((await router.planProvider(request))?.id).toBe('local_flux');
+    expect(await router.listCandidates(request)).toContainEqual({
+      id: 'apple_playground',
+      eligible: false,
+      unmet: ['not in the request allowlist (allowed_providers)'],
+    });
+  });
+
   it('filters out training_eligible providers when mode is privacy_first', async () => {
     const freeTrainingProvider: ImageGenerationProvider = {
       id: 'gemini_fast',

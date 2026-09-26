@@ -16,7 +16,7 @@ tags:
   ]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-25
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, mission_controller, implementer, operator]
 phase_affinity: [alignment, execution]
 ---
@@ -75,14 +75,15 @@ executor: `browser:goto` (a page), `system` `activate_application` / `open_path`
 
 ## 4. Converse (会話する)
 
-| Need                                     | Use                                                                                                                                                                                                                  |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Answer a person on any text channel      | the surface conversation seam `runSurfaceMessageConversation` (`libs/core/surface-runtime-orchestrator.ts`) — already used by `ask`, Slack / Telegram / Discord / iMessage satellites, voice-hub, concierge, Chronos |
-| Ask Kyberion from the terminal           | `pnpm kyberion ask "<text>"`                                                                                                                                                                                         |
-| Send a message out                       | `presence:dispatch` with a channel prefix (`slack:`, `telegram:` …)                                                                                                                                                  |
-| Say something aloud / make an audio file | `pnpm kyberion speak "<text>" [--out <file>]` (inverse of `listen`); in pipelines `voice:generate_voice` / `voice:speak_local`                                                                                       |
-| Real-time voice dialogue                 | `pnpm kyberion voice conversation-turn` — see [voice-interface-protocol.md](./voice-interface-protocol.md)                                                                                                           |
-| Agent ↔ agent                            | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md)                                                                                               |
+| Need                                     | Use                                                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Answer a person on any text channel      | the surface conversation seam `runSurfaceMessageConversation` (`libs/core/surface-runtime-orchestrator.ts`) — already used by `ask`, Slack / Telegram / Discord / iMessage satellites, voice-hub, concierge, Chronos                                                         |
+| Ask Kyberion from the terminal           | `pnpm kyberion ask "<text>"`                                                                                                                                                                                                                                                 |
+| Send a message out                       | `presence:dispatch` with a channel prefix (`slack:`, `telegram:` …)                                                                                                                                                                                                          |
+| Say something aloud / make an audio file | `pnpm kyberion speak "<text>" [--out <file>]` (inverse of `listen`); in pipelines `voice:generate_voice` / `voice:speak_local`                                                                                                                                               |
+| Make an image from a prompt              | `pnpm kyberion draw "<prompt>" --out <image>` (inverse of `see`): local providers only by default; `--allow-cloud` / `--allow-handoff` opt in, `--ref` needs per-run consent for those, `--dry-run` shows the provider first; in pipelines `media-generation:generate_image` |
+| Real-time voice dialogue                 | `pnpm kyberion voice conversation-turn` — see [voice-interface-protocol.md](./voice-interface-protocol.md)                                                                                                                                                                   |
+| Agent ↔ agent                            | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md)                                                                                                                                                       |
 
 Do not add a new channel by wiring a reasoning backend directly — register it
 behind the surface seam so tenant scope, audit and approval apply.
@@ -99,3 +100,6 @@ behind the surface seam so tenant scope, audit and approval apply.
 4. **Voice conversation is the one path outside the surface seam** today
    (`realtime-voice-conversation.ts` calls the reasoning backend directly). Keep that
    in mind when auditing what a voice session could reach.
+5. **Do not call image-generation APIs or a host `generate_image` tool by hand.** Go
+   through `pnpm kyberion draw` so the egress gate, the reference-image consent and the
+   audit receipt apply.
