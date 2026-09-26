@@ -25,7 +25,10 @@ import {
   safeExecResult,
   assertSafeRepositoryPath,
   safeReadFile,
+  MAX_RANGE_READ_BYTES,
+  safeReadFileRange,
   safeReadFileTail,
+  safeRealpath,
   safeStatfs,
   safeWriteFile,
   sanitizePath,
@@ -85,6 +88,69 @@ describe('secure-io core', () => {
       expect(() =>
         safeReadFile(path.join(process.cwd(), 'knowledge/personal/connections/slack.json'))
       ).toThrow('[SENSITIVE_PATH_DENIED]');
+    });
+  });
+
+  describe('safeReadFileRange', () => {
+    it('reads a bounded window and a short final window', () => {
+      const testFile = path.join(tmpDir, 'range.txt');
+      const content = '0123456789'.repeat(10);
+      fs.writeFileSync(testFile, content);
+      expect(safeReadFileRange(testFile, 5, 10).toString('utf8')).toBe(content.slice(5, 15));
+      expect(safeReadFileRange(testFile, 95, 10).toString('utf8')).toBe(content.slice(95));
+      expect(safeReadFileRange(testFile, 200, 10).length).toBe(0);
+    });
+
+    it('rejects invalid bounds and symlinks', () => {
+      const testFile = path.join(tmpDir, 'range-target.txt');
+      fs.writeFileSync(testFile, 'abc');
+      expect(() => safeReadFileRange(testFile, -1, 1)).toThrow('Invalid position');
+      expect(() => safeReadFileRange(testFile, 0, 0)).toThrow('Invalid length');
+      const link = path.join(tmpDir, 'range-link.txt');
+      fs.symlinkSync(testFile, link);
+      expect(() => safeReadFileRange(link, 0, 1)).toThrow('symbolic link');
+    });
+
+    it('refuses a window larger than the range cap', () => {
+      const testFile = path.join(tmpDir, 'range-cap.txt');
+      fs.writeFileSync(testFile, 'abc');
+      expect(safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES).toString('utf8')).toBe('abc');
+      expect(() => safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES + 1)).toThrow('exceeds the');
+    });
+  });
+
+  describe('safeRealpath', () => {
+    it('resolves symlinked parent directories, including for a missing leaf', () => {
+      const realDir = path.join(tmpDir, 'real');
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(path.join(realDir, 'a.txt'), 'a');
+      const linkDir = path.join(tmpDir, 'link');
+      fs.symlinkSync(realDir, linkDir);
+      const canonicalReal = fs.realpathSync.native(realDir);
+      expect(safeRealpath(path.join(linkDir, 'a.txt'))).toBe(path.join(canonicalReal, 'a.txt'));
+      expect(safeRealpath(path.join(linkDir, 'new', 'b.txt'))).toBe(
+        path.join(canonicalReal, 'new', 'b.txt')
+      );
+    });
+
+    it('rejects a dangling or looping symlink component instead of treating it as missing', () => {
+      const dangling = path.join(tmpDir, 'dangling');
+      fs.symlinkSync(path.join(tmpDir, 'nowhere'), dangling);
+      expect(() => safeRealpath(dangling)).toThrow('[PATH_UNRESOLVABLE]');
+      expect(() => safeRealpath(path.join(dangling, 'x.txt'))).toThrow('[PATH_UNRESOLVABLE]');
+      const loop = path.join(tmpDir, 'loop');
+      fs.symlinkSync(loop, loop);
+      expect(() => safeRealpath(path.join(loop, 'x.txt'))).toThrow('[PATH_UNRESOLVABLE]');
+    });
+
+    it('refuses paths that resolve outside the repository', () => {
+      expect(() => safeRealpath(path.join(os.tmpdir(), 'x.txt'))).toThrow(
+        '[PATH_OUTSIDE_REPOSITORY]'
+      );
+      const escape = path.join(tmpDir, 'escape');
+      fs.symlinkSync(os.tmpdir(), escape);
+      expect(() => safeRealpath(path.join(escape, 'x.txt'))).toThrow('[PATH_OUTSIDE_REPOSITORY]');
+      expect(safeRealpath(process.cwd())).toBe(fs.realpathSync.native(process.cwd()));
     });
   });
 

@@ -12,6 +12,8 @@ import { resolveGoldenRulePriorityOrder, resolveVision } from './vision-resolver
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
+  expireApprovalRequest,
+  isApprovalRequestExpired,
   listApprovalRequests,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
@@ -67,6 +69,14 @@ export interface ApprovalGateParams {
   hasUI?: boolean;
   /** Explicit non-interactive mode signal; stronger than an inferred TTY. */
   nonInteractive?: boolean;
+  /**
+   * ISO expiry stamped on a newly created request. Setting it opts into
+   * renewable requests: a matched request whose expiry has lapsed (whatever
+   * its status) no longer binds the correlation id, so a rejection or an old
+   * approval does not lock the operation forever — a fresh request is opened.
+   * Must parse and lie in the future; it is clamped to MAX_APPROVAL_TTL_MS.
+   */
+  expiresAt?: string;
 }
 
 export interface ApprovalGateResult {
@@ -239,6 +249,30 @@ function buildApprovalDraft(params: {
   };
 }
 
+/** Longest lifetime a renewable request may be stamped with. */
+export const MAX_APPROVAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Expired status, or an expiry that has passed (a malformed expiry counts as passed). */
+function isLapsedRequest(record: ApprovalRequestRecord, now: number): boolean {
+  return record.status === 'expired' || isApprovalRequestExpired(record, now);
+}
+
+/**
+ * Caller-supplied expiry, checked against the real clock: unparsable or
+ * non-future values are refused, far-future ones clamped to the max TTL.
+ */
+function clampRenewableExpiry(
+  expiresAt: string,
+  now: number
+): { value: string } | { error: string } {
+  const parsed = typeof expiresAt === 'string' ? Date.parse(expiresAt) : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return { error: `expiresAt '${String(expiresAt)}' is not a valid timestamp` };
+  }
+  if (parsed <= now) return { error: 'expiresAt is not in the future' };
+  return { value: new Date(Math.min(parsed, now + MAX_APPROVAL_TTL_MS)).toISOString() };
+}
+
 /**
  * Enforce the approval gate before executing a governed operation.
  *
@@ -311,19 +345,58 @@ export function enforceApprovalGate(
     return { allowed: true, status: 'not_required', message: 'No approval required' };
   }
 
+  // Renewable expiry is validated against the real clock, never a caller's.
+  const now = Date.now();
+  let renewableExpiresAt: string | undefined;
+  if (params.expiresAt !== undefined) {
+    const expiry = clampRenewableExpiry(params.expiresAt, now);
+    if ('error' in expiry) {
+      const reason = `[APPROVAL_EXPIRY_INVALID] ${expiry.error}`;
+      auditChain.record({
+        agentId,
+        action: 'approval_gate',
+        operation: operationId,
+        result: 'denied',
+        reason,
+        metadata: { correlationId, intentId },
+      });
+      recordGovernanceAction(agentId, 'approval_gate', `${operationId}:denied`, true);
+      return { allowed: false, status: 'pending', message: reason };
+    }
+    renewableExpiresAt = expiry.value;
+  }
+
   // --- Step 2: Search for an existing request matching this correlationId ---
   const existing = listApprovalRequests({ storageChannels: [channel] });
-  const matched = existing.find((r: ApprovalRequestRecord) => r.correlationId === correlationId);
+  const sameCorrelation = existing.filter(
+    (r: ApprovalRequestRecord) => r.correlationId === correlationId
+  );
+  if (renewableExpiresAt !== undefined) {
+    // A lapsed pending request is closed for good so it cannot be decided late.
+    for (const record of sameCorrelation) {
+      if (record.status !== 'pending' || !isApprovalRequestExpired(record, now)) continue;
+      try {
+        expireApprovalRequest(role, {
+          channel: record.channel,
+          storageChannel: channel,
+          requestId: record.id,
+        });
+      } catch {
+        /* the request stays unmatched either way; persistence is best-effort */
+      }
+    }
+  }
+  const matched =
+    renewableExpiresAt === undefined
+      ? sameCorrelation[0]
+      : sameCorrelation.find((r: ApprovalRequestRecord) => !isLapsedRequest(r, now));
 
   if (matched) {
     // An approved record that carries an expiry must not be reused past it —
     // otherwise a single human "yes" becomes a standing, permanent grant
-    // (security review CR-4). Records with no expiresAt keep prior behavior.
-    const approvalExpired =
-      matched.status === 'approved' &&
-      typeof matched.expiresAt === 'string' &&
-      Number.isFinite(Date.parse(matched.expiresAt)) &&
-      Date.parse(matched.expiresAt) <= Date.now();
+    // (security review CR-4). A malformed expiry counts as passed; records
+    // with no expiresAt keep prior behavior.
+    const approvalExpired = matched.status === 'approved' && isApprovalRequestExpired(matched, now);
 
     const expectedPayloadHash = computeApprovalPayloadHash(payload);
     const bindingMismatch =
@@ -475,6 +548,7 @@ export function enforceApprovalGate(
     channel,
     threadTs: nowIso(),
     correlationId,
+    ...(renewableExpiresAt !== undefined ? { expiresAt: renewableExpiresAt } : {}),
     requestedBy: agentId,
     draft,
     source: params.source,

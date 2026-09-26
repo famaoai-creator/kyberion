@@ -38,6 +38,7 @@ import {
 import { osAutomationBridge } from '@agent/core/os-automation-bridge';
 import { isMacOS } from '@agent/core/platform';
 import * as path from 'node:path';
+import { resolveSystemClickCoordinate } from './system-mark-target.js';
 import {
   assertUnsafeShellAllowed,
   assertUnsafeJsAllowed,
@@ -178,13 +179,15 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }
       break;
     }
-    case 'mouse_click':
+    case 'mouse_click': {
+      const point = (await resolveSystemClickCoordinate(params, ctx.session_id)) ?? { x: 0, y: 0 };
       if (params.button === 'right') {
-        rightClickAt(Number(params.x || 0), Number(params.y || 0), Number(params.click_count || 1));
+        rightClickAt(point.x, point.y, Number(params.click_count || 1));
       } else {
-        clickAt(Number(params.x || 0), Number(params.y || 0), Number(params.click_count || 1));
+        clickAt(point.x, point.y, Number(params.click_count || 1));
       }
       break;
+    }
     case 'mouse_move':
       moveMouse(Number(params.x || 0), Number(params.y || 0));
       break;

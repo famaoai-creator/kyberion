@@ -108,3 +108,8 @@ export function resolveImagesnapBin(): string {
 export function resolveLightpandaBin(): string {
   return resolveExternalToolBin('lightpanda', ['KYBERION_LIGHTPANDA_BIN'], 'lightpanda');
 }
+
+/** yt-dlp video fetcher for libs/core/video-ingest (never self-updated). */
+export function resolveYtDlpBin(): string {
+  return resolveExternalToolBin('yt_dlp', ['KYBERION_YTDLP_BIN'], 'yt-dlp');
+}
