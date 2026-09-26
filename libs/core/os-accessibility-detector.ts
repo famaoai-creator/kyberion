@@ -32,6 +32,8 @@ export const OS_ACCESSIBILITY_MAX_ELEMENTS = 200;
 export const OS_ACCESSIBILITY_MAX_SCAN = 2_000;
 export const OS_ACCESSIBILITY_MAX_DEPTH = 12;
 const PERMISSION_CACHE_MS = 30_000;
+// A denial is re-probed sooner so a newly granted permission takes effect quickly.
+const PERMISSION_DENIED_CACHE_MS = 5_000;
 
 /** Roles a user can click, type into or toggle. */
 export const INTERACTIVE_AX_ROLES: ReadonlySet<string> = new Set([
@@ -295,7 +297,10 @@ export class OsAccessibilityDetector implements UiElementDetector {
 
   private async permissionGranted(): Promise<boolean> {
     const now = (this.deps.now ?? Date.now)();
-    if (this.permission?.trusted && now - this.permission.at < PERMISSION_CACHE_MS) return true;
+    if (this.permission) {
+      const ttl = this.permission.trusted ? PERMISSION_CACHE_MS : PERMISSION_DENIED_CACHE_MS;
+      if (now - this.permission.at < ttl) return this.permission.trusted;
+    }
     let trusted = false;
     try {
       const result = await this.run('osascript', ['-l', 'JavaScript', '-e', PERMISSION_SCRIPT], {
