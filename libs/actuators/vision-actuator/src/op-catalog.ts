@@ -25,6 +25,19 @@ const VISION_SCHEMA = {
 
 const TIER_SCHEMA = { type: 'string', enum: ['public', 'confidential', 'personal'] } as const;
 
+const DESCRIBE_IMAGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    path: { type: 'string' },
+    kind: { type: 'string' },
+    tier: TIER_SCHEMA,
+    mission_id: { type: 'string' },
+    tenant_slug: { type: 'string' },
+  },
+  additionalProperties: false,
+  required: ['path'],
+} as const;
+
 const VIDEO_SOURCE_SCHEMA = {
   oneOf: [
     {
@@ -113,6 +126,16 @@ const MARK_ELEMENTS_SCHEMA = {
     ocr_mode: { type: 'string' },
     output_path: { type: 'string' },
     max_marks: { type: 'integer', minimum: 1 },
+    tier: TIER_SCHEMA,
+    mission_id: { type: 'string' },
+    dom_snapshot_id: { type: 'string', minLength: 1 },
+    display_index: { type: 'integer', minimum: 0 },
+    display_origin: {
+      type: 'object',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['x', 'y'],
+      additionalProperties: false,
+    },
   },
   additionalProperties: false,
   required: ['path', 'session_id'],
@@ -148,6 +171,7 @@ const DESCRIBE_SCREEN_DELTA_SCHEMA = {
 } as const;
 
 const VISION_SCHEMAS: Record<string, unknown> = {
+  describe_image: DESCRIBE_IMAGE_SCHEMA,
   fetch_video: FETCH_VIDEO_SCHEMA,
   build_video_brief: BUILD_VIDEO_BRIEF_SCHEMA,
   mark_elements: MARK_ELEMENTS_SCHEMA,

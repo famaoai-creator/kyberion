@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { dhashFile, hamming } from './image-dhash.js';
-import { pathResolver } from './path-resolver.js';
+import { assertVolatileId, findMissionPath, pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import type { SomImageSize, SomMark } from './set-of-marks.js';
+import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
 
 /**
  * Session-volatile store for Set-of-Marks results and the `mark:<n>` target
@@ -14,7 +14,11 @@ import type { SomImageSize, SomMark } from './set-of-marks.js';
  * latest marks of a session and refused with [MARK_STALE] when that promise can
  * no longer be trusted: marks older than the TTL, a different marks_id than
  * the caller planned against, or a current screen whose dHash moved away from
- * the marked screenshot.
+ * the marked screenshot. The current screen hash is mandatory: a resolver that
+ * cannot see the screen refuses rather than trusting the TTL alone.
+ *
+ * Non-public marks live in the mission directory; the session dir then holds
+ * only a pointer (mission id + marks id), never labels or boxes.
  */
 
 export const MARKS_TTL_MS = 60_000;
@@ -22,7 +26,17 @@ export const MARKS_TTL_MS = 60_000;
 export const MARK_SCREEN_MAX_HAMMING = 5;
 const MARKS_FILE = 'vision-marks.json';
 const MARKS_VERSION = 1;
+const POINTER_KIND = 'vision-marks-pointer';
 const MARK_TARGET = /^mark:(\d{1,4})$/;
+
+export type MarksTier = 'public' | 'confidential' | 'personal';
+
+/** Display the marked screenshot was taken on. */
+export interface MarksDisplay {
+  index?: number;
+  /** Top-left of the display in global logical points, when known. */
+  origin?: { x: number; y: number };
+}
 
 export interface MarksRecord {
   version: number;
@@ -35,6 +49,11 @@ export interface MarksRecord {
   /** Image pixels per logical point (e.g. 2 on a Retina capture). */
   scale: number;
   marks: SomMark[];
+  tier?: MarksTier;
+  mission_id?: string;
+  /** Browser snapshot the DOM refs of these marks belong to. */
+  dom_snapshot_id?: string;
+  display?: MarksDisplay;
 }
 
 export interface SaveMarksInput {
@@ -46,6 +65,20 @@ export interface SaveMarksInput {
   ttl_ms?: number;
   now?: () => number;
   marks_id?: string;
+  /** Defaults to public. Non-public marks require mission_id. */
+  tier?: MarksTier;
+  /** Existing mission whose directory holds the marks. */
+  mission_id?: string;
+  dom_snapshot_id?: string;
+  display?: MarksDisplay;
+}
+
+interface MarksPointer {
+  version: number;
+  kind: typeof POINTER_KIND;
+  session_id: string;
+  marks_id: string;
+  mission_id: string;
 }
 
 export interface ResolveMarkTargetOptions {
@@ -54,7 +87,10 @@ export interface ResolveMarkTargetOptions {
   scale?: number;
   /** Refuse unless the stored marks carry this id. */
   marks_id?: string;
-  /** dHash of the screen right now; refused when it moved from the marked image. */
+  /**
+   * dHash of the screen right now; refused when it moved from the marked
+   * image. One of current_dhash / current_image_path is required.
+   */
   current_dhash?: string;
   /** Screenshot of the screen right now; hashed when current_dhash is absent. */
   current_image_path?: string;
@@ -71,6 +107,8 @@ export interface MarkTargetResolution {
   /** Browser snapshot ref when the mark came from the DOM. */
   ref?: string;
   label?: string;
+  dom_snapshot_id?: string;
+  display?: MarksDisplay;
 }
 
 export type MarkTargetErrorCode = 'MARK_STALE' | 'MARK_INVALID';
@@ -86,13 +124,33 @@ export class MarkTargetError extends Error {
 }
 
 function requireSessionId(sessionId: string): string {
-  const trimmed = String(sessionId || '').trim();
-  if (!trimmed) throw new MarkTargetError('MARK_INVALID', 'session_id is required');
-  return trimmed;
+  if (!String(sessionId || '').trim()) {
+    throw new MarkTargetError('MARK_INVALID', 'session_id is required');
+  }
+  try {
+    return assertVolatileId('session', sessionId);
+  } catch (error) {
+    throw new MarkTargetError('MARK_INVALID', (error as Error).message);
+  }
 }
 
+/** Session-dir file: the marks themselves (public) or a pointer to them. */
 export function marksStatePath(sessionId: string): string {
   return path.join(pathResolver.volatile('session', requireSessionId(sessionId)), MARKS_FILE);
+}
+
+/** Mission-local marks file; the mission must already exist. */
+export function missionMarksStatePath(missionId: string, sessionId: string): string {
+  let missionPath: string | null;
+  try {
+    missionPath = findMissionPath(assertVolatileId('mission', missionId));
+  } catch (error) {
+    throw new MarkTargetError('MARK_INVALID', (error as Error).message);
+  }
+  if (!missionPath) {
+    throw new MarkTargetError('MARK_INVALID', `mission '${missionId}' does not exist`);
+  }
+  return path.join(missionPath, 'tmp', 'vision-marks', requireSessionId(sessionId), MARKS_FILE);
 }
 
 /** The mark number of a `mark:<n>` target, or undefined for any other string. */
@@ -115,6 +173,11 @@ export function saveMarks(input: SaveMarksInput): MarksRecord {
   if (!Number.isFinite(scale) || scale <= 0) {
     throw new MarkTargetError('MARK_INVALID', 'scale must be a positive number');
   }
+  const tier = input.tier ?? 'public';
+  const missionId = input.mission_id?.trim() || undefined;
+  if (tier !== 'public' && !missionId) {
+    throw new MarkTargetError('MARK_INVALID', `${tier} marks need a mission_id to stay in scope`);
+  }
   const record: MarksRecord = {
     version: MARKS_VERSION,
     marks_id: input.marks_id ?? randomUUID(),
@@ -124,12 +187,56 @@ export function saveMarks(input: SaveMarksInput): MarksRecord {
     image: input.image,
     image_dhash: input.image_dhash,
     scale,
-    marks: input.marks,
+    marks: input.marks.map(({ label, ...mark }) => {
+      const safe = safeMarkLabel(label);
+      return safe ? { ...mark, label: safe } : mark;
+    }),
+    tier,
+    ...(missionId ? { mission_id: missionId } : {}),
+    ...(input.dom_snapshot_id ? { dom_snapshot_id: input.dom_snapshot_id } : {}),
+    ...(input.display ? { display: input.display } : {}),
   };
   const statePath = marksStatePath(sessionId);
-  safeMkdir(path.dirname(statePath), { recursive: true });
-  safeWriteFile(statePath, `${JSON.stringify(record, null, 2)}\n`);
+  if (missionId) {
+    const scopedPath = missionMarksStatePath(missionId, sessionId);
+    writeJson(scopedPath, record);
+    const pointer: MarksPointer = {
+      version: MARKS_VERSION,
+      kind: POINTER_KIND,
+      session_id: sessionId,
+      marks_id: record.marks_id,
+      mission_id: missionId,
+    };
+    writeJson(statePath, pointer);
+  } else {
+    writeJson(statePath, record);
+  }
   return record;
+}
+
+function writeJson(filePath: string, value: unknown): void {
+  safeMkdir(path.dirname(filePath), { recursive: true });
+  safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function readJson(filePath: string, label: string): unknown {
+  if (!safeExistsSync(filePath)) return undefined;
+  try {
+    return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' })), label);
+  } catch {
+    return undefined;
+  }
+}
+
+function isMarksPointer(value: unknown): value is MarksPointer {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<MarksPointer>;
+  return (
+    candidate.version === MARKS_VERSION &&
+    candidate.kind === POINTER_KIND &&
+    typeof candidate.marks_id === 'string' &&
+    typeof candidate.mission_id === 'string'
+  );
 }
 
 function isMarksRecord(value: unknown): value is MarksRecord {
@@ -146,21 +253,30 @@ function isMarksRecord(value: unknown): value is MarksRecord {
 }
 
 export function loadMarks(sessionId: string): MarksRecord | undefined {
-  const statePath = marksStatePath(sessionId);
-  if (!safeExistsSync(statePath)) return undefined;
-  try {
-    const parsed = parseSafeJsonInput(
-      String(safeReadFile(statePath, { encoding: 'utf8' })),
-      'vision marks state'
-    );
-    return isMarksRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
+  const id = requireSessionId(sessionId);
+  const parsed = readJson(marksStatePath(id), 'vision marks state');
+  if (isMarksPointer(parsed)) {
+    if (parsed.session_id !== id) return undefined;
+    const scoped = readJson(missionMarksStatePath(parsed.mission_id, id), 'vision marks state');
+    return isMarksRecord(scoped) && scoped.marks_id === parsed.marks_id && scoped.session_id === id
+      ? scoped
+      : undefined;
   }
+  // A full record in the session dir is only trusted when it is public.
+  return isMarksRecord(parsed) && (parsed.tier ?? 'public') === 'public' ? parsed : undefined;
 }
 
 export function clearMarks(sessionId: string): void {
-  safeRmSync(marksStatePath(sessionId), { force: true });
+  const statePath = marksStatePath(sessionId);
+  const parsed = readJson(statePath, 'vision marks state');
+  if (isMarksPointer(parsed)) {
+    try {
+      safeRmSync(missionMarksStatePath(parsed.mission_id, sessionId), { force: true });
+    } catch {
+      // A vanished mission leaves nothing to clear.
+    }
+  }
+  safeRmSync(statePath, { force: true });
 }
 
 export async function resolveMarkTarget(
@@ -195,14 +311,23 @@ export async function resolveMarkTarget(
   const currentDhash =
     options.current_dhash ??
     (options.current_image_path ? await dhashFile(options.current_image_path) : undefined);
-  if (currentDhash) {
-    const distance = hamming(currentDhash, record.image_dhash);
-    if (distance > (options.max_hamming ?? MARK_SCREEN_MAX_HAMMING)) {
-      throw new MarkTargetError(
-        'MARK_STALE',
-        `the screen changed since marks ${record.marks_id} (dHash distance ${distance}); re-run mark_elements`
-      );
-    }
+  if (!currentDhash) {
+    throw new MarkTargetError(
+      'MARK_STALE',
+      `cannot verify the current screen against marks ${record.marks_id}; a current screen hash is required`
+    );
+  }
+  let distance: number;
+  try {
+    distance = hamming(currentDhash, record.image_dhash);
+  } catch {
+    throw new MarkTargetError('MARK_STALE', 'the current screen hash is malformed');
+  }
+  if (distance > (options.max_hamming ?? MARK_SCREEN_MAX_HAMMING)) {
+    throw new MarkTargetError(
+      'MARK_STALE',
+      `the screen changed since marks ${record.marks_id} (dHash distance ${distance}); re-run mark_elements`
+    );
   }
   const mark = record.marks.find((entry) => entry.n === n);
   if (!mark) {
@@ -222,5 +347,7 @@ export async function resolveMarkTarget(
     y: Math.round(mark.center.y / scale),
     ...(mark.ref ? { ref: mark.ref } : {}),
     ...(mark.label ? { label: mark.label } : {}),
+    ...(record.dom_snapshot_id ? { dom_snapshot_id: record.dom_snapshot_id } : {}),
+    ...(record.display ? { display: record.display } : {}),
   };
 }

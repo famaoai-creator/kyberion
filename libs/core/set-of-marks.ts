@@ -1,3 +1,4 @@
+import { isSensitiveScreenText } from './frame-redaction.js';
 import type { OcrResult } from './ocr-types.js';
 
 /**
@@ -13,6 +14,10 @@ import type { OcrResult } from './ocr-types.js';
  *    different detectors, keeping the best-scored box and merging provenance;
  * 3. marks are numbered in reading order (top to bottom, left to right, with
  *    a row tolerance so slightly misaligned boxes in one row stay in order).
+ *
+ * Labels go through the same PII/secret detection as screen redaction: a
+ * label whose text would be blacked out in the redacted screenshot is dropped,
+ * so marks never carry what the overlay image hides.
  *
  * Everything here is pure; drawing and persistence live elsewhere.
  */
@@ -126,9 +131,12 @@ function clipBox(box: SomBox, size: SomImageSize | undefined): SomBox | undefine
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
-function cleanLabel(label: string | undefined): string | undefined {
-  const trimmed = label?.replace(/\s+/g, ' ').trim();
-  return trimmed ? trimmed : undefined;
+/** Whitespace-normalised label, or undefined when empty or redaction would mask it. */
+export function safeMarkLabel(label: string | null | undefined): string | undefined {
+  if (typeof label !== 'string') return undefined;
+  const trimmed = label.replace(/\s+/g, ' ').trim();
+  if (!trimmed || isSensitiveScreenText(label) || isSensitiveScreenText(trimmed)) return undefined;
+  return trimmed;
 }
 
 function absorb(into: WorkingCandidate, from: WorkingCandidate): void {
@@ -213,7 +221,7 @@ export function fuseSetOfMarks(
     working.push({
       box,
       kind: candidate.kind,
-      label: cleanLabel(candidate.label),
+      label: safeMarkLabel(candidate.label),
       score: Number.isFinite(candidate.score) ? candidate.score : 0,
       ref: candidate.ref,
       sources: new Set([candidate.source]),
@@ -247,9 +255,9 @@ export function candidatesFromOcr(result: OcrResult, imageSize: SomImageSize): S
   const normalized = result.boundingBoxUnits === 'normalized';
   const candidates: SomCandidate[] = [];
   for (const line of result.lines) {
-    const label = cleanLabel(line.text);
     const raw = line.boundingBox;
-    if (!label || !raw) continue;
+    if (!line.text?.trim() || !raw) continue;
+    const label = safeMarkLabel(line.text);
     const box = normalized
       ? {
           x: raw.x * imageSize.width,
@@ -263,7 +271,7 @@ export function candidatesFromOcr(result: OcrResult, imageSize: SomImageSize): S
       box,
       source: 'ocr',
       kind: 'text',
-      label,
+      ...(label ? { label } : {}),
       score: normalizeConfidence(line.confidence),
     });
   }
@@ -303,7 +311,7 @@ export function candidatesFromDomSnapshot(
       width: element.bbox.width * scale,
       height: element.bbox.height * scale,
     };
-    const label = cleanLabel(element.name ?? undefined) ?? cleanLabel(element.text ?? undefined);
+    const label = safeMarkLabel(element.name) ?? safeMarkLabel(element.text);
     candidates.push({
       box,
       source: 'dom',

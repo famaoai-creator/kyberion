@@ -6,9 +6,21 @@ const { ocrImage, redactFrame } = vi.hoisted(() => ({ ocrImage: vi.fn(), redactF
 vi.mock('./ocr-bridge.js', () => ({ ocrImage }));
 vi.mock('./frame-redaction.js', () => ({ redactFrame }));
 
-import { redactScreenCaptureFile } from './screen-frame-redaction.js';
+import {
+  createRedactedImageCopy,
+  redactScreenCaptureFile,
+  redactScreenVideoFrame,
+} from './screen-frame-redaction.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
+import path from 'node:path';
 
 async function fixturePng(): Promise<Buffer> {
   return new Jimp({ data: Buffer.alloc(4 * 4 * 4, 255), width: 4, height: 4 }).getBuffer(
@@ -84,6 +96,82 @@ describe('redactScreenCaptureFile', () => {
     } finally {
       safeRmSync(input, { recursive: true, force: true });
       safeRmSync(output, { force: true });
+    }
+  });
+});
+
+function succeedRedaction() {
+  ocrImage.mockResolvedValue({
+    status: 'succeeded',
+    provider: 'fixture',
+    text: '',
+    confidence: 1,
+    elapsedMs: 0,
+    lines: [],
+  });
+  redactFrame.mockImplementation(({ frame }: { frame: { pixels: Uint8Array } }) => ({
+    status: 'redacted',
+    frame: { ...frame, pixels: new Uint8Array(frame.pixels.length).fill(0) },
+    regions: [],
+  }));
+}
+
+describe('redaction work files stay in scope', () => {
+  const root = pathResolver.sharedTmp(`screen-redaction-scope-tests/${process.pid}`);
+
+  it('redactScreenVideoFrame writes its OCR work file into work_dir only', async () => {
+    succeedRedaction();
+    const workDir = path.join(root, 'mission-tmp');
+    try {
+      const frame = {
+        format: { mime_type: 'image/png' as const },
+        payload: new Uint8Array(await fixturePng()),
+        ts_ms: 7,
+      };
+      const redacted = await redactScreenVideoFrame(frame, { work_dir: workDir });
+      expect(redacted.ts_ms).toBe(7);
+      const ocrPath = ocrImage.mock.calls.at(-1)?.[0].path as string;
+      expect(path.dirname(ocrPath)).toBe(workDir);
+      expect(safeReaddir(workDir)).toEqual([]);
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('redactScreenCaptureFile OCRs the capture in place instead of copying it', async () => {
+    succeedRedaction();
+    const input = path.join(root, 'in-place', 'raw.png');
+    const output = path.join(root, 'in-place', 'redacted.png');
+    try {
+      safeWriteFile(input, await fixturePng());
+      await redactScreenCaptureFile(input, output);
+      expect(ocrImage.mock.calls.at(-1)?.[0].path).toBe(input);
+      expect(safeReaddir(path.join(root, 'in-place'))).toEqual(['redacted.png']);
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('createRedactedImageCopy leaves the source intact and disposes its work dir', async () => {
+    succeedRedaction();
+    const source = path.join(root, 'copy', 'photo.png');
+    const workDir = path.join(root, 'copy-work');
+    try {
+      safeWriteFile(source, await fixturePng());
+      const copy = await createRedactedImageCopy(source, { work_dir: workDir });
+      expect(copy.path.startsWith(workDir + path.sep)).toBe(true);
+      expect(safeExistsSync(source)).toBe(true);
+      expect(safeReaddir(path.dirname(copy.path))).toEqual(['redacted.png']);
+      copy.dispose();
+      expect(safeReaddir(workDir)).toEqual([]);
+
+      redactFrame.mockReturnValue({ status: 'withheld', reason: 'ocr_failed' });
+      await expect(createRedactedImageCopy(source, { work_dir: workDir })).rejects.toThrow(
+        'withheld'
+      );
+      expect(safeReaddir(workDir)).toEqual([]);
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
     }
   });
 });

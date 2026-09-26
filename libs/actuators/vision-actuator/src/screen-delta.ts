@@ -8,7 +8,12 @@ import {
   type ScreenDeltaResult,
   type TileGrid,
 } from '@agent/core/dirty-tile-describer';
-import { inferImagePayloadTier, type PayloadTier } from '@agent/core/image-description-bridge';
+import type { PayloadTier } from '@agent/core/image-description-bridge';
+import {
+  requireVisionSessionId,
+  resolveVisionScope,
+  type MissionPathResolver,
+} from './vision-scope.js';
 
 /**
  * vision:describe_screen_delta — dirty-tile description of a screenshot.
@@ -16,8 +21,9 @@ import { inferImagePayloadTier, type PayloadTier } from '@agent/core/image-descr
  * Tile crops are what reaches the vision model, and the model channel judges
  * their tier by where they live. The effective tier is the strictest of the
  * declared tier, the screenshot's path and the mission's path; any non-public
- * tier crops into the mission directory, so a confidential screen is never
- * cropped into the public shared tmp.
+ * tier crops into (and keeps its tile memory in) an existing mission's
+ * directory, so a confidential screen is never cropped into the public shared
+ * tmp and its descriptions are never reused by a public call.
  */
 
 export interface DescribeScreenDeltaParams {
@@ -36,14 +42,8 @@ export interface DescribeScreenDeltaOpDeps {
     input: DescribeScreenDeltaInput,
     deps: DirtyTileDescriberDeps
   ) => Promise<ScreenDeltaResult>;
-  describer?: Omit<DirtyTileDescriberDeps, 'work_dir'>;
-  resolveMissionPath?: (missionId: string) => string;
-}
-
-const TIER_RANK: Record<PayloadTier, number> = { public: 0, confidential: 1, personal: 2 };
-
-function stricter(a: PayloadTier, b: PayloadTier): PayloadTier {
-  return TIER_RANK[a] >= TIER_RANK[b] ? a : b;
+  describer?: Omit<DirtyTileDescriberDeps, 'work_dir' | 'state_dir'>;
+  resolveMissionPath?: MissionPathResolver;
 }
 
 export async function handleDescribeScreenDelta(
@@ -54,14 +54,11 @@ export async function handleDescribeScreenDelta(
   if (!logicalPath) {
     throw new Error('[SCREEN_DELTA_INVALID] describe_screen_delta requires params.path');
   }
-  const sessionId = String(params.session_id || '').trim();
-  if (!sessionId) {
-    throw new Error('[SCREEN_DELTA_INVALID] describe_screen_delta requires params.session_id');
-  }
-  const declared = params.tier;
-  if (declared !== undefined && !(declared in TIER_RANK)) {
-    throw new Error('[SCREEN_DELTA_INVALID] tier must be public, confidential or personal');
-  }
+  const sessionId = requireVisionSessionId(
+    params.session_id,
+    'SCREEN_DELTA_INVALID',
+    'describe_screen_delta'
+  );
   const imagePath = assertSafeRepositoryPath(pathResolver.rootResolve(logicalPath), {
     allowMissingLeaf: true,
   });
@@ -69,20 +66,23 @@ export async function handleDescribeScreenDelta(
     throw new Error(`[VISION_RESOURCE_FILE] image path must be a regular file: ${logicalPath}`);
   }
 
-  let tier = stricter(declared ?? 'public', inferImagePayloadTier(imagePath));
-  const missionId = String(params.mission_id || '').trim();
-  let workDir: string | undefined;
-  if (missionId) {
-    const missionPath = (
-      deps.resolveMissionPath ?? ((id: string) => pathResolver.volatile('mission', id))
-    )(missionId);
-    tier = stricter(tier, inferImagePayloadTier(missionPath));
-    workDir = path.join(missionPath, 'tmp', 'vision-tiles');
-  } else if (tier !== 'public') {
-    throw new Error(
-      `[VISION_TIER_SCOPE] ${tier} screen delta needs mission_id so tile crops stay mission-local`
-    );
-  }
+  const scope = resolveVisionScope(
+    {
+      image_path: imagePath,
+      tier: params.tier,
+      mission_id: params.mission_id,
+      subject: 'screen delta',
+      invalid_code: 'SCREEN_DELTA_INVALID',
+    },
+    deps.resolveMissionPath
+  );
+  const tier = scope.tier;
+  const scopeDirs = scope.mission_path
+    ? {
+        work_dir: path.join(scope.mission_path, 'tmp', 'vision-tiles'),
+        state_dir: path.join(scope.mission_path, 'tmp', 'vision-state'),
+      }
+    : {};
 
   const input: DescribeScreenDeltaInput = {
     path: imagePath,
@@ -97,7 +97,7 @@ export async function handleDescribeScreenDelta(
   };
   const result = await (deps.describeDelta ?? describeScreenDelta)(input, {
     ...(deps.describer ?? {}),
-    ...(workDir ? { work_dir: workDir } : {}),
+    ...scopeDirs,
   });
   return { status: 'succeeded' as const, path: logicalPath, tier, ...result };
 }

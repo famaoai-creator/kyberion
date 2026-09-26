@@ -133,6 +133,46 @@ describe('describeImage with the reasoning_vision provider', () => {
   });
 });
 
+describe('prepare_egress_image', () => {
+  it('sends only the prepared copy, keeps the original tier and disposes the copy', async () => {
+    const calls: VisionCall[] = [];
+    const dispose = vi.fn();
+    const prepared = pathResolver.rootResolve('active/shared/tmp/redaction/redacted.png');
+    const prepare = vi.fn(async () => ({ path: prepared, dispose }));
+    const result = await describeImage(
+      { path: 'active/missions/confidential/MSN-X/evidence/shot.jpg' },
+      {
+        tenant_slug: 'acme',
+        prepare_egress_image: prepare,
+        resolveBackend: () => visionBackend(calls),
+      }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(prepare).toHaveBeenCalledWith(
+      pathResolver.rootResolve('active/missions/confidential/MSN-X/evidence/shot.jpg')
+    );
+    expect(calls[0].images).toEqual([{ path: prepared, media_type: 'image/png' }]);
+    expect(calls[0].scope).toMatchObject({ tier: 'confidential', tenant_slug: 'acme' });
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing when preparation fails', async () => {
+    const calls: VisionCall[] = [];
+    const result = await describeImage(
+      { path: 'active/shared/tmp/shot.png' },
+      {
+        prepare_egress_image: async () => {
+          throw new Error('screen frame withheld: ocr_unavailable');
+        },
+        resolveBackend: () => visionBackend(calls),
+      }
+    );
+    expect(result).toMatchObject({ status: 'failed', provider: 'reasoning_vision' });
+    expect(result.error).toMatch(/withheld/);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('createReasoningVisionDescribeFn', () => {
   it('returns the trimmed description and honours a custom prompt', async () => {
     const calls: VisionCall[] = [];

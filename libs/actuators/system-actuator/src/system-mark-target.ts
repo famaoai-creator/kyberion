@@ -1,14 +1,25 @@
 import {
+  MarkTargetError,
+  loadMarks,
   resolveMarkTarget,
   type MarkTargetResolution,
   type ResolveMarkTargetOptions,
 } from '@agent/core/mark-target-resolver';
+import { dhashFile } from '@agent/core/image-dhash';
+import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
+import { safeLstat, safeRmSync } from '@agent/core/secure-io';
 
 /**
  * Screen coordinates for system clicks addressed by a Set-of-Marks target.
  * An explicit coordinate always wins; `target_mark` (`mark:<n>` from vision
  * mark_elements) is resolved only when no coordinate is given, into logical
  * points (the marks' display scale is applied by the resolver).
+ *
+ * A mark is clicked only after the current screen is compared with the marked
+ * screenshot: the caller's `current_dhash`, else a fresh capture of the marks'
+ * display through the governed screen-capture bridge (hashed, then deleted).
+ * Marks from a secondary display are shifted by its recorded origin, and
+ * refused when that origin is unknown.
  */
 
 export interface SystemMarkTargetInput {
@@ -18,12 +29,24 @@ export interface SystemMarkTargetInput {
   target_mark?: unknown;
   mark_session_id?: unknown;
   marks_id?: unknown;
+  /** dHash of the screen right now, when the caller already captured it. */
+  current_dhash?: unknown;
 }
 
 export type MarkResolver = (
   target: string,
   options: ResolveMarkTargetOptions
 ) => Promise<MarkTargetResolution>;
+
+/** dHash of what the given display shows right now. */
+export type CurrentScreenHasher = (request: { display_index?: number }) => Promise<string>;
+
+export interface SystemMarkTargetDeps {
+  resolver?: MarkResolver;
+  hashCurrentScreen?: CurrentScreenHasher;
+  /** Display the stored marks came from (defaults to the session's saved marks). */
+  markedDisplayIndex?: (sessionId: string) => number | undefined;
+}
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -36,19 +59,72 @@ function explicitCoordinate(input: SystemMarkTargetInput): { x: number; y: numbe
   return { x: Number(input.x || 0), y: Number(input.y || 0) };
 }
 
+export const hashCurrentScreen: CurrentScreenHasher = async ({ display_index }) => {
+  const capture = await createScreenCaptureBridge().captureScreenshot(
+    display_index !== undefined ? { display_index } : {}
+  );
+  try {
+    if (!safeLstat(capture.save_path).isFile()) {
+      throw new Error('current screen capture is not a regular file');
+    }
+    return await dhashFile(capture.save_path);
+  } finally {
+    safeRmSync(capture.save_path, { force: true });
+  }
+};
+
+function storedDisplayIndex(sessionId: string): number | undefined {
+  try {
+    return loadMarks(sessionId)?.display?.index;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function resolveSystemClickCoordinate(
   input: SystemMarkTargetInput,
   fallbackSessionId: string | undefined,
-  resolver: MarkResolver = resolveMarkTarget
+  deps: SystemMarkTargetDeps = {}
 ): Promise<{ x: number; y: number } | undefined> {
   const explicit = explicitCoordinate(input);
   if (explicit) return explicit;
   const targetMark = optionalString(input.target_mark);
   if (!targetMark) return undefined;
+  const sessionId = optionalString(input.mark_session_id) ?? fallbackSessionId ?? '';
   const marksId = optionalString(input.marks_id);
-  const resolved = await resolver(targetMark, {
-    session_id: optionalString(input.mark_session_id) ?? fallbackSessionId ?? '',
+  if (!sessionId) {
+    throw new MarkTargetError('MARK_INVALID', `${targetMark} needs mark_session_id or session_id`);
+  }
+
+  let currentDhash = optionalString(input.current_dhash);
+  if (!currentDhash) {
+    const displayIndex = (deps.markedDisplayIndex ?? storedDisplayIndex)(sessionId);
+    try {
+      currentDhash = await (deps.hashCurrentScreen ?? hashCurrentScreen)(
+        displayIndex !== undefined ? { display_index: displayIndex } : {}
+      );
+    } catch (error) {
+      throw new MarkTargetError(
+        'MARK_STALE',
+        `cannot capture the current screen to verify ${targetMark}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  const resolved = await (deps.resolver ?? resolveMarkTarget)(targetMark, {
+    session_id: sessionId,
+    current_dhash: currentDhash,
     ...(marksId ? { marks_id: marksId } : {}),
   });
+  const display = resolved.display;
+  if (display?.origin) {
+    return { x: resolved.x + display.origin.x, y: resolved.y + display.origin.y };
+  }
+  if (display?.index !== undefined && display.index !== 0) {
+    throw new MarkTargetError(
+      'MARK_INVALID',
+      `marks ${resolved.marks_id} came from display ${display.index} whose origin is unknown; pass display_origin to mark_elements`
+    );
+  }
   return { x: resolved.x, y: resolved.y };
 }

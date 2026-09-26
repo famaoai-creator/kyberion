@@ -1,9 +1,16 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Jimp } from 'jimp';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { clearMarks, resolveMarkTarget } from '@agent/core/mark-target-resolver';
+import {
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { clearMarks, marksStatePath, resolveMarkTarget } from '@agent/core/mark-target-resolver';
 import type { SomRedactFn } from '@agent/core/som-overlay';
 import { handleMarkElements } from './mark-elements.js';
 
@@ -100,11 +107,17 @@ describe('handleMarkElements', () => {
     expect(safeExistsSync(result.svg_path)).toBe(true);
 
     // The stored marks drive later clicks: DOM marks by ref, others by logical point.
+    const current_dhash = result.image_dhash;
     await expect(
-      resolveMarkTarget('mark:1', { session_id: id, now: () => T0 + 1 })
+      resolveMarkTarget('mark:1', { session_id: id, now: () => T0 + 1, current_dhash })
     ).resolves.toMatchObject({ ref: '@e2', x: 120, y: 30 });
     await expect(
-      resolveMarkTarget('mark:2', { session_id: id, now: () => T0 + 1, marks_id: result.marks_id })
+      resolveMarkTarget('mark:2', {
+        session_id: id,
+        now: () => T0 + 1,
+        marks_id: result.marks_id,
+        current_dhash,
+      })
     ).resolves.toEqual({ n: 2, marks_id: result.marks_id, x: 20, y: 55, label: 'Help' });
   });
 
@@ -115,5 +128,128 @@ describe('handleMarkElements', () => {
     await expect(handleMarkElements({ path: 'x.png', session_id: 's', scale: 0 })).rejects.toThrow(
       /VISION_RESOURCE_FILE|scale/
     );
+  });
+});
+
+const noDetections = async () => ({ detectors_run: ['ocr_text'], candidates: [] });
+
+describe('handleMarkElements scope', () => {
+  it('keeps the raw copy in the session dir and never next to a caller output_path', async () => {
+    const image = await writeScreen(40, 20);
+    const id = session('raw-copy');
+    const redactDirs: string[] = [];
+    const output = path.join(dir, 'caller-out', 'overlay.png');
+    const result = await handleMarkElements(
+      { path: image, session_id: id, output_path: path.relative(pathResolver.rootDir(), output) },
+      {
+        detect: async () => ({
+          detectors_run: ['ocr_text'],
+          candidates: [
+            {
+              box: { x: 1, y: 1, width: 20, height: 8 },
+              source: 'ocr',
+              kind: 'text',
+              label: 'dave.k@example.com',
+              score: 0.9,
+            },
+          ],
+        }),
+        redact: async (inputPath, outputPath) => {
+          redactDirs.push(path.dirname(inputPath));
+          await passthroughRedact(inputPath, outputPath);
+        },
+        now: () => T0,
+      }
+    );
+    expect(result.tier).toBe('public');
+    expect(redactDirs).toEqual([path.join(pathResolver.volatile('session', id), 'vision-marks')]);
+    expect(safeReaddir(path.dirname(output)).sort()).toEqual(['overlay.png', 'overlay.svg']);
+    expect(result.marks).toHaveLength(1);
+    expect(result.marks[0]).not.toHaveProperty('label');
+  });
+
+  it.each([
+    ['output_path equal to the input', (image: string) => ({ output_path: image })],
+    ['traversal-shaped session_id', () => ({ session_id: '../escape' })],
+  ])('refuses %s', async (_name, extra) => {
+    const image = await writeScreen(20, 20);
+    const id = session('refuse');
+    await expect(
+      handleMarkElements(
+        { path: image, session_id: id, ...extra(image) },
+        { detect: noDetections, redact: passthroughRedact }
+      )
+    ).rejects.toThrow(/VISION_MARK_INVALID/);
+    expect(safeExistsSync(path.join(dir, 'screen.png'))).toBe(true);
+  });
+
+  it('refuses a non-public screenshot without a mission before writing anything', async () => {
+    const image = await writeScreen(20, 20);
+    const id = session('tier');
+    const detect = async () => {
+      throw new Error('must not run');
+    };
+    await expect(
+      handleMarkElements(
+        { path: image, session_id: id, tier: 'confidential' },
+        { detect, redact: passthroughRedact }
+      )
+    ).rejects.toThrow('[VISION_TIER_SCOPE] confidential');
+    await expect(
+      handleMarkElements(
+        { path: image, session_id: id, tier: 'confidential', mission_id: 'MSN-NOT-THERE' },
+        { detect, redact: passthroughRedact }
+      )
+    ).rejects.toThrow("[VISION_TIER_SCOPE] mission 'MSN-NOT-THERE' does not exist");
+    expect(safeExistsSync(marksStatePath(id))).toBe(false);
+  });
+
+  it('keeps every artifact of a mission-scoped screenshot inside the mission', async () => {
+    await withExecutionContextAsync('mission_controller', async () => {
+      const missionId = `MSN-MARK-ELEMENTS-${process.pid}`;
+      const missionPath = pathResolver.missionDir(missionId, 'confidential');
+      safeWriteFile(path.join(missionPath, 'mission-state.json'), '{}');
+      const id = session('mission');
+      try {
+        const image = await writeScreen(40, 20);
+        await expect(
+          handleMarkElements(
+            {
+              path: image,
+              session_id: id,
+              mission_id: missionId,
+              output_path: path.relative(pathResolver.rootDir(), path.join(dir, 'leak.png')),
+            },
+            { detect: noDetections, redact: passthroughRedact }
+          )
+        ).rejects.toThrow('[VISION_TIER_SCOPE] output_path must stay inside mission');
+        expect(safeExistsSync(path.join(dir, 'leak.png'))).toBe(false);
+
+        const redactDirs: string[] = [];
+        const result = await handleMarkElements(
+          { path: image, session_id: id, mission_id: missionId, dom_snapshot_id: 'tab@1' },
+          {
+            detect: noDetections,
+            redact: async (inputPath, outputPath) => {
+              redactDirs.push(path.dirname(inputPath));
+              await passthroughRedact(inputPath, outputPath);
+            },
+            now: () => T0,
+          }
+        );
+        const scoped = path.join(missionPath, 'tmp', 'vision-marks', id);
+        expect(result.tier).toBe('confidential');
+        expect(redactDirs).toEqual([scoped]);
+        for (const artifact of [result.annotated_path, result.svg_path]) {
+          expect(path.dirname(artifact)).toBe(scoped);
+        }
+        expect(String(safeReadFile(marksStatePath(id), { encoding: 'utf8' }))).toContain(
+          '"kind": "vision-marks-pointer"'
+        );
+      } finally {
+        clearMarks(id);
+        safeRmSync(missionPath, { recursive: true, force: true });
+      }
+    });
   });
 });

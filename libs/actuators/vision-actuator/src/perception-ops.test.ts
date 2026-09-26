@@ -195,6 +195,7 @@ describe('handleDescribeScreenDelta mission scoping', () => {
     );
     expect(describeDelta).toHaveBeenCalledWith(expect.objectContaining({ tier: 'confidential' }), {
       work_dir: path.join(missionPath, 'tmp', 'vision-tiles'),
+      state_dir: path.join(missionPath, 'tmp', 'vision-state'),
     });
     expect(result.tier).toBe('confidential');
   });
