@@ -58,6 +58,129 @@ Good fits for this preflight include proposal decks, internal updates, briefing 
 8. Generate: build the deck with the selected brief, theme, and pattern pack.
 9. Review: propose reusable preference updates for `knowledge/personal/` only when the user approves.
 
+## Deck Modes
+
+Two structural paths exist, selected by `document_profile` (or `deck_mode`):
+
+- **`executive-proposal` / `vision-proposal` (canonical)** — the deck follows a
+  fixed proposal skeleton (cover → executive-summary → why-change →
+  solution-shape → governance → delivery-plan → decision). Content binds by
+  position from `story.chapters` and `evidence`. Use for actual decision/ask
+  decks where the persuasive arc is the point.
+- **`generic-deck` (section-driven)** — `document_profile: "generic-deck"` or
+  `deck_mode: "sections"`. Each `payload.sections` entry becomes one slide
+  (heading → title, body/bullets → content, callouts → callout layouts), plus
+  cover and agenda. Use for reports, briefings, and any deck whose structure
+  comes from the user's sections rather than the proposal arc.
+
+Sections may carry typed payloads that render as real components instead of
+bullet text (semantic_type is inferred when omitted):
+
+| Field                                                | Component                                                                           | Inferred semantic        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------ |
+| `table: {columns, rows, colWidths?}` (or `rows[][]`) | native `<a:tbl>` table with header row                                              | `table`                  |
+| `metrics: [{value, label}]`                          | KPI cards (big number + label, accent bar; single metric → centered spotlight card) | `roi`                    |
+| `steps: [{title, description}]`                      | chevron process flow                                                                | `roadmap`                |
+| `columns: {left                                      | right                                                                               | center: {title, items}}` | rounded comparison cards with headers | `comparison` |
+| `checklist: [item]`                                  | two-column check-pill grid                                                          | `appendix`               |
+| `quote: {text, attribution?}`                        | large centered quote with accent mark                                               | `summary`                |
+| `image: {path, caption?}`                            | embedded figure with caption                                                        | `evidence`               |
+| `divider: true`                                      | full-bleed section divider slide                                                    | `hero`                   |
+| `cta: "…"`                                           | explicit call-to-action button text on decision slides                              | (decision)               |
+
+Explicit `semantic_type`/`layout_key`/`media_kind`/`section_id` on a section
+override the inference. Plain `body`/`bullets` sections still flow through the
+body-zone machinery (problem/evidence → callout, control → risk pair,
+architecture → panel, summary → statement, contents → agenda).
+
+The same typed fields render across formats:
+
+- **`summary-report` DOCX** — metrics/steps/columns become styled `w:tbl`
+  rows, `table` honors `colWidths` in inches, `quote` gets an accent rule,
+  `checklist` renders `☐/☑` items, `image` embeds a centered figure.
+- **`summary-report` PDF** — metrics/steps/columns become surface-filled
+  vector blocks, `table` draws header/grid strokes, `quote` gets an accent
+  rule, `image` embeds on the page. The builder paginates automatically:
+  flow-space content splits into page bands (usable height ≈ page − top/bottom
+  margins), `ensureSpace` keeps cards/quotes/table headers off the break, and
+  each page gets a centered page-number footer.
+- **`operator-tracker` XLSX** — structured sections append below the grid:
+  metrics → info-styled KPI row, steps → header/body row pair, columns →
+  side-by-side cells, `table`/`tables` → native grid, checklist → ☐/☑ rows,
+  quote → info row, `image` → an anchored drawing spanning ~4 columns × 10
+  rows with an optional caption row (row span follows the PNG aspect ratio).
+- `divider: true` is a chapter break — deck: section slide; docx:
+  `w:pageBreakBefore` on the heading; pdf: the section starts on a fresh
+  page; xlsx: an extra gap row. `cta` renders as an accent action bar in
+  docx/pdf and an info row in xlsx.
+- `wbs` — work breakdown. Nested `[{id, name, items|children}]` auto-numbers
+  children (1.1, 1.1.2); flat `[{level, name}]` also works. pptx/pdf/docx
+  render an indented tree (accent bar + bold L1, ├/└ connectors); xlsx writes
+  merged hierarchy rows.
+- `timeline` — schedule entries `[{label, start, end?, owner?}]`. With
+  parseable dates (`YYYY[-MM[-DD]]`) pptx/pdf draw proportional bars on a
+  shared scale (mini-Gantt, last entry accented); without dates pptx falls
+  back to a milestone track. docx renders a 期間/項目/担当 table; xlsx writes
+  span/label/owner columns.
+- `matrix` — 2×2 quadrant `{x_axis, y_axis?, quadrants:[{title, items}]}`.
+  pptx draws a quadrant grid with axis captions (y-axis rotated); docx/pdf
+  render surface-filled quadrant cells; xlsx writes merged quadrant rows.
+- `process` — ordered flow `[{label, description?}]` (strings also work).
+  pptx draws joined boxes (horizontal arrows ≤4 steps, vertical ↓ beyond);
+  docx numbers steps with ↓ separators; pdf draws accent-barred step rows;
+  xlsx writes STEP n / label / description rows.
+- `org` — org chart. Nested `[{name, role?, reports|children}]` or flat
+  `[{name, role?, level}]`. pptx draws level rows with elbow connectors;
+  docx/pdf render ◆/– indented lines with role suffix; xlsx writes
+  indent + role columns.
+- `pyramid` — hierarchy layers `[{label, description?}]`, index 0 = apex.
+  pptx/pdf draw centered bands that widen toward the base (apex = primary,
+  base = accent, middle = surface); docx renders indented centered shaded
+  paragraphs; xlsx writes Lv.n rows.
+- `flow` — swimlane flow. Grouped `[{lane, steps:[...]|items:[...]}]` or
+  flat `[{lane, label}]` (flat entries group by lane in document order).
+  pptx draws lane-label bars + connected step boxes with `→`; docx renders a
+  two-column lane/steps table; pdf draws a dark lane label + joined step
+  text on a surface band; xlsx writes lane | joined-steps rows.
+- `roadmap` — period cards `[{period, title?, items?}]` (quarterly/phase
+  horizons — unlike `timeline`, periods aren't date-scaled). pptx draws
+  card columns with colored period headers; docx/pdf render a period-header
+  table row + item rows; xlsx writes period/title/items columns.
+- `kpi_table` — `[{metric, value, target?, delta?|change?|trend?}]`. pptx
+  renders an emphasized metric/value/目標/変化 row list with accent-colored
+  positive deltas; docx renders a headered 指標/現在/目標/変化 table; pdf
+  renders emphasized rows; xlsx writes a header + data grid.
+
+Developer guide for adding new fields lives in
+[media-structured-content-extension](./media-structured-content-extension.md):
+the normalizer/`STRUCTURED_FIELD_KEYS` registration, per-format renderer
+conventions, and ordering contract.
+
+- `image` accepts layout hints: `width`/`height` (inches) and
+  `align` (`left|center|right`, default center for docx/pdf, left for xlsx).
+  xlsx additionally honors `cols`/`rows` (drawing anchor span overrides).
+  `caption` doubles as the docx image `descr` (alt text).
+- PDF prose wraps to the content width via the shared font-metric
+  measurement (`@agent/core/native-pptx-engine/text-metrics` —
+  advance-width classes for CJK/latin, CJK breaks anywhere, latin at word
+  boundaries):
+  body paragraphs, bullets, callouts, quotes, checklist items, column-card
+  items, step descriptions and **table cells** (row height follows the
+  tallest wrapped cell). Continuation pages carry a running header (doc
+  title, top-right) and a centered page number; table header rows repeat
+  flush at the top of each continuation band.
+- docx tables emit `w:cantSplit` rows (structured blocks never split
+  mid-page), `w:tblCellMar` cell margins, `w:tblHeader` header repetition,
+  and metric/column cards use white inside-V separators so surface-filled
+  cells read as spaced cards.
+- xlsx long-text rows (section heading, quote, CTA, checklist item,
+  caption) emit `mergeCells` across the section block so values aren't
+  clipped by the first column's width.
+
+If a doc-style brief (with `payload.sections`) produces a deck of preset
+titles and empty bodies, the canonical path was taken by mistake — switch to
+`generic-deck`.
+
 ## Outputs
 
 Minimum output:

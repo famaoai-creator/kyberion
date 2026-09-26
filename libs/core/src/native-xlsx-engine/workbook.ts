@@ -23,8 +23,7 @@ export function generateWorkbook(protocol: XlsxDesignProtocol): string {
   xml += '<sheets>';
   protocol.sheets.forEach((sheet, i) => {
     xml += `<sheet name="${escXml(sheet.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"`;
-    if (sheet.state === 'hidden') xml += ' state="hidden"';
-    if (sheet.state === 'veryHidden') xml += ' state="veryHidden"';
+    if (sheet.state) xml += ` state="${sheet.state}"`;
     xml += '/>';
   });
   xml += '</sheets>';
