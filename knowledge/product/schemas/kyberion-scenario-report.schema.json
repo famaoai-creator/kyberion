@@ -69,6 +69,21 @@
         "reasoning_calls": { "type": "integer", "minimum": 0 }
       }
     },
+    "warnings": {
+      "type": "array",
+      "description": "Run diagnostics (FU-01). scope_lost: while the simulated run was active an op reached its seams with no scenario scope (unrelated host work, or run work that lost its async context).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "op", "source", "count"],
+        "properties": {
+          "kind": { "enum": ["scope_lost"] },
+          "op": { "type": "string", "minLength": 1 },
+          "source": { "enum": ["pipeline", "actuator", "delegate", "mcp", "op-dispatch"] },
+          "count": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
     "duration_ms": { "type": "number" },

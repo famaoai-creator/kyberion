@@ -1,7 +1,8 @@
 /**
- * ES-02/ES-04: the side-effect log a scenario run collects. All four arrays
- * share one monotonically increasing `seq`, so the trajectory writer and the
- * final checks can order ops, approvals, writes and reasoning calls exactly.
+ * ES-02/ES-04: the side-effect log a scenario run collects. All arrays share
+ * one monotonically increasing `seq`, so the trajectory writer and the final
+ * checks can order ops, approvals, writes and reasoning calls exactly.
+ * `warnings` (FU-01) are diagnostics about the run, never side effects.
  */
 
 import type { OpPreflightCall } from './op-preflight.js';
@@ -58,11 +59,26 @@ export interface ScenarioReasoningRecord {
   response_length?: number;
 }
 
+/**
+ * FU-01 scope_lost: while a simulated run was active, an op reached its seams
+ * with no scenario scope at all. That is either unrelated host work or run
+ * work that lost its async context (e.g. a callback from a pre-existing
+ * emitter); it is not blocked, but the scenario author must see it.
+ */
+export interface ScenarioWarningRecord {
+  seq: number;
+  kind: 'scope_lost';
+  op: string;
+  /** Where the dispatch was observed (preflight source, or the op resolver); never a stack. */
+  source: OpPreflightCall['source'] | 'op-dispatch';
+}
+
 export interface ScenarioSideEffectLog {
   ops: ScenarioOpRecord[];
   approvals: ScenarioApprovalRecord[];
   writes: ScenarioWriteRecord[];
   reasoning: ScenarioReasoningRecord[];
+  warnings: ScenarioWarningRecord[];
 }
 
 type WithoutSeq<T> = T extends unknown ? Omit<T, 'seq'> : never;
@@ -70,7 +86,13 @@ type WithoutSeq<T> = T extends unknown ? Omit<T, 'seq'> : never;
 const seqCounters = new WeakMap<ScenarioSideEffectLog, number>();
 
 export function createScenarioSideEffectLog(): ScenarioSideEffectLog {
-  const log: ScenarioSideEffectLog = { ops: [], approvals: [], writes: [], reasoning: [] };
+  const log: ScenarioSideEffectLog = {
+    ops: [],
+    approvals: [],
+    writes: [],
+    reasoning: [],
+    warnings: [],
+  };
   seqCounters.set(log, 0);
   return log;
 }
@@ -114,5 +136,14 @@ export function appendScenarioReasoning(
 ): ScenarioReasoningRecord {
   const entry = { seq: nextSeq(log), ...record };
   log.reasoning.push(entry);
+  return entry;
+}
+
+export function appendScenarioWarning(
+  log: ScenarioSideEffectLog,
+  record: WithoutSeq<ScenarioWarningRecord>
+): ScenarioWarningRecord {
+  const entry = { seq: nextSeq(log), ...record };
+  log.warnings.push(entry);
   return entry;
 }

@@ -78,7 +78,21 @@ resolution, the canonical approval handler and the previously bound reasoning
 backend, and is not recorded in the run's log. A risky approval (e.g.
 `secret-guard`) is granted only to a request raised while a fixture handler
 serves that same op; any other in-scope request is denied with
-`[SCENARIO_APPROVAL_UNFIXTURED]` (or `REJECTED` / `PENDING`).
+`[SCENARIO_APPROVAL_UNFIXTURED]` (or `REJECTED` / `PENDING`). The virtual
+clock is bound the same way (`runWithClock` in `libs/core/foundation/clock.ts`):
+inside the run `nowIso()` is virtual, elsewhere it stays wall time.
+
+Scope loss is ambiguous rather than blocked. If run work loses its async
+context (typically a callback from an emitter, pool or timer that was created
+before the run), its ops look exactly like unrelated host work: in the
+`simulated` profile they get normal op resolution instead of
+`[SCENARIO_UNSTUBBED_OP]`. So that such a leak is never silent, every op that
+reaches the run's seams with no scenario scope at all while a simulated run is
+active is recorded as a `scope_lost` warning (op name plus the observation point:
+preflight source or `op-dispatch`; no stacks). The report lists them under
+`warnings` (grouped with a count, also shown in `report.md`); a scenario with
+warnings still passes, so check them when writing or debugging a scenario.
+Calls from another scenario's scope are not warnings.
 
 Reports carry `evidence_class: "simulated"` for simulated runs; evidence
 intakes reject them (`assertNotSimulatedEvidence`).

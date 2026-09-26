@@ -63,25 +63,38 @@ function fixtureMatches(fixture: CompiledReasoningFixture, prompt: string): bool
   return fixture.contains !== undefined || fixture.regex !== undefined;
 }
 
-export function createScenarioFixtureBackend(
+interface ScenarioFixtureResponder {
+  answer(method: string, prompt: string): string;
+  answerStructured<T>(method: string, input: unknown): T;
+  /** A call fixtures can never serve (tools, images): logged and thrown like a miss. */
+  refuse(method: string, prompt: string): never;
+}
+
+function createFixtureResponder(
   def: ScenarioDefinition,
   log: ScenarioSideEffectLog
-): ReasoningBackend {
+): ScenarioFixtureResponder {
   const fixtures = def.modelFixtures === 'fixtures' ? compileFixtures(def) : [];
 
-  function answer(method: string, prompt: string): string {
-    const base = {
+  function baseRecord(method: string, prompt: string) {
+    return {
       method,
       backend: SCENARIO_FIXTURE_BACKEND_NAME,
       prompt_hash: sha256(prompt),
       prompt_length: prompt.length,
     };
-    if (def.modelFixtures === 'model-free') {
-      appendScenarioReasoning(log, { ...base, outcome: 'forbidden' });
-      throw new Error(
-        `[SCENARIO_MODEL_CALL_FORBIDDEN] scenario ${def.id} is model-free but ${method} was called`
-      );
-    }
+  }
+
+  function forbid(method: string, base: ReturnType<typeof baseRecord>): never {
+    appendScenarioReasoning(log, { ...base, outcome: 'forbidden' });
+    throw new Error(
+      `[SCENARIO_MODEL_CALL_FORBIDDEN] scenario ${def.id} is model-free but ${method} was called`
+    );
+  }
+
+  function answer(method: string, prompt: string): string {
+    const base = baseRecord(method, prompt);
+    if (def.modelFixtures === 'model-free') forbid(method, base);
     const fixture = fixtures.find((candidate) => fixtureMatches(candidate, prompt));
     if (!fixture) {
       appendScenarioReasoning(log, { ...base, outcome: 'miss' });
@@ -110,6 +123,27 @@ export function createScenarioFixtureBackend(
     }
   }
 
+  function refuse(method: string, prompt: string): never {
+    const base = baseRecord(method, prompt);
+    if (def.modelFixtures === 'model-free') forbid(method, base);
+    appendScenarioReasoning(log, { ...base, outcome: 'miss' });
+    throw new Error(
+      `[SCENARIO_FIXTURE_MISS] scenario ${def.id}: ${method} cannot be served from reasoning fixtures (prompt sha256 ${base.prompt_hash.slice(0, 12)})`
+    );
+  }
+
+  return { answer, answerStructured, refuse };
+}
+
+export function createScenarioFixtureBackend(
+  def: ScenarioDefinition,
+  log: ScenarioSideEffectLog
+): ReasoningBackend {
+  return fixtureBackendFrom(createFixtureResponder(def, log));
+}
+
+function fixtureBackendFrom(responder: ScenarioFixtureResponder): ReasoningBackend {
+  const { answer, answerStructured } = responder;
   return {
     name: SCENARIO_FIXTURE_BACKEND_NAME,
     async prompt(prompt) {
@@ -150,28 +184,35 @@ export function createScenarioFixtureBackend(
 
 /**
  * FU-01: route each call to `fixture` inside the scenario scope and to
- * `fallback()` (the backend that was bound before the run, else the stub)
+ * `fallback` (the backend that was bound before the run, else the stub)
  * everywhere else, so unrelated host reasoning is never fixture-answered.
+ * Every optional capability of `fallback` stays available outside the scope;
+ * inside it, streaming is the fixture answer, tools / images are refused like
+ * a fixture miss, and there is no delegation handle.
  */
 function scopeFixtureBackend(
   fixture: ReasoningBackend,
-  fallback: () => ReasoningBackend,
+  responder: ScenarioFixtureResponder,
+  fallback: ReasoningBackend,
   inScope: () => boolean
 ): ReasoningBackend {
-  const pick = (): ReasoningBackend => (inScope() ? fixture : fallback());
-  return {
+  const pick = (): ReasoningBackend => (inScope() ? fixture : fallback);
+  const scoped: ReasoningBackend = {
     get name() {
       return pick().name;
     },
+    get supportsVision() {
+      return inScope() ? false : fallback.supportsVision;
+    },
     getRuntimeInstructions: (options) =>
-      inScope() ? [] : (fallback().getRuntimeInstructions?.(options) ?? []),
+      inScope() ? [] : (fallback.getRuntimeInstructions?.(options) ?? []),
     getRuntimeProviderName: (options) =>
-      inScope() ? fixture.name : fallback().getRuntimeProviderName?.(options) || fallback().name,
-    resetSession: () => (inScope() ? undefined : fallback().resetSession?.()),
+      inScope() ? fixture.name : fallback.getRuntimeProviderName?.(options) || fallback.name,
+    resetSession: () => (inScope() ? undefined : fallback.resetSession?.()),
     getNativeSubagentAdopter: () =>
-      inScope() ? null : (fallback().getNativeSubagentAdopter?.() ?? null),
+      inScope() ? null : (fallback.getNativeSubagentAdopter?.() ?? null),
     requiresNativeSubagent: () =>
-      inScope() ? false : (fallback().requiresNativeSubagent?.() ?? false),
+      inScope() ? false : (fallback.requiresNativeSubagent?.() ?? false),
     prompt: (prompt, options) => pick().prompt(prompt, options),
     delegateTask: (instruction, context, options) =>
       pick().delegateTask(instruction, context, options),
@@ -185,6 +226,36 @@ function scopeFixtureBackend(
     extractTestPlan: (input, options) => pick().extractTestPlan(input, options),
     decomposeIntoTasks: (input, options) => pick().decomposeIntoTasks(input, options),
   };
+  if (fallback.streamPrompt) {
+    scoped.streamPrompt = (prompt, options) => {
+      if (!inScope()) return fallback.streamPrompt!(prompt, options);
+      return (async function* fixtureStream(): AsyncGenerator<string> {
+        const text = await fixture.prompt(prompt, options);
+        if (text) yield text;
+      })();
+    };
+  }
+  if (fallback.generateWithTools) {
+    scoped.generateWithTools = async (prompt, tools, options) =>
+      inScope()
+        ? responder.refuse('generateWithTools', prompt)
+        : fallback.generateWithTools!(prompt, tools, options);
+  }
+  if (fallback.promptWithImages) {
+    scoped.promptWithImages = async (prompt, images, options) =>
+      inScope()
+        ? responder.refuse('promptWithImages', prompt)
+        : fallback.promptWithImages!(prompt, images, options);
+  }
+  if (fallback.delegateTaskHandle) {
+    // Absent inside the scope (callers fall back to the fixture-served
+    // delegateTask) so a scenario never opens a real delegation record.
+    Object.defineProperty(scoped, 'delegateTaskHandle', {
+      enumerable: true,
+      get: () => (inScope() ? undefined : fallback.delegateTaskHandle!.bind(fallback)),
+    });
+  }
+  return scoped;
 }
 
 export interface ScenarioFixtureBackendInstallOptions {
@@ -220,14 +291,16 @@ export function installScenarioFixtureBackend(
       );
     }
   }
-  const fixtureBackend = createScenarioFixtureBackend(def, log);
+  const responder = createFixtureResponder(def, log);
+  const fixtureBackend = fixtureBackendFrom(responder);
   const { scopeId } = options;
   const backend =
     scopeId === undefined
       ? fixtureBackend
       : scopeFixtureBackend(
           fixtureBackend,
-          () => prior?.implementation ?? stubReasoningBackend,
+          responder,
+          prior?.implementation ?? stubReasoningBackend,
           () => getActiveScenarioRunId() === scopeId
         );
   const unregister = registerReasoningBackend(backend, {

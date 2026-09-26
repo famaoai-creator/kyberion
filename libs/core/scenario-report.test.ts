@@ -12,6 +12,7 @@ import {
 import {
   appendScenarioApproval,
   appendScenarioOp,
+  appendScenarioWarning,
   createScenarioSideEffectLog,
 } from './scenario-side-effect-log.js';
 
@@ -114,5 +115,39 @@ describe('scenario report (ES-05)', () => {
         isFailingScenarioStatus(s as never)
       )
     ).toEqual([false, true, false, false, true]);
+  });
+
+  it('surfaces scope_lost warnings grouped by op and source (FU-01)', () => {
+    const log = createScenarioSideEffectLog();
+    appendScenarioWarning(log, { kind: 'scope_lost', op: 'demo:apply', source: 'pipeline' });
+    appendScenarioWarning(log, { kind: 'scope_lost', op: 'demo:apply', source: 'op-dispatch' });
+    appendScenarioWarning(log, { kind: 'scope_lost', op: 'demo:apply', source: 'pipeline' });
+    const report = buildScenarioReport({
+      def: scenario(),
+      runId: 'run-w',
+      status: 'pass',
+      log,
+      startedAtMs: 0,
+      finishedAtMs: 0,
+      wallMs: 0,
+    });
+    expect(report.warnings).toEqual([
+      { kind: 'scope_lost', op: 'demo:apply', source: 'pipeline', count: 2 },
+      { kind: 'scope_lost', op: 'demo:apply', source: 'op-dispatch', count: 1 },
+    ]);
+    expect(validate(report)).toBe(true);
+    expect(renderScenarioReportMarkdown(report)).toContain(
+      '- warning scope_lost: demo:apply via pipeline (2x)'
+    );
+    const clean = buildScenarioReport({
+      def: scenario(),
+      runId: 'run-c',
+      status: 'pass',
+      log: createScenarioSideEffectLog(),
+      startedAtMs: 0,
+      finishedAtMs: 0,
+      wallMs: 0,
+    });
+    expect(clean).not.toHaveProperty('warnings');
   });
 });

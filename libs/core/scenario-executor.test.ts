@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getScenarioOpOverride, resolveActuatorOperation } from './actuator-op-registry.js';
 import { getClock, systemClock } from './foundation/clock.js';
+import { nowIso } from './foundation/time.js';
 import { runOpPreflight } from './op-preflight.js';
 import { pathResolver } from './path-resolver.js';
+import { runInScenarioScope } from './scenario-run-scope.js';
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
 import {
   runScenario,
@@ -295,5 +297,89 @@ describe('runScenario (ES-05)', () => {
     expect(report.status).toBe('pass');
     expect(insideSeen).toBe('scenario-fixture');
     await expect(outside).resolves.toBe('[UNKNOWN_OP]');
+  });
+
+  it('binds the virtual clock only inside the run: concurrent work keeps wall time (FU-01)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    let entered!: () => void;
+    const turnEntered = new Promise<void>((done) => {
+      entered = done;
+    });
+    const outside = (async () => {
+      await turnEntered;
+      const seen = nowIso();
+      release();
+      return seen;
+    })();
+    const base = fakeRunner();
+    let insideSeen = '';
+    const report = await runScenario(scenario(), {
+      seedNonce: `clock-${process.pid}`,
+      runPipeline: async (request) => {
+        entered();
+        await gate;
+        insideSeen = nowIso();
+        return base(request);
+      },
+    });
+    expect(report.status).toBe('pass');
+    expect(insideSeen).toBe('2024-05-01T00:00:00.000Z');
+    expect(Date.parse(await outside)).toBeGreaterThan(Date.parse('2025-01-01T00:00:00.000Z'));
+  });
+
+  it('records scope_lost when a dispatch with no scenario scope happens during a simulated run (FU-01)', async () => {
+    const resolve = () => {
+      try {
+        return resolveActuatorOperation('demo', 'apply')?.source ?? 'none';
+      } catch (error) {
+        return (error as Error).message.slice(0, 12);
+      }
+    };
+    let release!: () => void;
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    let entered!: () => void;
+    const turnEntered = new Promise<void>((done) => {
+      entered = done;
+    });
+    const outside = (async () => {
+      await turnEntered;
+      // No scope at all: not blocked, but surfaced.
+      const seen = resolve();
+      await runOpPreflight({ op: 'demo:apply', params: {}, source: 'actuator' });
+      // Another run's scope is not a lost scope.
+      runInScenarioScope('other-run', () => resolve());
+      release();
+      return seen;
+    })();
+    const base = fakeRunner();
+    const report = await runScenario(scenario(), {
+      seedNonce: `lost-${process.pid}`,
+      runPipeline: async (request) => {
+        entered();
+        await gate;
+        return base(request);
+      },
+    });
+    await expect(outside).resolves.toBe('[UNKNOWN_OP]');
+    expect(report.status).toBe('pass');
+    expect(report.side_effects.ops_applied).toBe(1);
+    expect(report.warnings).toEqual([
+      { kind: 'scope_lost', op: 'demo:apply', source: 'op-dispatch', count: 1 },
+      { kind: 'scope_lost', op: 'demo:apply', source: 'actuator', count: 1 },
+    ]);
+  });
+
+  it('reports no warnings when nothing leaves the run scope', async () => {
+    const report = await runScenario(scenario(), {
+      seedNonce: `nolost-${process.pid}`,
+      runPipeline: fakeRunner(),
+    });
+    expect(report.status).toBe('pass');
+    expect(report).not.toHaveProperty('warnings');
   });
 });
