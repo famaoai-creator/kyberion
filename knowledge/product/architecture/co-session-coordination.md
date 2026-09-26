@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, co-session, multi-provider, coordination, peer-messaging, work-coordination]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-11
+last_updated: 2026-09-26
 ---
 
 # Co-Session Coordination
@@ -130,6 +130,7 @@ Handoff / 依頼の `kind` は Mesh Hub の allowlist と同系:
 ## 9. 関連
 
 - [`multi-provider-coexecution-contract.md`](../governance/multi-provider-coexecution-contract.md)
+- [`workspace-isolation.md`](./workspace-isolation.md) — git の共有状態（index）をセッション単位に分離する private index / owner 専用 worktree / workspace ledger
 - [`work-coordination-platform.md`](../orchestration/work-coordination-platform.md)
 - [`peer-network.md`](../orchestration/peer-network.md)
 - Mesh ADR: [`2026-06-24-mesh-hub-v1-boundaries.md`](./decisions/2026-06-24-mesh-hub-v1-boundaries.md)

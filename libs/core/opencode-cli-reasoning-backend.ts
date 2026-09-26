@@ -19,7 +19,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  disposeOnChildExit,
+  newDelegationSessionId,
+} from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -276,15 +280,30 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       prompt,
     ];
 
-    const stdout = await this.spawnCli(args, options?.signal);
+    const stdout = await this.spawnCli(
+      args,
+      options?.signal,
+      resolveEffectiveProviderPermissionProfile('opencode', options?.profile)
+    );
     return parseOpencodeRunJson(stdout);
   }
 
-  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
+  private spawnCli(
+    args: string[],
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'opencode',
+      cwd: this.workspaceDir,
+      sessionId: newDelegationSessionId('opencode'),
+      ...(profile ? { profile } : {}),
+    });
     const child = spawn(this.bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'opencode' }), ...childDelegationEnv() },
+      env: spawnEnv.env,
     });
+    disposeOnChildExit(child, spawnEnv);
 
     return withWallClockBudget(
       {
@@ -317,6 +336,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[opencode-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;

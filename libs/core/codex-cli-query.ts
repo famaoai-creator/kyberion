@@ -10,7 +10,11 @@ import { readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
-  buildProviderChildEnv,
+  buildDelegationSpawnEnv,
+  disposeOnChildExit,
+  newDelegationSessionId,
+} from './provider-spawn-env.js';
+import {
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
@@ -132,7 +136,11 @@ class CodexCliQuery {
 
       const started = Date.now();
       try {
-        await this.spawnCli(args, prompt);
+        await this.spawnCli(
+          args,
+          prompt,
+          effectiveProfile ?? (params.mode === 'workspace-write' ? 'implementer' : undefined)
+        );
       } catch (err) {
         recordEstimatedCliUsage('codex-cli', this.model, started, 'error', prompt.length, 0);
         throw err;
@@ -168,13 +176,25 @@ class CodexCliQuery {
    * enforced against a real, killable handle via {@link withWallClockBudget}
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
-  private spawnCli(args: string[], stdin: string): Promise<void> {
+  private spawnCli(
+    args: string[],
+    stdin: string,
+    profile?: ProviderPermissionProfileName
+  ): Promise<void> {
+    // XP-02: minimal allowlisted env, scoped to codex's own required vars;
+    // WS-02: private git index for write-capable runs.
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'codex',
+      cwd: this.cwd,
+      sessionId: newDelegationSessionId('codex'),
+      ...(profile ? { profile } : {}),
+    });
     const child = spawn(this.bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      // XP-02: minimal allowlisted env, scoped to codex's own required vars.
-      env: buildProviderChildEnv({ provider: 'codex' }),
+      env: spawnEnv.env,
       cwd: this.cwd,
     });
+    disposeOnChildExit(child, spawnEnv);
 
     return withWallClockBudget(
       {
@@ -212,6 +232,7 @@ class CodexCliQuery {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[codex-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;
