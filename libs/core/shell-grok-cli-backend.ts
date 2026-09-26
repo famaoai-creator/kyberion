@@ -37,6 +37,7 @@ import {
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { GrokAdapter, type AgentAskOptions, type AgentResponse } from './agent-adapter.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
@@ -640,7 +641,10 @@ export function probeShellGrokCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellGrokCliAvailability {
-  const bin = options.bin?.trim() || envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok';
+  const bin =
+    options.bin?.trim() ||
+    envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() ||
+    resolveProviderCliCommand('grok');
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
@@ -710,7 +714,7 @@ export function buildShellGrokCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-grok-cli] backend unavailable (bin=${envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || 'grok'}): ${availability.reason ?? 'failed health check'}`
+      `[shell-grok-cli] backend unavailable (bin=${envText(env, 'KYBERION_GROK_CLI_BIN')?.trim() || resolveProviderCliCommand('grok')}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }
