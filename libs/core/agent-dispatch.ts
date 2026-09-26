@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getA2ARoute } from './a2a-route-port.js';
 import { logger } from './core.js';
 import { deriveAgentNhiId } from './agent-identity.js';
+import { resolveAssumedRole } from './authority.js';
 import {
   appendDelegationLink,
   assertChainAttenuation,
@@ -879,7 +880,8 @@ function resolveDelegationTier(options?: ReasoningCallOptions): DelegationCapabi
 /**
  * NI-03: best-effort identity of the CURRENT actor for chain origination.
  * There is no authenticated "who am I" seam in a worker process yet, so this
- * mirrors authority.ts's role resolution inputs (SYSTEM_ROLE / MISSION_ROLE)
+ * mirrors authority.ts's role resolution inputs (the RA-01 scoped assumption,
+ * then SYSTEM_ROLE / MISSION_ROLE; the argv heuristic is deliberately skipped)
  * and projects them onto an NI-01 nhi_id when the slug derives cleanly,
  * falling back to a legacy `actor:<role>` string. Documented best-effort:
  * the chain root recorded here is an attribution claim, not a verified
@@ -889,7 +891,8 @@ function resolveDelegationTier(options?: ReasoningCallOptions): DelegationCapabi
 function resolveBestEffortDelegationActor(): string {
   const role =
     String(
-      getRegisteredEnvText('SYSTEM_ROLE') ||
+      resolveAssumedRole() ||
+        getRegisteredEnvText('SYSTEM_ROLE') ||
         getRegisteredEnvText('MISSION_ROLE') ||
         'delegating-agent'
     )

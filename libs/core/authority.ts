@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { AsyncLocalStorage } from 'node:async_hooks';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
 // here created a cycle (secure-io → tier-guard/policy-engine → authority →
@@ -14,6 +13,13 @@ import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
+import {
+  currentExecutionScope,
+  executionScopeStorage,
+  scopedAssumedRole,
+  scopedPersona,
+  type ExecutionScope,
+} from './foundation/execution-scope.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -87,10 +93,6 @@ function optionalStringFieldIsValid(record: JsonRecord, key: string): boolean {
 }
 
 let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
-const executionScopeStorage = new AsyncLocalStorage<{
-  tenantBound: boolean;
-  tenantSlug?: string;
-}>();
 
 function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
@@ -218,9 +220,34 @@ function isAuthority(value: string): value is Authority {
   );
 }
 
+function normalizeRoleName(role: string): string {
+  return role.toLowerCase().replace(/\s+/g, '_');
+}
+
+/**
+ * RA-01: the role assumed in-process by the innermost
+ * `withExecutionContext` / `withExecutionContextAsync`, if any. In-process
+ * only — it can never come from an inherited environment variable.
+ */
+export function resolveAssumedRole(): string | undefined {
+  const assumed = scopedAssumedRole();
+  return assumed ? normalizeRoleName(assumed) : undefined;
+}
+
+/**
+ * Role resolution precedence (RA-01):
+ *   1. the role assumed in-process by withExecutionContext* (scoped, per
+ *      async context; never inherited from the environment);
+ *   2. `SYSTEM_ROLE` (set by surface_runtime / runtime launchers);
+ *   3. `MISSION_ROLE`;
+ *   4. a heuristic derived from the process argv[1] basename.
+ */
 export function resolveRole(): string | undefined {
+  const assumedRole = resolveAssumedRole();
+  if (assumedRole) return assumedRole;
+
   const envRole = getRegisteredEnvText('SYSTEM_ROLE') || getRegisteredEnvText('MISSION_ROLE');
-  if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
+  if (envRole) return normalizeRoleName(envRole);
 
   const argv1 = process.argv[1] || '';
   const procName = path.basename(argv1, path.extname(argv1)).toLowerCase().replace(/[-]/g, '_');
@@ -229,6 +256,18 @@ export function resolveRole(): string | undefined {
   if (procName.includes('surface_runtime')) return 'surface_runtime';
   if (procName.includes('orchestrator')) return 'orchestrator';
   return procName || undefined;
+}
+
+/**
+ * The persona of the current execution: the persona bound by the innermost
+ * withExecutionContext* when it decided one, else `KYBERION_PERSONA`.
+ * Use this (not the raw env var) for authorization decisions — the env var is
+ * process-global and races between concurrent async contexts.
+ */
+export function resolveExecutionPersona(): string | undefined {
+  const scoped = scopedPersona();
+  if (scoped.bound) return scoped.persona;
+  return getRegisteredEnvText('KYBERION_PERSONA');
 }
 
 export function inferPersonaFromRole(role?: string): Persona {
@@ -242,12 +281,27 @@ export function inferPersonaFromRole(role?: string): Persona {
   return fromMap || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }
 
+/**
+ * Environment for a child process. With an explicit `role` the child runs as
+ * that role; without one, a child built from the live `process.env` inherits
+ * the role/persona assumed by the current execution scope (RA-01) instead of
+ * whatever a concurrent context last wrote into the process-global env.
+ */
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   role?: string,
   persona?: Persona
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
+  if (!role && !persona && baseEnv === process.env) {
+    const scope = currentExecutionScope();
+    if (scope?.assumedRole) {
+      nextEnv.MISSION_ROLE = scope.assumedRole;
+      if (typeof scope.assumedPersona === 'string') nextEnv.KYBERION_PERSONA = scope.assumedPersona;
+      else if (scope.assumedPersona === null) delete nextEnv.KYBERION_PERSONA;
+      return nextEnv;
+    }
+  }
   if (role) nextEnv.MISSION_ROLE = role;
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
@@ -258,26 +312,68 @@ export function buildExecutionEnv(
   return nextEnv;
 }
 
+interface PreparedExecutionContext {
+  scope: ExecutionScope;
+  resolvedPersona: Persona;
+}
+
+function prepareExecutionContext(
+  role: string,
+  persona: Persona | undefined,
+  tenantSlug: string | undefined
+): PreparedExecutionContext {
+  const resolvedPersona = persona || inferPersonaFromRole(role);
+  // Mirror the env semantics below: a known persona is bound, an unknown one
+  // with no explicit persona clears it, an explicit unknown keeps the outer one.
+  const assumedPersona: string | null | undefined =
+    resolvedPersona !== 'unknown'
+      ? resolvedPersona
+      : persona === undefined
+        ? null
+        : currentExecutionScope()?.assumedPersona;
+  return {
+    resolvedPersona,
+    scope: {
+      tenantBound: tenantSlug !== undefined,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      assumedRole: role,
+      assumedPersona,
+    },
+  };
+}
+
+/**
+ * Backwards-compatible env mirror of the scoped assumption, for code that
+ * still reads MISSION_ROLE / KYBERION_PERSONA directly. Correctness must not
+ * depend on it: concurrent async contexts share one process env.
+ */
+function applyExecutionEnv(role: string, persona: Persona | undefined, resolvedPersona: Persona) {
+  setRegisteredEnv('MISSION_ROLE', role);
+  if (resolvedPersona !== 'unknown') {
+    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
+  } else if (persona === undefined) {
+    setRegisteredEnv('KYBERION_PERSONA', undefined);
+  }
+}
+
+/**
+ * Run `fn` as `role` (and `persona`, default inferred from the role). The
+ * assumption is carried in an AsyncLocalStorage scope that `resolveRole()`
+ * and the persona resolution read first (RA-01), so it wins over SYSTEM_ROLE
+ * and is isolated per async context.
+ */
 export function withExecutionContext<T>(
   role: string,
   fn: () => T,
   persona?: Persona,
   tenantSlug?: string
 ): T {
+  const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  setRegisteredEnv('MISSION_ROLE', role);
-  const resolvedPersona = persona || inferPersonaFromRole(role);
-  if (resolvedPersona !== 'unknown') {
-    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
-  } else if (persona === undefined) {
-    setRegisteredEnv('KYBERION_PERSONA', undefined);
-  }
+  applyExecutionEnv(role, persona, prepared.resolvedPersona);
   try {
-    return executionScopeStorage.run(
-      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
-      fn
-    );
+    return executionScopeStorage.run(prepared.scope, fn);
   } finally {
     setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
@@ -287,7 +383,9 @@ export function withExecutionContext<T>(
 /**
  * Async counterpart of withExecutionContext. The synchronous helper restores
  * process context as soon as an async callback returns its Promise, which is
- * too early for governed writes after the first await.
+ * too early for governed writes after the first await. The scoped assumption
+ * follows `fn` across awaits; the env mirror is process-global and is only
+ * restored when `fn` settles.
  */
 export async function withExecutionContextAsync<T>(
   role: string,
@@ -295,20 +393,12 @@ export async function withExecutionContextAsync<T>(
   persona?: Persona,
   tenantSlug?: string
 ): Promise<T> {
+  const prepared = prepareExecutionContext(role, persona, tenantSlug);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  setRegisteredEnv('MISSION_ROLE', role);
-  const resolvedPersona = persona || inferPersonaFromRole(role);
-  if (resolvedPersona !== 'unknown') {
-    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
-  } else if (persona === undefined) {
-    setRegisteredEnv('KYBERION_PERSONA', undefined);
-  }
+  applyExecutionEnv(role, persona, prepared.resolvedPersona);
   try {
-    return await executionScopeStorage.run(
-      { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
-      fn
-    );
+    return await executionScopeStorage.run(prepared.scope, fn);
   } finally {
     setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
@@ -423,7 +513,7 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
   const missionId = getRegisteredEnvText('MISSION_ID');
-  const envPersona = getRegisteredEnvText('KYBERION_PERSONA');
+  const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
   let persona: Persona = normalizePersona(envPersona);
