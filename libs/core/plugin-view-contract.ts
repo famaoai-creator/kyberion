@@ -23,6 +23,7 @@
  * never read. Viewer role / tier / tenant gating is evaluated server-side by
  * `isPluginViewVisible`; a client filter can only narrow it.
  */
+import { getActivePluginContentDigest } from './plugin-lifecycle.js';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema, createAjv2020 } from './foundation/ajv.js';
@@ -960,6 +961,15 @@ function activePluginOperation(resolved: ResolvedPluginViewAction) {
     throw new PluginViewError(
       'PLUGIN_VIEW_ACTION_UNAVAILABLE',
       `op '${action.op}' is not active for plugin '${view.pluginId}' in this process`
+    );
+  }
+  // The running module must be the approved copy: a re-approved package that
+  // has not been reloaded yet (or an untracked activation) must not execute.
+  const activeDigest = getActivePluginContentDigest(view.pluginId);
+  if (!view.contentDigest || activeDigest !== view.contentDigest) {
+    throw new PluginViewError(
+      'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+      `plugin '${view.pluginId}' running in this process is not the approved copy; reload it first`
     );
   }
   return { ...operation, handler: operation.handler };

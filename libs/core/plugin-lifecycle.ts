@@ -407,6 +407,11 @@ export function isPluginActive(pluginId: string): boolean {
   return activePlugins.has(pluginId);
 }
 
+/** Content digest of the module currently activated for `pluginId` (undefined when inactive or legacy). */
+export function getActivePluginContentDigest(pluginId: string): string | undefined {
+  return activePlugins.get(pluginId)?.contentDigest;
+}
+
 export function listActivePlugins(): string[] {
   return [...activePlugins.keys()].sort();
 }
