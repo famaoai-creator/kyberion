@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "role-assumption-policy.schema.json",
+  "title": "Role assumption policy",
+  "description": "RA-02: which authority roles a process launched with SYSTEM_ROLE may assume in-process via withExecutionContext / withExecutionContextAsync.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "description", "shared_core_roles", "system_roles"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "shared_core_roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roles", "rationale"],
+      "properties": {
+        "roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/role" }
+        },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "system_roles": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/definitions/role" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["may_assume", "rationale"],
+        "properties": {
+          "may_assume": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/definitions/role" }
+          },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "role": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+  }
+}

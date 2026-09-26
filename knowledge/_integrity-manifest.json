@@ -735,7 +735,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 23321,
+      "size": 23578,
       "type": "md"
     },
     {
@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 8633,
+      "size": 15918,
       "type": "md"
     },
     {
@@ -2427,7 +2427,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 22468,
+      "size": 23087,
       "type": "md"
     },
     {
@@ -3527,6 +3527,12 @@
       "tier": "public",
       "size": 1279,
       "type": "md"
+    },
+    {
+      "path": "product/governance/role-assumption-policy.json",
+      "tier": "public",
+      "size": 12935,
+      "type": "json"
     },
     {
       "path": "product/governance/role-authority-map.json",
@@ -11014,6 +11020,12 @@
       "path": "product/schemas/review-gate-result.schema.json",
       "tier": "public",
       "size": 757,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/role-assumption-policy.schema.json",
+      "tier": "public",
+      "size": 1598,
       "type": "json"
     },
     {

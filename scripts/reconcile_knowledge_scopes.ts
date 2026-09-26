@@ -4,7 +4,7 @@ import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { sendOpsAlert } from '@agent/core/ops-alert';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import type { ScopeContext } from '@agent/core/scope-context';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
@@ -37,7 +37,7 @@ function reportPath(): string {
 }
 
 export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconciliationReport> {
-  return withExecutionContext('ecosystem_architect', async () => {
+  return withExecutionContextAsync('ecosystem_architect', async () => {
     const health = scanKnowledgeScopeHealth({ persistHistory: true });
     const migrationPlans = (['feedback', 'intent', 'ledger', 'promotion'] as const).map((kind) =>
       buildPlan(kind, false)

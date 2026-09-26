@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/role-assumption-policy.schema.json",
+  "version": "1.0.0",
+  "description": "RA-02 defense in depth for in-process role assumption. When a process runs with SYSTEM_ROLE (surface_runtime launches every surface with SYSTEM_ROLE=<surface id>; `pnpm surfaces` and `pnpm config-mission` set it for their own runtimes), withExecutionContext / withExecutionContextAsync may only assume the SYSTEM_ROLE itself, the shared core roles (narrow libs/core store-writer roles), or the roles listed for that system role here; anything else throws [ROLE_ASSUMPTION_DENIED]. A SYSTEM_ROLE without an entry may only assume itself. Processes without SYSTEM_ROLE are unaffected. Lists are derived from static reachability of withExecutionContext call sites (literal role arguments and the governed-artifact role wrappers) from each surface entry point; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
+  "shared_core_roles": {
+    "roles": [
+      "chronos_gateway",
+      "infrastructure_sentinel",
+      "knowledge_steward",
+      "slack_bridge",
+      "surface_runtime"
+    ],
+    "rationale": "Narrow roles that libs/core modules assume internally on behalf of every caller to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh), knowledge_steward (mission creation), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime). The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them in may_assume with the modules that reach them."
+  },
+  "system_roles": {
+    "chronos_mirror_v2": {
+      "may_assume": [
+        "chronos_localadmin",
+        "chronos_operator",
+        "ecosystem_architect",
+        "generation_scheduler",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. Chronos viewer-scoped routes assume chronos_localadmin / chronos_operator (withViewerExecutionContext*, plugin-host-boot tenant registry reads); generation_scheduler via libs/core generation-scheduler. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, plugin-view-actions, surface-mission-proposals (plugin approvals and dispatch); ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core authn-providers (viewer principal registry), browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "computer_surface": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. ecosystem_architect: presence/displays/computer-surface/server.ts (/api/identity) and libs/core storage-janitor. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; sovereign_concierge: libs/core authn-providers, browser-onboarding, tool-runtime-policy."
+    },
+    "concierge": {
+      "may_assume": [
+        "concierge_localadmin",
+        "concierge_operator",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. Concierge routes assume sovereign_concierge directly (config-missions, ingest, me, members, memory-queue, notification-preferences, plugins, setup, training, work-inventory) plus libs/core authn-providers, browser-onboarding, slack-onboarding, tool-runtime-policy; withConciergeViewerContext assumes concierge_localadmin / concierge_operator. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, deployment-adapter, storage-janitor."
+    },
+    "discord_bridge": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "imessage_bridge": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "mcp_server_cowork": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. scripts/mcp_server.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    },
+    "nexus_daemon": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. presence/bridge/nexus-daemon.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    },
+    "oauth_callback_surface": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. scripts/oauth_callback_surface.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    },
+    "presence_studio": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts), plus libs/core authn-providers, browser-onboarding, slack-onboarding, tool-runtime-policy, background-review-patch, deployment-adapter, storage-janitor. mission_controller: hearing-mission-routes.ts and libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals."
+    },
+    "slack_bridge": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "telegram_bridge": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "terminal_bridge": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. presence/bridge/terminal/server.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    },
+    "voice_hub": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. satellites/voice-hub/server.ts. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection, surface-mission-proposals; ecosystem_architect: libs/core background-review-patch, storage-janitor; sovereign_concierge: libs/core browser-onboarding, slack-onboarding, tool-runtime-policy."
+    },
+    "surface_runtime": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. `pnpm surfaces` and the terminal HUD run scripts/surface_runtime.ts with SYSTEM_ROLE=surface_runtime. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    },
+    "system_configurator": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Derived from static module reachability of withExecutionContext* call sites from the entry point. `pnpm config-mission` and its preset pipeline child (scripts/config_mission.ts, scripts/run_pipeline.ts) run with SYSTEM_ROLE=system_configurator. mission_controller: libs/core agent-identity, mission-dispatch-io, mission-lifecycle-service, mission-task-recovery, orchestrator-session, plugin-managed-install, provider-egress-gate, surface-mission-steering, task-scoped-grants, work-graph-projection; ecosystem_architect: libs/core storage-janitor; sovereign_concierge: libs/core browser-onboarding, tool-runtime-policy."
+    }
+  }
+}

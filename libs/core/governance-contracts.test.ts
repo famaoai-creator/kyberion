@@ -266,6 +266,16 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
+    name: 'role-assumption-policy',
+    schemaPath: 'knowledge/product/schemas/role-assumption-policy.schema.json',
+    dataPath: 'knowledge/product/governance/role-assumption-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      description: 'missing shared roles',
+      system_roles: { 'Chronos-Mirror': { may_assume: ['chronos_localadmin'] } },
+    },
+  },
+  {
     name: 'team-role-index',
     schemaPath: 'knowledge/product/schemas/team-role-index.schema.json',
     dataPath: 'knowledge/product/orchestration/team-role-index.json',
