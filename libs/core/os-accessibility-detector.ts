@@ -59,6 +59,11 @@ export const OS_ACCESSIBILITY_WINDOWS_PROBE_TIMEOUT_MS = 6_000;
 export const OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS = 5_000;
 /** Child-process environment variable carrying the Windows script options (JSON). */
 export const OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV = 'KYBERION_UIA_OPTIONS';
+/**
+ * Opt-in switch for the Windows live smoke test (os-accessibility-detector.live.test.ts):
+ * '1' launches Notepad on this machine's desktop and runs the detector against it.
+ */
+export const OS_ACCESSIBILITY_LIVE_SMOKE_ENV = 'KYBERION_UIA_LIVE_SMOKE';
 const POWERSHELL = 'powershell.exe';
 // powershell.exe fails to start without SystemRoot (error 8009001d), and the
 // secure-io child environment allowlist does not carry Windows system variables.
