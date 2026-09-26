@@ -896,10 +896,12 @@ describe('approved human view actions (FU-02)', () => {
       operation: 'permfixture:write',
       correlationId: id,
       metadata: {
+        authority: 'human',
         approval_request_id: id,
         requested_by: 'viewer-1',
         approved_by: 'human:approver',
         self_approved: false,
+        handled: true,
       },
     });
     // The claim is audited before the handler runs.
@@ -1249,7 +1251,11 @@ describe('agent view action dispatch is audited (AU-01)', () => {
       .filter((entry) => entry.action.startsWith('plugin_view.action.'));
   }
 
-  /** A copy of the fixture with one extra agent action whose op always throws. */
+  /**
+   * A copy of the fixture with one extra agent action whose op always
+   * throws, echoing back a `sentinel` param in its error message (so a test
+   * can prove that text never reaches the audit chain unredacted).
+   */
   function fixtureCopyWithFailingOp(): string {
     const manifest = JSON.parse(readFixture('plugin-manifest.json'));
     manifest.provides.ops.push('permfixture:fail');
@@ -1257,7 +1263,11 @@ describe('agent view action dispatch is audited (AU-01)', () => {
       id: 'probe_fail',
       authority: 'agent',
       op: 'permfixture:fail',
-      paramsSchema: { type: 'object', properties: {}, additionalProperties: false },
+      paramsSchema: {
+        type: 'object',
+        properties: { sentinel: { type: 'string', maxLength: 200 } },
+        additionalProperties: false,
+      },
     });
     const index = readFixture('index.mjs').replace(
       '  );\n};\n',
@@ -1265,8 +1275,9 @@ describe('agent view action dispatch is audited (AU-01)', () => {
         '  );\n',
         "  api.registerOperation('permfixture:fail', {\n",
         "    stepType: 'apply',\n",
-        '    handler: async () => {\n',
-        "      throw new Error('permfixture:fail always throws');\n",
+        '    handler: async (_op, params) => {\n',
+        "      const sentinel = params && typeof params.sentinel === 'string' ? params.sentinel : '';\n",
+        "      throw new Error('permfixture:fail always throws' + (sentinel ? ': ' + sentinel : ''));\n",
         '    },\n',
         '  });\n',
         '};\n',
@@ -1322,11 +1333,39 @@ describe('agent view action dispatch is audited (AU-01)', () => {
         requested_by: 'agent:runtime-1',
         actor_role: 'localadmin',
         surface: 'api',
+        handled: true,
       },
     });
+    // `dispatch_id` is the same value used as the entry's top-level correlationId.
+    expect(entries[1].metadata?.dispatch_id).toBe(entries[1].correlationId);
     expect(entries[1].metadata?.params_digest).toEqual(expect.any(String));
     // Raw params never reach the audit chain, only their digest.
     expect(JSON.stringify(entries[1])).not.toMatch(/"params"/u);
+  });
+
+  it('never leaks a secret-shaped sentinel param into the audit chain', async () => {
+    // Built at runtime: a secret-shaped literal in source trips push protection.
+    const SENTINEL = ['sk', 'A'.repeat(24)].join('-');
+    const { view } = await activeFixtureView('views-agent-sentinel', fixtureCopyWithFailingOp());
+    const audit = spyAudit();
+    await expect(
+      dispatchPluginViewAction(
+        resolvePluginViewAction(view(), 'probe_fail', { sentinel: SENTINEL }),
+        dispatchContext('agent:runtime-5')
+      )
+    ).rejects.toThrow(SENTINEL);
+
+    const entries = auditedDispatches(audit);
+    expect(entries.map((entry) => [entry.action, entry.result])).toEqual([
+      ['plugin_view.action.started', 'allowed'],
+      ['plugin_view.action.execute', 'failed'],
+    ]);
+    for (const entry of entries) {
+      expect(JSON.stringify(entry)).not.toContain(SENTINEL);
+    }
+    // The handler's own thrown message is redacted, not just its params.
+    expect(entries[1].reason).toContain('[REDACTED_SECRET]');
+    expect(entries[1].reason).not.toContain(SENTINEL);
   });
 
   it('audits started + failed when the op handler throws', async () => {
