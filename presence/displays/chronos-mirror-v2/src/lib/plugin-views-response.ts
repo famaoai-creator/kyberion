@@ -51,10 +51,27 @@ function viewerForPluginViews(viewer: ViewerContext): PluginViewViewer {
   };
 }
 
+function inViewerScope(tenantSlug: string | undefined, viewer: ViewerContext): boolean {
+  const scope = viewerForPluginViews(viewer).tenantSlugs;
+  return !tenantSlug || scope === 'all' || scope.includes(tenantSlug);
+}
+
+/**
+ * Managed records in the viewer's tenant scope. Other tenants' records are
+ * dropped by the listing itself, so their managed copies are never digested
+ * per request; a viewer scoped to 'all' (localadmin) lists every tenant.
+ */
+export function listManagedPluginsInViewerScope(viewer: ViewerContext): ManagedPluginRecord[] {
+  const scope = viewerForPluginViews(viewer).tenantSlugs;
+  return scope === 'all'
+    ? listManagedPlugins()
+    : listManagedPlugins(undefined, { tenantAllow: scope });
+}
+
 export function readVisiblePluginViews(
   viewer: ViewerContext,
   filter: PluginViewFilter,
-  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPluginsInViewerScope(viewer)
 ) {
   return listPluginViewsForViewer(listRecords(), viewerForPluginViews(viewer), filter);
 }
@@ -81,14 +98,11 @@ export function pluginViewFrameUrl(pluginId: string, viewId: string): string {
 /** Plugin ids whose managed record lies in the viewer's tenant scope. */
 export function pluginIdsInViewerScope(
   viewer: ViewerContext,
-  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPluginsInViewerScope(viewer)
 ): Set<string> {
-  const scope = viewerForPluginViews(viewer).tenantSlugs;
   return new Set(
     listRecords()
-      .filter(
-        (record) => !record.tenantSlug || scope === 'all' || scope.includes(record.tenantSlug)
-      )
+      .filter((record) => inViewerScope(record.tenantSlug, viewer))
       .map((record) => record.pluginId)
   );
 }
@@ -238,14 +252,13 @@ export function findVisiblePluginView(
   viewer: ViewerContext,
   pluginId: string,
   viewId: string,
-  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPluginsInViewerScope(viewer)
 ): LoadedPluginView {
-  const scope = viewerForPluginViews(viewer).tenantSlugs;
   const record = listRecords().find(
     (entry) =>
       entry.pluginId === pluginId &&
       // Another tenant's plugin is "not found", whatever its status.
-      (!entry.tenantSlug || scope === 'all' || scope.includes(entry.tenantSlug))
+      inViewerScope(entry.tenantSlug, viewer)
   );
   if (record && record.activationStatus !== 'activatable') {
     throw new PluginViewError(
@@ -269,7 +282,7 @@ export function readVisiblePluginViewFrame(
   viewer: ViewerContext,
   pluginId: string,
   viewId: string,
-  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPluginsInViewerScope(viewer)
 ): string {
   const view = findVisiblePluginView(viewer, pluginId, viewId, listRecords);
   if (view.declaration.isolation !== 'sandboxed-iframe' || typeof view.html !== 'string') {
@@ -289,9 +302,17 @@ export function readVisiblePluginViewFrame(
 export async function runPluginViewAction(
   viewer: ViewerContext,
   input: PluginViewActionInput,
-  listRecords: () => ManagedPluginRecord[] = () => listManagedPlugins()
+  listRecords: () => ManagedPluginRecord[] = () => listManagedPluginsInViewerScope(viewer)
 ): Promise<PluginViewActionOutcome> {
   const view = findVisiblePluginView(viewer, input.plugin_id, input.view_id, listRecords);
+  // Plugin ops are process-wide (one host may allow several tenants): an
+  // action runs only for a plugin of the viewer's own tenant scope.
+  if (!inViewerScope(view.tenantSlug, viewer)) {
+    throw new PluginViewError(
+      'PLUGIN_VIEW_NOT_FOUND',
+      `view '${input.plugin_id}/${input.view_id}' is not available`
+    );
+  }
   const resolved = resolvePluginViewAction(view, input.action_id, input.params);
   if (input.approval_request_id) {
     return executeApprovedPluginViewAction(resolved, input.approval_request_id, {

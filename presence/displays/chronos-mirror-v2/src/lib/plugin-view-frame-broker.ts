@@ -14,6 +14,14 @@
  * dialog (plugin, action, params) before the existing plugin-views POST — a
  * `human` action there only becomes an approval request. `resize` heights
  * are clamped to 120–2000 px. Replies carry codes only.
+ *
+ * `event.source` survives a navigation of the frame, and a sandboxed frame may
+ * still navigate itself. The component reports every iframe `load` through
+ * `frameLoaded()`: the first is the approved document, any later one is a
+ * navigation and invalidates the broker for good — every later message is
+ * dropped and no pending result is posted back. The Chronos pages' CSP
+ * (`frame-src 'self'`) keeps such a navigation same-origin; a new broker is
+ * only created for a freshly mounted frame (the user reopens the view).
  */
 import {
   PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY,
@@ -37,7 +45,13 @@ const MESSAGE_KEYS: Record<string, readonly string[]> = {
 };
 
 export type PluginViewFrameDropReason =
-  'source' | 'not_plain_data' | 'oversize' | 'shape' | 'capability' | 'undeclared_action';
+  | 'invalidated'
+  | 'source'
+  | 'not_plain_data'
+  | 'oversize'
+  | 'shape'
+  | 'capability'
+  | 'undeclared_action';
 
 export type PluginViewFrameRejectCode = 'PLUGIN_VIEW_FRAME_BUSY' | 'PLUGIN_VIEW_FRAME_RATE_LIMITED';
 
@@ -93,18 +107,43 @@ export type PluginViewFrameHandleResult =
 
 export interface PluginViewFrameBroker {
   handleMessage(event: { source: unknown; data: unknown }): PluginViewFrameHandleResult;
+  /**
+   * Call on every iframe `load`. The first load is the approved document;
+   * a later one is a navigation: the broker invalidates itself and returns false.
+   */
+  frameLoaded(): boolean;
+  /** Stops the broker for good: later messages are dropped, pending results are not posted. */
+  invalidate(): void;
+  readonly invalidated: boolean;
+  /** Locale change: re-sends `init` once the frame is ready (keeps the rate limit). */
+  setLocale(locale: string): void;
 }
 
-/** Accepts only JSON-like data built from plain objects and arrays (bounded). */
-export function isPlainFrameData(value: unknown): boolean {
+type FrameDataVerdict = 'ok' | 'not_plain_data' | 'oversize';
+
+/**
+ * Walks JSON-like data built from plain objects and arrays (bounded depth and
+ * nodes). String and key lengths are summed on the way: UTF-8 is at least one
+ * byte per UTF-16 unit, so a sum above the message bound is oversize before
+ * anything is serialized.
+ */
+function inspectFrameData(value: unknown): FrameDataVerdict {
   let nodes = 0;
+  let chars = 0;
+  let oversize = false;
   const seen = new Set<object>();
+  const count = (text: string): boolean => {
+    chars += text.length;
+    if (chars > PLUGIN_VIEW_FRAME_MAX_MESSAGE_BYTES) oversize = true;
+    return !oversize;
+  };
   const visit = (current: unknown, depth: number): boolean => {
     nodes += 1;
     if (nodes > MAX_NODES || depth > MAX_DEPTH) return false;
     if (current === null) return true;
     switch (typeof current) {
       case 'string':
+        return count(current);
       case 'boolean':
         return true;
       case 'number':
@@ -120,9 +159,15 @@ export function isPlainFrameData(value: unknown): boolean {
     if (Array.isArray(object)) return object.every((item) => visit(item, depth + 1));
     const prototype = Object.getPrototypeOf(object);
     if (prototype !== Object.prototype && prototype !== null) return false;
-    return Object.values(object).every((item) => visit(item, depth + 1));
+    return Object.entries(object).every(([key, item]) => count(key) && visit(item, depth + 1));
   };
-  return visit(value, 0);
+  if (visit(value, 0)) return 'ok';
+  return oversize ? 'oversize' : 'not_plain_data';
+}
+
+/** Accepts only JSON-like data built from plain objects and arrays (bounded). */
+export function isPlainFrameData(value: unknown): boolean {
+  return inspectFrameData(value) === 'ok';
 }
 
 function byteLength(text: string): number {
@@ -149,8 +194,13 @@ export function createPluginViewFrameBroker(
     options.capabilities.includes(PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY) && declared.size > 0;
   const accepted: number[] = [];
   let inFlight = false;
+  let invalidated = false;
+  let loads = 0;
+  let ready = false;
+  let locale = options.locale;
 
   const reply = (message: Omit<PluginViewFrameReply, 'protocol'>) => {
+    if (invalidated) return;
     try {
       options.post({ protocol: PLUGIN_VIEW_FRAME_PROTOCOL, ...message });
     } catch {
@@ -166,9 +216,11 @@ export function createPluginViewFrameBroker(
   async function run(requestId: string, request: PluginViewFrameActionRequest): Promise<void> {
     let result: PluginViewFrameActionResult;
     try {
-      result = (await options.confirm(request))
-        ? await options.submit(request)
-        : { status: 'declined' };
+      // A navigation while the dialog was open voids the allow.
+      result =
+        (await options.confirm(request)) && !invalidated
+          ? await options.submit(request)
+          : { status: 'declined' };
     } catch {
       result = { status: 'error', errorCode: 'PLUGIN_VIEW_FRAME_SUBMIT_FAILED' };
     } finally {
@@ -183,11 +235,29 @@ export function createPluginViewFrameBroker(
   }
 
   return {
+    get invalidated() {
+      return invalidated;
+    },
+    invalidate() {
+      invalidated = true;
+    },
+    frameLoaded() {
+      loads += 1;
+      if (loads > 1) invalidated = true;
+      return !invalidated;
+    },
+    setLocale(next) {
+      if (next === locale) return;
+      locale = next;
+      if (ready) reply({ type: 'init', locale });
+    },
     handleMessage(event) {
+      if (invalidated) return drop('invalidated');
       const frameWindow = options.frameWindow();
       if (!frameWindow || event.source !== frameWindow) return drop('source');
       const data = event.data;
-      if (!isPlainFrameData(data)) return drop('not_plain_data');
+      const verdict = inspectFrameData(data);
+      if (verdict !== 'ok') return drop(verdict);
       if (byteLength(JSON.stringify(data)) > PLUGIN_VIEW_FRAME_MAX_MESSAGE_BYTES) {
         return drop('oversize');
       }
@@ -202,7 +272,8 @@ export function createPluginViewFrameBroker(
       if (!keys || !hasExactKeys(message, keys)) return drop('shape');
 
       if (message.type === 'ready') {
-        reply({ type: 'init', locale: options.locale });
+        ready = true;
+        reply({ type: 'init', locale });
         return { handled: true, kind: 'ready' };
       }
       if (message.type === 'resize') {

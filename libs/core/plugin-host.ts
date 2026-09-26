@@ -13,8 +13,11 @@
  * Eligible = `activatable` and either tenant-less (shared) or bound to a tenant
  * in `tenantAllow`. Records of other tenants are dropped by the listing itself
  * after parsing their record file — the host never activates, digests or
- * imports them, and activation re-verifies only the target copy by id. Operations are
- * registered process-wide, so the tenant allowlist is the isolation boundary.
+ * imports them, and activation re-verifies only the target copy by id — and
+ * refuses before import when the re-read record's tenant or digests no longer
+ * match the listed one. Operations are registered process-wide, so the tenant
+ * allowlist is the isolation boundary: allowing several tenants in one host
+ * merges their trust (see plugin-permissions-and-views.md).
  *
  * Syncs are single-flight: requests while a sync runs coalesce into exactly
  * one follow-up sync. A per-record fingerprint (id, status, both digests,
@@ -36,6 +39,7 @@ import {
   getActivePluginPermissionsDigest,
   isPluginActive,
   reloadPlugin,
+  type ManagedPluginExpectation,
 } from './plugin-lifecycle.js';
 import {
   isManagedPluginActivationAllowed,
@@ -181,6 +185,14 @@ function fingerprintOf(record: ManagedPluginRecord): string {
   ]);
 }
 
+function expectationOf(record: ManagedPluginRecord): ManagedPluginExpectation {
+  return {
+    tenantSlug: record.tenantSlug ?? null,
+    contentDigest: record.contentDigest,
+    permissionsDigest: record.permissionsDigest,
+  };
+}
+
 function digestPrefix(record: ManagedPluginRecord): { contentDigestPrefix?: string } {
   return record.contentDigest ? { contentDigestPrefix: record.contentDigest.slice(0, 12) } : {};
 }
@@ -287,7 +299,10 @@ export function createPluginHost(options: CreatePluginHostOptions): PluginHost {
 
     if (!active) {
       try {
-        const result = await activatePlugin({ record: entry }, lifecycleOptions);
+        const result = await activatePlugin(
+          { record: entry, expected: expectationOf(entry) },
+          lifecycleOptions
+        );
         if (!result.ok) throw new Error(result.reason);
         next.status = { ...base, state: 'active', reasonCode: 'activated' };
         record('plugin_host.activate', pluginId, 'completed', 'activated', audited);
@@ -307,7 +322,10 @@ export function createPluginHost(options: CreatePluginHostOptions): PluginHost {
     }
     let result: Awaited<ReturnType<typeof reloadPlugin>> | undefined;
     try {
-      result = await reloadPlugin(pluginId, { ...lifecycleOptions, source: { record: entry } });
+      result = await reloadPlugin(pluginId, {
+        ...lifecycleOptions,
+        source: { record: entry, expected: expectationOf(entry) },
+      });
     } catch {
       result = undefined;
     }

@@ -723,7 +723,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 19104,
+      "size": 20796,
       "type": "md"
     },
     {
@@ -6303,7 +6303,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 998693,
+      "size": 999525,
       "type": "json"
     },
     {
@@ -12117,7 +12117,7 @@
     {
       "path": "product/schemas/workspace-ledger.schema.json",
       "tier": "public",
-      "size": 1299,
+      "size": 1464,
       "type": "json"
     },
     {

@@ -360,6 +360,41 @@ describe('plugin host sync (PH-01)', () => {
     );
   });
 
+  it('refuses a record swapped between listing and activation', async () => {
+    const { managedRoot, id } = newRoot();
+    const listed = install(id('swap'), managedRoot, { tenantSlug: 'tenant-a' });
+    let swap: () => void = () => undefined;
+    const { host, actions } = hostFor(managedRoot, {
+      tenantAllow: ['tenant-a'],
+      listRecords: () => {
+        const records = listManagedPlugins(managedRoot);
+        swap();
+        swap = () => undefined;
+        return records;
+      },
+    });
+    // Another tenant's approved copy replaces the listed one before activation.
+    swap = () => install(listed.pluginId, managedRoot, { tenantSlug: 'tenant-b' });
+    const status = await host.syncNow();
+    expect(isPluginActive(listed.pluginId)).toBe(false);
+    expect(status.plugins).toEqual([
+      expect.objectContaining({ state: 'refused', reasonCode: 'activation_failed' }),
+    ]);
+    expect(actions()).toContain(`plugin_host.refuse:${listed.pluginId}:activation_failed`);
+
+    // Same tenant, different approved content: also refused before import.
+    const second = install(id('swap-content'), managedRoot, { tenantSlug: 'tenant-a' });
+    swap = () =>
+      install(second.pluginId, managedRoot, {
+        tenantSlug: 'tenant-a',
+        source: fixtureSource((manifest) => {
+          manifest.version = '9.9.9';
+        }),
+      });
+    await host.syncNow();
+    expect(isPluginActive(second.pluginId)).toBe(false);
+  });
+
   it('coalesces concurrent sync requests into one follow-up run', async () => {
     let listings = 0;
     const { host } = hostFor('unused', {

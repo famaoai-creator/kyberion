@@ -26,6 +26,8 @@ export interface EnsureChronosPluginHostOptions {
   env?: EnvSource;
   /** Host factory override (tests). */
   create?: typeof createPluginHost;
+  /** Tenant registry lookup override (tests). */
+  isKnownTenant?: (slug: string) => boolean;
 }
 
 export function isChronosPluginHostEnabled(env?: EnvSource): boolean {
@@ -56,11 +58,19 @@ function getOrCreateChronosPluginHost(options: EnsureChronosPluginHostOptions): 
   const create = options.create ?? createPluginHost;
   return getOrCreatePluginHost(CHRONOS_PLUGIN_HOST_SURFACE, () => {
     const { tenants, rejected } = parsePluginHostTenantAllow(
-      getRegisteredEnvText('KYBERION_CHRONOS_PLUGIN_HOST_TENANTS', { env: options.env })
+      getRegisteredEnvText('KYBERION_CHRONOS_PLUGIN_HOST_TENANTS', { env: options.env }),
+      options.isKnownTenant
     );
     if (rejected.length > 0) {
       console.warn(
         `[chronos-mirror-v2] plugin host: ignoring ${rejected.length} invalid, reserved or unknown tenant(s) in KYBERION_CHRONOS_PLUGIN_HOST_TENANTS`
+      );
+    }
+    if (tenants.length > 1) {
+      // Plugin ops are registered process-wide: one host for several tenants
+      // lets each tenant's plugins be called from the others' paths.
+      console.warn(
+        `[chronos-mirror-v2] plugin host: ${tenants.length} tenants allowed in one process share one trust domain (plugin operations are process-wide); run one Chronos per tenant to keep them isolated`
       );
     }
     const host = create({
