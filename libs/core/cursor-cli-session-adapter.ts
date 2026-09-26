@@ -14,10 +14,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
-  buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
@@ -242,10 +245,21 @@ export class CursorCliSessionAdapter {
   }
 
   private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
-    const child = this.spawnProcess(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...buildProviderChildEnv({ provider: 'cursor' }), ...childDelegationEnv() },
-    }) as ChildProcessWithoutNullStreams;
+    // No profile: every native delegation already runs in its own
+    // `--worktree`, and a GIT_INDEX_FILE seeded from this checkout would
+    // override that worktree's own index.
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'cursor',
+      sessionId: newDelegationSessionId('cursor'),
+    });
+    const child = spawnWithDelegationEnv(
+      spawnEnv,
+      () =>
+        this.spawnProcess(this.bin, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: spawnEnv.env,
+        }) as ChildProcessWithoutNullStreams
+    );
 
     return withWallClockBudget(
       {
@@ -278,6 +292,7 @@ export class CursorCliSessionAdapter {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[cursor-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;

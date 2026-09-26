@@ -7,12 +7,16 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import {
-  buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import * as pathResolver from './path-resolver.js';
 import {
   delegationChildHandleFromChildProcess,
@@ -506,10 +510,13 @@ export class AgyCliBackend implements ReasoningBackend {
       prompt,
       ...this.extraArgs,
     ];
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildProviderChildEnv({ provider: 'agy' }),
-    });
+    const spawnEnv = this.buildSpawnEnv(options?.advisory ? 'planner' : undefined);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -583,6 +590,7 @@ export class AgyCliBackend implements ReasoningBackend {
     } finally {
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      spawnEnv.dispose();
     }
   }
 
@@ -620,7 +628,7 @@ export class AgyCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args);
+    const stdout = await this.spawnCli(args, undefined, params.profile);
     let cliResult: any;
     try {
       cliResult = parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output');
@@ -681,7 +689,7 @@ export class AgyCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, signal);
+    const stdout = await this.spawnCli(args, signal, profile);
     try {
       const cliResult = parseSafeJsonObjectValue(
         parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output'),
@@ -750,13 +758,32 @@ export class AgyCliBackend implements ReasoningBackend {
    * enforced against a real, killable handle via {@link withWallClockBudget}
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
-  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
-    assertReasoningEgressAllowed(this.name);
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // XP-02: minimal allowlisted env, scoped to agy's own required vars.
-      env: buildProviderChildEnv({ provider: 'agy' }),
+  /**
+   * XP-02: minimal allowlisted env, scoped to agy's own required vars;
+   * WS-02: private git index when the effective profile is implementer.
+   */
+  private buildSpawnEnv(profile?: ProviderPermissionProfileName) {
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('agy', profile);
+    return buildDelegationSpawnEnv({
+      provider: 'agy',
+      sessionId: newDelegationSessionId('agy'),
+      ...(effectiveProfile ? { profile: effectiveProfile } : {}),
     });
+  }
+
+  private spawnCli(
+    args: string[],
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const spawnEnv = this.buildSpawnEnv(profile);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {
@@ -785,6 +812,7 @@ export class AgyCliBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[agy-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;

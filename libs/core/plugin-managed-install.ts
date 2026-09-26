@@ -865,14 +865,28 @@ function verifyManagedPluginActivation(record: ManagedPluginRecord): ManagedPlug
   };
 }
 
-function readManagedRecord(managedDir: string): ManagedPluginRecord | null {
+/** Parses the record file only — no digest, manifest or approval verification. */
+function readManagedRecordUnverified(managedDir: string): ManagedPluginRecord | null {
   const recordPath = path.join(managedDir, MANAGED_RECORD_FILENAME);
   if (!safeExistsSync(recordPath)) return null;
   try {
-    return verifyManagedPluginActivation(loadManagedPluginRecordAtPath(recordPath, managedDir));
+    return loadManagedPluginRecordAtPath(recordPath, managedDir);
   } catch {
     return null;
   }
+}
+
+function verifyManagedRecordSafely(record: ManagedPluginRecord): ManagedPluginRecord | null {
+  try {
+    return verifyManagedPluginActivation(record);
+  } catch {
+    return null;
+  }
+}
+
+function readManagedRecord(managedDir: string): ManagedPluginRecord | null {
+  const record = readManagedRecordUnverified(managedDir);
+  return record ? verifyManagedRecordSafely(record) : null;
 }
 
 /** Load a managed plugin record through the shared schema and file boundary. */
@@ -1073,59 +1087,107 @@ export function refreshManagedPluginActivation(
   });
 }
 
+export interface ManagedPluginRecordHeader {
+  pluginId: string;
+  tenantSlug?: string;
+}
+
+export interface ListManagedPluginsOptions {
+  /**
+   * Tenants whose tenant-bound plugins are listed; tenant-less (shared)
+   * plugins always are. Unset = every tenant. Records of other tenants are
+   * dropped after parsing the record file alone — their managed copies are
+   * never hashed, their manifests never read, their approvals never loaded.
+   */
+  tenantAllow?: readonly string[];
+  /** Receives the header of every record dropped by `tenantAllow`. */
+  onExcluded?: (header: ManagedPluginRecordHeader) => void;
+}
+
 /**
  * Lists installed plugins from the managed directory only (never the
  * staging/temp area, never an arbitrary source). Broken manifests are
  * surfaced as diagnostic entries and are never executed — fail-open display,
  * fail-closed execution.
  */
-export function listManagedPlugins(managedRoot?: string): ManagedPluginRecord[] {
+export function listManagedPlugins(
+  managedRoot?: string,
+  options: ListManagedPluginsOptions = {}
+): ManagedPluginRecord[] {
   const root = resolveManagedRoot(managedRoot);
   if (!safeExistsSync(root)) return [];
 
+  const tenantAllow = options.tenantAllow ? new Set(options.tenantAllow) : undefined;
   const entries: ManagedPluginRecord[] = [];
   for (const name of safeReaddir(root).sort(codepointCompare)) {
     const managedDir = path.join(root, name);
-    const stat = safeLstat(managedDir);
-    if (!stat.isDirectory()) continue; // never treat stray files as plugins
+    if (!safeLstat(managedDir).isDirectory()) continue; // never treat stray files as plugins
 
-    const record = readManagedRecord(managedDir);
-    if (record) {
-      entries.push(record);
+    const record = readManagedRecordUnverified(managedDir);
+    if (record?.tenantSlug && tenantAllow && !tenantAllow.has(record.tenantSlug)) {
+      options.onExcluded?.({ pluginId: record.pluginId, tenantSlug: record.tenantSlug });
       continue;
     }
-
-    // No managed-installer record (e.g. hand-placed directory) — degrade to
-    // a diagnostic listing entry without executing or trusting anything.
-    const { manifest, diagnostics } = readPluginManifestSafely(managedDir);
-    const effectiveDiagnostics: PluginManifestDiagnostic[] = diagnostics.length
-      ? diagnostics
-      : [
-          {
-            code: 'managed_record_missing',
-            message:
-              'No managed-installer record found; provenance could not be verified, so this entry is treated as third-party and blocked pending approval.',
-            severity: 'warning',
-          },
-        ];
-    entries.push({
-      pluginId: name,
-      trust: 'third-party',
-      trustReason:
-        'No managed-installer record found; provenance unknown, defaulting to third-party.',
-      resolvedSourcePath: managedDir,
-      managedPath: managedDir,
-      manifest,
-      diagnostics: effectiveDiagnostics,
-      activationStatus: resolveActivationStatus({
-        diagnostics: effectiveDiagnostics,
-        trust: 'third-party',
-        integrity: 'legacy',
-      }),
-      installedAt: '',
-    });
+    entries.push(managedEntryOf(name, managedDir, record));
   }
   return entries;
+}
+
+/**
+ * By-id lookup: reads and verifies only `<managedRoot>/<pluginId>` (same
+ * semantics as the matching `listManagedPlugins` entry). Null when the
+ * plugin is not installed or its record names another plugin.
+ */
+export function loadManagedPlugin(
+  pluginId: string,
+  managedRoot?: string
+): ManagedPluginRecord | null {
+  const name = normalizePluginId(pluginId);
+  if (name !== pluginId) return null;
+  const root = resolveManagedRoot(managedRoot);
+  const managedDir = assertSafeRepositoryPath(path.join(root, name), { allowMissingLeaf: true });
+  if (!safeExistsSync(managedDir) || !safeLstat(managedDir).isDirectory()) return null;
+  const entry = managedEntryOf(name, managedDir, readManagedRecordUnverified(managedDir));
+  return entry.pluginId === pluginId ? entry : null;
+}
+
+function managedEntryOf(
+  name: string,
+  managedDir: string,
+  unverified: ManagedPluginRecord | null
+): ManagedPluginRecord {
+  const record = unverified ? verifyManagedRecordSafely(unverified) : null;
+  if (record) return record;
+
+  // No managed-installer record (e.g. hand-placed directory) — degrade to
+  // a diagnostic listing entry without executing or trusting anything.
+  const { manifest, diagnostics } = readPluginManifestSafely(managedDir);
+  const effectiveDiagnostics: PluginManifestDiagnostic[] = diagnostics.length
+    ? diagnostics
+    : [
+        {
+          code: 'managed_record_missing',
+          message:
+            'No managed-installer record found; provenance could not be verified, so this entry is treated as third-party and blocked pending approval.',
+          severity: 'warning',
+        },
+      ];
+  return {
+    pluginId: name,
+    trust: 'third-party',
+    trustReason:
+      'No managed-installer record found; provenance unknown, defaulting to third-party.',
+    resolvedSourcePath: managedDir,
+    managedPath: managedDir,
+    manifest,
+    diagnostics: effectiveDiagnostics,
+    activationStatus: resolveActivationStatus({
+      diagnostics: effectiveDiagnostics,
+      trust: 'third-party',
+      integrity: 'legacy',
+    }),
+    installedAt: '',
+  };
 }
 
 export function isManagedPluginActivationAllowed(

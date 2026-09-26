@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font:
+          14px system-ui,
+          sans-serif;
+        margin: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="state">Fixture frame loaded</p>
+    <button id="probe" type="button">Probe env</button>
+    <script>
+      const PROTOCOL = 'kyberion.plugin-view/1';
+      let counter = 0;
+      window.parent.postMessage({ protocol: PROTOCOL, type: 'ready' }, '*');
+      document.getElementById('probe').addEventListener('click', () => {
+        counter += 1;
+        window.parent.postMessage(
+          {
+            protocol: PROTOCOL,
+            type: 'action.request',
+            requestId: `r${counter}`,
+            actionId: 'probe_env',
+            params: {},
+          },
+          '*'
+        );
+      });
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent || !event.data || event.data.protocol !== PROTOCOL)
+          return;
+        if (event.data.type === 'action.result') {
+          document.getElementById('state').textContent = `Result: ${event.data.status}`;
+        }
+      });
+    </script>
+  </body>
+</html>

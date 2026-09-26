@@ -20,7 +20,11 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import * as readline from 'node:readline';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
@@ -485,7 +489,12 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...permissionArgs,
       ...this.extraArgs,
     ];
-    return this.spawnCli(args, '', options?.signal);
+    return this.spawnCli(
+      args,
+      '',
+      options?.signal,
+      resolveEffectiveProviderPermissionProfile('claude', permissionProfile)
+    );
   }
 
   async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
@@ -521,11 +530,21 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
       ...this.extraArgs,
     ];
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // Keep the same provider-scoped child environment as the batch path.
-      env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
+    // Keep the same provider-scoped child environment as the batch path.
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'claude',
+      sessionId: newDelegationSessionId('claude'),
+      profile: resolveEffectiveProviderPermissionProfile(
+        'claude',
+        options?.advisory ? 'planner' : undefined
+      ),
     });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -624,6 +643,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     } finally {
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      spawnEnv.dispose();
     }
   }
 
@@ -797,7 +817,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    return this.spawnCli(args, '');
+    return this.spawnCli(args, '', undefined, resolveEffectiveProviderPermissionProfile('claude'));
   }
 
   /**
@@ -820,7 +840,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    return this.spawnCli(args, '');
+    return this.spawnCli(args, '', undefined, resolveEffectiveProviderPermissionProfile('claude'));
   }
 
   async runStructured<T>(params: {
@@ -881,13 +901,26 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * this backend's CLI process is actually SIGTERM'd then (after the grace
    * window) SIGKILL'd, not just abandoned.
    */
-  private spawnCli(args: string[], stdin: string, signal?: AbortSignal): Promise<string> {
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // XP-02: minimal allowlisted env (no cross-provider credential
-      // leakage); SA-05: one delegation hop deeper than us.
-      env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
+  private spawnCli(
+    args: string[],
+    stdin: string,
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    // XP-02: minimal allowlisted env (no cross-provider credential
+    // leakage); SA-05: one delegation hop deeper than us; WS-02: private git
+    // index for implementer delegations.
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'claude',
+      sessionId: newDelegationSessionId('claude'),
+      ...(profile ? { profile } : {}),
     });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {
@@ -921,6 +954,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         })
     ).catch((err) => {
       if (err instanceof DelegationWallClockExceededError) {
+        spawnEnv.dispose();
         throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
       }
       throw err;

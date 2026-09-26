@@ -2,10 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kyberion.ai/schemas/plugin-view-declaration.schema.json",
   "title": "Plugin View Declaration",
-  "description": "EP-05: one entry of a plugin manifest's provides.views. Views are declarative A2UI documents rendered with the kyberion-base catalog; they never execute plugin code. Validated by libs/core/plugin-view-contract.ts, which also enforces the document, vocabulary, capability and action rules this schema cannot express.",
+  "description": "EP-05: one entry of a plugin manifest's provides.views. in-process-a2ui views are declarative A2UI documents rendered with the kyberion-base catalog and never execute plugin code; PH-02 sandboxed-iframe views are one self-contained HTML document served with a sandbox CSP in an opaque-origin iframe. Validated by libs/core/plugin-view-contract.ts (and plugin-view-frame.ts), which also enforces the document, vocabulary, capability and action rules this schema cannot express.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "titleKey", "document", "isolation", "roleGate"],
+  "if": {
+    "properties": { "isolation": { "const": "sandboxed-iframe" } },
+    "required": ["isolation"]
+  },
+  "then": { "properties": { "document": { "type": "string", "pattern": "\\.html$" } } },
+  "else": { "properties": { "document": { "type": "string", "pattern": "\\.a2ui\\.json$" } } },
   "properties": {
     "id": {
       "type": "string",
@@ -21,20 +27,20 @@
     },
     "document": {
       "type": "string",
-      "pattern": "^views/[a-z0-9][a-z0-9_-]{0,63}\\.a2ui\\.json$",
-      "description": "Plugin-relative path of the A2UI document (always under views/)."
+      "pattern": "^views/[a-z0-9][a-z0-9_-]{0,63}\\.(a2ui\\.json|html)$",
+      "description": "Plugin-relative path of the view document (always under views/): *.a2ui.json for in-process-a2ui, *.html (<= 512KB UTF-8) for sandboxed-iframe."
     },
     "isolation": {
       "type": "string",
       "enum": ["in-process-a2ui", "sandboxed-iframe"],
-      "description": "Rendering isolation. Only in-process-a2ui is supported; sandboxed-iframe is reserved and rejected with [PLUGIN_VIEW_UNSUPPORTED]."
+      "description": "Rendering isolation. in-process-a2ui renders the A2UI document inside the host surface; sandboxed-iframe renders the HTML document in an iframe sandboxed to allow-scripts only (opaque origin, no network, host-mediated postMessage)."
     },
     "capabilities": {
       "type": "array",
       "maxItems": 16,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$" },
-      "description": "Additional host capabilities the view requests. Deny by default; the allowlist is currently empty, so any entry is rejected."
+      "description": "Additional host capabilities the view requests. Deny by default; the allowlist is [\"action.request\"] (an iframe view may ask the host to run one of its declared actions, always host-confirmed). Any other entry is rejected."
     },
     "roleGate": {
       "type": "object",

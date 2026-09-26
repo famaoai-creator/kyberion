@@ -1328,6 +1328,26 @@ export function safeReadlink(filePath: string): string {
   return fs.readlinkSync(resolved);
 }
 
+/**
+ * Read-only filesystem capacity for the volume holding `targetPath`.
+ * Used by the WS-06 workspace disk budget to enforce a free-space floor.
+ */
+export function safeStatfs(targetPath: string): { freeBytes: number; totalBytes: number } {
+  assertSensitivePathAllowed(targetPath, 'read', isSensitivePathMediated());
+  const resolved = pathResolver.resolve(targetPath);
+  const check = validateReadPermission(resolved);
+  if (!check.allowed) {
+    throw new Error(
+      `[ROLE_VIOLATION] Role is NOT authorized to statfs path '${targetPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
+    );
+  }
+  const stats = fs.statfsSync(resolved);
+  return {
+    freeBytes: Number(stats.bavail) * Number(stats.bsize),
+    totalBytes: Number(stats.blocks) * Number(stats.bsize),
+  };
+}
+
 registerEnvironmentRegistryReader(() =>
   secureLoadJsonIfPresent<{
     entries?: Array<{

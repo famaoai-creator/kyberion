@@ -81,6 +81,9 @@ export const PERSONAL_PADS_CLIENT_TEXT_KEYS = [
   'personal_pads:dialog_save',
   'personal_pads:dialog_discard',
   'personal_pads:dialog_cancel',
+  'personal_pads:plugin_views_title',
+  'personal_pads:plugin_views_empty',
+  'personal_pads:plugin_view_action_in_chronos',
 ] as const satisfies readonly VocabularyKey[];
 
 export const PERSONAL_PADS_TIERS = ['personal', 'confidential', 'public'] as const;
