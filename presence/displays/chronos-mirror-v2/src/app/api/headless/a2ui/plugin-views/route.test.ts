@@ -175,7 +175,7 @@ async function act(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  state.managedRoot = pathResolver.shared(`plugins/managed-test-chronos-views-${randomUUID()}`);
+  state.managedRoot = pathResolver.sharedTmp(`plugins/managed-test-chronos-views-${randomUUID()}`);
   cleanup.push(state.managedRoot);
   state.viewer = viewer();
 });
