@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,7 +14,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
  * policies (knowledge/product) and holds its own personal tier.
  */
 
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ENV_KEYS = [
   'KYBERION_ROOT',
   'SYSTEM_ROLE',

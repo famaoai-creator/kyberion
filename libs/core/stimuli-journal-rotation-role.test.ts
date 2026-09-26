@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -12,7 +13,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
  * real secure-io / tier-guard stack against a hermetic KYBERION_ROOT.
  */
 
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA'] as const;
 const JOURNAL_RELATIVE = 'presence/bridge/runtime/stimuli.jsonl';
 const MAX_BYTES = 256;
