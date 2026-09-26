@@ -1485,7 +1485,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 49440,
+      "size": 49900,
       "type": "json"
     },
     {
@@ -1593,7 +1593,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 148822,
+      "size": 150063,
       "type": "json"
     },
     {
@@ -3729,7 +3729,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 26225,
+      "size": 27025,
       "type": "json"
     },
     {
@@ -4355,6 +4355,12 @@
       "tier": "public",
       "size": 8862,
       "type": "md"
+    },
+    {
+      "path": "product/governance/workspace-budget-policy.json",
+      "tier": "public",
+      "size": 731,
+      "type": "json"
     },
     {
       "path": "product/hints/browser-approval-workflow.json",
@@ -10473,7 +10479,7 @@
     {
       "path": "product/schemas/plugin-view-declaration.schema.json",
       "tier": "public",
-      "size": 3626,
+      "size": 4373,
       "type": "json"
     },
     {
@@ -12094,6 +12100,18 @@
       "path": "product/schemas/working-memory-action.schema.json",
       "tier": "public",
       "size": 2056,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workspace-budget-policy.schema.json",
+      "tier": "public",
+      "size": 615,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workspace-ledger.schema.json",
+      "tier": "public",
+      "size": 1299,
       "type": "json"
     },
     {
