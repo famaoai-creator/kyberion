@@ -89,7 +89,7 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 
 Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受けで決まった Persona が `KYBERION_PERSONA` より優先されます。
 
-互換性のため、`withExecutionContext*` は従来どおり `MISSION_ROLE` / `KYBERION_PERSONA` 環境変数も設定・復元し、子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。ただし**正しさは環境変数に依存しません**: 環境変数はプロセス全体で 1 つなので、1 つのサーバープロセス内で並行するリクエストの間で競合します。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
+環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
 
 以前は `SYSTEM_ROLE` が `MISSION_ROLE` より優先されていたため、surface_runtime から起動されたサーフェスでは `withExecutionContext` によるロール引き受けがすべて黙って無視されていました（例: Chronos の `chronos_localadmin` によるテナントレジストリ読み取りやプラグイン承認）。
 
