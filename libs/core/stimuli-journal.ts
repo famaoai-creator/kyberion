@@ -24,6 +24,15 @@ const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl
  * swallows the error. infrastructure_sentinel is a shared core role (allowed
  * under every SYSTEM_ROLE, role-assumption-policy.json) that already owns the
  * nerve/mesh bus stores and is granted presence/bridge/runtime/.
+ *
+ * Because every caller now writes as the same role, a journal record says
+ * nothing about who produced it: `from` / `node_id` / `intent` are
+ * self-declared. The journal must therefore never become an authorization
+ * input — e.g. dynamic-permission-guard's contextual grants (keyed on a
+ * recent stimulus intent/keyword via sensory-memory) must stay unwired from
+ * tier-guard / secure-io / policy-engine until the writer is authenticated
+ * (signed or attributed records). stimuli-journal-rotation-role.test.ts
+ * pins that no authorization module imports it.
  */
 export const STIMULI_JOURNAL_WRITER_ROLE = 'infrastructure_sentinel';
 
