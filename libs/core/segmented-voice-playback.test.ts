@@ -1,7 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { describe, expect, it, vi } from 'vitest';
+
+const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  spawnMock.mockImplementation(actual.spawn);
+  return { ...actual, spawn: spawnMock };
+});
 
 import { speakSegmented } from './segmented-voice-playback.js';
 import type { PlaybackHandle, PlaybackResult } from './audio-playback.js';
+
+interface FakeChild extends EventEmitter {
+  stdout: null;
+  stderr: PassThrough;
+  kill: ReturnType<typeof vi.fn>;
+  exitCode: number | null;
+}
+
+function createFakeChild(): FakeChild {
+  const child = new EventEmitter() as FakeChild;
+  child.stdout = null;
+  child.stderr = new PassThrough();
+  child.exitCode = null;
+  child.kill = vi.fn(() => child.exitCode === null);
+  return child;
+}
+
+function closeFakeChild(child: FakeChild, code = 0): void {
+  child.exitCode = code;
+  child.emit('close', code);
+}
 
 function immediateHandle(): PlaybackHandle {
   const done = Promise.resolve<PlaybackResult>({ ok: true, interrupted: false });
@@ -220,5 +251,39 @@ describe('speakSegmented', () => {
     const result = await controller.stop();
     expect(result.interrupted).toBe(true);
     expect(played).toEqual(['/tmp/seg-0.wav']);
+  });
+
+  it('uses the default player (playAudioFile) in-place pause() instead of stop-and-replay', async () => {
+    const children: FakeChild[] = [];
+    spawnMock.mockImplementation(() => {
+      const child = createFakeChild();
+      children.push(child);
+      return child;
+    });
+
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      // No `play` override: exercises the real default (playAudioFile).
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(children).toHaveLength(1);
+
+    controller.pause?.();
+    expect(children[0].kill).toHaveBeenCalledWith('SIGSTOP');
+    controller.resume?.();
+    expect(children[0].kill).toHaveBeenLastCalledWith('SIGCONT');
+
+    closeFakeChild(children[0], 0);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(children).toHaveLength(2);
+    closeFakeChild(children[1], 0);
+
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    // Segment 0 was paused/resumed in place, not stopped and replayed.
+    expect(children).toHaveLength(2);
   });
 });

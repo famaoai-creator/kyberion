@@ -84,6 +84,12 @@ node dist/scripts/run_realtime_voice_conversation.js \
 `external` など)はループのイベントと trace の
 `realtime_voice.turn_cancelled` に出る。
 
+`two_stage` の一時停止は、既定のプレイヤー(afplay/aplay)では POSIX の
+SIGSTOP/SIGCONT でプレイヤー process をその場で止めて再開するため、再開時に
+今の文が最初から再生し直されることはない。win32、またはカスタム `play()` が
+pause/resume を実装していない場合のみ、停止して次の再開時に文を再生し直す
+フォールバックになる。
+
 ## モデル・effort の変更
 
 変更は次の会話から使う。CLI の一時指定は保存設定より優先する。

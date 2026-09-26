@@ -19,6 +19,15 @@ export interface PlaybackHandle {
   done: Promise<PlaybackResult>;
   /** Stop playback immediately (SIGTERM, then SIGKILL after 1.5s). Idempotent. */
   stop(): Promise<PlaybackResult>;
+  /**
+   * Suspend the player in place (SIGSTOP on POSIX) so resume() continues the
+   * same segment instead of restarting it. Present only when the platform
+   * supports it (POSIX); absent on win32, where callers fall back to
+   * stop-and-replay.
+   */
+  pause?(): void;
+  /** Resume a player suspended by pause() (SIGCONT on POSIX). */
+  resume?(): void;
 }
 
 export interface PlaybackResult {
@@ -109,12 +118,20 @@ export function resolveAudioPlaybackCommand(audioPath = '{file}'): string[] | nu
   return adapter ? adapter.command(audioPath) : null;
 }
 
+/** True when `handle` exposes in-place pause()/resume() (see PlaybackHandle). */
+export function isPausablePlaybackHandle(
+  handle: PlaybackHandle
+): handle is PlaybackHandle & { pause(): void; resume(): void } {
+  return typeof handle.pause === 'function' && typeof handle.resume === 'function';
+}
+
 export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): PlaybackHandle {
   const argv = buildArgv(audioPath, opts);
   const child = spawn(argv[0], argv.slice(1), { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let settled = false;
   let interrupted = false;
+  let paused = false;
   let stderrTail = '';
   child.stderr?.on('data', (data: Buffer) => {
     stderrTail = `${stderrTail}${data.toString()}`.slice(-1000);
@@ -150,11 +167,26 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
     );
   });
 
-  return {
+  /** Send a POSIX signal to the player; false/caught when it can't be delivered (already gone). */
+  const sendSignal = (signal: NodeJS.Signals): boolean => {
+    try {
+      return child.kill(signal);
+    } catch {
+      return false;
+    }
+  };
+
+  const handle: PlaybackHandle = {
     done,
     stop: async () => {
       if (!settled) {
         interrupted = true;
+        // A suspended (SIGSTOPped) process never sees SIGTERM, so resume it
+        // first — otherwise it can't exit and stop() would hang until SIGKILL.
+        if (paused) {
+          sendSignal('SIGCONT');
+          paused = false;
+        }
         child.kill('SIGTERM');
         const killTimer = setTimeout(() => {
           try {
@@ -169,4 +201,20 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
       return done;
     },
   };
+
+  // Pause-in-place is a POSIX signal trick (SIGSTOP/SIGCONT); win32 has no
+  // equivalent, so callers keep the stop-and-replay fallback there.
+  if (process.platform !== 'win32') {
+    handle.pause = () => {
+      if (settled || paused) return;
+      if (sendSignal('SIGSTOP')) paused = true;
+    };
+    handle.resume = () => {
+      if (settled || !paused) return;
+      sendSignal('SIGCONT');
+      paused = false;
+    };
+  }
+
+  return handle;
 }
