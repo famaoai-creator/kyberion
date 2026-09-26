@@ -4,8 +4,10 @@ import type { OcrResult } from './ocr-types.js';
 /**
  * Set-of-Marks fusion.
  *
- * Detectors (DOM snapshot rects, OCR lines, future pixel detectors) propose
- * candidate boxes in image pixels. Fusion turns them into a short, numbered
+ * Detectors (DOM snapshot rects, OS accessibility rects, pixel regions, OCR
+ * lines) propose candidate boxes in image pixels. Exact sources (DOM and
+ * accessibility) score 1 and pixel regions score at most 0.6, so the exact box
+ * wins suppression of the same element while keeping the others' labels. Fusion turns them into a short, numbered
  * list of click targets:
  *
  * 1. icon-over-text suppression: a text box mostly covered by a control/icon
@@ -34,7 +36,7 @@ export interface SomBox {
   height: number;
 }
 
-export type SomSource = 'ocr' | 'dom' | 'detector';
+export type SomSource = 'ocr' | 'dom' | 'accessibility' | 'detector';
 export type SomKind = 'text' | 'icon' | 'control';
 
 export interface SomCandidate {
@@ -86,7 +88,7 @@ interface WorkingCandidate {
   order: number;
 }
 
-const SOURCE_ORDER: SomSource[] = ['dom', 'detector', 'ocr'];
+const SOURCE_ORDER: SomSource[] = ['dom', 'accessibility', 'detector', 'ocr'];
 const KIND_PRIORITY: Record<SomKind, number> = { control: 2, icon: 1, text: 0 };
 
 export function boxArea(box: SomBox): number {
