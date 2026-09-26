@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font:
+          14px system-ui,
+          sans-serif;
+        margin: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="origin" data-value="">origin: ?</p>
+    <p id="network" data-value="pending">network: pending</p>
+    <p id="csp" data-value="">csp: none</p>
+    <p id="init" data-value="">init: waiting</p>
+    <p id="result" data-status="" data-request="">result: none</p>
+    <button id="ping" type="button">Ping (agent)</button>
+    <button id="stamp" type="button">Stamp (human)</button>
+    <script>
+      const PROTOCOL = 'kyberion.plugin-view/1';
+      const show = (id, attribute, value) => {
+        const element = document.getElementById(id);
+        element.setAttribute(attribute, value);
+        element.textContent = `${id}: ${value}`;
+      };
+      // The sandbox (no allow-same-origin) gives the document an opaque origin.
+      show('origin', 'data-value', String(window.origin));
+      // connect-src 'none': any fetch must be refused by the CSP (not only by CORS).
+      document.addEventListener('securitypolicyviolation', (event) => {
+        show('csp', 'data-value', String(event.effectiveDirective));
+      });
+      fetch('/api/healthz').then(
+        () => show('network', 'data-value', 'allowed'),
+        () => show('network', 'data-value', 'blocked')
+      );
+      let counter = 0;
+      const request = (actionId, params) => {
+        counter += 1;
+        window.parent.postMessage(
+          {
+            protocol: PROTOCOL,
+            type: 'action.request',
+            requestId: `r${counter}`,
+            actionId,
+            params,
+          },
+          '*'
+        );
+      };
+      document.getElementById('ping').addEventListener('click', () => {
+        request('ping', { note: 'e2e-ping' });
+      });
+      document.getElementById('stamp').addEventListener('click', () => {
+        request('stamp', { label: 'e2e-stamp' });
+      });
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent || !event.data || event.data.protocol !== PROTOCOL) {
+          return;
+        }
+        if (event.data.type === 'init') show('init', 'data-value', String(event.data.locale));
+        if (event.data.type === 'action.result') {
+          const element = document.getElementById('result');
+          element.setAttribute('data-request', String(event.data.requestId));
+          show('result', 'data-status', String(event.data.status));
+        }
+      });
+      window.parent.postMessage({ protocol: PROTOCOL, type: 'ready' }, '*');
+    </script>
+  </body>
+</html>
