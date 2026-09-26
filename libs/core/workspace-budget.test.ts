@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from './path-resolver.js';
 import {
   safeExistsSync,
@@ -129,6 +129,55 @@ describe('workspace-budget', () => {
       statfs: unreadable,
     });
     expect(noFloor).toMatchObject({ allowed: true, freeBytes: null });
+  });
+
+  it('uses cached ledger bytes and measures only records without them', () => {
+    const cachedDir = path.join(base, 'workspaces', 'cached');
+    registerWorkspace({ path: cachedDir, kind: 'scratch-dir', owner: {}, bytes: 400 }, options);
+    const measure = vi.fn(() => 0);
+    const cached = checkWorkspaceBudget(base, 100, { ...options, measure });
+    expect(measure).not.toHaveBeenCalled();
+    expect(cached).toMatchObject({ allowed: true, usedBytes: 400 });
+
+    const uncachedDir = path.join(base, 'workspaces', 'uncached');
+    registerWorkspace({ path: uncachedDir, kind: 'scratch-dir', owner: {} }, options);
+    measure.mockReturnValue(50);
+    expect(checkWorkspaceBudget(base, 0, { ...options, measure }).usedBytes).toBe(450);
+    expect(measure.mock.calls).toEqual([[uncachedDir]]);
+  });
+
+  it('bounds the measurement walk', () => {
+    const dir = path.join(base, 'workspaces', 'many');
+    for (let i = 0; i < 5; i += 1) safeWriteFile(path.join(dir, `f${i}.txt`), 'xx');
+    expect(measureWorkspaceBytes(dir)).toBe(10);
+    expect(measureWorkspaceBytes(dir, { maxEntries: 2 })).toBe(4);
+    let t = 0;
+    expect(measureWorkspaceBytes(dir, { maxMs: 0, clock: () => (t += 1) })).toBe(0);
+  });
+
+  it('skips a released workspace that cannot be deleted and reclaims the next one', () => {
+    const broken = released('broken', 300);
+    const next = released('next', 300);
+    workspaceWithBytes('live', 300);
+    const victim = path.join(base, 'victim');
+    safeWriteFile(path.join(victim, 'keep.txt'), 'keep');
+    safeRmSync(broken.path, { recursive: true, force: true });
+    safeSymlinkSync(victim, broken.path, 'dir');
+    // The broken entry measures 0 (symlink), so 600 + 350 crosses the 900 threshold.
+    const result = checkWorkspaceBudget(base, 350, options);
+    expect(result.reclaimed).toEqual([next.id]);
+    expect(result.allowed).toBe(true);
+    expect(safeExistsSync(path.join(victim, 'keep.txt'))).toBe(true);
+  });
+
+  it('never reclaims released git worktrees inline (left to the TTL sweep)', () => {
+    const dir = path.join(base, 'workspaces', 'wt');
+    safeWriteFile(path.join(dir, 'blob.bin'), 'x'.repeat(900));
+    const worktree = registerWorkspace({ path: dir, kind: 'git-worktree', owner: {} }, options);
+    releaseWorkspace(worktree.id, options);
+    const result = checkWorkspaceBudget(base, 200, options);
+    expect(result).toMatchObject({ allowed: false, reason: 'cap-exceeded', reclaimed: [] });
+    expect(safeExistsSync(dir)).toBe(true);
   });
 
   it('loads the governed policy and applies env overrides', () => {

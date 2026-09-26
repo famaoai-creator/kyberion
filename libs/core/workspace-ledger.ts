@@ -43,7 +43,13 @@ export interface WorkspaceRecord {
   createdAt: string;
   live: boolean;
   releasedAt?: string;
+  /** Cached size in bytes (set at register/release, refreshed by the sweep). */
   bytes?: number;
+  /** Process that registered the workspace, with its start marker (pid-reuse guard). */
+  pid?: number;
+  pidStartedAt?: string;
+  /** git-index only: the delegated child using the index; never deleted while it runs. */
+  childPid?: number;
 }
 
 export interface RegisterWorkspaceInput {
@@ -52,6 +58,18 @@ export interface RegisterWorkspaceInput {
   owner: WorkspaceOwner;
   repoRoot?: string;
   bytes?: number;
+  pid?: number;
+  pidStartedAt?: string;
+}
+
+/** Fields a caller decided on; the delete re-checks them under the ledger lock. */
+export type WorkspaceRecordSnapshot = Pick<WorkspaceRecord, 'live' | 'createdAt' | 'releasedAt'>;
+
+export interface DeleteWorkspaceGuard {
+  /** Refuse ([WORKSPACE_CHANGED]) unless the locked record still matches this snapshot. */
+  expect?: WorkspaceRecordSnapshot;
+  /** git-worktree only: refuse ([WORKSPACE_DIRTY]) when it has uncommitted or unreachable work. */
+  requireCleanWorktree?: boolean;
 }
 
 export interface WorkspaceLedgerOptions {
@@ -181,6 +199,11 @@ function cleanOwner(owner: WorkspaceOwner): WorkspaceOwner {
   return cleaned;
 }
 
+function processFields(input: RegisterWorkspaceInput): Partial<WorkspaceRecord> {
+  if (!input.pid || !Number.isInteger(input.pid) || input.pid <= 0) return {};
+  return { pid: input.pid, ...(input.pidStartedAt ? { pidStartedAt: input.pidStartedAt } : {}) };
+}
+
 function registerWithId(
   id: string,
   input: RegisterWorkspaceInput,
@@ -208,6 +231,10 @@ function registerWithId(
         ...(input.bytes !== undefined ? { bytes: input.bytes } : {}),
       };
       delete reactivated.releasedAt;
+      delete reactivated.pid;
+      delete reactivated.pidStartedAt;
+      delete reactivated.childPid;
+      Object.assign(reactivated, processFields(input));
       return {
         records: records.map((record) => (record.id === existing.id ? reactivated : record)),
         result: reactivated,
@@ -222,6 +249,7 @@ function registerWithId(
       createdAt: nowIsoOf(options),
       live: true,
       ...(input.bytes !== undefined ? { bytes: input.bytes } : {}),
+      ...processFields(input),
     };
     return { records: [...records, record], result: record };
   });
@@ -254,16 +282,45 @@ export function createScratchWorkspace(
 /** Mark a workspace as no longer in use; it becomes eligible for reclaim. */
 export function releaseWorkspace(
   id: string,
-  options: WorkspaceLedgerOptions = {}
+  options: WorkspaceLedgerOptions = {},
+  update: { bytes?: number } = {}
 ): WorkspaceRecord | null {
   return mutateLedger(options, (records) => {
     const existing = records.find((record) => record.id === id);
     if (!existing) return { records: null, result: null };
     if (!existing.live) return { records: null, result: existing };
-    const released: WorkspaceRecord = { ...existing, live: false, releasedAt: nowIsoOf(options) };
+    const released: WorkspaceRecord = {
+      ...existing,
+      live: false,
+      releasedAt: nowIsoOf(options),
+      ...(update.bytes !== undefined ? { bytes: update.bytes } : {}),
+    };
     return {
       records: records.map((record) => (record.id === id ? released : record)),
       result: released,
+    };
+  });
+}
+
+/** Update cached bookkeeping (size, child pid) of a registered workspace. */
+export function annotateWorkspace(
+  id: string,
+  update: { bytes?: number; childPid?: number },
+  options: WorkspaceLedgerOptions = {}
+): WorkspaceRecord | null {
+  return mutateLedger(options, (records) => {
+    const existing = records.find((record) => record.id === id);
+    if (!existing) return { records: null, result: null };
+    const annotated: WorkspaceRecord = { ...existing };
+    if (update.bytes !== undefined && Number.isFinite(update.bytes) && update.bytes >= 0) {
+      annotated.bytes = update.bytes;
+    }
+    if (update.childPid !== undefined && Number.isInteger(update.childPid) && update.childPid > 0) {
+      annotated.childPid = update.childPid;
+    }
+    return {
+      records: records.map((record) => (record.id === id ? annotated : record)),
+      result: annotated,
     };
   });
 }
@@ -276,6 +333,38 @@ export function listWorkspaces(options: WorkspaceLedgerOptions = {}): WorkspaceR
 function isOwnerPath(): boolean {
   const depth = Number(getRegisteredEnvText('KYBERION_DELEGATION_DEPTH'));
   return !(Number.isFinite(depth) && depth > 0);
+}
+
+function assertSnapshotMatches(record: WorkspaceRecord, expected: WorkspaceRecordSnapshot): void {
+  if (
+    record.live !== expected.live ||
+    record.createdAt !== expected.createdAt ||
+    record.releasedAt !== expected.releasedAt
+  ) {
+    throw new Error(
+      `[WORKSPACE_CHANGED] ${record.id} changed since it was selected for deletion (live=${String(record.live)}); skipped`
+    );
+  }
+}
+
+/**
+ * Uncommitted changes, or commits HEAD has that no branch, tag or remote
+ * reaches (a detached worktree's own commits), in a git worktree.
+ */
+export function describeUnsavedWorktreeWork(worktreePath: string): string | null {
+  const status = safeExecResult('git', ['status', '--porcelain', '--untracked-files=all'], {
+    cwd: worktreePath,
+    timeoutMs: 60_000,
+  });
+  if (status.status !== 0) return `git status failed: ${status.stderr.trim()}`;
+  if (status.stdout.trim().length > 0) return 'uncommitted changes';
+  const unreachable = safeExecResult(
+    'git',
+    ['rev-list', '-n', '1', 'HEAD', '--not', '--branches', '--tags', '--remotes'],
+    { cwd: worktreePath, timeoutMs: 60_000 }
+  );
+  if (unreachable.status !== 0) return `git rev-list failed: ${unreachable.stderr.trim()}`;
+  return unreachable.stdout.trim().length > 0 ? 'commits not reachable from any ref' : null;
 }
 
 function removeWorkspaceFromDisk(record: WorkspaceRecord, resolved: string): boolean {
@@ -308,17 +397,27 @@ function removeWorkspaceFromDisk(record: WorkspaceRecord, resolved: string): boo
  * Delete a registered workspace from disk and drop its ledger record.
  * Re-validates every location invariant at deletion time; git worktrees go
  * through `git worktree remove --force` on the owner path only, never rm.
+ * Callers that decided on an earlier snapshot pass `guard.expect` so a record
+ * re-registered (or re-released) in between is refused instead of deleted.
  */
 export function deleteRegisteredWorkspace(
   id: string,
-  options: WorkspaceLedgerOptions = {}
+  options: WorkspaceLedgerOptions = {},
+  guard: DeleteWorkspaceGuard = {}
 ): DeleteWorkspaceResult {
   return mutateLedger(options, (records) => {
     const record = records.find((candidate) => candidate.id === id);
     if (!record) throw new Error(`[WORKSPACE_NOT_REGISTERED] no workspace with id ${id}`);
+    if (guard.expect) assertSnapshotMatches(record, guard.expect);
     const resolved = resolveWorkspacePath(record.path, options);
     if (resolved !== record.path) {
       throw new Error(`[WORKSPACE_PATH] ledger path is not canonical: ${record.path}`);
+    }
+    if (guard.requireCleanWorktree && record.kind === 'git-worktree' && safeExistsSync(resolved)) {
+      const unsaved = describeUnsavedWorktreeWork(resolved);
+      if (unsaved) {
+        throw new Error(`[WORKSPACE_DIRTY] ${resolved} kept: ${unsaved}`);
+      }
     }
     const removedFromDisk = removeWorkspaceFromDisk(record, resolved);
     return {

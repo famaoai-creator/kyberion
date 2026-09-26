@@ -1,33 +1,38 @@
 /**
  * WS-01 per-session private git index.
  *
- * A write-capable delegation gets its own `GIT_INDEX_FILE`, seeded from the
- * checkout's real index, so a worker's accidental `git add` stages into a
- * private snapshot instead of the index every other concurrent session
- * shares. Workers still never commit; the mission owner may commit a session
- * index through `commitFromSessionIndex` (mission-git.ts), which refuses when
- * HEAD moved away from `baselineSha`.
+ * A write-capable delegation gets its own `GIT_INDEX_FILE`, seeded from HEAD
+ * (never from the shared index, which may hold other sessions' staged work),
+ * so a worker's accidental `git add` stages into a private snapshot instead of
+ * the index every other concurrent session shares. The mission owner commits
+ * a session index through `commitFromSessionIndex` (mission-git.ts). Nothing
+ * stops a worker from committing with its private index anyway, so dispose
+ * brings the shared index up to the moved HEAD for the paths those commits
+ * changed — otherwise the owner's next commit would silently revert them.
  */
 
 import * as path from 'node:path';
+import { auditChain } from './audit-chain.js';
 import { createLogger } from './logger.js';
 import { shared } from './path-resolver.js';
-import {
-  safeCopyFileSync,
-  safeExecResult,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-} from './secure-io.js';
+import { safeExecResult, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { checkWorkspaceBudget, type WorkspaceBudgetOptions } from './workspace-budget.js';
 import {
+  annotateWorkspace,
   deleteRegisteredWorkspace,
   GIT_INDEXES_ROOT_SUBPATH,
   registerWorkspace,
   releaseWorkspace,
   type WorkspaceLedgerOptions,
   type WorkspaceOwner,
+  type WorkspaceRecord,
 } from './workspace-ledger.js';
+import {
+  isPidAlive,
+  isProcessGroupAlive,
+  processStartMarker,
+  type ProcessIdentityProbe,
+} from './workspace-process-identity.js';
 
 const logger = createLogger('session-git-index');
 
@@ -42,8 +47,19 @@ export interface SessionGitIndex {
   /** Workspace ledger id of the index directory. */
   workspaceId: string;
   env: { GIT_INDEX_FILE: string };
-  /** Release the ledger entry and delete the index directory. Idempotent. */
-  dispose(): void;
+  /** Record the delegated child so no sweep deletes the index while it runs. */
+  attachChild(pid: number | undefined): void;
+  /**
+   * Reconcile the shared index with commits made through this index, release
+   * the ledger entry and delete the index directory. While `childPid` (or its
+   * process group) is still alive the directory is kept for the janitor
+   * sweep; a later call deletes it. Idempotent.
+   */
+  dispose(options?: SessionGitIndexDisposeOptions): void;
+}
+
+export interface SessionGitIndexDisposeOptions {
+  childPid?: number;
 }
 
 export interface PrepareSessionGitIndexInput {
@@ -57,6 +73,20 @@ export interface PrepareSessionGitIndexOptions {
   root?: string;
   ledger?: WorkspaceLedgerOptions;
   budget?: Omit<WorkspaceBudgetOptions, keyof WorkspaceLedgerOptions>;
+  /** Test seam: process liveness / start-marker probes. */
+  processProbe?: ProcessIdentityProbe;
+  /** Test seam: audit sink for shared-index reconciliation (defaults to the audit chain). */
+  audit?: (entry: SharedIndexReconcileAudit) => void;
+}
+
+export interface SharedIndexReconcileAudit {
+  sessionId: string;
+  fromSha: string | null;
+  toSha: string;
+  /** Paths whose shared-index entry was moved to the new HEAD. */
+  updated: string[];
+  /** Paths left alone because the shared index held other staged work for them. */
+  skipped: string[];
 }
 
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -70,6 +100,10 @@ function gitText(cwd: string, args: string[]): string | null {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function realIndexBytes(realIndex: string): number {
   try {
     return safeExistsSync(realIndex) ? safeLstat(realIndex).size : 0;
@@ -79,31 +113,135 @@ function realIndexBytes(realIndex: string): number {
 }
 
 /**
- * Seed from the real index (keeps its stat cache). A linked worktree's index
- * may live outside the repository's secure-io scope; fall back to building
- * the index from HEAD with git itself.
+ * Seed from HEAD, not from the shared index: a copy of the shared index would
+ * carry other sessions' staged changes into this session's commit.
  */
-function seedIndex(
-  repoRoot: string,
-  realIndex: string,
-  indexPath: string,
-  baselineSha: string | null
-): void {
-  if (safeExistsSync(realIndex)) {
-    try {
-      safeCopyFileSync(realIndex, indexPath);
-      return;
-    } catch (error) {
-      logger.warn(
-        `copying ${realIndex} failed (${error instanceof Error ? error.message : String(error)}); seeding from HEAD`
-      );
+function seedIndex(repoRoot: string, indexPath: string, baselineSha: string | null): void {
+  const result = git(
+    repoRoot,
+    baselineSha ? ['read-tree', baselineSha] : ['read-tree', '--empty'],
+    {
+      GIT_INDEX_FILE: indexPath,
     }
-  }
-  if (!baselineSha) return;
-  const result = git(repoRoot, ['read-tree', baselineSha], { GIT_INDEX_FILE: indexPath });
+  );
   if (result.status !== 0) {
     throw new Error(`git read-tree failed: ${result.stderr.trim()}`);
   }
+}
+
+interface TreeEntry {
+  mode: string;
+  oid: string;
+}
+
+const ABSENT_MODE = /^0+$/;
+
+/** `git diff-tree -r -z --no-renames` raw output → path → [before, after] (null = absent). */
+function parseRawDiff(out: string): Map<string, [TreeEntry | null, TreeEntry | null]> {
+  const changes = new Map<string, [TreeEntry | null, TreeEntry | null]>();
+  const tokens = out.split('\0');
+  for (let i = 0; i + 1 < tokens.length; i += 2) {
+    const [oldMode, newMode, oldOid, newOid] = tokens[i].replace(/^:/, '').split(' ');
+    const file = tokens[i + 1];
+    if (!file || !newOid) continue;
+    changes.set(file, [
+      ABSENT_MODE.test(oldMode) ? null : { mode: oldMode, oid: oldOid },
+      ABSENT_MODE.test(newMode) ? null : { mode: newMode, oid: newOid },
+    ]);
+  }
+  return changes;
+}
+
+/** `git ls-tree -r -z` output → path → entry. */
+function parseLsTree(out: string): Map<string, TreeEntry> {
+  const entries = new Map<string, TreeEntry>();
+  for (const line of out.split('\0')) {
+    const tab = line.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, , oid] = line.slice(0, tab).split(' ');
+    entries.set(line.slice(tab + 1), { mode, oid });
+  }
+  return entries;
+}
+
+/** `git ls-files -s -z` output → path → stage-0 entry (null when the path is conflicted). */
+function parseIndex(out: string): Map<string, TreeEntry | null> {
+  const entries = new Map<string, TreeEntry | null>();
+  for (const line of out.split('\0')) {
+    const tab = line.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, oid, stage] = line.slice(0, tab).split(' ');
+    const file = line.slice(tab + 1);
+    entries.set(file, stage === '0' && !entries.has(file) ? { mode, oid } : null);
+  }
+  return entries;
+}
+
+function sameEntry(a: TreeEntry | null | undefined, b: TreeEntry | null): boolean {
+  if (a === null) return false; // conflicted in the shared index: never touch
+  if (a === undefined) return b === null;
+  return b !== null && a.mode === b.mode && a.oid === b.oid;
+}
+
+function gitOrThrow(cwd: string, args: string[], input?: string): string {
+  const result = safeExecResult('git', args, {
+    cwd,
+    timeoutMs: 60_000,
+    maxOutputMB: 256,
+    ...(input !== undefined ? { input } : {}),
+  });
+  if (result.status !== 0) {
+    throw new Error(`git ${args[0]} failed: ${result.stderr.trim() || String(result.status)}`);
+  }
+  return result.stdout;
+}
+
+/**
+ * After HEAD moved from `fromSha` (commits made through a private index),
+ * move every shared-index entry the commits changed to the new HEAD — only
+ * where the shared entry still equals `fromSha`'s, so work another session
+ * staged there is never clobbered. Returns null when HEAD did not move.
+ */
+export function reconcileSharedIndex(
+  repoRoot: string,
+  fromSha: string | null,
+  sessionId: string
+): SharedIndexReconcileAudit | null {
+  const head = gitText(repoRoot, ['rev-parse', '--verify', '--quiet', 'HEAD']) || null;
+  if (!head || head === fromSha) return null;
+  const changes = fromSha
+    ? parseRawDiff(gitOrThrow(repoRoot, ['diff-tree', '-r', '-z', '--no-renames', fromSha, head]))
+    : new Map(
+        [...parseLsTree(gitOrThrow(repoRoot, ['ls-tree', '-r', '-z', head]))].map(
+          ([file, entry]) => [file, [null, entry] as [TreeEntry | null, TreeEntry | null]]
+        )
+      );
+  const shared = parseIndex(gitOrThrow(repoRoot, ['ls-files', '-s', '-z']));
+  const updated: string[] = [];
+  const skipped: string[] = [];
+  let input = '';
+  for (const [file, [before, after]] of changes) {
+    if (!sameEntry(shared.get(file), before)) {
+      skipped.push(file);
+      continue;
+    }
+    const zero = '0'.repeat((after ?? before)?.oid.length ?? 40);
+    input += after ? `${after.mode} ${after.oid}\t${file}\0` : `0 ${zero}\t${file}\0`;
+    updated.push(file);
+  }
+  if (input) gitOrThrow(repoRoot, ['update-index', '-z', '--index-info'], input);
+  return { sessionId, fromSha, toSha: head, updated, skipped };
+}
+
+function defaultReconcileAudit(entry: SharedIndexReconcileAudit): void {
+  auditChain.record({
+    agentId: 'session-git-index',
+    action: 'shared_index_reconcile',
+    operation: 'dispose',
+    result: 'completed',
+    reason: `HEAD moved from ${entry.fromSha ?? '(none)'} to ${entry.toSha} during session ${entry.sessionId}`,
+    metadata: { ...entry },
+  });
 }
 
 /**
@@ -132,7 +270,8 @@ export function prepareSessionGitIndex(
     const baselineSha = gitText(cwd, ['rev-parse', '--verify', '--quiet', 'HEAD']) || null;
 
     const dir = path.join(options.root ?? shared(GIT_INDEXES_ROOT_SUBPATH), sessionId);
-    const budget = checkWorkspaceBudget(dir, realIndexBytes(realIndex), {
+    const estimatedBytes = realIndexBytes(realIndex);
+    const budget = checkWorkspaceBudget(dir, estimatedBytes, {
       ...ledger,
       ...options.budget,
     });
@@ -143,37 +282,99 @@ export function prepareSessionGitIndex(
       return null;
     }
 
+    const probe = options.processProbe ?? {};
+    const pidStartedAt = (probe.startMarker ?? processStartMarker)(process.pid);
     const record = registerWorkspace(
       {
         path: dir,
         kind: 'git-index',
         owner: { ...(input.owner ?? {}), session_id: sessionId },
+        bytes: estimatedBytes,
+        pid: process.pid,
+        ...(pidStartedAt ? { pidStartedAt } : {}),
       },
       ledger
     );
     workspaceId = record.id;
     safeMkdir(record.path, { recursive: true });
     const indexPath = path.join(record.path, 'index');
-    seedIndex(repoRoot, realIndex, indexPath, baselineSha);
+    const resolvedRoot = path.resolve(repoRoot);
+    seedIndex(resolvedRoot, indexPath, baselineSha);
 
-    let disposed = false;
     const id = record.id;
+    const audit = options.audit ?? defaultReconcileAudit;
+    const childAlive = (pid: number): boolean =>
+      (probe.isPidAlive ?? isPidAlive)(pid) || (!probe.isPidAlive && isProcessGroupAlive(pid));
+    let reconciledSha = baselineSha;
+    let attachedChild: number | undefined;
+    let released: WorkspaceRecord | null = null;
+    let finished = false;
+
+    const reconcile = () => {
+      try {
+        const result = reconcileSharedIndex(resolvedRoot, reconciledSha, sessionId);
+        if (!result) return;
+        reconciledSha = result.toSha;
+        logger.warn(
+          `HEAD moved to ${result.toSha} during session ${sessionId}; shared index updated for ${result.updated.length} path(s), ${result.skipped.length} with other staged work left alone`
+        );
+        try {
+          audit(result);
+        } catch (error) {
+          logger.warn(`reconcile audit failed: ${errorText(error)}`);
+        }
+      } catch (error) {
+        logger.warn(`shared index reconcile failed for ${sessionId}: ${errorText(error)}`);
+      }
+    };
+
     return {
       sessionId,
-      repoRoot: path.resolve(repoRoot),
+      repoRoot: resolvedRoot,
       indexPath,
       baselineSha,
       workspaceId: id,
       env: { GIT_INDEX_FILE: indexPath },
-      dispose: () => {
-        if (disposed) return;
-        disposed = true;
+      attachChild: (pid) => {
+        if (pid === undefined || !Number.isInteger(pid) || pid <= 0) return;
+        attachedChild = pid;
         try {
-          releaseWorkspace(id, ledger);
-          deleteRegisteredWorkspace(id, ledger);
+          annotateWorkspace(id, { childPid: pid }, ledger);
         } catch (error) {
+          logger.warn(`could not record child ${pid} of ${sessionId}: ${errorText(error)}`);
+        }
+      },
+      dispose: (disposeOptions = {}) => {
+        if (finished) return;
+        reconcile();
+        try {
+          if (!released) {
+            released = releaseWorkspace(id, ledger, { bytes: realIndexBytes(indexPath) });
+            if (!released) {
+              finished = true;
+              return;
+            }
+          }
+          const childPid = disposeOptions.childPid ?? attachedChild;
+          if (childPid !== undefined && childAlive(childPid)) {
+            if (childPid !== attachedChild) annotateWorkspace(id, { childPid }, ledger);
+            logger.warn(
+              `child ${childPid} of ${sessionId} may still use ${indexPath}; kept for the janitor sweep`
+            );
+            return;
+          }
+          finished = true;
+          deleteRegisteredWorkspace(id, ledger, {
+            expect: {
+              live: released.live,
+              createdAt: released.createdAt,
+              releasedAt: released.releasedAt,
+            },
+          });
+        } catch (error) {
+          finished = true;
           logger.warn(
-            `dispose failed for ${sessionId}; the janitor sweep reclaims it: ${error instanceof Error ? error.message : String(error)}`
+            `dispose failed for ${sessionId}; the janitor sweep reclaims it: ${errorText(error)}`
           );
         }
       },

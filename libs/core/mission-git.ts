@@ -89,36 +89,57 @@ function assertMissionOwnerPath(action: string): void {
 /**
  * WS-03: commit what a worker session staged in its private index. Owner path
  * only. A private index is a full tree snapshot, so committing it after HEAD
- * moved would silently revert other sessions' commits — refuse instead.
+ * moved would silently revert other sessions' commits — refuse instead. The
+ * commit is built with write-tree + commit-tree and HEAD is advanced with a
+ * compare-and-swap `update-ref`, so a HEAD that moves between the check and
+ * the update still fails closed (commit hooks do not run on this path).
  */
 export function commitFromSessionIndex(
   idx: SessionGitIndex,
-  message: string
+  message: string,
+  testHooks: { beforeRefUpdate?: () => void } = {}
 ): SessionIndexCommitResult {
   assertSessionIndexCommitOwner();
   const cwd = idx.repoRoot;
   const head = safeExecResult('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], { cwd });
   const currentSha = head.status === 0 ? head.stdout.trim() || null : null;
-  if (currentSha !== idx.baselineSha) {
-    throw new Error(
-      `[SESSION_INDEX_STALE] HEAD moved from ${idx.baselineSha ?? '(none)'} to ${currentSha ?? '(none)'} since session ${idx.sessionId} started; re-stage on a fresh index instead`
+  const stale = (current: string | null) =>
+    new Error(
+      `[SESSION_INDEX_STALE] HEAD moved from ${idx.baselineSha ?? '(none)'} to ${current ?? '(none)'} since session ${idx.sessionId} started; re-stage on a fresh index instead`
     );
+  if (currentSha !== idx.baselineSha) throw stale(currentSha);
+  const tree = safeExec('git', ['write-tree'], { cwd, env: idx.env }).trim();
+  if (
+    currentSha &&
+    safeExec('git', ['rev-parse', `${currentSha}^{tree}`], { cwd }).trim() === tree
+  ) {
+    return { sha: null, paths: [] };
   }
-  const env = idx.env;
-  const staged = safeExec(
+  const sha = safeExec(
     'git',
-    ['diff', '--cached', '--name-only', '-z', ...(currentSha ? [currentSha] : []), '--'],
-    { cwd, env }
+    ['commit-tree', tree, ...(currentSha ? ['-p', currentSha] : []), '-m', message],
+    { cwd }
+  ).trim();
+  testHooks.beforeRefUpdate?.();
+  const subject = message.split('\n')[0];
+  const updated = safeExecResult(
+    'git',
+    ['update-ref', '-m', `commit: ${subject}`, 'HEAD', sha, currentSha ?? '0'.repeat(sha.length)],
+    { cwd }
+  );
+  if (updated.status !== 0) {
+    const moved = safeExecResult('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], { cwd });
+    throw stale(moved.status === 0 ? moved.stdout.trim() || null : null);
+  }
+  const paths = safeExec(
+    'git',
+    currentSha
+      ? ['diff-tree', '-r', '-z', '--no-renames', '--name-only', currentSha, sha]
+      : ['ls-tree', '-r', '-z', '--name-only', sha],
+    { cwd }
   )
     .split('\0')
     .filter(Boolean);
-  if (currentSha && staged.length === 0) return { sha: null, paths: [] };
-  safeExec('git', ['commit', '-q', '-m', message], { cwd, env });
-  const sha = getGitHash(cwd);
-  const paths =
-    staged.length > 0
-      ? staged
-      : safeExec('git', ['ls-files', '-z'], { cwd, env }).split('\0').filter(Boolean);
   // Bring the shared index in line with the new HEAD for the committed paths
   // only, leaving anything else staged there untouched.
   if (paths.length > 0) {

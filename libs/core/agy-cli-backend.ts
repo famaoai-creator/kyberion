@@ -14,8 +14,8 @@ import {
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import {
   buildDelegationSpawnEnv,
-  disposeOnChildExit,
   newDelegationSessionId,
+  spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -511,11 +511,12 @@ export class AgyCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
     const spawnEnv = this.buildSpawnEnv(options?.advisory ? 'planner' : undefined);
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -777,11 +778,12 @@ export class AgyCliBackend implements ReasoningBackend {
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const spawnEnv = this.buildSpawnEnv(profile);
-    const child = spawn(this.bin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv.env,
-    });
-    disposeOnChildExit(child, spawnEnv);
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(this.bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
 
     return withWallClockBudget(
       {

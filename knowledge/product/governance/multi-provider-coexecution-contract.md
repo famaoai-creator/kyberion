@@ -103,9 +103,11 @@ ad-hoc same-checkout collaboration; they are not mission-owner authority.
   Git writes.
 - Private git index (WS-01/02): every `implementer` provider CLI delegation
   is spawned through `buildDelegationSpawnEnv` with its own `GIT_INDEX_FILE`
-  (seeded from the real index, ledger-registered, deleted when the child
-  exits), so a worker's accidental `git add` never stages into the shared
-  index. `KYBERION_SESSION_GIT_INDEX=0` disables it. Only the mission owner
+  (seeded from HEAD, ledger-registered, deleted once the child and its
+  process group are gone), so a worker's accidental `git add` never stages
+  into the shared index. If a worker commits anyway, dispose moves the
+  shared index to the new HEAD for the committed paths so the owner's next
+  commit does not revert it. `KYBERION_SESSION_GIT_INDEX=0` disables it. Only the mission owner
   may commit a session index (`commitFromSessionIndex`), and only while HEAD
   still equals the index's baseline.
 - Session worktrees are owner-only: per-session `git worktree`s for parallel
