@@ -1,0 +1,186 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * TR-01: Chronos runs under SYSTEM_ROLE=chronos_mirror_v2, which cannot read
+ * the personal tier. The chronos-access token registry is read through the
+ * dedicated `chronos_token_registry_reader` role, whose only grant is that one
+ * file. These tests run the real secure-io / tier-guard / secret-guard stack
+ * against a hermetic KYBERION_ROOT that links the checked-in governance
+ * policies (knowledge/product) and holds its own personal tier.
+ */
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const ENV_KEYS = [
+  'KYBERION_ROOT',
+  'SYSTEM_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
+  'MISSION_ID',
+  'KYBERION_SECRET_ENCRYPTION',
+] as const;
+const REGISTRY_RELATIVE = 'knowledge/personal/connections/chronos-access.json';
+
+let root = '';
+const original: Record<string, string | undefined> = {};
+
+function runtimeToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString('hex');
+  return { token, hash: createHash('sha256').update(token).digest('hex') };
+}
+
+async function loadModules() {
+  vi.resetModules();
+  const authority = await import('./authority.js');
+  const registry = await import('./chronos-access-registry.js');
+  const tierGuard = await import('./tier-guard.js');
+  const secureIo = await import('./secure-io.js');
+  authority.resetRoleAssumptionPolicyCache();
+  return { authority, registry, tierGuard, secureIo };
+}
+
+describe('TR-01 chronos_token_registry_reader', () => {
+  let issued: { token: string; hash: string };
+
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-chronos-token-reader-'));
+    fs.writeFileSync(path.join(root, 'package.json'), '{"name":"hermetic"}\n');
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '# hermetic\n');
+    fs.mkdirSync(path.join(root, 'knowledge', 'personal', 'connections'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'knowledge', 'personal', 'tenants'), { recursive: true });
+    fs.symlinkSync(
+      path.join(REPO_ROOT, 'knowledge', 'product'),
+      path.join(root, 'knowledge', 'product')
+    );
+    issued = runtimeToken();
+    fs.writeFileSync(
+      path.join(root, REGISTRY_RELATIVE),
+      JSON.stringify({
+        tokens: [{ token_hash: issued.hash, role: 'readonly', tenant_slugs: ['acme-corp'] }],
+      })
+    );
+    fs.writeFileSync(
+      path.join(root, 'knowledge/personal/connections/other-service.json'),
+      '{"api":"placeholder"}\n'
+    );
+    fs.writeFileSync(path.join(root, 'knowledge/personal/tenants/acme-corp.json'), '{}\n');
+  });
+
+  afterAll(() => {
+    if (root) fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+    process.env.KYBERION_ROOT = root;
+    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    vi.resetModules();
+  });
+
+  it('cannot read the registry under the ambient chronos_mirror_v2 role', async () => {
+    const { registry } = await loadModules();
+    expect(() => registry.readChronosTokenRegistrations()).toThrow();
+  });
+
+  it('reads the registry under SYSTEM_ROLE=chronos_mirror_v2 through the reader role', async () => {
+    const { authority, registry } = await loadModules();
+    const registrations = authority.withExecutionContext(
+      registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+      () => registry.readChronosTokenRegistrations()
+    );
+    expect(registrations).not.toBeNull();
+    expect(registry.findChronosTokenRegistration(issued.token, registrations ?? [])).toMatchObject({
+      role: 'readonly',
+      tenant_slugs: ['acme-corp'],
+    });
+  });
+
+  it('may be assumed from Concierge and the surfaces that reach authn-providers', async () => {
+    const { authority, registry } = await loadModules();
+    for (const systemRole of [
+      'chronos_mirror_v2',
+      'concierge',
+      'computer_surface',
+      'presence_studio',
+    ]) {
+      expect(
+        authority.isRoleAssumptionAllowed(systemRole, registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE),
+        systemRole
+      ).toBe(true);
+    }
+    expect(
+      authority.isRoleAssumptionAllowed('slack_bridge', registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE)
+    ).toBe(false);
+  });
+
+  it('grants nothing beyond reading that single file', async () => {
+    const { authority, registry, tierGuard } = await loadModules();
+    const abs = (relative: string) => path.join(root, relative);
+    const verdicts = authority.withExecutionContext(
+      registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+      () => ({
+        persona: authority.resolveIdentityContext().persona,
+        readRegistry: tierGuard.validateReadPermission(abs(REGISTRY_RELATIVE)).allowed,
+        readOtherConnection: tierGuard.validateReadPermission(
+          abs('knowledge/personal/connections/other-service.json')
+        ).allowed,
+        readSibling: tierGuard.validateReadPermission(
+          abs('knowledge/personal/connections/chronos-access.json.bak')
+        ).allowed,
+        readTenant: tierGuard.validateReadPermission(
+          abs('knowledge/personal/tenants/acme-corp.json')
+        ).allowed,
+        readConfidential: tierGuard.validateReadPermission(
+          abs('knowledge/confidential/acme-corp/notes.md')
+        ).allowed,
+        writeRegistry: tierGuard.validateWritePermission(abs(REGISTRY_RELATIVE)).allowed,
+        writePersonal: tierGuard.validateWritePermission(abs('knowledge/personal/notes.md'))
+          .allowed,
+        writeChronosCoordination: tierGuard.validateWritePermission(
+          abs('active/shared/coordination/chronos/state.json')
+        ).allowed,
+        writeProduct: tierGuard.validateWritePermission(
+          abs('knowledge/product/governance/security-policy.json')
+        ).allowed,
+      })
+    );
+    expect(verdicts).toEqual({
+      persona: 'worker',
+      readRegistry: true,
+      readOtherConnection: false,
+      readSibling: false,
+      readTenant: false,
+      readConfidential: false,
+      writeRegistry: false,
+      writePersonal: false,
+      writeChronosCoordination: false,
+      writeProduct: false,
+    });
+  });
+
+  it('cannot store a registration through the governed writer', async () => {
+    const { authority, registry } = await loadModules();
+    expect(() =>
+      authority.withExecutionContext(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+        registry.issueChronosAccessToken({ role: 'readonly', tenantSlugs: ['acme-corp'] })
+      )
+    ).toThrow(/Sovereign Sanctuary: Access restricted/);
+    const stored = JSON.parse(fs.readFileSync(path.join(root, REGISTRY_RELATIVE), 'utf8')) as {
+      tokens: unknown[];
+    };
+    expect(stored.tokens).toHaveLength(1);
+  });
+});
