@@ -6,7 +6,7 @@
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '../../foundation/time.js';
-import { safeExistsSync, safeMkdir } from '../../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from '../../secure-io.js';
 import type { XlsxDesignProtocol } from '../types/xlsx-protocol.js';
 import { generateContentTypes } from './content-types.js';
 import { generateGlobalRels, generateWorkbookRels, generateSheetRels } from './rels.js';
@@ -14,7 +14,7 @@ import { generateStyles } from './styles.js';
 import { generateSharedStrings } from './shared-strings.js';
 import { generateWorkbook } from './workbook.js';
 import { generateWorksheet } from './worksheet.js';
-import { generateDrawing } from './drawing.js';
+import { generateDrawing, collectDrawingImageRels } from './drawing.js';
 import { generateTable } from './table.js';
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
@@ -150,12 +150,47 @@ export async function generateNativeXlsx(
       zip.addFile(sheetRelsPath, Buffer.from(generateSheetRels(sheetExtras), 'utf8'));
     }
 
-    // Drawing XML
+    // Drawing XML — plus image binaries + the drawing's .rels so that
+    // r:embed references inside <xdr:pic> actually resolve.
     if (drawingIdx > 0 && sheet.drawing) {
       zip.addFile(
         `xl/drawings/drawing${drawingIdx}.xml`,
         Buffer.from(generateDrawing(sheet.drawing, protocol.locale), 'utf8')
       );
+
+      const imageRels = collectDrawingImageRels(sheet.drawing);
+      if (imageRels.length > 0) {
+        const RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+        let rels = '';
+        let imageSeq = 0;
+        for (const { rId, element } of imageRels) {
+          imageSeq += 1;
+          const rawExt =
+            (element.imagePath && path.extname(element.imagePath).slice(1).toLowerCase()) || 'png';
+          const ext = ['png', 'jpg', 'jpeg'].includes(rawExt) ? rawExt : 'png';
+          const mediaName = `sheet${sheetIdx + 1}-img${imageSeq}.${ext}`;
+          let binary: Buffer | null = null;
+          if (element.imageData) {
+            binary = Buffer.from(element.imageData, 'base64');
+          } else if (element.imagePath && safeExistsSync(element.imagePath)) {
+            binary = safeReadFile(element.imagePath, { encoding: null }) as Buffer;
+          }
+          if (!binary) continue;
+          zip.addFile(`xl/media/${mediaName}`, binary);
+          rels += `  <Relationship Id="${rId}" Type="${RT}/image" Target="../media/${mediaName}"/>\n`;
+        }
+        if (rels) {
+          zip.addFile(
+            `xl/drawings/_rels/drawing${drawingIdx}.xml.rels`,
+            Buffer.from(
+              `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+                `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n` +
+                `${rels}</Relationships>`,
+              'utf8'
+            )
+          );
+        }
+      }
     }
 
     // Table XMLs

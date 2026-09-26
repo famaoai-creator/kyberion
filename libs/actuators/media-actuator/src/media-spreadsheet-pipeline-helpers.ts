@@ -13,6 +13,10 @@ import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-poli
 import { resolveMediaToneStyle } from '@agent/core/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
 import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
+import { hasStructured } from './media-structured-content.js';
+import { appendStructuredXlsxSections } from './media-structured-xlsx.js';
+import { columnNumberToLetter, inferPrimitiveCellType } from './media-structured-xlsx.js';
+export { columnNumberToLetter, inferPrimitiveCellType };
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
@@ -36,25 +40,6 @@ export interface MediaTrackerXlsxProtocol extends Omit<XlsxDesignProtocol, 'shee
     sheetRoles: unknown[];
     sheetSemantics: unknown[];
   };
-}
-
-export function columnNumberToLetter(input: number): string {
-  let n = Math.max(1, Math.floor(input));
-  let out = '';
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-}
-
-export function inferPrimitiveCellType(value: any): 'n' | 'b' | 'd' | 's' {
-  if (typeof value === 'number') return 'n';
-  if (typeof value === 'boolean') return 'b';
-  if (value instanceof Date) return 'd';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(value)) return 'd';
-  return 's';
 }
 
 export function buildSmartTableSheet(sheet: any, index: number): any {
@@ -151,9 +136,9 @@ export function normalizeXlsxDesignProtocol(protocol: any): XlsxDesignProtocol {
       return {
         id: String(sheet?.id || `sheet${index + 1}`),
         name: String(sheet?.name || `Sheet ${index + 1}`),
-        state: sheet?.state || 'visible',
+        state: sheet?.state,
         dimension: sheet?.dimension,
-        sheetView: sheet?.sheetView || {},
+        sheetView: sheet?.sheetView,
         columns: Array.isArray(sheet?.columns) ? sheet.columns : [],
         rows: Array.isArray(sheet?.rows) ? sheet.rows : [],
         mergeCells: Array.isArray(sheet?.mergeCells) ? sheet.mergeCells : [],
@@ -320,6 +305,28 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
           styleIndex,
         })),
       });
+    });
+
+    // Structured section blocks — the same typed fields a report/deck
+    // section carries land below the tracker grid: metrics → KPI row,
+    // table → native grid, steps → phase rows, columns → side-by-side
+    // blocks, checklist → ☐/☑ rows, quote → highlighted row. Sections
+    // without structured fields are skipped so plain tracker briefs keep
+    // their original shape.
+    const payloadSections = Array.isArray(brief.payload.sections) ? brief.payload.sections : [];
+    const structuredSections = payloadSections.filter((section: any) => hasStructured(section));
+    const drawingElements: any[] = [];
+    const sectionMergeCells: Array<{ ref: string }> = [];
+    appendStructuredXlsxSections(structuredSections, {
+      sheetRows,
+      sectionMergeCells,
+      drawingElements,
+      columns,
+      rows,
+      dataStartIndex,
+      styleMap,
+      layout,
+      rootDir,
     });
 
     const dataValidations = columns
@@ -984,6 +991,8 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
             width: widths[index] || Number(layout.default_column_width || 18),
           })),
           rows: sheetRows,
+          ...(drawingElements.length > 0 ? { drawing: { elements: drawingElements } } : {}),
+          ...(sectionMergeCells.length > 0 ? { mergeCells: sectionMergeCells } : {}),
           conditionalFormats,
           dataValidations,
         },

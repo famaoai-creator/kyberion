@@ -15,14 +15,18 @@ import { handleAction } from './index.js';
 
 const CANVAS = { w: 10, h: 5.625 };
 
-function loadZoneCatalog(): Record<string, any> {
+function loadZoneCatalogFile(): any {
   const raw = safeReadFile(
     pathResolver.knowledge(
       'public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json'
     ),
     { encoding: 'utf8' }
   ) as string;
-  return JSON.parse(raw).body_zones;
+  return JSON.parse(raw);
+}
+
+function loadZoneCatalog(): Record<string, any> {
+  return loadZoneCatalogFile().body_zones;
 }
 
 async function compileWithSemantic(semanticType: string, body: string[]): Promise<any> {
@@ -101,9 +105,18 @@ describe('zone catalog', () => {
       });
 
       it('respects the type ramp floor on every region', () => {
+        const typography = loadZoneCatalogFile().tokens?.typography || {};
+        const resolveSize = (value: unknown): unknown =>
+          typeof value === 'string' && value.startsWith('@typography.')
+            ? typography[value.slice('@typography.'.length)]
+            : value;
         for (const region of zone.regions) {
           if (region.font_size === undefined) continue;
-          expect(region.font_size, `${zoneKey}.${region.id} font size`).toBeGreaterThanOrEqual(10);
+          const resolved = resolveSize(region.font_size);
+          expect(typeof resolved, `${zoneKey}.${region.id} font size`).toBe('number');
+          expect(resolved as number, `${zoneKey}.${region.id} font size`).toBeGreaterThanOrEqual(
+            10
+          );
         }
       });
     });
