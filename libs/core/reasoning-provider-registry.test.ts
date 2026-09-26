@@ -59,6 +59,56 @@ describe('reasoning provider registry', () => {
     ).toBeNull();
   });
 
+  it('declares a cost_tier on every governed descriptor', () => {
+    const descriptors = listReasoningProviderDescriptors();
+    const missing = descriptors
+      .filter((descriptor) => descriptor.cost_tier !== 'free' && descriptor.cost_tier !== 'metered')
+      .map((descriptor) => descriptor.mode);
+    expect(missing).toEqual([]);
+  });
+
+  it('rejects a descriptor with an invalid cost_tier value', () => {
+    expect(
+      parseReasoningProviderDescriptor({
+        mode: 'stub',
+        provider: 'stub',
+        module: './reasoning-backend',
+        capabilities: {
+          reasoning: true,
+          structured_output: true,
+          abort: true,
+          session_continuity: false,
+          input_modalities: ['text'],
+        },
+        env_keys: [],
+        cost_tier: 'unlimited',
+      })
+    ).toBeNull();
+  });
+
+  it('accepts a descriptor with a valid cost_tier and without one (optional field)', () => {
+    const base = {
+      mode: 'stub' as const,
+      provider: 'stub',
+      module: './reasoning-backend',
+      capabilities: {
+        reasoning: true,
+        structured_output: true,
+        abort: true,
+        session_continuity: false,
+        input_modalities: ['text'],
+      },
+      env_keys: [],
+    };
+    expect(parseReasoningProviderDescriptor(base)?.cost_tier).toBeUndefined();
+    expect(parseReasoningProviderDescriptor({ ...base, cost_tier: 'free' })?.cost_tier).toBe(
+      'free'
+    );
+    expect(parseReasoningProviderDescriptor({ ...base, cost_tier: 'metered' })?.cost_tier).toBe(
+      'metered'
+    );
+  });
+
   it('passes an opaque bootstrap context to a registered factory', () => {
     const descriptor = getReasoningProviderDescriptor('stub');
     if (!descriptor) throw new Error('stub descriptor missing');

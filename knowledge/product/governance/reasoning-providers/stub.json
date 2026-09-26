@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": []
+      "env_keys": [],
+      "cost_tier": "free"
     }
   ]
 }

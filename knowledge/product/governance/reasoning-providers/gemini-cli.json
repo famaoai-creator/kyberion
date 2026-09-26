@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["GEMINI_CLI_BIN"]
+      "env_keys": ["GEMINI_CLI_BIN"],
+      "cost_tier": "free"
     }
   ]
 }

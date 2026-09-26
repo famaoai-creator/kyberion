@@ -12,7 +12,8 @@
         "session_continuity": true,
         "input_modalities": ["text"]
       },
-      "env_keys": ["GH_TOKEN"]
+      "env_keys": ["GH_TOKEN"],
+      "cost_tier": "free"
     }
   ]
 }

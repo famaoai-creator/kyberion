@@ -17,7 +17,8 @@
         "DEVIN_PERMISSION_MODE",
         "DEVIN_SANDBOX",
         "KYBERION_DEVIN_CLI_BIN"
-      ]
+      ],
+      "cost_tier": "free"
     }
   ]
 }

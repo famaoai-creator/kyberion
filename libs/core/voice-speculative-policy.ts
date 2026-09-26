@@ -8,6 +8,7 @@
 import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExecResult } from './secure-io.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js';
 
 export const SPECULATIVE_REPLY_ENV = 'KYBERION_VOICE_SPECULATIVE_REPLY';
 
@@ -40,32 +41,18 @@ export function detectVoicePowerSource(options: DetectPowerSourceOptions = {}): 
   return 'unknown';
 }
 
-// Local runtimes and subscription CLIs: a revoked speculation costs no per-request fee.
-const FREE_REASONING_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
-  'claude-cli',
-  'codex-cli',
-  'gemini-cli',
-  'agy-cli',
-  'grok-cli',
-  'copilot',
-  'cursor-cli',
-  'opencode-cli',
-  'devin-cli',
-  'local',
-  'ollama',
-  'vllm',
-  'lmstudio',
-  'llamacpp',
-  'mlx',
-  'localai',
-  'stub',
-]);
-
-/** Cost tier of a reasoning backend mode; unknown or API-key backends are metered. */
+/**
+ * Cost tier of a reasoning backend mode, sourced from the governed reasoning
+ * provider registry's `cost_tier` field (local runtimes and subscription
+ * CLIs are 'free'; per-token API backends are 'metered'). An unknown mode or
+ * a descriptor missing `cost_tier` fails closed as 'metered'.
+ */
 export function costTierForReasoningMode(
   mode: ReasoningBackendMode | string | null | undefined
 ): VoiceCostTier {
-  return mode && FREE_REASONING_MODES.has(mode as ReasoningBackendMode) ? 'free' : 'metered';
+  if (!mode) return 'metered';
+  const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
+  return descriptor?.cost_tier ?? 'metered';
 }
 
 export interface SpeculativeReplyPolicy {

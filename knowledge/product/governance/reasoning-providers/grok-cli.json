@@ -12,7 +12,8 @@
         "session_continuity": true,
         "input_modalities": ["text"]
       },
-      "env_keys": ["GROK_CLI", "GROK_VERSION"]
+      "env_keys": ["GROK_CLI", "GROK_VERSION"],
+      "cost_tier": "free"
     }
   ]
 }

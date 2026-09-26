@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
+      "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"],
+      "cost_tier": "metered"
     }
   ]
 }

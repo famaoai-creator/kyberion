@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["KYBERION_LOCAL_LLM_URL"]
+      "env_keys": ["KYBERION_LOCAL_LLM_URL"],
+      "cost_tier": "free"
     }
   ]
 }

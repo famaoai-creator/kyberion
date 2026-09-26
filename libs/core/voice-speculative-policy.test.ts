@@ -1,4 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { getReasoningProviderDescriptorMock } = vi.hoisted(() => ({
+  getReasoningProviderDescriptorMock: vi.fn(),
+}));
+
+vi.mock('./reasoning-provider-registry.js', () => ({
+  getReasoningProviderDescriptor: getReasoningProviderDescriptorMock,
+}));
+
+afterEach(() => {
+  getReasoningProviderDescriptorMock.mockClear();
+});
+
 import {
   costTierForReasoningMode,
   detectVoicePowerSource,
@@ -53,13 +66,29 @@ describe('detectVoicePowerSource', () => {
 });
 
 describe('costTierForReasoningMode', () => {
-  it('treats local and subscription CLI backends as free, everything else as metered', () => {
-    expect(costTierForReasoningMode('claude-cli')).toBe('free');
-    expect(costTierForReasoningMode('ollama')).toBe('free');
-    expect(costTierForReasoningMode('anthropic')).toBe('metered');
-    expect(costTierForReasoningMode('openrouter')).toBe('metered');
-    expect(costTierForReasoningMode(null)).toBe('metered');
+  it('reads cost_tier from the reasoning provider descriptor, not a hard-coded list', () => {
+    // claude-cli used to be hard-coded 'free'; the descriptor is now authoritative.
+    getReasoningProviderDescriptorMock.mockReturnValueOnce({ cost_tier: 'metered' });
+    expect(costTierForReasoningMode('claude-cli')).toBe('metered');
+    expect(getReasoningProviderDescriptorMock).toHaveBeenCalledWith('claude-cli');
+
+    // anthropic used to be hard-coded 'metered'; the descriptor is now authoritative.
+    getReasoningProviderDescriptorMock.mockReturnValueOnce({ cost_tier: 'free' });
+    expect(costTierForReasoningMode('anthropic')).toBe('free');
+  });
+
+  it('fails closed to metered when the descriptor has no cost_tier field', () => {
+    getReasoningProviderDescriptorMock.mockReturnValueOnce({});
+    expect(costTierForReasoningMode('some-mode')).toBe('metered');
+  });
+
+  it('fails closed to metered for an unknown mode or no mode at all', () => {
+    getReasoningProviderDescriptorMock.mockReturnValueOnce(undefined);
     expect(costTierForReasoningMode('something-new')).toBe('metered');
+    expect(costTierForReasoningMode(null)).toBe('metered');
+    expect(costTierForReasoningMode(undefined)).toBe('metered');
+    // null/undefined mode never even reaches the registry lookup.
+    expect(getReasoningProviderDescriptorMock).toHaveBeenCalledTimes(1);
   });
 });
 
