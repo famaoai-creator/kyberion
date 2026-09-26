@@ -15,6 +15,9 @@ import { describeImage as coreDescribeImage } from '@agent/core/image-descriptio
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { handleMarkElements } from './mark-elements.js';
+import { handleDescribeScreenDelta } from './screen-delta.js';
+import { handleBuildVideoBrief, handleFetchVideo } from './video-ops.js';
 import * as path from 'node:path';
 import {
   currentProcessArgv,
@@ -23,7 +26,7 @@ import {
 } from '@agent/core/cli-utils';
 
 /**
- * Vision-Actuator v1.3.0 [LEGACY COMPATIBILITY FACADE]
+ * Vision-Actuator v1.5.0 [LEGACY COMPATIBILITY FACADE]
  * Preserves legacy visual generation/capture entrypoints while the ecosystem
  * shifts generative workflows toward media-generation-actuator.
  */
@@ -148,6 +151,12 @@ async function executeSingleAction(input: any) {
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
   if (action === 'describe_image') return describeImage(params);
+  if (action === 'fetch_video') return handleFetchVideo(params);
+  if (action === 'build_video_brief') return handleBuildVideoBrief(params);
+  if (action === 'mark_elements') {
+    return { status: 'succeeded', ...(await handleMarkElements(params)) };
+  }
+  if (action === 'describe_screen_delta') return handleDescribeScreenDelta(params);
   if (!LEGACY_MEDIA_GENERATION_ACTIONS.has(action)) {
     throw new Error(
       `Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`

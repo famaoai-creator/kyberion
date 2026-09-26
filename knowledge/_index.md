@@ -157,6 +157,7 @@
 - [Token Management and Reasoning-Level Routing RFC](./product/architecture/token-management-rfc-2026-06-20.md) (public | Ecosystem Architect)
 - [Tool Runtime Abstraction](./product/architecture/tool-runtime-abstraction.md) (public | Unknown)
 - [Validation Scenarios](./product/architecture/validation-scenarios.md) (public | Ecosystem Architect)
+- [Visual Grounding and Video Ingest](./product/architecture/visual-grounding-and-video-ingest.md) (public | Unknown)
 - [Voice Generation Absorption Plan](./product/architecture/voice-generation-absorption-plan.md) (public | Ecosystem Architect)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./product/architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./product/architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
