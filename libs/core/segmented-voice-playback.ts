@@ -175,9 +175,12 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
       gate.pause();
       const handle = currentPlayback as Partial<PausablePlaybackHandle> | null;
       if (!handle) return;
-      if (typeof handle.pause === 'function') {
-        handle.pause();
-      } else if (!stoppedForPause && handle.stop) {
+      // pause() reports whether the player actually suspended (see
+      // audio-playback.ts); when it can't (e.g. no SIGSTOP support left, or
+      // it failed), fall back to stop-and-replay like a non-pausable player
+      // instead of assuming silence.
+      if (typeof handle.pause === 'function' && handle.pause()) return;
+      if (!stoppedForPause && handle.stop) {
         stoppedForPause = true;
         void handle.stop();
       }

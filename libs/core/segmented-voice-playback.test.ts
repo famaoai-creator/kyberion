@@ -205,6 +205,41 @@ describe('speakSegmented', () => {
     expect(result.metrics.segments_spoken).toBe(2);
   });
 
+  it('falls back to stop-and-replay when pause() reports failure (S11)', async () => {
+    const played: string[] = [];
+    const first = pendingHandle();
+    let stops = 0;
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      play: (audioPath) => {
+        played.push(audioPath);
+        if (played.length > 1) return immediateHandle();
+        return {
+          done: first.done,
+          // SIGSTOP failed to reach the child (e.g. a shell-wrapped custom
+          // command); pause() reports it instead of the caller assuming
+          // silence.
+          pause: () => false,
+          stop: () => {
+            stops += 1;
+            return first.stop();
+          },
+        };
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.pause?.();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(stops).toBe(1);
+
+    controller.resume?.();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/seg-0.wav', '/tmp/seg-0.wav', '/tmp/seg-1.wav']);
+  });
+
   it('pause() pauses a pausable handle in place and resume() continues it', async () => {
     const played: string[] = [];
     const calls: string[] = [];

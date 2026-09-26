@@ -723,7 +723,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 10603,
+      "size": 12094,
       "type": "md"
     },
     {
@@ -6291,7 +6291,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 992657,
+      "size": 993598,
       "type": "json"
     },
     {

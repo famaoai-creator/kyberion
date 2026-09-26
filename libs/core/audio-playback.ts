@@ -24,8 +24,18 @@ export interface PlaybackHandle {
    * same segment instead of restarting it. Present only when the platform
    * supports it (POSIX); absent on win32, where callers fall back to
    * stop-and-replay.
+   *
+   * Returns true when the process is now suspended (including if it already
+   * was), false when SIGSTOP could not be delivered — callers must not
+   * assume silence and should fall back to stop-and-replay in that case.
+   *
+   * SIGSTOP is delivered to the spawned child process only. A custom
+   * `command` that wraps the real player in a shell (e.g. `sh -c '...'`)
+   * suspends the shell, not any grandchild it spawned, so audio can keep
+   * playing — pause() reports success (the shell stopped) even though
+   * sound is not actually silenced in that case.
    */
-  pause?(): void;
+  pause?(): boolean;
   /** Resume a player suspended by pause() (SIGCONT on POSIX). */
   resume?(): void;
 }
@@ -121,7 +131,7 @@ export function resolveAudioPlaybackCommand(audioPath = '{file}'): string[] | nu
 /** True when `handle` exposes in-place pause()/resume() (see PlaybackHandle). */
 export function isPausablePlaybackHandle(
   handle: PlaybackHandle
-): handle is PlaybackHandle & { pause(): void; resume(): void } {
+): handle is PlaybackHandle & { pause(): boolean; resume(): void } {
   return typeof handle.pause === 'function' && typeof handle.resume === 'function';
 }
 
@@ -142,9 +152,21 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
     resolveDone = resolve;
   });
 
+  // Best-effort: registered only once a pause actually suspends the child, so
+  // a host process exiting while playback is stopped doesn't leave the
+  // player permanently stuck (it would otherwise never see SIGTERM/SIGKILL
+  // dispatched after node has already begun tearing down).
+  let exitHookInstalled = false;
+  const exitHook = (): void => {
+    if (!paused) return;
+    sendSignal('SIGCONT');
+    sendSignal('SIGKILL');
+  };
+
   const settle = (result: PlaybackResult): void => {
     if (settled) return;
     settled = true;
+    if (exitHookInstalled) process.off('exit', exitHook);
     resolveDone(result);
   };
 
@@ -206,8 +228,15 @@ export function playAudioFile(audioPath: string, opts: PlayAudioOptions = {}): P
   // equivalent, so callers keep the stop-and-replay fallback there.
   if (process.platform !== 'win32') {
     handle.pause = () => {
-      if (settled || paused) return;
-      if (sendSignal('SIGSTOP')) paused = true;
+      if (settled) return false;
+      if (paused) return true;
+      if (!sendSignal('SIGSTOP')) return false;
+      paused = true;
+      if (!exitHookInstalled) {
+        exitHookInstalled = true;
+        process.on('exit', exitHook);
+      }
+      return true;
     };
     handle.resume = () => {
       if (settled || !paused) return;

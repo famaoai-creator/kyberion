@@ -1,7 +1,7 @@
 ---
 title: Realtime voice conversation operations
 tags: [voice, realtime, conversation, model-selection, voice-profile, operations]
-last_updated: 2026-09-24
+last_updated: 2026-09-26
 ---
 
 # Realtime voice conversation operations
@@ -88,7 +88,14 @@ node dist/scripts/run_realtime_voice_conversation.js \
 SIGSTOP/SIGCONT でプレイヤー process をその場で止めて再開するため、再開時に
 今の文が最初から再生し直されることはない。win32、またはカスタム `play()` が
 pause/resume を実装していない場合のみ、停止して次の再開時に文を再生し直す
-フォールバックになる。
+フォールバックになる。`pause()` が SIGSTOP の送達失敗を報告した場合(既に
+終了した process など)も同じ停止・再生し直しフォールバックになり、無音が
+起きたと誤認しない。
+
+SIGSTOP は spawn した子 process 自身にしか届かない。カスタム `command` が
+`sh -c '...'` のようにシェル経由で実プレイヤーを起動している場合、止まるのは
+シェルだけで、シェルが起動した孫 process(実プレイヤー)は鳴り続ける ——
+シェルラップを挟むカスタムコマンドを使うときは注意すること。
 
 ## モデル・effort の変更
 
