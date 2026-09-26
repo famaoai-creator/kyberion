@@ -40,6 +40,7 @@ import {
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import {
@@ -996,7 +997,7 @@ export function probeShellClaudeCliAvailability(
   options: { bin?: string; timeoutMs?: number } = {}
 ): ShellClaudeCliAvailability {
   const explicitBin = options.bin?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim();
-  const bin = explicitBin || 'claude';
+  const bin = explicitBin || resolveProviderCliCommand('claude');
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   const primary = probeClaudeBinOnce(bin, env, timeoutMs);
@@ -1130,7 +1131,7 @@ export function buildShellClaudeCliBackendFromEnv(
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-claude-cli] backend unavailable (bin=${envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
+      `[shell-claude-cli] backend unavailable (bin=${envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || resolveProviderCliCommand('claude')}): ${availability.reason ?? 'failed health check'}. If the reason mentions "${CLAUDE_CLI_PLACEHOLDER_SIGNATURE}", run \`pnpm approve-builds\` (approve @anthropic-ai/claude-code) or set KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude.`
     );
     return null;
   }
