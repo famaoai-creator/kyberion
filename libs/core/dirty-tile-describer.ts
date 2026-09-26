@@ -8,7 +8,7 @@ import {
   type DescribeFn,
   type PayloadTier,
 } from './image-description-bridge.js';
-import { pathResolver } from './path-resolver.js';
+import { assertVolatileId, pathResolver } from './path-resolver.js';
 import { redactScreenCaptureFile } from './screen-frame-redaction.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -21,6 +21,10 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } fr
  * previous description. A per-call budget caps VLM calls; tiles over budget
  * are marked stale and described first on the next call. Every image goes
  * through screen redaction before any crop reaches the describer.
+ *
+ * Tile memory holds descriptions, so it is keyed by tier and, for non-public
+ * tiers, kept in the caller's mission-local state_dir: a public call never
+ * reads (or reuses) a confidential description.
  */
 
 export const DEFAULT_TILE_GRID = 4;
@@ -30,7 +34,7 @@ export const DEFAULT_MAX_DESCRIBE_PER_CALL = 16;
 export const REUSE_MAX_HAMMING = 5;
 /** Rough prompt+image token cost of describing one tile, for savings stats. */
 export const APPROX_TOKENS_PER_TILE = 256;
-const STATE_FILE = 'vision-tiles.json';
+const STATE_FILE_PREFIX = 'vision-tiles';
 const STATE_VERSION = 1;
 
 export interface TileGrid {
@@ -64,6 +68,11 @@ export interface DirtyTileDescriberDeps {
    * Non-public tiers must pass a mission-local dir so the vision channel accepts the crops.
    */
   work_dir?: string;
+  /**
+   * Parent for tile memory. Defaults to the session's volatile dir for public
+   * screens; required (mission-local) for non-public tiers.
+   */
+  state_dir?: string;
 }
 
 export type ScreenTileStatus = 'described' | 'reused' | 'stale';
@@ -158,8 +167,25 @@ function tileRects(image: { width: number; height: number }, grid: TileGrid) {
   return rects;
 }
 
-export function screenDeltaStatePath(sessionId: string): string {
-  return path.join(pathResolver.volatile('session', sessionId), STATE_FILE);
+function requireSessionId(sessionId: string): string {
+  try {
+    return assertVolatileId('session', sessionId);
+  } catch (error) {
+    throw new Error(`[SCREEN_DELTA_INVALID] ${(error as Error).message}`);
+  }
+}
+
+/** Tile memory of one session at one tier (a state_dir holds many sessions). */
+export function screenDeltaStatePath(
+  sessionId: string,
+  tier: PayloadTier = 'public',
+  stateDir?: string
+): string {
+  const id = requireSessionId(sessionId);
+  const file = `${STATE_FILE_PREFIX}.${tier}.json`;
+  return stateDir
+    ? path.join(stateDir, id, file)
+    : path.join(pathResolver.volatile('session', id), file);
 }
 
 function isTilesState(value: unknown): value is TilesState {
@@ -207,8 +233,16 @@ export async function describeScreenDelta(
   input: DescribeScreenDeltaInput,
   deps: DirtyTileDescriberDeps = {}
 ): Promise<ScreenDeltaResult> {
-  const sessionId = String(input.session_id || '').trim();
-  if (!sessionId) throw new Error('[SCREEN_DELTA_INVALID] session_id is required');
+  if (!String(input.session_id || '').trim()) {
+    throw new Error('[SCREEN_DELTA_INVALID] session_id is required');
+  }
+  const sessionId = requireSessionId(input.session_id);
+  const tier: PayloadTier = input.tier ?? 'public';
+  if (tier !== 'public' && (!deps.work_dir || !deps.state_dir)) {
+    throw new Error(
+      `[VISION_TIER_SCOPE] ${tier} screen delta needs a mission-local work_dir and state_dir`
+    );
+  }
   const budget = positiveInt(
     input.max_describe_per_call ?? DEFAULT_MAX_DESCRIBE_PER_CALL,
     'max_describe_per_call',
@@ -216,15 +250,14 @@ export async function describeScreenDelta(
   );
   const now = deps.now ?? Date.now;
   const describe =
-    deps.describe ??
-    createReasoningVisionDescribeFn({ tier: input.tier, tenant_slug: input.tenant_slug });
+    deps.describe ?? createReasoningVisionDescribeFn({ tier, tenant_slug: input.tenant_slug });
   const redact = deps.redact ?? redactScreenCaptureFile;
 
   const sourceBuffer = readImageBuffer(input.path);
   const source = await Jimp.read(sourceBuffer);
   const image = { width: source.bitmap.width, height: source.bitmap.height };
   const grid = resolveTileGrid(image, input);
-  const statePath = screenDeltaStatePath(sessionId);
+  const statePath = screenDeltaStatePath(sessionId, tier, deps.state_dir);
 
   const previous = loadState(statePath);
   const sameLayout =
@@ -348,6 +381,10 @@ export async function describeScreenDelta(
 }
 
 /** Drops a session's tile memory (e.g. when the observed window changes). */
-export function resetScreenDeltaState(sessionId: string): void {
-  safeRmSync(screenDeltaStatePath(sessionId), { force: true });
+export function resetScreenDeltaState(
+  sessionId: string,
+  tier: PayloadTier = 'public',
+  stateDir?: string
+): void {
+  safeRmSync(screenDeltaStatePath(sessionId, tier, stateDir), { force: true });
 }

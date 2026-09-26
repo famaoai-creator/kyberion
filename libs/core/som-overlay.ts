@@ -3,7 +3,7 @@ import { Jimp } from 'jimp';
 import { dhashRegion } from './image-dhash.js';
 import { redactScreenCaptureFile } from './screen-frame-redaction.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import type { SomImageSize, SomMark } from './set-of-marks.js';
+import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
 
 /**
  * Set-of-Marks overlay: numbered boxes drawn on a redacted copy of the
@@ -66,6 +66,11 @@ export interface RenderSomOverlayInput {
   output_path: string;
   /** SVG destination; defaults to output_path with an .svg extension. */
   svg_output_path?: string;
+  /**
+   * Directory for the transient raw/redacted work files; defaults to the
+   * output directory. Must be in the same scope as the screenshot.
+   */
+  work_dir?: string;
 }
 
 export interface RenderSomOverlayDeps {
@@ -224,7 +229,8 @@ export function buildSomSvg(
     const color = rgbHex(colorFor(mark.n));
     const badge = measureMarkLabel(mark.n, glyphScale);
     const origin = badgeOrigin(mark, badge, image);
-    const title = mark.label ? `<title>${escapeXml(mark.label)}</title>` : '';
+    const label = safeMarkLabel(mark.label);
+    const title = label ? `<title>${escapeXml(label)}</title>` : '';
     const ref = mark.ref ? ` data-ref="${escapeXml(mark.ref)}"` : '';
     lines.push(
       `  <g data-mark="${mark.n}"${ref}>${title}`,
@@ -256,8 +262,8 @@ export async function inspectSomImage(
 
 /**
  * Redacts the screenshot, then draws the marks on the redacted copy. The raw
- * pixels never reach output_path: the redaction work files sit next to it and
- * are removed before returning.
+ * pixels never reach output_path: the redaction work files sit in work_dir
+ * (default: next to output_path) and are removed before returning.
  */
 export async function renderSomOverlay(
   input: RenderSomOverlayInput,
@@ -269,10 +275,17 @@ export async function renderSomOverlay(
   const image = { width: sourceImage.bitmap.width, height: sourceImage.bitmap.height };
 
   const outputDir = path.dirname(input.output_path);
-  safeMkdir(outputDir, { recursive: true });
   const stem = path.basename(input.output_path, path.extname(input.output_path));
-  const rawPath = path.join(outputDir, `.${stem}.raw.png`);
-  const redactedPath = path.join(outputDir, `.${stem}.redacted.png`);
+  const svgPath = input.svg_output_path ?? path.join(outputDir, `${stem}.svg`);
+  const inputPath = path.resolve(input.image_path);
+  if ([input.output_path, svgPath].some((target) => path.resolve(target) === inputPath)) {
+    throw new Error('[SOM_OVERLAY_OUTPUT] overlay outputs must not overwrite the screenshot');
+  }
+  const workDir = input.work_dir ?? outputDir;
+  safeMkdir(outputDir, { recursive: true });
+  safeMkdir(workDir, { recursive: true });
+  const rawPath = path.join(workDir, `.${stem}.raw.png`);
+  const redactedPath = path.join(workDir, `.${stem}.redacted.png`);
   try {
     safeWriteFile(rawPath, source);
     await redact(rawPath, redactedPath);
@@ -287,7 +300,6 @@ export async function renderSomOverlay(
     safeRmSync(redactedPath, { force: true });
   }
 
-  const svgPath = input.svg_output_path ?? path.join(outputDir, `${stem}.svg`);
   safeWriteFile(svgPath, buildSomSvg(image, input.marks));
   return { annotated_path: input.output_path, svg_path: svgPath, image };
 }

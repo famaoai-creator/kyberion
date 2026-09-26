@@ -30604,37 +30604,20 @@
           "input_schema": {
             "type": "object",
             "properties": {
-              "extractStructure": {
-                "type": "boolean"
-              },
-              "extract_structure": {
-                "type": "boolean"
+              "path": {
+                "type": "string"
               },
               "kind": {
                 "type": "string"
               },
-              "language": {
+              "tier": {
+                "type": "string",
+                "enum": ["public", "confidential", "personal"]
+              },
+              "mission_id": {
                 "type": "string"
               },
-              "mode": {
-                "type": "string"
-              },
-              "path": {
-                "type": "string"
-              },
-              "providerPreference": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "provider_preference": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "purpose": {
+              "tenant_slug": {
                 "type": "string"
               }
             },
@@ -30813,6 +30796,34 @@
               "max_marks": {
                 "type": "integer",
                 "minimum": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["public", "confidential", "personal"]
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "dom_snapshot_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "display_origin": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
               }
             },
             "additionalProperties": false,

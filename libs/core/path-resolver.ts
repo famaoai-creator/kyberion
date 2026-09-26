@@ -329,6 +329,25 @@ export function assertMissionIdArgument(missionId: string): void {
   }
 }
 
+const VOLATILE_SESSION_ID = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9._])?$/;
+
+/**
+ * Strict id check for state keyed by a session or mission id. volatile()
+ * normalizes refs for backward compatibility, so `a/b` and `a-b` share a
+ * directory; callers keying sensitive state must validate and reject instead.
+ */
+export function assertVolatileId(kind: 'session' | 'mission', value: unknown): string {
+  const id = typeof value === 'string' ? value.trim() : '';
+  if (kind === 'mission') {
+    assertMissionIdArgument(id);
+    return id;
+  }
+  if (!VOLATILE_SESSION_ID.test(id) || id.includes('..')) {
+    throw new Error(`[path-resolver] invalid session id '${String(value)}'`);
+  }
+  return id;
+}
+
 function normalizePathSegment(value: string, fallback = 'shared') {
   return (
     String(value || '')
@@ -601,6 +620,7 @@ export const pathResolver = {
   skillDir,
   missionDir,
   assertMissionIdArgument,
+  assertVolatileId,
   projectWorkspaceDir,
   projectOsDir,
   projectStateDir,

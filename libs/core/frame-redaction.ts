@@ -46,6 +46,11 @@ function looksLikeSecretShape(value: string): boolean {
   );
 }
 
+/** True when redactFrame would black out an OCR line with this text. */
+export function isSensitiveScreenText(text: string): boolean {
+  return findPiiSpans(text).length > 0 || looksLikeSecretShape(text);
+}
+
 function fillOpaque(frame: RgbaFrame, region: RedactionRegion): void {
   const left = Math.max(0, Math.floor(region.x));
   const top = Math.max(0, Math.floor(region.y));

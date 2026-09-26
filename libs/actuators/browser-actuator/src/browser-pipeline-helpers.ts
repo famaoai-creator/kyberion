@@ -22,7 +22,7 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
-import { isMarkTarget, resolveBrowserMarkTarget } from './browser-mark-target.js';
+import * as browserMarks from './browser-mark-target.js';
 import { opControl } from './browser-control-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
@@ -523,6 +523,7 @@ async function opCapture(
         {
           ...ctx,
           last_snapshot: snapshot,
+          last_snapshot_id: browserMarks.browserSnapshotId(snapshot),
           last_capture: snapshot,
           ref_map: Object.fromEntries(
             snapshot.elements.map((element) => [element.ref, element.selector])
@@ -1160,10 +1161,12 @@ async function opApply(
       });
     case 'click_ref': {
       let ref = resolve(params.ref);
-      if (isMarkTarget(ref)) {
-        const target = await resolveBrowserMarkTarget(ref, {
+      if (browserMarks.isMarkTarget(ref)) {
+        const target = await browserMarks.resolveBrowserMarkTarget(ref, {
           params,
           sessionId: ctx.session_id || 'default',
+          currentSnapshotId: browserMarks.browserSnapshotId(ctx.last_snapshot),
+          captureScreen: () => page.screenshot(),
         });
         if (target.kind === 'point') {
           await retry(async () => {

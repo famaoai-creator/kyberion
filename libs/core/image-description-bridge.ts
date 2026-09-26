@@ -51,10 +51,22 @@ export class ImageDescriptionUnavailableError extends Error {
 export type PayloadTier = ReasoningPayloadScope['tier'];
 export type ReasoningBackendResolver = () => ReasoningBackend | Promise<ReasoningBackend>;
 
+/** An image copy that is safe to send off-machine, removed by dispose(). */
+export interface EgressImage {
+  path: string;
+  dispose: () => void;
+}
+
 export interface ReasoningVisionOptions {
   /** Declared tier of the image; raised (never lowered) to the tier implied by its path. */
   tier?: PayloadTier;
   tenant_slug?: string;
+  /**
+   * Turns the image into the copy that actually leaves the machine (e.g. a
+   * screen-redacted PNG). Runs after the vision channel is confirmed; a
+   * failure means nothing is sent.
+   */
+  prepare_egress_image?: (absolutePath: string) => Promise<EgressImage>;
   /** Defaults to the active reasoning backend. Injected in tests. */
   resolveBackend?: ReasoningBackendResolver;
 }
@@ -142,15 +154,35 @@ export class ReasoningVisionImageDescriptionProvider implements ImageDescription
         `[VISION_UNSUPPORTED_MEDIA_TYPE] cannot attach ${path.extname(absolutePath) || 'extensionless'} images`
       );
     }
-    const reply = await withReasoningPayloadScope(
-      {
-        tier: effectiveTier(absolutePath, this.options.tier),
-        ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
-        purpose: 'image description',
-      },
-      () => backend.promptWithImages!(prompt, [{ path: absolutePath, media_type: mediaType }])
-    );
-    return reply.trim();
+    const tier = effectiveTier(absolutePath, this.options.tier);
+    const prepared = this.options.prepare_egress_image
+      ? await this.options.prepare_egress_image(absolutePath)
+      : undefined;
+    try {
+      const attachment = prepared
+        ? {
+            path: prepared.path,
+            media_type: MEDIA_TYPES[path.extname(prepared.path).toLowerCase()],
+          }
+        : { path: absolutePath, media_type: mediaType };
+      if (!attachment.media_type) {
+        throw new Error('[VISION_UNSUPPORTED_MEDIA_TYPE] prepared egress image has no image type');
+      }
+      const reply = await withReasoningPayloadScope(
+        {
+          tier: prepared ? effectiveTier(prepared.path, tier) : tier,
+          ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
+          purpose: 'image description',
+        },
+        () =>
+          backend.promptWithImages!(prompt, [
+            { path: attachment.path, media_type: attachment.media_type },
+          ])
+      );
+      return reply.trim();
+    } finally {
+      prepared?.dispose();
+    }
   }
 
   async describe(request: ImageDescriptionRequest): Promise<ImageDescriptionResult> {

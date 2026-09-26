@@ -271,3 +271,42 @@ describe('candidatesFromDomSnapshot', () => {
     ]);
   });
 });
+
+describe('label redaction', () => {
+  const EMAIL = 'alice.smith@example.com';
+  const CARD = '4111 1111 1111 1111';
+
+  it.each([
+    ['an email', `Signed in as ${EMAIL}`],
+    ['a card number', `Card ${CARD}`],
+    ['a secret-shaped token', 'sk_live_9fA3kQ7zL2mX8pR4tV6wY1bN'],
+  ])('drops an OCR label containing %s but keeps its box', (_name, line) => {
+    const candidates = candidatesFromOcr(
+      {
+        status: 'succeeded',
+        provider: 'tesseract',
+        text: line,
+        confidence: 90,
+        elapsedMs: 1,
+        lines: [{ text: line, confidence: 90, boundingBox: { x: 1, y: 2, width: 30, height: 8 } }],
+      },
+      { width: 100, height: 100 }
+    );
+    expect(candidates).toEqual([
+      { box: { x: 1, y: 2, width: 30, height: 8 }, source: 'ocr', kind: 'text', score: 0.9 },
+    ]);
+  });
+
+  it('never lets a sensitive DOM or candidate label reach a mark', () => {
+    const dom = candidatesFromDomSnapshot([
+      { ref: '@e1', name: EMAIL, bbox: { x: 0, y: 0, width: 40, height: 10 } },
+    ]);
+    expect(dom[0]).not.toHaveProperty('label');
+    const marks = fuseSetOfMarks([
+      text(0, 50, 40, 10, `Pay with ${CARD}`),
+      { ...control(0, 100, 40, 10), label: 'Checkout' },
+    ]);
+    expect(marks.map((mark) => mark.label)).toEqual([undefined, 'Checkout']);
+    expect(JSON.stringify(marks)).not.toMatch(/4111 1111|example\.com/);
+  });
+});

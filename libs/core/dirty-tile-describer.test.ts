@@ -5,8 +5,10 @@ import {
   describeScreenDelta,
   resetScreenDeltaState,
   resolveTileGrid,
+  screenDeltaStatePath,
   type RedactFn,
 } from './dirty-tile-describer.js';
+import * as path from 'node:path';
 import {
   ImageDescriptionUnavailableError,
   createReasoningVisionDescribeFn,
@@ -224,6 +226,58 @@ describe('describeScreenDelta', () => {
   it('requires a session id', async () => {
     await expect(describeScreenDelta({ path: 'unused.png', session_id: ' ' })).rejects.toThrow(
       /session_id is required/
+    );
+  });
+});
+
+describe('tier-scoped tile memory', () => {
+  const scopeRoot = pathResolver.sharedTmp(`dirty-tile-scope-tests/${process.pid}`);
+  const missionDeps = {
+    work_dir: path.join(scopeRoot, 'mission', 'tmp', 'vision-tiles'),
+    state_dir: path.join(scopeRoot, 'mission', 'tmp', 'vision-state'),
+  };
+
+  afterEach(() => safeRmSync(scopeRoot, { recursive: true, force: true }));
+
+  it('refuses a non-public screen without mission-local work and state dirs', async () => {
+    const id = sessionId('tier-refuse');
+    const { describe: describeFn, seen } = recordingDescriber();
+    for (const deps of [{}, { work_dir: missionDeps.work_dir }]) {
+      await expect(
+        describeScreenDelta(
+          { path: await writeScreen('tier-refuse'), session_id: id, tier: 'confidential' },
+          { describe: describeFn, redact: blackoutRedact, ...deps }
+        )
+      ).rejects.toThrow('[VISION_TIER_SCOPE]');
+    }
+    expect(seen).toHaveLength(0);
+  });
+
+  it('never lets a public call reuse or read confidential descriptions', async () => {
+    const id = sessionId('tier-split');
+    const screen = await writeScreen('tier-split');
+    const { describe: describeFn, seen } = recordingDescriber();
+    const confidential = await describeScreenDelta(
+      { path: screen, session_id: id, tier: 'confidential', grid: 2 },
+      { describe: describeFn, redact: blackoutRedact, ...missionDeps }
+    );
+    expect(confidential.state_path).toBe(
+      path.join(missionDeps.state_dir, id, 'vision-tiles.confidential.json')
+    );
+    expect(safeExistsSync(screenDeltaStatePath(id))).toBe(false);
+
+    const publicCall = await describeScreenDelta(
+      { path: screen, session_id: id, grid: 2 },
+      { describe: describeFn, redact: blackoutRedact }
+    );
+    expect(publicCall.stats.tiles_described).toBe(4);
+    expect(seen).toHaveLength(8);
+    expect(publicCall.state_path).toBe(screenDeltaStatePath(id, 'public'));
+  });
+
+  it.each(['a/b', '../x'])('rejects session id %j', async (id) => {
+    await expect(describeScreenDelta({ path: 'unused.png', session_id: id })).rejects.toThrow(
+      /SCREEN_DELTA_INVALID.*invalid session id/
     );
   });
 });
