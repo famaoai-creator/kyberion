@@ -1533,7 +1533,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 51864,
+      "size": 53496,
       "type": "json"
     },
     {
@@ -1641,7 +1641,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 154300,
+      "size": 154477,
       "type": "json"
     },
     {
@@ -2775,13 +2775,13 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 3421,
+      "size": 4645,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 21766,
+      "size": 23906,
       "type": "json"
     },
     {
@@ -2793,7 +2793,7 @@
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 883,
+      "size": 934,
       "type": "json"
     },
     {
@@ -2955,7 +2955,19 @@
     {
       "path": "product/governance/model-registry/model-7861693a67726f6b2d342e36.json",
       "tier": "public",
-      "size": 665,
+      "size": 704,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-7861693a67726f6b2d342e37.json",
+      "tier": "public",
+      "size": 839,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-7861693a67726f6b2d342e372d6275696c642d66617374.json",
+      "tier": "public",
+      "size": 1084,
       "type": "json"
     },
     {
@@ -4965,7 +4977,7 @@
     {
       "path": "product/orchestration/browser-discovery-playbook.md",
       "tier": "public",
-      "size": 5405,
+      "size": 7022,
       "type": "md"
     },
     {
@@ -5055,7 +5067,7 @@
     {
       "path": "product/orchestration/data-ingestion-protocol.md",
       "tier": "public",
-      "size": 4889,
+      "size": 5842,
       "type": "md"
     },
     {
@@ -5619,7 +5631,7 @@
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 18676,
+      "size": 19318,
       "type": "json"
     },
     {

@@ -146,7 +146,7 @@ describe('reasoning-route-resolver', () => {
       env: { XAI_API_KEY: 'xai-test-key' },
     });
     expect(route.mode).toBe('grok-api');
-    expect(route.model).toBe('xai:grok-4.6');
+    expect(route.model).toBe('xai:grok-4.7');
     expect(route.capabilities).toEqual(expect.arrayContaining(['tools', 'vision']));
   });
 
@@ -209,7 +209,7 @@ describe('reasoning-route-resolver', () => {
       },
     });
     expect(route.mode).toBe('grok-api');
-    expect(route.model).toBe('xai:grok-4.6');
+    expect(route.model).toBe('xai:grok-4.7');
   });
 
   it('accepts the registered Grok Build model alias for the CLI route', () => {
