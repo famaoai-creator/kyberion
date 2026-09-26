@@ -28,6 +28,7 @@ import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { createLogger } from './logger.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
 
 const logger = createLogger('secure-io');
 const auditChain = auditChainModule.auditChain;
@@ -190,6 +191,16 @@ export function buildSafeExecEnv(
     if (value !== undefined) {
       safeEnv[key] = value;
     }
+  }
+
+  // RA-01: a child inherits the role/persona assumed by the caller's own
+  // execution scope, not whatever a concurrent async context last mirrored
+  // into the process-global env.
+  const scope = currentExecutionScope();
+  if (scope?.assumedRole) {
+    safeEnv.MISSION_ROLE = scope.assumedRole;
+    if (typeof scope.assumedPersona === 'string') safeEnv.KYBERION_PERSONA = scope.assumedPersona;
+    else if (scope.assumedPersona === null) delete safeEnv.KYBERION_PERSONA;
   }
 
   for (const [key, value] of Object.entries(extraEnv)) {
