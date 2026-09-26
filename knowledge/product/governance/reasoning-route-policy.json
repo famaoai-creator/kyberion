@@ -406,7 +406,7 @@
     },
     "grok-cli-default": {
       "mode": "grok-cli",
-      "model_ref": "xai:grok-4.6",
+      "model_ref": "xai:grok-4.7",
       "capabilities": ["text", "structured_output", "tools"]
     },
     "cursor-cli-default": {
@@ -425,7 +425,7 @@
     },
     "grok-api-default": {
       "mode": "grok-api",
-      "model_ref": "xai:grok-4.6",
+      "model_ref": "xai:grok-4.7",
       "capabilities": ["text", "structured_output", "tools", "vision"],
       "tools_enabled": true,
       "allowed_tools": ["read_file", "list_directory"]
