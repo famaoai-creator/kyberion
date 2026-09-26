@@ -199,6 +199,39 @@ describe('RA-01 scoped role assumption', () => {
   });
 });
 
+describe('S6 role normalization', () => {
+  const original: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+  });
+
+  it('normalizes the assumed role once for the scope, the env mirror and children', () => {
+    const seen = withExecutionContext(' Mission Controller ', () => ({
+      role: resolveRole(),
+      mirror: process.env.MISSION_ROLE,
+      child: buildExecutionEnv().MISSION_ROLE,
+      safeChild: buildSafeExecEnv().MISSION_ROLE,
+      persona: resolveExecutionPersona(),
+    }));
+    expect(seen).toEqual({
+      role: 'mission_controller',
+      mirror: 'mission_controller',
+      child: 'mission_controller',
+      safeChild: 'mission_controller',
+      persona: 'worker',
+    });
+  });
+});
+
 describe('RA-02 role assumption policy', () => {
   const original: Record<string, string | undefined> = {};
 
