@@ -14,7 +14,11 @@ import {
   type ScenarioEvidenceClass,
 } from './scenario-evidence-class.js';
 import type { ScenarioCheckResult } from './scenario-final-checks.js';
-import type { ScenarioSideEffectLog, ScenarioWarningRecord } from './scenario-side-effect-log.js';
+import {
+  scenarioWarningsDropped,
+  type ScenarioSideEffectLog,
+  type ScenarioWarningRecord,
+} from './scenario-side-effect-log.js';
 
 export type ScenarioRunStatus = 'pass' | 'fail' | 'skipped' | 'lane_skipped' | 'error';
 export type ScenarioTurnStatus = 'pass' | 'fail' | 'error';
@@ -62,6 +66,8 @@ export interface ScenarioReport {
   side_effects: ScenarioSideEffectSummary;
   /** Present only when the run produced warnings (e.g. `scope_lost`). */
   warnings?: ScenarioReportWarning[];
+  /** Present only when the warning cap (MAX_SCENARIO_WARNINGS) dropped records. */
+  warnings_dropped?: number;
   started_at: string;
   finished_at: string;
   /** Virtual-clock duration (deterministic). */
@@ -118,6 +124,7 @@ export interface BuildScenarioReportInput {
 
 export function buildScenarioReport(input: BuildScenarioReportInput): ScenarioReport {
   const warnings = input.log ? summarizeWarnings(input.log) : [];
+  const warningsDropped = input.log ? scenarioWarningsDropped(input.log) : 0;
   return {
     schema_version: SCENARIO_REPORT_SCHEMA_VERSION,
     scenario_id: input.def.id,
@@ -132,6 +139,7 @@ export function buildScenarioReport(input: BuildScenarioReportInput): ScenarioRe
     final_checks: input.finalChecks ?? [],
     side_effects: input.log ? summarizeSideEffects(input.log) : emptySideEffectSummary(),
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(warningsDropped > 0 ? { warnings_dropped: warningsDropped } : {}),
     started_at: new Date(input.startedAtMs).toISOString(),
     finished_at: new Date(input.finishedAtMs).toISOString(),
     duration_ms: input.finishedAtMs - input.startedAtMs,
@@ -176,6 +184,8 @@ export function renderScenarioReportMarkdown(report: ScenarioReport): string {
       `- warning ${warning.kind}: ${escapeCell(warning.op)} via ${warning.source} (${warning.count}x)`
     );
   }
+  if (report.warnings_dropped)
+    lines.push(`- warning cap reached: ${report.warnings_dropped} warning(s) dropped`);
   for (const turn of report.turns) {
     lines.push('', `## Turn ${turn.index} (${turn.kind}): ${turn.status}`);
     if (turn.error) lines.push('', `error: ${escapeCell(turn.error)}`);
