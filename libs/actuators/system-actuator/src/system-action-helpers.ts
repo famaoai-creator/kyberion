@@ -22,6 +22,7 @@ import {
 import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
+import { resolveSystemClickCoordinate } from './system-mark-target.js';
 
 export interface SystemPipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -77,6 +78,10 @@ export interface ComputerInteractionAction {
       | 'voice_input_toggle'
       | 'wait';
     coordinate?: { x: number; y: number };
+    /** `mark:<n>` from vision mark_elements; used only when coordinate is absent. */
+    target_mark?: string;
+    mark_session_id?: string;
+    marks_id?: string;
     text?: string;
     key?: string;
     dictation_keycode?: number;
@@ -703,6 +708,11 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     };
   }
 
+  const pointerTypes = ['left_click', 'double_click', 'right_click', 'mouse_move'];
+  const coordinate = pointerTypes.includes(interaction.type)
+    ? await resolveSystemClickCoordinate(interaction, input.session_id)
+    : interaction.coordinate;
+
   const steps: SystemPipelineStep[] = [];
   if (application && interaction.type !== 'wait' && interaction.type !== 'activate_application') {
     steps.push({
@@ -738,8 +748,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         type: 'apply',
         op: 'mouse_click',
         params: {
-          x: interaction.coordinate?.x || 0,
-          y: interaction.coordinate?.y || 0,
+          x: coordinate?.x || 0,
+          y: coordinate?.y || 0,
           button: 'left',
         },
       });
@@ -749,8 +759,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         type: 'apply',
         op: 'mouse_click',
         params: {
-          x: interaction.coordinate?.x || 0,
-          y: interaction.coordinate?.y || 0,
+          x: coordinate?.x || 0,
+          y: coordinate?.y || 0,
           button: 'left',
           click_count: 2,
         },
@@ -761,8 +771,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         type: 'apply',
         op: 'mouse_click',
         params: {
-          x: interaction.coordinate?.x || 0,
-          y: interaction.coordinate?.y || 0,
+          x: coordinate?.x || 0,
+          y: coordinate?.y || 0,
           button: 'right',
         },
       });
@@ -772,8 +782,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
         type: 'apply',
         op: 'mouse_move',
         params: {
-          x: interaction.coordinate?.x || 0,
-          y: interaction.coordinate?.y || 0,
+          x: coordinate?.x || 0,
+          y: coordinate?.y || 0,
         },
       });
       break;

@@ -961,6 +961,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/visual-grounding-and-video-ingest.md",
+      "tier": "public",
+      "size": 10585,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/voice-generation-absorption-plan.md",
       "tier": "public",
       "size": 3250,
@@ -1221,7 +1227,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 21883,
+      "size": 22015,
       "type": "json"
     },
     {
@@ -1629,7 +1635,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 153172,
+      "size": 153543,
       "type": "json"
     },
     {
@@ -3579,7 +3585,7 @@
     {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 443,
+      "size": 470,
       "type": "json"
     },
     {
@@ -3610,6 +3616,12 @@
       "path": "product/governance/seam-provider-selection/streaming-tts-bridge.json",
       "tier": "public",
       "size": 2779,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/ui-element-detector.json",
+      "tier": "public",
+      "size": 2706,
       "type": "json"
     },
     {
@@ -3699,7 +3711,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 19896,
+      "size": 20351,
       "type": "json"
     },
     {
@@ -4065,7 +4077,7 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 537,
+      "size": 551,
       "type": "json"
     },
     {
@@ -4195,6 +4207,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/yt_dlp.json",
+      "tier": "public",
+      "size": 3200,
+      "type": "json"
+    },
+    {
       "path": "product/governance/track-creation-policy.json",
       "tier": "public",
       "size": 10027,
@@ -4222,6 +4240,12 @@
       "path": "product/governance/video-composition-template-registry.json",
       "tier": "public",
       "size": 3018,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/video-ingest-policy.json",
+      "tier": "public",
+      "size": 1034,
       "type": "json"
     },
     {
@@ -4689,7 +4713,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1463315,
+      "size": 1474076,
       "type": "json"
     },
     {
@@ -5079,7 +5103,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19970,
+      "size": 20112,
       "type": "json"
     },
     {
@@ -8313,7 +8337,7 @@
     {
       "path": "product/schemas/computer-interaction.schema.json",
       "tier": "public",
-      "size": 6424,
+      "size": 6977,
       "type": "json"
     },
     {
@@ -11851,6 +11875,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/video-ingest-policy.schema.json",
+      "tier": "public",
+      "size": 1150,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/video-motion-patterns.schema.json",
       "tier": "public",
       "size": 3563,
@@ -11883,7 +11913,7 @@
     {
       "path": "product/schemas/vision-action.schema.json",
       "tier": "public",
-      "size": 1489,
+      "size": 1765,
       "type": "json"
     },
     {

@@ -1,0 +1,13 @@
+{
+  "$schema": "../schemas/video-ingest-policy.schema.json",
+  "version": "1.0.0",
+  "description": "MV-05 video ingest policy (libs/core/video-ingest). allowed_hosts lists the hosts (and their subdomains) a remote fetch may target; the URL host is also pre-judged by egress-policy.json. require_approval_for_remote gates every uncached remote fetch behind the risky-op approval gate. max_duration_sec / max_bytes bound what yt-dlp may download and what a local file may be; the remaining fields tune keyframe planning and the yt-dlp format selector (also passed to the metadata probe). Retention: downloaded source media is deleted from the cache entry after derivation unless the op sets keep_source; derived artifacts stay.",
+  "allowed_hosts": ["youtube.com", "youtu.be", "vimeo.com"],
+  "max_duration_sec": 7200,
+  "max_bytes": 1073741824,
+  "require_approval_for_remote": true,
+  "default_max_keyframes": 24,
+  "keyframe_interval_sec": 60,
+  "scene_threshold": 0.3,
+  "download_format": "bv*[height<=720]+ba/b[height<=720]/b"
+}

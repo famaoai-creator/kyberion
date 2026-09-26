@@ -3311,6 +3311,38 @@
       "types": "./dist/html-to-markdown.d.ts",
       "default": "./dist/html-to-markdown.js"
     },
+    "./image-dhash": {
+      "types": "./dist/image-dhash.d.ts",
+      "default": "./dist/image-dhash.js"
+    },
+    "./dirty-tile-describer": {
+      "types": "./dist/dirty-tile-describer.d.ts",
+      "default": "./dist/dirty-tile-describer.js"
+    },
+    "./video-ingest": {
+      "types": "./dist/video-ingest/index.d.ts",
+      "default": "./dist/video-ingest/index.js"
+    },
+    "./set-of-marks": {
+      "types": "./dist/set-of-marks.d.ts",
+      "default": "./dist/set-of-marks.js"
+    },
+    "./ui-element-detector": {
+      "types": "./dist/ui-element-detector.d.ts",
+      "default": "./dist/ui-element-detector.js"
+    },
+    "./som-overlay": {
+      "types": "./dist/som-overlay.d.ts",
+      "default": "./dist/som-overlay.js"
+    },
+    "./mark-target-resolver": {
+      "types": "./dist/mark-target-resolver.d.ts",
+      "default": "./dist/mark-target-resolver.js"
+    },
+    "./risky-op-approval-port": {
+      "types": "./dist/risky-op-approval-port.d.ts",
+      "default": "./dist/risky-op-approval-port.js"
+    },
     "./plugin-view-frame": {
       "types": "./dist/plugin-view-frame.d.ts",
       "default": "./dist/plugin-view-frame.js"

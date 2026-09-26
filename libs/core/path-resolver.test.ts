@@ -14,6 +14,8 @@ import {
   projectWorkspaceDir,
   findMissionPath,
   isSafeMissionManagementPath,
+  assertVolatileId,
+  volatile,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -148,5 +150,28 @@ describe('path-resolver portability helpers', () => {
         safeRmSync(missionPath, { recursive: true, force: true });
       }
     });
+  });
+});
+
+describe('assertVolatileId', () => {
+  it.each(['session-1', 'vision.s_2', 'A'])('accepts session id %j unchanged', (id) => {
+    expect(assertVolatileId('session', id)).toBe(id);
+  });
+
+  it.each(['', '..', 'a/b', 'a\\b', 'a..b', '-a', 'a-', '.hidden', 'a b', 'x'.repeat(129)])(
+    'rejects session id %j instead of normalizing it',
+    (id) => {
+      expect(() => assertVolatileId('session', id)).toThrow(/invalid session id/);
+    }
+  );
+
+  it('rejects ids that volatile() would collapse onto another id', () => {
+    expect(volatile('session', 'a/b')).toBe(volatile('session', 'a-b'));
+    expect(() => assertVolatileId('session', 'a/b')).toThrow(/invalid session id/);
+  });
+
+  it('validates mission ids with the mission id rule', () => {
+    expect(assertVolatileId('mission', 'MSN-A1')).toBe('MSN-A1');
+    expect(() => assertVolatileId('mission', '../MSN')).toThrow(/invalid mission id/);
   });
 });

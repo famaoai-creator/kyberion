@@ -69,7 +69,7 @@
       "path": "libs/actuators/browser-actuator",
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 2,
       "ops": ["computer_interaction", "pipeline"],
       "contract_schema": "knowledge/product/schemas/browser-automation-pipeline.schema.json",
@@ -335,7 +335,7 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "capability_count": 26,
       "ops": [
         "audit_verify",
@@ -404,9 +404,17 @@
       "path": "libs/actuators/vision-actuator",
       "d": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
       "s": "implemented",
-      "version": "1.4.0",
-      "capability_count": 3,
-      "ops": ["describe_image", "inspect_image", "ocr_image"],
+      "version": "1.5.0",
+      "capability_count": 7,
+      "ops": [
+        "build_video_brief",
+        "describe_image",
+        "describe_screen_delta",
+        "fetch_video",
+        "inspect_image",
+        "mark_elements",
+        "ocr_image"
+      ],
       "contract_schema": "knowledge/product/schemas/vision-action.schema.json",
       "prerequisites_summary": "-"
     },

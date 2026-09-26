@@ -1,6 +1,6 @@
 {
   "actuator_id": "vision-actuator",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
   "contract_schema": "knowledge/product/schemas/vision-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -18,6 +18,10 @@
   "capabilities": [
     { "op": "inspect_image", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "describe_image", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "describe_image", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "fetch_video", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "build_video_brief", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mark_elements", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "describe_screen_delta", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

@@ -46,6 +46,11 @@ function looksLikeSecretShape(value: string): boolean {
   );
 }
 
+/** True when redactFrame would black out an OCR line with this text. */
+export function isSensitiveScreenText(text: string): boolean {
+  return findPiiSpans(text).length > 0 || looksLikeSecretShape(text);
+}
+
 function fillOpaque(frame: RgbaFrame, region: RedactionRegion): void {
   const left = Math.max(0, Math.floor(region.x));
   const top = Math.max(0, Math.floor(region.y));
@@ -75,6 +80,35 @@ function mergeRegion(regions: RedactionRegion[], next: RedactionRegion): void {
     regions.push(next);
 }
 
+type OcrBox = NonNullable<NonNullable<OcrResult['lines']>[number]['boundingBox']>;
+type PixelBox = Omit<RedactionRegion, 'reason'>;
+
+/**
+ * Converts an OCR box into frame pixels. `normalized` boxes are 0..1 fractions
+ * of the frame; undeclared units mean pixels. Returns null for any other unit
+ * or a non-finite box so the caller fails closed.
+ */
+function toPixelBox(
+  box: OcrBox,
+  units: OcrResult['boundingBoxUnits'],
+  frame: { width: number; height: number }
+): PixelBox | null {
+  const values = [box.x, box.y, box.width, box.height];
+  if (!values.every((value) => typeof value === 'number' && Number.isFinite(value))) return null;
+  if (units === undefined || units === 'pixel') {
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }
+  if (units === 'normalized') {
+    return {
+      x: box.x * frame.width,
+      y: box.y * frame.height,
+      width: box.width * frame.width,
+      height: box.height * frame.height,
+    };
+  }
+  return null;
+}
+
 /**
  * Redact a frame using OCR only as a coordinate source. OCR text and raw
  * values are not returned. A failed OCR result withholds the frame.
@@ -91,6 +125,14 @@ export function redactFrame(input: {
       finding_count: 0,
       reason: input.ocr?.error || 'ocr_unavailable',
     };
+  const units = input.ocr.boundingBoxUnits;
+  if (units !== undefined && units !== 'pixel' && units !== 'normalized')
+    return {
+      status: 'withheld',
+      regions: [],
+      finding_count: 0,
+      reason: 'ocr_bounding_box_units_unknown',
+    };
   const frame: RgbaFrame = {
     width: input.frame.width,
     height: input.frame.height,
@@ -104,8 +146,11 @@ export function redactFrame(input: {
   const knownValues = (input.knownSensitiveText || []).filter((value) => value.length > 0);
   for (const value of knownValues) {
     const matchingLine = input.ocr.lines.find((line) => line.text.includes(value));
-    if (matchingLine?.boundingBox) {
-      mergeRegion(regions, { ...matchingLine.boundingBox, reason: 'known_sensitive_value' });
+    const box = matchingLine?.boundingBox
+      ? toPixelBox(matchingLine.boundingBox, units, input.frame)
+      : null;
+    if (box) {
+      mergeRegion(regions, { ...box, reason: 'known_sensitive_value' });
       findingCount += 1;
     } else {
       const region: RedactionRegion = {
@@ -126,7 +171,8 @@ export function redactFrame(input: {
     if (spans.length === 0 && !hasShape) continue;
     // A finding without coordinates cannot be safely redacted. Sending the
     // original frame would turn an OCR limitation into an exfiltration path.
-    if (!line.boundingBox) {
+    const box = line.boundingBox ? toPixelBox(line.boundingBox, units, input.frame) : null;
+    if (!box) {
       return {
         status: 'withheld',
         regions,
@@ -135,7 +181,7 @@ export function redactFrame(input: {
       };
     }
     const reason = hasShape ? 'high_entropy_shape' : 'pii';
-    mergeRegion(regions, { ...line.boundingBox, reason });
+    mergeRegion(regions, { ...box, reason });
     findingCount += Math.max(1, spans.length);
   }
   for (const region of regions) fillOpaque(frame, region);

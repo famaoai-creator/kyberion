@@ -276,6 +276,54 @@ export interface SafeReadTailResult {
  * `fs.readFileSync` (which would otherwise silently follow a symlink or
  * surface a confusing low-level error for a directory).
  */
+/** Upper bound for one `safeReadFileRange` window; larger reads must be chunked. */
+export const MAX_RANGE_READ_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Reads `length` bytes starting at `position` (fewer at end of file) with the
+ * same governance as a full read: repository-scoped, no symlinks, regular
+ * files only. Lets callers hash or scan large files in bounded chunks; one
+ * window is capped at MAX_RANGE_READ_BYTES.
+ */
+export function safeReadFileRange(filePath: string, position: number, length: number): Buffer {
+  if (!Number.isInteger(position) || position < 0) {
+    throw new Error(`Invalid position for range read: ${position}`);
+  }
+  if (!Number.isInteger(length) || length <= 0) {
+    throw new Error(`Invalid length for range read: ${length}`);
+  }
+  if (length > MAX_RANGE_READ_BYTES) {
+    throw new Error(
+      `Range read length ${length} exceeds the ${MAX_RANGE_READ_BYTES}-byte window limit`
+    );
+  }
+  const resolved = assertReadableRepositoryFile(filePath, 'range');
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`File not found: ${resolved}`);
+  }
+  if (fs.lstatSync(resolved).isSymbolicLink()) {
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
+  }
+  const fd = fs.openSync(resolved, 'r');
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new Error(`Not a regular file: ${resolved}`);
+    }
+    const readLength = Math.max(0, Math.min(length, stat.size - position));
+    const buffer = Buffer.alloc(readLength);
+    let offset = 0;
+    while (offset < readLength) {
+      const read = fs.readSync(fd, buffer, offset, readLength - offset, position + offset);
+      if (read <= 0) break;
+      offset += read;
+    }
+    return offset === readLength ? buffer : buffer.subarray(0, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTailResult {
   if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
     throw new Error(`Invalid maxBytes for tail read: ${maxBytes}`);
@@ -1212,6 +1260,57 @@ export function safeLstat(filePath: string): fs.Stats {
     );
   }
   return fs.lstatSync(resolved);
+}
+
+/** True when an entry exists at p (a dangling symlink counts); throws on ELOOP and the like. */
+function entryExists(p: string): boolean {
+  try {
+    fs.lstatSync(p);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return false;
+    throw error;
+  }
+}
+
+/**
+ * Canonical path with every symlink resolved, including symlinked parent
+ * directories. A missing tail is resolved through its nearest existing
+ * ancestor, so classification of a not-yet-written path still sees the real
+ * parent. Fails closed: a symlink component that does not resolve (dangling,
+ * looping) and a canonical path outside the repository both throw. Like
+ * safeExistsSync it reveals no content, so only the sensitive-path deny list
+ * applies (to the input and to the canonical path).
+ */
+export function safeRealpath(filePath: string): string {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
+  const resolved = path.resolve(pathResolver.resolve(filePath));
+  const missing: string[] = [];
+  let existing = resolved;
+  let real: string;
+  try {
+    while (!entryExists(existing)) {
+      const parent = path.dirname(existing);
+      if (parent === existing) break;
+      missing.unshift(path.basename(existing));
+      existing = parent;
+    }
+    real = fs.realpathSync.native(existing);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+    throw new Error(
+      `[PATH_UNRESOLVABLE] ${filePath} has a component that does not resolve (${code})`
+    );
+  }
+  const canonical = path.join(real, ...missing);
+  const root = fs.realpathSync.native(pathResolver.rootDir());
+  const relative = path.relative(root, canonical);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`[PATH_OUTSIDE_REPOSITORY] ${filePath} resolves outside the repository`);
+  }
+  assertSensitivePathAllowed(canonical, 'read', isSensitivePathMediated());
+  return canonical;
 }
 
 /**

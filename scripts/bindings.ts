@@ -40,6 +40,7 @@ import '../libs/core/src/actuator-capability.js';
 import '../libs/core/surface-interaction-model.js';
 import '../libs/core/task-plan-coordinator-port.js';
 import '../libs/core/task-session.js';
+import '../libs/core/ui-element-detector.js';
 import '../libs/core/virtual-camera-bridge.js';
 import '../libs/core/voice-bridge.js';
 import '../libs/core/vad-registry.js';

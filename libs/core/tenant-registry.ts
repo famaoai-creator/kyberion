@@ -222,7 +222,8 @@ function resolveTenantKnowledgeRootPath(
   tenantSlug: string,
   knowledgeRoot: string
 ): string {
-  const normalized = knowledgeRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+  let normalized = knowledgeRoot.replace(/\\/g, '/');
+  while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
   const expectedPrefix = `knowledge/confidential/${tenantSlug}`;
   if (normalized !== expectedPrefix && !normalized.startsWith(`${expectedPrefix}/`)) {
     throw new Error(
@@ -255,7 +256,8 @@ function resolveTenantKnowledgeRootPath(
 
 /** Underlying failure text, without its trailing period, so a suffix reads as one sentence. */
 function describeCause(error: unknown): string {
-  return String((error as Error)?.message ?? error).replace(/\s*\.\s*$/, '');
+  const text = String((error as Error)?.message ?? error).trimEnd();
+  return text.endsWith('.') ? text.slice(0, -1).trimEnd() : text;
 }
 
 /**

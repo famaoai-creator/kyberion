@@ -126,6 +126,19 @@
           },
           "required": ["x", "y"]
         },
+        "target_mark": {
+          "type": "string",
+          "pattern": "^mark:[0-9]{1,4}$",
+          "description": "Set-of-Marks target from vision mark_elements; resolved to a coordinate only when coordinate is absent."
+        },
+        "mark_session_id": {
+          "type": "string",
+          "description": "Session whose marks resolve target_mark (defaults to session_id)."
+        },
+        "marks_id": {
+          "type": "string",
+          "description": "Refuse the click unless the session's current marks carry this id."
+        },
         "to_coordinate": {
           "type": "object",
           "additionalProperties": false,

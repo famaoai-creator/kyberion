@@ -14,6 +14,8 @@ export type OcrDataTier = 'public' | 'confidential' | 'personal';
  */
 export type OcrDataEgress = 'none' | 'loopback' | 'external';
 
+export type OcrBoundingBoxUnits = 'pixel' | 'normalized';
+
 export interface OcrRequest {
   path: string;
   language?: string;
@@ -53,6 +55,11 @@ export interface OcrResult {
   confidence: number;
   lines?: OcrTextLine[];
   structuredData?: any;
+  /**
+   * Units of `lines[].boundingBox`: image pixels, or 0..1 fractions of the
+   * image size (top-left origin). Undeclared means pixels.
+   */
+  boundingBoxUnits?: OcrBoundingBoxUnits;
   error?: string;
   elapsedMs: number;
   /** Egress of the provider that served this result, so callers can assert it. */

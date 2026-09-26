@@ -11,11 +11,14 @@ import {
 import { executeServicePreset } from '@agent/core/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ocrImage as coreOcrImage } from '@agent/core/ocr-bridge';
-import { describeImage as coreDescribeImage } from '@agent/core/image-description-bridge';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
 import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
+import { handleDescribeImage } from './describe-image.js';
+import { handleMarkElements } from './mark-elements.js';
+import { handleDescribeScreenDelta } from './screen-delta.js';
+import { handleBuildVideoBrief, handleFetchVideo } from './video-ops.js';
 import * as path from 'node:path';
 import {
   currentProcessArgv,
@@ -24,7 +27,7 @@ import {
 } from '@agent/core/cli-utils';
 
 /**
- * Vision-Actuator v1.3.0 [LEGACY COMPATIBILITY FACADE]
+ * Vision-Actuator v1.5.0 [LEGACY COMPATIBILITY FACADE]
  * Preserves legacy visual generation/capture entrypoints while the ecosystem
  * shifts generative workflows toward media-generation-actuator.
  */
@@ -134,28 +137,18 @@ async function ocrImage(params: any) {
   };
 }
 
-async function describeImage(params: any) {
-  const logicalPath = String(params.path || '');
-  if (!logicalPath) throw new Error('describe_image requires params.path');
-  resolveVisionRepositoryPath(logicalPath);
-  const result = await coreDescribeImage({
-    path: logicalPath,
-    kind: params.kind,
-  });
-  return {
-    status: result.status,
-    path: logicalPath,
-    description: result.description,
-    provider: result.provider,
-  };
-}
-
 async function executeSingleAction(input: any) {
   const action = input.action;
   const params = input.params || {};
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
-  if (action === 'describe_image') return describeImage(params);
+  if (action === 'describe_image') return handleDescribeImage(params);
+  if (action === 'fetch_video') return handleFetchVideo(params);
+  if (action === 'build_video_brief') return handleBuildVideoBrief(params);
+  if (action === 'mark_elements') {
+    return { status: 'succeeded', ...(await handleMarkElements(params)) };
+  }
+  if (action === 'describe_screen_delta') return handleDescribeScreenDelta(params);
   if (!LEGACY_MEDIA_GENERATION_ACTIONS.has(action)) {
     throw new Error(
       `Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`
