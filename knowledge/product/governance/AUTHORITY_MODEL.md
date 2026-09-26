@@ -78,6 +78,29 @@ Kyberion 自体のメンテナンス。
 
 Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
 
+### B2. ロールの解決順序とロール引き受けポリシー (RA-01 / RA-02)
+
+`resolveRole()`（`libs/core/authority.ts`）は次の順で現在の Authority Role を決めます。secure-io / tier-guard の認可判定は `resolveIdentityContext()` 経由でこの結果を使います。
+
+1. **プロセス内で引き受けたロール** — `withExecutionContext` / `withExecutionContextAsync` が `AsyncLocalStorage`（`libs/core/foundation/execution-scope.ts`）に載せたロール。非同期コンテキストごとに独立し、`await` をまたいでも入れ子でも正しく戻ります。**プロセス内でしか設定できず、親プロセスから継承した環境変数からは決して来ません。**
+2. `SYSTEM_ROLE` — `scripts/surface_runtime.ts` が各サーフェスを `SYSTEM_ROLE=<surface id の - を _ にしたもの>`（例: Chronos → `chronos_mirror_v2`）で起動し、`pnpm surfaces` / `pnpm config-mission` も自身に設定します。
+3. `MISSION_ROLE`
+4. `process.argv[1]` のファイル名からの推定
+
+Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受けで決まった Persona が `KYBERION_PERSONA` より優先されます。
+
+互換性のため、`withExecutionContext*` は従来どおり `MISSION_ROLE` / `KYBERION_PERSONA` 環境変数も設定・復元し、子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。ただし**正しさは環境変数に依存しません**: 環境変数はプロセス全体で 1 つなので、1 つのサーバープロセス内で並行するリクエストの間で競合します。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
+
+以前は `SYSTEM_ROLE` が `MISSION_ROLE` より優先されていたため、surface_runtime から起動されたサーフェスでは `withExecutionContext` によるロール引き受けがすべて黙って無視されていました（例: Chronos の `chronos_localadmin` によるテナントレジストリ読み取りやプラグイン承認）。
+
+**ロール引き受けポリシー（多層防御）**: `SYSTEM_ROLE` が設定されたプロセスが引き受けられるのは、次のいずれかのロールだけです。それ以外を引き受けようとすると、`fn` を実行する前に `[ROLE_ASSUMPTION_DENIED]` で失敗します。
+
+- `SYSTEM_ROLE` 自身（常に許可）
+- [`role-assumption-policy.json`](./role-assumption-policy.json) の `shared_core_roles`（`libs/core` が呼び出し元の代わりに内部で引き受けるロール）
+- 同ファイルの `system_roles.<system role>.may_assume`
+
+`system_roles` に載っていない `SYSTEM_ROLE` は自分自身しか引き受けられません。ポリシーファイルがない、または壊れている場合も同じです（fail closed）。`SYSTEM_ROLE` のないプロセスの挙動は変わりません。一覧は、各サーフェスのエントリポイントから静的に到達できる `withExecutionContext*` 呼び出し（ロールのリテラル引数と、governed artifact 用のロールラッパー）から導出しています。新しいサーフェスを追加したり、サーフェスから到達するコードで新しいロールを引き受けたりする場合は、このポリシーを更新してください（`libs/core/authority-role-assumption.test.ts` が、起動対象の全サーフェスにエントリがあることを検査します）。
+
 ### C. Authority (特権)
 
 特定の物理操作に対して与えられる、時間制限付きの「鍵」です。

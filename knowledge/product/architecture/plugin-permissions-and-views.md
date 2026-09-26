@@ -256,7 +256,11 @@ exercises all of this together: governed third-party install and approval in a
 hermetic root, the Chronos production build with the host enabled for one
 tenant, and Playwright Chromium through the iframe view, the host confirmation,
 one agent action and one approved human action (executed once, the second
-execution refused). See `plugins/README.md`.
+execution refused) — both with Chronos started directly and with the
+surface_runtime environment (`SYSTEM_ROLE=chronos_mirror_v2`), where the
+host's role assumptions depend on the RA-01 scoped role resolution (see
+[AUTHORITY_MODEL §3.B2](../governance/AUTHORITY_MODEL.md)). See
+`plugins/README.md`.
 
 Limits: reloads keep the previous module in memory until the process exits;
 the host is still cooperative enforcement (§4), so enable it only where you
