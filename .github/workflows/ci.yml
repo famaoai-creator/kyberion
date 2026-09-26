@@ -134,7 +134,9 @@ jobs:
 
       # PE-02: the Chronos plugin host, a sandboxed-iframe plugin view and an
       # approved human action end to end in Chromium, against a hermetic root
-      # under active/shared/tmp/ (reuses this job's build and Chromium; ~15 s).
+      # under active/shared/tmp/ (reuses this job's build and Chromium). RA-03:
+      # runs twice by default — Chronos started directly and with the
+      # surface_runtime env (SYSTEM_ROLE=chronos_mirror_v2) — ~11 s each, ~25 s.
       - name: Plugin views E2E
         timeout-minutes: 5
         run: pnpm kyberion check plugin-views-e2e
