@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   MarkTargetResolution,
@@ -43,15 +44,15 @@ const { handleSystemAction } = await import('./system-action-helpers.js');
 
 const RESOLVED: MarkTargetResolution = { n: 2, marks_id: 'm1', x: 225, y: 110 };
 const SCREEN = '00ff00ff00ff00ff';
-const capturePath = pathResolver.sharedTmp(`system-mark-target-tests/${process.pid}.png`);
+const CHECK_DIR = pathResolver.sharedTmp('mark-target-checks');
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.resolveMarkTarget.mockResolvedValue(RESOLVED);
   mocks.loadMarks.mockReturnValue(undefined);
-  mocks.captureScreenshot.mockImplementation(async () => {
-    safeWriteFile(capturePath, 'png');
-    return { save_path: capturePath };
+  mocks.captureScreenshot.mockImplementation(async (request: { save_path: string }) => {
+    safeWriteFile(request.save_path, 'png');
+    return { save_path: request.save_path };
   });
   mocks.dhashFile.mockResolvedValue(SCREEN);
 });
@@ -91,22 +92,45 @@ describe('resolveSystemClickCoordinate', () => {
 });
 
 describe('current screen verification', () => {
-  it('hashes a fresh capture of the marked display and deletes the capture', async () => {
+  it('hashes a fresh capture of the marked display at a unique path and deletes it', async () => {
     mocks.loadMarks.mockReturnValue({ display: { index: 0 } });
     await resolveSystemClickCoordinate({ target_mark: 'mark:2' }, 'vision-session');
-    expect(mocks.captureScreenshot).toHaveBeenCalledWith({ display_index: 0 });
-    expect(mocks.dhashFile).toHaveBeenCalledWith(capturePath);
-    expect(safeExistsSync(capturePath)).toBe(false);
+    await resolveSystemClickCoordinate({ target_mark: 'mark:2' }, 'vision-session');
+    const [first, second] = mocks.captureScreenshot.mock.calls.map(
+      ([request]) => (request as { save_path: string }).save_path
+    );
+    expect(mocks.captureScreenshot).toHaveBeenCalledWith({ save_path: first, display_index: 0 });
+    expect(path.dirname(first)).toBe(CHECK_DIR);
+    expect(first).not.toBe(second);
+    expect(mocks.dhashFile).toHaveBeenCalledWith(first);
+    expect(safeExistsSync(first)).toBe(false);
     expect(mocks.resolveMarkTarget.mock.calls[0][1].current_dhash).toBe(SCREEN);
   });
 
-  it('uses a caller-provided current_dhash without capturing', async () => {
+  it('never trusts a caller-supplied hash: an echoed stale image_dhash still gets a fresh capture', async () => {
+    const staleEcho = 'abcdabcdabcdabcd';
     await resolveSystemClickCoordinate(
-      { target_mark: 'mark:2', current_dhash: 'abcdabcdabcdabcd' },
+      { target_mark: 'mark:2', current_dhash: staleEcho } as Parameters<
+        typeof resolveSystemClickCoordinate
+      >[0],
       'vision-session'
     );
-    expect(mocks.captureScreenshot).not.toHaveBeenCalled();
-    expect(mocks.resolveMarkTarget.mock.calls[0][1].current_dhash).toBe('abcdabcdabcdabcd');
+    expect(mocks.captureScreenshot).toHaveBeenCalledTimes(1);
+    expect(mocks.resolveMarkTarget.mock.calls[0][1].current_dhash).toBe(SCREEN);
+  });
+
+  it('deletes the capture when the bridge throws after writing it', async () => {
+    let written = '';
+    mocks.captureScreenshot.mockImplementationOnce(async (request: { save_path: string }) => {
+      written = request.save_path;
+      safeWriteFile(written, 'png');
+      throw new Error('post-capture failure');
+    });
+    await expect(
+      resolveSystemClickCoordinate({ target_mark: 'mark:2' }, 'vision-session')
+    ).rejects.toThrow(/^\[MARK_STALE\]/);
+    expect(written).not.toBe('');
+    expect(safeExistsSync(written)).toBe(false);
   });
 
   it('refuses a mark without any session before capturing the screen', async () => {

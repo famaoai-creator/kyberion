@@ -309,4 +309,24 @@ describe('label redaction', () => {
     expect(marks.map((mark) => mark.label)).toEqual([undefined, 'Checkout']);
     expect(JSON.stringify(marks)).not.toMatch(/4111 1111|example\.com/);
   });
+
+  it('drops labels of editable DOM fields regardless of content, including absorbed OCR text', () => {
+    const dom = candidatesFromDomSnapshot([
+      { ref: '@e1', tag: 'INPUT', name: 'hunter2', bbox: { x: 0, y: 0, width: 80, height: 20 } },
+      { ref: '@e2', tag: 'textarea', text: 'draft', bbox: { x: 0, y: 40, width: 80, height: 20 } },
+      { ref: '@e3', editable: true, text: 'note', bbox: { x: 0, y: 80, width: 80, height: 20 } },
+      { ref: '@e4', role: 'textbox', name: 'typed', bbox: { x: 0, y: 120, width: 80, height: 20 } },
+      { ref: '@e5', tag: 'button', name: 'Send', bbox: { x: 0, y: 160, width: 80, height: 20 } },
+    ]);
+    expect(dom.map((candidate) => candidate.label)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'Send',
+    ]);
+    const marks = fuseSetOfMarks([...dom, text(2, 2, 60, 16, 'my typed value')]);
+    expect(marks.find((mark) => mark.ref === '@e1')).not.toHaveProperty('label');
+    expect(JSON.stringify(marks)).not.toMatch(/hunter2|draft|note|typed|my typed value/);
+  });
 });

@@ -97,7 +97,9 @@ export type VideoIngestFailureCode =
   | 'SIZE_EXCEEDED'
   | 'EXTRACTOR_OUTDATED'
   | 'TIER_DOWNGRADE'
+  | 'TIER_UNRESOLVED'
   | 'TENANT_MISMATCH'
+  | 'TENANT_UNRESOLVED'
   | 'TOOL_FAILED';
 
 export type VideoIngestOutcome =

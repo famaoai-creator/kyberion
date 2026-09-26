@@ -67,6 +67,13 @@ export interface ApprovalGateParams {
   hasUI?: boolean;
   /** Explicit non-interactive mode signal; stronger than an inferred TTY. */
   nonInteractive?: boolean;
+  /**
+   * ISO expiry stamped on a newly created request. Setting it opts into
+   * renewable requests: a matched request whose expiry has lapsed (whatever
+   * its status) no longer binds the correlation id, so a rejection or an old
+   * approval does not lock the operation forever — a fresh request is opened.
+   */
+  expiresAt?: string;
 }
 
 export interface ApprovalGateResult {
@@ -239,6 +246,14 @@ function buildApprovalDraft(params: {
   };
 }
 
+/** Expired status, or an expiry that has passed (a malformed expiry counts as passed). */
+function isLapsedRequest(record: ApprovalRequestRecord, now: number): boolean {
+  if (record.status === 'expired') return true;
+  if (typeof record.expiresAt !== 'string' || record.expiresAt.trim() === '') return false;
+  const expiresAt = Date.parse(record.expiresAt);
+  return !Number.isFinite(expiresAt) || expiresAt <= now;
+}
+
 /**
  * Enforce the approval gate before executing a governed operation.
  *
@@ -313,7 +328,13 @@ export function enforceApprovalGate(
 
   // --- Step 2: Search for an existing request matching this correlationId ---
   const existing = listApprovalRequests({ storageChannels: [channel] });
-  const matched = existing.find((r: ApprovalRequestRecord) => r.correlationId === correlationId);
+  const sameCorrelation = existing.filter(
+    (r: ApprovalRequestRecord) => r.correlationId === correlationId
+  );
+  const matched =
+    params.expiresAt === undefined
+      ? sameCorrelation[0]
+      : sameCorrelation.find((r: ApprovalRequestRecord) => !isLapsedRequest(r, Date.now()));
 
   if (matched) {
     // An approved record that carries an expiry must not be reused past it —
@@ -475,6 +496,7 @@ export function enforceApprovalGate(
     channel,
     threadTs: nowIso(),
     correlationId,
+    ...(params.expiresAt !== undefined ? { expiresAt: params.expiresAt } : {}),
     requestedBy: agentId,
     draft,
     source: params.source,

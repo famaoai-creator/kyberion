@@ -34,10 +34,15 @@ dispatches.
   caller passes no `approval` context, or approval is still pending, the op
   returns `status: approval_required` instead of failing. Only `agent_id` is
   taken from the op params: the correlation id is always
-  `video-ingest:<content key>`, the channel is `system`, and the gate's
-  `human_only` request is bound to `vision:fetch_video` and the payload hash of
-  `{url, format, max_bytes, max_duration_sec}`, so an approval for one URL can
-  never authorize another. Live/upcoming streams (`LIVE_STREAM`) and remote
+  `video-ingest:<content key>:<payload hash>`, the channel is `system`, and the
+  gate's `human_only` request is bound to `vision:fetch_video` and the payload
+  hash of `{url, format, max_bytes, max_duration_sec}`, so an approval for one
+  URL can never authorize another, and changing the policy limits asks again
+  instead of colliding with the earlier request. Every request expires after
+  24 h (`VIDEO_FETCH_APPROVAL_TTL_MS`): the gate's renewable-request mode
+  (`expiresAt`) stops a lapsed request — pending, rejected or approved — from
+  binding the correlation id, so a rejection never locks a URL forever and an
+  approval is never a standing grant; the next call opens a fresh request. Live/upcoming streams (`LIVE_STREAM`) and remote
   videos without a known duration (`DURATION_UNKNOWN`) are refused before any
   download. The metadata probe uses the same `-f` selector as the download, so
   the size check matches the actual selection. Other failures throw
@@ -46,14 +51,21 @@ dispatches.
   itself.
 - Cache: content key = sha256(normalized URL + format) or sha256(file bytes,
   hashed in fixed-size chunks).
-  The cache goes to the mission when `mission_id` is given, else the tenant's
+  The cache goes to the mission when `mission_id` is given (it must be a valid
+  mission id of an existing mission, else `INVALID_SOURCE`), else the tenant's
   volatile area when `tenant_slug` is given, else
   `active/shared/cache/video-ingest/` (public). A local file is never cached in
   a lower tier than its input (`TIER_DOWNGRADE`), and a local file owned by a
   tenant (`knowledge/confidential/{slug}/`, `active/projects/{tier}/{slug}/`, a
   tenant-scoped mission dir, or a mission whose state records a tenant) is only
-  cached under that same tenant (`TENANT_MISMATCH`). A cache hit runs no
-  external command.
+  cached under that same tenant (`TENANT_MISMATCH`). Classification uses the
+  canonical path (symlinks, including symlinked parent directories, are
+  resolved through `safeRealpath`) and compares the repo-relative path
+  case-insensitively. It fails closed: a path outside the repository is
+  `TIER_UNRESOLVED`, and a confidential/personal partition whose owner is not a
+  valid tenant slug or a shared prefix (`common`, `tenant-groups`) — or a
+  mission state with an unreadable or invalid tenant — is `TENANT_UNRESOLVED`.
+  A cache hit runs no external command.
 - Download: yt-dlp writes into the cache entry with `-P <entry> -o
 'source.%(ext)s'`, `--ffmpeg-location` from the resolver and
   `--match-filter '!is_live'`. The merged `source.<ext>` is used; if only split
@@ -61,7 +73,12 @@ dispatches.
 - Retention: a failed or oversize download removes its partial media from the
   cache entry. After derivation the downloaded source media is deleted (derived
   audio, frames, subtitles and the brief stay) unless `keep_source: true`. A
-  local input file is never deleted.
+  local input file is never deleted. Download, derivation and cleanup of one
+  cache entry run under a per-entry lock (`lock-utils`), so a concurrent run
+  waits and then serves the cached brief instead of deleting media another
+  run is still deriving from. Source media kept by an earlier `keep_source`
+  run is reused rather than downloaded again (and never deleted by a failed
+  re-download).
 - External binaries (`yt-dlp`, `ffmpeg`, `ffprobe`) resolve through
   `libs/core/tool-binary-resolvers.ts` (`KYBERION_YTDLP_BIN`,
   `KYBERION_FFMPEG_BIN`, `KYBERION_FFPROBE_BIN`, then the managed binary, then
@@ -92,6 +109,33 @@ site's terms of service.
   `mark:<n>` into a ref or a logical point. An expired, missing or mismatched
   record is rejected with `[MARK_STALE]`: re-mark instead of clicking a stale
   target.
+- `system-actuator` always compares the marks' image dHash with a fresh
+  full-display capture (unique path under `active/shared/tmp/mark-target-checks/`,
+  deleted in `finally`). A caller-supplied `current_dhash` is not accepted:
+  `mark_elements` returns `image_dhash`, so echoing it back would defeat the
+  check. Consequently, marks made from a window or region capture never match
+  a display capture and are always `[MARK_STALE]` for system clicks — mark a
+  full-display screenshot for `target_mark`.
+- Mark labels never carry typed input: editable DOM elements (`input`,
+  `textarea`, `contenteditable`/`editable`, textbox-like roles) get no label,
+  whatever their name or text, and absorb no OCR text lying inside them.
+
+## Image description
+
+`vision:describe_image` sends pixels off the machine through the
+`reasoning_vision` provider, so the provider only ever receives an OCR-redacted
+copy (`createRedactedImageCopy`); when redaction fails nothing is sent. The
+tier is the strictest of the declared `tier`, the image path and the mission
+path, and a non-public image needs `mission_id` (`[VISION_TIER_SCOPE]`) so the
+redaction copy is made inside the mission (`<mission>/tmp/vision-describe/`).
+When both `mission_id` and `tenant_slug` are given (here and in
+`describe_screen_delta`), the tenant must be the mission's own tenant (from its
+state or its tenant directory); a mismatch, a tenant-less mission or an
+unresolvable owner is refused with `[VISION_TIER_SCOPE]`.
+
+Screen streams and recordings redact each frame through a scratch copy; under
+a mission (`MISSION_ID`) that copy is made in `<mission>/tmp/screen-redaction/`,
+otherwise in the shared tmp floor.
 
 ## OCR bounding-box units
 

@@ -276,10 +276,14 @@ export interface SafeReadTailResult {
  * `fs.readFileSync` (which would otherwise silently follow a symlink or
  * surface a confusing low-level error for a directory).
  */
+/** Upper bound for one `safeReadFileRange` window; larger reads must be chunked. */
+export const MAX_RANGE_READ_BYTES = 64 * 1024 * 1024;
+
 /**
  * Reads `length` bytes starting at `position` (fewer at end of file) with the
  * same governance as a full read: repository-scoped, no symlinks, regular
- * files only. Lets callers hash or scan large files in bounded chunks.
+ * files only. Lets callers hash or scan large files in bounded chunks; one
+ * window is capped at MAX_RANGE_READ_BYTES.
  */
 export function safeReadFileRange(filePath: string, position: number, length: number): Buffer {
   if (!Number.isInteger(position) || position < 0) {
@@ -287,6 +291,11 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
   }
   if (!Number.isInteger(length) || length <= 0) {
     throw new Error(`Invalid length for range read: ${length}`);
+  }
+  if (length > MAX_RANGE_READ_BYTES) {
+    throw new Error(
+      `Range read length ${length} exceeds the ${MAX_RANGE_READ_BYTES}-byte window limit`
+    );
   }
   const resolved = assertReadableRepositoryFile(filePath, 'range');
   if (!fs.existsSync(resolved)) {
@@ -1251,6 +1260,29 @@ export function safeLstat(filePath: string): fs.Stats {
     );
   }
   return fs.lstatSync(resolved);
+}
+
+/**
+ * Canonical path with every symlink resolved, including symlinked parent
+ * directories. A missing tail is resolved through its nearest existing
+ * ancestor, so classification of a not-yet-written path still sees the real
+ * parent. Like safeExistsSync it reveals no content, so only the sensitive-path
+ * deny list applies (to the input and to the canonical path).
+ */
+export function safeRealpath(filePath: string): string {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
+  const resolved = path.resolve(pathResolver.resolve(filePath));
+  const missing: string[] = [];
+  let existing = resolved;
+  while (!fs.existsSync(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) break;
+    missing.unshift(path.basename(existing));
+    existing = parent;
+  }
+  const canonical = path.join(fs.realpathSync.native(existing), ...missing);
+  assertSensitivePathAllowed(canonical, 'read', isSensitivePathMediated());
+  return canonical;
 }
 
 /**
