@@ -1,5 +1,6 @@
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 const ALLOWED_DELIVERY_SURFACES = new Set<SurfaceAsyncChannel>([
   'slack',
@@ -8,6 +9,14 @@ const ALLOWED_DELIVERY_SURFACES = new Set<SurfaceAsyncChannel>([
   'imessage',
 ]);
 const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/gu;
+const ENV_CHANNEL_PREFIX = 'env:';
+/**
+ * Registered env vars a schedule may name as `channel: "env:NAME"`, so a
+ * personal destination (e.g. the operator's Slack DM id) never lands in a
+ * checked-in pipeline file. Allowlisted so a schedule cannot route to an
+ * arbitrary environment value.
+ */
+const DELIVERY_CHANNEL_ENV_VARS = new Set(['KYBERION_OPERATOR_SLACK_DM']);
 
 export interface ChronosDeliveryTarget {
   surface: SurfaceAsyncChannel;
@@ -59,6 +68,14 @@ export function validateChronosDeliveryTarget(
   if (!channel || channel.length > 500 || channel.includes('\u0000')) {
     throw new Error('[POLICY_VIOLATION] Chronos delivery channel must be bounded and non-empty.');
   }
+  if (channel.startsWith(ENV_CHANNEL_PREFIX)) {
+    const envName = channel.slice(ENV_CHANNEL_PREFIX.length);
+    if (!DELIVERY_CHANNEL_ENV_VARS.has(envName)) {
+      throw new Error(
+        `[POLICY_VIOLATION] Chronos delivery channel env reference is not allowlisted: ${envName}`
+      );
+    }
+  }
   if (threadTs.length > 500 || threadTs.includes('\u0000')) {
     throw new Error('[POLICY_VIOLATION] Chronos delivery thread_ts is invalid.');
   }
@@ -71,6 +88,31 @@ export function validateChronosDeliveryTarget(
     ...(threadTs ? { thread_ts: threadTs } : {}),
     ...(template === undefined ? {} : { template }),
   };
+}
+
+/**
+ * Resolve a validated delivery channel: literal channels pass through, and
+ * `env:NAME` reads the allowlisted registered env var — failing closed when it
+ * is unset so a scheduled message is never posted to a guessed destination.
+ */
+export function resolveChronosDeliveryChannel(
+  channel: string,
+  env?: Record<string, string | undefined>
+): string {
+  if (!channel.startsWith(ENV_CHANNEL_PREFIX)) return channel;
+  const envName = channel.slice(ENV_CHANNEL_PREFIX.length);
+  if (!DELIVERY_CHANNEL_ENV_VARS.has(envName)) {
+    throw new Error(
+      `[POLICY_VIOLATION] Chronos delivery channel env reference is not allowlisted: ${envName}`
+    );
+  }
+  const resolved = (getRegisteredEnvText(envName, { env }) || '').trim();
+  if (!resolved || resolved.length > 500 || resolved.includes('\u0000')) {
+    throw new Error(
+      `[CONFIG_MISSING] Chronos delivery channel ${channel} is unset; set ${envName} to the destination channel or member id.`
+    );
+  }
+  return resolved;
 }
 
 export function renderChronosDeliveryMessage(input: {
@@ -103,6 +145,7 @@ export function enqueueChronosDelivery(input: ChronosDeliveryInput): string {
     throw new Error('scheduleId, pipelineName, and runId are required for Chronos delivery.');
   }
   const target = validateChronosDeliveryTarget(input.target);
+  const channel = resolveChronosDeliveryChannel(target.channel);
   const rendered = renderChronosDeliveryMessage({
     scheduleId,
     pipelineName,
@@ -114,7 +157,7 @@ export function enqueueChronosDelivery(input: ChronosDeliveryInput): string {
   return enqueueSurfaceOutboxMessage({
     surface: target.surface,
     correlationId: `chronos:${scheduleId}:${runId}`,
-    channel: target.channel,
+    channel,
     // An empty thread_ts means “post to the channel”. Using the channel id as
     // a thread timestamp makes Slack attempt to reply to a nonexistent thread.
     threadTs: target.thread_ts || '',

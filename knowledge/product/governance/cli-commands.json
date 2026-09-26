@@ -299,6 +299,14 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.memory",
+      "command": "memory",
+      "noun": "memory",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.task",
       "command": "task",
       "noun": "task",
@@ -337,6 +345,54 @@
       "verb": "default",
       "entry": "operator-cli",
       "audience": "operator"
+    },
+    {
+      "id": "operator-cli.read",
+      "command": "read",
+      "noun": "read",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.write",
+      "command": "write",
+      "noun": "write",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.see",
+      "command": "see",
+      "noun": "see",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.listen",
+      "command": "listen",
+      "noun": "listen",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.watch",
+      "command": "watch",
+      "noun": "watch",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.speak",
+      "command": "speak",
+      "noun": "speak",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
     },
     {
       "id": "operator-cli.run",
@@ -507,11 +563,18 @@
         "calendar agenda",
         "calendar freebusy",
         "calendar create-event",
+        "memory",
         "task",
         "task plan",
         "task start",
         "task scenario",
         "offboard",
+        "read",
+        "write",
+        "see",
+        "listen",
+        "watch",
+        "speak",
         "run",
         "preview",
         "intent",

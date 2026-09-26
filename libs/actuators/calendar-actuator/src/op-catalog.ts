@@ -36,6 +36,22 @@ const CALENDAR_PROPERTIES = {
   time_zone: { type: 'string' },
   title: { type: 'string' },
   with_meet: { type: 'boolean' },
+  event_id: { type: 'string' },
+  reminder_minutes_before_start: { type: 'integer', minimum: 0 },
+  send_updates: { enum: ['all', 'externalOnly', 'none'] },
+  duration_minutes: { type: 'integer', minimum: 1 },
+  slot_step_minutes: { type: 'integer', minimum: 1 },
+  business_calendar: { enum: ['none', 'japanese_bank'] },
+  working_hours: {
+    type: 'object',
+    properties: {
+      start: { type: 'string' },
+      end: { type: 'string' },
+      weekdays: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 6 } },
+    },
+    required: ['start', 'end'],
+    additionalProperties: false,
+  },
 };
 
 const CALENDAR_SCHEMA = {
@@ -54,6 +70,15 @@ const CALENDAR_EXAMPLES = {
       end_date: '2026-08-26T18:00:00+09:00',
     },
   ],
+  find_slots: [
+    {
+      calendar_names: ['primary'],
+      start_date: '2026-08-26T00:00:00+09:00',
+      end_date: '2026-08-29T00:00:00+09:00',
+      duration_minutes: 60,
+      business_calendar: 'japanese_bank',
+    },
+  ],
   create_event: [
     {
       calendar_names: ['primary'],
@@ -62,17 +87,32 @@ const CALENDAR_EXAMPLES = {
       end_date: '2026-08-26T11:00:00+09:00',
     },
   ],
+  update_event: [
+    {
+      calendar_id: 'primary',
+      event_id: 'event-123',
+      start_date: '2026-08-26T11:00:00+09:00',
+      end_date: '2026-08-26T12:00:00+09:00',
+      reminder_minutes_before_start: 15,
+    },
+  ],
+  delete_event: [{ calendar_id: 'primary', event_id: 'event-123' }],
 };
 
 export const CALENDAR_ACTUATOR_CAPTURE_OPS = [
   'list_calendars',
   'list_events',
   'query_freebusy',
+  'find_slots',
 ] as const;
 
 export const CALENDAR_ACTUATOR_TRANSFORM_OPS = [] as const;
 
-export const CALENDAR_ACTUATOR_APPLY_OPS = ['create_event'] as const;
+export const CALENDAR_ACTUATOR_APPLY_OPS = [
+  'create_event',
+  'update_event',
+  'delete_event',
+] as const;
 
 function toSpec(op: string, kind: PipelineStepType) {
   const schema = {
@@ -86,7 +126,9 @@ function toSpec(op: string, kind: PipelineStepType) {
             { required: ['calendar_targets'] },
           ],
         }
-      : {}),
+      : op === 'update_event' || op === 'delete_event'
+        ? { required: ['event_id', 'calendar_id'] }
+        : {}),
   };
   return {
     op,
