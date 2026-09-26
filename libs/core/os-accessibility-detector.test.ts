@@ -1,10 +1,18 @@
 import * as vm from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   OS_ACCESSIBILITY_ENUMERATE_SCRIPT,
+  OS_ACCESSIBILITY_MAX_DEPTH,
   OS_ACCESSIBILITY_MAX_ELEMENTS,
+  OS_ACCESSIBILITY_MAX_SCAN,
+  OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT,
+  OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV,
+  OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
+  OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
   OsAccessibilityDetector,
   candidatesFromAccessibility,
+  isEditableAccessibilityElement,
+  normaliseUiaElement,
   parseAccessibilitySnapshot,
   type AccessibilityCommandRunner,
   type AccessibilityElement,
@@ -41,7 +49,7 @@ const SNAPSHOT = {
 interface Call {
   command: string;
   args: string[];
-  options: { timeoutMs: number; maxOutputMB: number };
+  options: { timeoutMs: number; maxOutputMB: number; env?: Record<string, string> };
 }
 
 function fakeRunner(
@@ -405,5 +413,325 @@ describe('enumeration script', () => {
         application: 'Finder',
       })
     ).resolves.toEqual([]);
+  });
+});
+
+describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
+  const live = { image_path: 'screen.png', image_size: IMAGE, live_screen: true };
+  // Primary monitor 1000x600 physical pixels: the 2000 px screenshot is scale 2.
+  const UIA_SNAPSHOT = {
+    screen: { width: 1000, height: 600 },
+    dpi_awareness: 'per_monitor_v2',
+    application: 'notepad',
+    window: { x: 0, y: 0, width: 1000, height: 600 },
+    elements: [
+      { role: 'TitleBar', title: 'Untitled - Notepad', x: 0, y: 0, width: 1000, height: 30 },
+      { role: 'Button', title: 'Close', description: null, x: 960, y: 0, width: 40, height: 30 },
+      { role: 'MenuItem', title: 'File', x: 5, y: 30, width: 40, height: 20 },
+      { role: 'Document', title: 'Text Editor', x: 0, y: 50, width: 1000, height: 500 },
+      { role: 'Edit', title: 'Search', x: 600, y: 30, width: 100, height: 20 },
+      {
+        role: 'Edit',
+        title: 'hunter2',
+        password: true,
+        x: 700,
+        y: 30,
+        width: 100,
+        height: 20,
+      },
+      { role: 'Pane', title: 'Pane', x: 0, y: 0, width: 1000, height: 600 },
+      {
+        role: 'Hyperlink',
+        title: 'Help',
+        description: 'Opens help',
+        x: 10,
+        y: 560,
+        width: 30,
+        height: 12,
+      },
+    ],
+  };
+
+  interface WindowsCall extends Call {
+    script: string;
+  }
+
+  function decode(args: string[]): string {
+    const index = args.indexOf('-EncodedCommand');
+    return index < 0 ? '' : Buffer.from(args[index + 1], 'base64').toString('utf16le');
+  }
+
+  function fakeWindowsRunner(
+    options: { available?: boolean; snapshot?: unknown; enumerateStatus?: number } = {}
+  ) {
+    const calls: WindowsCall[] = [];
+    const run: AccessibilityCommandRunner = async (command, args, runOptions) => {
+      const script = decode(args);
+      calls.push({ command, args, options: runOptions, script });
+      if (script === OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT) {
+        return {
+          stdout: `${JSON.stringify({ available: options.available ?? true })}\r\n`,
+          stderr: '',
+          status: 0,
+        };
+      }
+      return {
+        stdout: `WARNING: noise\r\n${JSON.stringify(options.snapshot ?? UIA_SNAPSHOT)}\r\n`,
+        stderr: options.enumerateStatus ? 'Exception calling "FromHandle"' : '',
+        status: options.enumerateStatus ?? 0,
+      };
+    };
+    return { run, calls };
+  }
+
+  it('probes UI Automation once through an encoded powershell.exe and caches the result', async () => {
+    let now = 0;
+    const { run, calls } = fakeWindowsRunner();
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32', now: () => now });
+    expect(await detector.isAvailable(live)).toBe(true);
+    now = 10_000;
+    expect(await detector.isAvailable(live)).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].command).toBe('powershell.exe');
+    expect(calls[0].args.slice(0, 4)).toEqual([
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-EncodedCommand',
+    ]);
+    expect(calls[0].script).toBe(OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT);
+  });
+
+  it('is unavailable when UI Automation does not load, the probe fails, or the image is not the live screen', async () => {
+    const missing = fakeWindowsRunner({ available: false });
+    expect(
+      await new OsAccessibilityDetector({ run: missing.run, platform: 'win32' }).isAvailable(live)
+    ).toBe(false);
+    const throwing: AccessibilityCommandRunner = async () => {
+      throw new Error('spawn powershell.exe ENOENT');
+    };
+    expect(
+      await new OsAccessibilityDetector({ run: throwing, platform: 'win32' }).isAvailable(live)
+    ).toBe(false);
+    const { run, calls } = fakeWindowsRunner();
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    expect(await detector.isAvailable({ image_path: 's.png', image_size: IMAGE })).toBe(false);
+    expect(await detector.detect({ image_path: 's.png', image_size: IMAGE })).toEqual([]);
+    const secondary = { ...live, screen_origin: { x: -1920, y: 0 } };
+    expect(await detector.isAvailable(secondary)).toBe(false);
+    expect(await detector.detect(secondary)).toEqual([]);
+    expect(calls).toHaveLength(0);
+    expect(await detector.isAvailable({ ...secondary, screen_scale: 1 })).toBe(true);
+  });
+
+  it('maps UIA control types, keeps editable and password fields unlabelled and derives the scale from the physical screen', async () => {
+    const { run } = fakeWindowsRunner();
+    const candidates = await new OsAccessibilityDetector({ run, platform: 'win32' }).detect(live);
+    expect(candidates).toEqual([
+      {
+        box: { x: 1920, y: 0, width: 80, height: 60 },
+        source: 'accessibility',
+        kind: 'control',
+        label: 'Close',
+        score: 1,
+      },
+      {
+        box: { x: 10, y: 60, width: 80, height: 40 },
+        source: 'accessibility',
+        kind: 'control',
+        label: 'File',
+        score: 1,
+      },
+      {
+        box: { x: 0, y: 100, width: 2000, height: 1000 },
+        source: 'accessibility',
+        kind: 'control',
+        score: 1,
+        editable: true,
+      },
+      {
+        box: { x: 1200, y: 60, width: 200, height: 40 },
+        source: 'accessibility',
+        kind: 'control',
+        score: 1,
+        editable: true,
+      },
+      {
+        box: { x: 1400, y: 60, width: 200, height: 40 },
+        source: 'accessibility',
+        kind: 'control',
+        score: 1,
+        editable: true,
+      },
+      {
+        box: { x: 20, y: 1120, width: 60, height: 24 },
+        source: 'accessibility',
+        kind: 'control',
+        label: 'Help',
+        score: 1,
+      },
+    ]);
+    // A screenshot at the physical size maps 1:1.
+    const physical = await new OsAccessibilityDetector({ run, platform: 'win32' }).detect({
+      ...live,
+      image_size: { width: 1000, height: 600 },
+    });
+    expect(physical[0].box).toEqual({ x: 960, y: 0, width: 40, height: 30 });
+  });
+
+  it('normalises control types to the AX vocabulary', () => {
+    const roles = [
+      'Button',
+      'SplitButton',
+      'CheckBox',
+      'RadioButton',
+      'ComboBox',
+      'Edit',
+      'Document',
+      'Hyperlink',
+      'MenuItem',
+      'TabItem',
+      'ListItem',
+      'DataItem',
+      'TreeItem',
+      'Slider',
+      'Spinner',
+      'Pane',
+      'toString',
+    ].map((role) => normaliseUiaElement(element(role, 0, 0, 1, 1)).role);
+    expect(roles).toEqual([
+      'AXButton',
+      'AXMenuButton',
+      'AXCheckBox',
+      'AXRadioButton',
+      'AXComboBox',
+      'AXTextField',
+      'AXTextArea',
+      'AXLink',
+      'AXMenuItem',
+      'AXTab',
+      'AXCell',
+      'AXCell',
+      'AXCell',
+      'AXSlider',
+      'AXIncrementor',
+      'uia:Pane',
+      'uia:toString',
+    ]);
+    const password = normaliseUiaElement(
+      element('Custom', 0, 0, 1, 1, { title: 'secret', password: true })
+    );
+    expect(password).toMatchObject({ role: 'AXTextField', subrole: 'AXSecureTextField' });
+    expect(isEditableAccessibilityElement(password)).toBe(true);
+    expect(
+      ['Edit', 'Document', 'ComboBox'].map((role) =>
+        isEditableAccessibilityElement(normaliseUiaElement(element(role, 0, 0, 1, 1)))
+      )
+    ).toEqual([true, true, true]);
+  });
+
+  it('passes options through the child environment, never through the script text', async () => {
+    vi.stubEnv('SystemRoot', 'C:\\Windows');
+    try {
+      const { run, calls } = fakeWindowsRunner();
+      const application = "notepad'; Remove-Item C:\\ -Recurse; '";
+      await new OsAccessibilityDetector({ run, platform: 'win32' }).detect({
+        ...live,
+        application,
+      });
+      const call = calls[0];
+      expect(call.command).toBe('powershell.exe');
+      expect(call.script).toBe(OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT);
+      expect(call.args.join(' ')).not.toContain('notepad');
+      expect(call.args.join(' ')).not.toContain('Remove-Item');
+      expect(call.options).toMatchObject({ timeoutMs: 8_000, maxOutputMB: 4 });
+      expect(call.options.env?.SystemRoot).toBe('C:\\Windows');
+      expect(JSON.parse(call.options.env?.[OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV] ?? '')).toEqual({
+        maxDepth: OS_ACCESSIBILITY_MAX_DEPTH,
+        maxScan: OS_ACCESSIBILITY_MAX_SCAN,
+        application,
+        budgetMs: OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('turns a not_frontmost snapshot into no candidates', async () => {
+    const { run } = fakeWindowsRunner({
+      snapshot: {
+        screen: { width: 1000, height: 600 },
+        application: 'notepad',
+        elements: [],
+        reason: 'not_frontmost',
+      },
+    });
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    await expect(detector.detect({ ...live, application: 'notepad' })).resolves.toEqual([]);
+    await expect(detector.readSnapshot({ ...live, application: 'notepad' })).resolves.toMatchObject(
+      { application: 'notepad', reason: 'not_frontmost', elements: [] }
+    );
+  });
+
+  it('reads the window rect and DPI awareness and caps the candidates', async () => {
+    const many = Array.from({ length: 500 }, (_, i) => ({
+      role: 'Button',
+      title: `B${i}`,
+      x: (i % 50) * 20,
+      y: Math.floor(i / 50) * 20,
+      width: 10,
+      height: 10,
+    }));
+    const { run } = fakeWindowsRunner({
+      snapshot: { ...UIA_SNAPSHOT, elements: many, truncated: true },
+    });
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    const snapshot = await detector.readSnapshot(live);
+    expect(snapshot).toMatchObject({
+      window: { x: 0, y: 0, width: 1000, height: 600 },
+      dpi_awareness: 'per_monitor_v2',
+      truncated: true,
+    });
+    expect(snapshot.elements[0].role).toBe('AXButton');
+    expect(await detector.detect(live)).toHaveLength(OS_ACCESSIBILITY_MAX_ELEMENTS);
+  });
+
+  it('fails with a coded error when enumeration fails', async () => {
+    const { run } = fakeWindowsRunner({ enumerateStatus: 1 });
+    await expect(
+      new OsAccessibilityDetector({ run, platform: 'win32' }).detect(live)
+    ).rejects.toThrow(/UI_ELEMENT_DETECTOR_ACCESSIBILITY.*FromHandle/);
+  });
+});
+
+describe('Windows enumeration script', () => {
+  const script = OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT;
+
+  it('reads only the foreground window and guards a named application', () => {
+    expect(script).toContain('GetForegroundWindow()');
+    expect(script).toContain('AutomationElement]');
+    expect(script).toContain('$A::FromHandle($fg)');
+    expect(script).toMatch(/\[string\]::Equals\(\$fgName, \$want/);
+    expect(script).toContain("Finish 'not_frontmost' '[]'");
+  });
+
+  it('reads its options from the environment and interpolates nothing', () => {
+    expect(script).toContain(`$env:${OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV}`);
+    expect(script).toContain('ConvertFrom-Json -InputObject $raw');
+    expect(script).not.toContain('${');
+    expect(OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT).not.toContain('${');
+  });
+
+  it('is DPI aware, bounded and escapes non-ASCII output', () => {
+    expect(script).toContain('SetThreadDpiAwarenessContext([IntPtr]::new(-4))');
+    expect(script).toContain('SetProcessDPIAware()');
+    expect(script).toContain('GetSystemMetrics(0)');
+    expect(script).toContain('ControlViewCondition');
+    expect(script).toContain('IsPasswordProperty');
+    expect(script).toContain('$node.Depth -ge $maxDepth');
+    expect(script).toContain('$scanned -ge $maxScan');
+    expect(script).toContain('$clock.ElapsedMilliseconds -ge $budget');
+    expect(script).toContain("'[^\\x20-\\x7E]|[\"\\\\]'");
+    expect(script).toContain("'\\u{0:x4}'");
   });
 });
