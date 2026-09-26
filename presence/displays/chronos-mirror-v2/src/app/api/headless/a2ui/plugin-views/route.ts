@@ -21,6 +21,7 @@ import {
   PluginViewError,
   pluginViewErrorStatus,
   pluginViewLocale,
+  readVisiblePluginViewActionRequests,
   readVisiblePluginViews,
   runPluginViewAction,
 } from '../../../../../lib/plugin-views-response';
@@ -58,8 +59,18 @@ export function GET(req: NextRequest) {
       tenantSlug: tenant,
       ...(tier ? { tier } : {}),
     });
-    const { views, errors } = withViewerExecutionContext(resolvedViewer.context, () =>
-      readVisiblePluginViews(resolvedViewer.context, { tenant, tier })
+    const { views, errors, actionRequests } = withViewerExecutionContext(
+      resolvedViewer.context,
+      () => {
+        const visible = readVisiblePluginViews(resolvedViewer.context, { tenant, tier });
+        return {
+          ...visible,
+          actionRequests: readVisiblePluginViewActionRequests(
+            resolvedViewer.context,
+            visible.views
+          ),
+        };
+      }
     );
     return NextResponse.json(
       headlessEnvelope(
@@ -67,7 +78,8 @@ export function GET(req: NextRequest) {
         buildPluginViewsPayload(
           views,
           errors,
-          pluginViewLocale(req.headers.get('accept-language'))
+          pluginViewLocale(req.headers.get('accept-language')),
+          actionRequests
         ),
         resolvedViewer.context
       )
@@ -77,7 +89,11 @@ export function GET(req: NextRequest) {
   }
 }
 
-/** EP-05: invoke a declared view action (`human` authority queues an approval request). */
+/**
+ * EP-05: invoke a declared view action (`human` authority queues an approval
+ * request). FU-02: with `approval_request_id` the approved human action is
+ * executed exactly once.
+ */
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
@@ -105,7 +121,9 @@ export async function POST(req: NextRequest) {
           message_key:
             outcome.status === 'approval_required'
               ? 'plugin:view_action_approval_required'
-              : 'plugin:view_action_dispatched',
+              : outcome.status === 'executed'
+                ? 'plugin:view_action_executed'
+                : 'plugin:view_action_dispatched',
         },
         resolvedViewer.context
       ),

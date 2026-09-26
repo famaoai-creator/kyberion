@@ -723,7 +723,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 9362,
+      "size": 10609,
       "type": "md"
     },
     {
@@ -3309,73 +3309,73 @@
     {
       "path": "product/governance/reasoning-providers/agy-cli.json",
       "tier": "public",
-      "size": 393,
+      "size": 420,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/anthropic.json",
       "tier": "public",
-      "size": 402,
+      "size": 432,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/claude-agent.json",
       "tier": "public",
-      "size": 415,
+      "size": 445,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/claude-cli.json",
       "tier": "public",
-      "size": 384,
+      "size": 411,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/codex-cli.json",
       "tier": "public",
-      "size": 398,
+      "size": 425,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/copilot.json",
       "tier": "public",
-      "size": 379,
+      "size": 406,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/cursor-cli.json",
       "tier": "public",
-      "size": 445,
+      "size": 472,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/devin-cli.json",
       "tier": "public",
-      "size": 491,
+      "size": 518,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/gemini-api.json",
       "tier": "public",
-      "size": 419,
+      "size": 449,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/gemini-cli.json",
       "tier": "public",
-      "size": 388,
+      "size": 415,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/grok-api.json",
       "tier": "public",
-      "size": 419,
+      "size": 449,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/grok-cli.json",
       "tier": "public",
-      "size": 393,
+      "size": 420,
       "type": "json"
     },
     {
@@ -3387,67 +3387,67 @@
     {
       "path": "product/governance/reasoning-providers/llamacpp.json",
       "tier": "public",
-      "size": 409,
+      "size": 436,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/lmstudio.json",
       "tier": "public",
-      "size": 435,
+      "size": 462,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/local.json",
       "tier": "public",
-      "size": 404,
+      "size": 431,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/localai.json",
       "tier": "public",
-      "size": 406,
+      "size": 433,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/mlx.json",
       "tier": "public",
-      "size": 394,
+      "size": 421,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/nemotron-api.json",
       "tier": "public",
-      "size": 413,
+      "size": 443,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/ollama.json",
       "tier": "public",
-      "size": 403,
+      "size": 430,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/opencode-cli.json",
       "tier": "public",
-      "size": 439,
+      "size": 466,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/openrouter.json",
       "tier": "public",
-      "size": 423,
+      "size": 453,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/stub.json",
       "tier": "public",
-      "size": 359,
+      "size": 386,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/vllm.json",
       "tier": "public",
-      "size": 397,
+      "size": 424,
       "type": "json"
     },
     {
@@ -6291,7 +6291,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 988499,
+      "size": 992657,
       "type": "json"
     },
     {
@@ -10821,7 +10821,7 @@
     {
       "path": "product/schemas/reasoning-provider-registry.schema.json",
       "tier": "public",
-      "size": 1648,
+      "size": 2066,
       "type": "json"
     },
     {
