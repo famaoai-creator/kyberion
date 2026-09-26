@@ -1,4 +1,5 @@
 import { Jimp } from 'jimp';
+import { logger } from './core.js';
 import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { boxArea, coverageRatio, iou, type SomBox, type SomCandidate } from './set-of-marks.js';
 import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-detector.js';
@@ -57,6 +58,10 @@ export const PIXEL_REGION_DEFAULTS = {
   iconMaxSide: 64,
   iconMaxAspect: 1.6,
   maxRegions: 150,
+  /** Components kept (strongest first) before the quadratic merge step. */
+  maxComponents: 2000,
+  /** Larger images (width x height) are skipped with a warning, before decoding when the size is known. */
+  maxImagePixels: 40_000_000,
 } as const;
 
 export type PixelRegionOptions = Partial<{
@@ -292,6 +297,7 @@ export function detectPixelRegions(
 ): PixelRegion[] {
   const o = { ...PIXEL_REGION_DEFAULTS, ...options };
   if (bitmap.width < 2 || bitmap.height < 2) return [];
+  if (bitmap.width * bitmap.height > o.maxImagePixels) return [];
   const gray = toWorkingGray(bitmap, o.maxWorkSide);
   const { width, height, factor } = gray;
   const edges = adaptiveThreshold(
@@ -334,7 +340,13 @@ export function detectPixelRegions(
     });
   }
 
-  const merged = mergeBoxes(regions, o.mergeIou, o.nestedCoverage, o.minNestedShare);
+  const strongest =
+    regions.length > o.maxComponents
+      ? regions
+          .sort((a, b) => b.score - a.score || boxArea(b.box) - boxArea(a.box))
+          .slice(0, Math.max(0, Math.floor(o.maxComponents)))
+      : regions;
+  const merged = mergeBoxes(strongest, o.mergeIou, o.nestedCoverage, o.minNestedShare);
   return merged
     .sort((a, b) => b.score - a.score || a.box.y - b.box.y || a.box.x - b.box.x)
     .slice(0, Math.max(0, Math.floor(o.maxRegions)));
@@ -382,6 +394,14 @@ export class PixelRegionDetector implements UiElementDetector {
   }
 
   async detect(request: UiElementDetectionRequest): Promise<SomCandidate[]> {
+    const limit = this.deps.options?.maxImagePixels ?? PIXEL_REGION_DEFAULTS.maxImagePixels;
+    const declared = request.image_size.width * request.image_size.height;
+    if (declared > limit) {
+      logger.warn(
+        `[ui-element-detector] pixel_regions skipped a ${request.image_size.width}x${request.image_size.height} image (over ${limit} pixels)`
+      );
+      return [];
+    }
     const bitmap = await (this.deps.readBitmap ?? readPixelBitmap)(request.image_path);
     return pixelRegionCandidates(detectPixelRegions(bitmap, this.deps.options));
   }

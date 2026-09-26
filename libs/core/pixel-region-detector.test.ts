@@ -189,6 +189,37 @@ describe('detectPixelRegions', () => {
   });
 });
 
+describe('size guards', () => {
+  it('skips an image over the pixel limit before decoding it', async () => {
+    let decoded = 0;
+    const detector = new PixelRegionDetector({
+      readBitmap: async () => {
+        decoded += 1;
+        return uiScene(() => [245, 245, 245]);
+      },
+    });
+    const huge = { image_path: 'huge.png', image_size: { width: 10_000, height: 5_000 } };
+    expect(await detector.detect(huge)).toEqual([]);
+    expect(decoded).toBe(0);
+    expect(
+      detectPixelRegions(
+        uiScene(() => [245, 245, 245]),
+        { maxImagePixels: 1000 }
+      )
+    ).toEqual([]);
+  });
+
+  it('keeps only the strongest components before merging', () => {
+    const bitmap = canvas(400, 300, () => [245, 245, 245]);
+    for (let row = 0; row < 6; row += 1) {
+      for (let col = 0; col < 8; col += 1) {
+        fillRect(bitmap, { x: 10 + col * 48, y: 10 + row * 48, width: 24, height: 24 }, [0, 0, 0]);
+      }
+    }
+    expect(detectPixelRegions(bitmap, { maxComponents: 7 })).toHaveLength(7);
+  });
+});
+
 describe('PixelRegionDetector', () => {
   it('reads the screenshot from disk and returns detector candidates without labels', async () => {
     const bitmap = uiScene(() => [245, 245, 245]);
