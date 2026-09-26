@@ -33,7 +33,7 @@ function sourceDir(name: string): string {
 
 function managedRootDir(name: string): string {
   return tracked(
-    pathResolver.shared(`plugins/managed-test-cli-${process.pid}-${name}-${randomUUID()}`)
+    pathResolver.sharedTmp(`plugins/managed-test-cli-${process.pid}-${name}-${randomUUID()}`)
   );
 }
 

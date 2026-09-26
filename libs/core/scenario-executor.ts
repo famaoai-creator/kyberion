@@ -13,7 +13,7 @@
  */
 
 import * as path from 'node:path';
-import { setClock } from './foundation/clock.js';
+import { runWithClock } from './foundation/clock.js';
 import { redactSensitiveObject } from './network.js';
 import { pathResolver } from './path-resolver.js';
 import { getLastServedReasoningMode, type LastServedReasoningMode } from './reasoning-backend.js';
@@ -153,9 +153,11 @@ function gateReason(
   return null;
 }
 
-function maxSeq(log: ScenarioSideEffectLog): number {
+/** Highest side-effect seq so far; bounds each turn's window of records. */
+export function scenarioLogHighWaterSeq(log: ScenarioSideEffectLog): number {
   return Math.max(
     0,
+    // Warnings use their own counter (host noise must not shift turn windows).
     ...[log.ops, log.approvals, log.writes, log.reasoning].map((list) => list.at(-1)?.seq ?? 0)
   );
 }
@@ -274,72 +276,83 @@ export async function runScenario(
   const served: (LastServedReasoningMode | null)[] = [];
   const transcript: string[] = [];
   let interceptor: ScenarioInterceptor | undefined;
-  let disposeClock: (() => void) | undefined;
   let status: ScenarioRunStatus = 'pass';
   let reason: string | undefined;
   let finishedAtMs = startedAtMs;
   let finalTrace: Trace | undefined;
 
   try {
-    disposeClock = setClock(ctx.clock);
-    ctx.materializeSeedFiles();
-    interceptor = installScenarioInterceptor(ctx, def);
-    const trace = new TraceContext(`scenario:${def.id}`, { pipelineId: `scenario:${def.id}` });
+    // FU-01: the virtual clock is bound to this run's async context only, so
+    // concurrent work elsewhere in the process keeps wall-clock nowIso().
+    await runWithClock(ctx.clock, async () => {
+      ctx.materializeSeedFiles();
+      const active = installScenarioInterceptor(ctx, def);
+      interceptor = active;
+      const trace = new TraceContext(`scenario:${def.id}`, { pipelineId: `scenario:${def.id}` });
 
-    for (const [index, turn] of def.turns.entries()) {
-      const turnStartMs = ctx.clock.now();
-      const window: ScenarioSeqWindow = { fromSeq: maxSeq(interceptor.log) + 1, toSeq: 0 };
-      trace.startSpan('scenario.turn', { index, kind: turn.kind });
-      const outcome = await runTurn(turn, index, def, ctx, interceptor, trace, options, served);
-      interceptor.snapshotWrites();
-      window.toSeq = maxSeq(interceptor.log) + 1;
-      if (turn.kind === 'pipeline') turnResponses.set(index, outcome.response);
-      if (turn.kind === 'intent') {
-        transcript.push(
-          `USER: ${turn.text}`,
-          `AGENT: ${String((outcome.response as { response?: unknown }).response ?? '')}`
-        );
-      }
+      // FU-01: turns run inside the run's async scope; the interceptor's seams
+      // ignore every call made outside it (other work in this process).
+      await active.runInScope(async () => {
+        for (const [index, turn] of def.turns.entries()) {
+          const turnStartMs = ctx.clock.now();
+          const window: ScenarioSeqWindow = {
+            fromSeq: scenarioLogHighWaterSeq(active.log) + 1,
+            toSeq: 0,
+          };
+          trace.startSpan('scenario.turn', { index, kind: turn.kind });
+          const outcome = await runTurn(turn, index, def, ctx, active, trace, options, served);
+          active.snapshotWrites();
+          window.toSeq = scenarioLogHighWaterSeq(active.log) + 1;
+          if (turn.kind === 'pipeline') turnResponses.set(index, outcome.response);
+          if (turn.kind === 'intent') {
+            transcript.push(
+              `USER: ${turn.text}`,
+              `AGENT: ${String((outcome.response as { response?: unknown }).response ?? '')}`
+            );
+          }
 
-      const checks = [
-        ...outcome.checks,
-        ...evaluateTurnChecks(turn.checks, interceptor.log, window, outcome.response),
-      ];
-      if (turn.checks?.judge) {
-        checks.push(
-          await evaluateJudgeCheck(
-            turn.checks.judge,
-            transcript.join('\n'),
-            observedActorBackends(interceptor.log, served),
-            options.judgeBackend
-          )
-        );
-      }
-      const turnStatus = outcome.error ? 'fail' : checks.every((c) => c.pass) ? 'pass' : 'fail';
-      trace.endSpan(turnStatus === 'pass' ? 'ok' : 'error', outcome.error);
-      turns.push({
-        index,
-        kind: turn.kind,
-        status: turnStatus,
-        checks,
-        duration_ms: ctx.clock.now() - turnStartMs,
-        ...(outcome.error ? { error: outcome.error } : {}),
+          const checks = [
+            ...outcome.checks,
+            ...evaluateTurnChecks(turn.checks, active.log, window, outcome.response),
+          ];
+          if (turn.checks?.judge) {
+            checks.push(
+              await evaluateJudgeCheck(
+                turn.checks.judge,
+                transcript.join('\n'),
+                observedActorBackends(active.log, served),
+                options.judgeBackend
+              )
+            );
+          }
+          const turnStatus = outcome.error ? 'fail' : checks.every((c) => c.pass) ? 'pass' : 'fail';
+          trace.endSpan(turnStatus === 'pass' ? 'ok' : 'error', outcome.error);
+          turns.push({
+            index,
+            kind: turn.kind,
+            status: turnStatus,
+            checks,
+            duration_ms: ctx.clock.now() - turnStartMs,
+            ...(outcome.error ? { error: outcome.error } : {}),
+          });
+        }
       });
-    }
 
-    for (const [index, response] of turnResponses) writeTurnArtifact(ctx, index, response);
-    finalTrace = trace.finalize();
-    for (const check of def.finalChecks) {
-      finalChecks.push(evaluateFinalCheck(check, interceptor.log, finalTrace, ctx));
-    }
-    const failed = turns.some((turn) => turn.status !== 'pass') || finalChecks.some((c) => !c.pass);
-    status = failed ? 'fail' : 'pass';
+      for (const [index, response] of turnResponses) writeTurnArtifact(ctx, index, response);
+      finalTrace = trace.finalize();
+      for (const check of def.finalChecks) {
+        finalChecks.push(evaluateFinalCheck(check, active.log, finalTrace, ctx));
+      }
+      const failed =
+        turns.some((turn) => turn.status !== 'pass') || finalChecks.some((c) => !c.pass);
+      status = failed ? 'fail' : 'pass';
+    });
   } catch (error) {
     status = 'error';
     reason = errorText(error);
   } finally {
     finishedAtMs = ctx.clock.now();
-    const failure = disposeAll([() => interceptor?.dispose(), () => disposeClock?.()]);
+    const failure = disposeAll([() => interceptor?.dispose()]);
     if (failure) {
       ctx.dispose();
       throw failure.error;

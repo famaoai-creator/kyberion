@@ -34,7 +34,7 @@ import {
   listManagedPlugins,
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
-import type { PluginPermissionGrant } from './plugin-permissions.js';
+import { permissionsDigest, type PluginPermissionGrant } from './plugin-permissions.js';
 import { loadApprovalRequest } from './approval-store.js';
 import {
   activatePluginContributions,
@@ -405,6 +405,22 @@ function errorText(error: unknown): string {
 
 export function isPluginActive(pluginId: string): boolean {
   return activePlugins.has(pluginId);
+}
+
+/** Content digest of the module currently activated for `pluginId` (undefined when inactive or legacy). */
+export function getActivePluginContentDigest(pluginId: string): string | undefined {
+  return activePlugins.get(pluginId)?.contentDigest;
+}
+
+/**
+ * Digest of the grant the active module currently runs under: undefined when
+ * the plugin is inactive, null for a legacy (unwrapped) official plugin.
+ */
+export function getActivePluginPermissionsDigest(pluginId: string): string | null | undefined {
+  const state = activePlugins.get(pluginId);
+  if (!state) return undefined;
+  const grant = state.activation.grant.grant;
+  return grant === null ? null : permissionsDigest(grant);
 }
 
 export function listActivePlugins(): string[] {

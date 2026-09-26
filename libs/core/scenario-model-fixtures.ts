@@ -16,9 +16,11 @@ import {
   resetReasoningBackend,
   restoreStubServedOps,
   snapshotStubServedOps,
+  stubReasoningBackend,
 } from './reasoning-backend.js';
 import { coreSeamCatalog } from './seam.js';
 import type { ScenarioDefinition } from './scenario-definition.js';
+import { getActiveScenarioRunId } from './scenario-run-scope.js';
 import { appendScenarioReasoning, type ScenarioSideEffectLog } from './scenario-side-effect-log.js';
 
 export const SCENARIO_FIXTURE_BACKEND_NAME = 'scenario-fixtures';
@@ -61,25 +63,38 @@ function fixtureMatches(fixture: CompiledReasoningFixture, prompt: string): bool
   return fixture.contains !== undefined || fixture.regex !== undefined;
 }
 
-export function createScenarioFixtureBackend(
+interface ScenarioFixtureResponder {
+  answer(method: string, prompt: string): string;
+  answerStructured<T>(method: string, input: unknown): T;
+  /** A call fixtures can never serve (tools, images): logged and thrown like a miss. */
+  refuse(method: string, prompt: string): never;
+}
+
+function createFixtureResponder(
   def: ScenarioDefinition,
   log: ScenarioSideEffectLog
-): ReasoningBackend {
+): ScenarioFixtureResponder {
   const fixtures = def.modelFixtures === 'fixtures' ? compileFixtures(def) : [];
 
-  function answer(method: string, prompt: string): string {
-    const base = {
+  function baseRecord(method: string, prompt: string) {
+    return {
       method,
       backend: SCENARIO_FIXTURE_BACKEND_NAME,
       prompt_hash: sha256(prompt),
       prompt_length: prompt.length,
     };
-    if (def.modelFixtures === 'model-free') {
-      appendScenarioReasoning(log, { ...base, outcome: 'forbidden' });
-      throw new Error(
-        `[SCENARIO_MODEL_CALL_FORBIDDEN] scenario ${def.id} is model-free but ${method} was called`
-      );
-    }
+  }
+
+  function forbid(method: string, base: ReturnType<typeof baseRecord>): never {
+    appendScenarioReasoning(log, { ...base, outcome: 'forbidden' });
+    throw new Error(
+      `[SCENARIO_MODEL_CALL_FORBIDDEN] scenario ${def.id} is model-free but ${method} was called`
+    );
+  }
+
+  function answer(method: string, prompt: string): string {
+    const base = baseRecord(method, prompt);
+    if (def.modelFixtures === 'model-free') forbid(method, base);
     const fixture = fixtures.find((candidate) => fixtureMatches(candidate, prompt));
     if (!fixture) {
       appendScenarioReasoning(log, { ...base, outcome: 'miss' });
@@ -108,6 +123,27 @@ export function createScenarioFixtureBackend(
     }
   }
 
+  function refuse(method: string, prompt: string): never {
+    const base = baseRecord(method, prompt);
+    if (def.modelFixtures === 'model-free') forbid(method, base);
+    appendScenarioReasoning(log, { ...base, outcome: 'miss' });
+    throw new Error(
+      `[SCENARIO_FIXTURE_MISS] scenario ${def.id}: ${method} cannot be served from reasoning fixtures (prompt sha256 ${base.prompt_hash.slice(0, 12)})`
+    );
+  }
+
+  return { answer, answerStructured, refuse };
+}
+
+export function createScenarioFixtureBackend(
+  def: ScenarioDefinition,
+  log: ScenarioSideEffectLog
+): ReasoningBackend {
+  return fixtureBackendFrom(createFixtureResponder(def, log));
+}
+
+function fixtureBackendFrom(responder: ScenarioFixtureResponder): ReasoningBackend {
+  const { answer, answerStructured } = responder;
   return {
     name: SCENARIO_FIXTURE_BACKEND_NAME,
     async prompt(prompt) {
@@ -147,6 +183,91 @@ export function createScenarioFixtureBackend(
 }
 
 /**
+ * FU-01: route each call to `fixture` inside the scenario scope and to
+ * `fallback` (the backend that was bound before the run, else the stub)
+ * everywhere else, so unrelated host reasoning is never fixture-answered.
+ * Every optional capability of `fallback` stays available outside the scope;
+ * inside it, streaming is the fixture answer, tools / images are refused like
+ * a fixture miss, and there is no delegation handle.
+ */
+function scopeFixtureBackend(
+  fixture: ReasoningBackend,
+  responder: ScenarioFixtureResponder,
+  fallback: ReasoningBackend,
+  inScope: () => boolean
+): ReasoningBackend {
+  const pick = (): ReasoningBackend => (inScope() ? fixture : fallback);
+  const scoped: ReasoningBackend = {
+    get name() {
+      return pick().name;
+    },
+    get supportsVision() {
+      return inScope() ? false : fallback.supportsVision;
+    },
+    getRuntimeInstructions: (options) =>
+      inScope() ? [] : (fallback.getRuntimeInstructions?.(options) ?? []),
+    getRuntimeProviderName: (options) =>
+      inScope() ? fixture.name : fallback.getRuntimeProviderName?.(options) || fallback.name,
+    resetSession: () => (inScope() ? undefined : fallback.resetSession?.()),
+    getNativeSubagentAdopter: () =>
+      inScope() ? null : (fallback.getNativeSubagentAdopter?.() ?? null),
+    requiresNativeSubagent: () =>
+      inScope() ? false : (fallback.requiresNativeSubagent?.() ?? false),
+    prompt: (prompt, options) => pick().prompt(prompt, options),
+    delegateTask: (instruction, context, options) =>
+      pick().delegateTask(instruction, context, options),
+    divergePersonas: (input, options) => pick().divergePersonas(input, options),
+    crossCritique: (input, options) => pick().crossCritique(input, options),
+    synthesizePersona: (input, options) => pick().synthesizePersona(input, options),
+    forkBranches: (input, options) => pick().forkBranches(input, options),
+    simulateBranches: (input, options) => pick().simulateBranches(input, options),
+    extractRequirements: (input, options) => pick().extractRequirements(input, options),
+    extractDesignSpec: (input, options) => pick().extractDesignSpec(input, options),
+    extractTestPlan: (input, options) => pick().extractTestPlan(input, options),
+    decomposeIntoTasks: (input, options) => pick().decomposeIntoTasks(input, options),
+  };
+  if (fallback.streamPrompt) {
+    scoped.streamPrompt = (prompt, options) => {
+      if (!inScope()) return fallback.streamPrompt!(prompt, options);
+      return (async function* fixtureStream(): AsyncGenerator<string> {
+        const text = await fixture.prompt(prompt, options);
+        if (text) yield text;
+      })();
+    };
+  }
+  if (fallback.generateWithTools) {
+    scoped.generateWithTools = async (prompt, tools, options) =>
+      inScope()
+        ? responder.refuse('generateWithTools', prompt)
+        : fallback.generateWithTools!(prompt, tools, options);
+  }
+  if (fallback.promptWithImages) {
+    scoped.promptWithImages = async (prompt, images, options) =>
+      inScope()
+        ? responder.refuse('promptWithImages', prompt)
+        : fallback.promptWithImages!(prompt, images, options);
+  }
+  if (fallback.delegateTaskHandle) {
+    // Absent inside the scope (callers fall back to the fixture-served
+    // delegateTask) so a scenario never opens a real delegation record.
+    Object.defineProperty(scoped, 'delegateTaskHandle', {
+      enumerable: true,
+      get: () => (inScope() ? undefined : fallback.delegateTaskHandle!.bind(fallback)),
+    });
+  }
+  return scoped;
+}
+
+export interface ScenarioFixtureBackendInstallOptions {
+  /**
+   * FU-01: answer from fixtures only inside this scenario scope; calls made
+   * elsewhere go to the previously bound backend (or the stub). Unset keeps
+   * the unscoped behaviour (every call is fixture-answered).
+   */
+  scopeId?: string;
+}
+
+/**
  * Bind the fixture backend as the active reasoning backend. A backend that
  * was already bound is unbound for the run and re-bound (same implementation
  * and metadata) by the returned disposer. Unbinding goes through
@@ -155,7 +276,8 @@ export function createScenarioFixtureBackend(
  */
 export function installScenarioFixtureBackend(
   def: ScenarioDefinition,
-  log: ScenarioSideEffectLog
+  log: ScenarioSideEffectLog,
+  options: ScenarioFixtureBackendInstallOptions = {}
 ): () => void {
   const seam = coreSeamCatalog.get<ReasoningBackend>('reasoning-backend');
   const prior = seam?.list()[0];
@@ -169,7 +291,18 @@ export function installScenarioFixtureBackend(
       );
     }
   }
-  const backend = createScenarioFixtureBackend(def, log);
+  const responder = createFixtureResponder(def, log);
+  const fixtureBackend = fixtureBackendFrom(responder);
+  const { scopeId } = options;
+  const backend =
+    scopeId === undefined
+      ? fixtureBackend
+      : scopeFixtureBackend(
+          fixtureBackend,
+          responder,
+          prior?.implementation ?? stubReasoningBackend,
+          () => getActiveScenarioRunId() === scopeId
+        );
   const unregister = registerReasoningBackend(backend, {
     provenance: 'builtin',
     source: 'libs/core/scenario-model-fixtures.ts',

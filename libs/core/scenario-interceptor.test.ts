@@ -1,8 +1,18 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getScenarioOpOverride, resolveActuatorOperation } from './actuator-op-registry.js';
+import {
+  getScenarioOpOverride,
+  isScenarioApprovalGranted,
+  resolveActuatorOperation,
+} from './actuator-op-registry.js';
 import { listOpPreflightListeners, registerOpGuard, runOpPreflight } from './op-preflight.js';
-import { getReasoningBackend, stubReasoningBackend } from './reasoning-backend.js';
+import {
+  getReasoningBackend,
+  registerReasoningBackend,
+  resetReasoningBackend,
+  stubReasoningBackend,
+} from './reasoning-backend.js';
+import type { ReasoningBackend } from './reasoning-backend-contracts.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
 import {
@@ -11,6 +21,7 @@ import {
   type ScenarioInterceptor,
 } from './scenario-interceptor.js';
 import { createScenarioRunContext, type ScenarioRunContext } from './scenario-run-context.js';
+import { runServingScenarioFixture } from './scenario-run-scope.js';
 import { safeMkdir, safeRmSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
 function scenario(overrides: Partial<ScenarioDefinition> = {}): ScenarioDefinition {
@@ -59,11 +70,13 @@ afterEach(() => {
 describe('installScenarioInterceptor (ES-02)', () => {
   it('records admitted ops observe-only, with redacted params, and never decides', async () => {
     const { interceptor } = setup();
-    const result = await runOpPreflight({
-      op: 'demo:apply_thing',
-      params: { target: 'x', api_key: 'sk-abcdefghijklmnopqrstuvwx' },
-      source: 'pipeline',
-    });
+    const result = await interceptor.runInScope(() =>
+      runOpPreflight({
+        op: 'demo:apply_thing',
+        params: { target: 'x', api_key: 'sk-abcdefghijklmnopqrstuvwx' },
+        source: 'pipeline',
+      })
+    );
     expect(result.decision).toBe('allow');
     expect(result.listener_ids).toContain(SCENARIO_CAPTURE_LISTENER_ID);
     expect(interceptor.log.ops).toEqual([
@@ -80,13 +93,15 @@ describe('installScenarioInterceptor (ES-02)', () => {
     ]);
 
     // Approval-required and not granted: the built-in guard still asks.
-    const gated = await runOpPreflight({
-      op: 'demo:apply_thing',
-      params: {},
-      source: 'pipeline',
-      requiresApproval: true,
-      approvalGranted: false,
-    });
+    const gated = await interceptor.runInScope(() =>
+      runOpPreflight({
+        op: 'demo:apply_thing',
+        params: {},
+        source: 'pipeline',
+        requiresApproval: true,
+        approvalGranted: false,
+      })
+    );
     expect(gated.decision).toBe('ask');
     expect(interceptor.log.ops[1]?.admitted).toBeUndefined();
     expect(interceptor.log.approvals).toEqual([
@@ -112,11 +127,9 @@ describe('installScenarioInterceptor (ES-02)', () => {
       check: () => ({ decision: 'block', reason: 'late block' }),
     });
     try {
-      const result = await runOpPreflight({
-        op: 'demo:apply_thing',
-        params: {},
-        source: 'pipeline',
-      });
+      const result = await interceptor.runInScope(() =>
+        runOpPreflight({ op: 'demo:apply_thing', params: {}, source: 'pipeline' })
+      );
       expect(result.decision).toBe('block');
       expect(interceptor.log.ops[0]?.admitted).toBeUndefined();
     } finally {
@@ -126,45 +139,47 @@ describe('installScenarioInterceptor (ES-02)', () => {
 
   it('serves fixtures without touching real handlers and fails closed on unstubbed ops', async () => {
     const { interceptor } = setup();
-    const served = resolveActuatorOperation('demo', 'apply_thing');
-    expect(served).toMatchObject({ source: 'scenario-fixture' });
-    const out = await served!.handler!(
-      'apply_thing',
-      { export_as: 'thing', _step_id: 'internal' },
-      { before: 1 },
-      'apply'
-    );
-    expect(out).toEqual({
-      handled: true,
-      ctx: { before: 1, applied: true, thing: { id: 'thing-1' } },
-    });
+    await interceptor.runInScope(async () => {
+      const served = resolveActuatorOperation('demo', 'apply_thing');
+      expect(served).toMatchObject({ source: 'scenario-fixture' });
+      const out = await served!.handler!(
+        'apply_thing',
+        { export_as: 'thing', _step_id: 'internal' },
+        { before: 1 },
+        'apply'
+      );
+      expect(out).toEqual({
+        handled: true,
+        ctx: { before: 1, applied: true, thing: { id: 'thing-1' } },
+      });
 
-    await expect(
-      resolveActuatorOperation('demo', 'broken')!.handler!('broken', {}, {}, 'apply')
-    ).rejects.toThrow('fixture failure');
-    expect(() => resolveActuatorOperation('system', 'exec')).toThrow(
-      '[SCENARIO_UNSTUBBED_OP] system:exec'
-    );
-    // Pure passthrough ops keep their normal path.
-    expect(resolveActuatorOperation('system', 'log')).toMatchObject({
-      source: 'actuator-op-registry',
+      await expect(
+        resolveActuatorOperation('demo', 'broken')!.handler!('broken', {}, {}, 'apply')
+      ).rejects.toThrow('fixture failure');
+      expect(() => resolveActuatorOperation('system', 'exec')).toThrow(
+        '[SCENARIO_UNSTUBBED_OP] system:exec'
+      );
+      // Pure passthrough ops keep their normal path.
+      expect(resolveActuatorOperation('system', 'log')).toMatchObject({
+        source: 'actuator-op-registry',
+      });
+      expect(interceptor.log.ops.map((r) => [r.seq, r.op, r.stage, r.outcome])).toEqual([
+        [1, 'demo:apply_thing', 'apply', 'ok'],
+        [2, 'demo:broken', 'apply', 'error'],
+        [3, 'system:exec', 'unstubbed', undefined],
+      ]);
+      expect(interceptor.log.ops[0]?.params).toEqual({ export_as: 'thing' });
     });
-    expect(interceptor.log.ops.map((r) => [r.seq, r.op, r.stage, r.outcome])).toEqual([
-      [1, 'demo:apply_thing', 'apply', 'ok'],
-      [2, 'demo:broken', 'apply', 'error'],
-      [3, 'system:exec', 'unstubbed', undefined],
-    ]);
-    expect(interceptor.log.ops[0]?.params).toEqual({ export_as: 'thing' });
   });
 
   it('lets provider-qualified runs fall through to real ops', () => {
-    setup(
+    const { interceptor } = setup(
       scenario({
         lane: 'live-only',
         executionProfile: 'provider-qualified',
       })
     );
-    expect(resolveActuatorOperation('system', 'exec')).toMatchObject({
+    expect(interceptor.runInScope(() => resolveActuatorOperation('system', 'exec'))).toMatchObject({
       source: 'actuator-op-registry',
     });
   });
@@ -177,19 +192,17 @@ describe('installScenarioInterceptor (ES-02)', () => {
         fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
       })
     );
-    expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })).toMatchObject({
+    const ask = (opId: string) =>
+      interceptor.runInScope(() =>
+        runServingScenarioFixture(opId, () => requireRiskyApproval({ opId, agentId: 't' }))
+      );
+    expect(ask('secret:grant')).toMatchObject({
       allowed: false,
       message: '[SCENARIO_APPROVAL_REJECTED] secret:grant',
     });
     interceptor.setApprovalDecision('secret:grant', 'approved');
-    expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })).toEqual({
-      allowed: true,
-      status: 'approved',
-    });
-    expect(requireRiskyApproval({ opId: 'other:op', agentId: 't' })).toMatchObject({
-      allowed: false,
-      status: 'pending',
-    });
+    expect(ask('secret:grant')).toEqual({ allowed: true, status: 'approved' });
+    expect(ask('other:op')).toMatchObject({ allowed: false, status: 'pending' });
     expect(interceptor.log.approvals.map((r) => [r.kind, r.op, r.decision, r.previous])).toEqual([
       ['requested', 'secret:grant', 'rejected', undefined],
       ['decided', 'secret:grant', 'approved', 'rejected'],
@@ -199,12 +212,43 @@ describe('installScenarioInterceptor (ES-02)', () => {
   });
 
   it('never grants a risky approval for an op no fixture serves', () => {
-    setup(scenario({ seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] } }));
-    expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })).toMatchObject({
+    const { interceptor } = setup(
+      scenario({ seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] } })
+    );
+    expect(
+      interceptor.runInScope(() =>
+        runServingScenarioFixture('secret:grant', () =>
+          requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })
+        )
+      )
+    ).toMatchObject({
       allowed: false,
       status: 'pending',
       message: expect.stringContaining('[SCENARIO_APPROVAL_UNFIXTURED] secret:grant'),
     });
+  });
+
+  it('never grants an in-scope risky approval that no fixture dispatch raised (FU-01)', () => {
+    const base = scenario();
+    const { interceptor } = setup(
+      scenario({
+        seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] },
+        fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
+      })
+    );
+    const unfixtured = expect.stringContaining('[SCENARIO_APPROVAL_UNFIXTURED] secret:grant');
+    // Same op id, but raised by host code inside the turn rather than by the fixture.
+    expect(
+      interceptor.runInScope(() => requireRiskyApproval({ opId: 'secret:grant', agentId: 't' }))
+    ).toMatchObject({ allowed: false, status: 'pending', message: unfixtured });
+    // Raised while a different fixture op is being served.
+    expect(
+      interceptor.runInScope(() =>
+        runServingScenarioFixture('demo:apply_thing', () =>
+          requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })
+        )
+      )
+    ).toMatchObject({ allowed: false, message: unfixtured });
   });
 
   it('defers risky approvals to the canonical handler outside the simulated profile', () => {
@@ -217,7 +261,11 @@ describe('installScenarioInterceptor (ES-02)', () => {
         fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
       })
     );
-    const answer = requireRiskyApproval({ opId: 'secret:grant', agentId: 't' });
+    const answer = interceptor.runInScope(() =>
+      runServingScenarioFixture('secret:grant', () =>
+        requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })
+      )
+    );
     expect(answer.allowed).toBe(false);
     expect(answer.message ?? '').not.toMatch(/SCENARIO/);
     expect(interceptor.log.approvals.map((r) => [r.channel, r.op, r.decision])).toEqual([
@@ -253,7 +301,7 @@ describe('installScenarioInterceptor (ES-02)', () => {
   it('dispose removes every registration and a second install then succeeds', () => {
     const def = scenario();
     const { interceptor } = setup(def);
-    expect(getReasoningBackend().name).toBe('scenario-fixtures');
+    expect(interceptor.runInScope(() => getReasoningBackend().name)).toBe('scenario-fixtures');
     const ctx2 = createScenarioRunContext(def, { seedNonce: 'second' });
     expect(() => installScenarioInterceptor(ctx2, def)).toThrow(/duplicate listener id/);
     // The failed second install rolled back and did not disturb the first.
@@ -263,11 +311,125 @@ describe('installScenarioInterceptor (ES-02)', () => {
     expect(listOpPreflightListeners().map((l) => l.id)).not.toContain(SCENARIO_CAPTURE_LISTENER_ID);
     expect(getScenarioOpOverride()).toBeUndefined();
     expect(getReasoningBackend()).toBe(stubReasoningBackend);
-    expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' }).message).not.toMatch(
-      /SCENARIO/
-    );
+    expect(
+      interceptor.runInScope(
+        () => requireRiskyApproval({ opId: 'secret:grant', agentId: 't' }).message
+      )
+    ).not.toMatch(/SCENARIO/);
 
     const again = installScenarioInterceptor(ctx2, def);
     again.dispose();
+  });
+});
+
+describe('scenario scope isolation (FU-01)', () => {
+  function probe() {
+    let resolution: string;
+    try {
+      resolution = resolveActuatorOperation('system', 'exec')?.source ?? 'none';
+    } catch (error) {
+      resolution = (error as Error).message.slice(0, 24);
+    }
+    return {
+      resolution,
+      fixtureApproval: isScenarioApprovalGranted('secret', 'grant'),
+      riskyApproval: runServingScenarioFixture('secret:grant', () =>
+        requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })
+      ),
+      backend: getReasoningBackend().name,
+    };
+  }
+
+  function isolationSetup() {
+    const prior = { ...stubReasoningBackend, name: 'prior-backend' } as ReasoningBackend;
+    registerReasoningBackend(prior, { provenance: 'builtin', source: 'test' });
+    const base = scenario();
+    const installed = setup(
+      scenario({
+        seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] },
+        fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
+      })
+    );
+    cleanups.push(() => resetReasoningBackend());
+    return installed;
+  }
+
+  it('a concurrent out-of-scope task sees normal ops, canonical approval and the prior backend', async () => {
+    const { interceptor } = isolationSetup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Started outside the run: host work that happens to overlap it.
+    const outside = (async () => {
+      await gate;
+      const seen = probe();
+      await runOpPreflight({ op: 'demo:apply_thing', params: {}, source: 'pipeline' });
+      const reply = await getReasoningBackend().prompt('host question');
+      return { ...seen, reply };
+    })();
+
+    const inside = await interceptor.runInScope(async () => {
+      release();
+      const seenOutside = await outside;
+      return { seen: probe(), seenOutside };
+    });
+
+    expect(inside.seenOutside).toMatchObject({
+      resolution: 'actuator-op-registry',
+      fixtureApproval: false,
+      riskyApproval: { allowed: false, message: 'Approval gate is not registered' },
+      backend: 'prior-backend',
+    });
+    expect(inside.seenOutside.reply).toEqual(expect.any(String));
+    expect(inside.seen).toMatchObject({
+      resolution: '[SCENARIO_UNSTUBBED_OP] ',
+      fixtureApproval: true,
+      riskyApproval: { allowed: true, status: 'approved' },
+      backend: 'scenario-fixtures',
+    });
+    // Out-of-scope preflight and approval calls were not recorded.
+    expect(interceptor.log.ops.map((r) => [r.op, r.stage])).toEqual([['system:exec', 'unstubbed']]);
+    expect(interceptor.log.approvals.map((r) => r.op)).toEqual(['secret:grant']);
+    expect(interceptor.log.reasoning).toEqual([]);
+    // ...but surfaced as scope_lost (approval probes are not dispatches).
+    expect(interceptor.log.warnings.map((r) => [r.kind, r.op, r.source])).toEqual([
+      ['scope_lost', 'system:exec', 'op-dispatch'],
+      ['scope_lost', 'demo:apply_thing', 'pipeline'],
+    ]);
+  });
+
+  it('records no scope_lost warning outside the simulated profile', async () => {
+    const { interceptor } = setup(
+      scenario({ lane: 'live-only', executionProfile: 'provider-qualified' })
+    );
+    resolveActuatorOperation('system', 'exec');
+    await runOpPreflight({ op: 'demo:apply_thing', params: {}, source: 'pipeline' });
+    expect(interceptor.log.warnings).toEqual([]);
+  });
+
+  it('keeps nested async work started inside a turn in scope', async () => {
+    const { interceptor } = isolationSetup();
+    const results = await interceptor.runInScope(async () => {
+      await Promise.resolve();
+      const nested = await Promise.all([
+        (async () => {
+          await new Promise<void>((resolve) => setImmediate(resolve));
+          return probe();
+        })(),
+        new Promise<ReturnType<typeof probe>>((resolve) => queueMicrotask(() => resolve(probe()))),
+      ]);
+      await expect(getReasoningBackend().prompt('in scope')).rejects.toThrow(
+        '[SCENARIO_MODEL_CALL_FORBIDDEN]'
+      );
+      return nested;
+    });
+    for (const seen of results) {
+      expect(seen).toMatchObject({
+        resolution: '[SCENARIO_UNSTUBBED_OP] ',
+        fixtureApproval: true,
+        backend: 'scenario-fixtures',
+      });
+    }
   });
 });

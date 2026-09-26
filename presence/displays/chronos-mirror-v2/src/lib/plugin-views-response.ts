@@ -1,16 +1,21 @@
 import { listManagedPlugins, type ManagedPluginRecord } from '@agent/core/plugin-managed-install';
 import {
   composePluginViewsA2UI,
-  dispatchPluginViewAction,
   listPluginViewsForViewer,
   PluginViewError,
   pluginViewErrorStatus,
   resolvePluginViewAction,
   type LoadedPluginView,
-  type PluginViewActionOutcome,
   type PluginViewFilter,
   type PluginViewViewer,
 } from '@agent/core/plugin-view-contract';
+import {
+  dispatchPluginViewAction,
+  executeApprovedPluginViewAction,
+  listPluginViewActionRequests,
+  type PluginViewActionOutcome,
+  type PluginViewActionRequestSummary,
+} from '@agent/core/plugin-view-actions';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { toSurfaceAuthorizationContext, type ViewerContext } from './viewer-context';
 
@@ -53,10 +58,22 @@ export function readVisiblePluginViews(
   return listPluginViewsForViewer(listRecords(), viewerForPluginViews(viewer), filter);
 }
 
+/**
+ * FU-02: human action requests of the visible views. Only a viewer who may
+ * execute them (localadmin) sees them — they carry the queued params.
+ */
+export function readVisiblePluginViewActionRequests(
+  viewer: ViewerContext,
+  views: LoadedPluginView[]
+): PluginViewActionRequestSummary[] {
+  return viewer.role === 'localadmin' ? listPluginViewActionRequests(views) : [];
+}
+
 export function buildPluginViewsPayload(
   views: LoadedPluginView[],
   errors: Array<{ pluginId: string; viewId?: string; code: string }>,
-  locale: PluginViewLocale
+  locale: PluginViewLocale,
+  actionRequests: PluginViewActionRequestSummary[] = []
 ) {
   return {
     source_resource: 'plugin-views',
@@ -79,6 +96,19 @@ export function buildPluginViewsPayload(
       ...(error.viewId ? { view_id: error.viewId } : {}),
       code: error.code,
     })),
+    action_requests: actionRequests.map((request) => ({
+      approval_request_id: request.approvalRequestId,
+      plugin_id: request.pluginId,
+      view_id: request.viewId,
+      action_id: request.actionId,
+      params: request.params,
+      status: request.status,
+      requested_at: request.requestedAt,
+      // Chronos does not activate plugins in-process (FU-02 known gap), so an
+      // approved request is usually not executable here.
+      executable: request.executable,
+      ...(request.unavailableReason ? { unavailable_reason: request.unavailableReason } : {}),
+    })),
     a2ui: composePluginViewsA2UI(views, (key) => pluginViewTitle(key, locale)),
   };
 }
@@ -88,10 +118,14 @@ export interface PluginViewActionInput {
   view_id: string;
   action_id: string;
   params?: Record<string, unknown>;
+  /** FU-02: execute the approved human action instead of queueing it. */
+  approval_request_id?: string;
 }
 
+const APPROVAL_REQUEST_ID = /^[a-z0-9-]{1,128}$/iu;
+
 export function parsePluginViewActionInput(body: Record<string, unknown>): PluginViewActionInput {
-  const allowed = new Set(['plugin_id', 'view_id', 'action_id', 'params']);
+  const allowed = new Set(['plugin_id', 'view_id', 'action_id', 'params', 'approval_request_id']);
   const unknownKey = Object.keys(body).find((key) => !allowed.has(key));
   if (unknownKey)
     throw new PluginViewError('PLUGIN_VIEW_PARAMS_INVALID', `unknown field ${unknownKey}`);
@@ -109,17 +143,27 @@ export function parsePluginViewActionInput(body: Record<string, unknown>): Plugi
   ) {
     throw new PluginViewError('PLUGIN_VIEW_PARAMS_INVALID', 'params must be an object');
   }
+  const rawApprovalRequestId = body.approval_request_id;
+  if (
+    rawApprovalRequestId !== undefined &&
+    (typeof rawApprovalRequestId !== 'string' || !APPROVAL_REQUEST_ID.test(rawApprovalRequestId))
+  ) {
+    throw new PluginViewError('PLUGIN_VIEW_PARAMS_INVALID', 'approval_request_id is invalid');
+  }
+  const approvalRequestId = typeof rawApprovalRequestId === 'string' ? rawApprovalRequestId : '';
   return {
     plugin_id: text('plugin_id'),
     view_id: text('view_id'),
     action_id: text('action_id'),
     ...(params ? { params: params as Record<string, unknown> } : {}),
+    ...(approvalRequestId ? { approval_request_id: approvalRequestId } : {}),
   };
 }
 
 /**
  * Resolves the requested view among the plugin views visible to the viewer
- * and dispatches the action. A plugin that exists but is not activatable
+ * and dispatches the action — or, with `approval_request_id`, executes the
+ * approved human action once. A plugin that exists but is not activatable
  * (pending approval, digest mismatch) is 403; a view the viewer cannot see
  * is 404 so its existence is not disclosed.
  */
@@ -150,6 +194,13 @@ export async function runPluginViewAction(
     );
   }
   const resolved = resolvePluginViewAction(view, input.action_id, input.params);
+  if (input.approval_request_id) {
+    return executeApprovedPluginViewAction(resolved, input.approval_request_id, {
+      executedBy: viewer.principalId || `chronos:${viewer.role}`,
+      actorRole: viewer.role,
+      surface: 'chronos',
+    });
+  }
   return dispatchPluginViewAction(resolved, {
     requestedBy: viewer.principalId || `chronos:${viewer.role}`,
     actorRole: viewer.role,

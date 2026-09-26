@@ -14,7 +14,11 @@ import {
   type ScenarioEvidenceClass,
 } from './scenario-evidence-class.js';
 import type { ScenarioCheckResult } from './scenario-final-checks.js';
-import type { ScenarioSideEffectLog } from './scenario-side-effect-log.js';
+import {
+  scenarioWarningsDropped,
+  type ScenarioSideEffectLog,
+  type ScenarioWarningRecord,
+} from './scenario-side-effect-log.js';
 
 export type ScenarioRunStatus = 'pass' | 'fail' | 'skipped' | 'lane_skipped' | 'error';
 export type ScenarioTurnStatus = 'pass' | 'fail' | 'error';
@@ -38,6 +42,14 @@ export interface ScenarioSideEffectSummary {
   reasoning_calls: number;
 }
 
+/** FU-01: run diagnostics, grouped by kind / op / source. */
+export interface ScenarioReportWarning {
+  kind: ScenarioWarningRecord['kind'];
+  op: string;
+  source: ScenarioWarningRecord['source'];
+  count: number;
+}
+
 export interface ScenarioReport {
   schema_version: typeof SCENARIO_REPORT_SCHEMA_VERSION;
   scenario_id: string;
@@ -52,6 +64,10 @@ export interface ScenarioReport {
   turns: ScenarioTurnReport[];
   final_checks: ScenarioCheckResult[];
   side_effects: ScenarioSideEffectSummary;
+  /** Present only when the run produced warnings (e.g. `scope_lost`). */
+  warnings?: ScenarioReportWarning[];
+  /** Present only when the warning cap (MAX_SCENARIO_WARNINGS) dropped records. */
+  warnings_dropped?: number;
   started_at: string;
   finished_at: string;
   /** Virtual-clock duration (deterministic). */
@@ -82,6 +98,17 @@ export function summarizeSideEffects(log: ScenarioSideEffectLog): ScenarioSideEf
   };
 }
 
+export function summarizeWarnings(log: ScenarioSideEffectLog): ScenarioReportWarning[] {
+  const grouped = new Map<string, ScenarioReportWarning>();
+  for (const record of log.warnings) {
+    const key = JSON.stringify([record.kind, record.op, record.source]);
+    const existing = grouped.get(key);
+    if (existing) existing.count += 1;
+    else grouped.set(key, { kind: record.kind, op: record.op, source: record.source, count: 1 });
+  }
+  return [...grouped.values()];
+}
+
 export interface BuildScenarioReportInput {
   def: ScenarioDefinition;
   runId: string;
@@ -96,6 +123,8 @@ export interface BuildScenarioReportInput {
 }
 
 export function buildScenarioReport(input: BuildScenarioReportInput): ScenarioReport {
+  const warnings = input.log ? summarizeWarnings(input.log) : [];
+  const warningsDropped = input.log ? scenarioWarningsDropped(input.log) : 0;
   return {
     schema_version: SCENARIO_REPORT_SCHEMA_VERSION,
     scenario_id: input.def.id,
@@ -109,6 +138,8 @@ export function buildScenarioReport(input: BuildScenarioReportInput): ScenarioRe
     turns: input.turns ?? [],
     final_checks: input.finalChecks ?? [],
     side_effects: input.log ? summarizeSideEffects(input.log) : emptySideEffectSummary(),
+    ...(warnings.length > 0 ? { warnings } : {}),
+    ...(warningsDropped > 0 ? { warnings_dropped: warningsDropped } : {}),
     started_at: new Date(input.startedAtMs).toISOString(),
     finished_at: new Date(input.finishedAtMs).toISOString(),
     duration_ms: input.finishedAtMs - input.startedAtMs,
@@ -148,6 +179,13 @@ export function renderScenarioReportMarkdown(report: ScenarioReport): string {
       `${effects.approvals_requested} approval requests, ${effects.approvals_decided} decisions, ` +
       `${effects.writes} writes, ${effects.reasoning_calls} reasoning calls`
   );
+  for (const warning of report.warnings ?? []) {
+    lines.push(
+      `- warning ${warning.kind}: ${escapeCell(warning.op)} via ${warning.source} (${warning.count}x)`
+    );
+  }
+  if (report.warnings_dropped)
+    lines.push(`- warning cap reached: ${report.warnings_dropped} warning(s) dropped`);
   for (const turn of report.turns) {
     lines.push('', `## Turn ${turn.index} (${turn.kind}): ${turn.status}`);
     if (turn.error) lines.push('', `error: ${escapeCell(turn.error)}`);

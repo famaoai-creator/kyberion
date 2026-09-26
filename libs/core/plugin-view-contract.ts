@@ -40,13 +40,6 @@ import {
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
-import {
-  computeApprovalPayloadHash,
-  createApprovalRequest,
-  listApprovalRequests,
-} from './approval-store.js';
-import { resolveActuatorOperation } from './actuator-op-registry.js';
-import { runOpPreflight } from './op-preflight.js';
 import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 
 // ---------------------------------------------------------------------------
@@ -84,7 +77,10 @@ export type PluginViewErrorCode =
   | 'PLUGIN_VIEW_DENIED'
   | 'PLUGIN_VIEW_NOT_FOUND'
   | 'PLUGIN_VIEW_PARAMS_INVALID'
-  | 'PLUGIN_VIEW_ACTION_UNAVAILABLE';
+  | 'PLUGIN_VIEW_ACTION_UNAVAILABLE'
+  | 'PLUGIN_VIEW_APPROVAL_REQUIRED'
+  | 'PLUGIN_VIEW_APPROVAL_CONSUMED'
+  | 'PLUGIN_VIEW_APPROVAL_MISMATCH';
 
 export class PluginViewError extends Error {
   constructor(
@@ -104,10 +100,13 @@ export function pluginViewErrorStatus(code: PluginViewErrorCode): number {
     case 'PLUGIN_VIEW_ACTION_DENIED':
     case 'PLUGIN_VIEW_DENIED':
     case 'PLUGIN_VIEW_CAPABILITY_DENIED':
+    case 'PLUGIN_VIEW_APPROVAL_MISMATCH':
       return 403;
     case 'PLUGIN_VIEW_PARAMS_INVALID':
       return 400;
     case 'PLUGIN_VIEW_ACTION_UNAVAILABLE':
+    case 'PLUGIN_VIEW_APPROVAL_REQUIRED':
+    case 'PLUGIN_VIEW_APPROVAL_CONSUMED':
       return 409;
     default:
       return 422;
@@ -133,6 +132,8 @@ export interface LoadedPluginView {
   messages: A2UIMessage[];
   providedOps: string[];
   contentDigest?: string;
+  /** Digest of the approved permission grant (managed installs only). */
+  permissionsDigest?: string;
   /** Tenant the managed install was narrowed against (absent = shared). */
   tenantSlug?: string;
 }
@@ -640,6 +641,7 @@ export function loadPluginViews(
   let pluginId: string;
   let grant: PluginPermissionGrant | null | undefined;
   let contentDigest: string | undefined;
+  let permissionsDigest: string | undefined;
   let tenantSlug: string | undefined;
   if (typeof source === 'string') {
     pluginRoot = path.resolve(source);
@@ -660,6 +662,7 @@ export function loadPluginViews(
     pluginId = source.pluginId;
     grant = source.grantedPermissions ?? null;
     contentDigest = source.contentDigest;
+    permissionsDigest = source.permissionsDigest;
     tenantSlug = source.tenantSlug;
   }
 
@@ -694,6 +697,7 @@ export function loadPluginViews(
         messages,
         providedOps,
         ...(contentDigest ? { contentDigest } : {}),
+        ...(permissionsDigest ? { permissionsDigest } : {}),
         ...(tenantSlug ? { tenantSlug } : {}),
       });
     } catch (error) {
@@ -825,108 +829,6 @@ export function resolvePluginViewAction(
     );
   }
   return { view, action, params: value };
-}
-
-export type PluginViewActionOutcome =
-  | { status: 'approval_required'; approvalRequestId: string }
-  | { status: 'dispatched'; handled: boolean };
-
-export interface DispatchPluginViewActionContext {
-  requestedBy: string;
-  actorRole: string;
-  surface: 'chronos' | 'api';
-}
-
-/** Chronos approval channel (listed by the Chronos approvals queue). */
-export const PLUGIN_VIEW_APPROVAL_CHANNEL = 'chronos';
-
-/**
- * `human` actions become a human-only approval request in the shared approval
- * store (the existing approval UI path); `agent` actions are dispatched only
- * when the owning plugin is active in this process and op preflight admits
- * the call. Nothing here imports or activates plugin code.
- */
-export async function dispatchPluginViewAction(
-  resolved: ResolvedPluginViewAction,
-  context: DispatchPluginViewActionContext
-): Promise<PluginViewActionOutcome> {
-  const { view, action, params } = resolved;
-  const target = `${view.pluginId}/${view.declaration.id}/${action.id}`;
-  if (action.authority === 'human') {
-    const payloadHash = computeApprovalPayloadHash({
-      plugin_id: view.pluginId,
-      content_digest: view.contentDigest ?? null,
-      view_id: view.declaration.id,
-      action_id: action.id,
-      op: action.op,
-      params,
-    });
-    const effectBinding = `plugin-view-action:${target}`;
-    const existing = listApprovalRequests({
-      storageChannels: [PLUGIN_VIEW_APPROVAL_CHANNEL],
-      status: 'pending',
-    }).find(
-      (request) =>
-        request.accountability?.payloadHash === payloadHash &&
-        request.accountability?.effectBinding === effectBinding
-    );
-    if (existing) return { status: 'approval_required', approvalRequestId: existing.id };
-    // Same authority the plugin subsystem uses for install approvals
-    // (plugin-managed-install.ts): the request is a governed artifact of the
-    // plugin subsystem; the viewer was authorized by the calling surface.
-    const record = createApprovalRequest('mission_controller', {
-      channel: PLUGIN_VIEW_APPROVAL_CHANNEL,
-      storageChannel: PLUGIN_VIEW_APPROVAL_CHANNEL,
-      threadTs: target,
-      correlationId: `${target}:${payloadHash.slice(0, 16)}`,
-      requestedBy: context.requestedBy,
-      draft: {
-        title: `Plugin view action: ${action.op}`,
-        summary: `Plugin '${view.pluginId}' view '${view.declaration.id}' requests '${action.op}'.`,
-        details: `Params: ${JSON.stringify(params)}`,
-        severity: 'medium',
-      },
-      requestedByContext: {
-        surface: context.surface,
-        actorId: context.requestedBy,
-        actorRole: context.actorRole,
-      },
-      justification: {
-        reason: 'The plugin declared this view action with authority:human.',
-        requestedEffects: [effectBinding],
-      },
-      accountability: { finalDecision: 'human_only', payloadHash, effectBinding },
-    });
-    return { status: 'approval_required', approvalRequestId: record.id };
-  }
-
-  const [domain, ...rest] = action.op.split(':');
-  let operation: ReturnType<typeof resolveActuatorOperation> = null;
-  try {
-    operation = resolveActuatorOperation(domain, rest.join(':'));
-  } catch {
-    operation = null; // unknown op: the plugin is not active here
-  }
-  if (
-    !operation?.handler ||
-    operation.source !== 'plugin' ||
-    operation.pluginId !== view.pluginId
-  ) {
-    throw new PluginViewError(
-      'PLUGIN_VIEW_ACTION_UNAVAILABLE',
-      `op '${action.op}' is not active for plugin '${view.pluginId}' in this process`
-    );
-  }
-  const preflight = await runOpPreflight({ op: action.op, params, source: 'pipeline' });
-  if (preflight.decision !== 'allow') {
-    throw new PluginViewError(
-      'PLUGIN_VIEW_ACTION_DENIED',
-      `op preflight ${preflight.decision}: ${preflight.reason ?? action.op}`
-    );
-  }
-  const input = preflight.repaired_input ?? params;
-  const outcome = await operation.handler(operation.action, input, {}, operation.stepType);
-  return { status: 'dispatched', handled: outcome.handled };
 }
 
 // ---------------------------------------------------------------------------

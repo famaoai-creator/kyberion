@@ -355,6 +355,243 @@ describe('plugin grant binding and comparison', () => {
     expect(() => rescanned[1].probe()).toThrow('SANDBOX_NETWORK_DENIED');
   });
 
+  it('reuses nested collection copies until any level changes (FU-05)', () => {
+    const binding = createPluginGrantBinding('nested-memo', EMPTY_PLUGIN_GRANT);
+    const raw = {
+      groups: [[() => getActiveSandboxPolicy()?.mode]] as Array<Array<() => unknown>>,
+      table: [new Map([['run', () => getActiveSandboxPolicy()?.mode]])],
+    };
+    const w = binding.wrapObject(raw);
+    const first = w.groups;
+    expect(w.groups).toBe(first);
+    expect(first[0]).toBe(w.groups[0]);
+    expect(first[0][0]()).toBe('read-only');
+    expect(w.table).toBe(w.table);
+    expect(w.table[0].get('run')!()).toBe('read-only');
+
+    // The plugin mutates an inner level.
+    raw.groups[0].push(() => validateUrl('https://example.com'));
+    const refreshed = w.groups;
+    expect(refreshed).not.toBe(first);
+    expect(refreshed[0]).toHaveLength(2);
+    expect(() => refreshed[0][1]()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(w.groups).toBe(refreshed);
+
+    // A raw closure pushed into a nested copy never survives a cached read.
+    const escape = () => validateUrl('https://example.com');
+    refreshed[0].push(escape);
+    const again = w.groups;
+    expect(again).not.toBe(refreshed);
+    expect(again[0]).toHaveLength(2);
+    expect(again[0]).not.toContain(escape);
+
+    // A closure added to a shared data element of a nested copy forces a fresh copy.
+    const mixed = { rows: [[() => 'ok', { label: 'data' }]] as Array<Array<unknown>> };
+    const wm = binding.wrapObject(mixed);
+    const rows = wm.rows;
+    expect(wm.rows).toBe(rows);
+    (mixed.rows[0][1] as Record<string, unknown>).probe = () => validateUrl('https://example.com');
+    const rescanned = wm.rows as Array<Array<{ probe: () => unknown }>>;
+    expect(rescanned).not.toBe(rows);
+    expect(() => rescanned[0][1].probe()).toThrow('SANDBOX_NETWORK_DENIED');
+  });
+
+  it('copies over-budget pure data instead of proxying it (FU-05)', () => {
+    const binding = createPluginGrantBinding('big-data', EMPTY_PLUGIN_GRANT);
+    const big = {
+      meta: { version: 1 },
+      rows: Array.from({ length: 20_000 }, (_, i) => ({ i, tag: `r${i}` })),
+    };
+    const hidden = {
+      rows: Array.from({ length: 20_000 }, (_, i) => ({ i })),
+      deep: { a: { b: { run: () => validateUrl('https://example.com') } } },
+    };
+    const api = binding.wrapObject({
+      big: () => big,
+      hidden: () => hidden,
+    });
+
+    const result = api.big();
+    expect(Array.isArray(result.rows)).toBe(true);
+    expect(structuredClone(result)).toEqual(big);
+    // Subtrees that fit the scan budget are shared, not copied.
+    expect(result.rows[5]).toBe(big.rows[5]);
+
+    const found = api.hidden();
+    expect(() => found.deep.a.b.run()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+
+    // Read through an object wrapper, the copy is memoised until the plugin mutates it.
+    const holder = binding.wrapObject({ big });
+    expect(holder.big).toBe(holder.big);
+    expect(structuredClone(holder.big)).toEqual(big);
+    big.meta.version = 2;
+    expect(holder.big.meta.version).toBe(2);
+  });
+
+  it('does not re-scan over-budget data on property reads (FU-05)', () => {
+    let scans = 0;
+    const counted = new Proxy(
+      { i: -1 },
+      {
+        ownKeys: (target) => {
+          scans += 1;
+          return Reflect.ownKeys(target);
+        },
+      }
+    );
+    const withProbe = { rows: [counted, ...Array.from({ length: 20_000 }, (_, i) => ({ i }))] };
+    const binding = createPluginGrantBinding('big-reads', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({ withProbe: () => withProbe });
+    const probed = api.withProbe();
+    scans = 0;
+    for (let read = 0; read < 3; read += 1) {
+      expect(probed.rows[0].i).toBe(-1);
+      expect(probed.rows).toHaveLength(20_001);
+    }
+    expect(scans).toBe(0);
+  });
+
+  it('bounds copies of deep chains and still enforces the grant at the bottom (FU-05)', () => {
+    const binding = createPluginGrantBinding('deep-chain', EMPTY_PLUGIN_GRANT);
+    type Link = { next?: Link; run?: () => unknown };
+    const root: Link = {};
+    let cursor = root;
+    for (let level = 0; level < 5_000; level += 1) {
+      cursor.next = {};
+      cursor = cursor.next;
+    }
+    cursor.run = () => validateUrl('https://example.com');
+    const api = binding.wrapObject({ chain: () => root });
+    let walk = api.chain();
+    for (let level = 0; level < 5_000; level += 1) walk = walk.next!;
+    expect(() => walk.run!()).toThrow('SANDBOX_NETWORK_DENIED');
+  });
+
+  /** Proxy handler whose every trap attempts a network call and records the verdict. */
+  const probingHandler = (attempts: string[]): ProxyHandler<object> => {
+    const probe = (trap: string): void => {
+      try {
+        validateUrl('https://example.com');
+        attempts.push(`${trap}:allowed`);
+      } catch {
+        attempts.push(`${trap}:denied`);
+      }
+    };
+    return {
+      has: (target, property) => (probe('has'), Reflect.has(target, property)),
+      ownKeys: (target) => (probe('ownKeys'), Reflect.ownKeys(target)),
+      deleteProperty: (target, property) => (
+        probe('deleteProperty'),
+        Reflect.deleteProperty(target, property)
+      ),
+      defineProperty: (target, property, descriptor) => (
+        probe('defineProperty'),
+        Reflect.defineProperty(target, property, descriptor)
+      ),
+      getPrototypeOf: (target) => (probe('getPrototypeOf'), Reflect.getPrototypeOf(target)),
+      setPrototypeOf: (target, prototype) => (
+        probe('setPrototypeOf'),
+        Reflect.setPrototypeOf(target, prototype)
+      ),
+      isExtensible: (target) => (probe('isExtensible'), Reflect.isExtensible(target)),
+      preventExtensions: (target) => (
+        probe('preventExtensions'),
+        Reflect.preventExtensions(target)
+      ),
+      getOwnPropertyDescriptor: (target, property) => (
+        probe('getOwnPropertyDescriptor'),
+        Reflect.getOwnPropertyDescriptor(target, property)
+      ),
+      set: (target, property, value) => (probe('set'), Reflect.set(target, property, value)),
+    };
+  };
+
+  it('runs plugin-supplied proxy traps on object wrappers inside the grant (FU-05)', () => {
+    const attempts: string[] = [];
+    const binding = createPluginGrantBinding('proxy-traps', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({
+      make: () => new Proxy({ run: () => 1, extra: 1 }, probingHandler(attempts)),
+    });
+    const made = api.make() as Record<string, unknown>;
+    attempts.length = 0;
+    expect('extra' in made).toBe(true);
+    expect(Reflect.ownKeys(made)).toContain('extra');
+    expect(Object.getOwnPropertyDescriptor(made, 'extra')).toBeDefined();
+    made.extra = 2;
+    expect(delete made.extra).toBe(true);
+    Object.defineProperty(made, 'added', { value: 1, configurable: true, writable: true });
+    expect(Object.getPrototypeOf(made)).toBe(Object.prototype);
+    Object.setPrototypeOf(made, Object.prototype);
+    expect(Object.isExtensible(made)).toBe(true);
+    Object.preventExtensions(made);
+    expect(Object.isExtensible(made)).toBe(false);
+    expect(attempts.filter((entry) => entry.endsWith(':allowed'))).toEqual([]);
+    expect(new Set(attempts.map((entry) => entry.split(':')[0]))).toEqual(
+      new Set([
+        'has',
+        'ownKeys',
+        'deleteProperty',
+        'defineProperty',
+        'getPrototypeOf',
+        'setPrototypeOf',
+        'isExtensible',
+        'preventExtensions',
+        'getOwnPropertyDescriptor',
+        'set',
+      ])
+    );
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
+  it('wraps a plugin Proxy function over a host shadow (FU-05)', () => {
+    // Reflection never reaches the plugin's traps (not even the engine's
+    // Proxy invariant checks); reads, writes and calls run under the grant.
+    const attempts: string[] = [];
+    const binding = createPluginGrantBinding('proxy-function', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({
+      tool: () => new Proxy(function tool() {}, probingHandler(attempts)),
+    });
+    const tool = api.tool() as unknown as Record<string, unknown> & (() => unknown);
+    attempts.length = 0;
+    tool.extra = 1;
+    expect(tool.extra).toBe(1);
+    expect('extra' in tool).toBe(false);
+    expect(Reflect.ownKeys(tool)).not.toContain('extra');
+    expect(Object.getOwnPropertyDescriptor(tool, 'extra')).toBeUndefined();
+    expect(Object.getPrototypeOf(tool)).toBe(Function.prototype);
+    expect(Object.isExtensible(tool)).toBe(true);
+    expect(tool()).toBeUndefined();
+    expect(attempts.filter((entry) => entry.endsWith(':allowed'))).toEqual([]);
+    expect(attempts).toContain('set:denied');
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
+  it('wraps a plugin Proxy function prototype so it runs under the grant (S9)', () => {
+    // The shadow target's own `prototype` is writable, so wrapping the
+    // reported value is invariant-safe (unlike the raw-prototype case for
+    // ordinary function/class targets covered above).
+    function tool(): void {}
+    (tool as unknown as { prototype: Record<string, unknown> }).prototype.run = () =>
+      validateUrl('https://example.com');
+    const binding = createPluginGrantBinding('proxy-function-prototype', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({ make: () => new Proxy(tool, {}) });
+    const made = api.make() as unknown as { prototype: { run: () => string } };
+    expect(() => made.prototype.run()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
+  it('runs `in` on a function wrapper under the grant when its prototype is a plugin Proxy (FU-05)', () => {
+    const attempts: string[] = [];
+    function tool(): void {}
+    Object.setPrototypeOf(tool, new Proxy(Function.prototype, probingHandler(attempts)));
+    const binding = createPluginGrantBinding('proxy-prototype', EMPTY_PLUGIN_GRANT);
+    const wrapped = binding.wrapFunction(tool);
+    attempts.length = 0;
+    expect('missing' in wrapped).toBe(false);
+    expect(attempts).toEqual(['has:denied']);
+  });
+
   it('subscribes to promise subclasses inside the grant (S3)', async () => {
     const attempts: string[] = [];
     class SneakyPromise<T> extends Promise<T> {
@@ -494,7 +731,7 @@ describe('plugin grant binding and comparison', () => {
 });
 
 describe('resolvePluginExecutionGrant policy for undeclared permissions', () => {
-  const managedRoot = pathResolver.shared(`plugins/managed-test-grant-${randomUUID()}`);
+  const managedRoot = pathResolver.sharedTmp(`plugins/managed-test-grant-${randomUUID()}`);
 
   it('gives an undeclared third-party plugin the empty grant', () => {
     const resolved = resolvePluginExecutionGrant(

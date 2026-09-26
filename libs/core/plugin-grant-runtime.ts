@@ -34,6 +34,7 @@
  *   descriptive `permissions` shape): not wrapped — the legacy trusted path.
  */
 import * as path from 'node:path';
+import { types as utilTypes } from 'node:util';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
@@ -203,12 +204,13 @@ export interface PluginGrantBinding {
    * and thrown functions and classes (incl. `new`), (async) iterators,
    * promise results / rejections, errors and objects with methods or getters
    * are wrapped recursively (lazily, on access); arrays, Map and Set that
-   * carry executables are returned as wrapped copies (pure data is returned
-   * as-is). A copy is a SNAPSHOT: a member read through an object wrapper
-   * returns the same copy while neither side changed it, a fresh one once
-   * the plugin mutates its collection. Writes to a copy never reach the
-   * plugin's collection; the next read through the wrapper returns a fresh
-   * copy of the plugin's current contents.
+   * carry executables, and plain data too large to scan, are returned as
+   * wrapped copies (pure data is returned as-is). A copy is a SNAPSHOT: a
+   * member read through an object wrapper returns the same copy while
+   * neither side changed it at any nesting level, a fresh one once the
+   * plugin mutates its source. Writes to a copy never reach the plugin's
+   * object; the next read through the wrapper returns a fresh copy of the
+   * plugin's current contents.
    */
   wrapFunction<F extends (...args: any[]) => any>(fn: F): F;
   /** Function-valued members, getters and their results run under the grant. */
@@ -397,11 +399,42 @@ function scanValue(value: object, depth: number, state: ScanState): ScanResult {
  * when it (transitively) carries executable members, so pure data results
  * stay cloneable. Class instances, generators and iterators always carry
  * prototype methods. A structure too large to scan within the budget is
- * treated as executable for this call only.
+ * treated as executable for this call only (and then copied, see
+ * MAX_COPY_DEPTH).
  */
+function scanForWrap(
+  value: object,
+  produced?: WeakSet<object>
+): { verdict: ScanVerdict | 'unknown'; work: number } {
+  const state: ScanState = { active: new Set(), nodes: 0, members: 0, produced };
+  const result = scanValue(value, 0, state);
+  return { verdict: result.verdict, work: state.nodes + state.members };
+}
+
 function carriesExecutable(value: object, produced?: WeakSet<object>): boolean {
-  const result = scanValue(value, 0, { active: new Set(), nodes: 0, members: 0, produced });
-  return result.verdict !== 'data';
+  return scanForWrap(value, produced).verdict !== 'data';
+}
+
+/**
+ * Over-budget pure data is copied level by level (each member is wrapped on
+ * its own, so subtrees that fit the scan budget are shared as-is and only
+ * executable leaves become wrappers) instead of being proxied, so large
+ * JSON-like results stay structured-cloneable. The copy is bounded: past
+ * MAX_COPY_DEPTH nested copies, or once the scans of over-budget containers
+ * in one result exceed MAX_COPY_WORK, the remaining containers fall back to
+ * lazy object wrappers (grant-safe, not cloneable).
+ */
+const MAX_COPY_DEPTH = MAX_SCAN_DEPTH;
+const MAX_COPY_WORK = 4_000_000;
+
+/** Plain objects (Object.prototype / null prototype) whose own properties are all data. */
+function isPlainDataObject(value: object): boolean {
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return false;
+  return Reflect.ownKeys(value).every((key) => {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    return !descriptor || 'value' in descriptor;
+  });
 }
 
 /** Thrown values that keep failing to wrap are replaced after this many attempts. */
@@ -434,19 +467,55 @@ function collectionItems(value: object): unknown[] | undefined {
   return items;
 }
 
-function sameItems(known: unknown[], current: unknown[] | undefined): boolean {
+/** collectionItems for plain collections and plain data objects (prototype marker first). */
+function snapshotItems(value: object): unknown[] | undefined {
+  if (isPlainCollection(value)) return collectionItems(value);
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return undefined;
+  const items: unknown[] = [proto === null ? 0 : 1];
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    if (!descriptor) continue;
+    if (!('value' in descriptor)) return undefined;
+    items.push(key, descriptor.value);
+  }
+  return items;
+}
+
+function sameItems(known: unknown[] | undefined, current: unknown[] | undefined): boolean {
   return (
+    known !== undefined &&
     current !== undefined &&
     known.length === current.length &&
     known.every((item, index) => Object.is(item, current[index]))
   );
 }
 
+/** A copy made by one wrap: its raw source and both sides' item snapshots at copy time. */
+interface CopyOrigin {
+  raw: object;
+  rawItems: unknown[] | undefined;
+  copyItems: unknown[] | undefined;
+}
+
+interface CopyContext {
+  /** raw -> copy, for cycles and shared references. */
+  seen: Map<object, object>;
+  /** copy -> origin, for every copy this wrap produced (nested ones included). */
+  origins: Map<object, CopyOrigin>;
+  depth: number;
+  /** Scan work spent on over-budget containers. */
+  work: number;
+}
+
+function newCopyContext(): CopyContext {
+  return { seen: new Map(), origins: new Map(), depth: 0, work: 0 };
+}
+
 interface CollectionMemo {
   raw: object;
-  rawItems: unknown[];
   copy: object;
-  copyItems: unknown[];
+  origins: Map<object, CopyOrigin>;
 }
 
 export function createPluginGrantBinding(
@@ -462,8 +531,8 @@ export function createPluginGrantBinding(
 
   const wrappedFunctions = new WeakMap<Function, Function>();
   const proxies = new WeakMap<object, object>();
-  // Only immutable wrappers (Proxies) are recorded; collection copies are
-  // ordinary mutable objects and are always re-scanned.
+  // Only immutable wrappers (Proxies) are recorded; copies are ordinary
+  // mutable objects and are validated against their origin (copyIsCurrent).
   const produced = new WeakSet<object>();
 
   /** Wraps a thrown value; one that keeps failing to wrap becomes a host error. */
@@ -501,41 +570,73 @@ export function createPluginGrantBinding(
     fn: Function,
     method?: { receiver: object; self: () => object }
   ): Function => {
-    const proxy: Function = new Proxy(fn, {
-      apply: (target, thisArg, args) => {
+    // A plugin Proxy cannot be the wrapper's target: the engine's own Proxy
+    // invariant checks would call its traps outside the grant. It is wrapped
+    // over a host shadow instead, whose reflection (keys, descriptors,
+    // prototype, extensibility) is what the wrapper reports.
+    const pluginProxy = utilTypes.isProxy(fn);
+    const target: Function = pluginProxy ? function pluginFunctionShadow() {} : fn;
+    const reflective: ProxyHandler<Function> = pluginProxy
+      ? {}
+      : {
+          // Ordinary function targets: plugin code is only reachable through
+          // accessors (reported wrapped) and a plugin Proxy on the prototype
+          // chain (`in` walks it, so it runs under the grant).
+          has: (_target, property) => guard(() => Reflect.has(fn, property)),
+          getOwnPropertyDescriptor: (_target, property) => {
+            const descriptor = Reflect.getOwnPropertyDescriptor(fn, property);
+            if (!descriptor || property === 'prototype') return descriptor;
+            if ('value' in descriptor) {
+              // A non-configurable, non-writable value must be reported as-is.
+              if (!descriptor.configurable && !descriptor.writable) return descriptor;
+              return { ...descriptor, value: wrapResult(descriptor.value) };
+            }
+            // A non-configurable accessor must report the identical get/set.
+            if (!descriptor.configurable) return descriptor;
+            return {
+              ...descriptor,
+              ...(descriptor.get ? { get: wrapCallable(descriptor.get) as () => unknown } : {}),
+              ...(descriptor.set
+                ? { set: wrapCallable(descriptor.set) as (v: unknown) => void }
+                : {}),
+            };
+          },
+        };
+    const proxy: Function = new Proxy(target, {
+      ...reflective,
+      apply: (_target, thisArg, args) => {
         const result: unknown = guard(() =>
-          Reflect.apply(target, method ? method.receiver : thisArg, args)
+          Reflect.apply(fn, method ? method.receiver : thisArg, args)
         );
         // Fluent / iterator-protocol methods returning the target keep the wrapper.
         return method && result === method.receiver ? method.self() : wrapResult(result);
       },
-      construct: (target, args, newTarget) =>
+      construct: (_target, args, newTarget) =>
         wrapResult(
-          guard(() => Reflect.construct(target, args, newTarget === proxy ? target : newTarget))
+          guard(() => Reflect.construct(fn, args, newTarget === proxy ? fn : newTarget))
         ) as object,
-      get: (target, property) => {
-        const value: unknown = guard(() => Reflect.get(target, property, target));
-        if (property === 'prototype') return value;
+      get: (_target, property) => {
+        const value: unknown = guard(() => Reflect.get(fn, property, fn));
+        if (property === 'prototype') {
+          // Ordinary function targets: `target` is `fn` itself, and a
+          // class's `prototype` is non-configurable and non-writable, so a
+          // wrapped value would violate the Proxy get invariant (and break
+          // `instanceof`); reported raw here regardless of whether `fn` is
+          // actually a class, to stay safe without inspecting it.
+          // Plugin Proxy shadow targets: `target` is the throwaway
+          // `pluginFunctionShadow`, whose own `prototype` is an ordinary
+          // function's (writable), so the invariant does not constrain the
+          // trap result — wrapping it is safe and keeps property access on
+          // the prototype (e.g. `wrapped.prototype.method()`) inside the
+          // grant like every other reflected value.
+          return pluginProxy ? wrapResult(value) : value;
+        }
         const own = Reflect.getOwnPropertyDescriptor(target, property);
-        if (own && !own.configurable && 'value' in own && !own.writable) return value;
+        if (own && !own.configurable && 'value' in own && !own.writable) return own.value;
         return wrapResult(value);
       },
-      getOwnPropertyDescriptor: (target, property) => {
-        const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
-        if (!descriptor || property === 'prototype') return descriptor;
-        if ('value' in descriptor) {
-          // A non-configurable, non-writable value must be reported as-is.
-          if (!descriptor.configurable && !descriptor.writable) return descriptor;
-          return { ...descriptor, value: wrapResult(descriptor.value) };
-        }
-        // A non-configurable accessor must report the identical get/set.
-        if (!descriptor.configurable) return descriptor;
-        return {
-          ...descriptor,
-          ...(descriptor.get ? { get: wrapCallable(descriptor.get) as () => unknown } : {}),
-          ...(descriptor.set ? { set: wrapCallable(descriptor.set) as (v: unknown) => void } : {}),
-        };
-      },
+      // Setters are plugin code too.
+      set: (_target, property, value) => guard(() => Reflect.set(fn, property, value, fn)),
     });
     produced.add(proxy);
     return proxy;
@@ -550,6 +651,34 @@ export function createPluginGrantBinding(
     return wrapped;
   };
 
+  /**
+   * A memoised copy is current while, at every level it copied, the copy
+   * still holds exactly the items it was built with and the plugin's source
+   * still holds the same raw items. Shared data items are re-scanned (as on
+   * every uncached read) so a closure inserted into one since forces a fresh
+   * copy; nested copies are validated the same way instead of re-scanned.
+   */
+  const copyIsCurrent = (
+    copy: object,
+    origins: Map<object, CopyOrigin>,
+    visited: Set<object>
+  ): boolean => {
+    if (visited.has(copy)) return true;
+    visited.add(copy);
+    const origin = origins.get(copy);
+    if (!origin || !sameItems(origin.copyItems, snapshotItems(copy))) return false;
+    if (!sameItems(origin.rawItems, snapshotItems(origin.raw))) return false;
+    return origin.copyItems!.every(
+      (item) =>
+        item === null ||
+        typeof item !== 'object' ||
+        produced.has(item) ||
+        (origins.has(item)
+          ? copyIsCurrent(item, origins, visited)
+          : !carriesExecutable(item, produced))
+    );
+  };
+
   const wrapTarget = (target: object): object => {
     if (produced.has(target)) return target;
     const cached = proxies.get(target);
@@ -557,9 +686,12 @@ export function createPluginGrantBinding(
     const methods = new Map<PropertyKey, { member: Function; bound: Function }>();
     const collectionMemos = new Map<PropertyKey, CollectionMemo>();
     /**
-     * Collection members are copied once and the copy is reused while both
-     * the plugin's collection and the copy still hold the same elements, so
-     * `wrapper.tools === wrapper.tools` and loops stay linear.
+     * Collection (and over-budget data) members are copied once and the copy
+     * is reused while it is still current (copyIsCurrent), so
+     * `wrapper.tools === wrapper.tools`. Every read still re-validates the
+     * memo (copyIsCurrent re-scans the raw and copy items), so revalidation
+     * cost is O(size) per read for over-budget data — the copy is reused,
+     * not the scan.
      */
     const wrapMemberValue = (property: PropertyKey, member: unknown): unknown => {
       if (member === null || typeof member !== 'object' || produced.has(member)) {
@@ -570,36 +702,19 @@ export function createPluginGrantBinding(
       if (
         memo &&
         memo.raw === member &&
-        sameItems(memo.copyItems, collectionItems(memo.copy)) &&
-        guard(
-          () =>
-            sameItems(memo.rawItems, collectionItems(member)) &&
-            // Shared data elements (and nested copies) are re-scanned as on
-            // every uncached read, so a closure inserted into one since
-            // forces a fresh copy.
-            memo.copyItems.every(
-              (item) =>
-                item === null ||
-                typeof item !== 'object' ||
-                produced.has(item) ||
-                !carriesExecutable(item, produced)
-            )
-        )
+        guard(() => copyIsCurrent(memo.copy, memo.origins, new Set()))
       ) {
         return memo.copy;
       }
-      const rawItems = guard(() => collectionItems(member));
-      const wrapped = wrapResult(member);
-      const copyItems =
-        rawItems && wrapped !== member && typeof wrapped === 'object' && wrapped !== null
-          ? collectionItems(wrapped)
-          : undefined;
-      if (rawItems && copyItems) {
+      const context = newCopyContext();
+      const wrapped = wrapResult(member, context);
+      const origin =
+        typeof wrapped === 'object' && wrapped !== null ? context.origins.get(wrapped) : undefined;
+      if (origin && origin.raw === member && origin.rawItems && origin.copyItems) {
         collectionMemos.set(property, {
           raw: member,
-          rawItems,
           copy: wrapped as object,
-          copyItems,
+          origins: context.origins,
         });
       } else {
         collectionMemos.delete(property);
@@ -687,95 +802,136 @@ export function createPluginGrantBinding(
         }
         return readMember(property);
       },
+      // Every trap that reaches the target (possibly a plugin Proxy) runs
+      // under the grant; results are still reconciled against the shadow.
       set: (_shadow, property, value) => guard(() => Reflect.set(target, property, value, target)),
       has: (_shadow, property) => {
-        const present = Reflect.has(target, property);
+        const present = guard(() => Reflect.has(target, property));
         if (!present) Reflect.deleteProperty(shadow, property);
         return present;
       },
-      ownKeys: () => {
-        reconcile();
-        return Reflect.ownKeys(target);
-      },
+      ownKeys: () =>
+        guard(() => {
+          reconcile();
+          return Reflect.ownKeys(target);
+        }),
       deleteProperty: (_shadow, property) => {
-        const deleted = Reflect.deleteProperty(target, property);
+        const deleted = guard(() => Reflect.deleteProperty(target, property));
         if (deleted) Reflect.deleteProperty(shadow, property);
         return deleted;
       },
-      defineProperty: (_shadow, property, descriptor) => {
-        const defined = Reflect.defineProperty(target, property, descriptor);
-        if (defined && !Reflect.getOwnPropertyDescriptor(target, property)?.configurable) {
-          mirror(property);
-        }
-        return defined;
-      },
-      preventExtensions: () => {
-        const prevented = Reflect.preventExtensions(target);
-        if (prevented) sealShadow();
-        return prevented;
-      },
-      isExtensible: () => {
-        sealShadow();
-        return Reflect.isExtensible(shadow);
-      },
-      getPrototypeOf: () => Reflect.getPrototypeOf(target),
+      defineProperty: (_shadow, property, descriptor) =>
+        guard(() => {
+          const defined = Reflect.defineProperty(target, property, descriptor);
+          if (defined && !Reflect.getOwnPropertyDescriptor(target, property)?.configurable) {
+            mirror(property);
+          }
+          return defined;
+        }),
+      preventExtensions: () =>
+        guard(() => {
+          const prevented = Reflect.preventExtensions(target);
+          if (prevented) sealShadow();
+          return prevented;
+        }),
+      isExtensible: () =>
+        guard(() => {
+          sealShadow();
+          return Reflect.isExtensible(shadow);
+        }),
+      getPrototypeOf: () => guard(() => Reflect.getPrototypeOf(target)),
       setPrototypeOf: (_shadow, prototype) => {
-        const updated = Reflect.setPrototypeOf(target, prototype);
+        const updated = guard(() => Reflect.setPrototypeOf(target, prototype));
         if (updated && !Reflect.isExtensible(shadow)) Reflect.setPrototypeOf(shadow, prototype);
         return updated;
       },
-      getOwnPropertyDescriptor: (_shadow, property) => mirror(property),
+      getOwnPropertyDescriptor: (_shadow, property) => guard(() => mirror(property)),
     });
     proxies.set(target, proxy);
     produced.add(proxy);
     return proxy;
   };
 
+  /** Registers a finished copy with its origin (item snapshots) for memo validation. */
+  const recordCopy = (
+    context: CopyContext,
+    raw: object,
+    rawItems: unknown[] | undefined,
+    copy: object
+  ): object => {
+    context.origins.set(copy, { raw, rawItems, copyItems: snapshotItems(copy) });
+    return copy;
+  };
+
   /** Arrays, Map and Set carrying executables are returned as wrapped copies. */
   const copyCollection = (
     value: unknown[] | Map<unknown, unknown> | Set<unknown>,
-    seen: Map<object, object>
+    context: CopyContext
   ): object => {
-    if (value instanceof Map) {
-      const copy = new Map<unknown, unknown>();
-      seen.set(value, copy);
-      Map.prototype.forEach.call(value, (entry: unknown, key: unknown) => {
-        copy.set(wrapResult(key, seen), wrapResult(entry, seen));
-      });
-      return copy;
+    const rawItems = collectionItems(value);
+    context.depth += 1;
+    try {
+      if (value instanceof Map) {
+        const copy = new Map<unknown, unknown>();
+        context.seen.set(value, copy);
+        Map.prototype.forEach.call(value, (entry: unknown, key: unknown) => {
+          copy.set(wrapResult(key, context), wrapResult(entry, context));
+        });
+        return recordCopy(context, value, rawItems, copy);
+      }
+      if (value instanceof Set) {
+        const copy = new Set<unknown>();
+        context.seen.set(value, copy);
+        Set.prototype.forEach.call(value, (entry: unknown) => {
+          copy.add(wrapResult(entry, context));
+        });
+        return recordCopy(context, value, rawItems, copy);
+      }
+      const copy: unknown[] = new Array(value.length);
+      context.seen.set(value, copy);
+      copyOwnProperties(value, copy, context);
+      return recordCopy(context, value, rawItems, copy);
+    } finally {
+      context.depth -= 1;
     }
-    if (value instanceof Set) {
-      const copy = new Set<unknown>();
-      seen.set(value, copy);
-      Set.prototype.forEach.call(value, (entry: unknown) => {
-        copy.add(wrapResult(entry, seen));
-      });
-      return copy;
+  };
+
+  /** Over-budget plain data objects are copied (never with a plugin-supplied prototype). */
+  const copyPlainObject = (value: object, context: CopyContext): object => {
+    const rawItems = snapshotItems(value);
+    const copy: object = Object.getPrototypeOf(value) === null ? Object.create(null) : {};
+    context.seen.set(value, copy);
+    context.depth += 1;
+    try {
+      copyOwnProperties(value, copy, context);
+    } finally {
+      context.depth -= 1;
     }
-    const copy: unknown[] = new Array(value.length);
-    seen.set(value, copy);
+    return recordCopy(context, value, rawItems, copy);
+  };
+
+  function copyOwnProperties(value: object, copy: object, context: CopyContext): void {
     for (const key of Reflect.ownKeys(value)) {
-      if (key === 'length') continue;
+      if (key === 'length' && Array.isArray(copy)) continue;
       const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
       if (!descriptor) continue;
       const item: unknown =
         'value' in descriptor ? descriptor.value : guard(() => Reflect.get(value, key, value));
       Reflect.defineProperty(copy, key, {
-        value: wrapResult(item, seen),
+        value: wrapResult(item, context),
         writable: true,
         enumerable: descriptor.enumerable,
         configurable: true,
       });
     }
-    return copy;
-  };
+  }
 
-  function wrapResult(value: unknown, seen?: Map<object, object>, thrownAttempt = 0): unknown {
+  function wrapResult(value: unknown, context?: CopyContext, thrownAttempt = 0): unknown {
     if (legacy) return value;
     if (typeof value === 'function') return wrapCallable(value);
     if (value === null || typeof value !== 'object') return value;
     if (produced.has(value)) return value;
-    const copied = seen?.get(value);
+    const copied = context?.seen.get(value);
     if (copied) return copied;
     // Scanning, copying and promise subscription may hit plugin-defined
     // proxy traps, getters or Promise subclass `then` / species; they run
@@ -797,8 +953,20 @@ export function createPluginGrantBinding(
             );
           });
         }
-        if (!carriesExecutable(value, produced)) return value;
-        if (isPlainCollection(value)) return copyCollection(value, seen ?? new Map());
+        const scan = scanForWrap(value, produced);
+        if (scan.verdict === 'data') return value;
+        const ctx = context ?? newCopyContext();
+        const copyable = ctx.depth < MAX_COPY_DEPTH;
+        if (scan.verdict === 'exec') {
+          return copyable && isPlainCollection(value)
+            ? copyCollection(value, ctx)
+            : wrapTarget(value);
+        }
+        ctx.work += scan.work;
+        if (copyable && ctx.work <= MAX_COPY_WORK) {
+          if (isPlainCollection(value)) return copyCollection(value, ctx);
+          if (isPlainDataObject(value)) return copyPlainObject(value, ctx);
+        }
         return wrapTarget(value);
       });
     } catch (error) {
