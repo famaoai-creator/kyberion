@@ -121,6 +121,42 @@ describe('handleMarkElements', () => {
     ).resolves.toEqual({ n: 2, marks_id: result.marks_id, x: 20, y: 55, label: 'Help' });
   });
 
+  it('passes the live-screen mapping to the accessibility detector', async () => {
+    const image = await writeScreen(40, 20);
+    const requests: unknown[] = [];
+    const detect = async (request: unknown) => {
+      requests.push(request);
+      return { detectors_run: ['os_accessibility'], candidates: [] };
+    };
+    await handleMarkElements(
+      {
+        path: image,
+        session_id: session('live'),
+        detectors: ['os_accessibility', 'pixel_regions'],
+        live_screen: true,
+        application: 'Finder',
+        display_origin: { x: -1440, y: 0 },
+        scale: 2,
+      },
+      { detect, redact: passthroughRedact, now: () => T0 }
+    );
+    await handleMarkElements(
+      { path: image, session_id: session('stored') },
+      { detect, redact: passthroughRedact, now: () => T0 }
+    );
+    expect(requests[0]).toMatchObject({
+      live_screen: true,
+      application: 'Finder',
+      screen_origin: { x: -1440, y: 0 },
+      screen_scale: 2,
+    });
+    // A screenshot not declared live never enables the accessibility detector,
+    // and the default scale is left for the detector to derive.
+    expect(requests[1]).not.toHaveProperty('live_screen');
+    expect(requests[1]).not.toHaveProperty('screen_scale');
+    expect(requests[1]).not.toHaveProperty('screen_origin');
+  });
+
   it('validates required params', async () => {
     await expect(handleMarkElements({ path: '', session_id: 's' })).rejects.toThrow(
       /requires params.path/
