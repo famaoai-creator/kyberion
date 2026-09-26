@@ -3366,6 +3366,10 @@
     "./workspace-sweep": {
       "types": "./dist/workspace-sweep.d.ts",
       "default": "./dist/workspace-sweep.js"
+    },
+    "./vault-mount": {
+      "types": "./dist/vault-mount.d.ts",
+      "default": "./dist/vault-mount.js"
     }
   },
   "dependencies": {
