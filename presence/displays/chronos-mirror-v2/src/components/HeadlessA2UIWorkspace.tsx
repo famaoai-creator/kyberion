@@ -13,6 +13,7 @@ import {
 import {
   parsePluginViewActionRequests,
   pluginViewActionExecuteBody,
+  pluginViewActionRequestControl,
   pluginViewActionRequestTone,
   pluginViewActionStatusKey,
   type PluginViewActionRequestItem,
@@ -160,7 +161,7 @@ export function HeadlessA2UIWorkspace({
                     tone={pluginViewActionRequestTone(item.status)}
                   />
                   <span>{`${item.pluginId} / ${item.viewId} / ${item.actionId}`}</span>
-                  {item.status === 'approved' ? (
+                  {pluginViewActionRequestControl(item) === 'execute' ? (
                     <Button
                       label={uxText('view_action_execute', locale)}
                       variant="primary"
@@ -169,6 +170,8 @@ export function HeadlessA2UIWorkspace({
                         void executeAction(item);
                       }}
                     />
+                  ) : pluginViewActionRequestControl(item) === 'not_executable' ? (
+                    <span>{uxText('view_action_not_executable', locale)}</span>
                   ) : null}
                 </Stack>
               ))}

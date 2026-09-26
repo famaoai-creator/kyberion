@@ -23,7 +23,10 @@
  * never read. Viewer role / tier / tenant gating is evaluated server-side by
  * `isPluginViewVisible`; a client filter can only narrow it.
  */
-import { getActivePluginContentDigest } from './plugin-lifecycle.js';
+import {
+  getActivePluginContentDigest,
+  getActivePluginPermissionsDigest,
+} from './plugin-lifecycle.js';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema, createAjv2020 } from './foundation/ajv.js';
@@ -31,7 +34,7 @@ import { isRecord } from './foundation/text.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeCreateExclusiveFileSync, safeExistsSync, safeLstat } from './secure-io.js';
+import { safeCreateExclusiveFileSync, safeExistsSync, safeLstat, safeRmSync } from './secure-io.js';
 import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from './a2ui.js';
 import { A2UI_BASE_CATALOG_ID, type KyberionBaseComponentType } from './a2ui-catalog.js';
 import { resolveVocabularyEntry } from './vocabulary-catalog.js';
@@ -874,6 +877,13 @@ export const PLUGIN_VIEW_ACTION_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 
 const ACTION_REQUEST_DIR = `active/shared/coordination/channels/${PLUGIN_VIEW_APPROVAL_CHANNEL}/plugin-view-actions`;
 const MAX_LISTED_ACTION_REQUESTS = 50;
+/** Newest sidecars scanned per listing; older requests are not listed. */
+export const MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS = 200;
+/** Sidecars of terminal approvals older than this are pruned. */
+export const PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_PRUNED_PER_CALL = 50;
+const ACTION_REQUEST_TIME_KEY_LENGTH = 15;
+const ACTION_REQUEST_ENTRY = /^(\d{15})-[a-z0-9-]{1,128}\.json$/iu;
 
 function actionTarget(resolved: ResolvedPluginViewAction): string {
   return `${resolved.view.pluginId}/${resolved.view.declaration.id}/${resolved.action.id}`;
@@ -884,14 +894,16 @@ function actionEffectBinding(resolved: ResolvedPluginViewAction): string {
 }
 
 /**
- * The approval of a human action is bound to the plugin, view, action, op,
- * params, the approved content digest and the approved grant: a reinstalled
- * plugin, a changed grant or changed params can never reuse it.
+ * The approval of a human action is bound to the plugin, its tenant, view,
+ * action, op, params, the approved content digest and the approved grant: a
+ * reinstalled plugin (also for another tenant), a changed grant or changed
+ * params can never reuse it.
  */
 export function computePluginViewActionPayloadHash(resolved: ResolvedPluginViewAction): string {
   const { view, action, params } = resolved;
   return computeApprovalPayloadHash({
     plugin_id: view.pluginId,
+    tenant_slug: view.tenantSlug ?? null,
     content_digest: view.contentDigest ?? null,
     permissions_digest: view.permissionsDigest ?? null,
     view_id: view.declaration.id,
@@ -905,6 +917,7 @@ export function computePluginViewActionPayloadHash(resolved: ResolvedPluginViewA
 interface PluginViewActionRequestRecord {
   approval_request_id: string;
   plugin_id: string;
+  tenant_slug: string | null;
   view_id: string;
   action_id: string;
   params: Record<string, unknown>;
@@ -912,12 +925,25 @@ interface PluginViewActionRequestRecord {
   requested_at: string;
 }
 
-function actionRequestPath(approvalRequestId: string): string {
-  return `${ACTION_REQUEST_DIR}/${approvalRequestId}.json`;
+/** Sidecar names start with the request time, so name order is age order. */
+function actionRequestPath(approvalRequestId: string, requestedAt: string): string {
+  const time = Math.max(0, Date.parse(requestedAt) || 0);
+  const key = String(time).padStart(ACTION_REQUEST_TIME_KEY_LENGTH, '0');
+  return `${ACTION_REQUEST_DIR}/${key}-${approvalRequestId}.json`;
 }
 
 function actionClaimPath(approvalRequestId: string): string {
   return `${ACTION_REQUEST_DIR}/${approvalRequestId}.claim.json`;
+}
+
+/** Sidecar entries (with their request time), newest first. */
+function listActionRequestEntries(): Array<{ entry: string; time: number }> {
+  return listGovernedArtifacts(ACTION_REQUEST_DIR)
+    .flatMap((entry) => {
+      const match = ACTION_REQUEST_ENTRY.exec(entry);
+      return match ? [{ entry, time: Number(match[1]) }] : [];
+    })
+    .sort((a, b) => (a.entry < b.entry ? 1 : a.entry > b.entry ? -1 : 0));
 }
 
 function isActionClaimed(approvalRequestId: string): boolean {
@@ -943,8 +969,15 @@ function claimApprovedAction(approvalRequestId: string, claim: Record<string, un
   }
 }
 
-/** Resolves the op only when the owning plugin is active in this process. */
-function activePluginOperation(resolved: ResolvedPluginViewAction) {
+/**
+ * Resolves the op only when the owning plugin is active in this process and
+ * runs the approved content. `requireApprovedGrant` (human actions) also
+ * requires the running module's grant to be the approved grant.
+ */
+function activePluginOperation(
+  resolved: ResolvedPluginViewAction,
+  options: { requireApprovedGrant?: boolean } = {}
+) {
   const { view, action } = resolved;
   const [domain, ...rest] = action.op.split(':');
   let operation: ReturnType<typeof resolveActuatorOperation> = null;
@@ -972,6 +1005,21 @@ function activePluginOperation(resolved: ResolvedPluginViewAction) {
       `plugin '${view.pluginId}' running in this process is not the approved copy; reload it first`
     );
   }
+  if (options.requireApprovedGrant) {
+    const activeGrant = getActivePluginPermissionsDigest(view.pluginId);
+    if (activeGrant === null) {
+      throw new PluginViewError(
+        'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+        `plugin '${view.pluginId}' runs without a permission grant (legacy); approved actions need a grant-bound plugin`
+      );
+    }
+    if (!view.permissionsDigest || activeGrant !== view.permissionsDigest) {
+      throw new PluginViewError(
+        'PLUGIN_VIEW_ACTION_UNAVAILABLE',
+        `plugin '${view.pluginId}' running in this process does not run under the approved grant; reload it first`
+      );
+    }
+  }
   return { ...operation, handler: operation.handler };
 }
 
@@ -987,6 +1035,47 @@ async function preflightActionInput(
     );
   }
   return preflight.repaired_input ?? params;
+}
+
+function isTerminalActionApproval(approval: ApprovalRequestRecord | null, now: number): boolean {
+  return (
+    !approval ||
+    Boolean(approval.applyResult) ||
+    (approval.status !== 'pending' && approval.status !== 'approved') ||
+    isApprovalRequestExpired(approval, now)
+  );
+}
+
+/**
+ * Removes sidecars (and claims) of requests older than the retention window
+ * whose approval is terminal (decided and used, rejected, expired or gone).
+ * Oldest first, at most `limit` per call. Returns the number pruned.
+ */
+export function prunePluginViewActionRequests(
+  options: { now?: number; limit?: number } = {}
+): number {
+  const now = options.now ?? Date.now();
+  const limit = options.limit ?? MAX_PRUNED_PER_CALL;
+  let pruned = 0;
+  for (const { entry, time } of listActionRequestEntries().reverse()) {
+    if (pruned >= limit || time > now - PLUGIN_VIEW_ACTION_REQUEST_RETENTION_MS) break;
+    const logicalPath = `${ACTION_REQUEST_DIR}/${entry}`;
+    const sidecar = readGovernedArtifactJson<PluginViewActionRequestRecord>(logicalPath);
+    const approvalRequestId =
+      sidecar && typeof sidecar.approval_request_id === 'string'
+        ? sidecar.approval_request_id
+        : null;
+    const approval = approvalRequestId ? loadActionApproval(approvalRequestId) : null;
+    if (!isTerminalActionApproval(approval, now)) continue;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(resolveGovernedArtifactPath(logicalPath));
+      if (approvalRequestId) {
+        safeRmSync(resolveGovernedArtifactPath(actionClaimPath(approvalRequestId)));
+      }
+    });
+    pruned += 1;
+  }
+  return pruned;
 }
 
 /**
@@ -1015,6 +1104,11 @@ export async function dispatchPluginViewAction(
         !isApprovalRequestExpired(request)
     );
     if (existing) return { status: 'approval_required', approvalRequestId: existing.id };
+    try {
+      prunePluginViewActionRequests();
+    } catch (error) {
+      logger.warn(`[plugin-view] action request prune failed (ignored): ${String(error)}`);
+    }
     // Same authority the plugin subsystem uses for install approvals
     // (plugin-managed-install.ts): the request is a governed artifact of the
     // plugin subsystem; the viewer was authorized by the calling surface.
@@ -1045,13 +1139,18 @@ export async function dispatchPluginViewAction(
     const sidecar: PluginViewActionRequestRecord = {
       approval_request_id: record.id,
       plugin_id: view.pluginId,
+      tenant_slug: view.tenantSlug ?? null,
       view_id: view.declaration.id,
       action_id: action.id,
       params,
       payload_hash: payloadHash,
       requested_at: record.requestedAt,
     };
-    writeGovernedArtifactJson('mission_controller', actionRequestPath(record.id), sidecar);
+    writeGovernedArtifactJson(
+      'mission_controller',
+      actionRequestPath(record.id, record.requestedAt),
+      sidecar
+    );
     return { status: 'approval_required', approvalRequestId: record.id };
   }
 
@@ -1076,32 +1175,63 @@ function loadActionApproval(approvalRequestId: string): ApprovalRequestRecord | 
   }
 }
 
+function principalKey(id: string | null | undefined): string {
+  return (id ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^(?:human|user):/u, '');
+}
+
+/**
+ * Self-approval is allowed (a single-operator localadmin requests, approves
+ * and executes); it is made explicit in the audit instead: true when the
+ * approver is also the requester or the executor.
+ */
+function isSelfApproved(
+  approval: ApprovalRequestRecord,
+  context: ExecutePluginViewActionContext
+): boolean {
+  const approver = principalKey(approval.decidedBy);
+  return (
+    approver.length > 0 &&
+    (principalKey(approval.requestedBy) === approver ||
+      principalKey(context.executedBy) === approver)
+  );
+}
+
+type ActionAuditEvent =
+  | { action: 'plugin_view.action.execute'; result: 'completed' | 'failed' | 'denied' }
+  | { action: 'plugin_view.action.started'; result: 'allowed' };
+
 function auditActionExecution(
   resolved: ResolvedPluginViewAction,
-  approval: ApprovalRequestRecord,
+  approvalRequestId: string,
+  approval: ApprovalRequestRecord | null,
   context: ExecutePluginViewActionContext,
-  result: 'completed' | 'failed' | 'denied',
+  event: ActionAuditEvent,
   reason: string
 ): void {
   try {
     auditChain.record({
       agentId: context.executedBy,
-      action: 'plugin_view.action.execute',
+      action: event.action,
       operation: resolved.action.op,
-      result,
+      result: event.result,
       reason,
-      correlationId: approval.id,
+      correlationId: approvalRequestId,
       metadata: {
         plugin_id: resolved.view.pluginId,
         view_id: resolved.view.declaration.id,
         action_id: resolved.action.id,
-        approval_request_id: approval.id,
-        requested_by: approval.requestedBy,
-        approved_by: approval.decidedBy ?? null,
+        approval_request_id: approvalRequestId,
+        requested_by: approval?.requestedBy ?? null,
+        approved_by: approval?.decidedBy ?? null,
+        self_approved: approval ? isSelfApproved(approval, context) : false,
         executed_by: context.executedBy,
         actor_role: context.actorRole,
         surface: context.surface,
         content_digest: resolved.view.contentDigest ?? null,
+        permissions_digest: resolved.view.permissionsDigest ?? null,
       },
       ...(resolved.view.tenantSlug ? { tenantSlug: resolved.view.tenantSlug } : {}),
     });
@@ -1110,13 +1240,21 @@ function auditActionExecution(
   }
 }
 
+function sameParams(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  return computeApprovalPayloadHash(left) === computeApprovalPayloadHash(right);
+}
+
 /**
  * Runs an approved `human` view action exactly once. The approval must be a
  * human, authenticated, unexpired decision whose payload hash equals the
- * hash recomputed from the current plugin (content + grant digest), view,
- * action and params. Every check and the op preflight run before the
- * approval is claimed, so a refusal never spends it; the claim itself is an
- * exclusive create, so a second execution is refused.
+ * hash recomputed from the current plugin (tenant, content + grant digest),
+ * view, action and params; the running module must be the approved copy under
+ * the approved grant, and op preflight may not rewrite the approved params
+ * (the handler always receives exactly the approved params). Every check
+ * runs before the approval is claimed and every refusal is audited, so a
+ * refusal never spends it; the claim itself is an exclusive create, so a
+ * second execution is refused. A claim without a recorded result (crash
+ * mid-execution) is reported as `unknown`, never as executed.
  */
 export async function executeApprovedPluginViewAction(
   resolved: ResolvedPluginViewAction,
@@ -1131,16 +1269,25 @@ export async function executeApprovedPluginViewAction(
     );
   }
   const approval = loadActionApproval(approvalRequestId);
+  const deny = (error: PluginViewError): never => {
+    auditActionExecution(
+      resolved,
+      approvalRequestId,
+      approval,
+      context,
+      { action: 'plugin_view.action.execute', result: 'denied' },
+      error.message
+    );
+    throw error;
+  };
+  const refuse = (code: PluginViewErrorCode, message: string): never =>
+    deny(new PluginViewError(code, message));
   if (!approval) {
-    throw new PluginViewError(
+    return refuse(
       'PLUGIN_VIEW_NOT_FOUND',
       `approval request '${approvalRequestId}' does not exist`
     );
   }
-  const refuse = (code: PluginViewErrorCode, message: string): never => {
-    auditActionExecution(resolved, approval, context, 'denied', `[${code}] ${message}`);
-    throw new PluginViewError(code, message);
-  };
   if (
     approval.threadTs !== actionTarget(resolved) ||
     approval.accountability?.finalDecision !== 'human_only' ||
@@ -1169,8 +1316,23 @@ export async function executeApprovedPluginViewAction(
     refuse('PLUGIN_VIEW_APPROVAL_REQUIRED', `approval '${approval.id}' has expired`);
   }
 
-  const operation = activePluginOperation(resolved);
-  const input = await preflightActionInput(resolved);
+  let operation: ReturnType<typeof activePluginOperation>;
+  let input: Record<string, unknown>;
+  try {
+    operation = activePluginOperation(resolved, { requireApprovedGrant: true });
+    input = await preflightActionInput(resolved);
+  } catch (error) {
+    if (error instanceof PluginViewError) return deny(error);
+    throw error;
+  }
+  // A preflight listener (plugin-registered ones included) may not turn the
+  // approved call into a different one.
+  if (!sameParams(input, resolved.params)) {
+    refuse(
+      'PLUGIN_VIEW_APPROVAL_MISMATCH',
+      `op preflight rewrote the params approved in '${approval.id}'`
+    );
+  }
   if (
     !claimApprovedAction(approval.id, {
       approval_request_id: approval.id,
@@ -1180,33 +1342,75 @@ export async function executeApprovedPluginViewAction(
   ) {
     refuse('PLUGIN_VIEW_APPROVAL_CONSUMED', `approval '${approval.id}' was already used`);
   }
+  auditActionExecution(
+    resolved,
+    approval.id,
+    approval,
+    context,
+    { action: 'plugin_view.action.started', result: 'allowed' },
+    'approved action claimed; running the handler'
+  );
 
-  const recordResult = (result: 'success' | 'failed', auditRef?: string) =>
-    recordApprovalApplyResult('mission_controller', {
-      channel: PLUGIN_VIEW_APPROVAL_CHANNEL,
-      requestId: approval.id,
-      applyResult: {
-        appliedAt: nowIso(),
-        appliedBy: context.executedBy,
-        result,
-        ...(auditRef ? { auditRef } : {}),
-      },
-    });
+  const recordResult = (result: 'success' | 'failed', auditRef?: string) => {
+    try {
+      recordApprovalApplyResult('mission_controller', {
+        channel: PLUGIN_VIEW_APPROVAL_CHANNEL,
+        requestId: approval.id,
+        applyResult: {
+          appliedAt: nowIso(),
+          appliedBy: context.executedBy,
+          result,
+          ...(auditRef ? { auditRef } : {}),
+        },
+      });
+    } catch (error) {
+      // The claim still prevents a second run; the request is reported `unknown`.
+      logger.warn(`[plugin-view] recording the action result failed: ${String(error)}`);
+    }
+  };
+  let outcome: Awaited<ReturnType<typeof operation.handler>>;
   try {
-    const outcome = await operation.handler(operation.action, input, {}, operation.stepType);
-    recordResult('success');
-    auditActionExecution(resolved, approval, context, 'completed', 'approved action executed');
-    return { status: 'executed', handled: outcome.handled, approvalRequestId: approval.id };
+    outcome = await operation.handler(
+      operation.action,
+      { ...resolved.params },
+      {},
+      operation.stepType
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     recordResult('failed', message.slice(0, 500));
-    auditActionExecution(resolved, approval, context, 'failed', message);
+    auditActionExecution(
+      resolved,
+      approval.id,
+      approval,
+      context,
+      { action: 'plugin_view.action.execute', result: 'failed' },
+      message
+    );
     throw error;
   }
+  recordResult('success');
+  auditActionExecution(
+    resolved,
+    approval.id,
+    approval,
+    context,
+    { action: 'plugin_view.action.execute', result: 'completed' },
+    'approved action executed'
+  );
+  return { status: 'executed', handled: outcome.handled, approvalRequestId: approval.id };
 }
 
 export type PluginViewActionRequestStatus =
-  'pending' | 'approved' | 'rejected' | 'expired' | 'executed' | 'failed' | 'stale' | 'closed';
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'executed'
+  | 'failed'
+  | 'unknown'
+  | 'stale'
+  | 'closed';
 
 export interface PluginViewActionRequestSummary {
   approvalRequestId: string;
@@ -1216,6 +1420,10 @@ export interface PluginViewActionRequestSummary {
   params: Record<string, unknown>;
   status: PluginViewActionRequestStatus;
   requestedAt: string;
+  /** True only for an approved request this process can run now. */
+  executable: boolean;
+  /** Why an approved request cannot run in this process (error code). */
+  unavailableReason?: PluginViewErrorCode;
 }
 
 function actionRequestStatus(
@@ -1225,7 +1433,8 @@ function actionRequestStatus(
 ): PluginViewActionRequestStatus {
   if (approval.applyResult)
     return approval.applyResult.result === 'success' ? 'executed' : 'failed';
-  if (isActionClaimed(approval.id)) return 'executed';
+  // Claimed without a recorded result: running now, or crashed mid-execution.
+  if (isActionClaimed(approval.id)) return 'unknown';
   if (approval.status === 'rejected') return 'rejected';
   if (approval.status === 'expired') return 'expired';
   if (approval.status !== 'pending' && approval.status !== 'approved') return 'closed';
@@ -1236,37 +1445,55 @@ function actionRequestStatus(
 
 /**
  * Human action requests of the given (already viewer-filtered) views, newest
- * first. `stale` = the plugin or its grant changed since the request, so the
- * approval can no longer be executed.
+ * first; only the newest `MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS` sidecars
+ * are read. A request is listed only for a view of the same plugin and
+ * tenant. `stale` = the plugin or its grant changed since the request, so the
+ * approval can no longer be executed. `executable` = approved and the
+ * approved copy runs in this process under the approved grant.
  */
 export function listPluginViewActionRequests(
   views: readonly LoadedPluginView[],
-  options: { now?: number } = {}
+  options: { now?: number; maxScanned?: number } = {}
 ): PluginViewActionRequestSummary[] {
   const now = options.now ?? Date.now();
   const byView = new Map(views.map((view) => [`${view.pluginId}/${view.declaration.id}`, view]));
   const summaries: PluginViewActionRequestSummary[] = [];
-  for (const entry of listGovernedArtifacts(ACTION_REQUEST_DIR)) {
-    if (!entry.endsWith('.json') || entry.endsWith('.claim.json')) continue;
+  const entries = listActionRequestEntries().slice(
+    0,
+    options.maxScanned ?? MAX_SCANNED_PLUGIN_VIEW_ACTION_REQUESTS
+  );
+  for (const { entry } of entries) {
     const sidecar = readGovernedArtifactJson<PluginViewActionRequestRecord>(
       `${ACTION_REQUEST_DIR}/${entry}`
     );
     if (!sidecar || !isRecord(sidecar.params)) continue;
     const view = byView.get(`${sidecar.plugin_id}/${sidecar.view_id}`);
-    if (!view) continue;
+    if (!view || (sidecar.tenant_slug ?? null) !== (view.tenantSlug ?? null)) continue;
     const approval = loadActionApproval(sidecar.approval_request_id);
     if (
       !approval ||
       approval.threadTs !== `${view.pluginId}/${view.declaration.id}/${sidecar.action_id}`
     )
       continue;
-    let currentHash: string | null = null;
+    let resolved: ResolvedPluginViewAction | null = null;
     try {
-      currentHash = computePluginViewActionPayloadHash(
-        resolvePluginViewAction(view, sidecar.action_id, sidecar.params)
-      );
+      resolved = resolvePluginViewAction(view, sidecar.action_id, sidecar.params);
     } catch {
-      currentHash = null; // action or schema no longer admits these params
+      resolved = null; // action or schema no longer admits these params
+    }
+    const status = actionRequestStatus(
+      approval,
+      resolved ? computePluginViewActionPayloadHash(resolved) : null,
+      now
+    );
+    let unavailableReason: PluginViewErrorCode | undefined;
+    if (status === 'approved' && resolved) {
+      try {
+        activePluginOperation(resolved, { requireApprovedGrant: true });
+      } catch (error) {
+        unavailableReason =
+          error instanceof PluginViewError ? error.code : 'PLUGIN_VIEW_ACTION_UNAVAILABLE';
+      }
     }
     summaries.push({
       approvalRequestId: approval.id,
@@ -1274,8 +1501,10 @@ export function listPluginViewActionRequests(
       viewId: view.declaration.id,
       actionId: sidecar.action_id,
       params: sidecar.params,
-      status: actionRequestStatus(approval, currentHash, now),
+      status,
       requestedAt: approval.requestedAt,
+      executable: status === 'approved' && resolved !== null && !unavailableReason,
+      ...(unavailableReason ? { unavailableReason } : {}),
     });
   }
   return summaries

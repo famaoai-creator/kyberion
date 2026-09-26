@@ -13,6 +13,7 @@ export const PLUGIN_VIEW_ACTION_REQUEST_STATUSES = [
   'expired',
   'executed',
   'failed',
+  'unknown',
   'stale',
   'closed',
 ] as const;
@@ -26,6 +27,8 @@ export interface PluginViewActionRequestItem {
   actionId: string;
   params: Record<string, unknown>;
   status: PluginViewActionRequestStatus;
+  /** The server can run it now (approved and the approved copy is active there). */
+  executable: boolean;
 }
 
 const STATUS_SET = new Set<string>(PLUGIN_VIEW_ACTION_REQUEST_STATUSES);
@@ -54,6 +57,7 @@ export function parsePluginViewActionRequests(raw: unknown): PluginViewActionReq
         actionId,
         params: entry.params,
         status: status as PluginViewActionRequestStatus,
+        executable: entry.executable === true,
       },
     ];
   });
@@ -74,6 +78,8 @@ export function pluginViewActionRequestTone(
     case 'failed':
     case 'rejected':
       return 'danger';
+    case 'unknown':
+      return 'accent';
     default:
       return 'neutral';
   }
@@ -82,6 +88,18 @@ export function pluginViewActionRequestTone(
 /** Vocabulary key of a request status label (`plugin` domain). */
 export function pluginViewActionStatusKey(status: PluginViewActionRequestStatus): string {
   return `view_action_status_${status}`;
+}
+
+/**
+ * What the request row offers: an Execute button, the not-executable
+ * explanation (approved, but the plugin is not active in the server process),
+ * or nothing.
+ */
+export function pluginViewActionRequestControl(
+  item: PluginViewActionRequestItem
+): 'execute' | 'not_executable' | 'none' {
+  if (item.status !== 'approved') return 'none';
+  return item.executable ? 'execute' : 'not_executable';
 }
 
 /** POST body that executes an approved request once. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parsePluginViewActionRequests,
   pluginViewActionExecuteBody,
+  pluginViewActionRequestControl,
   pluginViewActionRequestTone,
   pluginViewActionStatusKey,
 } from './plugin-view-action-requests';
@@ -14,6 +15,7 @@ const valid = {
   params: { path: 'active/shared/tmp/x' },
   status: 'approved',
   requested_at: '2026-09-26T00:00:00.000Z',
+  executable: true,
 };
 
 describe('plugin view action requests (FU-02)', () => {
@@ -37,6 +39,7 @@ describe('plugin view action requests (FU-02)', () => {
         actionId: 'write_probe',
         params: { path: 'active/shared/tmp/x' },
         status: 'approved',
+        executable: true,
       },
     ]);
     expect(parsePluginViewActionRequests({ data: {} })).toEqual([]);
@@ -55,5 +58,21 @@ describe('plugin view action requests (FU-02)', () => {
     expect(pluginViewActionRequestTone('approved')).toBe('accent');
     expect(pluginViewActionRequestTone('stale')).toBe('neutral');
     expect(pluginViewActionStatusKey('executed')).toBe('view_action_status_executed');
+  });
+
+  it('offers Execute only for an approved request the server can run', () => {
+    const parse = (entry: Record<string, unknown>) =>
+      parsePluginViewActionRequests({ data: { action_requests: [{ ...valid, ...entry }] } })[0];
+    expect(pluginViewActionRequestControl(parse({}))).toBe('execute');
+    // Missing or false `executable` (plugin not active in the server process).
+    const withoutFlag: Record<string, unknown> = { ...valid };
+    delete withoutFlag.executable;
+    expect(
+      parsePluginViewActionRequests({ data: { action_requests: [withoutFlag] } })[0].executable
+    ).toBe(false);
+    expect(pluginViewActionRequestControl(parse({ executable: false }))).toBe('not_executable');
+    expect(pluginViewActionRequestControl(parse({ status: 'pending' }))).toBe('none');
+    expect(parse({ status: 'unknown' }).status).toBe('unknown');
+    expect(pluginViewActionStatusKey('unknown')).toBe('view_action_status_unknown');
   });
 });

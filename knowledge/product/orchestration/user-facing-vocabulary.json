@@ -20922,6 +20922,16 @@
         "ja": "終了",
         "qps-ploc": "⟦Ƈŀőşėḓ ŀőř⟧"
       },
+      "view_action_status_unknown": {
+        "en": "Outcome unknown",
+        "ja": "結果不明",
+        "qps-ploc": "⟦Őůŧƈőɱė ůñķñőẇñ ŀőřė⟧"
+      },
+      "view_action_not_executable": {
+        "en": "Approved, but it cannot run here: the plugin is not active in the Chronos server process. Run it where the plugin is active.",
+        "ja": "承認済みですが、ここでは実行できません。Chronos のサーバープロセスではプラグインが動いていません。プラグインが動いている場所で実行してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ, ƀůŧ ïŧ ƈȧññőŧ řůñ ħėřė: ŧħė ṗŀůɠïñ ïş ñőŧ ȧƈŧïṽė ïñ ŧħė Ƈħřőñőş şėřṽėř ṗřőƈėşş. Řůñ ïŧ ẇħėřė ŧħė ṗŀůɠïñ ïş ȧƈŧïṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
       "view_error_approval_required": {
         "en": "A person has not approved this action yet, or the approval expired.",
         "ja": "この操作はまだ人に承認されていないか、承認の期限が切れています。",
