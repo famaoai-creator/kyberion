@@ -30,7 +30,7 @@ phase_affinity: [alignment, execution]
 
 - `media:pdf_extract { path, ocr? }` → `PdfDesignProtocol`。ページごとのテキスト（pdf-parse の整形テキストを統合）、位置付きテキスト要素、**配置画像を PNG/JPEG として抽出**（ページ上の位置付き）。
 - `media:document_digest { path, ocr? }` → ページ区切り・推定表・メタデータ付き Markdown。
-- `ocr: true`（または `{ enabled, language, mode, min_area_ratio }`）でページ内の画像（貼り付けた表・グラフ・スクリーンショット）を OCR する。ページ面積の 3% 未満（ロゴ等）は対象外。既定はローカルのみ（`mode: 'local_only'`、Apple Vision / tesseract）。
+- `ocr: true`（または `{ enabled, language, mode, min_area_ratio }`）でページ内の画像（貼り付けた表・グラフ・スクリーンショット）を OCR する。ページ面積の 3% 未満（ロゴ等）は対象外。既定はローカルのみ（`training_use: 'local_only'`、Apple Vision / tesseract）。請求書など個人情報を含む文書は一律拒否せず、`tier: 'confidential'` または `tier: 'personal'` とテナントを指定して、その tier の知識として保持できる。外部 OCR を使う場合だけ `training_use: 'zero_retention'` または `training_use: 'training_eligible'` を明示し、通常のテナント外部送信許可を通す。
 - スキャン PDF（1 ページ 1 枚の全面画像）: `media:pdf_to_pptx_design` に `hints.features.fullPageImageOcrOverlay: true`。このオーバーレイはページの一部にある画像では**発火しない**ので、その場合は上の `ocr: true` を使う。
 - PDF → 表グリッド: `media:pdf_to_xlsx_design`。
 - ページ操作のみ（分割・結合・回転・暗号化等）: `pdf_*` の pypdf 系 op。内容は読まない。

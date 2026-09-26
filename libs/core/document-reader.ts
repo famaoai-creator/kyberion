@@ -32,7 +32,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { ocrImage } from './ocr-bridge.js';
-import type { OcrRoutingMode } from './ocr-types.js';
+import type { OcrDataPolicy, OcrDataTier, OcrRoutingMode } from './ocr-types.js';
 import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from './visual-raster.js';
 import { extractPptxSlides, type ExtractedSlide } from './src/native-pptx-engine/engine.js';
 import { distillPdfDesign, selectPdfOcrImages } from './src/pdf-utils.js';
@@ -70,10 +70,16 @@ export const READABLE_DOCUMENT_EXTENSIONS: Readonly<Record<string, ReadableDocum
 };
 
 export interface ReadDocumentOptions {
-  /** OCR embedded images (slides, pages, pictures) with local providers. */
+  /** OCR embedded images (slides, pages, pictures). */
   ocr?: boolean;
   ocrLanguage?: string;
   ocrMode?: OcrRoutingMode;
+  /** Tier of the source. PII may be retained when the caller declares this. */
+  tier?: OcrDataTier;
+  /** Owning tenant for tier-aware external egress checks. */
+  tenantSlug?: string;
+  /** Provider data-use ceiling. Defaults to local_only. */
+  trainingUse?: OcrDataPolicy;
   /**
    * Also write every embedded image (slide / page / picture) into this
    * directory inside the repository — EMF/WMF converted to PNG — so a reader
@@ -99,6 +105,9 @@ export interface ReadDocumentTable {
 export interface ReadDocumentResult {
   format: ReadableDocumentFormat;
   markdown: string;
+  /** Classification carried with the extracted content for the next storage step. */
+  dataTier?: OcrDataTier;
+  trainingUse?: OcrDataPolicy;
   title?: string;
   tables: ReadDocumentTable[];
   /** Things the reader could not see (unreadable images, hidden sheets …). */
@@ -169,7 +178,12 @@ export async function readDocument(
     default:
       throw new Error(`[document-reader] unsupported format: ${String(format)}`);
   }
-  return { ...result, images: exporter?.images ?? [] };
+  return {
+    ...result,
+    ...(options.tier ? { dataTier: options.tier } : {}),
+    ...(options.trainingUse ? { trainingUse: options.trainingUse } : {}),
+    images: exporter?.images ?? [],
+  };
 }
 
 /** Writes images into the requested directory, converting vector formats. */
@@ -226,7 +240,12 @@ async function ocrStagedImage(
     const result = await ocrImage({
       path: target,
       language: options.ocrLanguage || 'jpn+eng',
-      mode: options.ocrMode || 'local_only',
+      mode:
+        options.ocrMode ||
+        (options.trainingUse && options.trainingUse !== 'local_only' ? 'balanced' : 'local_only'),
+      ...(options.tier ? { tier: options.tier } : {}),
+      ...(options.tenantSlug ? { tenant_slug: options.tenantSlug } : {}),
+      training_use: options.trainingUse || 'local_only',
     });
     return result.text.trim() ? { text: result.text.trim() } : {};
   } catch (error) {
@@ -395,7 +414,14 @@ export async function ocrPdfDesignImages(
         const result = await ocrImage({
           path: image.path,
           language: options.ocrLanguage || 'jpn+eng',
-          mode: options.ocrMode || 'local_only',
+          mode:
+            options.ocrMode ||
+            (options.trainingUse && options.trainingUse !== 'local_only'
+              ? 'balanced'
+              : 'local_only'),
+          ...(options.tier ? { tier: options.tier } : {}),
+          ...(options.tenantSlug ? { tenant_slug: options.tenantSlug } : {}),
+          training_use: options.trainingUse || 'local_only',
         });
         if (result.text.trim()) {
           imageOcr.push({

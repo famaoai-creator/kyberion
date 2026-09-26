@@ -19,6 +19,10 @@ export {
 
 export * from './ocr-types.js';
 
+export * from './knowledge-context.js';
+
+export * from './knowledge-adapter.js';
+
 export * from './secret-bridge.js';
 
 export * from './secret-types.js';
@@ -365,6 +369,10 @@ export * from './audio-bus-bridge.js';
 export * from './browser-automation-runtime-bridge.js';
 
 export * from './calendar-provider-bridge.js';
+
+export * from './temporal-context.js';
+
+export * from './calendar-slot-planner.js';
 
 export * from './a2a-bridge.js';
 

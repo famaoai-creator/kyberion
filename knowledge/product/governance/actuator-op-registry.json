@@ -256,9 +256,9 @@
       ]
     },
     "calendar": {
-      "capture": ["list_calendars", "list_events", "query_freebusy"],
+      "capture": ["find_slots", "list_calendars", "list_events", "query_freebusy"],
       "transform": [],
-      "apply": ["create_event"]
+      "apply": ["create_event", "delete_event", "update_event"]
     },
     "code": {
       "capture": [

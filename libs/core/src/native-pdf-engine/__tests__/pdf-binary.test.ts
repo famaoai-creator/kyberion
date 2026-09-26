@@ -26,7 +26,7 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
           body: 'Hello Native PDF World!\nThis is a truly native PDF.',
           title: 'Native Test',
         },
-      } as any,
+      } as unknown as Parameters<typeof generateNativePdf>[0],
       OUT,
       { compress: false }
     );

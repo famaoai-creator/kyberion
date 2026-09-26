@@ -22,6 +22,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
   registerScheduledPipeline,
@@ -275,7 +276,10 @@ export function resolveTenantRuntimeEnv(
       assertNoSymlinkTenantPath(path.resolve(rootDir), relative);
       const file = path.join(rootDir, relative);
       if (!safeExistsSync(file)) return null;
-      return JSON.parse(String(safeReadFile(file, { encoding: 'utf8' }))) as TenantRuntimeAllowlist;
+      return parseSafeJsonInput(
+        String(safeReadFile(file, { encoding: 'utf8' })),
+        `tenant runtime allowlist ${relative}`
+      ) as TenantRuntimeAllowlist;
     },
     undefined,
     scope.tenant_slug

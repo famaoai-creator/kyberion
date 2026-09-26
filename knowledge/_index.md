@@ -86,6 +86,7 @@
 - [Intent-Loop Wiring Status (connection audit)](./product/architecture/intent-loop-wiring-status.md) (public | Ecosystem Architect)
 - [Judgment Backend Seam](./product/architecture/judgment-backend-seam.md) (public | Unknown)
 - [Knowledge Card, Overlay, and Policy Graph Model](./product/architecture/knowledge-card-overlay-model.md) (public | Ecosystem Architect)
+- [Knowledge and Memory Context Adapter Model](./product/architecture/knowledge-memory-context-model.md) (public | Unknown)
 - [Kyberion Abstraction and Security Improvement Plan](./product/architecture/kyberion-abstraction-security-improvement-plan-2026-04-06.md) (public | Ecosystem Architect)
 - [Kyberion Canonical Concept Index](./product/architecture/kyberion-canonical-concept-index.md) (public | Codex)
 - [Kyberion Concept Map](./product/architecture/kyberion-concept-map.md) (public | Unknown)
@@ -149,6 +150,7 @@
 - [Studio Agent Orchestration Absorption Plan](./product/architecture/studio-agent-orchestration-absorption-plan.md) (public | Ecosystem Architect)
 - [Subagent Observability Model](./product/architecture/subagent-observability-model.md) (public | Ecosystem Architect)
 - [Surface Responsibility Model](./product/architecture/surface-responsibility-model.md) (public | Ecosystem Architect)
+- [Temporal Context and Calendar Workflow Model](./product/architecture/temporal-context-model.md) (public | Unknown)
 - [Tenant-Aware Vision-Mission Model](./product/architecture/tenant-vision-model.md) (public | Ecosystem Architect)
 - [Tenant-scoped knowledge and actuator execution](./product/architecture/tenant-scoped-actuator-execution.md) (public | Unknown)
 - [Terminal Hosting: The Institutional Gateway](./product/architecture/terminal-hosting.md) (public | Ecosystem Architect)
@@ -163,7 +165,9 @@
 - [Work Inventory — a Discovery Stage Before the Intent Loop](./product/architecture/work-inventory-discovery-stage.md) (public | Ecosystem Architect)
 - [runtime-surface-lifecycle-model](./product/architecture/runtime-surface-lifecycle-model.md) (public | runtime_governance)
 - [テナント導入後の Runtime・Schedule・Surface・Channel スコープ調査報告](./product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md) (public | Ecosystem Architect)
+- [メモリとナレッジのコンテキスト・アダプタモデル](./product/architecture/knowledge-memory-context-model.ja.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [時間コンテキストとカレンダーワークフローモデル](./product/architecture/temporal-context-model.ja.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 
 ## 📁 product/architecture/decisions
