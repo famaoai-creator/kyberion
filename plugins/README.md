@@ -318,7 +318,7 @@ Both handlers are harmless; the host records the observable outcome.
 ```bash
 pnpm build                               # dist scripts + the Chronos production build
 pnpm exec playwright install chromium    # once
-pnpm kyberion check plugin-views-e2e     # ~15 s; --keep-root keeps the hermetic root
+pnpm kyberion check plugin-views-e2e     # ~25 s; --keep-root keeps the hermetic root
 ```
 
 `scripts/check_plugin_views_e2e.ts` builds a hermetic Kyberion root under
@@ -327,7 +327,12 @@ pnpm kyberion check plugin-views-e2e     # ~15 s; --keep-root keeps the hermetic
 that root's `plugins/` tree (so it is third-party), approves the install with
 the operator CLI, and starts `next start` on a free loopback port with
 `KYBERION_CHRONOS_PLUGIN_HOST` enabled for that one tenant and a random
-localadmin token. Playwright Chromium then lists the plugin views, opens the
+localadmin token. By default it runs the scenario twice, each with its own
+hermetic root: once with Chronos started directly and once with the
+environment `scripts/surface_runtime.ts` gives every surface
+(`SYSTEM_ROLE=chronos_mirror_v2`, `AUTHORIZED_SCOPE`, `KYBERION_PERSONA=worker`),
+so role assumptions are proven under both launches
+(`--launch-mode direct|surface-runtime|both`). Playwright Chromium then lists the plugin views, opens the
 iframe view, clicks inside it, confirms in the host dialog, and runs the agent
 action and the human action (approval request, CLI approval, Execute in
 Chronos, a second execution refused with 409). It asserts on data only: the
