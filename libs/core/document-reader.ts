@@ -272,6 +272,7 @@ function markdownTable(rows: string[][]): string {
   const cell = (value: string | undefined) =>
     String(value ?? '')
       .replace(/\n/g, ' / ')
+      .replace(/\\/g, '\\\\')
       .replace(/\|/g, '\\|');
   const line = (row: string[]) =>
     `| ${Array.from({ length: width }, (_, i) => cell(row[i])).join(' | ')} |`;

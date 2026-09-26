@@ -298,7 +298,7 @@ export function renderDigestBody(
  * the PII scrub and the SA-03 untrusted wrap act on the BODY only.
  */
 export function composeCard(frontmatterBlock: string, body: string): string {
-  return `${frontmatterBlock}\n\n${body.replace(/^\n+/, '').replace(/\s+$/, '')}\n`;
+  return `${frontmatterBlock}\n\n${body.replace(/^\n+/, '').trimEnd()}\n`;
 }
 
 // ---------------------------------------------------------------------------
