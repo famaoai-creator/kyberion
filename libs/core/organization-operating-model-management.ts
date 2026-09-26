@@ -44,6 +44,7 @@ import {
   listOrganizationOperationStates,
   listOrganizationOperationRuns,
   loadOrganizationCadence,
+  loadOrganizationOperation,
 } from './organization-operating-model-operations.js';
 import type {
   OrganizationTier,
@@ -100,6 +101,40 @@ function hasFreshServiceObservation(state: OrganizationServiceState, now = Date.
   );
 }
 
+/**
+ * Stamp `deadline_effective_from`: a new deadline, or a changed business_day /
+ * time, takes effect now; an unchanged deadline on re-registration keeps its
+ * original effective time (a legacy record without one keeps its previous
+ * updated_at, the closest record of when the deadline was set), so editing an
+ * operation after a deadline never hides that period's miss.
+ */
+function resolveOperationDeadline(
+  deadline: NonNullable<OrganizationOperationRecord['deadline']>,
+  input: BuildOrganizationOperationInput,
+  now: string
+): NonNullable<OrganizationOperationRecord['deadline']> {
+  const existing = loadOrganizationOperation(input.operationId, {
+    organizationId: input.organizationId,
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  const previous = existing?.deadline;
+  const unchanged =
+    previous !== undefined &&
+    previous.kind === deadline.kind &&
+    previous.business_day === deadline.business_day &&
+    previous.time === deadline.time;
+  return {
+    kind: deadline.kind,
+    business_day: deadline.business_day,
+    time: deadline.time,
+    deadline_effective_from: unchanged
+      ? previous.deadline_effective_from || existing!.updated_at
+      : now,
+  };
+}
+
 export function buildOrganizationOperationRecord(
   input: BuildOrganizationOperationInput,
   now = nowIso()
@@ -123,11 +158,19 @@ export function buildOrganizationOperationRecord(
       })
     )
       throw new Error('Scheduled operation requires a valid five-field cron expression.');
+    // An implicit UTC default silently shifted local schedules by the zone
+    // offset, so a scheduled operation must name its timezone.
+    if (!input.triggerTimezone) {
+      throw new Error('Scheduled operation requires --timezone (IANA, e.g. Asia/Tokyo).');
+    }
     try {
-      new Intl.DateTimeFormat('en-US', { timeZone: input.triggerTimezone || 'UTC' });
+      new Intl.DateTimeFormat('en-US', { timeZone: input.triggerTimezone });
     } catch {
       throw new Error('Scheduled operation requires a valid IANA timezone.');
     }
+  }
+  if (input.deadline && input.triggerKind !== 'schedule') {
+    throw new Error('An operation deadline requires a scheduled trigger with a timezone.');
   }
   if (input.executionKind === 'runbook') {
     const ref = input.executionRef;
@@ -149,6 +192,9 @@ export function buildOrganizationOperationRecord(
       );
     }
   }
+  const deadline = input.deadline
+    ? resolveOperationDeadline(input.deadline, input, now)
+    : undefined;
   const record: OrganizationOperationRecord = {
     version: '1.0.0',
     operation_id: input.operationId,
@@ -165,6 +211,7 @@ export function buildOrganizationOperationRecord(
         ? { timezone: input.triggerTimezone }
         : {}),
     },
+    ...(deadline ? { deadline } : {}),
     automation_boundary: {
       allowed_actions: input.allowedActions || [],
       approval_required_actions: input.approvalRequiredActions || [],

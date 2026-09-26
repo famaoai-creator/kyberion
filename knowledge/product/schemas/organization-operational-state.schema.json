@@ -14,6 +14,11 @@
       "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
     "status": { "type": "string", "enum": ["draft", "active", "paused", "archived"] },
+    "parent_organization_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "description": "Parent organization in the same tier and tenant (a subsidiary that does not warrant its own tenant)."
+    },
     "purpose_ref": { "type": "string" },
     "active_project_ids": { "type": "array", "items": { "type": "string" } },
     "active_operation_ids": { "type": "array", "items": { "type": "string" } },

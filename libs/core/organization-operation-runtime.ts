@@ -1,6 +1,12 @@
 import { matchCronField, matchesCron } from './cron-utils.js';
+import {
+  calendarDateInZone,
+  nthBusinessDayOfMonthClamped,
+  zonedWallTimeToInstant,
+} from './business-calendar.js';
 import type {
   OrganizationOperationRecord,
+  OrganizationOperationRun,
   OrganizationOperationState,
 } from './organization-operating-model.js';
 
@@ -75,5 +81,73 @@ export function organizationOperationDueProjection(
     next_due_at: nextDue,
     due_status:
       dueAt > now.getTime() ? 'current' : dueAt + 60_000 > now.getTime() ? 'due' : 'overdue',
+  };
+}
+
+export interface OrganizationOperationDeadlineProjection {
+  /** Start of the period the deadline belongs to (first day of the month, 00:00 local). */
+  period_start: string;
+  deadline_at: string;
+  /** `untracked`: the deadline had passed before the deadline took effect. */
+  status: 'met' | 'upcoming' | 'missed' | 'untracked';
+  /** Set on `missed` when a successful run landed in the period after the deadline. */
+  completed_late?: true;
+}
+
+/** The run fields the deadline projection reads. */
+export type OrganizationOperationDeadlineRun = Pick<
+  OrganizationOperationRun,
+  'status' | 'completed_at'
+> & { operation_id?: string };
+
+/**
+ * Project an operation's deadline for the period containing `now` from its run
+ * history. A period is met only by a successful run completed inside the period
+ * at or before the deadline; a later success leaves it missed (`completed_late`).
+ * The deadline day is clamped to the month's last business day, so a short
+ * month never drops the deadline.
+ */
+export function organizationOperationDeadlineProjection(
+  operation: OrganizationOperationRecord,
+  runs: readonly OrganizationOperationDeadlineRun[],
+  now = new Date()
+): OrganizationOperationDeadlineProjection | undefined {
+  const deadline = operation.deadline;
+  const timeZone = operation.trigger.timezone;
+  if (!deadline || !timeZone) return undefined;
+  const today = calendarDateInZone(now, timeZone);
+  const businessDay = nthBusinessDayOfMonthClamped(today.year, today.month, deadline.business_day);
+  const periodStart = zonedWallTimeToInstant(
+    { year: today.year, month: today.month, day: 1 },
+    '00:00',
+    timeZone
+  ).getTime();
+  const deadlineAt = zonedWallTimeToInstant(businessDay, deadline.time, timeZone).getTime();
+  let met = false;
+  let completedLate = false;
+  for (const run of runs) {
+    if (run.operation_id !== undefined && run.operation_id !== operation.operation_id) continue;
+    if (run.status !== 'succeeded' || !run.completed_at) continue;
+    const completedAt = Date.parse(run.completed_at);
+    if (!Number.isFinite(completedAt) || completedAt < periodStart) continue;
+    if (completedAt <= deadlineAt) met = true;
+    else if (completedAt <= now.getTime()) completedLate = true;
+  }
+  // Legacy records predate deadline_effective_from; their last edit is the
+  // closest available approximation of when the deadline started to apply.
+  const effectiveFrom = Date.parse(deadline.deadline_effective_from || operation.updated_at);
+  const untracked = !met && Number.isFinite(effectiveFrom) && effectiveFrom > deadlineAt;
+  const status = met
+    ? 'met'
+    : untracked
+      ? 'untracked'
+      : now.getTime() > deadlineAt
+        ? 'missed'
+        : 'upcoming';
+  return {
+    period_start: new Date(periodStart).toISOString(),
+    deadline_at: new Date(deadlineAt).toISOString(),
+    status,
+    ...(status === 'missed' && completedLate ? { completed_late: true as const } : {}),
   };
 }
