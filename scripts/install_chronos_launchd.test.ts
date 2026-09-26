@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   buildChronosLaunchdPlist,
   chronosLaunchAgentTargetPath,
   CHRONOS_LAUNCHD_LABEL,
   main,
+  resolveForwardedChronosEnv,
 } from './install_chronos_launchd.js';
 
 // LC-01d: plist generation is a pure string function — pin its load-bearing
@@ -63,6 +64,37 @@ describe('install_chronos_launchd plist generation', () => {
     expect(escaped).toContain('/opt/tools &amp; bins/node');
     expect(escaped).toContain('&lt;repo&gt;');
     expect(escaped).not.toContain('<repo>');
+  });
+
+  it('forwards allowlisted daemon settings and refuses anything else', () => {
+    const withEnv = buildChronosLaunchdPlist({
+      nodePath: '/usr/local/bin/node',
+      repoRoot: '/Volumes/data/kyberion',
+      logDir: '/Users/alice/Library/Logs',
+      env: { KYBERION_CHRONOS_SCHEDULES: 'organization-daily-digest' },
+    });
+    expect(withEnv).toContain(
+      '<key>KYBERION_CHRONOS_SCHEDULES</key>\n    <string>organization-daily-digest</string>'
+    );
+    expect(() =>
+      buildChronosLaunchdPlist({
+        nodePath: '/usr/local/bin/node',
+        repoRoot: '/Volumes/data/kyberion',
+        logDir: '/Users/alice/Library/Logs',
+        env: { SLACK_BOT_TOKEN: 'xoxb-secret' },
+      })
+    ).toThrow(/cannot be forwarded/);
+  });
+
+  it('checks the forwardable allowlist before reading any shell value', () => {
+    const readEnv = vi.fn((name: string) => `value-of-${name}`);
+    expect(() =>
+      resolveForwardedChronosEnv(['KYBERION_PERSONA', 'SLACK_BOT_TOKEN'], readEnv)
+    ).toThrow(/SLACK_BOT_TOKEN cannot be forwarded/);
+    expect(readEnv).not.toHaveBeenCalledWith('SLACK_BOT_TOKEN');
+    expect(resolveForwardedChronosEnv(['KYBERION_PERSONA'], readEnv)).toEqual({
+      KYBERION_PERSONA: 'value-of-KYBERION_PERSONA',
+    });
   });
 
   it('targets the per-user LaunchAgents directory', () => {
