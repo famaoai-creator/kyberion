@@ -15,7 +15,10 @@ vi.mock('./decision-rights.js', () => ({
   evaluateDecisionRights: vi.fn(),
 }));
 
-vi.mock('./approval-store.js', () => ({
+vi.mock('./approval-store.js', async (importOriginal) => ({
+  isApprovalRequestExpired: (await importOriginal<typeof import('./approval-store.js')>())
+    .isApprovalRequestExpired,
+  expireApprovalRequest: vi.fn(),
   createApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
   lookupSessionApprovalCache: vi.fn(() => null),
@@ -28,12 +31,13 @@ vi.mock('./audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
 }));
 
-import { enforceApprovalGate } from './approval-gate.js';
+import { enforceApprovalGate, MAX_APPROVAL_TTL_MS } from './approval-gate.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import type { DecisionRightsMatrix } from './decision-rights.js';
 import {
   createApprovalRequest,
+  expireApprovalRequest,
   listApprovalRequests,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
@@ -46,6 +50,7 @@ const mockResolveDecisionRightsMatrix = vi.mocked(resolveDecisionRightsMatrix);
 const mockEvaluateDecisionRights = vi.mocked(evaluateDecisionRights);
 const mockListRequests = vi.mocked(listApprovalRequests);
 const mockCreateRequest = vi.mocked(createApprovalRequest);
+const mockExpireRequest = vi.mocked(expireApprovalRequest);
 const mockLookupSessionCache = vi.mocked(lookupSessionApprovalCache);
 const mockRecordSessionCacheAutoApproval = vi.mocked(recordSessionCacheAutoApproval);
 const mockAuditRecord = vi.mocked(auditChain.record);
@@ -175,6 +180,24 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it('treats an approved request with a malformed expiresAt as expired (fail closed)', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([
+      {
+        id: 'req-1',
+        correlationId: 'corr-123',
+        status: 'approved',
+        decidedBy: 'admin',
+        expiresAt: 'not-a-date',
+      } as unknown as ApprovalRequestRecord,
+    ]);
+    const result = enforceApprovalGate(baseParams);
+    expect(result.allowed).toBe(false);
+    expect(result.message).toMatch(/expired/);
+  });
+
   describe('renewable requests (expiresAt)', () => {
     const past = () => new Date(Date.now() - 60_000).toISOString();
     const future = () => new Date(Date.now() + 60_000).toISOString();
@@ -232,6 +255,66 @@ describe('enforceApprovalGate', () => {
       const result = enforceApprovalGate({ ...baseParams, expiresAt: future() });
       expect(result).toMatchObject({ allowed: false, requestId: 'req-old' });
       expect(mockCreateRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses an unparsable or non-future expiry without creating a request', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([]);
+      for (const expiresAt of ['not-a-date', past(), new Date().toISOString().replace('Z', 'X')]) {
+        const result = enforceApprovalGate({ ...baseParams, expiresAt });
+        expect(result, expiresAt).toMatchObject({ allowed: false });
+        expect(result.message, expiresAt).toMatch(/APPROVAL_EXPIRY_INVALID/);
+      }
+      expect(mockCreateRequest).not.toHaveBeenCalled();
+    });
+
+    it('clamps a far-future expiry to the max TTL measured on the real clock', () => {
+      vi.useFakeTimers({ now: Date.parse('2026-09-26T00:00:00.000Z') });
+      try {
+        requireApproval();
+        mockListRequests.mockReturnValue([]);
+        enforceApprovalGate({ ...baseParams, expiresAt: '2099-01-01T00:00:00.000Z' });
+        expect(mockCreateRequest).toHaveBeenCalledWith(
+          'mission_controller',
+          expect.objectContaining({
+            expiresAt: new Date(Date.now() + MAX_APPROVAL_TTL_MS).toISOString(),
+          })
+        );
+        expect(MAX_APPROVAL_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('persists the expiry of a lapsed pending request before opening a fresh one', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-stale',
+          channel: 'terminal',
+          correlationId: 'corr-123',
+          status: 'pending',
+          expiresAt: past(),
+        }),
+        asRecord({
+          id: 'req-bad',
+          channel: 'terminal',
+          correlationId: 'corr-123',
+          status: 'pending',
+          expiresAt: 'garbage',
+        }),
+      ]);
+      const result = enforceApprovalGate({ ...baseParams, expiresAt: future() });
+      expect(result).toMatchObject({ allowed: false, requestId: 'req-fresh' });
+      expect(mockExpireRequest.mock.calls.map((call) => call[1].requestId)).toEqual([
+        'req-stale',
+        'req-bad',
+      ]);
+      expect(mockExpireRequest).toHaveBeenCalledWith('mission_controller', {
+        channel: 'terminal',
+        storageChannel: 'terminal',
+        requestId: 'req-stale',
+      });
     });
 
     it('keeps the legacy binding for callers that do not opt in', () => {

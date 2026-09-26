@@ -131,6 +131,26 @@ describe('secure-io core', () => {
         path.join(canonicalReal, 'new', 'b.txt')
       );
     });
+
+    it('rejects a dangling or looping symlink component instead of treating it as missing', () => {
+      const dangling = path.join(tmpDir, 'dangling');
+      fs.symlinkSync(path.join(tmpDir, 'nowhere'), dangling);
+      expect(() => safeRealpath(dangling)).toThrow('[PATH_UNRESOLVABLE]');
+      expect(() => safeRealpath(path.join(dangling, 'x.txt'))).toThrow('[PATH_UNRESOLVABLE]');
+      const loop = path.join(tmpDir, 'loop');
+      fs.symlinkSync(loop, loop);
+      expect(() => safeRealpath(path.join(loop, 'x.txt'))).toThrow('[PATH_UNRESOLVABLE]');
+    });
+
+    it('refuses paths that resolve outside the repository', () => {
+      expect(() => safeRealpath(path.join(os.tmpdir(), 'x.txt'))).toThrow(
+        '[PATH_OUTSIDE_REPOSITORY]'
+      );
+      const escape = path.join(tmpDir, 'escape');
+      fs.symlinkSync(os.tmpdir(), escape);
+      expect(() => safeRealpath(path.join(escape, 'x.txt'))).toThrow('[PATH_OUTSIDE_REPOSITORY]');
+      expect(safeRealpath(process.cwd())).toBe(fs.realpathSync.native(process.cwd()));
+    });
   });
 
   describe('safeReadFileTail', () => {

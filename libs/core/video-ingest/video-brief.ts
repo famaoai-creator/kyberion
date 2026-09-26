@@ -11,6 +11,7 @@ import {
 } from '../risky-op-approval-port.js';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRealpath,
@@ -18,6 +19,7 @@ import {
 } from '../secure-io.js';
 import { selectSpeechToTextBridges } from '../speech-to-text-bridge.js';
 import { withLock } from '../src/lock-utils.js';
+import { resolveTenant } from '../tenant-registry.js';
 import { resolveFfmpegBin, resolveFfprobeBin, resolveYtDlpBin } from '../tool-binary-resolvers.js';
 import {
   assertLocalVideoWithinLimits,
@@ -82,20 +84,30 @@ interface ClassifiedPath {
   lower: string;
 }
 
+/** Canonical path; unresolvable symlinks and anything outside the repository fail closed. */
+function canonicalPath(filePath: string): string {
+  try {
+    return safeRealpath(path.resolve(pathResolver.rootDir(), filePath));
+  } catch (error) {
+    throw new VideoIngestError('TIER_UNRESOLVED', (error as Error).message);
+  }
+}
+
 /** Classify by where the bytes really live: symlinks (also in parents) resolved. */
 function classifyPath(filePath: string): ClassifiedPath {
-  const root = safeRealpath(pathResolver.rootDir());
-  const canonical = safeRealpath(path.resolve(pathResolver.rootDir(), filePath));
-  const rel = path.relative(root, canonical).split(path.sep).join('/');
-  if (rel === '..' || rel.startsWith('../') || path.isAbsolute(rel)) {
-    throw new VideoIngestError('TIER_UNRESOLVED', `${filePath} resolves outside the repository`);
-  }
+  const rel = path
+    .relative(canonicalPath(pathResolver.rootDir()), canonicalPath(filePath))
+    .split(path.sep)
+    .join('/');
   return { rel, lower: rel.toLowerCase() };
 }
 
 /** Data tier implied by where a path lives (knowledge/ or active/ tier partitions). */
 export function tierOfPath(filePath: string): VideoTier {
-  const { lower } = classifyPath(filePath);
+  return tierOfClassified(classifyPath(filePath).lower);
+}
+
+function tierOfClassified(lower: string): VideoTier {
   const match =
     /^knowledge\/(personal|confidential|public)(?:\/|$)/.exec(lower) ??
     /^active\/(?:missions|projects|organizations)\/(personal|confidential|public)(?:\/|$)/.exec(
@@ -108,6 +120,9 @@ export function tierOfPath(filePath: string): VideoTier {
 
 /** `knowledge/confidential/{common,tenant-groups}` are shared, never a tenant. */
 const SHARED_TENANT_PREFIXES = new Set(['common', 'tenant-groups']);
+
+/** Workspace segment of tenant-less trees (`active/{projects,organizations,missions}/{tier}/shared/`). */
+const SHARED_WORKSPACE_SEGMENT = 'shared';
 
 type MissionStateTenant =
   | { state: 'absent' }
@@ -140,17 +155,18 @@ function tenantUnresolved(rel: string, why: string): VideoIngestError {
 }
 
 /**
- * Tenant owning a path: `knowledge/confidential/{slug}/`, the tenant volatile
- * area `active/projects/{tier}/{slug}/`, a tenant-scoped mission directory
- * `active/missions/{tier}/{slug}/{mission}/`, or the tenant recorded in a
- * mission's state (`active/missions/{tier}/{mission}/`).
+ * Tenant owning a path: `knowledge/confidential/{slug}/`, the tenant-scoped
+ * trees `active/{projects,organizations}/{tier}/{slug}/`, a tenant-scoped
+ * mission directory `active/missions/{tier}/{slug}/{mission}/`, or the tenant
+ * recorded in a mission's state (`active/missions/{tier}/{mission}/`). The
+ * `shared` workspace segment and the shared knowledge prefixes have no tenant.
  *
- * Fails closed (TENANT_UNRESOLVED) for a confidential or personal partition
- * whose owner cannot be determined, so an unknown owner never passes the
- * same-tenant check.
+ * Fails closed (TENANT_UNRESOLVED) for any non-public path whose owner cannot
+ * be determined, so an unknown owner never passes the same-tenant check.
  */
 export function tenantOfPath(filePath: string): string | undefined {
   const { rel, lower } = classifyPath(filePath);
+  const scoped = tierOfClassified(lower) !== 'public';
   const parts = lower.split('/');
   const original = rel.split('/');
   if (parts[0] === 'knowledge' && parts[1] === 'confidential') {
@@ -159,23 +175,34 @@ export function tenantOfPath(filePath: string): string | undefined {
     if (slug && isValidTenantSlug(slug)) return slug;
     throw tenantUnresolved(rel, 'not under a tenant or shared prefix');
   }
-  if (parts[0] !== 'active' || (parts[1] !== 'projects' && parts[1] !== 'missions')) {
+  const tree = parts[1];
+  const tier = parts[2];
+  const tenantTree =
+    parts[0] === 'active' &&
+    (tree === 'projects' || tree === 'organizations' || tree === 'missions') &&
+    (tier === 'personal' || tier === 'confidential' || tier === 'public');
+  if (!tenantTree) {
+    if (scoped) throw tenantUnresolved(rel, 'not inside a tenant-scoped partition');
     return undefined;
   }
-  const tier = parts[2];
-  if (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') return undefined;
-  const scoped = tier !== 'public';
   const segment = parts[3];
   if (!segment) {
     if (scoped) throw tenantUnresolved(rel, 'no tenant segment');
     return undefined;
   }
-  if (parts[1] === 'projects') {
+  if (tree !== 'missions') {
+    if (segment === SHARED_WORKSPACE_SEGMENT) return undefined;
     if (isValidTenantSlug(segment)) return segment;
     if (scoped) throw tenantUnresolved(rel, `'${original[3]}' is not a tenant slug`);
     return undefined;
   }
-  const segmentDir = path.join(safeRealpath(pathResolver.rootDir()), ...original.slice(0, 4));
+  return missionTenant(rel, original, scoped);
+}
+
+/** `active/missions/{tier}/{mission | slug/mission | shared/mission}/…`. */
+function missionTenant(rel: string, original: string[], scoped: boolean): string | undefined {
+  const segment = original[3].toLowerCase();
+  const segmentDir = path.join(canonicalPath(pathResolver.rootDir()), ...original.slice(0, 4));
   const recorded = missionStateTenant(segmentDir);
   if (recorded.state === 'tenant') return recorded.slug;
   if (recorded.state === 'tenantless') return undefined;
@@ -183,20 +210,50 @@ export function tenantOfPath(filePath: string): string | undefined {
     if (scoped) throw tenantUnresolved(rel, 'mission state has no readable tenant');
     return undefined;
   }
-  if (scoped) {
-    if (isValidTenantSlug(segment)) return segment;
-    throw tenantUnresolved(rel, `'${original[3]}' is neither a mission nor a tenant slug`);
+  const shared = segment === SHARED_WORKSPACE_SEGMENT;
+  if (!shared && !isValidTenantSlug(segment)) {
+    if (scoped)
+      throw tenantUnresolved(rel, `'${original[3]}' is neither a mission nor a tenant slug`);
+    return undefined;
   }
-  return isValidTenantSlug(original[3]) ? original[3] : undefined;
+  const partitionTenant = shared ? undefined : segment;
+  // A mission nested in a tenant (or shared) partition must not claim another tenant.
+  const nested = original[4]
+    ? missionStateTenant(path.join(segmentDir, original[4]))
+    : ({ state: 'absent' } as const);
+  if (nested.state === 'unreadable') {
+    throw tenantUnresolved(rel, 'mission state has no readable tenant');
+  }
+  if (nested.state === 'tenant' && nested.slug !== partitionTenant) {
+    if (shared) return nested.slug;
+    throw tenantUnresolved(
+      rel,
+      `mission state names tenant '${nested.slug}' inside the '${segment}' partition`
+    );
+  }
+  return partitionTenant;
 }
+
+/** Throws unless the tenant is registered and operational. */
+export type VideoTenantAuthorizer = (tenantSlug: string) => void;
+
+const defaultTenantAuthorizer: VideoTenantAuthorizer = (tenantSlug) => {
+  resolveTenant(tenantSlug);
+};
 
 /**
  * Mission-local when a mission is given, else the tenant's volatile area,
- * else the shared (public) cache.
+ * else the shared (public) cache. A caller-named tenant is authorized here:
+ * alongside a mission it must be that mission's tenant, on its own it must
+ * resolve in the tenant registry.
  */
 export function resolveVideoCachePlacement(
-  scope: { mission_id?: string; tenant_slug?: string } = {}
+  scope: { mission_id?: string; tenant_slug?: string } = {},
+  authorizeTenant: VideoTenantAuthorizer = defaultTenantAuthorizer
 ): VideoCachePlacement {
+  if (scope.tenant_slug !== undefined && !isValidTenantSlug(scope.tenant_slug)) {
+    throw new VideoIngestError('INVALID_SOURCE', `invalid tenant slug '${scope.tenant_slug}'`);
+  }
   if (scope.mission_id) {
     let missionId: string;
     try {
@@ -209,6 +266,14 @@ export function resolveVideoCachePlacement(
       throw new VideoIngestError('INVALID_SOURCE', `mission '${missionId}' does not exist`);
     }
     const tenant = tenantOfPath(missionPath);
+    if (scope.tenant_slug && scope.tenant_slug !== tenant) {
+      throw new VideoIngestError(
+        'TENANT_MISMATCH',
+        `tenant '${scope.tenant_slug}' does not own mission '${missionId}' (${
+          tenant ? `tenant '${tenant}'` : 'tenant-less mission'
+        })`
+      );
+    }
     return {
       scope: 'mission',
       root: path.join(missionPath, 'cache', 'video'),
@@ -217,8 +282,13 @@ export function resolveVideoCachePlacement(
     };
   }
   if (scope.tenant_slug) {
-    if (!isValidTenantSlug(scope.tenant_slug)) {
-      throw new VideoIngestError('INVALID_SOURCE', `invalid tenant slug '${scope.tenant_slug}'`);
+    try {
+      authorizeTenant(scope.tenant_slug);
+    } catch (error) {
+      throw new VideoIngestError(
+        'TENANT_UNRESOLVED',
+        `tenant '${scope.tenant_slug}' is not a registered, operational tenant: ${(error as Error).message}`
+      );
     }
     const tenantPath = pathResolver.volatile('tenant', scope.tenant_slug, { tier: 'confidential' });
     return {
@@ -296,6 +366,7 @@ export type VideoTranscribeFn = (
   language: string | undefined
 ) => Promise<{ language?: string; segments: TranscriptSegment[] } | null>;
 
+/** Caller-facing options; everything here may come from op params. */
 export interface BuildVideoBriefOptions {
   language?: string;
   max_keyframes?: number;
@@ -308,13 +379,21 @@ export interface BuildVideoBriefOptions {
   approval?: VideoIngestApprovalContext;
   /** Keep downloaded remote media in the cache entry after derivation (default: delete). */
   keep_source?: boolean;
+}
+
+/**
+ * Test seams (tools, policy, placement, gates, clock). Never derived from op
+ * params: only buildVideoBriefWithInternals accepts them.
+ */
+export interface VideoBriefInternals {
   runner?: VideoCommandRunner;
   policy?: VideoIngestPolicy;
   cachePlacement?: VideoCachePlacement;
+  authorizeTenant?: VideoTenantAuthorizer;
   transcribe?: VideoTranscribeFn;
   evaluateEgress?: (url: string) => EgressPolicyDecision;
   requestApproval?: (request: RiskyApprovalRequest) => RiskyApprovalResult;
-  /** Clock for approval expiry (default Date.now). */
+  /** Clock for the requested approval expiry (default Date.now); the gate clamps it. */
   now?: () => number;
   bins?: { yt_dlp?: string; ffmpeg?: string; ffprobe?: string };
 }
@@ -425,8 +504,21 @@ async function transcriptFor(
 /** Upper bound on waiting for another run on the same cache entry (download + derivation). */
 export const VIDEO_ENTRY_LOCK_TIMEOUT_MS = 45 * 60_000;
 
+/**
+ * Lock resource for a cache entry, keyed by its canonical path — lower-cased
+ * on case-insensitive platforms so `Entry` and `entry` share one lock.
+ */
+export function videoEntryLockResource(
+  entryDir: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  const canonical = canonicalPath(entryDir);
+  const key = platform === 'darwin' || platform === 'win32' ? canonical.toLowerCase() : canonical;
+  return `video-ingest-${sha256Hex(key).slice(0, 32)}`;
+}
+
 async function withVideoEntryLock<T>(entryDir: string, fn: () => Promise<T>): Promise<T> {
-  const resource = `video-ingest-${sha256Hex(path.resolve(entryDir)).slice(0, 32)}`;
+  const resource = videoEntryLockResource(entryDir);
   try {
     return await withLock(resource, fn, VIDEO_ENTRY_LOCK_TIMEOUT_MS);
   } catch (error) {
@@ -456,8 +548,17 @@ export async function buildVideoBrief(
   source: VideoSource,
   options: BuildVideoBriefOptions = {}
 ): Promise<VideoIngestOutcome> {
+  return buildVideoBriefWithInternals(source, options, {});
+}
+
+/** buildVideoBrief with test seams; not for op facades. */
+export async function buildVideoBriefWithInternals(
+  source: VideoSource,
+  options: BuildVideoBriefOptions,
+  internals: VideoBriefInternals
+): Promise<VideoIngestOutcome> {
   try {
-    return await buildVideoBriefUnchecked(source, options);
+    return await buildVideoBriefUnchecked(source, options, internals);
   } catch (error) {
     if (error instanceof VideoIngestError) {
       return {
@@ -473,10 +574,11 @@ export async function buildVideoBrief(
 
 async function buildVideoBriefUnchecked(
   source: VideoSource,
-  options: BuildVideoBriefOptions
+  options: BuildVideoBriefOptions,
+  internals: VideoBriefInternals
 ): Promise<VideoIngestOutcome> {
-  const policy = options.policy ?? loadVideoIngestPolicy();
-  const runner = options.runner ?? defaultVideoCommandRunner;
+  const policy = internals.policy ?? loadVideoIngestPolicy();
+  const runner = internals.runner ?? defaultVideoCommandRunner;
   const maxKeyframes = options.max_keyframes ?? policy.default_max_keyframes;
   const preference = options.transcript_preference ?? 'auto';
   const warnings: string[] = [];
@@ -500,22 +602,36 @@ async function buildVideoBriefUnchecked(
     inputTier = 'public';
     normalizedSource = { kind: 'url', url: normalized };
   } else {
-    localPath = path.resolve(pathResolver.rootDir(), source.path);
+    const requested = path.resolve(pathResolver.rootDir(), source.path);
+    // Refuse a symlinked input, then work only on the canonical path so the
+    // file classified, hashed and probed is the one the tools read.
+    let isLink = false;
+    try {
+      isLink = safeLstat(requested).isSymbolicLink();
+    } catch (error) {
+      // A missing input is reported by the size check below.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
+    }
+    if (isLink) {
+      throw new VideoIngestError('INVALID_SOURCE', `${source.path} is a symbolic link`);
+    }
+    localPath = canonicalPath(requested);
     assertLocalVideoWithinLimits(localPath, policy.max_bytes);
     const pathTier = tierOfPath(localPath);
     const declared = options.input_tier ?? 'public';
     inputTier = TIER_RANK[declared] > TIER_RANK[pathTier] ? declared : pathTier;
     inputTenant = tenantOfPath(localPath);
-    normalizedSource = { kind: 'file', path: repoRelative(localPath) };
+    normalizedSource = { kind: 'file', path: classifyPath(localPath).rel };
     contentKey = '';
   }
 
   const placement =
-    options.cachePlacement ??
-    resolveVideoCachePlacement({
-      mission_id: options.mission_id,
-      tenant_slug: options.tenant_slug,
-    });
+    internals.cachePlacement ??
+    resolveVideoCachePlacement(
+      { mission_id: options.mission_id, tenant_slug: options.tenant_slug },
+      internals.authorizeTenant
+    );
   assertNoTierDowngrade(inputTier, placement);
   assertSameTenant(inputTenant, placement);
   if (localPath) contentKey = fileContentKey(localPath, policy.max_bytes);
@@ -526,7 +642,7 @@ async function buildVideoBriefUnchecked(
   if (cached) return { status: 'ok', brief: { ...cached, cache_hit: true } };
 
   if (url) {
-    const decision = (options.evaluateEgress ?? evaluateEgressPolicy)(url.toString());
+    const decision = (internals.evaluateEgress ?? evaluateEgressPolicy)(url.toString());
     if (decision.verdict === 'deny') {
       throw new VideoIngestError('EGRESS_DENIED', decision.reason);
     }
@@ -549,8 +665,8 @@ async function buildVideoBriefUnchecked(
         max_bytes: policy.max_bytes,
         max_duration_sec: policy.max_duration_sec,
       };
-      const now = (options.now ?? Date.now)();
-      const decisionResult = (options.requestApproval ?? requireRiskyApproval)({
+      const now = (internals.now ?? Date.now)();
+      const decisionResult = (internals.requestApproval ?? requireRiskyApproval)({
         opId: FETCH_VIDEO_APPROVAL_OP,
         agentId: options.approval.agent_id,
         correlationId: videoFetchCorrelationId(contentKey, payload),
@@ -578,7 +694,7 @@ async function buildVideoBriefUnchecked(
     let prepared: PreparedMedia;
     let downloadedMedia = false;
     if (url) {
-      const ytDlp = options.bins?.yt_dlp ?? resolveYtDlpBin();
+      const ytDlp = internals.bins?.yt_dlp ?? resolveYtDlpBin();
       const info = await fetchRemoteVideoInfo(
         runner,
         ytDlp,
@@ -620,7 +736,7 @@ async function buildVideoBriefUnchecked(
             format: policy.download_format,
             maxBytes: policy.max_bytes,
             subtitle,
-            ffmpegBin: options.bins?.ffmpeg ?? resolveFfmpegBin(),
+            ffmpegBin: internals.bins?.ffmpeg ?? resolveFfmpegBin(),
           });
       downloadedMedia = !keptMedia;
       prepared = {
@@ -638,7 +754,7 @@ async function buildVideoBriefUnchecked(
       const mediaPath = localPath;
       const info = await probeLocalVideo(
         runner,
-        options.bins?.ffprobe ?? resolveFfprobeBin(),
+        internals.bins?.ffprobe ?? resolveFfprobeBin(),
         mediaPath
       );
       if (info.metadata.duration_sec > policy.max_duration_sec) {
@@ -657,7 +773,7 @@ async function buildVideoBriefUnchecked(
     // the cache entry; downloaded source media is dropped after derivation —
     // success or failure — unless keep_source. A local input is never touched.
     try {
-      const ffmpeg = options.bins?.ffmpeg ?? resolveFfmpegBin();
+      const ffmpeg = internals.bins?.ffmpeg ?? resolveFfmpegBin();
       let audioPath: string | undefined;
       const transcript = await transcriptFor(
         prepared,
@@ -678,7 +794,7 @@ async function buildVideoBriefUnchecked(
             return null;
           }
         },
-        options.transcribe ?? defaultVideoTranscribe,
+        internals.transcribe ?? defaultVideoTranscribe,
         options.language,
         warnings
       );
