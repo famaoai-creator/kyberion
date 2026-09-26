@@ -1,0 +1,80 @@
+{
+  "$schema": "../schemas/role-assumption-policy.schema.json",
+  "version": "1.0.0",
+  "description": "RA-02 defense in depth for in-process role assumption. When a process runs with SYSTEM_ROLE (surface_runtime launches every surface with SYSTEM_ROLE=<surface id>; `pnpm surfaces` and `pnpm config-mission` set it for their own runtimes), withExecutionContext / withExecutionContextAsync may only assume the SYSTEM_ROLE itself, the shared core roles, or the roles listed for that system role here; anything else throws [ROLE_ASSUMPTION_DENIED]. A SYSTEM_ROLE without an entry may only assume itself. Processes without SYSTEM_ROLE are unaffected. Lists are derived from static reachability of withExecutionContext call sites (literal role arguments and the governed-artifact role wrappers) from each surface entry point; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
+  "shared_core_roles": {
+    "roles": [
+      "chronos_gateway",
+      "ecosystem_architect",
+      "infrastructure_sentinel",
+      "knowledge_steward",
+      "mission_controller",
+      "slack_bridge",
+      "sovereign_concierge",
+      "surface_runtime"
+    ],
+    "rationale": "Roles that libs/core modules assume internally on behalf of every caller and that every surface reaches through @agent/core: mission_controller (mission lifecycle, dispatch, task grants, agent identity, plugin approvals, provider egress), sovereign_concierge (authn principal registry, tool runtime policy, onboarding), infrastructure_sentinel (work coordination, peer messaging, mesh), ecosystem_architect (storage janitor, background review), knowledge_steward (mission creation), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime)."
+  },
+  "system_roles": {
+    "chronos_mirror_v2": {
+      "may_assume": ["chronos_localadmin", "chronos_operator", "generation_scheduler"],
+      "rationale": "Chronos viewer-scoped routes assume chronos_localadmin / chronos_operator (withViewerExecutionContext*, plugin-host-boot tenant registry reads, plugin approvals); the generation scheduler module reached from Chronos assumes generation_scheduler."
+    },
+    "computer_surface": {
+      "may_assume": [],
+      "rationale": "presence/displays/computer-surface/server.ts assumes ecosystem_architect only (a shared core role)."
+    },
+    "concierge": {
+      "may_assume": ["concierge_localadmin", "concierge_operator"],
+      "rationale": "Concierge routes assume sovereign_concierge (shared) and the viewer-scoped concierge_localadmin / concierge_operator roles (withConciergeViewerContext)."
+    },
+    "discord_bridge": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "imessage_bridge": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "mcp_server_cowork": {
+      "may_assume": [],
+      "rationale": "scripts/mcp_server.ts reaches only shared core roles (cowork-surface assumes surface_runtime)."
+    },
+    "nexus_daemon": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "oauth_callback_surface": {
+      "may_assume": [],
+      "rationale": "scripts/oauth_callback_surface.ts assumes surface_runtime (shared)."
+    },
+    "presence_studio": {
+      "may_assume": [],
+      "rationale": "Presence Studio routes assume ecosystem_architect, sovereign_concierge and mission_controller (all shared)."
+    },
+    "slack_bridge": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "telegram_bridge": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "terminal_bridge": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "voice_hub": {
+      "may_assume": [],
+      "rationale": "Reaches only shared core roles."
+    },
+    "surface_runtime": {
+      "may_assume": [],
+      "rationale": "`pnpm surfaces` and the terminal HUD run scripts/surface_runtime.ts with SYSTEM_ROLE=surface_runtime; it reaches only shared core roles."
+    },
+    "system_configurator": {
+      "may_assume": [],
+      "rationale": "`pnpm config-mission` and its preset pipeline child (scripts/config_mission.ts) run with SYSTEM_ROLE=system_configurator; they reach only shared core roles."
+    }
+  }
+}
