@@ -11,9 +11,15 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
-  buildProviderChildEnv,
   resolveActiveProviderPermissionArgs,
+  resolveEffectiveProviderPermissionProfile,
+  type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
+import {
+  buildDelegationSpawnEnv,
+  disposeOnChildExit,
+  newDelegationSessionId,
+} from './provider-spawn-env.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import type {
@@ -252,7 +258,10 @@ export class GeminiCliBackend implements ReasoningBackend {
     ];
     // For delegation, we don't necessarily want JSON format, we want it to just do the work.
     // However, the caller expects a string result (the report).
-    const stdout = await this.spawnCli(args);
+    const stdout = await this.spawnCli(
+      args,
+      activePermissionArgs ? resolveEffectiveProviderPermissionProfile('gemini') : undefined
+    );
     const lines = stdout.split('\n');
     const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
     if (jsonStartIdx === -1) {
@@ -371,11 +380,11 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
   }
 
-  private async spawnCli(args: string[]): Promise<string> {
+  private async spawnCli(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
     const started = Date.now();
     const promptChars = args.join(' ').length;
     try {
-      const stdout = await this.spawnCliRaw(args);
+      const stdout = await this.spawnCliRaw(args, profile);
       recordEstimatedCliUsage(
         'gemini-cli',
         this.model,
@@ -391,16 +400,23 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
   }
 
-  private spawnCliRaw(args: string[]): Promise<string> {
+  private spawnCliRaw(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
     return new Promise((resolve, reject) => {
+      const spawnEnv = buildDelegationSpawnEnv({
+        provider: 'gemini',
+        sessionId: newDelegationSessionId('gemini'),
+        ...(profile ? { profile } : {}),
+      });
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: buildProviderChildEnv({ provider: 'gemini' }),
+        env: spawnEnv.env,
       });
+      disposeOnChildExit(child, spawnEnv);
       let stdout = '';
       let stderr = '';
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
+        spawnEnv.dispose();
         reject(new Error(`[gemini-cli] timed out after ${this.timeoutMs}ms`));
       }, this.timeoutMs);
       child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
@@ -465,10 +481,15 @@ export async function runGeminiCliQuery<T>(params: {
   ];
 
   const stdout = await new Promise<string>((resolve, reject) => {
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'gemini',
+      sessionId: newDelegationSessionId('gemini'),
+    });
     const child = spawn(bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildProviderChildEnv({ provider: 'gemini' }),
+      env: spawnEnv.env,
     });
+    disposeOnChildExit(child, spawnEnv);
     let out = '';
     let err = '';
     const timer = setTimeout(() => {

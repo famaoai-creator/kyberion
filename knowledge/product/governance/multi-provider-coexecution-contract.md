@@ -3,7 +3,7 @@ title: Multi-Provider Co-Execution Contract
 category: Governance
 tags: [governance, multi-provider, cli, co-execution, xp-04, so-03]
 importance: 9
-last_updated: 2026-09-11
+last_updated: 2026-09-26
 ---
 
 # Multi-Provider Co-Execution Contract
@@ -101,6 +101,18 @@ ad-hoc same-checkout collaboration; they are not mission-owner authority.
   provider permission-profile mapping) must not grant `.git` write /
   commit / push tools; only the mission owner's execution path may perform
   Git writes.
+- Private git index (WS-01/02): every `implementer` provider CLI delegation
+  is spawned through `buildDelegationSpawnEnv` with its own `GIT_INDEX_FILE`
+  (seeded from the real index, ledger-registered, deleted when the child
+  exits), so a worker's accidental `git add` never stages into the shared
+  index. `KYBERION_SESSION_GIT_INDEX=0` disables it. Only the mission owner
+  may commit a session index (`commitFromSessionIndex`), and only while HEAD
+  still equals the index's baseline.
+- Session worktrees are owner-only: per-session `git worktree`s for parallel
+  writers are created (`createSessionWorktree`) and removed
+  (`deleteRegisteredWorkspace`) only on the mission owner's path and only
+  through the workspace ledger — never by a worker CLI. See
+  [workspace-isolation](../architecture/workspace-isolation.md).
 - Provider state directories that are gitignored but not yet regenerable by
   a ceremony (e.g. a newly adopted provider) must still be excluded from Git
   rather than committed ad hoc — add the ignore rule first, wire the

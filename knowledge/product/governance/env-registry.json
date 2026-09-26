@@ -638,16 +638,16 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional provider setting for chronos plugin host; use only an endpoint or executable allowed by the active policy.",
+      "documented": true
     },
     {
       "name": "KYBERION_CHRONOS_PLUGIN_HOST_TENANTS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for chronos plugin host tenants; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_AGENT_TOOLS",
@@ -2721,8 +2721,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for plugin host poll ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PREFIX",
@@ -3163,8 +3163,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Give implementer provider CLI delegations a private GIT_INDEX_FILE seeded from the checkout index so worker git add never stages into the shared index. Default on; 0 disables. Under Vitest it is off unless set to 1.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",
