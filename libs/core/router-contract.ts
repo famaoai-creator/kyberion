@@ -49,7 +49,7 @@ export interface IntentRoutingMap {
 const intentRoutingCatalog = defineCatalog<IntentRoutingMap>({
   id: 'intent-routing-map',
   path: () => pathResolver.knowledge('product/governance/intent-routing-map.json'),
-  schema: 'knowledge/product/schemas/intent-routing-map.schema.json',
+  schema: pathResolver.knowledge('product/schemas/intent-routing-map.schema.json'),
 });
 
 export function loadIntentRoutingMap(): IntentRoutingMap {
