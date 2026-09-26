@@ -309,7 +309,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7739,
+      "size": 7869,
       "type": "md"
     },
     {
@@ -321,7 +321,7 @@
     {
       "path": "product/architecture/computer-use-runtime-model.md",
       "tier": "public",
-      "size": 5128,
+      "size": 5558,
       "type": "md"
     },
     {
@@ -723,7 +723,7 @@
     {
       "path": "product/architecture/plugin-permissions-and-views.md",
       "tier": "public",
-      "size": 12094,
+      "size": 9362,
       "type": "md"
     },
     {
@@ -735,7 +735,7 @@
     {
       "path": "product/architecture/presence-layer.md",
       "tier": "public",
-      "size": 7359,
+      "size": 7534,
       "type": "md"
     },
     {
@@ -1155,7 +1155,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 8312,
+      "size": 8633,
       "type": "md"
     },
     {
@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 21695,
+      "size": 21837,
       "type": "json"
     },
     {
@@ -1257,7 +1257,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 12464,
+      "size": 13471,
       "type": "json"
     },
     {
@@ -1485,7 +1485,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 49440,
+      "size": 50596,
       "type": "json"
     },
     {
@@ -1593,7 +1593,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 148822,
+      "size": 150170,
       "type": "json"
     },
     {
@@ -2235,7 +2235,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6854,
+      "size": 6989,
       "type": "json"
     },
     {
@@ -2367,7 +2367,7 @@
     {
       "path": "product/governance/knowledge-sync-rules.json",
       "tier": "public",
-      "size": 4772,
+      "size": 4773,
       "type": "json"
     },
     {
@@ -2985,7 +2985,7 @@
     {
       "path": "product/governance/organization-operations-runbook.md",
       "tier": "public",
-      "size": 3050,
+      "size": 5796,
       "type": "md"
     },
     {
@@ -3309,73 +3309,73 @@
     {
       "path": "product/governance/reasoning-providers/agy-cli.json",
       "tier": "public",
-      "size": 420,
+      "size": 393,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/anthropic.json",
       "tier": "public",
-      "size": 432,
+      "size": 402,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/claude-agent.json",
       "tier": "public",
-      "size": 445,
+      "size": 415,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/claude-cli.json",
       "tier": "public",
-      "size": 411,
+      "size": 384,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/codex-cli.json",
       "tier": "public",
-      "size": 425,
+      "size": 398,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/copilot.json",
       "tier": "public",
-      "size": 406,
+      "size": 379,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/cursor-cli.json",
       "tier": "public",
-      "size": 472,
+      "size": 445,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/devin-cli.json",
       "tier": "public",
-      "size": 518,
+      "size": 491,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/gemini-api.json",
       "tier": "public",
-      "size": 449,
+      "size": 419,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/gemini-cli.json",
       "tier": "public",
-      "size": 415,
+      "size": 388,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/grok-api.json",
       "tier": "public",
-      "size": 449,
+      "size": 419,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/grok-cli.json",
       "tier": "public",
-      "size": 420,
+      "size": 393,
       "type": "json"
     },
     {
@@ -3387,67 +3387,67 @@
     {
       "path": "product/governance/reasoning-providers/llamacpp.json",
       "tier": "public",
-      "size": 436,
+      "size": 409,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/lmstudio.json",
       "tier": "public",
-      "size": 462,
+      "size": 435,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/local.json",
       "tier": "public",
-      "size": 431,
+      "size": 404,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/localai.json",
       "tier": "public",
-      "size": 433,
+      "size": 406,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/mlx.json",
       "tier": "public",
-      "size": 421,
+      "size": 394,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/nemotron-api.json",
       "tier": "public",
-      "size": 443,
+      "size": 413,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/ollama.json",
       "tier": "public",
-      "size": 430,
+      "size": 403,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/opencode-cli.json",
       "tier": "public",
-      "size": 466,
+      "size": 439,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/openrouter.json",
       "tier": "public",
-      "size": 453,
+      "size": 423,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/stub.json",
       "tier": "public",
-      "size": 386,
+      "size": 359,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-providers/vllm.json",
       "tier": "public",
-      "size": 424,
+      "size": 397,
       "type": "json"
     },
     {
@@ -3603,7 +3603,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 22021,
+      "size": 22795,
       "type": "json"
     },
     {
@@ -3663,13 +3663,13 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 19212,
+      "size": 19896,
       "type": "json"
     },
     {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
-      "size": 4410,
+      "size": 7354,
       "type": "json"
     },
     {
@@ -4395,7 +4395,7 @@
     {
       "path": "product/hints/document-digest.json",
       "tier": "public",
-      "size": 1063,
+      "size": 1471,
       "type": "json"
     },
     {
@@ -4629,7 +4629,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1440786,
+      "size": 1444495,
       "type": "json"
     },
     {
@@ -4995,13 +4995,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19705,
+      "size": 20652,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 9302,
+      "size": 9431,
       "type": "json"
     },
     {
@@ -5799,7 +5799,7 @@
     {
       "path": "product/orchestration/service-harness-registry.json",
       "tier": "public",
-      "size": 65596,
+      "size": 64977,
       "type": "json"
     },
     {
@@ -5925,7 +5925,7 @@
     {
       "path": "product/orchestration/service-presets/media-generation.json",
       "tier": "public",
-      "size": 3784,
+      "size": 3376,
       "type": "json"
     },
     {
@@ -5985,7 +5985,7 @@
     {
       "path": "product/orchestration/service-presets/vision.json",
       "tier": "public",
-      "size": 1377,
+      "size": 704,
       "type": "json"
     },
     {
@@ -6291,7 +6291,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 993598,
+      "size": 997582,
       "type": "json"
     },
     {
@@ -8553,7 +8553,7 @@
     {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
-      "size": 1294,
+      "size": 1500,
       "type": "json"
     },
     {
@@ -8637,7 +8637,7 @@
     {
       "path": "product/schemas/file-pipeline.schema.json",
       "tier": "public",
-      "size": 2446,
+      "size": 2682,
       "type": "json"
     },
     {
@@ -9201,7 +9201,7 @@
     {
       "path": "product/schemas/kyberion-scenario-report.schema.json",
       "tier": "public",
-      "size": 4115,
+      "size": 3230,
       "type": "json"
     },
     {
@@ -10257,13 +10257,13 @@
     {
       "path": "product/schemas/organization-operation.schema.json",
       "tier": "public",
-      "size": 3248,
+      "size": 4065,
       "type": "json"
     },
     {
       "path": "product/schemas/organization-operational-state.schema.json",
       "tier": "public",
-      "size": 2048,
+      "size": 2289,
       "type": "json"
     },
     {
@@ -10437,7 +10437,7 @@
     {
       "path": "product/schemas/pipeline-adf.schema.json",
       "tier": "public",
-      "size": 12978,
+      "size": 14102,
       "type": "json"
     },
     {
@@ -10821,7 +10821,7 @@
     {
       "path": "product/schemas/reasoning-provider-registry.schema.json",
       "tier": "public",
-      "size": 2066,
+      "size": 1648,
       "type": "json"
     },
     {
@@ -12159,7 +12159,7 @@
     {
       "path": "product/voice/realtime-voice-conversation-operations.md",
       "tier": "public",
-      "size": 11671,
+      "size": 10642,
       "type": "md"
     },
     {

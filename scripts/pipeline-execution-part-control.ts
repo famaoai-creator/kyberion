@@ -39,6 +39,8 @@ import {
   runInlineHealthDegradationWatch,
   runInlineUiUxGovernanceAudit,
   runInlineTenantDriftWatch,
+  runInlineOrganizationDigest,
+  runInlineOrganizationRecordRun,
   runInlineAutoCheckpoint,
   runInlineBackupCreate,
   runInlineBackupRestoreDrill,
@@ -620,6 +622,12 @@ export async function dispatchLeafOp(
   }
   if (domain === 'core' && action === 'run_tenant_drift_watch') {
     return runInlineTenantDriftWatch(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'organization_digest') {
+    return runInlineOrganizationDigest(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'organization_record_run') {
+    return runInlineOrganizationRecordRun(step, params, ctx);
   }
   if (domain === 'core' && action === 'run_auto_checkpoint')
     return runInlineAutoCheckpoint(step, params, ctx);
