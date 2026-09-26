@@ -127,10 +127,28 @@ not drop silently.
   boundary changes: `pnpm --filter @agent/core build && pnpm run
 build:actuators`.
 - Anything invoking `node dist/scripts/...` tests the LAST build. Rebuild
-  before trusting behavior.
+  before trusting behavior. Scratch scripts run via `node --import
+./scripts/ts-loader.mjs` hit the same rule: `@agent/core/*` specifiers
+  resolve to `libs/core/dist/` whenever a build exists, so edits under
+  `libs/core/src/` are invisible until `pnpm --filter @agent/core build`.
 - **Never mix ts-loader source imports with `@agent/core` dist imports in
   one process** — dual module registries mean two copies of every
   singleton (registered backends silently fall back to stub).
+- **Catalog directories shadow their sibling `.json` index.** Catalog
+  loaders (`loadThemeCatalog`, `loadMediaDesignSystemsCatalog`) merge the
+  recursively-read directory (`media-templates/themes/`,
+  `media-templates/media-design-systems/`) and only fall back to the
+  sibling `themes.json` / `media-design-systems.json` when the directory is
+  empty. Add or edit entries in the **directory** files — the top-level
+  `.json` is a mirror and silently ignored otherwise.
+- **Slide-layout catalogs are token-first.** `body-zone-layouts.json` (and
+  any layout template catalog) may carry a `tokens` table
+  (`tokens.spacing`/`tokens.typography` — inches / pt); zone, chrome and hero
+  fields reference them as `@spacing.md`, `@typography.title`, `@font.body`,
+  `@color.surface`. Resolution is theme-first, then the catalog tokens, so a
+  theme's own `spacing`/`typography` keys retune the whole layout system
+  without touching geometry. Never put raw font sizes or spacing literals in
+  new zone specs — add a token or use the nearest existing ref.
 - vitest pool is `forks` on purpose: suites mutate `process.env`
   (KYBERION_ROOT tmp roots, MISSION_ROLE, personas); worker threads share
   env and cross-contaminate.

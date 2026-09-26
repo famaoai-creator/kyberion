@@ -649,9 +649,10 @@ function extractCell(xml: string, sharedStrings: string[]): XlsxCell | null {
   const vContent = getTagContent(xml, 'v') || getTagContent(xml, 'x:v');
   if (vContent !== undefined) {
     if (t === 's') {
-      // Shared string reference
+      // Shared string reference — an empty string is a valid entry, so test
+      // bounds rather than truthiness ('' must not fall back to the index).
       const idx = parseInt(vContent);
-      cell.value = sharedStrings[idx] || vContent;
+      cell.value = idx >= 0 && idx < sharedStrings.length ? sharedStrings[idx] : vContent;
     } else if (t === 'b') {
       cell.value = vContent === '1';
     } else if (t === 'n' || !t) {
@@ -670,8 +671,8 @@ function extractCell(xml: string, sharedStrings: string[]): XlsxCell | null {
   if (t === 'inlineStr') {
     const isTag = getTagFull(xml, 'is') || getTagFull(xml, 'x:is');
     if (isTag) {
-      const tContent = getTagContent(isTag, 't') || getTagContent(isTag, 'x:t');
-      if (tContent) cell.value = tContent;
+      const tContent = getTagContent(isTag, 't') ?? getTagContent(isTag, 'x:t');
+      if (tContent !== undefined) cell.value = tContent;
     }
   }
 

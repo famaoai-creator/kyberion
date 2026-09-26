@@ -192,6 +192,7 @@ export interface MediaSlideLayoutPresetCatalog {
   body_zones?: Record<string, MediaLayoutBodyZone>;
   default?: string;
   templates?: Record<string, MediaLayoutTemplate>;
+  tokens?: Record<string, Record<string, unknown>>;
   _meta?: string;
 }
 
@@ -199,6 +200,7 @@ export interface MediaLayoutTemplateCatalog {
   version: string;
   default: string;
   templates: Record<string, MediaLayoutTemplate>;
+  tokens?: Record<string, Record<string, unknown>>;
 }
 
 export interface MediaLayoutThemeInput {
@@ -322,6 +324,7 @@ function loadBodyZoneLayouts(rootDir: string): MediaLayoutTemplate {
     chrome: catalog.chrome || {},
     hero: catalog.hero || {},
     body_zones: catalog.body_zones || {},
+    tokens: catalog.tokens || {},
   };
   return _cachedBzl;
 }
@@ -359,7 +362,11 @@ function getPngDisplaySize(
   } catch {
     /* non-PNG or unreadable — fall through */
   }
-  return { w: Math.round(targetH * 3 * 1000) / 1000, h: targetH };
+  const fallbackW = targetH * 3;
+  return {
+    w: Math.round(Math.min(maxW ?? fallbackW, fallbackW) * 1000) / 1000,
+    h: targetH,
+  };
 }
 
 /**
@@ -410,6 +417,55 @@ function resolveBodyZoneLayout(semanticType: string): string {
   }
 }
 
+/**
+ * Design-token resolution for layout templates.
+ *
+ * Zone/chrome geometry carries `@<table>.<key>` string refs (e.g.
+ * "@spacing.md", "@typography.body", "@font.heading", "@color.surface") that
+ * resolve theme-first, then the template's own `tokens` table, then fall back
+ * to the literal the token was meant to express. A theme without token keys
+ * simply renders the catalog defaults, which keeps every existing zone spec
+ * valid while letting themes re-tune the whole layout system.
+ */
+const TOKEN_REF_RE = /^@([a-zA-Z_]+)\.([a-zA-Z0-9_]+)$/;
+
+function resolveDesignToken(
+  ref: string,
+  theme: any,
+  templateTokens: Record<string, Record<string, unknown>>
+): unknown {
+  const match = TOKEN_REF_RE.exec(String(ref));
+  if (!match) return ref;
+  const [, table, key] = match;
+  const themeTables: Record<string, any> = {
+    spacing: theme?.spacing || theme?.theme?.spacing,
+    typography: theme?.typography || theme?.theme?.typography,
+    color: theme?.colors || theme?.theme?.colors,
+    font: theme?.fonts || theme?.theme?.fonts,
+  };
+  const themeValue = themeTables[table]?.[key];
+  if (themeValue !== undefined) return themeValue;
+  const catalogValue = templateTokens?.[table]?.[key];
+  return catalogValue !== undefined ? catalogValue : ref;
+}
+
+function applyTokenRefs(node: any, theme: any, tokens: any): any {
+  if (typeof node === 'string' && node.startsWith('@')) {
+    return resolveDesignToken(node, theme, tokens);
+  }
+  if (Array.isArray(node)) {
+    return node.map((item) => applyTokenRefs(item, theme, tokens));
+  }
+  if (node && typeof node === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      out[key] = key === 'tokens' ? value : applyTokenRefs(value, theme, tokens);
+    }
+    return out;
+  }
+  return node;
+}
+
 let _cachedLayoutTemplates: MediaLayoutTemplateCatalog | null = null;
 function loadLayoutTemplateCatalog(rootDir: string): MediaLayoutTemplateCatalog {
   if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
@@ -418,6 +474,7 @@ function loadLayoutTemplateCatalog(rootDir: string): MediaLayoutTemplateCatalog 
     version: catalog.version,
     default: catalog.default || 'corporate-standard',
     templates: catalog.templates || {},
+    tokens: catalog.tokens || {},
   };
   return _cachedLayoutTemplates;
 }
@@ -444,13 +501,19 @@ function resolveLayoutTemplate(
     theme?.pptx?.layout_templates ||
     theme?.web?.layout_templates ||
     null;
+  // `@spacing.md`-style refs resolve theme-first, then the template catalog's
+  // token table, so any template from any source honors the active design
+  // system without embedding its colors/sizes literally.
+  const resolveTokens = (tpl: any, catalogTokens: any): any =>
+    applyTokenRefs(tpl, theme, { ...(catalogTokens || {}), ...(tpl?.tokens || {}) });
+
   if (themeTemplateCatalog?.templates) {
     const templateId =
       slideData?.layout_template_id || themeTemplateCatalog.default || theme?.layout_template_id;
     const tpl =
       themeTemplateCatalog.templates?.[templateId] ||
       themeTemplateCatalog.templates?.[themeTemplateCatalog.default];
-    if (tpl) return tpl;
+    if (tpl) return resolveTokens(tpl, themeTemplateCatalog.tokens);
   }
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
   const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
@@ -464,7 +527,7 @@ function resolveLayoutTemplate(
       );
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
-      if (tpl) return tpl;
+      if (tpl) return resolveTokens(tpl, catalog.tokens);
     } catch {
       /* fall through to public catalog */
     }
@@ -475,9 +538,9 @@ function resolveLayoutTemplate(
   if (templateId) {
     const catalog = loadLayoutTemplateCatalog(rootDir);
     const tpl = catalog.templates?.[templateId];
-    if (tpl) return tpl;
+    if (tpl) return resolveTokens(tpl, catalog.tokens);
   }
-  return loadBodyZoneLayouts(rootDir);
+  return resolveTokens(loadBodyZoneLayouts(rootDir), null);
 }
 
 function resolveBodyZoneKey(

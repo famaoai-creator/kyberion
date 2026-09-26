@@ -1527,7 +1527,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 51489,
+      "size": 51679,
       "type": "json"
     },
     {
@@ -2427,7 +2427,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 22468,
+      "size": 23780,
       "type": "md"
     },
     {
@@ -2667,7 +2667,7 @@
     {
       "path": "product/governance/media-theme-role-policy.json",
       "tier": "public",
-      "size": 440,
+      "size": 642,
       "type": "json"
     },
     {
@@ -4977,7 +4977,7 @@
     {
       "path": "product/orchestration/capability-verb-inventory.md",
       "tier": "public",
-      "size": 8284,
+      "size": 8894,
       "type": "md"
     },
     {
@@ -5170,6 +5170,12 @@
       "path": "product/orchestration/lifestyle-booking-playbook.md",
       "tier": "public",
       "size": 9080,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/media-structured-content-extension.md",
+      "tier": "public",
+      "size": 12608,
       "type": "md"
     },
     {
@@ -5565,7 +5571,7 @@
     {
       "path": "product/orchestration/presentation-authoring-playbook.md",
       "tier": "public",
-      "size": 3989,
+      "size": 12755,
       "type": "md"
     },
     {
@@ -6477,7 +6483,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 3269,
+      "size": 4390,
       "type": "md"
     },
     {
@@ -6832,6 +6838,30 @@
       "path": "product/pipeline-templates/marketing-strategy.json",
       "tier": "public",
       "size": 1753,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/media-docx-roundtrip.json",
+      "tier": "public",
+      "size": 2638,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/media-pdf-roundtrip.json",
+      "tier": "public",
+      "size": 2614,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/media-pptx-roundtrip.json",
+      "tier": "public",
+      "size": 1314,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/media-xlsx-roundtrip.json",
+      "tier": "public",
+      "size": 2562,
       "type": "json"
     },
     {
@@ -11313,7 +11343,7 @@
     {
       "path": "product/schemas/slide-layout-presets.schema.json",
       "tier": "public",
-      "size": 842,
+      "size": 1042,
       "type": "json"
     },
     {
@@ -12651,13 +12681,13 @@
     {
       "path": "public/design-patterns/media-templates/document-composition-presets.json",
       "tier": "public",
-      "size": 9836,
+      "size": 13278,
       "type": "json"
     },
     {
       "path": "public/design-patterns/media-templates/document-composition-presets/defaults.json",
       "tier": "public",
-      "size": 168,
+      "size": 204,
       "type": "json"
     },
     {
@@ -12681,7 +12711,7 @@
     {
       "path": "public/design-patterns/media-templates/document-composition-presets/presentation-profiles.json",
       "tier": "public",
-      "size": 4901,
+      "size": 8193,
       "type": "json"
     },
     {
@@ -12711,7 +12741,7 @@
     {
       "path": "public/design-patterns/media-templates/media-design-systems.json",
       "tier": "public",
-      "size": 5245,
+      "size": 6273,
       "type": "json"
     },
     {
@@ -12741,7 +12771,7 @@
     {
       "path": "public/design-patterns/media-templates/media-design-systems/systems.json",
       "tier": "public",
-      "size": 5188,
+      "size": 7063,
       "type": "json"
     },
     {
@@ -12783,7 +12813,7 @@
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json",
       "tier": "public",
-      "size": 14285,
+      "size": 15874,
       "type": "json"
     },
     {
@@ -12813,7 +12843,7 @@
     {
       "path": "public/design-patterns/media-templates/themes.json",
       "tier": "public",
-      "size": 4818,
+      "size": 5990,
       "type": "json"
     },
     {
@@ -12831,7 +12861,7 @@
     {
       "path": "public/design-patterns/media-templates/themes/themes.json",
       "tier": "public",
-      "size": 4756,
+      "size": 7139,
       "type": "json"
     },
     {

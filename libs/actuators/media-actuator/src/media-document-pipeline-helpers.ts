@@ -1,3 +1,4 @@
+import { pickStructuredSectionFields } from './media-structured-content.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -201,17 +202,29 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
     const contentData = outline.toc.map((entry: any) => ({
+      id: entry.section_id || entry.id,
       title: entry.title,
       body: Array.isArray(entry.body) ? entry.body : [entry.objective].filter(Boolean),
       subtitle: entry.objective,
+      eyebrow: entry.eyebrow,
       visual: entry.visual || entry.supporting_visual,
       media_kind: entry.media_kind,
       layout_key: entry.layout_key,
       semantic_type: entry.semantic_type,
+      ...pickStructuredSectionFields(entry),
+      columns: entry.columns,
+      checklist: entry.checklist,
+      cta: entry.cta,
+      quote: entry.quote,
+      image: entry.image,
       design_system_id: outline.design_system_id,
       branding: outline.branding || {},
     }));
-    if (!contentData.some((entry: any) => String(entry.id || '').toLowerCase() === 'contents')) {
+    if (
+      !contentData.some((entry: any) =>
+        ['contents'].includes(String(entry.id || entry.section_id || '').toLowerCase())
+      )
+    ) {
       const contentsEntry = Array.isArray(outline.toc)
         ? outline.toc.find((entry: any) => String(entry.section_id || '') === 'contents')
         : null;

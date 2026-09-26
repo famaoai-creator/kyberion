@@ -113,9 +113,21 @@ export function resolveThemeHexColor(
     case 'info':
       return String(themeColors.info || '#DBEAFE');
     case 'muted':
-      return String(themeColors.muted || '#F1F5F9');
+      return String(themeColors.muted || themeColors.muted_text || '#F1F5F9');
     case 'surface':
       return String(themeColors.surface || themeColors.background_card || '#E9EDF4');
+    case 'text_primary':
+      return String(themeColors.text_primary || themeColors.text || fallback);
+    case 'text_secondary':
+      return String(
+        themeColors.text_secondary || themeColors.muted_text || themeColors.muted || '#595959'
+      );
+    case 'navy':
+      return String(themeColors.navy || themeColors.secondary || themeColors.primary || '#003366');
+    case 'cta':
+      return String(themeColors.cta || themeColors.accent || '#0070C0');
+    case 'text':
+      return String(themeColors.text || fallback);
     default:
       return String(themeColors.text || fallback);
   }

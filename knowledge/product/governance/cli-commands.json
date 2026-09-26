@@ -363,6 +363,14 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.diff",
+      "command": "diff",
+      "noun": "diff",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.see",
       "command": "see",
       "noun": "see",
@@ -571,6 +579,7 @@
         "offboard",
         "read",
         "write",
+        "diff",
         "see",
         "listen",
         "watch",

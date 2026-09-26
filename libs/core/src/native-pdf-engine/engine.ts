@@ -439,19 +439,27 @@ function buildAestheticContent(
   unicode: boolean,
   encodeText?: (text: string) => string
 ): string {
-  let s = 'BT\n';
+  let s = '';
   for (const el of elements) {
     if ((el.type === 'text' || el.type === 'heading') && el.text) {
       const fontSize = el.fontSize || 12;
+      // Nonstroking fill color via `rg` — a graphics-state op, so it must sit
+      // OUTSIDE the text object. One BT/ET pair per element.
+      const rgb = Array.isArray((el as any).color)
+        ? (el as any).color.map((c: number) => Math.min(1, Math.max(0, Number(c) || 0)))
+        : [0, 0, 0];
+      s += `${rgb.join(' ')} rg\n`;
+      s += 'BT\n';
       s += `/F1 ${fontSize} Tf\n1 0 0 1 ${el.x} ${pageHeight - el.y} Tm\n`;
       s += encodeText
         ? `${encodeText(el.text)} Tj\n`
         : unicode && hasNonAscii(el.text)
           ? `${encodePdfString(el.text, true)} Tj\n`
           : `(${escapeLit(el.text)}) Tj\n`;
+      s += 'ET\n';
     }
   }
-  return s + 'ET';
+  return s;
 }
 
 function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
@@ -1182,10 +1190,14 @@ export async function generateNativePdf(
     // Vectors (graphics state)
     if (page.vectors?.length) content += buildVectorStream(page.vectors, page.height);
 
-    // Text: aesthetic elements on first page, or regular text
-    if (protocol.aesthetic?.elements?.length && pi === 0) {
+    // Text: aesthetic elements are page-scoped via `el.page` (0-based);
+    // elements without a page field stay on page 0 — same as before.
+    const scopedElements = (protocol.aesthetic?.elements ?? []).filter(
+      (el) => Math.max(0, Math.floor(Number(el.page ?? 0))) === pi
+    );
+    if (scopedElements.length > 0) {
       content += buildAestheticContent(
-        protocol.aesthetic.elements,
+        scopedElements,
         page.height,
         opts.unicode,
         embeddedFont?.encodeText

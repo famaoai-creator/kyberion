@@ -89,6 +89,7 @@ function runPropertiesXml(rPr: DocxRunProperties | undefined): string {
     if (rPr.color.theme) xml += ` w:themeColor="${rPr.color.theme}"`;
     xml += '/>';
   }
+  if (rPr.spacing !== undefined) xml += `<w:spacing w:val="${rPr.spacing}"/>`;
   if (rPr.sz) xml += `<w:sz w:val="${rPr.sz}"/>`;
   if (rPr.szCs) xml += `<w:szCs w:val="${rPr.szCs}"/>`;
   if (rPr.highlight) xml += `<w:highlight w:val="${rPr.highlight}"/>`;
@@ -109,8 +110,37 @@ function runContentXml(content: DocxRunContent): string {
       return content.breakType ? `<w:br w:type="${content.breakType}"/>` : '<w:br/>';
     case 'tab':
       return '<w:tab/>';
-    case 'drawing':
-      return content.drawing.rawXml ? `<w:drawing>${content.drawing.rawXml}</w:drawing>` : '';
+    case 'drawing': {
+      const drawing = content.drawing;
+      if (drawing.rawXml) return `<w:drawing>${drawing.rawXml}</w:drawing>`;
+      // Structured inline image: callers supply an rId (registered in
+      // document.xml.rels) plus an extent in EMUs — the engine builds the
+      // wp:inline wrapper. Round-tripped drawings still arrive as rawXml and
+      // bypass this entirely.
+      if (drawing.imageRId && drawing.extent) {
+        const cx = Math.round(drawing.extent.cx);
+        const cy = Math.round(drawing.extent.cy);
+        const name = escXml(drawing.name || 'Figure');
+        // wp:docPr ids must be unique within the part — hash the full rId
+        // string so digit-suffix collisions (rId1 vs rIdImg1) can't occur.
+        const docPrId = [...String(drawing.imageRId)].reduce((a, c) => a + c.charCodeAt(0), 0) || 1;
+        return (
+          `<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">` +
+          `<wp:extent cx="${cx}" cy="${cy}"/>` +
+          `<wp:docPr id="${docPrId}" name="${name}"` +
+          (drawing.description ? ` descr="${escXml(drawing.description)}"` : '') +
+          `/>` +
+          `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+          `<pic:pic>` +
+          `<pic:nvPicPr><pic:cNvPr id="0" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+          `<pic:blipFill><a:blip r:embed="${drawing.imageRId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+          `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
+          `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+          `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`
+        );
+      }
+      return '';
+    }
     case 'fieldChar':
       return `<w:fldChar w:fldCharType="${content.fldCharType}"/>`;
     case 'instrText':
@@ -269,6 +299,7 @@ function tableRowXml(row: DocxTableRow): string {
         xml += '/>';
       }
       if (row.trPr.tblHeader) xml += '<w:tblHeader/>';
+      if (row.trPr.cantSplit) xml += '<w:cantSplit/>';
       xml += '</w:trPr>';
     }
   }
@@ -302,6 +333,15 @@ function tableXml(table: DocxTable): string {
         if (b.insideH) xml += borderEdgeXml(b.insideH, 'insideH');
         if (b.insideV) xml += borderEdgeXml(b.insideV, 'insideV');
         xml += '</w:tblBorders>';
+      }
+      if (table.tblPr.tblCellMar) {
+        const m = table.tblPr.tblCellMar;
+        xml += '<w:tblCellMar>';
+        if (m.top !== undefined) xml += `<w:top w:w="${m.top}" w:type="dxa"/>`;
+        if (m.left !== undefined) xml += `<w:left w:w="${m.left}" w:type="dxa"/>`;
+        if (m.bottom !== undefined) xml += `<w:bottom w:w="${m.bottom}" w:type="dxa"/>`;
+        if (m.right !== undefined) xml += `<w:right w:w="${m.right}" w:type="dxa"/>`;
+        xml += '</w:tblCellMar>';
       }
       xml += '</w:tblPr>';
     }
@@ -387,10 +427,40 @@ function sectionPropertiesXml(sect: DocxSectionProperties): string {
 
 // ─── Part Generators ────────────────────────────────────────
 
+/** Content types for passthrough parts that need an explicit Override. */
+const PASSTHROUGH_CONTENT_TYPES: Record<string, string> = {
+  'word/settings.xml':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml',
+  'word/footnotes.xml':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml',
+  'word/endnotes.xml':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml',
+  'word/comments.xml':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml',
+  'word/people.xml': 'application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml',
+};
+
+/** Relationship type URIs that do not live under RT_BASE. */
+const REL_TYPE_URIS: Record<string, string> = {
+  people: 'http://schemas.microsoft.com/office/2017/10/relationships/people',
+};
+
+function relTypeUri(type: string): string {
+  return REL_TYPE_URIS[type] || `${RT_BASE}/${type}`;
+}
+
+/** Resolve a document.xml.rels target to its package-relative part path. */
+function relTargetPartPath(target: string): string {
+  if (target.startsWith('/')) return target.slice(1);
+  if (target.startsWith('../')) return target.slice(3);
+  return `word/${target}`;
+}
+
 function generateContentTypes(
   hasNumbering: boolean,
   headersFooters: DocxHeaderFooter[],
-  relationships: DocxDesignProtocol['relationships']
+  relationships: DocxDesignProtocol['relationships'],
+  passthroughParts: DocxDesignProtocol['passthroughParts']
 ): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -421,6 +491,17 @@ function generateContentTypes(
     xml += `\n  <Override PartName="/word/${target}" ContentType="${contentType}"/>`;
   }
 
+  for (const part of passthroughParts || []) {
+    const contentType =
+      PASSTHROUGH_CONTENT_TYPES[part.path] ||
+      (/^customXml\/itemProps\d*\.xml$/.test(part.path)
+        ? 'application/vnd.openxmlformats-officedocument.customXmlProperties+xml'
+        : null);
+    if (contentType) {
+      xml += `\n  <Override PartName="/${part.path}" ContentType="${contentType}"/>`;
+    }
+  }
+
   xml += '\n</Types>';
   return xml;
 }
@@ -435,27 +516,36 @@ function generateGlobalRels(): string {
 }
 
 function generateDocumentRels(protocol: DocxDesignProtocol): string {
-  let rId = 1;
+  // Only relationships whose target parts this generator actually writes are
+  // carried over — keeping rels for un-emitted parts (settings, webSettings,
+  // footnotes, customXml, …) leaves dangling references in the package.
+  // Header/footer/image targets are emitted with their source names and are
+  // referenced verbatim from rawXml (sectPr, drawings), so their rIds must
+  // be preserved; built-in rels get IDs that cannot collide with them.
+  const emittedTypes = new Set(['header', 'footer', 'image', 'hyperlink']);
+  const passthroughPaths = new Set((protocol.passthroughParts || []).map((part) => part.path));
+  const preserved = protocol.relationships.filter(
+    (rel) => emittedTypes.has(rel.type) || passthroughPaths.has(relTargetPartPath(rel.target))
+  );
+  const usedIds = new Set(preserved.map((rel) => rel.id));
+  let nextIdNum = 0;
+  const nextId = (): string => {
+    do {
+      nextIdNum += 1;
+    } while (usedIds.has(`rId${nextIdNum}`));
+    return `rId${nextIdNum}`;
+  };
+
   let rels = '';
-
-  // Styles
-  rels += `  <Relationship Id="rId${rId++}" Type="${RT_BASE}/styles" Target="styles.xml"/>\n`;
-
-  // Theme
-  rels += `  <Relationship Id="rId${rId++}" Type="${RT_BASE}/theme" Target="theme/theme1.xml"/>\n`;
-
-  // Font table
-  rels += `  <Relationship Id="rId${rId++}" Type="${RT_BASE}/fontTable" Target="fontTable.xml"/>\n`;
-
-  // Numbering
+  rels += `  <Relationship Id="${nextId()}" Type="${RT_BASE}/styles" Target="styles.xml"/>\n`;
+  rels += `  <Relationship Id="${nextId()}" Type="${RT_BASE}/theme" Target="theme/theme1.xml"/>\n`;
+  rels += `  <Relationship Id="${nextId()}" Type="${RT_BASE}/fontTable" Target="fontTable.xml"/>\n`;
   if (protocol.numbering) {
-    rels += `  <Relationship Id="rId${rId++}" Type="${RT_BASE}/numbering" Target="numbering.xml"/>\n`;
+    rels += `  <Relationship Id="${nextId()}" Type="${RT_BASE}/numbering" Target="numbering.xml"/>\n`;
   }
 
-  // Original relationships (headers, footers, images, hyperlinks)
-  for (const rel of protocol.relationships) {
-    if (['styles', 'theme', 'fontTable', 'numbering'].includes(rel.type)) continue;
-    rels += `  <Relationship Id="${rel.id}" Type="${RT_BASE}/${rel.type}" Target="${rel.target}"`;
+  for (const rel of preserved) {
+    rels += `  <Relationship Id="${rel.id}" Type="${relTypeUri(rel.type)}" Target="${rel.target}"`;
     if (rel.targetMode) rels += ` TargetMode="${rel.targetMode}"`;
     rels += '/>\n';
   }
@@ -607,7 +697,8 @@ export async function generateNativeDocx(
   const contentTypes = generateContentTypes(
     hasNumbering,
     protocol.headersFooters,
-    protocol.relationships
+    protocol.relationships,
+    protocol.passthroughParts
   );
 
   zip.addFile('[Content_Types].xml', Buffer.from(contentTypes, 'utf8'));
@@ -674,6 +765,16 @@ export async function generateNativeDocx(
       xml += `</${rootTag}>`;
       zip.addFile(`word/${target}`, Buffer.from(xml, 'utf8'));
     }
+  }
+
+  // Passthrough parts (footnotes, settings, customXml, …) verbatim
+  for (const part of protocol.passthroughParts || []) {
+    zip.addFile(
+      part.path,
+      part.encoding === 'base64'
+        ? Buffer.from(part.content, 'base64')
+        : Buffer.from(part.content, 'utf8')
+    );
   }
 
   // Embed images from body drawings

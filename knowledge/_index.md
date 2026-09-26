@@ -372,6 +372,7 @@
 - [Kyberion Development Workflow](./product/orchestration/kyberion-development-workflow.md) (public | Ecosystem Architect)
 - [Kyberion Intent Scenario Catalog](./product/orchestration/intent-scenario-catalog.md) (public | Ecosystem Architect)
 - [Lifestyle Booking Playbook](./product/orchestration/lifestyle-booking-playbook.md) (public | Unknown)
+- [Media Structured-Content Extension Guide](./product/orchestration/media-structured-content-extension.md) (public | Unknown)
 - [Meeting Facilitation Workflow Simplification Proposal](./product/orchestration/meeting-facilitation-workflow-simplification-proposal.md) (public | Unknown)
 - [Meeting Operations Playbook](./product/orchestration/meeting-operations-playbook.md) (public | Unknown)
 - [Memory Snapshot Protocol](./product/orchestration/memory-snapshot-protocol.md) (public | Ecosystem Architect)

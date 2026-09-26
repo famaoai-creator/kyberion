@@ -175,6 +175,47 @@
         "heading": "Montserrat, sans-serif",
         "body": "Open Sans, sans-serif"
       }
+    },
+    "dads": {
+      "name": "DADS Standard (デジタル庁)",
+      "description": "Digital Agency Design System aligned theme: Noto Sans JP, Std text scale (body 16px+/11pt+, line-height 150-170%), Blue-900 primary, contrast-safe gray ramps (text >=4.5:1, borders >=3:1).",
+      "colors": {
+        "primary": "#0017C1",
+        "secondary": "#0031D8",
+        "accent": "#0017C1",
+        "background": "#ffffff",
+        "text": "#1A1A1A",
+        "accent_text": "#0017C1",
+        "surface": "#F1F1F4",
+        "muted_text": "#4D4D4D",
+        "border": "#9E9E9E",
+        "success": "#259D63",
+        "warning": "#B78F00",
+        "danger": "#EC0000"
+      },
+      "fonts": {
+        "heading": "Noto Sans JP, sans-serif",
+        "body": "Noto Sans JP, sans-serif"
+      },
+      "spacing": {
+        "xxs": 0.042,
+        "xs": 0.083,
+        "sm": 0.125,
+        "md": 0.167,
+        "lg": 0.25,
+        "xl": 0.333,
+        "xxl": 0.417,
+        "xxxl": 0.5
+      },
+      "typography": {
+        "display": 40,
+        "headline": 28,
+        "title": 20,
+        "body": 12,
+        "label": 11,
+        "caption": 10,
+        "subtitle": 16
+      }
     }
   }
 }

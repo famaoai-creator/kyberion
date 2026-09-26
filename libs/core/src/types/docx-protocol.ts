@@ -7,38 +7,59 @@
 // ─── Color ──────────────────────────────────────────────────
 
 export interface DocxColor {
-  val?: string;        // Hex RGB (e.g. "FF0000")
-  theme?: string;      // Theme color name
-  themeShade?: string;  // Shade modifier
-  themeTint?: string;   // Tint modifier
+  val?: string; // Hex RGB (e.g. "FF0000")
+  theme?: string; // Theme color name
+  themeShade?: string; // Shade modifier
+  themeTint?: string; // Tint modifier
 }
 
 // ─── Border ─────────────────────────────────────────────────
 
 export interface DocxBorderEdge {
-  val?: 'none' | 'single' | 'thick' | 'double' | 'dotted' | 'dashed'
-    | 'dashSmallGap' | 'dotDash' | 'dotDotDash' | 'triple' | 'thinThickSmallGap'
-    | 'thickThinSmallGap' | 'thinThickThinSmallGap' | 'thinThickMediumGap'
-    | 'thickThinMediumGap' | 'thinThickThinMediumGap' | 'thinThickLargeGap'
-    | 'thickThinLargeGap' | 'thinThickThinLargeGap' | 'wave' | 'doubleWave'
-    | 'dashDotStroked' | 'threeDEmboss' | 'threeDEngrave' | 'outset' | 'inset';
-  sz?: number;         // Border width in eighths of a point
-  space?: number;      // Spacing in points
-  color?: string;      // Hex RGB
+  val?:
+    | 'none'
+    | 'single'
+    | 'thick'
+    | 'double'
+    | 'dotted'
+    | 'dashed'
+    | 'dashSmallGap'
+    | 'dotDash'
+    | 'dotDotDash'
+    | 'triple'
+    | 'thinThickSmallGap'
+    | 'thickThinSmallGap'
+    | 'thinThickThinSmallGap'
+    | 'thinThickMediumGap'
+    | 'thickThinMediumGap'
+    | 'thinThickThinMediumGap'
+    | 'thinThickLargeGap'
+    | 'thickThinLargeGap'
+    | 'thinThickThinLargeGap'
+    | 'wave'
+    | 'doubleWave'
+    | 'dashDotStroked'
+    | 'threeDEmboss'
+    | 'threeDEngrave'
+    | 'outset'
+    | 'inset';
+  sz?: number; // Border width in eighths of a point
+  space?: number; // Spacing in points
+  color?: string; // Hex RGB
 }
 
 // ─── Shading ────────────────────────────────────────────────
 
 export interface DocxShading {
-  val?: string;        // Pattern (e.g. "clear", "solid")
-  color?: string;      // Pattern color
-  fill?: string;       // Background fill color (hex RGB)
+  val?: string; // Pattern (e.g. "clear", "solid")
+  color?: string; // Pattern color
+  fill?: string; // Background fill color (hex RGB)
 }
 
 // ─── Run Properties ─────────────────────────────────────────
 
 export interface DocxRunProperties {
-  rStyle?: string;     // Character style ID
+  rStyle?: string; // Character style ID
   rFonts?: {
     ascii?: string;
     hAnsi?: string;
@@ -47,44 +68,44 @@ export interface DocxRunProperties {
   };
   bold?: boolean;
   italic?: boolean;
-  underline?: string;  // 'single' | 'double' | 'thick' | 'dotted' | 'dash' | 'wave' | 'none'
+  underline?: string; // 'single' | 'double' | 'thick' | 'dotted' | 'dash' | 'wave' | 'none'
   strike?: boolean;
   dstrike?: boolean;
   color?: DocxColor;
-  sz?: number;         // Font size in half-points (24 = 12pt)
-  szCs?: number;       // Complex script font size
-  highlight?: string;  // Highlight color name
+  sz?: number; // Font size in half-points (24 = 12pt)
+  szCs?: number; // Complex script font size
+  highlight?: string; // Highlight color name
   shd?: DocxShading;
   vertAlign?: 'superscript' | 'subscript' | 'baseline';
-  spacing?: number;    // Letter spacing in twips
+  spacing?: number; // Letter spacing in twips
   outline?: boolean;
   shadow?: boolean;
   emboss?: boolean;
   imprint?: boolean;
-  vanish?: boolean;    // Hidden text
+  vanish?: boolean; // Hidden text
   rawXml?: string;
 }
 
 // ─── Paragraph Properties ───────────────────────────────────
 
 export interface DocxParagraphProperties {
-  pStyle?: string;     // Paragraph style ID
+  pStyle?: string; // Paragraph style ID
   jc?: 'left' | 'center' | 'right' | 'both' | 'distribute';
   ind?: {
-    left?: number;     // Twips
+    left?: number; // Twips
     right?: number;
     firstLine?: number;
     hanging?: number;
   };
   spacing?: {
-    before?: number;   // Twips
+    before?: number; // Twips
     after?: number;
-    line?: number;     // Line spacing (240 = single)
+    line?: number; // Line spacing (240 = single)
     lineRule?: 'auto' | 'exact' | 'atLeast';
   };
   numPr?: {
-    ilvl: number;      // Indentation level
-    numId: number;     // Numbering definition ID
+    ilvl: number; // Indentation level
+    numId: number; // Numbering definition ID
   };
   pBdr?: {
     top?: DocxBorderEdge;
@@ -99,8 +120,8 @@ export interface DocxParagraphProperties {
   pageBreakBefore?: boolean;
   widowControl?: boolean;
   outlineLevel?: number;
-  rPr?: DocxRunProperties;  // Default run properties for paragraph
-  sectPr?: DocxSectionProperties;  // Section break (multi-section documents)
+  rPr?: DocxRunProperties; // Default run properties for paragraph
+  sectPr?: DocxSectionProperties; // Section break (multi-section documents)
   rawXml?: string;
 }
 
@@ -127,7 +148,7 @@ export interface DocxDrawing {
   type: 'inline' | 'anchor';
   name?: string;
   description?: string;
-  extent?: { cx: number; cy: number };  // EMUs
+  extent?: { cx: number; cy: number }; // EMUs
   // Anchor-specific
   positionH?: { relativeFrom: string; offset?: number };
   positionV?: { relativeFrom: string; offset?: number };
@@ -136,7 +157,7 @@ export interface DocxDrawing {
   // Image reference
   imageRId?: string;
   imagePath?: string;
-  imageData?: string;   // Base64-encoded image binary (for lossless round-trip)
+  imageData?: string; // Base64-encoded image binary (for lossless round-trip)
   // Shape properties
   spPrXml?: string;
   rawXml?: string;
@@ -214,13 +235,14 @@ export interface DocxTableCellProperties {
 
 export interface DocxTableCell {
   tcPr?: DocxTableCellProperties;
-  content: DocxBlockContent[];  // Cells contain paragraphs/tables
+  content: DocxBlockContent[]; // Cells contain paragraphs/tables
 }
 
 export interface DocxTableRow {
   trPr?: {
     trHeight?: { val: number; hRule?: 'atLeast' | 'exact' | 'auto' };
-    tblHeader?: boolean;  // Header row repeated on each page
+    cantSplit?: boolean;
+    tblHeader?: boolean; // Header row repeated on each page
     rawXml?: string;
   };
   cells: DocxTableCell[];
@@ -228,7 +250,7 @@ export interface DocxTableRow {
 
 export interface DocxTable {
   tblPr?: DocxTableProperties;
-  tblGrid: number[];           // Column widths in twips
+  tblGrid: number[]; // Column widths in twips
   rows: DocxTableRow[];
   rawXml?: string;
 }
@@ -245,8 +267,8 @@ export type DocxBlockContent =
 
 export interface DocxSectionProperties {
   pgSz?: {
-    w: number;         // Page width in twips
-    h: number;         // Page height in twips
+    w: number; // Page width in twips
+    h: number; // Page height in twips
     orient?: 'portrait' | 'landscape';
   };
   pgMar?: {
@@ -263,7 +285,7 @@ export interface DocxSectionProperties {
   pgNumType?: { start?: number; fmt?: string };
   cols?: { num?: number; space?: number; sep?: boolean };
   docGrid?: { linePitch?: number; type?: string };
-  titlePg?: boolean;   // Different first page header/footer
+  titlePg?: boolean; // Different first page header/footer
   rawXml?: string;
 }
 
@@ -302,8 +324,8 @@ export interface DocxAbstractNum {
   abstractNumId: number;
   levels: Array<{
     ilvl: number;
-    numFmt: string;    // 'decimal' | 'bullet' | 'lowerLetter' | etc.
-    lvlText: string;   // e.g. "%1." or "●"
+    numFmt: string; // 'decimal' | 'bullet' | 'lowerLetter' | etc.
+    lvlText: string; // e.g. "%1." or "●"
     start?: number;
     jc?: string;
     pPr?: DocxParagraphProperties;
@@ -326,7 +348,7 @@ export interface DocxNum {
 
 export interface DocxTheme {
   name?: string;
-  colors: { [key: string]: string };  // dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink
+  colors: { [key: string]: string }; // dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink
   majorFont?: string;
   minorFont?: string;
   rawXml?: string;
@@ -350,8 +372,8 @@ export interface DocxLayoutProfile {
     headingEn?: string;
   };
   sizes?: {
-    body?: number;       // pt
-    heading1?: number;   // pt
+    body?: number; // pt
+    heading1?: number; // pt
     heading2?: number;
     heading3?: number;
     heading4?: number;
@@ -359,8 +381,8 @@ export interface DocxLayoutProfile {
     code?: number;
   };
   page?: {
-    width?: number;      // twips
-    height?: number;     // twips
+    width?: number; // twips
+    height?: number; // twips
     marginTop?: number;
     marginRight?: number;
     marginBottom?: number;
@@ -370,12 +392,12 @@ export interface DocxLayoutProfile {
     marginGutter?: number;
   };
   indent?: {
-    bodyLeft?: number;         // twips
-    bodyFirstLine?: number;    // twips
-    bodyRight?: number;        // twips
-    bodyLeftChars?: number;    // Word char unit x100
-    heading4Left?: number;     // twips
-    heading4Hanging?: number;  // twips
+    bodyLeft?: number; // twips
+    bodyFirstLine?: number; // twips
+    bodyRight?: number; // twips
+    bodyLeftChars?: number; // Word char unit x100
+    heading4Left?: number; // twips
+    heading4Hanging?: number; // twips
   };
   bullet?: {
     level0?: string;
@@ -406,12 +428,30 @@ export interface DocxNumberingPolicy {
   };
 }
 
+// ─── Passthrough Parts ──────────────────────────────────────
+
+/**
+ * A package part carried verbatim through extract → render (XML as utf8 text,
+ * binary as base64). Used for content-bearing parts the engine does not
+ * model natively — footnotes, endnotes, comments, settings, customXml — so
+ * that references from document.xml keep resolving after a round-trip.
+ * Legacy/environment parts (webSettings, thumbnails, app/core props) are
+ * intentionally not carried.
+ */
+export interface DocxPassthroughPart {
+  /** Package-relative path, e.g. "word/footnotes.xml" or "customXml/item1.xml". */
+  path: string;
+  content: string;
+  encoding?: 'utf8' | 'base64';
+}
+
 // ─── Root Protocol ──────────────────────────────────────────
 
 export interface DocxDesignProtocol {
   version: string;
   generatedAt: string;
   source?: DocxSourceDescriptor;
+  passthroughParts?: DocxPassthroughPart[];
   theme: DocxTheme;
   layoutProfile?: DocxLayoutProfile;
   numberingPolicy?: DocxNumberingPolicy;

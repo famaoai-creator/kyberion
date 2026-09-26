@@ -91,7 +91,7 @@ function elementXml(el: XlsxDrawingElement, idCounter: number, locale = 'ja-JP')
     return xml;
   }
 
-  if (el.type === 'image' && el.imagePath) {
+  if (el.type === 'image' && (el.imagePath || el.imageData)) {
     // Image element - needs relationship reference
     let xml = `<xdr:pic>`;
     xml += `<xdr:nvPicPr><xdr:cNvPr id="${idCounter}" name="${escXml(el.name || `Image ${idCounter}`)}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>`;
@@ -103,6 +103,26 @@ function elementXml(el: XlsxDrawingElement, idCounter: number, locale = 'ja-JP')
 
   // Fallback: empty shape
   return '';
+}
+
+/**
+ * Collect image elements with their generated rIds — generateDrawing assigns
+ * r:embed="rIdN" where N is the sequential element id (starting at 2), so the
+ * same walk yields the rels needed for the drawing's .rels part.
+ */
+export function collectDrawingImageRels(
+  drawing: XlsxDrawing
+): Array<{ rId: string; element: XlsxDrawingElement }> {
+  if (drawing.rawXml) return [];
+  let idCounter = 2;
+  const rels: Array<{ rId: string; element: XlsxDrawingElement }> = [];
+  for (const el of drawing.elements) {
+    const rId = `rId${idCounter++}`;
+    if (el.type === 'image' && (el.imagePath || el.imageData)) {
+      rels.push({ rId, element: el });
+    }
+  }
+  return rels;
 }
 
 export function generateDrawing(drawing: XlsxDrawing, locale = 'ja-JP'): string {

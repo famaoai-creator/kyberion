@@ -1,0 +1,73 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "media-pdf-roundtrip",
+  "version": "1.0.0",
+  "name": "PDF Roundtrip Reproduction",
+  "description": "Experimental — extract → render for PDF. pdf_extract distills the file into a design protocol (pages, text elements, layout hints), persists it as JSON, and pdf_render writes a new .pdf. Fidelity caveat: arbitrary real-world PDFs encode text as subset-font glyph IDs (unmapped CIDs), which the renderer cannot re-emit — output is typically blank or partial. Round-trip is reliable only for PDFs authored through this engine; for reproducing existing documents use the docx/pptx/xlsx templates, or extract text via `pnpm kyberion read` and re-author through media:generate_document. Override paths via --context.",
+  "_usage_note": "pdf_extract accepts aesthetic=true/false for layout-hint extraction and OCR params for image-based pages.",
+  "context": {
+    "mission_id": "MSN-PDF-ROUNDTRIP",
+    "preflight_cmd": "pnpm --version",
+    "source_pdf_path": "active/shared/tmp/pdf-roundtrip/input.pdf",
+    "design_path": "active/shared/tmp/pdf-roundtrip/design.json",
+    "roundtrip_pdf_path": "active/shared/tmp/pdf-roundtrip/roundtrip.pdf"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "extract_pdf_design",
+      "role": "source",
+      "op": "media:pdf_extract",
+      "produces": {
+        "channel": "source_pdf_design",
+        "type": "PdfDesign"
+      },
+      "params": {
+        "path": "{{source_pdf_path}}",
+        "export_as": "source_pdf_design"
+      }
+    },
+    {
+      "id": "persist_design",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "source_pdf_design",
+      "produces": {
+        "channel": "design_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "path": "{{design_path}}",
+        "format": "json",
+        "content": "{{source_pdf_design}}"
+      }
+    },
+    {
+      "id": "render_roundtrip_pdf",
+      "role": "sink",
+      "op": "media:pdf_render",
+      "consumes": "source_pdf_design",
+      "produces": {
+        "channel": "roundtrip_pdf_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "source_pdf_design",
+        "path": "{{roundtrip_pdf_path}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "PDF roundtrip completed: {{source_pdf_path}} -> {{roundtrip_pdf_path}} (design: {{design_path}})"
+      }
+    }
+  ]
+}
