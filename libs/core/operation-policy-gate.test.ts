@@ -5,6 +5,8 @@ import {
   currentDelegationDepth,
 } from './operation-policy-gate.js';
 import { auditChain } from './audit-chain.js';
+import { withExecutionContextAsync } from './authority.js';
+import { policyEngine } from './policy-engine.js';
 
 vi.mock('./audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -47,6 +49,27 @@ describe('operation-policy-gate (SA-05)', () => {
     expect(auditChain.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'policy_violation', operation: 'reasoning_delegation' })
     );
+  });
+
+  it('evaluates with the execution-scope persona, not the process env (B2)', async () => {
+    const saved = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'worker';
+    const evaluate = vi.spyOn(policyEngine, 'evaluate');
+    try {
+      await withExecutionContextAsync(
+        'mission_controller',
+        async () => {
+          await Promise.resolve();
+          assertOperationPolicy({ operation: 'network_request', context: {} });
+        },
+        'analyst'
+      );
+      expect(evaluate).toHaveBeenCalledWith(expect.objectContaining({ agentId: 'analyst' }));
+    } finally {
+      evaluate.mockRestore();
+      if (saved === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = saved;
+    }
   });
 
   it('allows delegation within the depth limit', () => {

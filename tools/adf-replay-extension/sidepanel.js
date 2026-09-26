@@ -98,6 +98,11 @@ const elements = {
   aiObservationSummaryButton: document.querySelector('#ai-observation-summary-button'),
   aiObservationSummaryStatus: document.querySelector('#ai-observation-summary-status'),
   aiObservationSummary: document.querySelector('#ai-observation-summary'),
+  inspectPageButton: document.querySelector('#inspect-page-button'),
+  inspectSendCliButton: document.querySelector('#inspect-send-cli-button'),
+  inspectPortInput: document.querySelector('#inspect-port-input'),
+  inspectPageStatus: document.querySelector('#inspect-page-status'),
+  inspectPageResult: document.querySelector('#inspect-page-result'),
   intentResult: document.querySelector('#intent-result'),
   intentOutcomeLabel: document.querySelector('#intent-outcome-label'),
   intentMatchedInfo: document.querySelector('#intent-matched-info'),
@@ -393,6 +398,14 @@ bindAction(elements.aiObservationSummaryButton, summarizeCurrentObservation, {
   busyLabel: '要約中…',
   busyNotice: 'Chrome 内蔵 AI で抽出観測を要約しています…',
 });
+bindAction(elements.inspectPageButton, inspectCurrentPageDOM, {
+  busyLabel: '解析中…',
+  busyNotice: 'ページDOM要素を解析しています…',
+});
+bindAction(elements.inspectSendCliButton, sendInspectionToCli, {
+  busyLabel: '送信中…',
+  busyNotice: 'Kyberion CLIへ解析データを送信しています…',
+});
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
@@ -516,6 +529,14 @@ refresh();
 void refreshBuiltInAiStatus();
 
 async function refresh() {
+  try {
+    const saved = await chrome.storage?.local?.get(['inspectCliPort']);
+    if (saved?.inspectCliPort && elements.inspectPortInput) {
+      elements.inspectPortInput.value = String(saved.inspectCliPort);
+    }
+  } catch (_) {
+    // optional storage cache
+  }
   const response = await chrome.runtime.sendMessage({ type: 'bridge:get-state' });
   if (!response?.ok)
     return showNotice(response?.error || 'Browser Bridge の状態を取得できません。', 'error');
@@ -718,6 +739,47 @@ async function summarizeCurrentObservation() {
   elements.aiObservationSummaryStatus.textContent = `ローカル生成: ${result.provider}`;
 }
 
+let lastInspectionData = null;
+
+async function inspectCurrentPageDOM() {
+  elements.inspectPageStatus.textContent = 'ページ要素を解析しています…';
+  const response = await invoke('bridge:inspect-page');
+  if (!response?.inspection) {
+    throw new Error(lastError || 'ページ要素の解析に失敗しました。');
+  }
+  lastInspectionData = response.inspection;
+  elements.inspectPageResult.hidden = false;
+  elements.inspectSendCliButton.hidden = false;
+  elements.inspectPageStatus.textContent = `解析完了: 入力欄 ${lastInspectionData.inputs.length} 件 / ボタン ${lastInspectionData.buttons.length} 件 / 見出し ${lastInspectionData.headings.length} 件 / リンク ${lastInspectionData.links.length} 件`;
+  elements.inspectPageResult.textContent = JSON.stringify(lastInspectionData, null, 2);
+}
+
+async function sendInspectionToCli() {
+  if (!lastInspectionData) {
+    throw new Error('解析結果がありません。先に「ページ構造を解析」を実行してください。');
+  }
+  const portVal = elements.inspectPortInput ? Number(elements.inspectPortInput.value) : 8788;
+  const port = Number.isInteger(portVal) && portVal > 0 && portVal < 65536 ? portVal : 8788;
+  try {
+    await chrome.storage?.local?.set({ inspectCliPort: port });
+  } catch (_) {
+    // optional storage cache
+  }
+
+  elements.inspectPageStatus.textContent = `Kyberion CLI (127.0.0.1:${port}) へ送信中…`;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/inspection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lastInspectionData),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    elements.inspectPageStatus.textContent = `✓ Kyberion CLI (ポート ${port}) へ解析データを送信しました。`;
+  } catch (error) {
+    elements.inspectPageStatus.textContent = `送信エラー: ${error instanceof Error ? error.message : String(error)} (pnpm kyberion browser inspect --mode extension --extension-port ${port} が待機しているか確認してください)`;
+  }
+}
+
 function render(nextState) {
   state.current = nextState || { connected: null, recording: null, lastDraft: null, notice: null };
   const connected = state.current.connected;
@@ -769,6 +831,7 @@ function render(nextState) {
   elements.aiScenarioButton.disabled = !connected;
   elements.aiScenarioUseIntentButton.disabled = !lastScenarioCandidate?.goal;
   elements.aiPageSummaryButton.disabled = !connected;
+  elements.inspectPageButton.disabled = !connected;
   elements.aiRepairButton.disabled = !state.current.repairPending?.target;
   elements.aiObservationSummaryButton.disabled = !(
     state.current.execution?.observation?.preview || []
