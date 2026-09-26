@@ -41,6 +41,29 @@ describe('video ops approval context', () => {
     ).rejects.toThrow('[VIDEO_INVALID_PARAMS]');
   });
 
+  it('never forwards internal seams from op params', async () => {
+    const build = vi.fn(async () => pending);
+    await handleBuildVideoBrief(
+      {
+        path: 'a.mp4',
+        tenant_slug: 'acme',
+        cachePlacement: { scope: 'shared', root: '/tmp/x', tier: 'public' },
+        requestApproval: () => ({ allowed: true, status: 'approved' }),
+        evaluateEgress: () => ({ verdict: 'allow' }),
+        now: () => 0,
+        runner: () => undefined,
+        policy: {},
+        bins: { ffprobe: '/bin/sh' },
+        internals: {},
+      } as unknown as Parameters<typeof handleBuildVideoBrief>[0],
+      { build }
+    );
+    expect(build.mock.calls[0]).toHaveLength(2);
+    expect((build.mock.calls[0] as unknown as [unknown, BuildVideoBriefOptions])[1]).toEqual({
+      tenant_slug: 'acme',
+    });
+  });
+
   it('runs with the governed approval handler registered in the actuator process', () => {
     expect(() =>
       registerRiskyApprovalHandler(() => ({ allowed: true, status: 'approved' }))

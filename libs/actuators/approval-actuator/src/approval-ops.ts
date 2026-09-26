@@ -1,6 +1,7 @@
 import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/approval-gate';
+import { isApprovalRequestExpired } from '@agent/core/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 
@@ -95,7 +96,11 @@ export function requestReviewOp(input: ReviewRequestInput) {
   const existing = listApprovalRequests({
     storageChannels: [channel],
     status: ['pending', 'approved'],
-  }).find((request) => request.correlationId === correlationId);
+  }).find(
+    // A lapsed review (or one with a malformed expiry) is neither approved nor
+    // still pending; a fresh request is opened instead.
+    (request) => request.correlationId === correlationId && !isApprovalRequestExpired(request)
+  );
   if (existing) {
     return {
       status: existing.status === 'approved' ? ('approved' as const) : ('pending' as const),

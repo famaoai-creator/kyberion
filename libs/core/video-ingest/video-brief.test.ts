@@ -15,12 +15,15 @@ import type { EgressPolicyDecision } from '../egress-policy.js';
 import type { RiskyApprovalRequest, RiskyApprovalResult } from '../risky-op-approval-port.js';
 import {
   assertNoTierDowngrade,
-  buildVideoBrief,
+  buildVideoBrief as publicBuildVideoBrief,
+  buildVideoBriefWithInternals,
   resolveVideoCachePlacement,
   tenantOfPath,
   tierOfPath,
+  videoEntryLockResource,
   videoFetchCorrelationId,
   type BuildVideoBriefOptions,
+  type VideoBriefInternals,
   type VideoCachePlacement,
 } from './video-brief.js';
 import {
@@ -36,6 +39,7 @@ import type {
   VideoCommandResult,
   VideoCommandRunner,
   VideoIngestPolicy,
+  VideoSource,
 } from './video-ingest-types.js';
 
 const TEST_ROOT = pathResolver.sharedTmp(`video-ingest-tests/${randomUUID()}`);
@@ -152,7 +156,35 @@ const allowEgress = (): EgressPolicyDecision => ({
   mode: 'warn',
 });
 
-function options(overrides: Partial<BuildVideoBriefOptions> = {}): BuildVideoBriefOptions {
+type TestOptions = BuildVideoBriefOptions & VideoBriefInternals;
+
+const INTERNAL_KEYS: ReadonlySet<string> = new Set<keyof VideoBriefInternals>([
+  'runner',
+  'policy',
+  'cachePlacement',
+  'authorizeTenant',
+  'transcribe',
+  'evaluateEgress',
+  'requestApproval',
+  'now',
+  'bins',
+]);
+
+/** Routes test seams to the internals argument and the rest to the public options. */
+function buildVideoBrief(source: VideoSource, all: TestOptions = {}) {
+  const publicOptions: Record<string, unknown> = {};
+  const internals: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(all)) {
+    (INTERNAL_KEYS.has(key) ? internals : publicOptions)[key] = value;
+  }
+  return buildVideoBriefWithInternals(
+    source,
+    publicOptions as BuildVideoBriefOptions,
+    internals as VideoBriefInternals
+  );
+}
+
+function options(overrides: Partial<TestOptions> = {}): TestOptions {
   return {
     policy: POLICY,
     cachePlacement: freshPlacement(),
@@ -164,6 +196,9 @@ function options(overrides: Partial<BuildVideoBriefOptions> = {}): BuildVideoBri
     ...overrides,
   };
 }
+
+/** Tenant authorizer that accepts every slug (the registry is not a fixture here). */
+const registered = () => undefined;
 
 afterAll(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
@@ -375,7 +410,7 @@ describe('video cache tier placement', () => {
     expect(tierOfPath(path.join(root, 'knowledge/confidential/acme/v.mp4'))).toBe('confidential');
     expect(tierOfPath(path.join(root, 'active/projects/personal/x/v.mp4'))).toBe('personal');
     expect(tierOfPath(path.join(root, 'active/shared/tmp/v.mp4'))).toBe('public');
-    expect(resolveVideoCachePlacement({ tenant_slug: 'acme' })).toMatchObject({
+    expect(resolveVideoCachePlacement({ tenant_slug: 'acme' }, registered)).toMatchObject({
       scope: 'tenant',
       tier: 'confidential',
     });
@@ -848,7 +883,9 @@ describe('video cache tenant placement', () => {
       tenantOfPath(path.join(root, 'active/missions/confidential/acme/MSN-X-1/evidence/v.mp4'))
     ).toBe('acme');
     expect(tenantOfPath(path.join(root, 'active/shared/tmp/v.mp4'))).toBeUndefined();
-    expect(resolveVideoCachePlacement({ tenant_slug: 'acme' }).tenant_slug).toBe('acme');
+    expect(resolveVideoCachePlacement({ tenant_slug: 'acme' }, registered).tenant_slug).toBe(
+      'acme'
+    );
   });
 
   it("resolves a mission directory's tenant from its mission state", () => {
@@ -935,6 +972,83 @@ describe('video cache fail-closed classification', () => {
     expect(() => tierOfPath('/definitely/outside/the/repo.mp4')).toThrow(/TIER_UNRESOLVED/);
   });
 
+  it('attributes the tenant-scoped organization tree like projects (B1)', () => {
+    expect(
+      tenantOfPath(path.join(root, 'active/organizations/confidential/acme/org-1/v.mp4'))
+    ).toBe('acme');
+    expect(tenantOfPath(path.join(root, 'active/organizations/Personal/ACME/org-1/v.mp4'))).toBe(
+      'acme'
+    );
+    expect(
+      tenantOfPath(path.join(root, 'active/organizations/confidential/shared/org-1/v.mp4'))
+    ).toBeUndefined();
+    expect(
+      tenantOfPath(path.join(root, 'active/projects/confidential/shared/p-1/v.mp4'))
+    ).toBeUndefined();
+    for (const rel of [
+      'active/organizations/confidential/x_y/org-1/v.mp4',
+      'active/organizations/personal',
+      'active/organizations/personal/@bad/v.mp4',
+    ]) {
+      expect(() => tenantOfPath(path.join(root, rel)), rel).toThrow(/TENANT_UNRESOLVED/);
+    }
+  });
+
+  it("refuses to cache one tenant's organization media under another tenant", async () => {
+    const slug = `vo${randomUUID().slice(0, 8)}`;
+    const orgRoot = path.join(root, 'active/organizations/confidential', slug);
+    const file = path.join(orgRoot, 'org-1', 'clip.mp4');
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    try {
+      safeMkdir(path.dirname(file), { recursive: true });
+      safeWriteFile(file, 'org-clip');
+      const runner = vi.fn<VideoCommandRunner>();
+      const outcome = await buildVideoBrief(
+        { kind: 'file', path: file },
+        options({
+          runner,
+          cachePlacement: {
+            scope: 'tenant',
+            root: path.join(TEST_ROOT, randomUUID()),
+            tier: 'confidential',
+            tenant_slug: 'other-tenant',
+          },
+        })
+      );
+      expect(outcome).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
+      expect(runner).not.toHaveBeenCalled();
+    } finally {
+      safeRmSync(orgRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed for any non-public path without a tenant partition', () => {
+    for (const rel of ['knowledge/personal/v.mp4', 'active/personal/v.mp4', 'vault/v.mp4']) {
+      expect(tierOfPath(path.join(root, rel)), rel).toBe('personal');
+      expect(() => tenantOfPath(path.join(root, rel)), rel).toThrow(/TENANT_UNRESOLVED/);
+    }
+  });
+
+  it('refuses a tenant-partition mission whose state claims another tenant', () => {
+    const missionId = `MSN-VIDEO-CLAIM-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const partition = `vc${randomUUID().slice(0, 8)}`;
+    const partitionDir = path.join(root, 'active/missions/confidential', partition);
+    const missionDir = path.join(partitionDir, missionId);
+    asMissionController();
+    try {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tenant_slug: 'globex' })
+      );
+      expect(() => tenantOfPath(path.join(missionDir, 'evidence/v.mp4'))).toThrow(
+        /TENANT_UNRESOLVED/
+      );
+    } finally {
+      safeRmSync(partitionDir, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on a confidential mission whose state names an invalid tenant', () => {
     const missionId = `MSN-VIDEO-BADTENANT-${randomUUID().slice(0, 8).toUpperCase()}`;
     const missionDir = path.join(root, 'active/missions/confidential', missionId);
@@ -1004,5 +1118,138 @@ describe('video cache mission placement', () => {
       options({ cachePlacement: undefined, mission_id: missionId, runner: vi.fn() })
     );
     expect(outcome).toMatchObject({ status: 'failed', code: 'INVALID_SOURCE' });
+  });
+});
+
+describe('video cache tenant authorization', () => {
+  const root = pathResolver.rootDir();
+  const asMissionController = () => vi.stubEnv('MISSION_ROLE', 'mission_controller');
+
+  it('requires a caller-named tenant to resolve in the tenant registry', () => {
+    const slug = `vu${randomUUID().slice(0, 8)}`;
+    expect(() => resolveVideoCachePlacement({ tenant_slug: slug })).toThrow(/TENANT_UNRESOLVED/);
+    const seen: string[] = [];
+    expect(
+      resolveVideoCachePlacement({ tenant_slug: slug }, (tenant) => {
+        seen.push(tenant);
+      })
+    ).toMatchObject({ scope: 'tenant', tenant_slug: slug });
+    expect(seen).toEqual([slug]);
+  });
+
+  it("refuses a tenant_slug that is not the mission's own tenant", () => {
+    const missionId = `MSN-VIDEO-OWNER-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const missionDir = path.join(root, 'active/missions/confidential', missionId);
+    asMissionController();
+    try {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tenant_slug: 'globex' })
+      );
+      expect(() =>
+        resolveVideoCachePlacement({ mission_id: missionId, tenant_slug: 'acme' }, registered)
+      ).toThrow(/TENANT_MISMATCH/);
+      expect(
+        resolveVideoCachePlacement({ mission_id: missionId, tenant_slug: 'globex' }, registered)
+      ).toMatchObject({ scope: 'mission', tenant_slug: 'globex' });
+    } finally {
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('local input canonicalization', () => {
+  it('refuses a symlinked input file', async () => {
+    const dir = path.join(TEST_ROOT, randomUUID());
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(path.join(dir, 'real.mp4'), 'clip');
+    const link = path.join(dir, 'link.mp4');
+    safeSymlinkSync(path.join(dir, 'real.mp4'), link);
+    const runner = vi.fn<VideoCommandRunner>();
+    const outcome = await buildVideoBrief({ kind: 'file', path: link }, options({ runner }));
+    expect(outcome).toMatchObject({ status: 'failed', code: 'INVALID_SOURCE' });
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it('hands the canonical input path to ffprobe and ffmpeg', async () => {
+    const realDir = path.join(TEST_ROOT, randomUUID());
+    const linkDir = path.join(TEST_ROOT, `alias-${randomUUID()}`);
+    safeMkdir(realDir, { recursive: true });
+    safeWriteFile(path.join(realDir, 'clip.mp4'), 'clip-canonical');
+    safeSymlinkSync(realDir, linkDir);
+    const calls: Call[] = [];
+    const outcome = await buildVideoBrief(
+      { kind: 'file', path: path.join(linkDir, 'clip.mp4') },
+      options({
+        runner: fakeRunner({}, calls),
+        approval: undefined,
+        transcript_preference: 'subtitles_only',
+      })
+    );
+    expect(outcome.status).toBe('ok');
+    const inputs = calls.flatMap((call) =>
+      call.command === 'fake-ffprobe'
+        ? [call.args[call.args.length - 1]]
+        : call.args.includes('-i')
+          ? [call.args[call.args.indexOf('-i') + 1]]
+          : []
+    );
+    expect(inputs.length).toBeGreaterThan(1);
+    for (const input of inputs) {
+      expect(input).not.toContain(`alias-`);
+      expect(input.endsWith(`${path.basename(realDir)}${path.sep}clip.mp4`)).toBe(true);
+    }
+  });
+});
+
+describe('internal seams are not caller options (S9)', () => {
+  it('ignores seams smuggled into the public options', async () => {
+    const placement = freshPlacement();
+    const contentKey = urlContentKey(
+      'https://www.youtube.com/watch?v=abc123',
+      POLICY.download_format
+    );
+    safeMkdir(path.join(placement.root, contentKey), { recursive: true });
+    // A planted brief in an attacker-chosen placement must not be served.
+    const variant = sha256Hex(
+      JSON.stringify({
+        language: null,
+        max_keyframes: POLICY.default_max_keyframes,
+        transcript_preference: 'auto',
+      })
+    ).slice(0, 12);
+    safeWriteFile(
+      path.join(placement.root, contentKey, `brief-${variant}.json`),
+      JSON.stringify({ content_key: contentKey, planted: true })
+    );
+    const smuggled = {
+      policy: POLICY,
+      cachePlacement: placement,
+      evaluateEgress: allowEgress,
+      requestApproval: () => ({ allowed: true, status: 'approved' }),
+    } as unknown as BuildVideoBriefOptions;
+    const outcome = await publicBuildVideoBrief({ kind: 'url', url: URL_ }, smuggled);
+    expect(outcome.status).not.toBe('ok');
+  });
+});
+
+describe('cache entry lock key', () => {
+  it('shares one lock across case variants on case-insensitive platforms', () => {
+    const upper = path.join(TEST_ROOT, 'Entry-ABC');
+    const lower = path.join(TEST_ROOT, 'entry-abc');
+    expect(videoEntryLockResource(upper, 'darwin')).toBe(videoEntryLockResource(lower, 'darwin'));
+    expect(videoEntryLockResource(upper, 'win32')).toBe(videoEntryLockResource(lower, 'win32'));
+    expect(videoEntryLockResource(upper, 'linux')).not.toBe(videoEntryLockResource(lower, 'linux'));
+  });
+
+  it('keys an entry reached through a symlinked parent by its canonical path', () => {
+    const realDir = path.join(TEST_ROOT, randomUUID());
+    const linkDir = path.join(TEST_ROOT, `lock-alias-${randomUUID()}`);
+    safeMkdir(realDir, { recursive: true });
+    safeSymlinkSync(realDir, linkDir);
+    expect(videoEntryLockResource(path.join(linkDir, 'k'), 'linux')).toBe(
+      videoEntryLockResource(path.join(realDir, 'k'), 'linux')
+    );
   });
 });
