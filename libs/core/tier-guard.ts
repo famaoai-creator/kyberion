@@ -153,15 +153,40 @@ function checkProjectScope(
   return null;
 }
 
-function expandPolicyPath(pattern: string, missionId?: string): string {
+const TENANT_PLACEHOLDER = '${KYBERION_TENANT}';
+
+/**
+ * Expand policy placeholders. `${KYBERION_TENANT}` expands to the tenant bound
+ * by the resolved identity (env, execution scope, or mission state). It is what
+ * lets a role such as `organization_operator` be granted "its own tenant only":
+ * when no valid tenant is bound (missing, reserved such as `shared`/`public`,
+ * or malformed) the pattern returns null and must never match, so an unbound
+ * process gets no tenant-parameterised grant at all rather than a wildcard.
+ */
+function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: string): string | null {
+  if (pattern.includes(TENANT_PLACEHOLDER)) {
+    const tenant = tenantSlug?.trim() || '';
+    if (!tenant || !isValidTenantSlug(tenant)) return null;
+    pattern = pattern.split(TENANT_PLACEHOLDER).join(tenant);
+  }
   const customerSlug = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || 'NONE';
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
     .replace('${KYBERION_CUSTOMER}', customerSlug);
 }
 
+function policyPathMatches(
+  relativePath: string,
+  pattern: string,
+  missionId?: string,
+  tenantSlug?: string
+): boolean {
+  const expanded = expandPolicyPath(pattern, missionId, tenantSlug);
+  return expanded !== null && pathStartsWith(relativePath, expanded);
+}
+
 function matchesAny(relativePath: string, patterns: string[] = [], missionId?: string): boolean {
-  return patterns.some((p) => pathStartsWith(relativePath, expandPolicyPath(p, missionId)));
+  return patterns.some((p) => policyPathMatches(relativePath, p, missionId));
 }
 
 function hasScopedSudoAccess(relativePath: string, sudoScope?: string[]): boolean {
@@ -392,6 +417,9 @@ function checkTenantScope(
   const groupDenial = checkTenantGroupScope(relativePath, tenantSlug, brokeredTenants);
   if (groupDenial) return groupDenial;
   const isSharedPath = cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix));
+  // A tenant-group share (knowledge/confidential/shared/{group}/) has already
+  // passed the membership check above; its `shared` segment is not a tenant.
+  const isGroupPath = Boolean(extractTenantGroupFromSharedPath(relativePath));
   const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
   const hasValidTenantSegment = Boolean(
     scoped && cfg.slugPattern.test(scoped.tenant) && isValidTenantSlug(scoped.tenant)
@@ -400,7 +428,7 @@ function checkTenantScope(
     cfg.requireTenantBinding &&
     !tenantSlug &&
     !brokeredTenants?.length &&
-    (isSharedPath || hasValidTenantSegment)
+    (isSharedPath || isGroupPath || hasValidTenantSegment)
   ) {
     const targetTenant =
       scoped?.tenant || extractTenantGroupFromSharedPath(relativePath) || '(shared)';
@@ -417,7 +445,7 @@ function checkTenantScope(
     void recordTenantScopeViolation({ relativePath, tenantSlug, targetTenant: tenantSlug, reason });
     return { allowed: false, reason };
   }
-  if (isSharedPath) return null;
+  if (isSharedPath || isGroupPath) return null;
 
   if (!scoped) return null;
   if (!tenantSlug && !brokeredTenants?.length) return null;
@@ -626,10 +654,12 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   );
   if (tenantDenial) return tenantDenial;
 
-  const defaultAllow = (policy.default_allow || []).map((p: string) =>
-    expandPolicyPath(p, currentMission)
-  );
-  if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
+  if (
+    (policy.default_allow || []).some((p: string) =>
+      policyPathMatches(relativePath, p, currentMission)
+    )
+  )
+    return { allowed: true };
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
@@ -639,7 +669,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
   if (
     roleRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   ) {
     return { allowed: true };
@@ -648,7 +678,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const personaRules = policy.persona_permissions?.[currentPersona];
   if (
     personaRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   ) {
     return { allowed: true };
@@ -758,13 +788,13 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
   if (
     roleRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   )
     return { allowed: true };
   if (
     roleRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   )
     return { allowed: true };
@@ -772,13 +802,13 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const personaRules = policy.persona_permissions?.[currentPersona];
   if (
     personaRules?.allow_read?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   )
     return { allowed: true };
   if (
     personaRules?.allow_write?.some((p: string) =>
-      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+      policyPathMatches(relativePath, p, currentMission, tenantSlug)
     )
   )
     return { allowed: true };

@@ -118,6 +118,25 @@ function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput
  * can still write; an unconfigured Claude Code session is denied (safe default,
  * matching the plugin's public-tier-only posture).
  */
+/**
+ * Deny-only shell gate for interactive Claude Code sessions.
+ *
+ * Unlike {@link evaluatePreToolUse} (which denies anything the policy does not
+ * explicitly allow — right for headless agents, far too strict for a human-led
+ * session), this returns a decision only when a denylist rule matches, e.g.
+ * `document-hand-extraction` steering agents to `pnpm kyberion read`. Every
+ * other command returns null so Claude Code's own permission flow (prompts,
+ * allow rules) stays in charge — returning 'allow' would silently auto-approve.
+ */
+export function evaluatePreToolUseShellDeny(input: PreToolUseInput): PreToolUseHookOutput | null {
+  if ((input.tool_name ?? '') !== 'Bash') return null;
+  const command = String(input.tool_input?.command ?? input.tool_input?.cmd ?? '').trim();
+  if (!command) return null;
+  const decision = evaluateShellCommandPolicy(command);
+  if (decision.verdict !== 'deny') return null;
+  return pre('deny', decision.reason || 'Denied by Kyberion shell-command policy.');
+}
+
 export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput {
   const tool = input.tool_name ?? '';
   if (tool === 'Bash') {
