@@ -1163,6 +1163,24 @@
       "audience": "operator"
     },
     {
+      "id": "script.workspace.list",
+      "module": "scripts/workspace_ledger.ts",
+      "command": "workspace list",
+      "noun": "workspace",
+      "verb": "list",
+      "audience": "operator",
+      "args": ["list"]
+    },
+    {
+      "id": "script.workspace.gc",
+      "module": "scripts/workspace_ledger.ts",
+      "command": "workspace gc",
+      "noun": "workspace",
+      "verb": "gc",
+      "audience": "operator",
+      "args": ["gc"]
+    },
+    {
       "id": "script.secret.introduce",
       "module": "scripts/secret_introduce.ts",
       "command": "secret introduce",

@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/workspace-budget-policy.schema.json",
+  "version": "1.0.0",
+  "description": "WS-06 workspace disk budget (libs/core/workspace-budget.ts). disk_cap_bytes bounds the total size of ledger-registered workspaces (active/shared/runtime/workspaces, .worktrees, active/shared/runtime/git-indexes); min_free_bytes is a free-disk floor on the target volume (0 disables it); orphan_ttl_hours is how long a released or owner-terminal workspace is kept before the janitor workspace sweep deletes it. Env overrides: KYBERION_WORKSPACE_DISK_CAP_BYTES, KYBERION_WORKSPACE_MIN_FREE_BYTES, KYBERION_WORKSPACE_ORPHAN_TTL_HOURS.",
+  "disk_cap_bytes": 21474836480,
+  "min_free_bytes": 2147483648,
+  "orphan_ttl_hours": 24
+}

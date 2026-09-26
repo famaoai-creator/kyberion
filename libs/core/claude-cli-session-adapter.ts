@@ -29,13 +29,14 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { childDelegationEnv } from './operation-policy-gate.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
-import {
-  buildProviderChildEnv,
-  type ProviderPermissionProfileName,
-} from './provider-permission-profiles.js';
+import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import {
@@ -284,13 +285,24 @@ export class ClaudeCliSessionAdapter {
     if (this.bootPromise) return this.bootPromise;
     this.bootPromise = new Promise<void>((resolve, reject) => {
       let child: ChildProcessWithoutNullStreams;
+      const spawnEnv = buildDelegationSpawnEnv({
+        provider: 'claude',
+        cwd: this.cwd,
+        sessionId: newDelegationSessionId('claude'),
+        profile: this.profile,
+      });
       try {
-        child = this.spawnProcess(this.bin, this.buildArgs(), {
-          cwd: this.cwd,
-          env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
-          stdio: 'pipe',
-          shell: false,
-        }) as ChildProcessWithoutNullStreams;
+        // Turn timeouts shut the session down, so close covers them too.
+        child = spawnWithDelegationEnv(
+          spawnEnv,
+          () =>
+            this.spawnProcess(this.bin, this.buildArgs(), {
+              cwd: this.cwd,
+              env: spawnEnv.env,
+              stdio: 'pipe',
+              shell: false,
+            }) as ChildProcessWithoutNullStreams
+        );
       } catch (error) {
         reject(this.unavailable(`claude CLI session failed to start: ${describe(error)}`));
         return;
