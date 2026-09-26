@@ -15,7 +15,12 @@
  * AU-01: an `agent` dispatch is audited with the same event vocabulary as a
  * human action's execution (`plugin_view.action.started` /
  * `plugin_view.action.execute`, see `auditAgentActionDispatch`) — nobody
- * approves it, so the dispatch itself is the accountable moment.
+ * approves it, so the dispatch itself is the accountable moment. Both audit
+ * paths are best-effort (fail-open): a recording failure is logged and
+ * swallowed, never blocking or reversing the action outcome (see
+ * `auditActionExecution` / `auditAgentActionDispatch`). `params_digest` /
+ * the payload hash correlate calls with the same params; they are unsalted
+ * hashes for that purpose only, not a confidentiality mechanism.
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -46,6 +51,7 @@ import { nowIso } from './foundation/time.js';
 import { createLogger } from './logger.js';
 import { resolveActuatorOperation } from './actuator-op-registry.js';
 import { runOpPreflight } from './op-preflight.js';
+import { redactSensitiveString } from './network.js';
 import {
   PluginViewError,
   resolvePluginViewAction,
@@ -416,7 +422,8 @@ export async function dispatchPluginViewAction(
     dispatchId,
     context,
     { action: 'plugin_view.action.execute', result: 'completed' },
-    'agent action executed'
+    'agent action executed',
+    outcome.handled
   );
   return { status: 'dispatched', handled: outcome.handled };
 }
@@ -476,13 +483,33 @@ type ActionAuditEvent =
   | { action: 'plugin_view.action.execute'; result: 'completed' | 'failed' | 'denied' }
   | { action: 'plugin_view.action.started'; result: 'allowed' };
 
+/** Bound on a persisted audit `reason` (after redaction), see {@link sanitizeAuditReason}. */
+const MAX_AUDIT_REASON_LENGTH = 500;
+
+/**
+ * A `reason` recorded here can be plugin-authored text this module never
+ * validated: a thrown handler `Error.message`, or an op-preflight listener's
+ * `reason` — either can echo back the very params the call carried. Redact
+ * it with the same helper the audit forwarder already applies to outbound
+ * audit entries (`redactSensitiveString`, `network.ts`; backed by
+ * secret-guard's active-secret redaction plus generic secret/local-path
+ * patterns) before it ever reaches the audit chain, then bound its length so
+ * one hostile or buggy plugin cannot bloat the chain. Redaction runs on the
+ * full string first so a secret pattern is never split — and left
+ * unmatched — by the length cut.
+ */
+function sanitizeAuditReason(reason: string): string {
+  return redactSensitiveString(reason).slice(0, MAX_AUDIT_REASON_LENGTH);
+}
+
 function auditActionExecution(
   resolved: ResolvedPluginViewAction,
   approvalRequestId: string,
   approval: ApprovalRequestRecord | null,
   context: ExecutePluginViewActionContext,
   event: ActionAuditEvent,
-  reason: string
+  reason: string,
+  handled?: boolean
 ): void {
   try {
     auditChain.record({
@@ -490,12 +517,13 @@ function auditActionExecution(
       action: event.action,
       operation: resolved.action.op,
       result: event.result,
-      reason,
+      reason: sanitizeAuditReason(reason),
       correlationId: approvalRequestId,
       metadata: {
         plugin_id: resolved.view.pluginId,
         view_id: resolved.view.declaration.id,
         action_id: resolved.action.id,
+        authority: 'human',
         approval_request_id: approvalRequestId,
         requested_by: approval?.requestedBy ?? null,
         approved_by: approval?.decidedBy ?? null,
@@ -505,6 +533,7 @@ function auditActionExecution(
         surface: context.surface,
         content_digest: resolved.view.contentDigest ?? null,
         permissions_digest: resolved.view.permissionsDigest ?? null,
+        ...(handled !== undefined ? { handled } : {}),
       },
       ...(resolved.view.tenantSlug ? { tenantSlug: resolved.view.tenantSlug } : {}),
     });
@@ -516,10 +545,13 @@ function auditActionExecution(
 /**
  * AU-01: same event vocabulary as `auditActionExecution` (`started` /
  * `execute` with `completed` / `failed` / `denied`), for an `agent`-authority
- * dispatch. Never carries raw params — only a stable digest
- * (`computeApprovalPayloadHash`), so params holding sensitive data leave no
- * readable trace in the audit chain. A recording failure is logged and
- * swallowed, exactly like the human path: it never turns a dispatch outcome
+ * dispatch. Best-effort like the human path: never carries raw params, only
+ * a stable digest (`computeApprovalPayloadHash`) used purely to correlate
+ * repeated calls with the same params — it is an unsalted hash of data this
+ * module does not otherwise treat as secret, not a confidentiality
+ * guarantee, so it must never be treated as a safe place to smuggle
+ * sensitive params either. A recording failure is logged and swallowed,
+ * exactly like the human path (fail-open): it never turns a dispatch outcome
  * into something the audit chain could not itself record.
  */
 function auditAgentActionDispatch(
@@ -527,7 +559,8 @@ function auditAgentActionDispatch(
   dispatchId: string,
   context: DispatchPluginViewActionContext,
   event: ActionAuditEvent,
-  reason: string
+  reason: string,
+  handled?: boolean
 ): void {
   try {
     auditChain.record({
@@ -535,19 +568,21 @@ function auditAgentActionDispatch(
       action: event.action,
       operation: resolved.action.op,
       result: event.result,
-      reason,
+      reason: sanitizeAuditReason(reason),
       correlationId: dispatchId,
       metadata: {
         plugin_id: resolved.view.pluginId,
         view_id: resolved.view.declaration.id,
         action_id: resolved.action.id,
         authority: 'agent',
+        dispatch_id: dispatchId,
         requested_by: context.requestedBy,
         actor_role: context.actorRole,
         surface: context.surface,
         content_digest: resolved.view.contentDigest ?? null,
         permissions_digest: resolved.view.permissionsDigest ?? null,
         params_digest: computeApprovalPayloadHash(resolved.params),
+        ...(handled !== undefined ? { handled } : {}),
       },
       ...(resolved.view.tenantSlug ? { tenantSlug: resolved.view.tenantSlug } : {}),
     });
@@ -729,7 +764,8 @@ export async function executeApprovedPluginViewAction(
     approval,
     context,
     { action: 'plugin_view.action.execute', result: 'completed' },
-    'approved action executed'
+    'approved action executed',
+    outcome.handled
   );
   return { status: 'executed', handled: outcome.handled, approvalRequestId: approval.id };
 }
