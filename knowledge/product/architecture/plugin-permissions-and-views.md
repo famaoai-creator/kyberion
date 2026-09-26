@@ -162,7 +162,29 @@ digest, view, action, op and params; expires after 24 hours) in the Chronos
 approval queue; `authority: agent` dispatches through op preflight only when
 the owning plugin is active in the serving process, otherwise 409 — the web
 surface imports plugin code only through its plugin host (§7), which is off
-by default.
+by default. Personal pads (PH-03b) dispatch `authority: agent` actions the
+same way through its own pads plugin host; `authority: human` actions there
+are always refused (403) and must be approved in Chronos.
+
+AU-01: an `agent` dispatch is audited with the same events as a human
+action's execution — `dispatchPluginViewAction` shares one implementation for
+both Chronos and personal pads, so this covers both surfaces.
+`plugin_view.action.started` (`allowed`) is written once op preflight admits
+the call; `plugin_view.action.execute` then follows with `completed` (the
+handler returned), `failed` (the handler threw) or `denied` (a pre-handler
+refusal — plugin not active, op unavailable, preflight rejection or block —
+which is audited without a `started` entry, since the call never started). A
+`dispatchId` generated once per call correlates the pair the way
+`approvalRequestId` does for a human action's execution. Every entry carries
+`plugin_id`, `view_id`, `action_id`, `authority: 'agent'`, the requesting
+principal (`requested_by` / `agentId`), `actor_role`, `surface`, the content
+and permissions digests, and a `params_digest` (a stable hash of the params);
+raw params are never written to the audit chain, the same as a human action's
+own audit entries, which carry no params either (only the approval record's
+`details` field holds them, gated separately by the approval store). A
+recording failure is logged and swallowed, the same policy
+`executeApprovedPluginViewAction` follows for a human action: it never turns
+a successful or failed dispatch into something else.
 
 Executing an approved human action (FU-02): the same `POST` with
 `approval_request_id`. Chronos shows the requests of visible views to
