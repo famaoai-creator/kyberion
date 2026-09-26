@@ -31,11 +31,16 @@ The WS items bound that shared state and the disk that per-session copies use.
 - Registers the **directory** in the workspace ledger as kind `git-index`
   before writing, after `checkWorkspaceBudget` allowed it, together with the
   registering process (`pid` + `pidStartedAt`, the `ps -o lstart=` start
-  marker that guards against pid reuse) and a cached size (`bytes`).
+  marker that guards against pid reuse) and a cached size (`bytes`). The
+  marker is read with `LC_ALL=C` and `TZ=UTC` and compared as the raw
+  string (never parsed); where it cannot be read (win32, a busybox `ps`
+  without `lstart`) liveness falls back to plain pid existence.
 - Returns `null` (and warns) instead of throwing when `cwd` is not in a work
   tree, the session id is not a safe path segment, the budget denies the copy,
   or seeding fails — the delegation then simply shares the real index.
-- `attachChild(pid)` records the spawned child (`childPid`) in the ledger.
+- `attachChild(pid)` records the spawned child (`childPid` + its start
+  marker `childStartedAt`) in the ledger, so a recycled child pid is not
+  taken for the child.
 - `dispose({ childPid? })`:
   1. **Reconciles the shared index when HEAD moved.** Nothing stops a worker
      from committing with its private index (some CLIs do). HEAD then points
@@ -45,11 +50,18 @@ The WS items bound that shared state and the disk that per-session copies use.
      new HEAD and moves each changed path's shared-index entry to HEAD's blob
      (`git update-index -z --index-info`) — only where the shared entry still
      equals the baseline, so work another session staged there is never
-     clobbered (skipped paths are reported). Each reconciliation is logged as
-     a warning and recorded in the audit chain (`shared_index_reconcile`).
+     clobbered (skipped paths are reported). The shared index is re-read
+     right before each write, and a write refused because another git process
+     holds `index.lock` is retried with backoff (50 / 150 / 400 ms). Each
+     reconciliation is logged as a warning and recorded in the audit chain
+     (`shared_index_reconcile`, result `completed`). When it still fails the
+     audit entry has result `failed`, the ledger entry records
+     `pendingReconcile` (`repoRoot`, `fromSha`) and the directory is kept: a
+     later `dispose` or the WS-07 sweep retries it, and neither budget
+     reclaim nor the sweep deletes the entry while it is pending.
   2. Releases the ledger entry.
-  3. Deletes the directory — unless the child (or its process group) is still
-     alive (e.g. the wall-clock timeout path disposes right after `SIGKILL`).
+  3. Deletes the directory — unless the reconcile is pending, or the child
+     (the recorded process, or its process group) is still alive (e.g. the wall-clock timeout path disposes right after `SIGKILL`).
      Then the directory is kept with `childPid` recorded; a later `dispose`
      (on `close`) or the WS-07 sweep deletes it once the child is gone.
      It is idempotent. Anything a crashed process leaves behind is reclaimed by
@@ -112,7 +124,11 @@ session staged:
   `git update-ref HEAD <new> <baseline>`, a compare-and-swap that fails
   (`[SESSION_INDEX_STALE]`) if HEAD moved between the check and the update.
   Commit hooks do not run on this path. After committing it refreshes the
-  shared index for exactly the committed paths.
+  shared index for exactly the committed paths
+  (`git --literal-pathspecs reset`, so a path containing `*?[` or `:(` never matches other paths). It
+  has no production caller yet: the owner-side commit flow is not wired to
+  it, so today a worker's staging only reaches HEAD through the dispose
+  reconciliation of commits the worker made itself.
 - `createSessionWorktree({ sessionId, repoRoot?, ref? })` creates an opt-in
   detached worktree under `.worktrees/<sessionId>` for parallel writers, owner
   path only, budget-checked and registered as `git-worktree` before
@@ -133,7 +149,12 @@ decided on an earlier snapshot pass `guard.expect` (`live`, `createdAt`,
 (`[WORKSPACE_CHANGED]`) when the record was re-registered or re-released in
 between — re-registering a path reuses its id. `guard.requireCleanWorktree`
 refuses (`[WORKSPACE_DIRTY]`) a git worktree with `git status --porcelain`
-output or commits no branch, tag or remote reaches. Workspaces
+output or commits no branch, tag or remote reaches. That probe runs **before**
+the ledger lock is taken (15 s timeout per git call), so a slow tree never
+blocks other ledger writers; under the lock the delete re-checks that the
+record still matches the probed snapshot. Ignored files are not unsaved work:
+removing a clean worktree deletes them, as does anything written between the
+probe and the removal. Workspaces
 never live under `active/shared/tmp/`, whose 24h TTL sweep would delete them
 mid-use.
 
@@ -148,7 +169,9 @@ record's cached `bytes` (set at register / release, refreshed by the sweep);
 only records without one are measured, with a walk bounded by entry count
 and wall time. Near the cap it reclaims released workspaces oldest first,
 skipping any that fail to delete (vanished, changed, owner-only) instead of
-aborting the check. Git worktrees are never reclaimed inline — they wait for
+aborting the check. A released `git-index` whose delegated child is still
+alive (same check as the sweep) or whose reconcile is pending is never
+reclaimed. Git worktrees are never reclaimed inline — they wait for
 the sweep's TTL and unsaved-work check. An unreadable free-space probe fails
 closed when a floor is configured.
 
@@ -163,7 +186,11 @@ Orphans are:
   alive with a different start marker); legacy entries without a pid fall
   back to the TTL on `createdAt`.
 
-A `git-index` whose `childPid` is still alive is never an orphan. Orphans are
+A `git-index` whose child is still alive (`childPid` with a matching
+`childStartedAt`, or its process group) is never an orphan. Before selecting
+orphans the sweep (not in dry-run) retries every pending shared-index
+reconcile; an entry whose reconcile still fails is kept and reported as an
+error. Orphans are
 deleted through the ledger with the snapshot guard and the clean-worktree
 check; surviving entries get their cached `bytes` refreshed. Unregistered
 directories under the roots are reported, never deleted.

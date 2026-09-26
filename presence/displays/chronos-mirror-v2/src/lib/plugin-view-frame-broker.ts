@@ -22,6 +22,15 @@
  * dropped and no pending result is posted back. The Chronos pages' CSP
  * (`frame-src 'self'`) keeps such a navigation same-origin; a new broker is
  * only created for a freshly mounted frame (the user reopens the view).
+ *
+ * Residual pre-load window: a navigation is only seen at the new document's
+ * `load`, so scripts of the navigated document can post (same `event.source`)
+ * before it fires. That window is bounded by `frame-src 'self'` (only
+ * same-origin documents, i.e. other served plugin views, can load there), by
+ * the opened view's declared actions and capabilities, and by the host
+ * confirm dialog every action request passes. A per-load channel nonce sent
+ * in `init` would not close it: the navigated document can send `ready` and
+ * receive a fresh `init` as well.
  */
 import {
   PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY,

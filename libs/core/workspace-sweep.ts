@@ -7,6 +7,7 @@
 import * as nodePath from 'node:path';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { findMissionPath, rootDir } from './path-resolver.js';
+import { retryPendingSharedIndexReconcile, type RunReconcileOptions } from './session-git-index.js';
 import { loadWorkspaceBudgetPolicy, measureWorkspaceBytes } from './workspace-budget.js';
 import {
   annotateWorkspace,
@@ -18,8 +19,7 @@ import {
   type WorkspaceRecord,
 } from './workspace-ledger.js';
 import {
-  isPidAlive,
-  isProcessGroupAlive,
+  isRecordedChildAlive,
   isRecordedProcessAlive,
   type ProcessIdentityProbe,
 } from './workspace-process-identity.js';
@@ -41,6 +41,8 @@ export interface SweepWorkspacesOptions extends Omit<WorkspaceLedgerOptions, 'no
   processProbe?: ProcessIdentityProbe;
   /** Test seam: size probe used to refresh cached `bytes` of surviving records. */
   measure?: (targetPath: string) => number;
+  /** Test seam: audit sink / retry schedule for pending shared-index reconciles. */
+  reconcile?: RunReconcileOptions;
 }
 
 export interface SweepWorkspacesResult {
@@ -80,7 +82,9 @@ function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
  * but its owner is terminal and `createdAt + TTL` has passed. A live git
  * index is an orphan once the process that registered it is gone (legacy
  * records without a pid: after the TTL); a git index whose delegated child
- * still runs is never an orphan. Orphans are deleted only through
+ * still runs is never an orphan. A git index with a pending shared-index
+ * reconcile is reconciled first (not in dry-run) and kept while that keeps
+ * failing. Orphans are deleted only through
  * `deleteRegisteredWorkspace`, which re-checks every path invariant and the
  * record snapshot under the ledger lock and keeps git worktrees with unsaved
  * work; directories without a ledger record are reported, never deleted.
@@ -127,12 +131,26 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     return Number.isFinite(ts) && ts + ttlMs <= nowMs;
   };
   const probe = opts.processProbe ?? {};
-  const pidAlive = probe.isPidAlive ?? isPidAlive;
-  const childAlive = (record: WorkspaceRecord): boolean =>
-    record.childPid !== undefined &&
-    (pidAlive(record.childPid) || (!probe.isPidAlive && isProcessGroupAlive(record.childPid)));
+  const stillPending = new Set<string>();
+  for (const record of records) {
+    if (record.kind !== 'git-index' || !record.pendingReconcile) continue;
+    if (opts.dryRun) {
+      stillPending.add(record.id);
+      continue;
+    }
+    try {
+      if (retryPendingSharedIndexReconcile(record, ledger, opts.reconcile)) continue;
+      errors.push(`workspace ${record.id}: shared index reconcile pending; kept`);
+    } catch (err: unknown) {
+      errors.push(
+        `workspace ${record.id}: shared index reconcile pending; kept: ${errorMessage(err)}`
+      );
+    }
+    stillPending.add(record.id);
+  }
   const orphanReason = (record: WorkspaceRecord): string | null => {
-    if (record.kind === 'git-index' && childAlive(record)) return null;
+    if (stillPending.has(record.id)) return null;
+    if (record.kind === 'git-index' && isRecordedChildAlive(record, probe)) return null;
     if (!record.live) return expired(record.releasedAt) ? 'released past orphan TTL' : null;
     if (record.kind === 'git-index') {
       if (record.pid !== undefined) {
