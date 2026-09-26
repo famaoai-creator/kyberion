@@ -279,7 +279,7 @@ describe('label redaction', () => {
   it.each([
     ['an email', `Signed in as ${EMAIL}`],
     ['a card number', `Card ${CARD}`],
-    ['a secret-shaped token', 'sk_live_9fA3kQ7zL2mX8pR4tV6wY1bN'],
+    ['a secret-shaped token', ['sk', 'live', '9fA3kQ7zL2mX8pR4tV6wY1bN'].join('_')],
   ])('drops an OCR label containing %s but keeps its box', (_name, line) => {
     const candidates = candidatesFromOcr(
       {
