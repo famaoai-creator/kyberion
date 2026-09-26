@@ -8,6 +8,8 @@ vi.mock('./audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
 
+const { OsAccessibilityDetector } = await import('./os-accessibility-detector.js');
+const { PixelRegionDetector } = await import('./pixel-region-detector.js');
 const {
   BrowserDomDetector,
   OcrTextDetector,
@@ -60,7 +62,7 @@ describe('ui-element-detector seam', () => {
     resetUiElementDetectors();
     ensureBuiltinUiElementDetectors();
     const ids = listUiElementDetectors().map((detector) => detector.id);
-    expect(ids).toEqual(['browser_dom', 'ocr_text']);
+    expect(ids).toEqual(['browser_dom', 'ocr_text', 'os_accessibility', 'pixel_regions']);
     const policy = getSeamSelectionPolicy('ui-element-detector');
     expect(policy?.default_provider).toBe('browser_dom');
     expect(Object.keys(policy?.providers ?? {}).sort()).toEqual(ids);
@@ -154,5 +156,102 @@ describe('ui-element-detector seam', () => {
     expect(result.decision?.ranked).toEqual(['ocr_text', 'browser_dom']);
     // OCR found nothing, so the DOM detector still supplied the marks.
     expect(result.detectors_run).toEqual(['ocr_text', 'browser_dom']);
+  });
+
+  describe('with the pixel and accessibility detectors', () => {
+    const blank = { width: 200, height: 200, data: Buffer.alloc(200 * 200 * 4, 255) };
+    const button = { width: 200, height: 200, data: Buffer.alloc(200 * 200 * 4, 255) };
+    for (let y = 80; y < 104; y += 1) {
+      for (let x = 80; x < 120; x += 1) {
+        button.data.fill(0, (y * 200 + x) * 4, (y * 200 + x) * 4 + 3);
+      }
+    }
+    const axSnapshot = JSON.stringify({
+      screen: { width: 100, height: 100 },
+      elements: [{ role: 'AXButton', title: 'Save', x: 6, y: 10, width: 20, height: 12 }],
+    });
+    const axRunner = (trusted: boolean) => async (_command: string, args: string[]) => ({
+      stdout: args[3].includes('AXIsProcessTrusted') ? JSON.stringify({ trusted }) : axSnapshot,
+      stderr: '',
+      status: 0,
+    });
+
+    function useAll(options: {
+      ocrLines?: OcrResult['lines'];
+      trusted?: boolean;
+      pixels?: typeof blank;
+    }) {
+      resetUiElementDetectors();
+      registerUiElementDetector(new BrowserDomDetector());
+      registerUiElementDetector(new OcrTextDetector(fakeOcr(options.ocrLines ?? []).ocr));
+      registerUiElementDetector(
+        new OsAccessibilityDetector({ run: axRunner(options.trusted ?? true), platform: 'darwin' })
+      );
+      registerUiElementDetector(
+        new PixelRegionDetector({ readBitmap: async () => options.pixels ?? blank })
+      );
+    }
+
+    const size = { width: 200, height: 200 };
+
+    it('keeps OCR ahead of pixel regions by default and falls through to pixels when OCR is empty', async () => {
+      useAll({ pixels: button });
+      const result = await detectUiElements({ image_path: 's.png', image_size: size });
+      expect(result.decision?.ranked).toEqual(['ocr_text', 'pixel_regions']);
+      expect(result.detectors_run).toEqual(['ocr_text', 'pixel_regions']);
+      expect(result.candidates).toEqual([
+        expect.objectContaining({ source: 'detector', kind: 'control' }),
+      ]);
+    });
+
+    it('ranks os_accessibility first for a declared live screen with the permission', async () => {
+      useAll({});
+      const result = await detectUiElements({
+        image_path: 's.png',
+        image_size: size,
+        live_screen: true,
+      });
+      expect(result.decision?.ranked).toEqual(['os_accessibility', 'ocr_text', 'pixel_regions']);
+      expect(result.detectors_run).toEqual(['os_accessibility']);
+      expect(result.candidates).toEqual([
+        expect.objectContaining({
+          source: 'accessibility',
+          label: 'Save',
+          box: { x: 12, y: 20, width: 40, height: 24 },
+        }),
+      ]);
+    });
+
+    it('excludes os_accessibility without the permission', async () => {
+      useAll({ trusted: false });
+      const result = await detectUiElements({
+        image_path: 's.png',
+        image_size: size,
+        live_screen: true,
+      });
+      expect(result.decision?.ranked).toEqual(['ocr_text', 'pixel_regions']);
+    });
+
+    it('ranks pixel regions first for the coverage purpose', async () => {
+      useAll({ pixels: button });
+      const result = await detectUiElements(
+        { image_path: 's.png', image_size: size },
+        { purpose: 'coverage' }
+      );
+      expect(result.decision?.ranked).toEqual(['pixel_regions', 'ocr_text']);
+      expect(result.detectors_run).toEqual(['pixel_regions']);
+    });
+
+    it('runs an explicit list for fusion', async () => {
+      useAll({ pixels: button });
+      const result = await detectUiElements(
+        { image_path: 's.png', image_size: size, live_screen: true },
+        { detectors: ['os_accessibility', 'pixel_regions'] }
+      );
+      expect(result.candidates.map((candidate) => candidate.source)).toEqual([
+        'accessibility',
+        'detector',
+      ]);
+    });
   });
 });

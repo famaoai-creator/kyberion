@@ -3,7 +3,7 @@ title: Visual Grounding and Video Ingest
 category: Architecture
 tags: [vision, video, set-of-marks, screen, ocr, redaction, tier, approval, yt-dlp]
 importance: 6
-last_updated: 2026-09-26
+last_updated: 2026-09-27
 ---
 
 # Visual Grounding and Video Ingest
@@ -99,11 +99,56 @@ site's terms of service.
 
 ## Set-of-Marks
 
-- `mark_elements` gathers candidates through the `ui-element-detector` seam.
-  The providers are `browser_dom` (snapshot element rects) and `ocr_text` (the
-  fallback). It then fuses the candidates: an icon absorbs the text it covers,
-  overlapping boxes are pruned, and marks are numbered in reading order. Marks
-  are drawn on a **redacted** copy of the screenshot.
+- `mark_elements` gathers candidates through the `ui-element-detector` seam
+  (providers below). It then fuses the candidates: an icon or control absorbs
+  the text it covers as its label, overlapping boxes (IoU > 0.5) are pruned
+  keeping the stronger one — exact sources score 1, so a DOM or accessibility
+  box wins over a pixel region or OCR line of the same element and inherits
+  its label and provenance (a DOM box also beats an accessibility box through
+  its ref) — and marks are numbered in reading order. Marks are drawn on a
+  **redacted** copy of the screenshot.
+- Detectors (`seam-provider-selection/ui-element-detector.json`):
+
+  | Detector           | Boxes                                                                           | Available when                                                                                    |
+  | ------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+  | `browser_dom`      | browser snapshot rects of interactive elements, with `@eN` refs (exact)         | `dom_elements` of the same viewport are supplied                                                  |
+  | `os_accessibility` | OS accessibility tree rects of interactive elements in the front window (exact) | macOS, `live_screen: true` (the screenshot IS this machine's screen now) and `AXIsProcessTrusted` |
+  | `ocr_text`         | OCR text lines (`local_only` by default), labelled                              | always                                                                                            |
+  | `pixel_regions`    | edge / connected-component regions: unlabelled icons and buttons OCR misses     | the screenshot is a readable file                                                                 |
+
+  Without `detectors`, `browser_dom` leads when it can run; otherwise the
+  `grounding` fallback purpose ranks `os_accessibility` (when available), then
+  `ocr_text`, then `pixel_regions`, and the first detector that finds anything
+  wins. `purpose: coverage` puts `pixel_regions` first. For the best marks on
+  a native screen, list detectors explicitly (e.g.
+  `["os_accessibility", "ocr_text", "pixel_regions"]`): every listed detector
+  runs and fusion merges them.
+
+- `pixel_regions` is pure TypeScript on the pixels (jimp decode, no model):
+  box-average downscale to a 1400 px long side, luma gradient
+  (|dx| + |dy|), adaptive threshold (gradient ≥ 24 and ≥ 1.1 × the 15×15
+  local mean, so smooth background gradients yield no edges), morphological
+  close (radius 1), 8-connected components with an explicit queue, then
+  boxes filtered by size (side ≥ 8 px, area ≥ 120 px², ≤ 60 % width /
+  35 % height / 8 % area of the image) and aspect (≤ 20:1 wide, ≤ 4:1 tall),
+  merged when IoU ≥ 0.6 or when a box ≥ 6 % the size of another lies ≥ 90 %
+  inside it (a glyph inside its button), capped at 150. Scores are 0.3–0.6
+  (edge density); small near-square boxes are `icon`, others `control`.
+- `os_accessibility` runs a JXA script through System Events (one Apple event
+  per property per tree level, depth ≤ 12, ≤ 2000 elements scanned, 8 s
+  timeout), keeps interactive roles (buttons, checkboxes, radios, pop-ups,
+  fields, sliders, links, menu items, tabs, cells, …) and caps the result at 200. Points map to pixels as `(point - screen_origin) × screen_scale`:
+  `mark_elements` passes `display_origin` as the origin and an explicit
+  `scale` as the scale; without them the origin is the main display's 0,0 and
+  the scale is image width / main display width in points. `application`
+  selects the app (default: frontmost). Labels come from the title, else the
+  description, through the same PII filter as every mark label; text fields,
+  text areas, combo and search fields are editable and never labelled. The
+  permission probe (`AXIsProcessTrusted`) never prompts; without it, off
+  macOS, or without `live_screen`, the detector is simply unavailable. Windows
+  UI Automation is not wired yet (the Windows bridge only lists window
+  titles), so it is unavailable there. The command runner is injectable, so
+  tests never run `osascript`.
 - Marks are stored in the session's volatile dir for 60 s, together with the
   image dHash. `system-actuator` (`target_mark`, used only when no coordinate
   is given) and `browser-actuator` (`click_ref: "mark:<n>"`) resolve
