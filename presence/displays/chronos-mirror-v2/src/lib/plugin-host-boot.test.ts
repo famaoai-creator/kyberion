@@ -1,4 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// PE-02: the registry is personal-tier; only the Chronos localadmin role may read it.
+vi.mock('@agent/core/tenant-registry', () => ({
+  resolveTenant: (slug: string) => {
+    if (process.env.MISSION_ROLE !== 'chronos_localadmin' || slug !== 'known-tenant') {
+      throw new Error(`[tenant-registry] tenant '${slug}' could not be read`);
+    }
+    return { profile: { tenant_slug: slug } };
+  },
+}));
 import {
   disposePluginHost,
   getPluginHost,
@@ -8,8 +18,10 @@ import {
 import {
   CHRONOS_PLUGIN_HOST_SURFACE,
   chronosPluginHostStatus,
+  CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS,
   ensureChronosPluginHost,
   isChronosPluginHostEnabled,
+  resetChronosPluginHostBootFailure,
 } from './plugin-host-boot';
 
 function fakeFactory() {
@@ -30,6 +42,7 @@ function fakeFactory() {
 
 afterEach(() => {
   disposePluginHost(CHRONOS_PLUGIN_HOST_SURFACE);
+  resetChronosPluginHostBootFailure();
   vi.restoreAllMocks();
 });
 
@@ -97,6 +110,28 @@ describe('Chronos plugin host boot (PH-01)', () => {
     expect(String(warn.mock.calls[0][0])).toContain('trust domain');
   });
 
+  it('resolves allowed tenants under the Chronos localadmin role, not the ambient role', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const previousRole = process.env.MISSION_ROLE;
+    delete process.env.MISSION_ROLE;
+    try {
+      const { create, created } = fakeFactory();
+      ensureChronosPluginHost({
+        env: {
+          KYBERION_CHRONOS_PLUGIN_HOST: '1',
+          KYBERION_CHRONOS_PLUGIN_HOST_TENANTS: 'known-tenant,unknown-tenant',
+        },
+        create,
+      });
+      expect(created[0].tenantAllow).toEqual(['known-tenant']);
+      // The role is restored after the lookup.
+      expect(process.env.MISSION_ROLE).toBeUndefined();
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
+  });
+
   it('never throws when the host cannot boot', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const create = vi.fn(() => {
@@ -106,5 +141,31 @@ describe('Chronos plugin host boot (PH-01)', () => {
       ensureChronosPluginHost({ env: { KYBERION_CHRONOS_PLUGIN_HOST: 'true' }, create })
     ).toBeNull();
     expect(getPluginHost(CHRONOS_PLUGIN_HOST_SURFACE)).toBeUndefined();
+  });
+
+  it('remembers a boot failure for the backoff period instead of retrying per request', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const create = vi.fn(() => {
+      throw new Error('boom');
+    });
+    let clock = 1_000_000;
+    const options = {
+      env: { KYBERION_CHRONOS_PLUGIN_HOST: 'true' },
+      create,
+      isKnownTenant: () => true,
+      now: () => clock,
+    };
+    expect(ensureChronosPluginHost(options)).toBeNull();
+    clock += CHRONOS_PLUGIN_HOST_BOOT_BACKOFF_MS - 1;
+    expect(ensureChronosPluginHost(options)).toBeNull();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    clock += 1;
+    const { create: working, start } = fakeFactory();
+    expect(ensureChronosPluginHost({ ...options, create: working })).not.toBeNull();
+    expect(working).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
