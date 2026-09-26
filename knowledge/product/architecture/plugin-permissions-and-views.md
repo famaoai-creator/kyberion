@@ -161,13 +161,12 @@ an exclusive create next to the request, so a second execution is 409. The
 op then runs through the same path as an agent action (active plugin
 registration, i.e. under its grant), the result is recorded on the approval
 (`applyResult`) and every attempt, refused or run, is written to the audit
-chain (`plugin_view.action.execute`).
+chain (`plugin_view.action.execute`). Execution also requires the module
+running in this process to be the approved copy (its activation digest equals
+the view's content digest); a re-approved package must be reloaded first.
 
 ## 7. Known gaps
 
-- Executing an approved `human` action checks the digest of the plugin on
-  disk; the in-process activation is matched by plugin id only (a reload is
-  what re-binds it to a re-approved copy).
 - View text props are literal plugin strings (the catalog has no key props);
   only keys are vocabulary-checked.
 - `sandboxed-iframe`, view capabilities and personal-pads composition are
