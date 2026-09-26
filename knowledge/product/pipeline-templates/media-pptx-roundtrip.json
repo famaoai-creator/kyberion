@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "media-pptx-roundtrip",
+  "version": "1.0.0",
+  "name": "PPTX Roundtrip Reproduction",
+  "description": "Reproduce a PPTX from its extracted design via the shared roundtrip fragment: pptx_extract distills the deck into a PptxDesignProtocol, a document_digest summarizes it, pptx_render writes it back, and the digest is persisted as JSON. Use this for reproduction/round-trip fidelity — authoring new decks goes through media:generate_document with a semantic brief instead. Override paths via --context: {\"source_pptx_path\": \"...\", \"roundtrip_pptx_path\": \"...\", \"digest_path\": \"...\"}.",
+  "context": {
+    "mission_id": "MSN-PPTX-ROUNDTRIP",
+    "preflight_cmd": "pnpm --version",
+    "source_pptx_path": "active/shared/tmp/pptx-roundtrip/input.pptx",
+    "digest_path": "active/shared/tmp/pptx-roundtrip/digest.json",
+    "roundtrip_pptx_path": "active/shared/tmp/pptx-roundtrip/roundtrip.pptx"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "roundtrip_pack",
+      "role": "transform",
+      "op": "core:include",
+      "params": { "fragment": "fragments/media-pptx-roundtrip-pack-fragment.json" }
+    }
+  ]
+}

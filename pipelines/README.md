@@ -42,6 +42,16 @@ pnpm pipeline --input pipelines/<name>.json
 node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<name>.json
 ```
 
+**Trust boundary:** only paths under `pipelines/` and
+`knowledge/product/pipeline-templates/` are the pre-trust executable surface.
+A pipeline anywhere else (e.g. `active/shared/tmp/`) fails with
+`[TRUST_REQUIRED]` unless its exact human approval is supplied:
+`pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust`
+→ `pnpm pipeline --input <path> --project-trust-approval <id>` (edits
+invalidate the approval). For discovery/scratch iteration, place the draft
+pipeline under `pipelines/` and remove or promote it afterwards — that keeps
+ad-hoc runs on the governed surface instead of bypassing trust.
+
 ---
 
 ## What logic belongs in a pipeline

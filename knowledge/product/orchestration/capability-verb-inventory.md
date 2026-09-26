@@ -45,16 +45,17 @@ moves the branching into the CLI.
 
 ## 2. Taking in ↔ putting out
 
-| Direction        | Unifying op                             | Verb                   | State                    |
-| ---------------- | --------------------------------------- | ---------------------- | ------------------------ |
-| Document → text  | `media:document_digest`                 | `pnpm kyberion read`   | unified                  |
-| Brief → document | `media:generate_document`               | `pnpm kyberion write`  | unified                  |
-| Image → text     | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | unified                  |
-| Prompt → image   | `media-generation:generate_image`       | —                      | **no verb**              |
-| Audio → text     | `voice:transcribe`                      | `pnpm kyberion listen` | unified                  |
-| Text → audio     | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | unified                  |
-| Video → timeline | frames + transcript composition         | `pnpm kyberion watch`  | unified                  |
-| Brief → video    | `video-composition:*`, `generate_video` | —                      | **no verb, two engines** |
+| Direction           | Unifying op                             | Verb                   | State                    |
+| ------------------- | --------------------------------------- | ---------------------- | ------------------------ |
+| Document → text     | `media:document_digest`                 | `pnpm kyberion read`   | unified                  |
+| Brief → document    | `media:generate_document`               | `pnpm kyberion write`  | unified                  |
+| Document ↔ document | `media:*_extract` design distillers     | `pnpm kyberion diff`   | unified                  |
+| Image → text        | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | unified                  |
+| Prompt → image      | `media-generation:generate_image`       | —                      | **no verb**              |
+| Audio → text        | `voice:transcribe`                      | `pnpm kyberion listen` | unified                  |
+| Text → audio        | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | unified                  |
+| Video → timeline    | frames + transcript composition         | `pnpm kyberion watch`  | unified                  |
+| Brief → video       | `video-composition:*`, `generate_video` | —                      | **no verb, two engines** |
 
 `write` is the worked example of §1. `media:generate_document` already dispatched on
 `render_target` (pptx / docx / xlsx / pdf) and the per-format `pptx_render` /
@@ -68,6 +69,13 @@ design cascade supply theme and layout. Per-artifact guidance still lives in
 [presentation-authoring-playbook](./presentation-authoring-playbook.md),
 [blog-authoring-playbook](./blog-authoring-playbook.md) and
 [narrated-video-production-playbook](./narrated-video-production-playbook.md).
+
+`diff` hides the format behind the `media:*_extract` distillers the same way
+`read` hides it behind `document_digest`: both files go through the same
+native extractor (docx/pptx/xlsx/pdf) and the designs are compared field-by-field,
+with volatile keys (`generatedAt`, extracted image paths) ignored. It is the
+verification half of a reproduction run — extract → render via the
+`media-docx-roundtrip` template, then `pnpm kyberion diff <source> <output>`.
 
 The image and video rows are **not** ready for the same treatment: `generate_image`
 goes out to a provider (an egress decision, unlike local document rendering), and video

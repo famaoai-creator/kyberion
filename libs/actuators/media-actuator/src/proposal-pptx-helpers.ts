@@ -1,3 +1,4 @@
+import { pickStructuredSectionFields } from './media-structured-content.js';
 import {
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
@@ -262,7 +263,7 @@ function classifySlidePatternSemantic(section: any, entry: any): string {
   const sectionId = String(section?.section_id || entry?.section_id || '').toLowerCase();
   const candidates: Record<string, string> = {
     cover: 'hero',
-    contents: 'summary',
+    contents: 'contents',
     'executive-summary': 'summary',
     'why-change': 'problem',
     'target-outcome': 'solution',
@@ -305,13 +306,139 @@ function applySlidePatternSelection(entry: any, brief: any, section: any = entry
   };
 }
 
+function resolveBriefDeckMode(brief: any): string {
+  return String(brief.deck_mode || brief.payload?.deck_mode || '').trim();
+}
+
+function genericDeckSectionId(section: any, index: number): string {
+  const slug = String(section?.heading || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || `section-${index + 1}`;
+}
+
+// Section-driven deck: brief.payload.sections become the slide list directly
+// (cover + one slide per section + optional closing), bypassing the canonical
+// proposal skeleton. Triggered by document_profile 'generic-deck' or
+// deck_mode 'sections'.
+function buildGenericDeckSectionList(brief: any): any[] {
+  const payloadSections = Array.isArray(brief.payload?.sections) ? brief.payload.sections : [];
+  const title = sanitizeProposalText(brief.title || brief.payload?.title, 'Deck');
+  const summary = sanitizeProposalText(
+    brief.summary ||
+      brief.payload?.summary ||
+      brief.story?.core_message ||
+      brief.payload?.story?.core_message ||
+      brief.objective,
+    ''
+  );
+  const closingCta = sanitizeProposalText(
+    brief.closing_cta || brief.story?.closing_cta || brief.payload?.story?.closing_cta,
+    ''
+  );
+  const list: any[] = [
+    {
+      section_id: 'cover',
+      title,
+      objective: summary,
+      // Eyebrow text — a small label above the hero title.
+      eyebrow: String(brief.document_profile || 'proposal')
+        .replace(/-/g, ' ')
+        .toUpperCase(),
+      media_kind: 'hero',
+      layout_key: 'cover-statement',
+      visual: 'hero statement',
+    },
+  ];
+  payloadSections.forEach((section: any, index: number) => {
+    const hasCallouts = Array.isArray(section?.callouts) && section.callouts.length > 0;
+    // Structured fields map onto the semantic type that best fits how the
+    // content reads — used when the section doesn't declare its own.
+    const inferredSemantic = (() => {
+      const nonEmpty = (v: any) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+      if (section?.divider === true) return 'hero';
+      if (section?.table) return 'table';
+      if (nonEmpty(section?.metrics) || nonEmpty(section?.kpi_table ?? section?.kpiTable))
+        return 'roi';
+      if (nonEmpty(section?.steps) || nonEmpty(section?.timeline) || nonEmpty(section?.roadmap))
+        return 'roadmap';
+      if (nonEmpty(section?.wbs) || nonEmpty(section?.process) || nonEmpty(section?.flow))
+        return 'execution';
+      if (nonEmpty(section?.org)) return 'architecture';
+      if (nonEmpty(section?.pyramid)) return 'summary';
+      if (section?.matrix || section?.columns) return 'comparison';
+      if (nonEmpty(section?.checklist)) return 'appendix';
+      if (section?.quote) return 'summary';
+      if (section?.image) return 'evidence';
+      return undefined;
+    })();
+    const isDivider = section?.divider === true;
+    list.push({
+      section_id: String(section?.section_id || '').trim() || genericDeckSectionId(section, index),
+      title: String(section?.heading || `Section ${index + 1}`),
+      objective:
+        Array.isArray(section?.body) && section.body[0] !== undefined
+          ? String(section.body[0])
+          : '',
+      media_kind:
+        String(section?.media_kind || '').trim() ||
+        (isDivider ? 'hero' : hasCallouts ? 'evidence' : 'section-flow'),
+      layout_key:
+        String(section?.layout_key || '').trim() ||
+        (isDivider ? 'cover-statement' : hasCallouts ? 'evidence-callout' : 'title-body'),
+      semantic_type: String(section?.semantic_type || '').trim() || inferredSemantic || undefined,
+      visual:
+        section?.visual ||
+        (section?.callouts?.[0]?.title ? String(section.callouts[0].title) : undefined),
+      ...pickStructuredSectionFields(section),
+      columns: section?.columns,
+      checklist: section?.checklist,
+      cta: section?.cta,
+      quote: section?.quote,
+      image: section?.image,
+    });
+  });
+  if (closingCta) {
+    list.push({
+      section_id: 'decision',
+      title: closingCta,
+      objective: closingCta,
+      media_kind: 'decision',
+      layout_key: 'decision-cta',
+      visual: 'call to action',
+    });
+  }
+  return list;
+}
+
+function useGenericDeckSections(
+  brief: any,
+  profileId: string,
+  narrativePatternId?: string
+): boolean {
+  if (!Array.isArray(brief.payload?.sections) || brief.payload.sections.length === 0) {
+    return false;
+  }
+  return (
+    profileId === 'generic-deck' ||
+    resolveBriefDeckMode(brief) === 'sections' ||
+    narrativePatternId === 'generic-deck' ||
+    brief.narrative_pattern_id === 'generic-deck'
+  );
+}
+
 function buildCanonicalProposalSlides(
   deps: ProposalPptxDependencies,
   rootDir: string,
   brief: any
 ): any[] {
-  const { preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
-  const sections = Array.isArray(preset.sections) ? preset.sections : [];
+  const { profileId, preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
+  const sections = useGenericDeckSections(brief, profileId, preset?.narrative_pattern_id)
+    ? buildGenericDeckSectionList(brief)
+    : Array.isArray(preset.sections)
+      ? preset.sections
+      : [];
   const evidence = buildCanonicalProposalEvidence(brief);
   const audience = normalizeAudienceList(brief.audience || brief.payload?.audience, [
     'Executive Sponsor',
@@ -354,20 +481,38 @@ function buildCanonicalProposalSlides(
     decision: [closingCta, `Owner: ${audience[0] || 'Executive Sponsor'}`],
   };
 
+  const payloadSections = Array.isArray(brief.payload?.sections) ? brief.payload.sections : [];
+  let payloadCursor = 0;
   const slideDefs = sections
     .filter((section: any) => String(section.section_id || '') !== 'contents')
     .map((section: any, index: number) => {
       const sectionId = String(section.section_id || `slide-${index + 1}`);
+      const payloadSection = sectionId === 'cover' ? null : payloadSections[payloadCursor++];
+      const payloadBody = payloadSection
+        ? [
+            ...(Array.isArray(payloadSection.body)
+              ? payloadSection.body.map((v: any) => sanitizeProposalText(v, ''))
+              : []),
+            ...(Array.isArray(payloadSection.bullets)
+              ? payloadSection.bullets.map((v: any) => sanitizeProposalText(v, ''))
+              : []),
+          ].filter(Boolean)
+        : [];
+      const payloadTitle = sanitizeProposalText(payloadSection?.heading, '');
       const canonicalSlide =
         slideByKey.get(sectionId) || slideByKey.get(String(section.media_kind || '')) || null;
       const titleFallback =
         sectionId === 'cover'
           ? sanitizeProposalText(brief.title || brief.payload?.title || section.title, sectionId)
-          : sanitizeProposalText(section.title, sectionId);
+          : sanitizeProposalText(payloadTitle || section.title, sectionId);
       const objectiveFallback = sanitizeProposalText(section.objective, '');
       const fallbackBody =
-        fallbackBodies[sectionId] ||
-        [objectiveFallback || objective, evidence[index % evidence.length]?.point].filter(Boolean);
+        payloadBody.length > 0
+          ? payloadBody
+          : fallbackBodies[sectionId] ||
+            [objectiveFallback || objective, evidence[index % evidence.length]?.point].filter(
+              Boolean
+            );
       const providedBody = Array.isArray(canonicalSlide?.body)
         ? canonicalSlide.body.map((entry: any) => sanitizeProposalText(entry, '')).filter(Boolean)
         : [];
@@ -407,10 +552,23 @@ function buildProposalNarrativeOutline(
 ): any {
   const { profileId, preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
   const tokens = buildCompositionTokenMap(brief);
-  const sections = Array.isArray(preset.sections) ? preset.sections : [];
+  const genericDeck = useGenericDeckSections(
+    brief,
+    String(profileId || ''),
+    preset?.narrative_pattern_id
+  );
+  const sections = genericDeck
+    ? buildGenericDeckSectionList(brief)
+    : Array.isArray(preset.sections)
+      ? preset.sections
+      : [];
   const requestedSections = Array.isArray(brief.required_sections)
     ? new Set(brief.required_sections.map((value: any) => String(value)))
     : null;
+  const outlinePayloadSections = Array.isArray(brief.payload?.sections)
+    ? brief.payload.sections
+    : [];
+  let outlinePayloadCursor = 0;
   const toc = insertDocumentContentsSection(
     sections
       .filter(
@@ -425,17 +583,35 @@ function buildProposalNarrativeOutline(
         const chapter = Array.isArray(brief.story?.chapters)
           ? brief.story.chapters[index]
           : undefined;
+        const payloadSection =
+          section.section_id === 'cover' ? null : outlinePayloadSections[outlinePayloadCursor++];
+        const payloadTitle = sanitizeProposalText(payloadSection?.heading, '');
+        const payloadBody = payloadSection
+          ? [
+              ...(Array.isArray(payloadSection.body)
+                ? payloadSection.body.map((v: any) => sanitizeProposalText(v, ''))
+                : []),
+              ...(Array.isArray(payloadSection.bullets)
+                ? payloadSection.bullets.map((v: any) => sanitizeProposalText(v, ''))
+                : []),
+            ].filter(Boolean)
+          : [];
         return applySlidePatternSelection(
           {
             section_id: section.section_id,
-            title: applyCompositionTemplate(section.title, tokens, chapter || section.section_id),
+            eyebrow: section.eyebrow,
+            title:
+              payloadTitle ||
+              applyCompositionTemplate(section.title, tokens, chapter || section.section_id),
             objective: applyCompositionTemplate(
               section.objective,
               tokens,
               chapter || brief.objective || ''
             ),
             body: [
-              supporting.point || chapter || brief.story?.core_message || brief.objective,
+              ...(payloadBody.length > 0
+                ? payloadBody
+                : [supporting.point || chapter || brief.story?.core_message || brief.objective]),
               section.section_id === 'executive-summary' && tokens.audience
                 ? `Audience: ${tokens.audience}`
                 : undefined,
@@ -444,7 +620,15 @@ function buildProposalNarrativeOutline(
             visual: supporting.title || section.visual || 'supporting visual',
             media_kind: section.media_kind || 'content',
             layout_key: section.layout_key || 'title-body',
-            semantic_type: classifyRenderSemantic(section.layout_key, section.media_kind),
+            semantic_type:
+              section.semantic_type ||
+              classifyRenderSemantic(section.layout_key, section.media_kind),
+            ...pickStructuredSectionFields(section),
+            columns: section.columns,
+            checklist: section.checklist,
+            cta: section.cta,
+            quote: section.quote,
+            image: section.image,
           },
           brief,
           section
@@ -473,7 +657,14 @@ function buildProposalNarrativeOutline(
     }
   }
   const contentsEntry = toc.find((entry: any) => String(entry.section_id || '') === 'contents');
-  if (
+  if (contentsEntry && genericDeck) {
+    // Section-driven decks index by slide title only — objective previews
+    // make agenda lines noisy.
+    contentsEntry.body = toc
+      .filter((entry: any) => !['cover', 'contents', 'decision'].includes(String(entry.section_id)))
+      .map((entry: any, index: number) => `${index + 1}. ${String(entry.title || '').trim()}`)
+      .filter((line: string) => line.replace(/^\d+\.\s*/, '').length > 0);
+  } else if (
     contentsEntry &&
     Array.isArray(contentsEntry.body) &&
     contentsEntry.body.length > 0 &&
@@ -625,14 +816,39 @@ function normalizeProposalBrief(deps: ProposalPptxDependencies, rootDir: string,
     const slides = buildCanonicalProposalSlides(deps, rootDir, normalized);
     const evidence = buildCanonicalProposalEvidence(normalized);
     const canonicalSections = Array.isArray(preset.sections) ? preset.sections : [];
-    const requiredSections = canonicalSections
-      .map((section: any) => String(section.section_id || ''))
-      .filter(Boolean);
+    const genericDeck = useGenericDeckSections(
+      normalized,
+      String(defaultProfile || ''),
+      preset?.narrative_pattern_id
+    );
+    const requiredSections = genericDeck
+      ? buildGenericDeckSectionList(normalized).map((section: any) =>
+          String(section.section_id || '')
+        )
+      : canonicalSections.map((section: any) => String(section.section_id || '')).filter(Boolean);
     const audience = normalizeAudienceList(normalized.audience || normalized.payload?.audience, [
       'Executive Sponsor',
     ]);
+    const payloadSections = Array.isArray(normalized.payload?.sections)
+      ? normalized.payload.sections
+      : [];
+    const sectionChapters = payloadSections
+      .map((section: any) =>
+        [
+          String(section?.heading || '').trim(),
+          ...(Array.isArray(section?.body) ? section.body.map((v: any) => String(v)) : []),
+          ...(Array.isArray(section?.bullets)
+            ? section.bullets.map((v: any) => `- ${String(v)}`)
+            : []),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      )
+      .filter(Boolean);
     const storyChapters = normalizeProposalList(
-      normalized.story?.chapters || normalized.payload?.story?.chapters,
+      normalized.story?.chapters ||
+        normalized.payload?.story?.chapters ||
+        (sectionChapters.length > 0 ? sectionChapters : undefined),
       canonicalSections
         .filter((section: any) => !['cover', 'contents'].includes(String(section.section_id || '')))
         .map((section: any) => String(section.title || section.section_id || '').trim())

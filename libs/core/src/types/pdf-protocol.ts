@@ -17,6 +17,8 @@ export interface PdfLayoutElement {
   text?: string;
   fontSize?: number;
   fontName?: string;
+  /** 0-based page index for multi-page documents; omitted = page 0. */
+  page?: number;
 }
 
 // ─── Image Element (ISO 32000-2 §8.9) ─────────────────────

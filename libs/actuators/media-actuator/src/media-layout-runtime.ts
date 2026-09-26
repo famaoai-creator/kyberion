@@ -2,6 +2,7 @@ import { logger } from '@agent/core/core';
 import { clamp } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { splitLinesBalanced } from '@agent/core/native-pptx-engine/text-metrics';
+import { buildStructuredSlideBody } from './media-structured-pptx.js';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
 import * as path from 'node:path';
@@ -92,6 +93,10 @@ function cssVarHex(value: unknown): string | undefined {
   if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
   return `#${channels.map((entry) => entry.toString(16).padStart(2, '0')).join('')}`;
 }
+
+// metrics / steps / columns / checklist) render the matching component in the
+// body zone instead of flattening it into bullet text. Returns null when no
+// structured payload exists so the caller falls back to zone rendering.
 
 function buildPptxSlideFromPattern(
   rootDir: string,
@@ -207,6 +212,25 @@ function buildPptxSlideFromPattern(
       text: '',
     });
 
+    // Eyebrow — small kicker label at the top of the hero area (same role
+    // as the report/pdf "SUMMARY REPORT" line). Anchored top-left, well
+    // clear of the vertically-centered title box.
+    if (data.eyebrow) {
+      elements.push({
+        type: 'text',
+        pos: { x: hro.title_x, y: 0.42, w: hro.title_w, h: 0.3 },
+        text: String(data.eyebrow),
+        style: {
+          fontSize: Math.max((hro.subtitle_font_size || 14) - 3, 9),
+          bold: true,
+          color: 'D0E4FF',
+          fontFamily: bodyFont,
+          align: 'left',
+          valign: 'middle',
+        },
+      });
+    }
+
     // Main title — centered on blue area
     if (data.title && placeholderConfig.title !== false) {
       const titleEl = mergePptxShape(
@@ -316,6 +340,7 @@ function buildPptxSlideFromPattern(
     const navyHex = resolveThemeHexColor(themeColors, 'navy', '#003366').replace('#', '');
     const azureHex = resolveThemeHexColor(themeColors, 'cta', '#0070C0').replace('#', '');
     const surfaceBg = resolveThemeHexColor(themeColors, 'surface', '#E9EDF4').replace('#', '');
+    const borderHex = resolveThemeHexColor(themeColors, 'border', '#C9CED8').replace('#', '');
     const bodyTextColor = resolveThemeHexColor(themeColors, 'text_primary', '#000000').replace(
       '#',
       ''
@@ -419,8 +444,31 @@ function buildPptxSlideFromPattern(
       text: '',
     });
 
-    // 6. Body zone — layout-dispatched
-    if (bodyText && placeholderConfig.body !== false) {
+    // 6. Body zone — layout-dispatched. Structured payloads (table / metrics /
+    // steps / columns / checklist) render as real components; plain text falls
+    // through to the zone machinery.
+    const structuredElements = buildStructuredSlideBody(data, {
+      bodyX,
+      bodyY,
+      bodyW,
+      bodyH,
+      bodyLines,
+      primaryHex,
+      accentHex,
+      navyHex,
+      surfaceBg,
+      bodyTextColor,
+      subTextColor,
+      borderHex,
+      headingFont,
+      bodyFont,
+      rootDir,
+      spacing: theme?.spacing || theme?.theme?.spacing,
+      typography: theme?.typography || theme?.theme?.typography,
+    });
+    if (structuredElements) {
+      elements.push(...structuredElements);
+    } else if (bodyText && placeholderConfig.body !== false) {
       if (bodyZoneKey === 'two_column_callout') {
         const zc = bzl.body_zones.two_column_callout;
         const { left: leftLines, right: rightLines } = splitLinesBalanced({
@@ -841,8 +889,12 @@ function buildPptxSlideFromPattern(
         });
       } else if (bodyZoneKey === 'decision_cta') {
         const zc = bzl.body_zones.decision_cta;
-        const ctaLine = bodyLines.length > 1 ? bodyLines[bodyLines.length - 1] : '';
-        const msgLines = ctaLine ? bodyLines.slice(0, -1) : bodyLines;
+        // Explicit cta wins; otherwise the last body line becomes the button —
+        // never duplicate it inside the message above.
+        const explicitCta = String(data.cta || '').trim();
+        const ctaLine =
+          explicitCta || (bodyLines.length > 1 ? bodyLines[bodyLines.length - 1] : '');
+        const msgLines = explicitCta ? bodyLines : ctaLine ? bodyLines.slice(0, -1) : bodyLines;
         const msgText = msgLines.join('\n');
         if (msgText) {
           const msgFit = recordFit(
@@ -1041,13 +1093,27 @@ function buildPptxSlideFromPattern(
       shapeType: 'rect',
       pos: { x: 0, y: chr.footer_y, w: 10, h: chr.footer_h },
       style: {
-        fill: 'F0F4FA',
+        fill: surfaceBg,
         color: subTextColor,
         fontSize: chr.footer_font_size,
         align: 'right',
         valign: 'middle',
       },
       text: brandName ? `${brandName}  |  Confidential  ` : '  Confidential  ',
+    });
+    // Slide number — kept as its own element so footer text stays a pure
+    // brand/confidentiality marker.
+    elements.push({
+      type: 'text',
+      pos: { x: 9.3, y: chr.footer_y, w: 0.65, h: chr.footer_h },
+      text: `${idx + 1}`,
+      style: {
+        fontSize: chr.footer_font_size,
+        color: subTextColor,
+        fontFamily: bodyFont,
+        align: 'right',
+        valign: 'middle',
+      },
     });
   }
 

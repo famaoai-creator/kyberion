@@ -47,6 +47,10 @@ House pattern (see `pipelines/daily-routine.json` and `pipelines/meeting-watcher
 
 ## Notable templates
 
+- `media-docx-roundtrip.json` — DOCX reproduction/round-trip: `media:docx_extract` distills a file into its `DocxDesignProtocol` (layout, styles, tables, plus passthrough parts like footnotes/settings/customXml), persists it as JSON, and `media:docx_render` writes it back. Use for reproducing an existing document; authoring a new one goes through `media:generate_document` with a semantic brief. Override paths via `--context`.
+- `media-xlsx-roundtrip.json` — XLSX reproduction/round-trip: `media:xlsx_extract` → persist `XlsxDesignProtocol` JSON → `media:xlsx_render`. Same shape as the DOCX template; verify the result with `pnpm kyberion diff <source> <output>`.
+- `media-pptx-roundtrip.json` — PPTX reproduction/round-trip via `core:include` of `fragments/media-pptx-roundtrip-pack-fragment.json` (extract → digest → render → persist). Verified lossless at design level.
+- `media-pdf-roundtrip.json` — **experimental** PDF extract → render. Arbitrary PDFs use subset-font glyph IDs the renderer cannot re-emit; use only for engine-authored PDFs or treat as a probe (see its description caveat).
 - `daily-github-inbox.json` — morning GitHub issue/PR/Actions capture via REST `service:preset` (`list_issues`, `list_pulls`, `actions_list_runs`). Local digest only; Slack `post_message` stays write-gated and is omitted from the default steps.
 - `schedule-summary-and-coordination.json` — today's calendar + free slots via `calendar:list_calendars` / `calendar:list_events` (no `dist/` shell).
 - `email-triage-workflow.json` — Gmail read/triage via `google-workspace` `gmail_triage`. Sending stays on `pnpm kyberion email deliver` / `email-actuator` and is approval-gated.

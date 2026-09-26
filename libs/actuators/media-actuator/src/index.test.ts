@@ -3129,3 +3129,365 @@ describe('media:deck_from_html', () => {
     expect(result.results[0].error).toContain('exceeds');
   });
 });
+
+describe('media-actuator report structured content', () => {
+  const structuredSections = [
+    {
+      heading: 'KPI Dashboard',
+      semantic_type: 'roi',
+      metrics: [
+        { value: '98%', label: 'Coverage' },
+        { value: '4.2d', label: 'Lead time' },
+      ],
+    },
+    {
+      heading: 'Status',
+      semantic_type: 'table',
+      table: {
+        columns: ['Item', 'Current', 'Target'],
+        rows: [['Vuln fix rate', '82%', '95%']],
+      },
+    },
+    {
+      heading: 'Voice',
+      semantic_type: 'summary',
+      quote: { text: 'Audit prep time halved.', attribution: 'Ops lead' },
+      cta: 'Approve the rollout',
+    },
+  ];
+
+  function extractDocxXml(docxPath: string, entryName: string): string {
+    const buffer = safeReadFile(docxPath, { encoding: null }) as Buffer;
+    const zip = new AdmZip(buffer);
+    const entry = zip.getEntry(entryName);
+    if (!entry) throw new Error(`Missing DOCX entry: ${entryName}`);
+    return entry.getData().toString('utf8');
+  }
+
+  it('renders structured sections into native docx blocks', async () => {
+    const outputPath = 'active/shared/tmp/media/structured-report.docx';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: outputPath,
+            data: {
+              title: 'Structured Report',
+              sections: structuredSections,
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const xml = extractDocxXml(outputPath, 'word/document.xml');
+    // Metrics + table both become real w:tbl blocks.
+    expect((xml.match(/<w:tbl>/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(xml).toContain('98%');
+    expect(xml).toContain('Coverage');
+    expect(xml).toContain('Vuln fix rate');
+    expect(xml).toContain('tblHeader');
+    // Quote keeps its text + attribution; CTA renders as an emphasized bar.
+    expect(xml).toContain('Audit prep time halved.');
+    expect(xml).toContain('Ops lead');
+    expect(xml).toContain('Approve the rollout');
+  });
+
+  it('paginates report PDFs when content exceeds one page', async () => {
+    const outputPath = 'active/shared/tmp/media/structured-report.pdf';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+
+    const manySections = Array.from({ length: 18 }, (_e, i) => ({
+      heading: `Section ${i + 1}`,
+      body: [`Body paragraph ${i + 1} with some filler text.`],
+      bullets: ['bullet one', 'bullet two'],
+    }));
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'pdf',
+            output_path: outputPath,
+            data: {
+              title: 'Long Report',
+              sections: manySections,
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const pdf = safeReadFile(outputPath, { encoding: null }) as Buffer;
+    const text = pdf.toString('latin1');
+    // Multiple page objects → content was partitioned across pages.
+    const pageCount = (text.match(/\/Type\s*\/Page[^s]/g) || []).length;
+    expect(pageCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('starts a divider section on a fresh docx page', async () => {
+    const outputPath = 'active/shared/tmp/media/structured-divider.docx';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: outputPath,
+            data: {
+              title: 'Divider Report',
+              sections: [
+                { heading: 'First', body: ['intro'] },
+                { heading: 'Second', divider: true, body: ['fresh page'] },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const xml = extractDocxXml(outputPath, 'word/document.xml');
+    expect(xml).toContain('<w:pageBreakBefore/>');
+  });
+
+  it('renders wbs/timeline/matrix structured fields in docx', async () => {
+    const outputPath = 'active/shared/tmp/media/structured-wbs.docx';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: outputPath,
+            data: {
+              title: 'Structured Plan',
+              sections: [
+                {
+                  heading: 'Breakdown',
+                  wbs: [
+                    { id: '1', name: 'PM work', items: ['Plan tasks', 'Weekly review'] },
+                    { id: '2', name: 'Build', items: ['Design', 'Implement'] },
+                  ],
+                },
+                {
+                  heading: 'Schedule',
+                  timeline: [
+                    { label: 'Design', start: '2026-04', end: '2026-06', owner: 'Sato' },
+                    { label: 'Build', start: '2026-07', end: '2026-12', owner: 'Dev' },
+                  ],
+                },
+                {
+                  heading: 'Risk',
+                  matrix: {
+                    x_axis: 'Probability',
+                    quadrants: [
+                      { title: 'High/High', items: ['Scope creep'] },
+                      { title: 'High/Low', items: ['Vendor delay'] },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const xml = extractDocxXml(outputPath, 'word/document.xml');
+    // WBS: tree connector + auto-numbered children
+    expect(xml).toContain('├');
+    expect(xml).toContain('PM work');
+    // timeline → schedule table with header + date span
+    expect(xml).toContain('2026-04');
+    expect(xml).toContain('2026-06');
+    // matrix → 2x2 table (surface fill quadrants + axis caption)
+    expect(xml).toContain('High/High');
+    expect(xml).toContain('Probability');
+  });
+
+  it('assigns unique image rels across sections (docx multi-image)', async () => {
+    // Regression: the extracted structured-docx renderer must share the
+    // imageSeq counter across sections — a second image used to collide
+    // on rIdImg1/report-figure-1.
+    const imgPath = 'active/shared/tmp/media/1x1-transparent.png';
+    safeWriteFile(
+      imgPath,
+      Buffer.from(
+        '89504e470d0a1a0a0000000d4948445200000001000000010806000000' +
+          '1f15c4890000000d49444154789c626001000000ffff030000060005' +
+          '57bfabd40000000049454e44ae426082',
+        'hex'
+      )
+    );
+
+    const outputPath = 'active/shared/tmp/media/structured-multi-img.docx';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: outputPath,
+            data: {
+              title: 'Multi image',
+              sections: [
+                { heading: 'A', image: { path: imgPath, caption: 'one' } },
+                { heading: 'B', image: { path: imgPath, caption: 'two' } },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+    expect(result.status).toBe('succeeded');
+    const rels = extractDocxXml(outputPath, 'word/_rels/document.xml.rels');
+    expect(rels).toContain('rIdImg1');
+    expect(rels).toContain('rIdImg2');
+    expect(rels).toContain('report-figure-2');
+  });
+
+  it('renders object-shaped table rows via columns mapping (docx)', async () => {
+    // Regression: {Item:'EDR', Qty:2} must not render as [object Object].
+    const out = 'active/shared/tmp/media/structured-objrow.docx';
+    if (safeExistsSync(out)) safeRmSync(out, { force: true });
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: out,
+            data: {
+              title: 'Obj rows',
+              sections: [
+                {
+                  heading: 'Table',
+                  table: { columns: ['Item', 'Qty'], rows: [{ Item: 'EDR', Qty: 2 }] },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+    expect(result.status).toBe('succeeded');
+    const xml = extractDocxXml(out, 'word/document.xml');
+    expect(xml).toContain('EDR');
+    expect(xml).not.toContain('[object Object]');
+  });
+
+  it('renders checklist after metrics in the same section (docx order)', async () => {
+    const out = 'active/shared/tmp/media/structured-order.docx';
+    if (safeExistsSync(out)) safeRmSync(out, { force: true });
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'summary-report',
+            render_target: 'docx',
+            output_path: out,
+            data: {
+              title: 'Order check',
+              sections: [
+                {
+                  heading: 'Mixed',
+                  metrics: [{ value: '99%', label: 'uptime' }],
+                  checklist: ['deploy done', 'notify done'],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+    expect(result.status).toBe('succeeded');
+    const xml = extractDocxXml(out, 'word/document.xml');
+    expect(xml.indexOf('uptime')).toBeLessThan(xml.indexOf('deploy done'));
+  });
+});
+
+describe('media-actuator tracker structured sections', () => {
+  it('appends structured section blocks below the tracker grid', async () => {
+    const outputPath = 'active/shared/tmp/media/structured-tracker.xlsx';
+    if (safeExistsSync(outputPath)) safeRmSync(outputPath, { force: true });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            profile_id: 'operator-tracker',
+            render_target: 'xlsx',
+            output_path: outputPath,
+            data: {
+              title: 'Structured Tracker',
+              columns: [
+                { key: 'item', label: 'Item' },
+                { key: 'owner', label: 'Owner' },
+              ],
+              rows: [{ item: 'EDR rollout', owner: 'Sato' }],
+              sections: [
+                { heading: 'KPI', metrics: [{ value: '98%', label: 'Coverage' }] },
+                {
+                  heading: 'Done',
+                  checklist: [{ item: 'Inventory', done: true }, 'Log retention'],
+                },
+                {
+                  heading: 'Open',
+                  table: { columns: ['Task', 'State'], rows: [['Review', 'Open']] },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const buffer = safeReadFile(outputPath, { encoding: null }) as Buffer;
+    const zip = new AdmZip(buffer);
+    // Cells are written as inlineStr — the board sheet is the second worksheet.
+    const sheet = zip.getEntry('xl/worksheets/sheet2.xml')!.getData().toString('utf8');
+    expect(sheet).toContain('98%  Coverage');
+    expect(sheet).toContain('☑ Inventory');
+    expect(sheet).toContain('☐ Log retention');
+    expect(sheet).toContain('Review');
+  });
+});

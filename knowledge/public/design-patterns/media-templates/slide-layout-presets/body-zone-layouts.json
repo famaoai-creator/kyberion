@@ -6,13 +6,13 @@
     "separator_h": 0.024,
     "footer_y": 5.35,
     "footer_h": 0.275,
-    "footer_font_size": 8,
+    "footer_font_size": "@typography.footer",
     "body_y": 0.76,
     "body_x": 0.44,
     "body_w": 9.15,
     "body_h": 4.55,
     "title_x": 0.35,
-    "title_font_size": 22,
+    "title_font_size": "@typography.title",
     "title_w_logo": 7.35,
     "title_w_no_logo": 9.5,
     "accent_strip_x": 0.3,
@@ -37,34 +37,34 @@
     "brand_name_y": 4.55,
     "brand_name_w": 7.1,
     "brand_name_h": 0.5,
-    "brand_name_font_size": 11,
+    "brand_name_font_size": "@typography.label",
     "title_x": 0.8,
     "title_y": 1.0,
     "title_w": 8.4,
     "title_h": 2.2,
-    "title_font_size": 36,
+    "title_font_size": "@typography.display",
     "subtitle_x": 1.2,
     "subtitle_y": 3.3,
     "subtitle_w": 7.6,
     "subtitle_h": 0.85,
-    "subtitle_font_size": 16
+    "subtitle_font_size": "@typography.subtitle"
   },
   "body_zones": {
     "single_column": {
-      "font_size": 13,
+      "font_size": "@typography.label",
       "line_spacing_pct": 155,
-      "margin": [0.1, 0.06, 0.06, 0.08]
+      "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"]
     },
     "two_column_callout": {
       "left_w": 4.45,
       "right_x": 5.07,
       "right_w": 4.65,
       "panel_h": 0.44,
-      "left_font_size": 13,
+      "left_font_size": "@typography.label",
       "left_line_spacing_pct": 155,
       "left_margin": [0.1, 0.06, 0.06, 0.08],
-      "panel_header_font_size": 12,
-      "panel_body_font_size": 12,
+      "panel_header_font_size": "@typography.body",
+      "panel_body_font_size": "@typography.body",
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
       "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
@@ -77,7 +77,7 @@
         "h": 0.28,
         "y_from_bottom": 0.32,
         "font_size": 9,
-        "margin": [0.02, 0.06, 0.02, 0.06]
+        "margin": [0.02, "@spacing.xxs", 0.02, "@spacing.xxs"]
       }
     },
     "two_column_risk": {
@@ -85,11 +85,11 @@
       "right_x": 5.07,
       "right_w": 4.65,
       "panel_h": 0.44,
-      "left_font_size": 13,
+      "left_font_size": "@typography.label",
       "left_line_spacing_pct": 155,
       "left_margin": [0.1, 0.06, 0.06, 0.08],
-      "panel_header_font_size": 12,
-      "panel_body_font_size": 12,
+      "panel_header_font_size": "@typography.body",
+      "panel_body_font_size": "@typography.body",
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
       "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
@@ -103,11 +103,11 @@
       "right_x": 3.5,
       "right_w": 6.12,
       "panel_h": 0.44,
-      "left_font_size": 12,
+      "left_font_size": "@typography.body",
       "left_line_spacing_pct": 165,
       "left_margin": [0.1, 0.06, 0.06, 0.08],
-      "panel_header_font_size": 12,
-      "panel_body_font_size": 12,
+      "panel_header_font_size": "@typography.body",
+      "panel_body_font_size": "@typography.body",
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
       "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
@@ -121,7 +121,7 @@
         "h": 0.28,
         "y_from_bottom": 0.32,
         "font_size": 9,
-        "margin": [0.02, 0.06, 0.02, 0.06]
+        "margin": [0.02, "@spacing.xxs", 0.02, "@spacing.xxs"]
       }
     },
     "architecture_panel": {
@@ -129,11 +129,11 @@
       "panel_header_y_offset": 1.75,
       "panel_header_h": 0.4,
       "panel_body_y_offset": 2.15,
-      "desc_font_size": 13,
+      "desc_font_size": "@typography.label",
       "desc_line_spacing_pct": 160,
       "desc_margin": [0.1, 0.06, 0.06, 0.08],
-      "panel_header_font_size": 11,
-      "panel_body_font_size": 12,
+      "panel_header_font_size": "@typography.label",
+      "panel_body_font_size": "@typography.body",
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
       "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
@@ -146,7 +146,7 @@
       "cta_x": 1.5,
       "cta_w": 7.0,
       "cta_h": 0.95,
-      "msg_font_size": 16,
+      "msg_font_size": "@typography.subtitle",
       "msg_line_spacing_pct": 160,
       "msg_margin": [0.1, 0.1, 0.1, 0.1],
       "cta_font_size": 15
@@ -165,9 +165,9 @@
             "w": "body_w",
             "h": 1.05
           },
-          "font_size": 14,
+          "font_size": "@typography.body",
           "line_spacing_pct": 150,
-          "margin": [0.1, 0.06, 0.06, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -184,11 +184,11 @@
             "w": "body_w",
             "h": 0.4
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "bold": true,
           "fill": "primary",
           "color": "white",
-          "margin": [0, 0, 0, 0.12],
+          "margin": [0, 0, 0, "@spacing.sm"],
           "align": "left",
           "valign": "middle"
         },
@@ -204,9 +204,9 @@
             "h": "body_h",
             "h_offset": -1.55
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "line_spacing_pct": 150,
-          "margin": [0.12, 0.12, 0.12, 0.15],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.md"],
           "fill": "surface",
           "color": "navy",
           "align": "left",
@@ -228,11 +228,11 @@
             "w": 4.45,
             "h": 0.4
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "bold": true,
           "fill": "navy",
           "color": "white",
-          "margin": [0, 0, 0, 0.12],
+          "margin": [0, 0, 0, "@spacing.sm"],
           "align": "left",
           "valign": "middle"
         },
@@ -248,9 +248,9 @@
             "h": "body_h",
             "h_offset": -0.5
           },
-          "font_size": 13,
+          "font_size": "@typography.label",
           "line_spacing_pct": 155,
-          "margin": [0.1, 0.06, 0.06, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -266,11 +266,11 @@
             "w": 4.65,
             "h": 0.4
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "bold": true,
           "fill": "primary",
           "color": "white",
-          "margin": [0, 0, 0, 0.12],
+          "margin": [0, 0, 0, "@spacing.sm"],
           "align": "left",
           "valign": "middle"
         },
@@ -286,9 +286,9 @@
             "h": "body_h",
             "h_offset": -0.5
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "line_spacing_pct": 150,
-          "margin": [0.12, 0.12, 0.12, 0.15],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.md"],
           "fill": "surface",
           "color": "navy",
           "align": "left",
@@ -309,9 +309,9 @@
             "w": 4.45,
             "h": "body_h"
           },
-          "font_size": 13,
+          "font_size": "@typography.label",
           "line_spacing_pct": 170,
-          "margin": [0.1, 0.06, 0.06, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -326,9 +326,9 @@
             "w": 4.65,
             "h": "body_h"
           },
-          "font_size": 13,
+          "font_size": "@typography.label",
           "line_spacing_pct": 170,
-          "margin": [0.1, 0.06, 0.06, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -341,7 +341,7 @@
         {
           "id": "statement",
           "type": "text",
-          "source": "body_head:2",
+          "source": "body_head:1",
           "pos": {
             "x": "body_x",
             "y": "body_y",
@@ -349,9 +349,9 @@
             "w": "body_w",
             "h": 2.6
           },
-          "font_size": 22,
+          "font_size": "@typography.title",
           "line_spacing_pct": 150,
-          "margin": [0.12, 0.12, 0.12, 0.12],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.sm"],
           "color": "navy",
           "align": "center",
           "valign": "middle"
@@ -359,7 +359,7 @@
         {
           "id": "support",
           "type": "text",
-          "source": "body_tail:-2",
+          "source": "body_tail:-1",
           "pos": {
             "x": 1.5,
             "y": "body_y",
@@ -367,9 +367,9 @@
             "w": 7.0,
             "h": 0.9
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "line_spacing_pct": 145,
-          "margin": [0.06, 0.1, 0.06, 0.1],
+          "margin": ["@spacing.xxs", "@spacing.xs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_secondary",
           "align": "center",
           "valign": "top"
@@ -389,9 +389,9 @@
             "w": "body_w",
             "h": 0.6
           },
-          "font_size": 13,
+          "font_size": "@typography.label",
           "line_spacing_pct": 145,
-          "margin": [0.08, 0.06, 0.04, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -408,9 +408,9 @@
             "h": "body_h",
             "h_offset": -0.7
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "line_spacing_pct": 160,
-          "margin": [0.12, 0.12, 0.12, 0.15],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.md"],
           "fill": "surface",
           "color": "navy",
           "align": "left",
@@ -428,9 +428,9 @@
             "h": "body_h",
             "h_offset": -0.7
           },
-          "font_size": 12,
+          "font_size": "@typography.body",
           "line_spacing_pct": 160,
-          "margin": [0.12, 0.12, 0.12, 0.15],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.md"],
           "fill": "surface",
           "color": "navy",
           "align": "left",
@@ -451,9 +451,9 @@
             "w": "body_w",
             "h": 0.75
           },
-          "font_size": 13,
+          "font_size": "@typography.label",
           "line_spacing_pct": 150,
-          "margin": [0.08, 0.06, 0.04, 0.08],
+          "margin": ["@spacing.xs", "@spacing.xxs", "@spacing.xxs", "@spacing.xs"],
           "color": "text_primary",
           "align": "left",
           "valign": "top"
@@ -470,11 +470,11 @@
             "w": "body_w",
             "h": 0.38
           },
-          "font_size": 11,
+          "font_size": "@typography.label",
           "bold": true,
           "fill": "navy",
           "color": "white",
-          "margin": [0, 0, 0, 0.12],
+          "margin": [0, 0, 0, "@spacing.sm"],
           "align": "left",
           "valign": "middle"
         },
@@ -490,9 +490,9 @@
             "h": "body_h",
             "h_offset": -1.23
           },
-          "font_size": 11,
+          "font_size": "@typography.label",
           "line_spacing_pct": 155,
-          "margin": [0.12, 0.12, 0.12, 0.15],
+          "margin": ["@spacing.sm", "@spacing.sm", "@spacing.sm", "@spacing.md"],
           "fill": "surface",
           "color": "navy",
           "align": "left",
@@ -501,5 +501,27 @@
       ]
     },
     "_meta_units": "All pos/size/margin values are INCHES on a 10x5.625in canvas. Margins are inset from the element box, so left+right must stay well under the element width."
+  },
+  "tokens": {
+    "spacing": {
+      "xxs": 0.042,
+      "xs": 0.083,
+      "sm": 0.125,
+      "md": 0.167,
+      "lg": 0.25,
+      "xl": 0.333,
+      "xxl": 0.417,
+      "xxxl": 0.5
+    },
+    "typography": {
+      "display": 36,
+      "headline": 28,
+      "title": 20,
+      "subtitle": 16,
+      "body": 12,
+      "label": 11,
+      "caption": 10,
+      "footer": 8
+    }
   }
 }
