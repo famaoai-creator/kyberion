@@ -12,7 +12,8 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["KYBERION_MLX_URL"]
+      "env_keys": ["KYBERION_MLX_URL"],
+      "cost_tier": "free"
     }
   ]
 }

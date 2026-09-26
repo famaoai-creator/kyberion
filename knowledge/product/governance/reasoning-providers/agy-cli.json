@@ -12,7 +12,8 @@
         "session_continuity": true,
         "input_modalities": ["text"]
       },
-      "env_keys": ["AGY_CLI", "ANTIGRAVITY_CLI"]
+      "env_keys": ["AGY_CLI", "ANTIGRAVITY_CLI"],
+      "cost_tier": "free"
     }
   ]
 }

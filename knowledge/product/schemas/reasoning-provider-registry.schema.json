@@ -41,6 +41,10 @@
           "env_keys": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "cost_tier": {
+            "description": "Billing shape of a completed request. 'free' = local runtime or flat-rate subscription CLI, so a revoked speculative request costs nothing extra. 'metered' = per-token/per-request billing, so a revoked speculative request burns real money. Optional; callers treat a missing or unrecognised value as 'metered'.",
+            "enum": ["free", "metered"]
           }
         },
         "required": ["mode", "provider", "module", "capabilities", "env_keys"]

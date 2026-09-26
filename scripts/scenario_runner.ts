@@ -51,6 +51,8 @@ export interface ScenarioRunSummaryEntry {
   report_dir?: string;
   /** Repo-relative run root, present only when it was kept (`--keep`). */
   run_root?: string;
+  /** Number of report warnings (e.g. `scope_lost`), present only when non-zero. */
+  warnings?: number;
 }
 
 export interface ScenarioRunSummary {
@@ -188,6 +190,9 @@ export async function runScenarioFiles(
         ...(report.reason ? { reason: report.reason } : {}),
         report_dir: writeReportFiles(report, trajectory),
         ...(args.keep && runRoot ? { run_root: pathResolver.toRepoRelative(runRoot) } : {}),
+        ...(report.warnings?.length
+          ? { warnings: report.warnings.reduce((sum, warning) => sum + warning.count, 0) }
+          : {}),
       };
       const failures = [
         ...report.turns.flatMap((turn) => [
@@ -221,7 +226,8 @@ export async function runScenarioFiles(
 export function formatScenarioSummary(summary: ScenarioRunSummary): string {
   const lines = summary.scenarios.map((entry) => {
     const label = entry.status.toUpperCase().padEnd(12);
-    const suffix = entry.reason ? ` — ${entry.reason}` : '';
+    const warned = entry.warnings ? ` (${entry.warnings} warning(s), see report)` : '';
+    const suffix = `${warned}${entry.reason ? ` — ${entry.reason}` : ''}`;
     return `${label} ${entry.scenario_id ?? entry.file}${suffix}`;
   });
   const counts = Object.entries(summary.counts)
