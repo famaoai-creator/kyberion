@@ -154,10 +154,57 @@ describe('RA-01 scoped role assumption', () => {
 
     await withExecutionContextAsync('surface_runtime', async () => {
       await Promise.resolve();
-      expect(process.env.MISSION_ROLE).toBe('surface_runtime');
+      // B1: the async helper never mirrors into the process env.
+      expect(process.env.MISSION_ROLE).toBe('outer_role');
+      expect(resolveRole()).toBe('surface_runtime');
     });
     expect(process.env.MISSION_ROLE).toBe('outer_role');
     expect(process.env.KYBERION_PERSONA).toBe('analyst');
+  });
+
+  it('leaves the process env intact when async contexts interleave (B1)', async () => {
+    process.env.MISSION_ROLE = 'outer_role';
+    process.env.KYBERION_PERSONA = 'worker';
+    const aEntered = deferred();
+    const bEntered = deferred();
+    const aDone = deferred();
+    const seen: Record<string, unknown> = {};
+
+    // A enters, B enters, A exits first, B exits last.
+    const a = withExecutionContextAsync('knowledge_steward', async () => {
+      aEntered.resolve();
+      await bEntered.promise;
+      seen.a = { role: resolveRole(), persona: resolveExecutionPersona() };
+    });
+    await aEntered.promise;
+    const b = withExecutionContextAsync(
+      'mission_controller',
+      async () => {
+        bEntered.resolve();
+        await aDone.promise;
+        seen.b = { role: resolveRole(), persona: resolveExecutionPersona() };
+      },
+      'ecosystem_architect'
+    );
+    await a;
+    aDone.resolve();
+    await b;
+
+    expect(seen).toEqual({
+      a: { role: 'knowledge_steward', persona: 'analyst' },
+      b: { role: 'mission_controller', persona: 'ecosystem_architect' },
+    });
+    expect(process.env.MISSION_ROLE).toBe('outer_role');
+    expect(process.env.KYBERION_PERSONA).toBe('worker');
+    expect(resolveRole()).toBe('outer_role');
+  });
+
+  it('does not restore the sync env mirror over a value fn wrote itself', () => {
+    process.env.MISSION_ROLE = 'outer_role';
+    withExecutionContext('mission_controller', () => {
+      process.env.MISSION_ROLE = 'set_by_fn';
+    });
+    expect(process.env.MISSION_ROLE).toBe('set_by_fn');
   });
 
   it('builds a child env from the scoped assumption, not the shared env mirror', async () => {
