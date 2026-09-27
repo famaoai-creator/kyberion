@@ -963,7 +963,7 @@
     {
       "path": "product/architecture/visual-grounding-and-video-ingest.md",
       "tier": "public",
-      "size": 14880,
+      "size": 18560,
       "type": "md"
     },
     {
@@ -1641,7 +1641,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 154284,
+      "size": 155041,
       "type": "json"
     },
     {
@@ -3645,7 +3645,7 @@
     {
       "path": "product/governance/seam-provider-selection/ui-element-detector.json",
       "tier": "public",
-      "size": 4613,
+      "size": 5041,
       "type": "json"
     },
     {
