@@ -8488,6 +8488,21 @@
         "en": "Approve only if you started this request; the value is entered on your own device after approval.",
         "ja": "自分で依頼した場合のみ承認してください。値は承認後に手元の端末で入力します。",
         "qps-ploc": "⟦Ȧṗṗřőṽė őñŀẏ ïƒ ẏőů şŧȧřŧėḓ ŧħïş řėɋůėşŧ; ŧħė ṽȧŀůė ïş ėñŧėřėḓ őñ ẏőůř őẇñ ḓėṽïƈė ȧƒŧėř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "approval_request_not_found": {
+        "en": "This approval request does not exist or has already been handled.",
+        "ja": "この承認要求は存在しないか、すでに処理済みです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ḓőėş ñőŧ ėẋïşŧ őř ħȧş ȧŀřėȧḓẏ ƀėėñ ħȧñḓŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "approval_request_other_thread": {
+        "en": "This approval request belongs to another thread.",
+        "ja": "この承認要求は別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ƀėŀőñɠş ŧő ȧñőŧħėř ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "approval_request_expired": {
+        "en": "This approval request has expired.",
+        "ja": "この承認要求は期限切れです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
       }
     },
     "concierge": {
