@@ -34,6 +34,8 @@ const FILES: Record<string, string> = {
       { id: 'wrapper-surface', command: 'node', args: ['dist/apps/wrapper.js'] },
       { id: 'union-surface', command: 'node', args: ['dist/apps/union.js'] },
       { id: 'dynamic-surface', command: 'node', args: ['dist/apps/dynamic.js'] },
+      { id: 'require-surface', command: 'node', args: ['dist/apps/required.js'] },
+      { id: 'missing-surface', command: 'node', args: ['dist/apps/missing.js'] },
       { id: 'spawn-surface', command: 'node', args: ['dist/apps/spawn.js'] },
     ],
   }),
@@ -79,6 +81,18 @@ const FILES: Record<string, string> = {
     '  return import(name);',
     '}',
   ].join('\n'),
+  'apps/required.ts': [
+    `import { createRequire } from '${['node', 'module'].join(':')}';`,
+    'const load = createRequire(import.meta.url);',
+    'export function run(): void {',
+    "  (load('../libs/core/required-dep.js') as { go(): void }).go();",
+    '}',
+  ].join('\n'),
+  'libs/core/required-dep.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    "export function go(): void { withExecutionContext('role_required', () => undefined); }",
+  ].join('\n'),
+  'apps/missing.ts': [`import { helper } from '${CORE}/not-there.js';`, 'helper();'].join('\n'),
   'apps/spawn.ts': [
     `import { spawn } from '${CHILD_PROCESS}';`,
     "spawn(process.execPath, ['dist/scripts/child.js'], { env: { ...process.env } });",
@@ -146,6 +160,19 @@ describe('RN-02 role assumption reachability analysis', () => {
     const surface = report.system_roles.dynamic_surface;
     expect(surface.unresolved_sites).toEqual(['apps/dynamic.ts#load']);
     expect(report.unresolved_sites['apps/dynamic.ts#load'][0]).toMatch(/dynamic import/);
+    expect(surface.policy_roles_not_reachable).toEqual([]);
+  });
+
+  it('follows createRequire-bound loads like require (S1)', () => {
+    const surface = report.system_roles.require_surface;
+    expect(Object.keys(surface.reachable_roles)).toEqual(['role_required']);
+    expect(surface.unresolved_sites).toEqual([]);
+  });
+
+  it('reports an internal specifier that does not resolve as an any-role site (S1)', () => {
+    const surface = report.system_roles.missing_surface;
+    expect(surface.unresolved_sites).toEqual(['apps/missing.ts#<module>']);
+    expect(report.unresolved_sites['apps/missing.ts#<module>'][0]).toMatch(/not-there\.js/);
     expect(surface.policy_roles_not_reachable).toEqual([]);
   });
 
