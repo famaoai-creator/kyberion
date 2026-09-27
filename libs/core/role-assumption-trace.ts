@@ -72,36 +72,57 @@ export function resolveRoleAssumptionTracePath(raw: string | undefined): string 
 const AUTHORITY_FRAME =
   /[\\/]libs[\\/]core[\\/](?:dist[\\/])?(?:authority|role-assumption-trace)\.[cm]?[jt]s\b/;
 
-function frameLocation(frame: string): string | null {
-  const match = /\(([^()]+)\)\s*$/.exec(frame) ?? /^\s*at\s+(.+)$/.exec(frame);
-  return match ? match[1].trim() : null;
+/** Functions of the assumption path itself, recognised by name when bundled (Next.js chunks). */
+const AUTHORITY_FUNCTIONS = new Set([
+  'traceRoleAssumption',
+  'captureStack',
+  'assertRoleAssumptionAllowed',
+  'prepareExecutionContext',
+  'withExecutionContext',
+  'withExecutionContextAsync',
+]);
+
+/** Top-level repo directories used to relativise a frame outside libs/core. */
+const REPO_TOP_LEVEL =
+  /(?:^|[\\/])((?:libs|presence|satellites|scripts|dist|plugins|tests)[\\/].*)$/;
+
+function parseFrame(frame: string): { fn: string | null; location: string } | null {
+  const withName = /^\s*at\s+(?:async\s+)?(.+?)\s+\(([^()]+)\)\s*$/.exec(frame);
+  if (withName) return { fn: withName[1].trim(), location: withName[2].trim() };
+  const bare = /^\s*at\s+(?:async\s+)?(.+)$/.exec(frame);
+  return bare ? { fn: null, location: bare[1].trim() } : null;
 }
 
 const MAX_TRACE_FRAMES = 5;
 
 /**
  * The stack frames outside authority.ts / this module (at most
- * {@link MAX_TRACE_FRAMES}), relative to the checkout that holds libs/core
- * (not KYBERION_ROOT, which may be a hermetic runtime root). Bundled frames
- * (e.g. Next.js chunks) are returned as-is.
+ * {@link MAX_TRACE_FRAMES}) as `path:line:col` or `path:line:col (function)`,
+ * relative to the checkout that holds libs/core (not KYBERION_ROOT, which may
+ * be a hermetic runtime root). In bundles (Next.js chunks) the assumption path
+ * is recognised by function name.
  */
 export function callerFramesFromStack(stack: string | undefined): string[] {
   if (!stack) return [];
   const frames: string[] = [];
   let codeRoot: string | null = null;
   for (const line of stack.split('\n').slice(1)) {
-    const location = frameLocation(line);
-    if (!location) continue;
-    const cleaned = location.replace(/^file:\/\//, '');
+    const parsed = parseFrame(line);
+    if (!parsed) continue;
+    const cleaned = parsed.location.replace(/^file:\/\//, '');
+    const fnName = parsed.fn?.replace(/^(?:Object|Module)\./, '') ?? null;
     if (AUTHORITY_FRAME.test(cleaned)) {
       const index = cleaned.search(/[\\/]libs[\\/]core[\\/]/);
       if (index > 0 && !codeRoot) codeRoot = cleaned.slice(0, index);
       continue;
     }
+    if (fnName && AUTHORITY_FUNCTIONS.has(fnName)) continue;
     if (cleaned.startsWith('node:') || cleaned.includes('node:internal')) continue;
-    frames.push(
-      codeRoot && cleaned.startsWith(`${codeRoot}/`) ? cleaned.slice(codeRoot.length + 1) : cleaned
-    );
+    const relative =
+      codeRoot && cleaned.startsWith(`${codeRoot}/`)
+        ? cleaned.slice(codeRoot.length + 1)
+        : (REPO_TOP_LEVEL.exec(cleaned)?.[1] ?? cleaned);
+    frames.push(fnName ? `${relative} (${fnName})` : relative);
     if (frames.length >= MAX_TRACE_FRAMES) break;
   }
   return frames;
