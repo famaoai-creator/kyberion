@@ -22,8 +22,9 @@ import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-
  * DPI aware, so element rects and the reported primary screen size are both
  * physical pixels and the default scale (image width / screen width) fits a
  * primary-monitor screenshot at any display scaling. Options travel in an
- * environment variable of the child process and the script is passed as
- * -EncodedCommand, so no request value is ever part of the script text.
+ * environment variable of the child process and the script is fed on stdin to a
+ * fixed -EncodedCommand bootstrap (the command line stays small whatever the
+ * script size), so no request value is ever part of the script text.
  *
  * The detector only ever runs when the request declares that the screenshot
  * IS this machine's live screen (`live_screen: true`): accessibility positions
@@ -129,7 +130,13 @@ export interface AccessibilityCommandResult {
 export type AccessibilityCommandRunner = (
   command: string,
   args: string[],
-  options: { timeoutMs: number; maxOutputMB: number; env?: Record<string, string> }
+  options: {
+    timeoutMs: number;
+    maxOutputMB: number;
+    env?: Record<string, string>;
+    /** Written to the child's stdin (the Windows scripts travel this way). */
+    input?: string;
+  }
 ) => Promise<AccessibilityCommandResult>;
 
 export interface OsAccessibilityDetectorDeps {
@@ -646,14 +653,25 @@ export function encodePowerShellCommand(script: string): string {
   return Buffer.from(script, 'utf16le').toString('base64');
 }
 
-/** powershell.exe arguments for a script, passed encoded so no argv quoting applies. */
-export function powerShellArgs(script: string): string[] {
+/**
+ * Fixed bootstrap passed on the command line: it reads the real script from
+ * stdin and runs it as one script block. The scripts themselves (the
+ * enumeration script with its C# walker is ~18 KB, far past the 32 767-char
+ * Windows command-line limit once encoded) always travel on stdin, so the
+ * command line has the same small size whatever the script. Scripts must be
+ * ASCII: stdin is decoded with the console code page.
+ */
+export const POWERSHELL_STDIN_BOOTSTRAP =
+  "$ErrorActionPreference = 'Stop'; & ([scriptblock]::Create([Console]::In.ReadToEnd()))";
+
+/** powershell.exe arguments that run the script given on stdin (see POWERSHELL_STDIN_BOOTSTRAP). */
+export function powerShellStdinArgs(): string[] {
   return [
     '-NoLogo',
     '-NoProfile',
     '-NonInteractive',
     '-EncodedCommand',
-    encodePowerShellCommand(script),
+    encodePowerShellCommand(POWERSHELL_STDIN_BOOTSTRAP),
   ];
 }
 
@@ -858,10 +876,11 @@ export class OsAccessibilityDetector implements UiElementDetector {
     try {
       const windows = this.platform === 'win32';
       const result = windows
-        ? await this.run(POWERSHELL, powerShellArgs(OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT), {
+        ? await this.run(POWERSHELL, powerShellStdinArgs(), {
             timeoutMs: OS_ACCESSIBILITY_WINDOWS_PROBE_TIMEOUT_MS,
             maxOutputMB: 1,
             env: windowsPowerShellEnv(),
+            input: OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
           })
         : await this.run('osascript', ['-l', 'JavaScript', '-e', PERMISSION_SCRIPT], {
             timeoutMs: OS_ACCESSIBILITY_PROBE_TIMEOUT_MS,
@@ -893,9 +912,10 @@ export class OsAccessibilityDetector implements UiElementDetector {
     };
     const windows = this.platform === 'win32';
     const result = windows
-      ? await this.run(POWERSHELL, powerShellArgs(OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT), {
+      ? await this.run(POWERSHELL, powerShellStdinArgs(), {
           timeoutMs: OS_ACCESSIBILITY_TIMEOUT_MS,
           maxOutputMB: 4,
+          input: OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT,
           env: {
             ...windowsPowerShellEnv(),
             [OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV]: JSON.stringify({

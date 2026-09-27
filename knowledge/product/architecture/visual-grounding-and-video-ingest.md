@@ -153,9 +153,12 @@ site's terms of service.
   macOS and Windows, or without `live_screen`, the detector is simply
   unavailable. The command runner is injectable, so hermetic tests never run
   `osascript` or `powershell.exe`.
-- On Windows, `os_accessibility` runs a PowerShell script (passed with
-  `-EncodedCommand`; options travel in the child-only `KYBERION_UIA_OPTIONS`
-  environment variable, never in the script text) that uses .NET UI
+- On Windows, `os_accessibility` runs a PowerShell script (fed on stdin to a
+  fixed `-EncodedCommand` bootstrap, so the command line stays a few hundred
+  characters whatever the script size — the script with its C# walker would
+  exceed the 32 767-character limit if encoded; options travel in the
+  child-only `KYBERION_UIA_OPTIONS` environment variable, never in the script
+  text) that uses .NET UI
   Automation: the foreground window (`GetForegroundWindow` →
   `AutomationElement.FromHandle`) is walked breadth-first with the same caps
   and 8 s timeout plus a 5 s in-script walk budget (the rest covers PowerShell
