@@ -114,7 +114,12 @@ describe('RN-01 role assumption trace', () => {
     expect(resolveRole()).toBe('sovereign_concierge');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
+      // The delegation is snapshotted: a later env write changes nothing...
       process.env[DELEGATED_ROLE_ENV] = 'chronos_localadmin@concierge';
+      expect(resolveRole()).toBe('sovereign_concierge');
+      // ...until a fresh process (test seam) reads the new value.
+      resetRoleAssumptionPolicyCache();
+      expect(resolveRole()).toBe('concierge');
       expect(resolveRole()).toBe('concierge');
       expect(
         warn.mock.calls.filter(([m]) => String(m).includes('ROLE_DELEGATION_DENIED'))
