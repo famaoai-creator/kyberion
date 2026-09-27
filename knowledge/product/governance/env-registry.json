@@ -1016,6 +1016,15 @@
       "subsystem": "tenancy"
     },
     {
+      "name": "KYBERION_DELEGATED_ROLE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Delegated child role (DR-01), `<role>@<issuing SYSTEM_ROLE>`. Set only by buildExecutionEnv(env, role) when the child env inherits SYSTEM_ROLE; the child then runs as <role> (below in-process assumptions, above SYSTEM_ROLE) if role-assumption-policy.json lets SYSTEM_ROLE assume it, else as SYSTEM_ROLE with a [ROLE_DELEGATION_DENIED] warning. Ignored without SYSTEM_ROLE or when issued under another SYSTEM_ROLE; never forwarded to provider CLI children or safe-exec defaults. Never set manually.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_DELEGATION_DEPTH",
       "category": "tuning",
       "type": "number",
