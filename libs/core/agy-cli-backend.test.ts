@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import * as path from 'node:path';
 import { z } from 'zod';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
@@ -72,6 +73,8 @@ describe('agy-cli-backend', () => {
     delete process.env.KYBERION_AGY_CLI_LOG_FILE;
     delete process.env.KYBERION_AGY_SANDBOX;
     delete process.env.KYBERION_AGY_AGENT;
+    delete process.env.KYBERION_AGY_PROFILE;
+    delete process.env.AGY_PROFILE;
   });
 
   it('builds from env when agy cli settings are configured', () => {
@@ -82,6 +85,72 @@ describe('agy-cli-backend', () => {
     const backend = buildAgyCliBackendFromEnv();
 
     expect(backend?.name).toBe('agy-cli');
+  });
+
+  it('builds from env when KYBERION_AGY_PROFILE is configured', () => {
+    process.env.KYBERION_AGY_PROFILE = 'work';
+    const backend = buildAgyCliBackendFromEnv();
+    expect(backend?.getAgyProfile()).toBe('work');
+  });
+
+  it('prefers KYBERION_AGY_PROFILE over AGY_PROFILE', () => {
+    process.env.KYBERION_AGY_PROFILE = 'work';
+    process.env.AGY_PROFILE = 'personal';
+    const backend = buildAgyCliBackendFromEnv();
+    expect(backend?.getAgyProfile()).toBe('work');
+  });
+
+  it('rejects path traversal attempts in agyProfile', () => {
+    const backend = new AgyCliBackend({ agyProfile: '../etc/passwd' });
+    expect(backend.resolveProfileHome()).toBeUndefined();
+  });
+
+  it('rejects invalid characters in agyProfile name', () => {
+    const backend = new AgyCliBackend({ agyProfile: 'work;rm -rf /' });
+    expect(backend.resolveProfileHome()).toBeUndefined();
+  });
+
+  it('returns undefined and omits AGY_PROFILE when profile does not exist', async () => {
+    const backend = new AgyCliBackend({ agyProfile: 'non-existent-profile-xyz' });
+    expect(backend.resolveProfileHome()).toBeUndefined();
+
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+    await backend.prompt('test fallback');
+
+    const spawnCall = spawnMock.mock.calls[0];
+    const spawnEnv = spawnCall[2].env;
+    expect(spawnEnv.AGY_PROFILE).toBeUndefined();
+  });
+
+  it('resolves named profile when it exists under customProfilesDir', () => {
+    const testDir = pathResolver.sharedTmp();
+    const backend = new AgyCliBackend({ agyProfile: path.basename(testDir) });
+    const resolved = backend.resolveProfileHome(path.dirname(testDir));
+    expect(resolved).toBe(testDir);
+  });
+
+  it('returns undefined for default profile', () => {
+    const backend = new AgyCliBackend({ agyProfile: 'default' });
+    expect(backend.resolveProfileHome()).toBeUndefined();
+  });
+
+  it('injects profile HOME and AGY_PROFILE into child process environment when profile exists', async () => {
+    const testProfilePath = pathResolver.sharedTmp();
+    const backend = new AgyCliBackend({ agyProfile: testProfilePath });
+    spawnMock.mockReturnValue(createChild('{"response":"ok"}'));
+
+    await backend.prompt('test profile');
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'agy',
+      expect.anything(),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          HOME: testProfilePath,
+          AGY_PROFILE: testProfilePath,
+        }),
+      })
+    );
   });
 
   it('routes the configured AGY CLI agent through the generated workspace definition', async () => {

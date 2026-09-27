@@ -2,8 +2,10 @@
 import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { safeExistsSync } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import {
@@ -78,6 +80,8 @@ export interface AgyCliBackendOptions {
   workspaceDir?: string;
   /** Optional Kyberion/AGY custom agent name, e.g. `kyberion-implementer`. */
   agent?: string;
+  /** Optional account profile name, e.g. `work` (resolving to ~/.agy-profiles/<name>). */
+  agyProfile?: string;
   /** Set false only for callers that intentionally provide their own AGY workspace. */
   includeWorkspaceAgents?: boolean;
   sandbox?: boolean;
@@ -187,6 +191,7 @@ export class AgyCliBackend implements ReasoningBackend {
   private readonly extraArgs: string[];
   private readonly workspaceDir: string;
   private readonly agent?: string;
+  private readonly agyProfile?: string;
   private readonly includeWorkspaceAgents: boolean;
   private readonly sandbox: boolean;
   private readonly logFile: string;
@@ -205,6 +210,10 @@ export class AgyCliBackend implements ReasoningBackend {
     this.extraArgs = options.extraArgs ?? [];
     this.workspaceDir = options.workspaceDir ?? pathResolver.rootDir();
     this.agent = options.agent;
+    this.agyProfile =
+      options.agyProfile ??
+      getRegisteredEnvText('KYBERION_AGY_PROFILE')?.trim() ??
+      getRegisteredEnvText('AGY_PROFILE')?.trim();
     this.includeWorkspaceAgents = options.includeWorkspaceAgents ?? true;
     this.sandbox = options.sandbox ?? getRegisteredEnvText('KYBERION_AGY_SANDBOX') !== '0';
     this.logFile =
@@ -759,16 +768,75 @@ export class AgyCliBackend implements ReasoningBackend {
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
   /**
+   * Resolves the ~/.agy-profiles/<name> home directory when an explicit
+   * profile is configured. Returns undefined when using default HOME.
+   */
+  public resolveProfileHome(customProfilesDir?: string): string | undefined {
+    if (!this.agyProfile || this.agyProfile === 'default') {
+      return undefined;
+    }
+    if (path.isAbsolute(this.agyProfile)) {
+      if (safeExistsSync(this.agyProfile)) {
+        return this.agyProfile;
+      }
+      logger.warn(
+        `[agy-cli] configured agyProfile path "${this.agyProfile}" does not exist; falling back to default HOME`
+      );
+      return undefined;
+    }
+
+    // Named profile validation: must only contain alphanumeric, hyphen, underscore
+    if (!/^[a-zA-Z0-9_-]+$/u.test(this.agyProfile)) {
+      logger.warn(
+        `[agy-cli] invalid agyProfile name "${this.agyProfile}" (must only contain alphanumeric, hyphens, and underscores); falling back to default HOME`
+      );
+      return undefined;
+    }
+
+    const realHome = getRegisteredEnvText('HOME')?.trim() || os.homedir();
+    const profilesDir = customProfilesDir ?? path.join(realHome, '.agy-profiles');
+    const resolvedProfilesDir = path.resolve(profilesDir);
+    const candidate = path.resolve(resolvedProfilesDir, this.agyProfile);
+
+    // Defense-in-depth containment check against path traversal
+    if (!candidate.startsWith(resolvedProfilesDir + path.sep)) {
+      logger.warn(
+        `[agy-cli] agyProfile "${this.agyProfile}" attempts path traversal; falling back to default HOME`
+      );
+      return undefined;
+    }
+
+    if (!safeExistsSync(candidate)) {
+      logger.warn(
+        `[agy-cli] configured agyProfile "${this.agyProfile}" does not exist at ${candidate}; falling back to default HOME`
+      );
+      return undefined;
+    }
+    return candidate;
+  }
+
+  /**
    * XP-02: minimal allowlisted env, scoped to agy's own required vars;
    * WS-02: private git index when the effective profile is implementer.
    */
   private buildSpawnEnv(profile?: ProviderPermissionProfileName) {
     const effectiveProfile = resolveEffectiveProviderPermissionProfile('agy', profile);
-    return buildDelegationSpawnEnv({
+    const delegationEnv = buildDelegationSpawnEnv({
       provider: 'agy',
       sessionId: newDelegationSessionId('agy'),
       ...(effectiveProfile ? { profile: effectiveProfile } : {}),
     });
+    const profileHome = this.resolveProfileHome();
+    if (profileHome) {
+      delegationEnv.env.HOME = profileHome;
+      if (process.platform === 'win32') {
+        delegationEnv.env.USERPROFILE = profileHome;
+      }
+      delegationEnv.env.AGY_PROFILE = this.agyProfile;
+    } else {
+      delete delegationEnv.env.AGY_PROFILE;
+    }
+    return delegationEnv;
   }
 
   private spawnCli(
@@ -818,6 +886,10 @@ export class AgyCliBackend implements ReasoningBackend {
       throw err;
     });
   }
+
+  getAgyProfile(): string | undefined {
+    return this.agyProfile;
+  }
 }
 
 export function buildAgyCliBackendFromEnv(
@@ -833,6 +905,9 @@ export function buildAgyCliBackendFromEnv(
   const sandboxEnabled = sandbox === undefined ? undefined : sandbox !== '0';
   const logFile = getRegisteredEnvText('KYBERION_AGY_CLI_LOG_FILE', { env })?.trim();
   const agent = getRegisteredEnvText('KYBERION_AGY_AGENT', { env })?.trim();
+  const agyProfile =
+    getRegisteredEnvText('KYBERION_AGY_PROFILE', { env })?.trim() ||
+    getRegisteredEnvText('AGY_PROFILE', { env })?.trim();
   const backend = new AgyCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
@@ -840,8 +915,11 @@ export function buildAgyCliBackendFromEnv(
     ...(sandboxEnabled !== undefined ? { sandbox: sandboxEnabled } : {}),
     ...(logFile ? { logFile } : {}),
     ...(agent ? { agent } : {}),
+    ...(agyProfile ? { agyProfile } : {}),
   });
-  logger.info(`[agy-cli] backend ready (bin=${bin ?? 'agy'}, model=${model ?? 'agy'})`);
+  logger.info(
+    `[agy-cli] backend ready (bin=${bin ?? 'agy'}, model=${model ?? 'agy'}${agyProfile ? `, profile=${agyProfile}` : ''})`
+  );
   return backend;
 }
 

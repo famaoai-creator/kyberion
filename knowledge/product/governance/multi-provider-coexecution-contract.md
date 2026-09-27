@@ -119,3 +119,10 @@ ad-hoc same-checkout collaboration; they are not mission-owner authority.
   a ceremony (e.g. a newly adopted provider) must still be excluded from Git
   rather than committed ad hoc — add the ignore rule first, wire the
   generation ceremony as a follow-up.
+- Provider account & profile isolation: When multiple accounts exist for a provider
+  on the same host (e.g. personal vs corporate Google accounts for Antigravity CLI,
+  or distinct Codex configurations), each execution context isolates its session and
+  auth state via dedicated profile environments (`~/.agy-profiles/<name>` for `agy`,
+  `CODEX_HOME` for `codex`). Kyberion supports selecting these profiles declaratively
+  via `KYBERION_AGY_PROFILE=<name>` or backend instantiation options (`agyProfile`),
+  preventing cross-account session pollution while preserving common developer dotfiles.

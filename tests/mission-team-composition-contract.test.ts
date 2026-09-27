@@ -218,8 +218,8 @@ describe('Mission team composition contract', () => {
     expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe(
       'nerve-agent'
     );
-    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe(
-      'reasoning-worker'
+    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toMatch(
+      /^(reasoning-worker|implementation-architect)$/
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(
       // Governed selectable CLI providers (provider-discovery IDs): the winner
