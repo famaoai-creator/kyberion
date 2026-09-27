@@ -36,7 +36,7 @@ describe('grok-api-backend', () => {
     expect(resolveGrokApiKey({})).toBeUndefined();
   });
 
-  it('builds from XAI_API_KEY with the official host and grok-4.6 default', () => {
+  it('builds from XAI_API_KEY with the official host and grok-4.7 default', () => {
     const backend = buildGrokApiBackendFromEnv({ XAI_API_KEY: 'xai-test-key' });
     expect(backend?.name).toBe('openai-compatible');
     expect(backend?.egressEndpoint).toBe(`${GROK_API_DEFAULT_BASE_URL}/`);
@@ -67,7 +67,7 @@ describe('grok-api-backend', () => {
       vi
         .fn()
         .mockResolvedValue(
-          new Response(JSON.stringify({ data: [{ id: 'grok-4.6' }] }), { status: 200 })
+          new Response(JSON.stringify({ data: [{ id: 'grok-4.7' }] }), { status: 200 })
         )
     );
     const probe = await probeGrokApiBackendAvailability({ XAI_API_KEY: 'xai-test-key' });

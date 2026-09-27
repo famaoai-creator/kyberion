@@ -201,7 +201,7 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
     const fetchMock = vi
       .fn()
       .mockImplementation(
-        async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.6' }] }), { status: 200 })
+        async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.7' }] }), { status: 200 })
       );
     vi.stubGlobal('fetch', fetchMock);
 

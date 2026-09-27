@@ -1481,6 +1481,69 @@
       "audience": "operator"
     },
     {
+      "id": "script.browser.profiles",
+      "module": "scripts/browser_profiles_cli.ts",
+      "args": ["profiles"],
+      "command": "browser profiles",
+      "noun": "browser",
+      "verb": "profiles",
+      "audience": "operator"
+    },
+    {
+      "id": "script.browser.open",
+      "module": "scripts/browser_profiles_cli.ts",
+      "args": ["open"],
+      "command": "browser open",
+      "noun": "browser",
+      "verb": "open",
+      "audience": "operator"
+    },
+    {
+      "id": "script.browser.create",
+      "module": "scripts/browser_profiles_cli.ts",
+      "args": ["create"],
+      "command": "browser create",
+      "noun": "browser",
+      "verb": "create",
+      "audience": "operator"
+    },
+    {
+      "id": "script.vault.mount",
+      "module": "scripts/vault_mount_cli.ts",
+      "args": ["mount"],
+      "command": "vault mount",
+      "noun": "vault",
+      "verb": "mount",
+      "audience": "operator"
+    },
+    {
+      "id": "script.vault.unmount",
+      "module": "scripts/vault_mount_cli.ts",
+      "args": ["unmount"],
+      "command": "vault unmount",
+      "noun": "vault",
+      "verb": "unmount",
+      "audience": "operator"
+    },
+    {
+      "id": "script.vault.list",
+      "module": "scripts/vault_mount_cli.ts",
+      "args": ["list"],
+      "command": "vault list",
+      "noun": "vault",
+      "verb": "list",
+      "audience": "operator"
+    },
+    {
+      "id": "script.vault.cleanup",
+      "module": "scripts/vault_mount_cli.ts",
+      "args": ["cleanup"],
+      "command": "vault cleanup",
+      "noun": "vault",
+      "verb": "cleanup",
+      "audience": "operator"
+    },
+    {
       "id": "script.kyberion",
       "script": "kyberion",
       "command": "kyberion default",
