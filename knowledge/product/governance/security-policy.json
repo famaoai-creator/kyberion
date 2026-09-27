@@ -547,6 +547,12 @@
     "check_tenant_registry_consistency": {
       "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/tenants/index.json"]
     },
+    "assemble_changelog": {
+      "allow_write": ["CHANGELOG.md", "changelog.d/"]
+    },
+    "generate_changelog": {
+      "allow_write": ["CHANGELOG.md"]
+    },
     "generate_design_tokens": {
       "allow_write": [
         "knowledge/public/design-patterns/media-templates/themes.json",

@@ -81,7 +81,10 @@ pnpm run validate       # full validate including check:contract-semver
 #    - For minor, scan unreleased commits with `pnpm tsx scripts/generate_changelog.ts`.
 NEW_VERSION="0.x.y"
 
-# 3. Generate changelog entries from commits since the last tag.
+# 3. Fold the per-PR fragments (changelog.d/*.md) into [Unreleased], then
+#    generate changelog entries from commits since the last tag.
+#    `assemble` deletes the fragments it merged; commit both together.
+pnpm kyberion changelog assemble
 pnpm tsx scripts/generate_changelog.ts --prepend
 
 # 4. Edit CHANGELOG.md:
@@ -105,7 +108,7 @@ pnpm run check:contract-semver -- --rebaseline
 #    Review and stage scripts/contract-baseline.json with the release prep.
 
 # 7. Commit the release prep.
-git add CHANGELOG.md package.json scripts/contract-baseline.json migration/
+git add CHANGELOG.md changelog.d/ package.json scripts/contract-baseline.json migration/
 git commit -m "chore(release): v${NEW_VERSION}"
 
 # 8. Tag the release.

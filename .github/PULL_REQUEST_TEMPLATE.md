@@ -66,7 +66,7 @@ N/A.
 - [ ] Mission / workitem references are included when applicable
 - [ ] Evidence paths or trace IDs are included when applicable
 - [ ] Tests added (or existing tests updated)
-- [ ] CHANGELOG.md updated under `[Unreleased]` (for user-visible changes)
+- [ ] User-visible change → added a `changelog.d/<short-slug>.md` fragment (do not edit `CHANGELOG.md`; see `changelog.d/README.md`)
 - [ ] PR title and commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Read [`docs/developer/EXTENSION_POINTS.md`](../docs/developer/EXTENSION_POINTS.md) if touching public surfaces
 
