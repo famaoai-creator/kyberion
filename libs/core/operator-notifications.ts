@@ -14,9 +14,11 @@ import {
 } from './secure-io.js';
 import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
+import { addInboxEntry, listInboxEntries } from './deliverable-inbox.js';
 import { sendIMessage } from './imessage-bridge.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
 import { appendOpsAlertLogRecord } from './ops-alert-log.js';
+import { withExecutionContext } from './authority.js';
 
 /**
  * E2E-04 Task 2: the return path (Kyberion → operator).
@@ -37,8 +39,9 @@ export type OperatorEvent =
   | 'ops_alert';
 
 export interface NotificationChannelTarget {
-  surface: 'slack' | 'imessage' | 'telegram' | 'discord';
-  /** Channel/chat/recipient ID on that surface (e.g. Slack channel ID). */
+  surface: 'slack' | 'imessage' | 'telegram' | 'discord' | 'inbox';
+  /** Channel/chat/recipient ID on that surface (e.g. Slack channel ID);
+   *  for `inbox` this is a free-form local recipient label. */
   target: string;
 }
 
@@ -64,6 +67,7 @@ const NOTIFICATION_SURFACES = new Set<NotificationChannelTarget['surface']>([
   'imessage',
   'telegram',
   'discord',
+  'inbox',
 ]);
 const OPERATOR_EVENTS = new Set<OperatorEvent>([
   'question',
@@ -158,11 +162,17 @@ function notificationPreferencesCatalogAtPath(filePath: string) {
 
 export function loadNotificationPreferences(): NotificationPreferences {
   try {
-    const filePath = notificationPreferencesPath();
-    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return {};
-    return (
-      parseNotificationPreferences(notificationPreferencesCatalogAtPath(filePath).load()) || {}
-    );
+    // The preferences file lives in the personal tier; reading it is the
+    // concierge role's job (routing delivery, not personal data access). Any
+    // caller — baseline check, pipeline worker, CLI — needs this elevation or
+    // every configured channel silently reads as "unconfigured".
+    return withExecutionContext('sovereign_concierge', () => {
+      const filePath = notificationPreferencesPath();
+      if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return {};
+      return (
+        parseNotificationPreferences(notificationPreferencesCatalogAtPath(filePath).load()) || {}
+      );
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[operator-notifications] failed to read preferences: ${detail}`);
@@ -262,12 +272,35 @@ export function resolveOperatorNotificationRoute(
 function deliver(
   route: NotificationChannelTarget,
   text: string,
-  correlationId: string
+  correlationId: string,
+  title: string
 ): Promise<void> {
   switch (route.surface) {
     case 'imessage':
       sendIMessage({ recipient: route.target, text });
       return;
+    case 'inbox': {
+      // Local fallback surface: no bridge/daemon required. The notification
+      // lands in the deliverable inbox that `pnpm kyberion` surfaces on the
+      // home screen and `pnpm kyberion inbox` lists/acknowledges.
+      const entryId = `INBOX-N-${correlationId
+        .replace(/[^A-Za-z0-9]/g, '')
+        .slice(-24)
+        .toUpperCase()}`;
+      const alreadyQueued = listInboxEntries({ limit: 500 }).some(
+        (entry) => entry.entry_id === entryId
+      );
+      if (!alreadyQueued) {
+        addInboxEntry({
+          entryId,
+          title: title || 'Operator notification',
+          summary: text,
+          kind: 'operator_notification',
+          status: 'unread',
+        });
+      }
+      return;
+    }
     // slack/telegram/discord: enqueue to the surface outbox; each bridge
     // drains its own outbox and performs the actual API send.
     default:
@@ -325,7 +358,7 @@ export function notifyOperatorSync(
     // the same event, which the title-only fallback could not express.
     const dedupeKey = `${event}:${payload.correlation_id || currentTriggerDeliveryId() || payload.title}`;
     if (!shouldNotifyOperator(dedupeKey)) return false;
-    deliver(route, formatNotificationText(event, payload), correlationId);
+    deliver(route, formatNotificationText(event, payload), correlationId, payload.title);
     return true;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
