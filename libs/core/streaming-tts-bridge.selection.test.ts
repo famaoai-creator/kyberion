@@ -43,7 +43,9 @@ describe('streaming-tts-bridge selection', () => {
   });
 
   it('declares capabilities on built-in and shell bridges', () => {
-    const [stub, gemini] = listStreamingTtsBridges();
+    const bridges = listStreamingTtsBridges();
+    const stub = bridges.find((bridge) => bridge.bridge_id === 'stub');
+    const gemini = bridges.find((bridge) => bridge.bridge_id === 'gemini');
     expect(getStreamingTtsCapabilities(stub!)).toEqual({
       languages: ['*'],
       local_only: true,

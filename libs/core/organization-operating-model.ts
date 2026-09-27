@@ -647,7 +647,10 @@ import {
   listOrganizationOperationalStates,
   buildOrganizationManagementView,
 } from './organization-operating-model-management.js';
-import type { OrganizationRetireKind } from './organization-operating-model-persistence.js';
+import type {
+  OrganizationRecordKind,
+  OrganizationRetireKind,
+} from './organization-operating-model-persistence.js';
 export type { OrganizationRecordKind } from './organization-operating-model-persistence.js';
 export type { OrganizationLifecycleVerb } from './organization-operating-model-persistence.js';
 export type { OrganizationRetireKind } from './organization-operating-model-persistence.js';
@@ -665,6 +668,79 @@ export type { BuildOrganizationDecisionInput } from './organization-operating-mo
 export type { OrganizationDecisionAddition } from './organization-operating-model-management.js';
 export type { BuildOrganizationProjectLinkInput } from './organization-operating-model-management.js';
 
+interface OrganizationEntityQuery {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+}
+
+interface OrganizationEntityKindHandler {
+  load(recordId: string, query: OrganizationEntityQuery): unknown;
+  save(record: any, options: { rootDir?: string }): unknown;
+  fileName: string;
+  directory: OrganizationRecordKind;
+  /** Throw to veto the lifecycle verb while blocking relations remain. */
+  assertNoBlockingRelations?(
+    record: { capability_ids?: string[]; service_ids?: string[] },
+    catalog: ReturnType<typeof loadOrganizationCatalog>,
+    recordId: string,
+    verb: 'retire' | 'remove'
+  ): void;
+}
+
+const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
+  OrganizationRetireKind,
+  OrganizationEntityKindHandler
+> = {
+  domain: {
+    load: (recordId, query) => loadOrganizationDomain(recordId, query),
+    save: (record, options) => saveOrganizationDomain(record, options),
+    fileName: 'domain.json',
+    directory: 'domains',
+    assertNoBlockingRelations(record, _catalog, recordId, verb) {
+      if ((record.capability_ids || []).length || (record.service_ids || []).length) {
+        throw new Error(`Cannot ${verb} domain '${recordId}' while child records remain.`);
+      }
+    },
+  },
+  capability: {
+    load: (recordId, query) => loadOrganizationCapability(recordId, query),
+    save: (record, options) => saveOrganizationCapability(record, options),
+    fileName: 'capability.json',
+    directory: 'capabilities',
+    assertNoBlockingRelations(record, _catalog, recordId, verb) {
+      if ((record.service_ids || []).length) {
+        throw new Error(`Cannot ${verb} capability '${recordId}' while service references remain.`);
+      }
+    },
+  },
+  service: {
+    load: (recordId, query) => loadOrganizationService(recordId, query),
+    save: (record, options) => saveOrganizationService(record, options),
+    fileName: 'service.json',
+    directory: 'services',
+    assertNoBlockingRelations(_record, catalog, recordId, verb) {
+      if (catalog.domains.some((domain) => domain.service_ids.includes(recordId))) {
+        throw new Error(`Cannot ${verb} service '${recordId}' while a domain references it.`);
+      }
+    },
+  },
+  operation: {
+    load: (recordId, query) => loadOrganizationOperation(recordId, query),
+    save: (record, options) => saveOrganizationOperation(record, options),
+    fileName: 'operation.json',
+    directory: 'operations',
+  },
+  cadence: {
+    load: (recordId, query) =>
+      listOrganizationCadences(query).find((entry) => entry.cadence_id === recordId) ?? null,
+    save: (record, options) => saveOrganizationCadence(record, options),
+    fileName: 'cadence.json',
+    directory: 'cadences',
+  },
+};
+
 export function retireOrganizationEntity(input: {
   organizationId: string;
   tier: OrganizationTier;
@@ -680,33 +756,11 @@ export function retireOrganizationEntity(input: {
     tenantSlug: input.tenantSlug,
     rootDir: input.rootDir,
   };
-  let record: any;
-  if (input.kind === 'domain') record = loadOrganizationDomain(input.recordId, query);
-  else if (input.kind === 'capability') record = loadOrganizationCapability(input.recordId, query);
-  else if (input.kind === 'service') record = loadOrganizationService(input.recordId, query);
-  else if (input.kind === 'operation') record = loadOrganizationOperation(input.recordId, query);
-  else
-    record = listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  const handler = ORGANIZATION_ENTITY_KIND_HANDLERS[input.kind];
+  const record: any = handler.load(input.recordId, query);
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
   const catalog = loadOrganizationCatalog(query);
-  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
-  if (
-    input.kind === 'domain' &&
-    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
-  ) {
-    throw new Error(`Cannot retire domain '${input.recordId}' while child records remain.`);
-  }
-  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
-    throw new Error(
-      `Cannot retire capability '${input.recordId}' while service references remain.`
-    );
-  }
-  if (
-    input.kind === 'service' &&
-    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
-  ) {
-    throw new Error(`Cannot retire service '${input.recordId}' while a domain references it.`);
-  }
+  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'retire');
   const next = {
     ...record,
     status: 'retired',
@@ -716,12 +770,7 @@ export function retireOrganizationEntity(input: {
       ...(input.reason ? { retire_reason: input.reason } : {}),
     },
   };
-  if (input.kind === 'domain') saveOrganizationDomain(next, { rootDir: input.rootDir });
-  else if (input.kind === 'capability')
-    saveOrganizationCapability(next, { rootDir: input.rootDir });
-  else if (input.kind === 'service') saveOrganizationService(next, { rootDir: input.rootDir });
-  else if (input.kind === 'operation') saveOrganizationOperation(next, { rootDir: input.rootDir });
-  else saveOrganizationCadence(next, { rootDir: input.rootDir });
+  handler.save(next, { rootDir: input.rootDir });
   auditChain.record({
     agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
     action: `organization.${input.kind}.retire`,
@@ -752,63 +801,18 @@ export function removeOrganizationEntity(input: {
     tenantSlug: input.tenantSlug,
     rootDir: input.rootDir,
   };
-  const record =
-    input.kind === 'domain'
-      ? loadOrganizationDomain(input.recordId, query)
-      : input.kind === 'capability'
-        ? loadOrganizationCapability(input.recordId, query)
-        : input.kind === 'service'
-          ? loadOrganizationService(input.recordId, query)
-          : input.kind === 'operation'
-            ? loadOrganizationOperation(input.recordId, query)
-            : listOrganizationCadences(query).find((entry) => entry.cadence_id === input.recordId);
+  const handler = ORGANIZATION_ENTITY_KIND_HANDLERS[input.kind];
+  const record: any = handler.load(input.recordId, query);
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
 
   const catalog = loadOrganizationCatalog(query);
-  const relationRecord = record as { capability_ids?: string[]; service_ids?: string[] };
-  if (
-    input.kind === 'domain' &&
-    ((relationRecord.capability_ids || []).length || (relationRecord.service_ids || []).length)
-  ) {
-    throw new Error(`Cannot remove domain '${input.recordId}' while child records remain.`);
-  }
-  if (input.kind === 'capability' && (relationRecord.service_ids || []).length) {
-    throw new Error(
-      `Cannot remove capability '${input.recordId}' while service references remain.`
-    );
-  }
-  if (
-    input.kind === 'service' &&
-    catalog.domains.some((domain) => domain.service_ids.includes(input.recordId))
-  ) {
-    throw new Error(`Cannot remove service '${input.recordId}' while a domain references it.`);
-  }
+  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'remove');
 
-  const fileName =
-    input.kind === 'domain'
-      ? 'domain.json'
-      : input.kind === 'capability'
-        ? 'capability.json'
-        : input.kind === 'service'
-          ? 'service.json'
-          : input.kind === 'operation'
-            ? 'operation.json'
-            : 'cadence.json';
-  const kindDirectory =
-    input.kind === 'domain'
-      ? 'domains'
-      : input.kind === 'capability'
-        ? 'capabilities'
-        : input.kind === 'service'
-          ? 'services'
-          : input.kind === 'operation'
-            ? 'operations'
-            : 'cadences';
   safeRmSync(
     recordPath(
-      kindDirectory,
+      handler.directory,
       input.recordId,
-      fileName,
+      handler.fileName,
       input.organizationId,
       input.tier,
       recordTenant(record),

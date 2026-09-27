@@ -88,6 +88,12 @@ interface ProviderProbeSpec {
   /** Cheap auth-status probe, only declared where one exists without a live LLM call. */
   authCommand?: string;
   authArgs?: string[];
+  /** Interpret the auth probe result; default: exit-status success. */
+  interpretAuthResult?: (result: ProbeExecResult) => boolean;
+  /** Detect a placeholder/shim binary so fallback candidates can be tried. */
+  isPlaceholderFailure?: (stderr: string) => boolean;
+  /** Fallback binaries to try when the primary probe hits a placeholder failure. */
+  fallbackBinaryCandidates?: () => string[];
   /** Declared (not probed — no cheap runtime signal exists) adapter capabilities. */
   headless: boolean;
   structuredOutput: boolean;
@@ -117,6 +123,9 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
     binaryArgs: ['--version'],
     authCommand: 'claude',
     authArgs: ['auth', 'status'],
+    interpretAuthResult: isClaudeCliAuthenticated,
+    isPlaceholderFailure: isClaudeCliPlaceholderFailure,
+    fallbackBinaryCandidates: () => resolveClaudeCliFallbackCandidates(),
     headless: true,
     structuredOutput: true,
     sandboxProbe: {
@@ -338,7 +347,7 @@ function probeSingleProvider(
   exec: ProbeExecFn,
   timeoutMs: number,
   probedAt: string,
-  claudeFallbackCandidates: () => string[],
+  fallbackCandidatesOverride: (() => string[]) | undefined,
   env: NodeJS.ProcessEnv
 ): ProviderCapability {
   const spec = PROVIDER_PROBE_TABLE[providerId];
@@ -359,12 +368,16 @@ function probeSingleProvider(
   let binaryCommand = resolvedBinary.command;
   let versionResult = runProbe(exec, binaryCommand, spec.binaryArgs, timeoutMs);
   if (
-    providerId === 'claude' &&
+    spec.isPlaceholderFailure &&
     !resolvedBinary.explicit &&
     !versionResult.ok &&
-    isClaudeCliPlaceholderFailure(versionResult.stderr)
+    spec.isPlaceholderFailure(versionResult.stderr)
   ) {
-    for (const candidate of claudeFallbackCandidates()) {
+    for (const candidate of (
+      fallbackCandidatesOverride ??
+      spec.fallbackBinaryCandidates ??
+      (() => [])
+    )()) {
       const fallbackResult = runProbe(exec, candidate, spec.binaryArgs, timeoutMs);
       if (fallbackResult.ok) {
         binaryCommand = candidate;
@@ -383,7 +396,7 @@ function probeSingleProvider(
     probeError = versionResult.stderr.trim() || `${spec.binaryCommand} probe failed (non-fatal)`;
   } else if (spec.authCommand && spec.authArgs) {
     const authResult = runProbe(exec, binaryCommand, spec.authArgs, timeoutMs);
-    authenticated = providerId === 'claude' ? isClaudeCliAuthenticated(authResult) : authResult.ok;
+    authenticated = spec.interpretAuthResult ? spec.interpretAuthResult(authResult) : authResult.ok;
     if (!authenticated) {
       probeError = authResult.stderr.trim() || `${spec.authCommand} auth probe reported failure`;
     }
@@ -435,8 +448,7 @@ export function probeProviderCapabilities(
   const providerIds = opts.providerIds ?? Object.keys(PROVIDER_PROBE_TABLE);
   const now = opts.now ?? (() => new Date());
   const probedAt = now().toISOString();
-  const claudeFallbackCandidates =
-    opts.resolveClaudeCliFallbackCandidates ?? (() => resolveClaudeCliFallbackCandidates());
+  const claudeFallbackCandidates = opts.resolveClaudeCliFallbackCandidates;
 
   return providerIds.map((providerId) => {
     try {
