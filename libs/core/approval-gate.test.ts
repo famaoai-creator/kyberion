@@ -185,9 +185,16 @@ describe('enforceApprovalGate', () => {
     mockResolveDecisionRightsMatrix.mockReturnValue(null);
     mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([
-      { id: 'req-old', correlationId: 'corr-123', status: 'expired' } as any,
+      {
+        id: 'req-old',
+        correlationId: 'corr-123',
+        status: 'expired',
+      } as unknown as ApprovalRequestRecord,
     ]);
-    mockCreateRequest.mockReturnValue({ id: 'req-new', status: 'pending' } as any);
+    mockCreateRequest.mockReturnValue({
+      id: 'req-new',
+      status: 'pending',
+    } as unknown as ApprovalRequestRecord);
 
     const result = enforceApprovalGate(baseParams);
 
