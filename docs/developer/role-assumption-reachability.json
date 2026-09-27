@@ -311,6 +311,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission-maintenance.ts#approveScopeChange (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission-orchestration-dispatch.ts#dispatchMissionNextTasksCore [delegated child role]",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -352,6 +357,11 @@
     },
     {
       "site": "libs/core/mission-orchestration-worker-part-context.ts#recordMissionContextTask [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-scope-approval.ts#createMissionScopeApprovalRequest (via libs/core/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
