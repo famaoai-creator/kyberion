@@ -35,6 +35,8 @@ export interface GeneratedArtifactStep {
   run(argv: string[]): Promise<unknown>;
   /** Validation-only steps always run with `--check`. */
   checkOnly?: boolean;
+  /** Write passes needed to reach a fixed point (default 1). */
+  passes?: number;
 }
 
 export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
@@ -46,6 +48,10 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
       'docs/developer/CONFIGURATION.md',
     ],
     run: (argv) => runEnvRegistry(argv),
+    // A newly referenced name is added undocumented on the first pass and
+    // promoted with a generated description on the next (mergeRegistry), so
+    // one pass leaves the env-registry gate red.
+    passes: 2,
   },
   {
     id: 'knowledge-index',
@@ -72,10 +78,15 @@ export async function resolveGeneratedArtifacts(
   const failed: string[] = [];
   const staged: string[] = [];
   for (const step of steps) {
-    clearProcessExitCode();
-    await step.run(options.check || step.checkOnly ? ['--check', '--quiet'] : ['--quiet']);
-    const code = getProcessExitCode();
-    clearProcessExitCode();
+    const checking = options.check || step.checkOnly === true;
+    const passes = checking ? 1 : (step.passes ?? 1);
+    let code: number | undefined;
+    for (let pass = 0; pass < passes && !code; pass += 1) {
+      clearProcessExitCode();
+      await step.run(checking ? ['--check', '--quiet'] : ['--quiet']);
+      code = getProcessExitCode();
+      clearProcessExitCode();
+    }
     if (code !== undefined && code !== 0) {
       failed.push(step.id);
       continue;
