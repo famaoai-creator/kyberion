@@ -11,6 +11,8 @@ import { nowIso } from './foundation/time.js';
 import { isVitestProcess } from './foundation/env.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
+import type { ApprovalDecisionCardContent } from './approval-decision-card.js';
+import type { ApprovalVetoWindow } from './approval-veto-window.js';
 import {
   eventScopeMatches,
   normalizeEventScope,
@@ -211,6 +213,14 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   accountability?: ApprovalAccountability;
   /** Canonical authority scope of the effect being approved. */
   scope?: EventScope;
+  /**
+   * Autonomous-operation P1-6: the decision card every surface renders — what
+   * is asked, the recommendation, why a human is needed, and whether it can be
+   * undone. See `approval-decision-card.ts`.
+   */
+  decisionCard?: ApprovalDecisionCardContent;
+  /** Autonomous-operation P1-7: present when silence after delivery lets the request proceed. */
+  veto?: ApprovalVetoWindow;
 }
 
 export interface ApprovalDecisionPayload {
@@ -473,8 +483,15 @@ export function createApprovalRequest(
     source?: ApprovalRequestSource;
     steering?: ApprovalSteeringAction;
     scope?: EventScopeInput;
+    decisionCard?: ApprovalDecisionCardContent;
+    veto?: ApprovalVetoWindow;
   }
 ): ApprovalRequestRecord {
+  if (params.veto && params.accountability?.finalDecision === 'human_only') {
+    throw new Error(
+      '[POLICY_VIOLATION] A veto-window request cannot also require a human-only final decision'
+    );
+  }
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   ensureGovernedArtifactDir(role, approvalRequestsLogicalDir(storageChannel));
 
@@ -513,6 +530,8 @@ export function createApprovalRequest(
     accountability: params.accountability,
     steering: params.steering,
     ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
+    ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
+    ...(params.veto ? { veto: params.veto } : {}),
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
