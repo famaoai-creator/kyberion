@@ -22,6 +22,9 @@ describe('auto_checkpoint', () => {
       reason: 'ok',
       axes: { scope: 0, reversibility: 0, sensitivity: 0, confidence: 1 },
       budgetCapTokens: 1000,
+      shadow: false,
+      escalations: [],
+      highRiskPathMatches: [],
     });
     vi.spyOn(missionState, 'listActiveMissions').mockReturnValue([
       { missionId: 'mission-a', missionPath: '/tmp/mission-a' },
@@ -63,6 +66,9 @@ describe('auto_checkpoint', () => {
       reason: 'approval required',
       axes: { scope: 3, reversibility: 3, sensitivity: 3, confidence: 3 },
       budgetCapTokens: 1000,
+      shadow: false,
+      escalations: [],
+      highRiskPathMatches: [],
     });
     const checkpointSpy = vi.spyOn(maintenance, 'createCheckpoint');
     const code = await runAutoCheckpoint();
