@@ -5155,6 +5155,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/human-intervention-census.md",
+      "tier": "public",
+      "size": 2731,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/hybrid-development-flow.md",
       "tier": "public",
       "size": 1581,
