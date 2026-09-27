@@ -157,10 +157,17 @@ site's terms of service.
   `-EncodedCommand`; options travel in the child-only `KYBERION_UIA_OPTIONS`
   environment variable, never in the script text) that uses .NET UI
   Automation: the foreground window (`GetForegroundWindow` →
-  `AutomationElement.FromHandle`) is walked breadth-first over the control
-  view, one cached `FindAll(Children)` per node, with the same caps and 8 s
-  timeout plus a 5 s in-script walk budget (the rest covers PowerShell
-  start-up). A named `application` is matched against the foreground window's
+  `AutomationElement.FromHandle`) is walked breadth-first with the same caps
+  and 8 s timeout plus a 5 s in-script walk budget (the rest covers PowerShell
+  start-up); a skipped element (offscreen, empty rect) is still descended
+  into. Walk strategies run in order until one finds an actionable control
+  type: `managed_control` (managed UIA client, control view, one cached
+  `FindAll(Children)` per node), then `com_control` and `com_raw` (the COM UIA
+  client over the control and raw views, which sees WinUI / XAML island
+  content — e.g. the modern Notepad — that the managed client misses). The
+  snapshot names the chosen `strategy` and carries name-free `diagnostics`
+  (per-depth scanned / emitted counts, skip reasons, the first 20 raw
+  elements' control type, class, framework and rect). A named `application` is matched against the foreground window's
   process name (case-insensitive, `.exe` optional); any other process yields
   `not_frontmost`. UIA control types map to the AX roles (Button → `AXButton`,
   SplitButton → `AXMenuButton`, Edit → `AXTextField`, Document → `AXTextArea`,
