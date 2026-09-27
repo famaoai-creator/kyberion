@@ -1,4 +1,4 @@
-import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
 import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import {
@@ -12,35 +12,41 @@ import {
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
-import { getReasoningBackend, type ReasoningCallOptions } from '@agent/core/reasoning-backend';
+import {
+  getReasoningBackend,
+  type ReasoningCallOptions,
+} from '@agent/core/reasoning/reasoning-backend';
 import {
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
-} from '@agent/core/reasoning-runtime-instructions';
+} from '@agent/core/reasoning/reasoning-runtime-instructions';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
 import { executeReportContract } from '@agent/core/report-contract';
-import { getReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
+import { getReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
 import { renderFacets, resolveFacets } from '@agent/core/facet-registry';
-import { resolveStepReasoningRoute } from '@agent/core/reasoning-route-resolver';
+import { resolveStepReasoningRoute } from '@agent/core/reasoning/reasoning-route-resolver';
 import {
   determineActuatorStepType,
   resolveActuatorOperation,
-} from '@agent/core/actuator-op-registry';
+} from '@agent/core/actuator/actuator-op-registry';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
-import { validateOpInput } from '@agent/core/op-input-contracts';
+import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { resolveIdentityContext } from '@agent/core/authority';
-import { defineLegacyPipelineActuator } from '@agent/core/actuator-sdk';
+import { defineLegacyPipelineActuator } from '@agent/core/actuator/actuator-sdk';
 import type {
   PipelineRunJournalHandle,
   PipelineRunJournalState,
   PipelineRunSuspendedPayload,
-} from '@agent/core/pipeline-run-journal';
+} from '@agent/core/pipeline/pipeline-run-journal';
 
 import { markRouterActive, markRouterInactive } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { type PipelineAdfStep, type PipelineStepReasoning } from '@agent/core/pipeline-contract';
+import {
+  type PipelineAdfStep,
+  type PipelineStepReasoning,
+} from '@agent/core/pipeline/pipeline-contract';
 import { type PipelineFailure } from './pipeline-result-reporting.js';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -701,7 +707,7 @@ export async function loadActuatorDispatch(
   }
 
   const { resolveProviderCapabilityId, invokeProviderCapability } =
-    await import('@agent/core/provider-bridge');
+    await import('@agent/core/provider/provider-bridge');
 
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.

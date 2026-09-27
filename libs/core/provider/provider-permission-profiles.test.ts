@@ -1,0 +1,310 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  PROVIDER_IDS,
+  buildProviderChildEnv,
+  resolveActiveProviderPermissionArgs,
+  resolveEffectiveProviderPermissionProfile,
+  resolveProviderPermissionArgs,
+  type ProviderId,
+} from './provider-permission-profiles.js';
+import { listSubagentCapabilityProfileNames } from '../subagent-capability-profiles.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+
+describe('provider-permission-profiles', () => {
+  it('projects an active read-only policy to explorer and preserves planner', () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'read-only',
+      networkAccess: false,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveEffectiveProviderPermissionProfile('codex')).toBe('explorer');
+      expect(resolveEffectiveProviderPermissionProfile('claude', 'implementer')).toBe('explorer');
+      expect(resolveEffectiveProviderPermissionProfile('grok', 'planner')).toBe('planner');
+    });
+  });
+
+  it('projects an active workspace-write policy to implementer only when unprofiled', () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'workspace-write',
+      networkAccess: true,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveEffectiveProviderPermissionProfile('codex')).toBe('implementer');
+      expect(resolveEffectiveProviderPermissionProfile('codex', 'explorer')).toBe('explorer');
+    });
+  });
+
+  it('rejects a partial active provider policy before permission projection', () => {
+    const policy = resolveSandboxPolicy({ provider: 'agy', mode: 'read-only' });
+    expect(() =>
+      withSandboxPolicy(policy, () => resolveEffectiveProviderPermissionProfile('agy'))
+    ).toThrow('SANDBOX_POLICY_PARTIAL');
+  });
+
+  it('returns provider argv for an active policy while preserving no-policy legacy behavior', () => {
+    expect(resolveActiveProviderPermissionArgs('codex')).toBeUndefined();
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(resolveActiveProviderPermissionArgs('codex')).toEqual(['--sandbox', 'read-only']);
+    });
+  });
+
+  describe('resolveProviderPermissionArgs', () => {
+    it('resolves every KD-05 profile x provider combo to either a grant or a typed refusal, never throwing', () => {
+      for (const profileName of listSubagentCapabilityProfileNames()) {
+        for (const provider of PROVIDER_IDS) {
+          let resolution: ReturnType<typeof resolveProviderPermissionArgs> | undefined;
+          expect(() => {
+            resolution = resolveProviderPermissionArgs(profileName, provider);
+          }).not.toThrow();
+          expect(resolution).toBeDefined();
+          expect(['ok', 'refused']).toContain(resolution!.kind);
+          if (resolution!.kind === 'ok') {
+            expect(Array.isArray(resolution!.args)).toBe(true);
+          } else {
+            expect(typeof resolution!.reason).toBe('string');
+            expect(resolution!.reason.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    it('throws only for a genuinely unknown KD-05 tier name', () => {
+      expect(() => resolveProviderPermissionArgs('not-a-real-tier', 'claude')).toThrow(
+        /SUBAGENT_PROFILE_UNKNOWN/
+      );
+    });
+
+    it('grants explorer no write/exec permissions for any provider', () => {
+      // Full-access markers that would indicate explorer was granted
+      // write/exec capability. Individual write/exec tool NAMES (e.g.
+      // "Write") legitimately appear in claude's --disallowedTools list, so
+      // those are checked separately by asserting the allowedTools segment
+      // only contains read-only tools.
+      const grantMarkers = [
+        'workspace-write',
+        'bypassPermissions',
+        '--dangerously-skip-permissions',
+      ];
+      const writeExecToolNames = ['Write', 'Edit', 'NotebookEdit', 'Bash', 'KillShell'];
+
+      for (const provider of PROVIDER_IDS) {
+        const resolution = resolveProviderPermissionArgs('explorer', provider);
+        if (resolution.kind === 'refused') {
+          // Refusing delegation is itself "no write/exec permission granted."
+          continue;
+        }
+        for (const marker of grantMarkers) {
+          expect(resolution.args).not.toContain(marker);
+        }
+
+        const allowedToolsIndex = resolution.args.indexOf('--allowedTools');
+        if (allowedToolsIndex !== -1) {
+          const nextFlagIndex = resolution.args.findIndex(
+            (arg, i) => i > allowedToolsIndex && arg.startsWith('--')
+          );
+          const allowedToolsSegment = resolution.args.slice(
+            allowedToolsIndex + 1,
+            nextFlagIndex === -1 ? undefined : nextFlagIndex
+          );
+          for (const toolName of writeExecToolNames) {
+            expect(allowedToolsSegment).not.toContain(toolName);
+          }
+        }
+      }
+    });
+
+    it('refuses agy explorer because its read-only sandbox is only partial', () => {
+      expect(resolveProviderPermissionArgs('explorer', 'agy')).toEqual({
+        kind: 'refused',
+        reason: expect.stringContaining('cannot satisfy the explorer read-only sandbox contract'),
+      });
+    });
+
+    it('grants planner no write/exec permissions for any provider (grant or refusal)', () => {
+      for (const provider of PROVIDER_IDS) {
+        const resolution = resolveProviderPermissionArgs('planner', provider);
+        if (resolution.kind === 'ok') {
+          expect(resolution.args).not.toContain('workspace-write');
+          expect(resolution.args).not.toContain('bypassPermissions');
+        } else {
+          expect(resolution.reason.length).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it('grants implementer at least one permission arg for every provider', () => {
+      for (const provider of PROVIDER_IDS) {
+        const resolution = resolveProviderPermissionArgs('implementer', provider);
+        expect(resolution.kind).toBe('ok');
+        if (resolution.kind === 'ok') {
+          expect(resolution.args.length).toBeGreaterThan(0);
+        }
+      }
+    });
+  });
+
+  describe('buildProviderChildEnv', () => {
+    const providers: ProviderId[] = [
+      'claude',
+      'codex',
+      'agy',
+      'grok',
+      'gemini',
+      'cursor',
+      'opencode',
+    ];
+    const fakeBaseEnv = (): NodeJS.ProcessEnv =>
+      ({
+        PATH: '/usr/bin:/bin',
+        HOME: '/home/test',
+        LANG: 'en_US.UTF-8',
+        TERM: 'xterm',
+        OPENAI_API_KEY: 'fake-openai-key',
+        ANTHROPIC_API_KEY: 'fake-anthropic-key',
+        GEMINI_API_KEY: 'fake-gemini-key',
+        GH_TOKEN: 'fake-github-token',
+        XAI_API_KEY: 'fake-xai-key',
+        CURSOR_API_KEY: 'fake-cursor-key',
+        CUSTOM_SECRET_TOKEN: 'fake-custom-token',
+        CODEX_HOME: '/home/test/.codex',
+        AGY_PROFILE: 'work',
+        KYBERION_PERSONA: 'implementer',
+        MISSION_ID: 'MSN-1',
+        UNRELATED_VAR: 'should-not-leak',
+      }) as NodeJS.ProcessEnv;
+
+    afterEach(() => {
+      delete process.env.KYBERION_PROVIDER_ENV_ALLOWLIST;
+    });
+
+    it('always allowlists PATH/HOME/LANG/TERM', () => {
+      for (const provider of providers) {
+        const env = buildProviderChildEnv({ provider, baseEnv: fakeBaseEnv() });
+        expect(env.PATH).toBe('/usr/bin:/bin');
+        expect(env.HOME).toBe('/home/test');
+        expect(env.LANG).toBe('en_US.UTF-8');
+        expect(env.TERM).toBe('xterm');
+      }
+    });
+
+    it('excludes other providers credentials for claude', () => {
+      const env = buildProviderChildEnv({ provider: 'claude', baseEnv: fakeBaseEnv() });
+      expect(env.ANTHROPIC_API_KEY).toBe('fake-anthropic-key');
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.CUSTOM_SECRET_TOKEN).toBeUndefined();
+    });
+
+    it('excludes other providers credentials for codex, and carries CODEX_HOME', () => {
+      const env = buildProviderChildEnv({ provider: 'codex', baseEnv: fakeBaseEnv() });
+      expect(env.OPENAI_API_KEY).toBe('fake-openai-key');
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.CODEX_HOME).toBe('/home/test/.codex');
+    });
+
+    it('excludes all credential vars for agy and carries AGY_PROFILE', () => {
+      const env = buildProviderChildEnv({ provider: 'agy', baseEnv: fakeBaseEnv() });
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.AGY_PROFILE).toBe('work');
+    });
+
+    it('excludes other providers credentials for grok, and carries XAI_API_KEY', () => {
+      const env = buildProviderChildEnv({ provider: 'grok', baseEnv: fakeBaseEnv() });
+      expect(env.XAI_API_KEY).toBe('fake-xai-key');
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.GH_TOKEN).toBeUndefined();
+      expect(env.CURSOR_API_KEY).toBeUndefined();
+    });
+
+    it('excludes other providers credentials for cursor, and carries CURSOR_API_KEY', () => {
+      const env = buildProviderChildEnv({ provider: 'cursor', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBe('fake-cursor-key');
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+    });
+
+    it('carries no provider API key for opencode (login session auth)', () => {
+      const env = buildProviderChildEnv({ provider: 'opencode', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+    });
+
+    it('carries KYBERION_*/MISSION_* vars for every provider, but not unrelated vars', () => {
+      for (const provider of providers) {
+        const env = buildProviderChildEnv({ provider, baseEnv: fakeBaseEnv() });
+        expect(env.KYBERION_PERSONA).toBe('implementer');
+        expect(env.MISSION_ID).toBe('MSN-1');
+        expect(env.UNRELATED_VAR).toBeUndefined();
+      }
+    });
+
+    it('escape hatch KYBERION_PROVIDER_ENV_ALLOWLIST=0 returns baseEnv unchanged', () => {
+      const base = { ...fakeBaseEnv(), KYBERION_PROVIDER_ENV_ALLOWLIST: '0' } as NodeJS.ProcessEnv;
+      const env = buildProviderChildEnv({ provider: 'claude', baseEnv: base });
+      expect(env).toEqual(base);
+      expect(env.OPENAI_API_KEY).toBe('fake-openai-key');
+      expect(env.UNRELATED_VAR).toBe('should-not-leak');
+    });
+
+    it('defaults to process.env when baseEnv is omitted', () => {
+      const previous = process.env.KYBERION_TEST_MARKER;
+      process.env.KYBERION_TEST_MARKER = 'present';
+      try {
+        const env = buildProviderChildEnv({ provider: 'claude' });
+        expect(env.KYBERION_TEST_MARKER).toBe('present');
+      } finally {
+        if (previous === undefined) delete process.env.KYBERION_TEST_MARKER;
+        else process.env.KYBERION_TEST_MARKER = previous;
+      }
+    });
+
+    // SO-03 boundary test: owner authority (MISSION_ROLE=mission_controller,
+    // set on the parent process by an active OrchestratorSession's execution
+    // context — orchestrator-session.ts's withExecutionContext calls) must
+    // never project into a spawned worker/provider delegation's env. This is
+    // the real projection code path shell-claude-cli-backend.ts /
+    // codex-cli-query.ts / agy-cli-backend.ts all call to build their child
+    // `spawn`/`spawnSync` env — anchoring here means a future change that
+    // re-adds MISSION_ROLE/SYSTEM_ROLE to the base-key allowlist fails this
+    // test instead of silently reopening the leak.
+    it('SO-03: never propagates MISSION_ROLE or SYSTEM_ROLE (owner-authority signals) into a delegation env', () => {
+      for (const provider of providers) {
+        const base = {
+          ...fakeBaseEnv(),
+          MISSION_ROLE: 'mission_controller',
+          SYSTEM_ROLE: 'mission_controller',
+          KYBERION_DELEGATED_ROLE: 'mission_controller@concierge',
+        } as NodeJS.ProcessEnv;
+        const env = buildProviderChildEnv({ provider, baseEnv: base });
+        expect(env.MISSION_ROLE, `provider=${provider}`).toBeUndefined();
+        expect(env.SYSTEM_ROLE, `provider=${provider}`).toBeUndefined();
+        // DR-01: the delegated child role is an authority signal too.
+        expect(env.KYBERION_DELEGATED_ROLE, `provider=${provider}`).toBeUndefined();
+        // MISSION_ID (a plain identifier, not an authority signal) is
+        // unaffected — this test only pins the authority-signal exclusion.
+        expect(env.MISSION_ID, `provider=${provider}`).toBe('MSN-1');
+      }
+    });
+  });
+});

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
-import { listMemberIds, readMemberProfile, type MemberProfile } from '@agent/core/member-registry';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
+import {
+  listMemberIds,
+  readMemberProfile,
+  type MemberProfile,
+} from '@agent/core/organization/member-registry';
 import {
   loadTrainingCatalog,
   readTrainingAssignments,

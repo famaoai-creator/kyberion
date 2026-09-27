@@ -56,7 +56,7 @@ It should not answer:
 The canonical pack shape is defined in:
 
 - [`mission-context-pack.schema.json`](../schemas/mission-context-pack.schema.json)
-- [`libs/core/mission-context-pack.ts`](/Users/famao/kyberion/libs/core/mission-context-pack.ts)
+- [`libs/core/mission/mission-context-pack.ts`](/Users/famao/kyberion/libs/core/mission/mission-context-pack.ts)
 
 The pack includes:
 
@@ -154,14 +154,14 @@ Knowledge is the derived store, not the source of truth for execution.
 
 The scoped injection flow should be owned by these modules or boundaries:
 
-- `libs/core/mission-context-pack.ts`
+- `libs/core/mission/mission-context-pack.ts`
   - resolve mission / project / track / task session / work item state
   - filter source facts by tier, tenant, role, and scope
   - inject reusable artifact hints from the project-level artifact registry
   - assemble the mission context pack
   - render the pack into prompt text
   - persist the pack into mission-local coordination storage
-- `libs/core/distill-knowledge-injector.ts`
+- `libs/core/knowledge/distill-knowledge-injector.ts`
   - resolve distilled knowledge hints that are relevant to the scoped pack
   - keep the knowledge source as a derived input, not the primary execution store
 - `scripts/refactor/mission-workitem-dispatch.ts`

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadApprovalRequest } from '@agent/core/approval-store';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
   loadTeamRoleIndex as loadGovernedTeamRoleIndex,
-} from '@agent/core/mission-team-index';
+} from '@agent/core/mission/mission-team-index';
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';

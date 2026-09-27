@@ -6,11 +6,11 @@ const mocks = vi.hoisted(() => ({
   recordGovernanceAction: vi.fn(),
 }));
 
-vi.mock('./approval-store.js', () => ({
+vi.mock('./governance/approval-store.js', () => ({
   createApprovalRequest: mocks.createApprovalRequest,
   listApprovalRequests: mocks.listApprovalRequests,
 }));
-vi.mock('./kill-switch.js', () => ({
+vi.mock('./governance/kill-switch.js', () => ({
   recordGovernanceAction: mocks.recordGovernanceAction,
 }));
 

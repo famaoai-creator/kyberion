@@ -23,7 +23,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import type { ReasoningBackend } from '@agent/core/reasoning-backend';
+import type { ReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   runMeetingDigest,
   type MeetingDigestInput,
@@ -31,7 +31,9 @@ import {
 } from './meeting-digest.js';
 import type { SyncSourceTransport } from './sources/index.js';
 
-vi.mock('@agent/core/reasoning-bootstrap', () => ({ installReasoningBackends: () => false }));
+vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
+  installReasoningBackends: () => false,
+}));
 
 const TENANT = 'example-tenant';
 const ROOT_REL = `knowledge/confidential/${TENANT}`;

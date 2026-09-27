@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync } from './secure-io.js';
-import { updateMemoryPromotionCandidateStatus } from './memory-promotion-queue.js';
+import { updateMemoryPromotionCandidateStatus } from './knowledge/memory-promotion-queue.js';
 import {
   enqueueTierPromotionCandidate,
   proposeTierPlacement,

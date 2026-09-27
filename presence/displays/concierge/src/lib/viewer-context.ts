@@ -12,14 +12,14 @@ import {
   SurfaceViewerScopeError,
   resolveSurfaceViewerTierAccess,
   extractSurfaceBearerToken,
-} from '@agent/core/surface-mutation-guard';
-import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+} from '@agent/core/surface/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
 import { withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import { toWireError } from '@agent/core/wire-error';
 
 const CONCIERGE_RATE_LIMIT_WINDOW_MS = 60_000;

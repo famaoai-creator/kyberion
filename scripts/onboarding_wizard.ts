@@ -2,23 +2,23 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { ensureDefaultTenantProfile } from '@agent/core/tenant-registry';
-import { listServiceOnboardingCatalogEntries } from '@agent/core/service-onboarding-catalog';
+import { ensureDefaultTenantProfile } from '@agent/core/organization/tenant-registry';
+import { listServiceOnboardingCatalogEntries } from '@agent/core/service/service-onboarding-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
   type LocalizedOnboardingText,
-} from '@agent/core/onboarding-flow-policy';
-import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
+} from '@agent/core/organization/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/organization/onboarding-summary-policy';
 import { resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
-import { isServiceConnectionReady } from '@agent/core/service-connection-readiness';
+import { isServiceConnectionReady } from '@agent/core/service/service-connection-readiness';
 import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
-import { writeServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
+import { writeServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -41,7 +41,7 @@ import {
   type OnboardingProfileState as OnboardingState,
   type OnboardingTenant as TenantDraft,
   type OnboardingTutorial as TutorialDraft,
-} from '@agent/core/onboarding-state';
+} from '@agent/core/organization/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';

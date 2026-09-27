@@ -3,12 +3,12 @@ import type {
   GenerateWithToolsResult,
   ReasoningBackend,
   ToolDefinition,
-} from '@agent/core/reasoning-backend-contracts';
+} from '@agent/core/reasoning/reasoning-backend-contracts';
 
 const state = vi.hoisted(() => ({ backend: undefined as ReasoningBackend | undefined }));
 
-vi.mock('@agent/core/reasoning-backend', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/reasoning-backend')>();
+vi.mock('@agent/core/reasoning/reasoning-backend', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/reasoning/reasoning-backend')>();
   return {
     ...actual,
     getReasoningBackend: () => state.backend,

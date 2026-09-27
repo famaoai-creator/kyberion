@@ -13,7 +13,7 @@ status: archived
 
 検索基盤(RRF ハイブリッド)は設計として健全だが、**入力素材と埋め込みバックエンドの2点で品質上限が低い**。
 
-- **本文が一切埋め込まれていない**: `libs/core/src/knowledge-index.ts` の埋め込み対象は `topic + tags + hint の先頭300字`(`:575-577`)で、hint 自体もタイトル+先頭段落200字(`:507-510`)。約877本のナレッジ文書の**本文は semantic にも lexical にも見えていない**。
+- **本文が一切埋め込まれていない**: `libs/core/knowledge/knowledge-index.ts` の埋め込み対象は `topic + tags + hint の先頭300字`(`:575-577`)で、hint 自体もタイトル+先頭段落200字(`:507-510`)。約877本のナレッジ文書の**本文は semantic にも lexical にも見えていない**。
 - **非 Mac では「セマンティック」が偽物**: 実埋め込みは MLX `multilingual-e5-large-instruct`(1024次元)で **Apple Silicon 専用**(`libs/core/mlx-embedding-backend.ts:86-89`)。それ以外(CI・Linux)は 64 次元 FNV ハッシュバケット(`libs/core/embedding-backend.ts:8,28-51`)に**無言でフォールバック**する。ハッシュは字面一致の近似であり意味検索ではないのに、コードパスは「hybrid semantic」を名乗る。
 - **ランカーが2系統併存**: `scripts/context_ranker.ts`(406行、frontmatter メタデータ+substring スコア)と `knowledge-index.ts`(718行、スコープ対応ハイブリッド)。コーパスもスコアも別物で、片方の改善がもう片方に効かない。
 - 良い点(維持する): スコープハッシュでキャッシュを tier 分離(`knowledge-index.ts:122-140`)、RRF フュージョン(`:626-703`)、embedding 無し時の lexical 縮退。

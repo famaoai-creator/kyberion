@@ -19,7 +19,7 @@ import {
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import {
   LOCAL_PAD_COMMON_FLAGS,
   LocalPadRequestBodyTooLargeError,

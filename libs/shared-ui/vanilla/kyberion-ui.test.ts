@@ -10,7 +10,7 @@ import {
   KB_STATUS_VALUES,
   A2UI_BASE_ALIASES,
   A2UI_BASE_COMPONENT_TYPES,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   KB_ALIASES,
   KB_RENDERED_TYPES,

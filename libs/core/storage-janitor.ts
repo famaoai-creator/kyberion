@@ -24,7 +24,7 @@ import {
   loadDelegationChildrenRegistryAtPath,
   writeDelegationChildrenRegistryAtPath,
   type DelegationChildRecord,
-} from './delegation-child-registry.js';
+} from './mission/delegation-child-registry.js';
 import {
   loadRetentionCatalog,
   retentionTtlMsForPath,
@@ -51,12 +51,12 @@ import {
   sweepRegisteredWorkspaces,
   type SweepWorkspacesOptions,
   type SweepWorkspacesResult,
-} from './workspace-sweep.js';
+} from './workforce/workspace-sweep.js';
 import {
   listSupervisorEventFiles,
   SUPERVISOR_EVENTS_FILE_PATTERN,
   SUPERVISOR_EVENTS_LEGACY_FILE,
-} from './agent-runtime-events.js';
+} from './agent/agent-runtime-events.js';
 
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
@@ -150,7 +150,7 @@ export interface SweepTrashResult {
 }
 
 /** XP-06 zombie sweep uses the same schema-bound record contract as its producer. */
-export type { DelegationChildRecord } from './delegation-child-registry.js';
+export type { DelegationChildRecord } from './mission/delegation-child-registry.js';
 
 export interface SweepDelegationChildrenOptions {
   dryRun: boolean;
@@ -167,7 +167,7 @@ export interface SweepDelegationChildrenResult {
   errors: string[];
 }
 
-export type { SweepWorkspacesOptions, SweepWorkspacesResult } from './workspace-sweep.js';
+export type { SweepWorkspacesOptions, SweepWorkspacesResult } from './workforce/workspace-sweep.js';
 
 export interface JanitorWorkspacesReport {
   registered: number;

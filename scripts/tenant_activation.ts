@@ -11,7 +11,7 @@ import {
   type TenantActivationCheck,
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
-} from '@agent/core/tenant-activation';
+} from '@agent/core/organization/tenant-activation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

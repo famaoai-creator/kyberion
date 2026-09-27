@@ -13,7 +13,7 @@ status: archived
 
 生成文書(PPTX/DOCX/PDF)の見た目の既定が「Office の初期値」のままで、日本語文書の生成品質・可搬性に穴がある。
 
-- **PPTX テーマの既定が Office デフォルト**: `libs/core/src/native-pptx-engine/theme.ts:2-20` は accent1 `5B9BD5` 等の Office 標準パレットと Calibri をハードコード。**East-Asian(`<a:ea>`)タイプフェイスは既定で空**(`theme.ts:19`)で、theme pack が明示的に supply しない限り日本語フォント指定がない。`builders.ts:171` は latin と ea に同じフォントを適用。
+- **PPTX テーマの既定が Office デフォルト**: `libs/core/media/native-pptx-engine/theme.ts:2-20` は accent1 `5B9BD5` 等の Office 標準パレットと Calibri をハードコード。**East-Asian(`<a:ea>`)タイプフェイスは既定で空**(`theme.ts:19`)で、theme pack が明示的に supply しない限り日本語フォント指定がない。`builders.ts:171` は latin と ea に同じフォントを適用。
 - **PDF の日本語フォントが非埋め込み**: `native-pdf-engine/engine.ts:590-625` は非 ASCII 検出で `HeiseiKakuGo-W5`(Adobe-Japan1-6 CID 参照)へ切替えるが、**フォントを埋め込まない**ため、Adobe CJK フォントパックの無いビューア(多くの Windows 環境・ブラウザ内蔵ビューア)で表示が崩れ得る。顧客納品物としての可搬性リスク。
 - **フォント既定が散在**: media-actuator に `'Inter'`/`'System-ui'`(`src/index.ts:423-424`)、`'Meiryo'` フォールバック(`:2433,2438`、`media-report-pipeline-helpers.ts:87,92`)が直書き。DOCX のフォントテーブルは Calibri/Times/`MS Gothic`(`native-docx-engine/engine.ts:571-573`)。日本語スタックの「正」が無い(DS-01 の正準トークンに定義予定)。
 - 一方、theme pack → palette のブリッジ(`media-actuator/src/index.ts:1397-1417`)、テーマカタログ(`themes.json` 8 テーマ)、レイアウトプリセット等の**上位層は良くできている**。穴は「既定値」と「日本語」に集中している。

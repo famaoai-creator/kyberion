@@ -22,7 +22,7 @@ import type {
 } from '@agent/core/seam-calibration';
 import type { SeamProviderCandidate } from '@agent/core/seam-provider-selection';
 import { safeExecResult, safeExistsSync, safeStat } from '@agent/core/secure-io';
-import { resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   detectTextLanguage,
   getVoiceEngineRegistry,
@@ -31,8 +31,8 @@ import {
   normalizeLanguageTag,
   type VoiceEngineArtifactFormat,
   type VoiceEngineRecord,
-} from '@agent/core/voice-engine-registry';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+} from '@agent/core/voice/voice-engine-registry';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
 
 export interface VoiceTtsEngineCalibrationInput {
   text: string;

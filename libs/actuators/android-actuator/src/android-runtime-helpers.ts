@@ -8,7 +8,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { resolveAdbBin } from '@agent/core/tool-binary-resolvers';
+import { resolveAdbBin } from '@agent/core/tool/tool-binary-resolvers';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
@@ -16,10 +16,10 @@ import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
-import type { AdfEngineContext } from '../../../core/adf-engine.js';
+import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import type { AdfEngineContext } from '../../../core/pipeline/adf-engine.js';
 import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import * as path from 'node:path';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(

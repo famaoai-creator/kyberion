@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import type { AudioChunk, AudioFormat } from './meeting/meeting-session-types.js';
 import { countBargeInWords, TwoStageBargeIn } from './two-stage-barge-in.js';
 
 const format: AudioFormat = { encoding: 'pcm_s16le', sample_rate_hz: 16_000, channels: 1 };

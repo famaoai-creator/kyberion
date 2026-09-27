@@ -28,7 +28,7 @@ last_updated: 2026-09-23
 How an outside identity (Google account, any OIDC IdP) becomes a Kyberion
 member, and how the member's per-tenant role turns into an authorization
 decision. Code: `libs/core/authn-providers.ts` (oidc-jwt),
-`libs/core/member-registry.ts`, `libs/core/front-desk-roles.ts`,
+`libs/core/organization/member-registry.ts`, `libs/core/front-desk-roles.ts`,
 `libs/core/authz-providers.ts` (member-membership).
 
 ## 1. The chain

@@ -131,5 +131,5 @@ To wire a new surface for handoff:
 - [`pipelines/mobile-webview-handoff-runner-ios.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-ios.json)
 - [`pipelines/mobile-webview-handoff-runner-android.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-android.json)
 - [`libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json`](libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
-- Audit-chain integration: [`libs/core/audit-chain.ts`](libs/core/audit-chain.ts)
-- Secret resolution contract: [`libs/core/secret-resolver.ts`](libs/core/secret-resolver.ts)
+- Audit-chain integration: [`libs/core/governance/audit-chain.ts`](libs/core/governance/audit-chain.ts)
+- Secret resolution contract: [`libs/core/secret/secret-resolver.ts`](libs/core/secret/secret-resolver.ts)

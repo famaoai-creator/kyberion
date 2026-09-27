@@ -1,0 +1,355 @@
+import { performanceScoreAdjustment } from '../agent/agent-performance-index.js';
+import { modelPerformanceScoreAdjustment } from '../reasoning/model-performance-index.js';
+import { modelRoleFitnessScoreAdjustment } from '../reasoning/model-role-fitness.js';
+import { deriveAgentNhiId } from '../agent/agent-identity.js';
+import {
+  resolveAgentProviderTarget,
+  type ResolvedAgentProviderTarget,
+} from '../agent/agent-provider-resolution.js';
+import { resolveSelectionHints } from '../agent/agent-manifest.js';
+import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
+import { resolveModelProvider } from '../reasoning/reasoning-model-routing.js';
+import { loadProviderConfig } from '../provider/provider-config.js';
+import type { ContextSecurityScope } from '../context-security-scope.js';
+import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce-load.js';
+import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
+
+export interface AuthorityRoleRecord {
+  description: string;
+  write_scopes: string[];
+  scope_classes: string[];
+  allowed_actuators: string[];
+  tier_access: string[];
+}
+
+export interface TeamRoleRecord {
+  description: string;
+  required_capabilities: string[];
+  compatible_authority_roles: string[];
+  allowed_delegate_team_roles: string[];
+  escalation_parent_team_role: string | null;
+  required_scope_classes: string[];
+  ownership_scope: string;
+  selection_hints?: {
+    preferred_agents?: string[];
+    preferred_models?: string[];
+  };
+  autonomy_level: 'low' | 'medium' | 'high';
+}
+
+export interface AgentProfileRecord {
+  authority_roles: string[];
+  team_roles: string[];
+  capabilities: string[];
+  selection_hints?: {
+    preferred_provider?: string;
+    preferred_modelId?: string;
+  };
+  provider_strategy?: 'strict' | 'preferred' | 'adaptive';
+  fallback_providers?: string[];
+}
+
+/**
+ * TC-01: how a roster role relates to the mission right now.
+ *
+ * - `assigned`  — staffed: an actor is bound, a staffing record exists and a
+ *                 runtime may be spawned for it.
+ * - `standby`   — on the roster with a resolved candidate actor, but not
+ *                 staffed. Promoted to `assigned` when work demands the role,
+ *                 which is a pure state transition: the candidate was already
+ *                 selected at composition time, so promotion never re-runs
+ *                 selection and stays reproducible.
+ * - `unfilled`  — no compatible actor exists in the pool. A real staffing gap,
+ *                 detected at composition time even for standby roles.
+ */
+export type MissionTeamAssignmentStatus = 'assigned' | 'standby' | 'unfilled';
+
+export interface MissionTeamAssignment {
+  team_role: string;
+  required: boolean;
+  status: MissionTeamAssignmentStatus;
+  /**
+   * TC-04: why this role is on the roster — `structural` (always staffed),
+   * `obligation` (required by the governed obligations catalog and therefore
+   * not removable by a template or organization overlay), `template`
+   * (organization preference), `restaff` (added mid-mission because work
+   * demanded a role the roster did not have — TC-06). Audits read the
+   * roster's justification from here instead of inferring it from the
+   * template name.
+   */
+  role_sources?: Array<'structural' | 'obligation' | 'template' | 'restaff'>;
+  agent_id: string | null;
+  actor_type?: 'agent' | 'human' | 'service';
+  resource?: import('../mission/mission-team-binding.js').WorkforceResourceRef;
+  accountable_human_id?: string | null;
+  runtime_identity?: string | null;
+  authority_role: string | null;
+  delegation_contract: {
+    ownership_scope: string;
+    allowed_delegate_team_roles: string[];
+    escalation_parent_team_role: string | null;
+    required_scope_classes: string[];
+    resolved_scope_classes: string[];
+    allowed_write_scopes: string[];
+  } | null;
+  provider: string | null;
+  modelId: string | null;
+  required_capabilities: string[];
+  notes: string;
+  model_hint?: {
+    tier: 'small' | 'standard' | 'large';
+    effort: 'low' | 'medium' | 'high';
+    model_id: string;
+    route_reason: string;
+  };
+  organization_role_id?: string;
+  perspective_ids?: string[];
+  reasoning_route_id?: string;
+  security_scope?: ContextSecurityScope;
+  selection_reason_codes?: string[];
+}
+
+interface SelectionCandidate {
+  agentId: string;
+  authorityRole: string;
+  authorityRecord: AuthorityRoleRecord;
+  resolvedTarget: ResolvedAgentProviderTarget;
+  score: number;
+}
+
+function selectedModelHasHint(modelId: string, preferredModels: Set<string>): boolean {
+  return preferredModels.has(
+    String(modelId || '')
+      .trim()
+      .toLowerCase()
+  );
+}
+
+export interface RoleSeparationConstraints {
+  /** Hard separation-of-duties: these actors must not take this role (falls back if it would leave the role unstaffed). */
+  excludeAgents?: Array<string | null | undefined>;
+  /** Soft: penalize these actors so independent alternatives win when available. */
+  avoidAgents?: Array<string | null | undefined>;
+  /** Soft: penalize these providers (heterogeneous review — a different model family reviews the work). */
+  avoidProviders?: Array<string | null | undefined>;
+}
+
+export interface TeamProviderPreference {
+  provider: string;
+  modelId?: string;
+  strategy?: 'preferred' | 'adaptive' | 'strict';
+}
+
+// Outweighs the operator preferred_agents bonus (20) so independence beats
+// habit, but stays under two capability hits (2×10 + provider bonus) so a
+// clearly better-qualified duplicate actor can still win.
+const SOD_AVOID_AGENT_PENALTY = 24;
+const SOD_AVOID_PROVIDER_PENALTY = 6;
+
+export interface SelectAgentForTeamRoleInput {
+  teamRole: string;
+  teamRoleRecord: TeamRoleRecord;
+  authorityRoles: Record<string, AuthorityRoleRecord>;
+  agents: Record<string, AgentProfileRecord>;
+  routingHint?: { model_id: string };
+  separation?: RoleSeparationConstraints;
+  /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
+  organizationId?: string;
+  providerPreference?: TeamProviderPreference;
+  /**
+   * TC-09: observed workforce load, built once per composition pass. Selection
+   * prefers an actor that is not already carrying work; the penalty is capped
+   * so load never outweighs a capability match.
+   */
+  loadIndex?: WorkforceLoadIndex;
+}
+
+export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): MissionTeamAssignment {
+  const {
+    teamRole,
+    teamRoleRecord,
+    authorityRoles,
+    agents,
+    routingHint,
+    separation,
+    organizationId,
+    providerPreference,
+    loadIndex,
+  } = input;
+  const hardExcludedAgents = new Set(
+    (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
+  );
+  const softAvoidAgents = new Set(
+    (separation?.avoidAgents || []).filter((entry): entry is string => Boolean(entry))
+  );
+  const softAvoidProviders = new Set(
+    (separation?.avoidProviders || []).filter((entry): entry is string => Boolean(entry))
+  );
+  const requiredCapabilities = new Set(
+    (teamRoleRecord.required_capabilities || [])
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const selectionHints = resolveTeamRoleSelectionHints(teamRoleRecord);
+  const preferredAgents = new Set(selectionHints.preferred_agents);
+  const preferredModels = new Set(selectionHints.preferred_models);
+  const candidates = Object.entries(agents)
+    .flatMap(([agentId, profile]) => {
+      if (!profile.team_roles.includes(teamRole)) return [];
+
+      const profileCapabilities = new Set(
+        (profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+      );
+      const routedModelId = routingHint?.model_id;
+      const routedProvider = routedModelId ? resolveModelProvider(routedModelId) : undefined;
+      const agentSelectionHints = providerPreference?.provider
+        ? {
+            ...profile.selection_hints,
+            preferred_provider: providerPreference.provider,
+            ...(providerPreference.modelId
+              ? { preferred_modelId: providerPreference.modelId }
+              : {}),
+          }
+        : profile.selection_hints;
+      const providerConfig = loadProviderConfig();
+      const fallbackProvider =
+        providerPreference?.provider ||
+        profile.selection_hints?.preferred_provider ||
+        routedProvider ||
+        providerConfig.default_priority[0] ||
+        'claude';
+      const fallbackModel =
+        providerPreference?.modelId ||
+        profile.selection_hints?.preferred_modelId ||
+        selectionHints.preferred_models[0] ||
+        routedModelId ||
+        providerConfig.default_models[fallbackProvider];
+      const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
+        agentSelectionHints,
+        fallbackProvider as any,
+        fallbackModel,
+        agentId
+      );
+      const resolvedTarget = resolveAgentProviderTarget({
+        preferredProvider: selectionProvider,
+        preferredModelId: selectionModel,
+        providerStrategy: providerPreference?.strategy || profile.provider_strategy || 'adaptive',
+        fallbackProviders: profile.fallback_providers || [],
+        requiredCapabilities: profile.capabilities,
+      });
+      const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
+        profileCapabilities.has(capability)
+      ).length;
+      const capabilityPenalty = Math.max(0, requiredCapabilities.size - capabilityHits) * 2;
+      const preferredAgentBonus = preferredAgents.has(agentId.toLowerCase()) ? 20 : 0;
+      const preferredModelBonus = selectedModelHasHint(resolvedTarget.modelId, preferredModels)
+        ? 5
+        : 0;
+      const providerBonus = selectionProvider === resolvedTarget.provider ? 2 : 0;
+      // Retrospective feedback: measured agent×role outcomes adjust the
+      // score within ±8 (operator preferred_agents bonus of 20 still wins).
+      const performanceBonus = performanceScoreAdjustment(agentId, teamRole);
+      const modelPerformanceBonus = modelPerformanceScoreAdjustment(
+        resolvedTarget.modelId,
+        teamRole
+      );
+      // TC-16: measured role fitness speaks only while real outcomes are
+      // silent — the cold start every new model and provider goes through.
+      const modelFitnessBonus = modelRoleFitnessScoreAdjustment(resolvedTarget.modelId, teamRole);
+      const separationPenalty =
+        (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
+        (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
+      // TC-09: observed load, scored by the shared worker-assignment policy so
+      // one module owns what "busy" costs a candidate.
+      const loadPenalty = loadIndex
+        ? workerLoadPenalty(resolveWorkforceLoad(agentId, loadIndex))
+        : 0;
+      const score =
+        capabilityHits * 10 -
+        capabilityPenalty +
+        preferredAgentBonus +
+        preferredModelBonus +
+        providerBonus +
+        performanceBonus +
+        modelPerformanceBonus +
+        modelFitnessBonus -
+        separationPenalty -
+        loadPenalty;
+
+      const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
+      const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>
+        teamRoleRecord.compatible_authority_roles.includes(role)
+      );
+      return compatibleAuthorityRoles.flatMap((authorityRole) => {
+        const authorityRecord = authorityRoles[authorityRole];
+        if (!authorityRecord) return [];
+        const resolvedScopes = new Set(authorityRecord.scope_classes || []);
+        const missingScope = Array.from(requiredScopes).find(
+          (scopeClass) => !resolvedScopes.has(scopeClass)
+        );
+        if (missingScope) return [];
+        return [
+          {
+            agentId,
+            authorityRole,
+            authorityRecord,
+            resolvedTarget,
+            score,
+          } satisfies SelectionCandidate,
+        ];
+      });
+    })
+    .filter((entry): entry is SelectionCandidate => Boolean(entry))
+    .sort((left, right) => right.score - left.score || left.agentId.localeCompare(right.agentId));
+
+  // Hard SoD exclusion: prefer any independent candidate; only when the pool
+  // has no alternative does the excluded actor win (a staffed role with a
+  // recorded SoD gap beats an unstaffed role).
+  const independentWinner = candidates.find(
+    (candidate) => !hardExcludedAgents.has(candidate.agentId)
+  );
+  const winner = independentWinner || candidates[0];
+  const separationFallback = Boolean(winner && !independentWinner && hardExcludedAgents.size > 0);
+  if (winner) {
+    return {
+      team_role: teamRole,
+      required: true,
+      status: 'assigned',
+      agent_id: winner.agentId,
+      // NI-01: canonical durable-identity name for the selected agent
+      // (kyberion://agent/<org>/<slug>). Pure derivation — the provisioned
+      // ledger record is ensured downstream at staffing/spawn time.
+      runtime_identity: deriveAgentNhiId(winner.agentId, organizationId),
+      authority_role: winner.authorityRole,
+      delegation_contract: {
+        ownership_scope: teamRoleRecord.ownership_scope,
+        allowed_delegate_team_roles: teamRoleRecord.allowed_delegate_team_roles,
+        escalation_parent_team_role: teamRoleRecord.escalation_parent_team_role,
+        required_scope_classes: teamRoleRecord.required_scope_classes,
+        resolved_scope_classes: winner.authorityRecord.scope_classes || [],
+        allowed_write_scopes: winner.authorityRecord.write_scopes || [],
+      },
+      provider: winner.resolvedTarget.provider,
+      modelId: winner.resolvedTarget.modelId,
+      required_capabilities: teamRoleRecord.required_capabilities,
+      notes: `${teamRoleRecord.autonomy_level} autonomy; capability-first match (${winner.resolvedTarget.strategy})${
+        separationFallback
+          ? '; WARNING separation-of-duties fallback — no independent actor available'
+          : ''
+      }`,
+    };
+  }
+
+  return {
+    team_role: teamRole,
+    required: true,
+    status: 'unfilled',
+    agent_id: null,
+    authority_role: null,
+    delegation_contract: null,
+    provider: null,
+    modelId: null,
+    required_capabilities: teamRoleRecord.required_capabilities,
+    notes: 'No compatible agent profile found for this team role',
+  };
+}

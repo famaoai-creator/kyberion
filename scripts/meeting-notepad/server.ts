@@ -19,9 +19,9 @@ import {
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { t as catalogT } from '@agent/core/t';
-import { getSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
+import { getSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import {
   createMeetingNotepadContext,
   meetingNotepadHandoffLogicalPath,

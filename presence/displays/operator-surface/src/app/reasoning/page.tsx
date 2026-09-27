@@ -1,5 +1,5 @@
 import { Callout, Grid, List, Metric, Section, StatusPill, Table } from '@agent/shared-ui';
-import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
+import { inspectReasoningRoutes } from '@agent/core/reasoning/reasoning-route-doctor';
 import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';

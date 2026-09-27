@@ -1,8 +1,8 @@
 import * as path from 'node:path';
-import { readModelRegistryDirectory } from '@agent/core/model-registry-directory';
+import { readModelRegistryDirectory } from '@agent/core/reasoning/model-registry-directory';
 import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { compileSchema, defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

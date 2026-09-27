@@ -1,44 +1,44 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export * from './approval-store.js';
+export * from './governance/approval-store.js';
 
 export * from './judge-route.js';
 
-export * from './judgment-backend.js';
+export * from './reasoning/judgment-backend.js';
 
 export * from './typesafe-jev-judgment-backend.js';
 
 export * from './laya-mlx-judgment-backend.js';
 
-export * from './judgment-assist.js';
+export * from './reasoning/judgment-assist.js';
 
 export * from './error-classifier-judgment.js';
 
-export * from './knowledge-relevance-judgment.js';
+export * from './knowledge/knowledge-relevance-judgment.js';
 
-export * from './browser-judgment.js';
+export * from './browser/browser-judgment.js';
 
-export * from './judgment-calibration-fit.js';
+export * from './reasoning/judgment-calibration-fit.js';
 
-export * from './judgment-callsite-eval.js';
+export * from './reasoning/judgment-callsite-eval.js';
 
-export * from './task-routing-judgment.js';
+export * from './task/task-routing-judgment.js';
 
-export * from './agent-runtime-readiness.js';
+export * from './agent/agent-runtime-readiness.js';
 
-export * from './plugin-source-trust.js';
+export * from './plugin/plugin-source-trust.js';
 
-export * from './plugin-managed-install.js';
+export * from './plugin/plugin-managed-install.js';
 
-export * from './skill-plugin-loader.js';
+export * from './plugin/skill-plugin-loader.js';
 
-export * from './provider-capability-scanner.js';
+export * from './provider/provider-capability-scanner.js';
 
-export * from './approval-gate-summary.js';
+export * from './governance/approval-gate-summary.js';
 
-export { enforceApprovalGate, hasHuman } from './approval-gate.js';
+export { enforceApprovalGate, hasHuman } from './governance/approval-gate.js';
 
-export type { ApprovalGateParams, ApprovalGateResult } from './approval-gate.js';
+export type { ApprovalGateParams, ApprovalGateResult } from './governance/approval-gate.js';
 
 export * from './lead-score.js';
 
@@ -54,7 +54,7 @@ export {
   computeIntentDelta,
   goalSimilarity,
   isBlockingDrift,
-} from './intent-delta.js';
+} from './intent/intent-delta.js';
 
 export type {
   DriftThresholds,
@@ -63,7 +63,7 @@ export type {
   IntentDelta,
   IntentDeltaChanges,
   IntentSnapshot,
-} from './intent-delta.js';
+} from './intent/intent-delta.js';
 
 export {
   emitIntentSnapshot,
@@ -74,9 +74,9 @@ export {
   listSnapshots,
   mapStageToLoopPhase,
   reclassifyDrift,
-} from './intent-snapshot-store.js';
+} from './intent/intent-snapshot-store.js';
 
-export type { EmitSnapshotParams, IntentDriftGateResult } from './intent-snapshot-store.js';
+export type { EmitSnapshotParams, IntentDriftGateResult } from './intent/intent-snapshot-store.js';
 
 export {
   getTrustLevel,
@@ -124,13 +124,13 @@ export {
   saveTestPlan,
 } from './sdlc-artifact-store.js';
 
-export { executeTaskPlan } from './task-executor.js';
+export { executeTaskPlan } from './task/task-executor.js';
 
 export {
   getTaskPlanCoordinator,
   registerTaskPlanCoordinator,
   resetTaskPlanCoordinator,
-} from './task-plan-coordinator-port.js';
+} from './task/task-plan-coordinator-port.js';
 
 export type {
   ExecuteTaskPlanParams,
@@ -138,20 +138,20 @@ export type {
   TaskExecutionRecord,
   TaskExecutionStatus,
   TaskPlanCoordinatorPort,
-} from './task-plan-coordinator-port.js';
+} from './task/task-plan-coordinator-port.js';
 
 export {
   getAgentExecutionPort,
   registerAgentExecutionPort,
   resetAgentExecutionPort,
   SupervisorAgentExecutionPort,
-} from './agent-execution-port.js';
+} from './agent/agent-execution-port.js';
 
 export type {
   AgentExecutionPort,
   AgentExecutionReceipt,
   AgentTaskEnvelope,
-} from './agent-execution-port.js';
+} from './agent/agent-execution-port.js';
 
 export {
   CoordinatedAgentExecutionPort,
@@ -169,28 +169,28 @@ export {
   readCanonicalWorkGraph,
   readCanonicalWorkGraphTasks,
   projectWorkGraphToNextTasks,
-} from './work-graph-projection.js';
+} from './workforce/work-graph-projection.js';
 
 export type {
   CanonicalWorkGraphRead,
   WorkGraphProjectionDrift,
   WorkGraphProjectionOptions,
   WorkGraphProjectionResult,
-} from './work-graph-projection.js';
+} from './workforce/work-graph-projection.js';
 
 export {
   getActuatorForwardingPort,
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
   withActuatorForwardingPort,
-} from './actuator-forwarding-port.js';
+} from './actuator/actuator-forwarding-port.js';
 
 export type {
   ActuatorForwardingPort,
   ActuatorForwardStatus,
   ActuatorForwardRequest,
   ActuatorForwardReceipt,
-} from './actuator-forwarding-port.js';
+} from './actuator/actuator-forwarding-port.js';
 
 export {
   getDeploymentAdapter,
@@ -199,18 +199,18 @@ export {
   resetDeploymentAdapter,
   ShellDeploymentAdapter,
   stubDeploymentAdapter,
-} from './deployment-adapter.js';
+} from './actuator/deployment-adapter.js';
 
 export type {
   DeployInput,
   DeployResult,
   DeploymentAdapter,
   ShellDeploymentAdapterOptions,
-} from './deployment-adapter.js';
+} from './actuator/deployment-adapter.js';
 
-export { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
+export { MobileBetaDeploymentAdapter } from './actuator/deployment-adapters/mobile-beta.js';
 
-export type { MobileBetaAdapterOptions } from './deployment-adapters/mobile-beta.js';
+export type { MobileBetaAdapterOptions } from './actuator/deployment-adapters/mobile-beta.js';
 
 export {
   ChainAuditForwarder,
@@ -221,13 +221,13 @@ export {
   resetAuditForwarder,
   ShellAuditForwarder,
   stubAuditForwarder,
-} from './audit-forwarder.js';
+} from './governance/audit-forwarder.js';
 
 export type {
   AuditForwarder,
   HttpAuditForwarderOptions,
   ShellAuditForwarderOptions,
-} from './audit-forwarder.js';
+} from './governance/audit-forwarder.js';
 
 export {
   ChainSecretResolver,
@@ -241,7 +241,7 @@ export {
   resolveSecretReferenceSync,
   resolveSecretSync,
   ShellSecretResolver,
-} from './secret-resolver.js';
+} from './secret/secret-resolver.js';
 
 export type {
   ResolveSecretInput,
@@ -249,23 +249,26 @@ export type {
   SecretResolverDescription,
   SecretResolver,
   ShellSecretResolverOptions,
-} from './secret-resolver.js';
+} from './secret/secret-resolver.js';
 
 export {
   consumeTenantBudget,
   inspectTenantBudget,
   withTenantBudget,
   TenantRateLimitExceededError,
-} from './tenant-rate-limiter.js';
+} from './organization/tenant-rate-limiter.js';
 
-export type { RateLimitDecision } from './tenant-rate-limiter.js';
+export type { RateLimitDecision } from './organization/tenant-rate-limiter.js';
 
 export {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
-} from './distill-knowledge-injector.js';
+} from './knowledge/distill-knowledge-injector.js';
 
-export type { DistilledKnowledgeEntry, FindRelevantInput } from './distill-knowledge-injector.js';
+export type {
+  DistilledKnowledgeEntry,
+  FindRelevantInput,
+} from './knowledge/distill-knowledge-injector.js';
 
 export {
   loadKnowledgeSlicesFile,
@@ -274,7 +277,7 @@ export {
   isKnowledgePathExcluded,
   isKnowledgePathInSearchRoots,
   _resetKnowledgeSlicesCacheForTests,
-} from './knowledge-slices.js';
+} from './knowledge/knowledge-slices.js';
 
 export type {
   KnowledgeSliceMatcher,
@@ -282,7 +285,7 @@ export type {
   KnowledgeSlicesFile,
   ResolveKnowledgeSliceInput,
   ResolvedKnowledgeSlice,
-} from './knowledge-slices.js';
+} from './knowledge/knowledge-slices.js';
 
 export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
 
@@ -302,11 +305,11 @@ export type {
   CapabilityRestrictionStatus,
 } from './capability-restriction-policy.js';
 
-export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
+export { loadMeetingFacilitatorPolicy } from './meeting/meeting-facilitator-policy.js';
 
-export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
+export type { MeetingFacilitatorPolicy } from './meeting/meeting-facilitator-policy.js';
 
-export { MissionEvidenceDoc } from './mission-evidence-doc.js';
+export { MissionEvidenceDoc } from './mission/mission-evidence-doc.js';
 
 export {
   grantVoiceConsent,
@@ -314,11 +317,11 @@ export {
   loadVoiceConsentAtPath,
   readVoiceConsent,
   revokeVoiceConsent,
-} from './voice-consent.js';
+} from './voice/voice-consent.js';
 
-export type { VoiceConsentRecord } from './voice-consent.js';
+export type { VoiceConsentRecord } from './voice/voice-consent.js';
 
-export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
+export type { MissionEvidenceDocOptions } from './mission/mission-evidence-doc.js';
 
 export {
   bootstrapManifest,
@@ -382,4 +385,4 @@ export * from './authz-policy-engine.js';
 
 export * from './authz-providers.js';
 
-export * from './surface-authn.js';
+export * from './surface/surface-authn.js';

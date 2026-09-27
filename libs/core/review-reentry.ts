@@ -5,10 +5,10 @@ import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
   type GovernedArtifactRole,
-} from './artifact-store.js';
+} from './workforce/artifact-store.js';
 import { logger } from './core.js';
-import { persistHints } from './src/feedback-loop.js';
-import { queueMissionMemoryPromotionCandidate } from './memory-promotion-queue.js';
+import { persistHints } from './knowledge/feedback-loop.js';
+import { queueMissionMemoryPromotionCandidate } from './knowledge/memory-promotion-queue.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 
 /**

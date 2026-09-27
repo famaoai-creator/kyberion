@@ -6,7 +6,7 @@
  *   pnpm exec tsx scripts/demos/demo_agent_pane_runtime_live.ts
  */
 
-import { agentLifecycle } from '@agent/core/agent-lifecycle';
+import { agentLifecycle } from '@agent/core/agent/agent-lifecycle';
 import { pathResolver } from '@agent/core/path-resolver';
 
 function setEnv(name: string, value: string): void {

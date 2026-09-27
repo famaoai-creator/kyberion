@@ -34,7 +34,7 @@ import {
   listSurfaceOutboxMessages,
   summarizeMissionSeedAssessment,
 } from '../../../lib/intelligence-primitives';
-import { getProjectManagementView } from '@agent/core/project-management';
+import { getProjectManagementView } from '@agent/core/project/project-management';
 import { resolveCompany } from '@agent/core/company';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
@@ -65,7 +65,8 @@ export async function GET(req: NextRequest) {
     const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
     const allowedTiers = new Set<string>(tierAccess);
     const accessRole = getChronosAccessRoleOrThrow(req);
-    const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
+    const runtimeSupervisorClient =
+      await import('@agent/core/agent/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
     const rawActiveMissions = intelligenceData
       .collectActiveMissions()

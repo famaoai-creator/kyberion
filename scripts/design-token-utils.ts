@@ -4,7 +4,7 @@ import {
   KB_STATUS_TONES,
   type KbStatusFamily,
   type KbStatusTone,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   loadBrandTokensAtPath,
   type BrandTokenColors,

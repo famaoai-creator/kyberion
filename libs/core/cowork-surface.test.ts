@@ -82,7 +82,7 @@ vi.mock('./foundation/io.js', () => ({
   }),
 }));
 
-vi.mock('./artifact-store.js', () => ({
+vi.mock('./workforce/artifact-store.js', () => ({
   writeGovernedArtifactJson: mockWriteGovernedArtifactJson,
   ensureGovernedArtifactDir: mockEnsureGovernedArtifactDir,
   resolveGovernedArtifactPath: vi.fn((p: string) => `/repo/${p}`),

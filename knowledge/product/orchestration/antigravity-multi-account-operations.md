@@ -124,7 +124,7 @@ When `KYBERION_AGY_PROFILE` is configured:
 When instantiating `AgyCliBackend` programmatically:
 
 ```typescript
-import { AgyCliBackend } from './libs/core/agy-cli-backend.js';
+import { AgyCliBackend } from './libs/core/provider/agy-cli-backend.js';
 
 const backend = new AgyCliBackend({
   agyProfile: 'work',

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // PE-02: the registry is personal-tier; only the Chronos localadmin role may read it.
-vi.mock('@agent/core/tenant-registry', () => ({
+vi.mock('@agent/core/organization/tenant-registry', () => ({
   resolveTenant: (slug: string) => {
     if (process.env.MISSION_ROLE !== 'chronos_localadmin' || slug !== 'known-tenant') {
       throw new Error(`[tenant-registry] tenant '${slug}' could not be read`);
@@ -14,7 +14,7 @@ import {
   getPluginHost,
   type CreatePluginHostOptions,
   type PluginHost,
-} from '@agent/core/plugin-host';
+} from '@agent/core/plugin/plugin-host';
 import {
   CHRONOS_PLUGIN_HOST_SURFACE,
   chronosPluginHostStatus,

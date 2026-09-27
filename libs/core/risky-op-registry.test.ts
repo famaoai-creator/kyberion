@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('./approval-gate.js', () => ({
+vi.mock('./governance/approval-gate.js', () => ({
   enforceApprovalGate: vi.fn(),
 }));
 
-import { enforceApprovalGate } from './approval-gate.js';
+import { enforceApprovalGate } from './governance/approval-gate.js';
 import { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
 
 describe('risky-op-registry', () => {

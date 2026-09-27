@@ -5,7 +5,7 @@
  * Import path: './types.js' (TypeScript resolves .js -> .ts under Node16 module resolution)
  */
 
-export * from './src/types/index.js';
+export * from './contracts/index.js';
 
 // ---------------------------------------------------------------------------
 // Knowledge Tiers
@@ -20,7 +20,7 @@ export type KnowledgeTier = TierLevel;
 /** Scoped tier with optional project isolation (multi-tenant). */
 export interface TierScope {
   tier: TierLevel;
-  project?: string;   // e.g. 'canton-node', 'client-a'
+  project?: string; // e.g. 'canton-node', 'client-a'
 }
 
 /** Numeric weight map for tier comparison (higher = more sensitive). */
@@ -216,7 +216,7 @@ export type SkillMetadata = CapabilityMetadata;
 export type SkillDefinition = CapabilityDefinition;
 export type SkillIndex = CapabilityIndex;
 
-export type { MissionContract } from './src/types/mission-contract.js';
+export type { MissionContract } from './contracts/mission-contract.js';
 
 // ---------------------------------------------------------------------------
 // Identity & Authority (Refined Governance)
@@ -230,7 +230,8 @@ export type { MissionContract } from './src/types/mission-contract.js';
  * mission mode → worker | mission_owner | analyst
  * admin mode   → sovereign
  */
-export type Persona = 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
+export type Persona =
+  'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 
 /**
  * Derived execution mode — which operational domain the process is in.
@@ -245,12 +246,12 @@ export type ExecutionMode = 'system' | 'mission' | 'sovereign';
 
 /** Discrete permissions granted to a process or mission. */
 export type Authority =
-  | 'SUDO'               // Full system access
-  | 'GIT_WRITE'          // Repository modification
-  | 'SECRET_READ'        // Reading sensitive keys (scoped)
-  | 'NETWORK_FETCH'      // External API access
-  | 'SYSTEM_EXEC'        // Shell command execution
-  | 'KNOWLEDGE_WRITE';   // Direct knowledge tier modification
+  | 'SUDO' // Full system access
+  | 'GIT_WRITE' // Repository modification
+  | 'SECRET_READ' // Reading sensitive keys (scoped)
+  | 'NETWORK_FETCH' // External API access
+  | 'SYSTEM_EXEC' // Shell command execution
+  | 'KNOWLEDGE_WRITE'; // Direct knowledge tier modification
 
 /** Unified context for the current execution thread. */
 export interface IdentityContext {

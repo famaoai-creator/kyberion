@@ -19,15 +19,15 @@
  *     [--status active]
  */
 
-import { auditChain } from '@agent/core/audit-chain';
-import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
 import {
   invalidateProcedureCache,
   readProcedureCatalog,
   resolveAllowlistedRecordingRef,
   validateProcedureCatalog,
-} from '@agent/core/procedure-registry';
-import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
+} from '@agent/core/knowledge/procedure-registry';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -36,7 +36,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
-import type { ProcedureEntry } from '@agent/core/procedure-types';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';

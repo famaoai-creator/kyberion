@@ -30,10 +30,10 @@ describe('docs-honesty contract (QM-10)', () => {
     it('the plugin loader really skips unapproved plugins (fail-closed execution)', () => {
       // Assert on the enforcement code itself, not on comments describing it —
       // deleting the gate while keeping its comment must fail this test.
-      const loader = read('libs/core/skill-plugin-loader.ts');
+      const loader = read('libs/core/plugin/skill-plugin-loader.ts');
       expect(loader).toContain('skipping rather than executing an unapproved plugin');
       expect(loader).toContain('activationStatus');
-      const installer = read('libs/core/plugin-managed-install.ts');
+      const installer = read('libs/core/plugin/plugin-managed-install.ts');
       expect(installer).toContain('pending_approval');
     });
 
@@ -85,20 +85,20 @@ describe('docs-honesty contract (QM-10)', () => {
     });
 
     it('the de-obfuscation module the plan describes exists with its guards', () => {
-      const normalize = read('libs/core/shell-command-normalize.ts');
+      const normalize = read('libs/core/shell/shell-command-normalize.ts');
       expect(normalize).toContain('allowableCommands');
       expect(normalize).toContain('PRIVILEGE_WRAPPERS');
       expect(normalize).toContain('scannableCommand');
     });
 
     it('the memory notebook module is the single source the plan claims', () => {
-      const notebook = read('libs/core/memory-notebook.ts');
+      const notebook = read('libs/core/knowledge/memory-notebook.ts');
       expect(notebook).toContain('neutralizeUntrustedProvenance');
       const actuator = read('libs/actuators/working-memory-actuator/src/index.ts');
       // a877d9c12 moved the actuator off a direct neutralizeUntrustedProvenance
       // call onto memory-notebook's foldCapture, which applies the guard itself
       // (memory-notebook.ts:262,321) — the single-source claim still holds.
-      expect(actuator).toContain("from '@agent/core/memory-notebook'");
+      expect(actuator).toContain("from '@agent/core/knowledge/memory-notebook'");
       expect(actuator).toContain('foldCapture');
       expect(actuator).not.toContain('function neutralizeUntrustedProvenance');
     });

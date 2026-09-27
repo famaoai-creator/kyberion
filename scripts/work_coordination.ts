@@ -1,4 +1,4 @@
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   appendCoordinationEvent,
@@ -20,22 +20,22 @@ import {
   type WorkItemSource,
   type WorkItemStatus,
   type WorkItemContext,
-} from '@agent/core/work-coordination';
+} from '@agent/core/workforce/work-coordination';
 import {
   getWorkCoordinationImportCatalogEntryByCommand,
   listWorkCoordinationImportCatalogEntries,
-} from '@agent/core/work-coordination-import-catalog';
-import type { GitHubIssueLike } from '@agent/core/work-integrations/github-issues';
-import type { JiraIssueLike } from '@agent/core/work-integrations/jira-issues';
-import { importGitHubIssueWithEvent } from '@agent/core/work-integrations/github-issues';
-import { importJiraIssueWithEvent } from '@agent/core/work-integrations/jira-issues';
+} from '@agent/core/workforce/work-coordination-import-catalog';
+import type { GitHubIssueLike } from '@agent/core/integrations/github-issues';
+import type { JiraIssueLike } from '@agent/core/integrations/jira-issues';
+import { importGitHubIssueWithEvent } from '@agent/core/integrations/github-issues';
+import { importJiraIssueWithEvent } from '@agent/core/integrations/jira-issues';
 import {
   buildIntegratedHandoffHistory,
   formatIntegratedHandoffHistory,
-} from '@agent/core/handoff-history';
+} from '@agent/core/mesh/handoff-history';
 import { loadAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
-import { loadStateAtPath } from '@agent/core/mission-state';
-import { projectWorkGraphToNextTasks } from '@agent/core/work-graph-projection';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
+import { projectWorkGraphToNextTasks } from '@agent/core/workforce/work-graph-projection';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

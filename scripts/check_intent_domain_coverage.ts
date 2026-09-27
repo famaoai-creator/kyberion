@@ -1,12 +1,12 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReaddir } from '@agent/core/secure-io';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
-import { loadIntentDomainOntologyCatalog } from '@agent/core/intent-resolution';
-import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
-import { loadMissionTeamTemplates } from '@agent/core/mission-team-index';
-import { loadMissionWorkflowCatalog } from '@agent/core/mission-workflow-catalog';
-import { loadOutcomeCatalog } from '@agent/core/work-design';
+import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
+import { loadIntentDomainOntologyCatalog } from '@agent/core/intent/intent-resolution';
+import { loadMissionClassificationPolicy } from '@agent/core/mission/mission-classification';
+import { loadMissionTeamTemplates } from '@agent/core/mission/mission-team-index';
+import { loadMissionWorkflowCatalog } from '@agent/core/mission/mission-workflow-catalog';
+import { loadOutcomeCatalog } from '@agent/core/workforce/work-design';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type StandardIntent = {

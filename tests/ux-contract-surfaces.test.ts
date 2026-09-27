@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { validateSurfaceUxContract } from '../libs/core/surface-ux-contract.js';
+import { validateSurfaceUxContract } from '../libs/core/surface/surface-ux-contract.js';
 import { formatOperatorPacketLines } from '../scripts/cli.js';
 
 const stripAnsi = (value: string): string => value.replace(/\u001b\[[0-9;]*m/gu, '');

@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator/actuator-op-discovery';
 import {
   loadActuatorManifest,
   type ActuatorManifestFile,

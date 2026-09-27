@@ -5,7 +5,7 @@ import { readJson } from './json.js';
 import { getFoundationIo } from './io.js';
 import { readTextFile } from './text.js';
 import type { ValidateFunction } from 'ajv';
-import { withLockSync } from '../src/lock-utils.js';
+import { withLockSync } from './lock-utils.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 
 export interface GovernedCatalogOptions<T> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildOperatorHomeA2UI } from './headless-a2ui';
-import type { OperatorHomeSummary } from '@agent/core/operator-home-summary';
+import type { OperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 
 describe('headless operator-home A2UI adapter', () => {
   it('projects the same semantic summary into a standard updateComponents message', () => {

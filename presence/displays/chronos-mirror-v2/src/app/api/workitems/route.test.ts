@@ -16,12 +16,12 @@ const mocks = vi.hoisted(() => ({
   withViewerExecutionContext: vi.fn((_viewer: unknown, fn: () => unknown) => fn()),
 }));
 
-vi.mock('@agent/core/work-coordination', () => ({
+vi.mock('@agent/core/workforce/work-coordination', () => ({
   listWorkItems: mocks.listWorkItems,
   updateWorkItem: mocks.updateWorkItem,
 }));
 
-vi.mock('@agent/core/work-visibility', () => ({
+vi.mock('@agent/core/workforce/work-visibility', () => ({
   buildWorkVisibilityProjection: mocks.buildWorkVisibilityProjection,
 }));
 

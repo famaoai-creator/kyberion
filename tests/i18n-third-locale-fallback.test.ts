@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
  * it into `i18n-third-locale-proof.test.ts` (which needs the real catalog)
  * would make those tests see the mock too.
  */
-vi.mock('@agent/core/vocabulary-catalog', () => ({
+vi.mock('@agent/core/knowledge/vocabulary-catalog', () => ({
   loadVocabularyCatalog: () => ({
     version: '2.0',
     default_locale: 'en',

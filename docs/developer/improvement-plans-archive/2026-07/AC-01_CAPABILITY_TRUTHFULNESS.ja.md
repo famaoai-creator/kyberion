@@ -13,7 +13,7 @@ status: archived
 
 「その能力が今この環境で本当に使えるか」をシステムが正しく申告できていない。宣伝(カタログ/manifest)と実装と実行環境の3者がずれている。
 
-- **能力プローブが 6/29 のみ**: `libs/core/src/actuator-capability.ts` が実環境チェックを持つのは browser/voice/vision/media/system/gemini-cli の 6 つだけ。**残り全アクチュエータはフォールバックで全 op を無条件 `available: true`**(`:81-86`)にしている。結果、実行時に `Missing runtime prerequisite` が **48 回**、`playwright not installed` / `spawn playwright ENOENT`、`capability 'browser-actuator' unavailable` などが未分類エラーレジストリに蓄積している(`active/shared/tmp/unclassified-error-registry.json`)。
+- **能力プローブが 6/29 のみ**: `libs/core/actuator/actuator-capability.ts` が実環境チェックを持つのは browser/voice/vision/media/system/gemini-cli の 6 つだけ。**残り全アクチュエータはフォールバックで全 op を無条件 `available: true`**(`:81-86`)にしている。結果、実行時に `Missing runtime prerequisite` が **48 回**、`playwright not installed` / `spawn playwright ENOENT`、`capability 'browser-actuator' unavailable` などが未分類エラーレジストリに蓄積している(`active/shared/tmp/unclassified-error-registry.json`)。
 - **具体例**: `code:semgrep_scan` は実装済み(`libs/actuators/code-actuator/src/code-pipeline-helpers.ts:267,275`)だが `spawnSync('semgrep', …)` は PATH に semgrep が無いと実行時に初めて落ちる。プローブが無いので事前検知できない。
 - **カタログドリフト**: `CAPABILITIES_GUIDE.md:5` は「Total Actuators: 28」だが `libs/actuators/` は 30 ディレクトリ。**working-memory-actuator は manifest に 14 op を持つ完全実装なのにカタログ未掲載**。評価レポート(`docs/verification/evaluation_report.md`)の V-6-05「脆弱性スキャン未実装」も semgrep_scan 実装後の現状に対して陳腐化している。
 - **manifest/型と実装のドリフト**: blockchain-actuator の型には `verify_anchor` があるが dispatch は未実装で default throw(`libs/actuators/blockchain-actuator/src/index.ts:25,79-81`)。service-actuator の旧 STREAM モードと network-actuator の旧 gist トランスポートは AC-06 で削除済み。
@@ -73,12 +73,12 @@ status: archived
 ### Task 1-2 representative slice — 2026-07-03
 
 - `schemas/actuator-manifest.schema.json` に `capabilities[].prerequisites` を追加した。`binaries` / `platforms` / `env` / `services` / `install` を宣言できる。
-- `libs/core/src/actuator-capability.ts` の fallback を、manifest prerequisites を評価する汎用プローブへ置換した。宣言が無い capability は従来どおり `available:true` のまま。
+- `libs/core/actuator/actuator-capability.ts` の fallback を、manifest prerequisites を評価する汎用プローブへ置換した。宣言が無い capability は従来どおり `available:true` のまま。
 - 既存の個別プローブがある actuator は、個別プローブ結果と manifest prerequisites を op 単位で合成する。
 - 代表ケースとして `libs/actuators/code-actuator/manifest.json` の `semgrep_scan` に `semgrep` binary prerequisite と install hint を追加した。
 - 検証:
-  - `pnpm exec vitest run libs/core/src/actuator-capability.test.ts`
-  - `pnpm exec vitest run libs/core/src/actuator-capability.test.ts scripts/run_doctor.test.ts`
+  - `pnpm exec vitest run libs/core/actuator/actuator-capability.test.ts`
+  - `pnpm exec vitest run libs/core/actuator/actuator-capability.test.ts scripts/run_doctor.test.ts`
   - `pnpm run typecheck`
   - `pnpm check -- --scope full --only catalogs`
   - `pnpm --filter '@agent/core' build`
@@ -92,7 +92,7 @@ status: archived
 - manifest に対象 op が無い場合は既存互換のため通す。
 - 検証:
   - `pnpm run typecheck`
-  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/src/actuator-capability.test.ts libs/core/error-classifier.test.ts`
+  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/actuator/actuator-capability.test.ts libs/core/error-classifier.test.ts`
   - `pnpm --filter '@agent/core' build`
   - `pnpm run build:repo`
   - `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":true}'`
@@ -106,5 +106,5 @@ status: archived
 - 検証:
   - `pnpm run typecheck`
   - `pnpm run build:repo`
-  - `pnpm exec vitest run libs/core/src/actuator-capability.test.ts`
+  - `pnpm exec vitest run libs/core/actuator/actuator-capability.test.ts`
   - `pnpm check -- --scope full --only catalogs`

@@ -6,16 +6,16 @@ import { safeExistsSync, safeReaddir } from './secure-io.js';
 import {
   MISSION_CLASS_VALUES,
   mapMissionClassToMissionTypeTemplate,
-} from './mission-classification.js';
+} from './mission/mission-classification.js';
 import {
   loadAgentProfileIndex,
   loadAuthorityRoleIndex,
   loadMissionTeamTemplates,
   loadTeamRoleIndex,
-} from './mission-team-index.js';
-import { SEPARATION_ROLE_PAIRS } from './mission-team-plan-composer.js';
-import { loadTeamCompositionObligations } from './team-composition-obligations.js';
-import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
+} from './mission/mission-team-index.js';
+import { SEPARATION_ROLE_PAIRS } from './mission/mission-team-plan-composer.js';
+import { loadTeamCompositionObligations } from './organization/team-composition-obligations.js';
+import { isObsoleteAgentRuntimeProvider } from './provider/provider-config.js';
 
 /**
  * TC-11: does the pool actually contain what the roster asks for?

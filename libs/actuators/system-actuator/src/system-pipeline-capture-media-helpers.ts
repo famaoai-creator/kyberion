@@ -11,13 +11,16 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual-audio-input-recording-bridge';
-import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
-import { createVirtualCameraInjectionBridge } from '@agent/core/virtual-camera-injection-bridge';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
-import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
-import { writeVideoFramesToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
-import type { VideoFrame } from '@agent/core/meeting-session-types';
+import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual/virtual-audio-input-recording-bridge';
+import { createVirtualCameraBridge } from '@agent/core/virtual/virtual-camera-bridge';
+import { createVirtualCameraInjectionBridge } from '@agent/core/virtual/virtual-camera-injection-bridge';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual/virtual-device-inventory-bridge';
+import { StubVideoFrameBus } from '@agent/core/video/video-frame-bus';
+import {
+  writeVideoFramesToMp4,
+  pipeMp4ToVideoFrameBus,
+} from '@agent/core/video/video-frame-archive';
+import type { VideoFrame } from '@agent/core/meeting/meeting-session-types';
 
 export type CaptureMediaParams = Record<string, unknown>;
 export type CaptureMediaCtx = Record<string, unknown>;

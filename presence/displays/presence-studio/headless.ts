@@ -7,9 +7,9 @@ import {
   type HeadlessResourceDescriptor,
 } from '@agent/core/headless-surface-contract';
 import { nowIso } from '@agent/core/foundation';
-import { listApprovalRequests } from '@agent/core/approval-store';
-import { listArtifactRecords } from '@agent/core/artifact-record';
-import { listProjectRecords } from '@agent/core/project-registry';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
+import { listProjectRecords } from '@agent/core/project/project-registry';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {
   narrowPresenceStudioTenant,
@@ -19,7 +19,7 @@ import {
   PresenceStudioViewerError,
   type PresenceStudioViewerContext,
 } from './security.js';
-import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 
 const PRESENCE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {

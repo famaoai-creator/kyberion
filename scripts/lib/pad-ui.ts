@@ -34,7 +34,7 @@ import {
   type SupportedLocale,
 } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import type { MessageParams } from '@agent/core/message-format';
 import { readKyberionDesignTokens, renderKyberionUiTokenBlock } from '../design-token-utils.js';
 

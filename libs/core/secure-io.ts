@@ -15,7 +15,7 @@ import {
   registerEnvironmentRegistryReader,
 } from './foundation/env.js';
 import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
-import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
+import { assertSandboxNetworkAllowed } from './shell/sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
@@ -24,9 +24,9 @@ import { validateWritePermission, validateReadPermission, detectTier } from './t
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
 // eslint-disable-next-line import/no-cycle
-import { policyEngine } from './policy-engine.js';
-import * as auditChainModule from './audit-chain.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
+import { policyEngine } from './governance/policy-engine.js';
+import * as auditChainModule from './governance/audit-chain.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 import { createLogger } from './logger.js';
 import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
 

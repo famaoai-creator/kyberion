@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
-import { resolveMemberByPrincipal, type MemberProfile } from '@agent/core/member-registry';
-import type { WorkInventoryScope } from '@agent/core/work-inventory';
-import { WorkInventoryConsentError } from '@agent/core/work-inventory-consent';
-import { authorizeSurfaceMutation } from '@agent/core/surface-mutation-guard';
+import {
+  resolveMemberByPrincipal,
+  type MemberProfile,
+} from '@agent/core/organization/member-registry';
+import type { WorkInventoryScope } from '@agent/core/workforce/work-inventory';
+import { WorkInventoryConsentError } from '@agent/core/workforce/work-inventory-consent';
+import { authorizeSurfaceMutation } from '@agent/core/surface/surface-mutation-guard';
 import {
   conciergeErrorResponse,
   guardConciergeRequest,

@@ -13,7 +13,7 @@ last_updated: 2026-08-26
 > **作成日**: 2026-08-09
 > **起点**: [microsoft/skill-recorder](https://github.com/microsoft/skill-recorder) v0.4.2(Electron + TypeScript、~25k LOC、MIT)の全サブシステム実コード分析(2026-08-09、shallow clone にて実施)。
 > **位置づけ**: [OPENHARNESS_ADOPTION_PLAN](../../improvement-plans-2026-07/OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md) と同じ「コードは取り込まず概念だけ既存契約へ昇華する」方式。
-> 本計画は**新パラダイムの提案ではない**。Kyberion は既に [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)(学習→再生、パターン A/B)を**凍結契約**として保有しており(`libs/core/procedure-types.ts`)、skill-recorder はその **desktop サブストレート**と**蒸留品質**に対する実装参照である。
+> 本計画は**新パラダイムの提案ではない**。Kyberion は既に [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)(学習→再生、パターン A/B)を**凍結契約**として保有しており(`libs/core/knowledge/procedure-types.ts`)、skill-recorder はその **desktop サブストレート**と**蒸留品質**に対する実装参照である。
 > **実装状況の正本**: [STATUS.ja.md](../../improvement-plans-2026-07/STATUS.ja.md)
 
 ## 0. 実装状況（2026-08-09）
@@ -47,7 +47,7 @@ Kyberion にとっての価値は製品としてではなく、**「観測 → �
 
 | 機構                   | skill-recorder 実装                                                                                            | Kyberion 現状                                                                                                        | 判定                 |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 学習→再生の契約        | `common/analysis.ts` + `common/skill.ts`(アプリ固有)                                                           | `libs/core/procedure-types.ts`(substrate 中立・凍結済み、A/B パターン、しきい値定数まで規定)                         | **Kyberion が上位**  |
+| 学習→再生の契約        | `common/analysis.ts` + `common/skill.ts`(アプリ固有)                                                           | `libs/core/knowledge/procedure-types.ts`(substrate 中立・凍結済み、A/B パターン、しきい値定数まで規定)               | **Kyberion が上位**  |
 | browser 録画           | 無し(画面録画で代替)                                                                                           | `tools/adf-replay-extension/`(MV3、DOM セマンティクス付き、per-action 承認 UI)+ `browser-recording-compiler.ts`      | **Kyberion が上位**  |
 | desktop 実演録画       | `electron/collectors/*`(ポーリング型。app 切替 1000ms / clipboard 700ms / URL 1500ms)                          | **無し**。`desktop-recording.schema.json` は存在するが**生成元がゼロ**                                               | **欠落 → DR-03**     |
 | desktop 実行系         | 該当なし(生成物は他エージェントが実行)                                                                         | `os-automation.ts` に `clickAt`/`keystrokeText`/`getWindowList`/`takeScreenshot` 等が**既に揃っている**              | **結線漏れ → DR-02** |
@@ -64,13 +64,13 @@ Kyberion にとっての価値は製品としてではなく、**「観測 → �
 
 ### 1.3 最大の発見 — 契約は凍結済みで、欠けているのは「観測層」と「意味層」
 
-`libs/core/procedure-types.ts:18` は `ProcedureSubstrate = 'browser' | 'desktop' | 'service' | 'media'` を凍結しており、[INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md) は desktop アダプタを詳細設計済みである。しかし実装は止まっている:
+`libs/core/knowledge/procedure-types.ts:18` は `ProcedureSubstrate = 'browser' | 'desktop' | 'service' | 'media'` を凍結しており、[INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md) は desktop アダプタを詳細設計済みである。しかし実装は止まっている:
 
-1. `procedure-dispatcher.ts:141-149` は `executor: 'system'` に対し `not_implemented` を返す。そのコメントは **「desktop has no OS automation backend」と書かれているが、これは事実に反する** — `libs/core/os-automation.ts` は `clickAt` / `rightClickAt` / `keystrokeText` / `pasteText` / `pressKey` / `getWindowList` / `activateWindowByTitle` / `takeScreenshot` / `clipboardRead` を macOS・Windows 両対応でエクスポート済みである。同じ陳腐化した注記が `desktop-recording.schema.json:5` にもある。**再生側はほぼ揃っており、止まっているのは観測側**。
+1. `procedure-dispatcher.ts:141-149` は `executor: 'system'` に対し `not_implemented` を返す。そのコメントは **「desktop has no OS automation backend」と書かれているが、これは事実に反する** — `libs/core/virtual/os-automation.ts` は `clickAt` / `rightClickAt` / `keystrokeText` / `pasteText` / `pressKey` / `getWindowList` / `activateWindowByTitle` / `takeScreenshot` / `clipboardRead` を macOS・Windows 両対応でエクスポート済みである。同じ陳腐化した注記が `desktop-recording.schema.json:5` にもある。**再生側はほぼ揃っており、止まっているのは観測側**。
 2. `knowledge/product/orchestration/procedures.json` は空(`"procedures": []`)。実データは `knowledge/personal/browser-procedures.json` の 5 件のみ。
 3. その 5 件はすべて `pipelines/browser/{id}.json` を参照するが、**`pipelines/browser/` ディレクトリが存在しない**。録画→カタログ登録は動いているが、コンパイル済み成果物が永続化されていない。
 
-さらに、Kyberion の蒸留は**散文しか生まない**。`extractHintsFromTrace`(`libs/core/src/feedback-loop.ts`)は `HINTS.md` へのテキストヒントを、`DistillCandidateRecord.target_kind` は `pattern | sop_candidate | knowledge_hint | report_template` を生成する — **実行可能成果物の選択肢が無い**。成功したミッションはヒントを残すが pipeline を残さない。
+さらに、Kyberion の蒸留は**散文しか生まない**。`extractHintsFromTrace`(`libs/core/knowledge/feedback-loop.ts`)は `HINTS.md` へのテキストヒントを、`DistillCandidateRecord.target_kind` は `pattern | sop_candidate | knowledge_hint | report_template` を生成する — **実行可能成果物の選択肢が無い**。成功したミッションはヒントを残すが pipeline を残さない。
 
 ### 1.4 desktop 設計 §6 の想定を補正する必要がある
 
@@ -141,7 +141,7 @@ Kyberion にとっての含意は大きい: `os-automation.ts` は既に `getWin
 
 ### DR-03: 人間実演レコーダ(ポーリング観測)(P0 / L)— **本計画の中核**
 
-**内容**: `desktop-recording.v1` を実際に生成する観測層を新設する(`libs/core/desktop-recording.ts`)。既存設計 §6 の「`osAutomationBridge` をフックする」方式は**人間の実演では発火しない**(§1.4)ため、**独立ポーリング観測**に改める。
+**内容**: `desktop-recording.v1` を実際に生成する観測層を新設する(`libs/core/virtual/desktop-recording.ts`)。既存設計 §6 の「`osAutomationBridge` をフックする」方式は**人間の実演では発火しない**(§1.4)ため、**独立ポーリング観測**に改める。
 
 - **観測ソース**: `getWindowList` / `activateWindowByTitle`(アクティブアプリ・ウィンドウタイトル)、`clipboardRead`(sha1 + 短いプレビューのみ。**内容は保持しない**)、`listChromeTabs`(ブラウザ URL)、`detectFocusedInput`(AX role/description/editable)。すべて `os-automation.ts` の既存エクスポート。
 - **映像は二次**: `screen-capture-bridge.ts` / `screen-recording-bridge.ts` を低レートで使い、**dHash 差分ゲート + ハートビート**で間引く(skill-recorder は 64bit dHash・ハミング距離 8・5 秒ハートビート・1fps/720p)。ハートビートは「静止画面でも任意の窓に必ずキーフレームが1枚存在する」ことを保証するための下限であり、省略してはならない。

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
+import { listMemoryPromotionCandidates } from '@agent/core/knowledge/memory-promotion-queue';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

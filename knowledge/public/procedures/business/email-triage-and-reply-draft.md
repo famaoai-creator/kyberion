@@ -56,5 +56,5 @@ This workflow is split into two surfaces:
 - This flow is intentionally local-first. It prepares the reply text, but final sending stays in your mail client or an external mail automation flow.
 - If `gws auth status` fails, authenticate before running the pipeline.
 - For production sending, prefer `Create Gmail Draft` first and only use `Send Approved Email` after reviewing the draft.
-- The Web and CLI surfaces share `libs/core/email-workflow.ts`, so draft parsing, auth checks, and Gmail delivery stay consistent.
+- The Web and CLI surfaces share `libs/core/integrations/email-workflow.ts`, so draft parsing, auth checks, and Gmail delivery stay consistent.
 - `pnpm email:workflow ...` remains as a direct helper for lower-level automation, but `pnpm kyberion email ...` is the preferred human-facing CLI entrypoint.

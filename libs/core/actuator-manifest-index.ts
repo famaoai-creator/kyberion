@@ -1,2 +1,2 @@
 /** Public package boundary for the actuator manifest catalog. */
-export * from './src/actuator-manifest-index.js';
+export * from './actuator/actuator-manifest-index.js';

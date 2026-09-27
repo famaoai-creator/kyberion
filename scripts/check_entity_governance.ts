@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { listProjectRecords } from '@agent/core/project-registry';
+import { listProjectRecords } from '@agent/core/project/project-registry';
 import {
   safeExistsSync,
   safeLstat,

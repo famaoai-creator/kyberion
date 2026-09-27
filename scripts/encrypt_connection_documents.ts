@@ -17,7 +17,7 @@ import {
   encryptConnectionDocument,
   isEncryptedConnectionEnvelope,
   resolveSecretEncryptionMode,
-} from '@agent/core/secret-encryption';
+} from '@agent/core/secret/secret-encryption';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';

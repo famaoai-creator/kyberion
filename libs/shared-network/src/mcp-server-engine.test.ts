@@ -102,9 +102,9 @@ vi.mock('@agent/core/knowledge-index', async () => {
   };
 });
 
-vi.mock('@agent/core/approval-store', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/approval-store')>(
-    '@agent/core/approval-store'
+vi.mock('@agent/core/governance/approval-store', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/governance/approval-store')>(
+    '@agent/core/governance/approval-store'
   );
   return {
     ...actual,
@@ -130,7 +130,7 @@ vi.mock('@agent/core/cowork-surface.js', () => ({
   listCoworkOutbox: mockListCoworkOutbox,
 }));
 
-vi.mock('@agent/core/approval-cowork-adapter.js', () => ({
+vi.mock('@agent/core/governance/approval-cowork-adapter', () => ({
   listPendingApprovalsForCowork: mockListPendingApprovals,
   decideApprovalFromCowork: mockDecideApproval,
   recordAuditExportRequest: mockRecordAuditExport,
@@ -140,9 +140,9 @@ vi.mock('@agent/core/cowork-knowledge-bridge.js', () => ({
   runCoworkKnowledgeSync: mockRunCoworkKnowledgeSync,
 }));
 
-vi.mock('@agent/core/service-engine', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/service-engine')>(
-    '@agent/core/service-engine'
+vi.mock('@agent/core/service/service-engine', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/service/service-engine')>(
+    '@agent/core/service/service-engine'
   );
   return {
     ...actual,

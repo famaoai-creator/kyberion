@@ -28,7 +28,7 @@ status: archived
 
 ## 1. 診断(2026-07-25、実コード突合)
 
-- **検出はあるが能力プローブがない**: `libs/core/provider-discovery.ts` はバイナリ存在ベース。headless モード可否・JSON 出力・認証状態・実行可能ツールは実行時に初めて判明し、「入っているが未認証の CLI」へルーティングして落ちる形が構造的に可能。
+- **検出はあるが能力プローブがない**: `libs/core/provider/provider-discovery.ts` はバイナリ存在ベース。headless モード可否・JSON 出力・認証状態・実行可能ツールは実行時に初めて判明し、「入っているが未認証の CLI」へルーティングして落ちる形が構造的に可能。
 - **backend は個別実装でルール共有がない**: `codex-cli-query.ts` / `agy-cli-backend.ts` / `shell-claude-cli-backend.ts` / `claude-agent-reasoning-backend.ts` が各自のプロセス起動・env 受け渡し・出力パースを持つ。子プロセス env の allowlist 最小化(HA-04 が `core:ptc` で実証済みの型)は委譲経路には未適用で、**無関係プロバイダの API キーが子プロセス env に漏れうる**。
 - **同一ディレクトリ併走の契約が未定義**: 各 CLI は cwd を暗黙コンテキストとして扱い、指示ファイル(`AGENTS.md` 正本 + `CLAUDE.md`/`CODEX.md`/`GEMINI.md` symlink — これは実装済みの正解)と `.claude/` 等のプロバイダ状態ディレクトリを読む。書き込み排他・git 操作の権限・プロバイダ状態ディレクトリの管理(gitignore / 生成)は規約化されていない。
 - **tier × egress の突合がない**: プロバイダごとにデータの行き先(外部 API / ローカル推論)が違うが、`personal` / `confidential` tier のデータをどの provider に渡してよいかのゲートがない。SA-04 の egress 制御は network 面が対象で、**委譲面(プロンプトに載せて外部 LLM へ送る)は未カバー**。

@@ -14,8 +14,8 @@
       "produces": { "channel": "project_management_tests", "type": "VitestResult" },
       "params": {
         "files": [
-          "libs/core/project-management.test.ts",
-          "libs/core/mission-project-reassignment.test.ts"
+          "libs/core/project/project-management.test.ts",
+          "libs/core/mission/mission-project-reassignment.test.ts"
         ]
       }
     },

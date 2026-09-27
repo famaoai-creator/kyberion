@@ -10,7 +10,7 @@
  */
 
 import { coreSeamCatalog, createSeam } from './seam.js';
-import type { VideoRouteHealth, VideoRouteMetrics } from './video-route.js';
+import type { VideoRouteHealth, VideoRouteMetrics } from './video/video-route.js';
 
 export interface CameraOutputCapabilities {
   /** Whether frames reach a real OS virtual-camera device. */

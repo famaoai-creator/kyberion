@@ -1,6 +1,6 @@
 # Kyberion Trace Schema
 
-> Generated from `libs/core/trace-schema.ts`; edit the schema source, not this file.
+> Generated from `libs/core/analysis/trace-schema.ts`; edit the schema source, not this file.
 
 | Span kind  | Allowed parents     | Status error condition                       |
 | ---------- | ------------------- | -------------------------------------------- |

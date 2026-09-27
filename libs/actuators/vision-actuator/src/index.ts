@@ -8,12 +8,12 @@ import {
   safeLstat,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { executeServicePreset } from '@agent/core/service-engine';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ocrImage as coreOcrImage } from '@agent/core/ocr-bridge';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
 import { handleDescribeImage } from './describe-image.js';
 import { handleMarkElements } from './mark-elements.js';
@@ -211,5 +211,5 @@ const main = async () => {
 if (isDirectEntry(import.meta.url, 'libs/actuators/vision-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'vision-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

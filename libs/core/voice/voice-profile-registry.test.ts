@@ -1,0 +1,331 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as pathResolver from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+
+const mocks = vi.hoisted(() => ({
+  customerRoot: vi.fn(() => null as string | null),
+}));
+
+vi.mock('../customer-resolver.js', () => ({
+  customerRoot: mocks.customerRoot,
+}));
+
+import {
+  getWritableVoiceProfileRegistryForTier,
+  getVoiceProfileRecord,
+  getVoiceProfileRegistry,
+  loadVoiceProfileRegistryAtPath,
+  listVoiceProfiles,
+  resetVoiceProfileRegistryCache,
+} from './voice-profile-registry.js';
+
+describe('voice profile registry', () => {
+  const tmpDir = pathResolver.sharedTmp('voice-profile-registry-tests');
+  const overridePath = `${tmpDir}/voice-profile-registry.json`;
+  const registryDir = `${tmpDir}/voice-profiles`;
+  const customerOverlayPath = `${tmpDir}/voice-profile-registry.customer.json`;
+  const overlayPath = `${tmpDir}/voice-profile-registry.personal.json`;
+
+  afterEach(() => {
+    safeRmSync(tmpDir, { recursive: true, force: true });
+    delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
+    delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR;
+    delete process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH;
+    mocks.customerRoot.mockReturnValue(null);
+    resetVoiceProfileRegistryCache();
+  });
+
+  it('loads profiles from override registry files', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'ja-default',
+        profiles: [
+          {
+            profile_id: 'ja-default',
+            display_name: 'Japanese Default',
+            tier: 'public',
+            languages: ['ja'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+          {
+            profile_id: 'shadow-en',
+            display_name: 'Shadow English',
+            tier: 'confidential',
+            languages: ['en'],
+            default_engine_id: 'open_voice_clone',
+            status: 'shadow',
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
+
+    const registry = getVoiceProfileRegistry();
+    expect(registry.default_profile_id).toBe('ja-default');
+    expect(getVoiceProfileRecord().profile_id).toBe('ja-default');
+    expect(listVoiceProfiles('shadow')).toHaveLength(1);
+  });
+
+  it('fails closed when the configured base registry is invalid', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
+
+    expect(() => getVoiceProfileRegistry()).toThrow(/Invalid catalog voice-profile-registry/);
+  });
+
+  it('rejects configured base registries outside the repository', () => {
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = '/tmp/kyberion-voice-profile-registry.json';
+
+    expect(() => getVoiceProfileRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects registry overrides that traverse a symbolic link', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    const linkedPath = `${tmpDir}/linked-registry.json`;
+    fs.symlinkSync(overridePath, linkedPath);
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = linkedPath;
+
+    expect(() => getVoiceProfileRegistry()).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('keeps explicit registry overrides isolated from the personal overlay', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'ja-default',
+        profiles: [
+          {
+            profile_id: 'ja-default',
+            display_name: 'Japanese Default',
+            tier: 'public',
+            languages: ['ja'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Personal Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/sample-01.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const registry = getVoiceProfileRegistry();
+    expect(registry.default_profile_id).toBe('ja-default');
+    expect(registry.profiles).toHaveLength(1);
+  });
+
+  it('loads the canonical directory when the default public registry is active', () => {
+    safeMkdir(registryDir, { recursive: true });
+    safeWriteFile(
+      `${registryDir}/operator-en-default.json`,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'operator-en-default',
+        profiles: [
+          {
+            profile_id: 'operator-en-default',
+            display_name: 'Operator English Default',
+            tier: 'public',
+            languages: ['en'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      `${registryDir}/operator-ja-default.json`,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'operator-ja-default',
+        profiles: [
+          {
+            profile_id: 'operator-ja-default',
+            display_name: 'Operator Japanese Default',
+            tier: 'public',
+            languages: ['ja'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR = registryDir;
+    // Keep this directory-loader test independent from the checked-in personal
+    // overlay, which otherwise changes the default profile in CI checkouts.
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = `${tmpDir}/missing-personal-overlay.json`;
+
+    const registry = getVoiceProfileRegistry();
+    expect(registry.default_profile_id).toBe('operator-ja-default');
+    expect(registry.profiles.map((profile) => profile.profile_id)).toContain('operator-ja-default');
+    expect(registry.profiles.map((profile) => profile.profile_id)).toContain('operator-en-default');
+  });
+
+  it('prefers the customer overlay when one is active', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      customerOverlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'customer-ja',
+        profiles: [
+          {
+            profile_id: 'customer-ja',
+            display_name: 'Customer Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/customer-sample.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Personal Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/sample-01.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    mocks.customerRoot.mockReturnValue(customerOverlayPath);
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const registry = getVoiceProfileRegistry();
+    expect(registry.default_profile_id).toBe('customer-ja');
+    expect(getVoiceProfileRecord().profile_id).toBe('customer-ja');
+    expect(registry.profiles.some((profile) => profile.profile_id === 'customer-ja')).toBe(true);
+    expect(registry.profiles.some((profile) => profile.profile_id === 'me-ja')).toBe(true);
+  });
+
+  it('merges the personal overlay when using the default public registry', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Personal Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/sample-01.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const registry = getVoiceProfileRegistry();
+    expect(registry.default_profile_id).toBe('me-ja');
+    expect(getVoiceProfileRecord().profile_id).toBe('me-ja');
+    expect(registry.profiles.some((profile) => profile.profile_id === 'me-ja')).toBe(true);
+  });
+
+  it('returns the personal overlay alone for personal-tier writes', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Personal Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/sample-01.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const writable = getWritableVoiceProfileRegistryForTier('personal');
+    expect(writable.registryPath).toBe(overlayPath);
+    expect(writable.registry.default_profile_id).toBe('me-ja');
+    expect(writable.registry.profiles.map((profile) => profile.profile_id)).toEqual(['me-ja']);
+    expect(
+      writable.registry.profiles.some((profile) => profile.profile_id === 'operator-ja-default')
+    ).toBe(false);
+  });
+
+  it('keeps an empty personal overlay valid before the first profile is registered', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const writable = getWritableVoiceProfileRegistryForTier('personal');
+    expect(writable.registry).toEqual({ version: 'test', default_profile_id: '', profiles: [] });
+  });
+
+  it('loads a path-bound registry with the same empty-overlay contract', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+
+    expect(loadVoiceProfileRegistryAtPath(overridePath, { allowEmpty: true })).toEqual({
+      version: 'test',
+      default_profile_id: '',
+      profiles: [],
+    });
+    expect(() => loadVoiceProfileRegistryAtPath(overridePath)).toThrow(
+      /Invalid catalog voice-profile-registry/
+    );
+  });
+});

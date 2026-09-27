@@ -7,14 +7,14 @@ const mocks = vi.hoisted(() => ({
   probeServiceRuntime: vi.fn(),
 }));
 
-vi.mock('@agent/core/audit-chain', () => ({
+vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: (...args: unknown[]) => mocks.record(...args) },
 }));
 
-vi.mock('@agent/core/service-runtime-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/service-runtime-registry')>(
-    '@agent/core/service-runtime-registry'
-  );
+vi.mock('@agent/core/service/service-runtime-registry', async () => {
+  const actual = await vi.importActual<
+    typeof import('@agent/core/service/service-runtime-registry')
+  >('@agent/core/service/service-runtime-registry');
   return { ...actual, probeServiceRuntime: mocks.probeServiceRuntime };
 });
 
@@ -34,7 +34,7 @@ import {
 import {
   getMediaBackendRecord,
   resetMediaBackendAvailabilityCache,
-} from '@agent/core/media-backend-registry';
+} from '@agent/core/media/media-backend-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync } from '@agent/core/secure-io';
 import { setSeamSelectionRule } from '@agent/core/seam-selection-rules';

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
-import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
+import { collectOperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,

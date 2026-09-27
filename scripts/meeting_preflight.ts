@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { installCoreEnvironmentProbes } from '@agent/core/environment-capability-probes';
-import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
 import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeReaddir } from '@agent/core/secure-io';

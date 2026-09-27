@@ -4,7 +4,7 @@ import {
   getWorkItem,
   clearWorkCoordinationStore,
   setWorkCoordinationNamespace,
-} from '@agent/core/work-coordination';
+} from '@agent/core/workforce/work-coordination';
 import {
   delegateMeetingReasoning,
   parseMeetingModelObject,

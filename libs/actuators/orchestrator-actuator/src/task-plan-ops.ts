@@ -1,4 +1,4 @@
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { missionDir, pathResolver } from '@agent/core/path-resolver';
 import {
   evaluateTaskPlanReadyGate,

@@ -1,5 +1,5 @@
 import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
-import { executeServicePreset } from '@agent/core/service-engine';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   createGovernedRetryOptionsBuilder,
@@ -9,7 +9,7 @@ import { retry, sleep } from '@agent/core/async-utils';
 import {
   compileMusicGenerationADF,
   buildMusicPromptFromAdf,
-} from '@agent/core/music-workflow-compiler';
+} from '@agent/core/media/music-workflow-compiler';
 import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
@@ -17,7 +17,7 @@ import {
 import {
   getMediaBackendRecord,
   resolveMediaBackendForPlatform,
-} from '@agent/core/media-backend-registry';
+} from '@agent/core/media/media-backend-registry';
 import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
@@ -31,7 +31,7 @@ import {
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isRecord } from '@agent/core/foundation';
-import type { GenerationJob } from '@agent/core/types/generation-job';
+import type { GenerationJob } from '@agent/core/contracts/generation-job';
 import {
   getGenerationHistoryAdapter,
   getGenerationHistoryAdapterForAction,

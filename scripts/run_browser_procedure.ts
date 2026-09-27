@@ -14,17 +14,20 @@
  *   pnpm kyberion browser run --adf libs/actuators/browser-actuator/examples/explore-and-export.json
  */
 
-import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
-import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
+import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
 import { withExecutionContextAsync } from '@agent/core/authority';
-import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
+import {
+  loadProcedures,
+  resolveAllowlistedRecordingRef,
+} from '@agent/core/knowledge/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import type { BrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
-import type { ProcedureEntry } from '@agent/core/procedure-types';
+import type { BrowserExtensionRecording } from '@agent/core/browser/browser-extension-bridge';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 import {

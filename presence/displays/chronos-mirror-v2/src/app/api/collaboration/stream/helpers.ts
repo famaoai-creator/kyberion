@@ -12,13 +12,13 @@ import {
   parseEventScopeFromRecord,
   type EventScopeFilter,
 } from '@agent/core/event-scope';
-import { redactCollaborationMetadata } from '@agent/core/agent-collaboration-events';
+import { redactCollaborationMetadata } from '@agent/core/agent/agent-collaboration-events';
 import {
   workerEventEnvelopeSchema,
   type WorkerEventEnvelope,
-} from '@agent/core/worker-event-stream';
+} from '@agent/core/workforce/worker-event-stream';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
+import { listMissionsInSearchDirs, loadState } from '@agent/core/mission/mission-state';
 import {
   collaborationEventVisibleToTier,
   normalizeWorkerEvent,

@@ -1,5 +1,5 @@
-import { describeServiceHarness } from '@agent/core/service-harness';
-import { loadServicePresetsCatalog } from '@agent/core/service-preset-registry';
+import { describeServiceHarness } from '@agent/core/service/service-harness';
+import { loadServicePresetsCatalog } from '@agent/core/service/service-preset-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineGenerator, isDirectScript } from './lib/harness.js';

@@ -11,7 +11,7 @@ import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
-import { assertProjectTrustApproval } from './project-trust.js';
+import { assertProjectTrustApproval } from './project/project-trust.js';
 import {
   registerExternalLifecycleHooks,
   type ExternalHookSource,

@@ -93,7 +93,7 @@ KA-02 の scope はホストの canonical execution scope から取得する。�
   接続を整えた環境で、テナント別のブラウザ操作と制作サンプルを同じ brief から再実行し、
   費用・所要時間・承認回数・成果物の品質を記録する。未実施を成功扱いしない。
 
-- **KA-06 第 1 段実装（2026-09-14）**: `libs/core/artifact-verification.ts` に、ジョブ受理・
+- **KA-06 第 1 段実装（2026-09-14）**: `libs/core/workforce/artifact-verification.ts` に、ジョブ受理・
   ファイル生成・内容検証・視覚レビュー・人による公開承認を分離して評価する純関数を追加した。
   視覚レビューの `skipped` / `failed` は fail-closed で `blocked`、前段が通って承認待ちの状態は
   `ready_for_approval`、明示的な人の承認後だけ `approved` / `publication_allowed=true` となる。
@@ -103,7 +103,7 @@ KA-02 の scope はホストの canonical execution scope から取得する。�
 
 2026-09-11 の実行結果:
 
-- `pnpm exec vitest run libs/core/knowledge-scope.test.ts libs/core/tenant-knowledge-retrieval.test.ts libs/core/creative-design-resolver.test.ts libs/actuators/browser-actuator/src/browser-interaction-helpers.test.ts libs/actuators/browser-actuator/src/index.test.ts libs/actuators/media-actuator/src/media-theme-scope.test.ts libs/actuators/media-actuator/src/media-theme-catalog.test.ts libs/actuators/media-actuator/src/personal-theme-overlay.test.ts`: **8 files / 98 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-scope.test.ts libs/core/organization/tenant-knowledge-retrieval.test.ts libs/core/creative-design-resolver.test.ts libs/actuators/browser-actuator/src/browser-interaction-helpers.test.ts libs/actuators/browser-actuator/src/index.test.ts libs/actuators/media-actuator/src/media-theme-scope.test.ts libs/actuators/media-actuator/src/media-theme-catalog.test.ts libs/actuators/media-actuator/src/personal-theme-overlay.test.ts`: **8 files / 98 tests passed**。
 - `pnpm typecheck`: **passed**。
 - KA-05 の live lease / retained metadata owner binding: `vitest run libs/actuators/browser-actuator/src/index.test.ts libs/actuators/browser-actuator/src/browser-session-ownership.test.ts` → **41 tests passed**。
 - `scripts/check_contract_schemas.test.ts` → **2 tests passed**。`pnpm check:contract-semver` → **32 actuators, 0 warnings**。

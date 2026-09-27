@@ -31,7 +31,7 @@ import {
   type SpeechToTextBridge,
   type TranscribeInput,
   type TranscribeResult,
-} from './speech-to-text-bridge.js';
+} from './voice/speech-to-text-bridge.js';
 import { discoverLocalSttBackends } from './local-stt-discovery.js';
 
 export const APPLE_SPEECH_FILE_BRIDGE_NAME = 'apple-speech-file';

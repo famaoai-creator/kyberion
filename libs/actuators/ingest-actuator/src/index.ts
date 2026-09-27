@@ -22,7 +22,10 @@
 import { logger } from '@agent/core/core';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { stalenessReport, type IngestSourceObservation } from '@agent/core/ingest-asset-ledger';
-import { defineCatalogBackedActuator, runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import {
+  defineCatalogBackedActuator,
+  runActuatorPipeline,
+} from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
 import { commitIngest, type IngestCommitInput } from './commit.js';
 import { dedupContent, type DedupInput } from './dedup.js';

@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadProjectOperatingSystemArtifactMap } from '@agent/core/project-management';
+import { loadProjectOperatingSystemArtifactMap } from '@agent/core/project/project-management';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile, slugify } from '@agent/core/foundation';

@@ -7,7 +7,7 @@ import {
   resolveMeetingPlatform,
   resolveMeetingPlatformFromUrl,
   validateMeetingTarget,
-} from '@agent/core/meeting-join-driver';
+} from '@agent/core/meeting/meeting-join-driver';
 import {
   installBrowserMeetingJoinDriver,
   createBrowserMeetingJoinDriver,

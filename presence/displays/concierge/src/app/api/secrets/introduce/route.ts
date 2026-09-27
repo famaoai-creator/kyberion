@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   describeIntroductionReadiness,
   proposeSecretIntroduction,
-} from '@agent/core/secret-introduction';
-import { listServiceSecretKeys } from '@agent/core/secret-identity';
+} from '@agent/core/secret/secret-introduction';
+import { listServiceSecretKeys } from '@agent/core/secret/secret-identity';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';

@@ -11,7 +11,7 @@
  * is unknown the configured max passes through unchanged.
  */
 
-import { estimateTokens } from './worker-context-compaction.js';
+import { estimateTokens } from './workforce/worker-context-compaction.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 export const DEFAULT_SAFETY_MARGIN_TOKENS = 1_024;

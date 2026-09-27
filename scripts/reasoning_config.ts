@@ -8,12 +8,12 @@ import {
   saveReasoningRouteUserConfig,
   validateReasoningRouteUserConfig,
   type ReasoningRouteUserConfig,
-} from '@agent/core/reasoning-route-resolver';
-import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
+} from '@agent/core/reasoning/reasoning-route-resolver';
+import { inspectReasoningRoutes } from '@agent/core/reasoning/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
-import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
 import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 
 const HELP = `Usage:

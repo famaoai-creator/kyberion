@@ -7,23 +7,23 @@ import { capabilityEntry } from '@agent/core/path-resolver';
 import {
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
-} from '@agent/core/reasoning-runtime-instructions';
+} from '@agent/core/reasoning/reasoning-runtime-instructions';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
-import { loadApprovalRequest } from '@agent/core/approval-store';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   isScenarioApprovalGranted,
   resolveActuatorOperation,
   resolveActuatorOperationTimeout,
   resolveScenarioOpOverride,
   type ResolvedActuatorOperation,
-} from '@agent/core/actuator-op-registry';
+} from '@agent/core/actuator/actuator-op-registry';
 import { executeProgrammaticToolCall } from '@agent/core/programmatic-tool-calling';
-import type { AdfStep, AdfSkippedStep } from '@agent/core/adf-engine';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import type { AdfStep, AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { parseSafeJsonInput } from '@agent/core/foundation';
-import { type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
   runInlineProductivityDryRunValidation,
@@ -280,7 +280,7 @@ export async function dispatchReasoningLeaf(
   ctx: Record<string, unknown>,
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
-  const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
+  const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
   const backend = getReasoningBackend();
   const resolvedInstruction =
     typeof params.instruction === 'string'

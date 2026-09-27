@@ -1,5 +1,5 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { handleAction } from './compute-actuator-helpers.js';
 import { describeOps } from './op-catalog.js';
 import {

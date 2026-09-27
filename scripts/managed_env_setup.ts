@@ -8,7 +8,7 @@ import {
   resolveManagedProviderCliBinary,
   resolveManagedProviderCliEnvPath,
   resolveProviderCliCommand,
-} from '@agent/core/provider-managed-env';
+} from '@agent/core/provider/provider-managed-env';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { safeExecResult, safeMkdir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

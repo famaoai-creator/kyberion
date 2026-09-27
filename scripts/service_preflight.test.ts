@@ -25,16 +25,16 @@ vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,
 }));
 
-vi.mock('@agent/core/service-runtime-registry', () => ({
+vi.mock('@agent/core/service/service-runtime-registry', () => ({
   probeServiceRuntime: mocks.probeServiceRuntime,
   getServiceRuntimeRecord: mocks.getServiceRuntimeRecord,
 }));
 
-vi.mock('@agent/core/service-endpoint-registry', () => ({
+vi.mock('@agent/core/service/service-endpoint-registry', () => ({
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
-vi.mock('@agent/core/service-validator', () => ({
+vi.mock('@agent/core/service/service-validator', () => ({
   inspectServiceAuth: mocks.inspectServiceAuth,
 }));
 

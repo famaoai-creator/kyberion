@@ -1,5 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { promoteVoiceProfileFromReceipt } from '@agent/core/voice-profile-promotion';
+import { promoteVoiceProfileFromReceipt } from '@agent/core/voice/voice-profile-promotion';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main(args: string[] = []) {

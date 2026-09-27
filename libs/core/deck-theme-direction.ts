@@ -53,7 +53,7 @@ export async function selectDeckTheme(input: SelectDeckThemeInput): Promise<stri
     const generate =
       input.generate ??
       (async (p: string) => {
-        const { getReasoningBackend } = await import('./reasoning-backend.js');
+        const { getReasoningBackend } = await import('./reasoning/reasoning-backend.js');
         return String(await getReasoningBackend().prompt(p));
       });
     const raw = await generate(prompt);
@@ -125,7 +125,7 @@ export async function draftDeckSectionBodies(
     const generate =
       input.generate ??
       (async (p: string) => {
-        const { getReasoningBackend } = await import('./reasoning-backend.js');
+        const { getReasoningBackend } = await import('./reasoning/reasoning-backend.js');
         return String(await getReasoningBackend().prompt(p));
       });
     const raw = await generate(prompt);

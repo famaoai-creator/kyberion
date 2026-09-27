@@ -17,7 +17,7 @@
         "properties": {
           "surface": { "type": "string", "minLength": 1 },
           "role": {
-            "description": "A GovernedArtifactRole (libs/core/artifact-store.ts GOVERNED_ARTIFACT_ROLES).",
+            "description": "A GovernedArtifactRole (libs/core/workforce/artifact-store.ts GOVERNED_ARTIFACT_ROLES).",
             "type": "string",
             "enum": [
               "slack_bridge",

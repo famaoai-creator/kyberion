@@ -5,8 +5,8 @@ import {
   type PeerAdviceResult,
   type ReasoningCallOptions,
   type ToolDefinition,
-} from '@agent/core/reasoning-backend';
-import { renderDeferredToolAnnouncement } from '@agent/core/prompt-cache-discipline';
+} from '@agent/core/reasoning/reasoning-backend';
+import { renderDeferredToolAnnouncement } from '@agent/core/reasoning/prompt-cache-discipline';
 
 export interface PureReasoningInput {
   instruction: string;

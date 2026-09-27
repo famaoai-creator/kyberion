@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createMemoryPromotionCandidate } from './memory-promotion-queue.js';
+import { createMemoryPromotionCandidate } from './knowledge/memory-promotion-queue.js';
 import {
   runKnowledgeValidationSweep,
   runTaskModelRoutingSummary,

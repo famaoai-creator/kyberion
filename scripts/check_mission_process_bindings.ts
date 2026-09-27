@@ -2,16 +2,16 @@ import * as yaml from 'js-yaml';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
-import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
-import { loadMissionReviewGateRegistry } from '@agent/core/mission-review-gates';
-import { loadMissionWorkflowCatalog } from '@agent/core/mission-workflow-catalog';
+import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
+import { loadMissionClassificationPolicy } from '@agent/core/mission/mission-classification';
+import { loadMissionReviewGateRegistry } from '@agent/core/mission/mission-review-gates';
+import { loadMissionWorkflowCatalog } from '@agent/core/mission/mission-workflow-catalog';
 import {
   loadGateProfileRegistry,
   loadMissionOrchestrationScenarioPack,
   loadMissionProcessRegistry,
   loadMissionTaskClassificationScenarioPack,
-} from '@agent/core/mission-process-governance';
+} from '@agent/core/mission/mission-process-governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type JsonRecord = Record<string, any>;

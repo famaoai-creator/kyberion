@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CoreAudioOutputBridge } from './coreaudio-output-bridge.js';
 import { CoreAudioDeviceInventoryBridge } from './coreaudio-device-inventory.js';
-import type { AudioDeviceDescriptor } from './audio-route.js';
+import type { AudioDeviceDescriptor } from './voice/audio-route.js';
 
 const originalPlatform = process.platform;
 const format = {

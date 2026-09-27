@@ -8,10 +8,13 @@
  * the human-facing output.
  */
 
-import { createMissionScopeApprovalRequest } from '@agent/core/mission-scope-approval';
-import { collectMissionTriageReport, draftScopeRebaselineGoal } from '@agent/core/mission-triage';
+import { createMissionScopeApprovalRequest } from '@agent/core/mission/mission-scope-approval';
+import {
+  collectMissionTriageReport,
+  draftScopeRebaselineGoal,
+} from '@agent/core/mission/mission-triage';
 import { logger } from '@agent/core/core';
-import type { ApprovalRequestRecord } from '@agent/core/approval-store';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 
 type Print = (value: unknown) => void;
 

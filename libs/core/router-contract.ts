@@ -2,8 +2,11 @@ import {
   classifySurfaceQueryIntent,
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
-} from './surface-query.js';
-import { resolveIntentResolutionPacket, type IntentResolutionPacket } from './intent-resolution.js';
+} from './surface/surface-query.js';
+import {
+  resolveIntentResolutionPacket,
+  type IntentResolutionPacket,
+} from './intent/intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 import { defineCatalog } from './foundation/governed-catalog.js';

@@ -1,6 +1,6 @@
 import * as authority from '@agent/core/authority';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { recordModelRoleFeedback } from '@agent/core/model-performance-index';
+import { recordModelRoleFeedback } from '@agent/core/reasoning/model-performance-index';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

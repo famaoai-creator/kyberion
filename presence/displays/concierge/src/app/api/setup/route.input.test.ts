@@ -19,19 +19,21 @@ vi.mock('@agent/core/foundation', () => ({
   getRegisteredEnvText: vi.fn(() => undefined),
   readJson: vi.fn(() => ({})),
 }));
-vi.mock('@agent/core/browser-onboarding', () => ({
+vi.mock('@agent/core/browser/browser-onboarding', () => ({
   applyBrowserOnboarding: writes.applyBrowserOnboarding,
   getBrowserOnboardingState: vi.fn(() => ({})),
   saveBrowserOnboardingVoiceSample: vi.fn(),
 }));
-vi.mock('@agent/core/reasoning-bootstrap', () => ({ getInstalledReasoningMode: vi.fn() }));
-vi.mock('@agent/core/agent-identity', () => ({ listAgentIdentities: vi.fn(() => []) }));
-vi.mock('@agent/core/tenant-registry', () => ({
+vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
+  getInstalledReasoningMode: vi.fn(),
+}));
+vi.mock('@agent/core/agent/agent-identity', () => ({ listAgentIdentities: vi.fn(() => []) }));
+vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: vi.fn(() => []),
   readTenantProfile: vi.fn(),
   writeTenantProfile: writes.writeTenantProfile,
 }));
-vi.mock('@agent/core/operator-notifications', () => ({
+vi.mock('@agent/core/surface/operator-notifications', () => ({
   loadNotificationPreferences: vi.fn(() => ({})),
 }));
 vi.mock('@agent/core/profile-root', () => ({
@@ -45,10 +47,10 @@ vi.mock('@agent/core/path-resolver', () => ({
     toRepoRelative: vi.fn((value: string) => value),
   },
 }));
-vi.mock('@agent/core/surface-runtime', () => ({
+vi.mock('@agent/core/surface/surface-runtime', () => ({
   loadSurfaceManifest: vi.fn(() => ({ surfaces: [] })),
 }));
-vi.mock('@agent/core/surface-role-catalog', () => ({
+vi.mock('@agent/core/surface/surface-role-catalog', () => ({
   loadSurfaceRoleCatalog: vi.fn(() => ({ roles: [] })),
 }));
 vi.mock('@agent/core/secure-io', () => ({

@@ -7,12 +7,12 @@
  */
 import { withExecutionContext } from '@agent/core/authority';
 import { HUMAN_ACTOR_PREFIX } from '@agent/core/actor';
-import type { HumanDecidedBy } from '@agent/core/mission-types';
+import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import type {
   WorkFrequencyPer,
   WorkInventoryFrequency,
   WorkInventoryScope,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import { getOptionValue, parseCsvOption } from '../refactor/mission-cli-args.js';
 import { resolveDecidedByFromArgv } from './decided-by-args.js';
 

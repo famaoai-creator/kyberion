@@ -2,7 +2,10 @@ import { Jimp } from 'jimp';
 import { logger } from './core.js';
 import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import { boxArea, coverageRatio, iou, type SomBox, type SomCandidate } from './set-of-marks.js';
-import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-detector.js';
+import type {
+  UiElementDetectionRequest,
+  UiElementDetector,
+} from './surface/ui-element-detector.js';
 
 /**
  * `pixel_regions` UI element detector: control-like regions found from pixels

@@ -2,8 +2,8 @@ import { classifyError } from '@agent/core/error-classifier';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
 import { persistTrace, TraceContext } from '@agent/core/trace';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
 import type { ValidateFunction } from 'ajv';
 import {

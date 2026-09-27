@@ -1,0 +1,783 @@
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { pathResolver, rootDir } from '../path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
+import { appendSupervisorEvent } from './agent-runtime-events.js';
+import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
+import { classifyAgentReadiness, describeAgentReadiness } from './agent-runtime-readiness.js';
+import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
+import {
+  ensureMissionTeamRuntime,
+  type EnsureMissionTeamRuntimeOptions,
+  type MissionTeamRuntimePlan,
+} from '../mission/mission-team-orchestrator.js';
+import { agentLifecycle, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
+import type { TaskModelHint } from '../reasoning/reasoning-model-routing.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeOpenAppendFile,
+  safeWriteFile,
+} from '../secure-io.js';
+import { spawnManagedProcess } from '../managed-process.js';
+import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
+import { logger } from '../core.js';
+import { metrics, resolveCostRates } from '../metrics.js';
+import { parseEventScopeInput, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  assertRuntimeNhiScope,
+  assertRuntimeScopeCompatible,
+  resolveRuntimeScope,
+} from '../tool/runtime-scope.js';
+
+export { appendSupervisorEvent } from './agent-runtime-events.js';
+export type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
+
+export interface AgentRuntimeEnsureRequest {
+  request_id: string;
+  mission_id: string;
+  scope: EventScope;
+  team_roles?: string[];
+  requested_by: string;
+  reason?: string;
+  created_at: string;
+}
+
+export interface AgentRuntimeEnsureResult {
+  request_id: string;
+  mission_id: string;
+  scope: EventScope;
+  team_roles?: string[];
+  requested_by: string;
+  created_at: string;
+  completed_at: string;
+  organization_profile?: MissionTeamRuntimePlan['organization_profile'];
+  runtime_plan: MissionTeamRuntimePlan;
+}
+
+interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeamRuntimeOptions {
+  requestedBy: string;
+  scope?: EventScopeInput;
+  reason?: string;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
+const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
+const AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-result.schema.json'
+);
+const AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-request.schema.json'
+);
+
+const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
+  id: 'agent-runtime-ensure-result',
+  path: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+});
+
+function agentRuntimeEnsureRequestCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureRequest>({
+    id: 'agent-runtime-ensure-request',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
+  });
+}
+
+function agentRuntimeEnsureResultCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureResult>({
+    id: 'agent-runtime-ensure-result',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  });
+}
+
+function safeQueuePath(filePath: string, queueDir: string): string {
+  const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const relative = path.relative(path.resolve(queueDir), resolved);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(`[AGENT_RUNTIME_QUEUE_SCOPE] path is outside the queue directory: ${filePath}`);
+  }
+  return resolved;
+}
+
+type ParsedAgentRuntimeEnsureRequest = Omit<AgentRuntimeEnsureRequest, 'scope'> & {
+  scope: EventScopeInput;
+};
+
+function requiredRequestString(
+  record: Record<string, unknown>,
+  key: keyof AgentRuntimeEnsureRequest
+): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`[AGENT_RUNTIME_REQUEST_INVALID] ${String(key)} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseAgentRuntimeEnsureRequest(
+  value: unknown,
+  expectedRequestId: string
+): ParsedAgentRuntimeEnsureRequest {
+  const record = parseSafeJsonObjectValue(value, 'agent runtime request');
+  const requestId = requiredRequestString(record, 'request_id');
+  if (requestId !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_REQUEST_INVALID] request_id '${requestId}' does not match queue file '${expectedRequestId}'`
+    );
+  }
+  const missionId = requiredRequestString(record, 'mission_id');
+  const requestedBy = requiredRequestString(record, 'requested_by');
+  const createdAt = requiredRequestString(record, 'created_at');
+  const scope = parseEventScopeInput(record.scope);
+  const teamRolesValue = record.team_roles;
+  let teamRoles: string[] | undefined;
+  if (teamRolesValue !== undefined) {
+    if (!Array.isArray(teamRolesValue)) {
+      throw new Error(
+        '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+      );
+    }
+    teamRoles = teamRolesValue.map((role) => {
+      if (typeof role !== 'string' || role.trim() === '') {
+        throw new Error(
+          '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+        );
+      }
+      return role;
+    });
+  }
+  const reason = record.reason;
+  if (reason !== undefined && typeof reason !== 'string') {
+    throw new Error('[AGENT_RUNTIME_REQUEST_INVALID] reason must be a string');
+  }
+  return {
+    request_id: requestId,
+    mission_id: missionId,
+    scope,
+    ...(teamRoles ? { team_roles: teamRoles } : {}),
+    requested_by: requestedBy,
+    ...(typeof reason === 'string' ? { reason } : {}),
+    created_at: createdAt,
+  };
+}
+
+function estimateRuntimeTokens(chars: unknown): number {
+  const count = Number(chars || 0);
+  return Number.isFinite(count) && count > 0 ? Math.ceil(count / 4) : 0;
+}
+
+export function resolveRuntimeTokenUsage(input: {
+  reportedInputTokens: number;
+  reportedOutputTokens: number;
+  promptChars: number;
+  responseChars: number;
+}): {
+  inputTokens: number;
+  outputTokens: number;
+  usageEstimated: boolean;
+  usageStatus: 'actual' | 'estimated';
+} {
+  const hasReportedUsage =
+    Number.isFinite(input.reportedInputTokens) &&
+    Number.isFinite(input.reportedOutputTokens) &&
+    (input.reportedInputTokens > 0 ||
+      input.reportedOutputTokens > 0 ||
+      (input.promptChars === 0 && input.responseChars === 0));
+  if (hasReportedUsage) {
+    return {
+      inputTokens: Math.max(0, input.reportedInputTokens),
+      outputTokens: Math.max(0, input.reportedOutputTokens),
+      usageEstimated: false,
+      usageStatus: 'actual',
+    };
+  }
+  return {
+    inputTokens: estimateRuntimeTokens(input.promptChars),
+    outputTokens: estimateRuntimeTokens(input.responseChars),
+    usageEstimated: true,
+    usageStatus: 'estimated',
+  };
+}
+
+function ensureQueueDirs(): void {
+  assertSafeRepositoryPath(REQUESTS_DIR, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(RESULTS_DIR, { allowMissingLeaf: true });
+  safeMkdir(REQUESTS_DIR);
+  safeMkdir(RESULTS_DIR);
+}
+
+export function getAgentRuntimeEnsureRequestPath(requestId: string): string {
+  ensureQueueDirs();
+  return safeQueuePath(path.join(REQUESTS_DIR, `${requestId}.json`), REQUESTS_DIR);
+}
+
+export function getAgentRuntimeEnsureResultPath(requestId: string): string {
+  ensureQueueDirs();
+  return safeQueuePath(path.join(RESULTS_DIR, `${requestId}.json`), RESULTS_DIR);
+}
+
+export function enqueueMissionTeamPrewarmRequest(input: {
+  missionId: string;
+  teamRoles?: string[];
+  requestedBy: string;
+  scope?: EventScopeInput;
+  reason?: string;
+}): AgentRuntimeEnsureRequest {
+  ensureQueueDirs();
+  const request: AgentRuntimeEnsureRequest = {
+    request_id: `AR-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    mission_id: input.missionId.toUpperCase(),
+    scope: resolveRuntimeScope({ missionId: input.missionId, scope: input.scope }),
+    team_roles: input.teamRoles?.length ? [...input.teamRoles] : undefined,
+    requested_by: input.requestedBy,
+    reason: input.reason,
+    created_at: nowIso(),
+  };
+  const requestPath = getAgentRuntimeEnsureRequestPath(request.request_id);
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(requestPath).validate(
+    request,
+    requestPath
+  );
+  safeWriteFile(requestPath, JSON.stringify(validated, null, 2));
+  appendSupervisorEvent({
+    decision: 'agent_runtime_prewarm_requested',
+    request_id: request.request_id,
+    mission_id: request.mission_id,
+    scope: request.scope,
+    requested_by: request.requested_by,
+    team_roles: request.team_roles || [],
+  });
+  return request;
+}
+
+export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
+  const safePath = safeQueuePath(requestPath, REQUESTS_DIR);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_REQUEST] request must be a regular file: ${requestPath}`);
+  }
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(safePath).load();
+  const request = parseAgentRuntimeEnsureRequest(
+    validated,
+    path.basename(safePath, path.extname(safePath))
+  );
+  return {
+    ...request,
+    mission_id: request.mission_id.toUpperCase(),
+    scope: resolveRuntimeScope({ missionId: request.mission_id, scope: request.scope }),
+  };
+}
+
+export async function processMissionTeamPrewarmRequest(
+  requestPath: string
+): Promise<AgentRuntimeEnsureResult> {
+  const request = loadMissionTeamPrewarmRequest(requestPath);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_prewarm_started',
+    request_id: request.request_id,
+    mission_id: request.mission_id,
+    scope: request.scope,
+    requested_by: request.requested_by,
+  });
+
+  const runtime_plan = await ensureMissionTeamRuntime({
+    missionId: request.mission_id,
+    teamRoles: request.team_roles,
+    scope: request.scope,
+    runtimeOwnerId: `agent-runtime-supervisor:${request.request_id}`,
+    runtimeOwnerType: 'agent-runtime-supervisor',
+  });
+
+  const result: AgentRuntimeEnsureResult = {
+    ...request,
+    completed_at: nowIso(),
+    organization_profile: runtime_plan.organization_profile,
+    runtime_plan,
+  };
+  const validatedResult = agentRuntimeEnsureResultCatalog.validate(
+    result,
+    getAgentRuntimeEnsureResultPath(request.request_id)
+  );
+  safeWriteFile(
+    getAgentRuntimeEnsureResultPath(request.request_id),
+    JSON.stringify(validatedResult, null, 2)
+  );
+  appendSupervisorEvent({
+    decision: 'agent_runtime_prewarm_completed',
+    request_id: request.request_id,
+    mission_id: request.mission_id,
+    scope: request.scope,
+    requested_by: request.requested_by,
+    assignment_count: runtime_plan.assignments.length,
+  });
+  return validatedResult;
+}
+
+/**
+ * Where a detached supervisor's own output goes.
+ *
+ * It used to go nowhere. The supervisor ran with `stdio: 'ignore'`, so when it
+ * died partway through starting a team — after splitting panes and launching
+ * agents, before delivering them anything or writing a result — its
+ * `[pane-runtime]` lines and the stack trace of whatever killed it went to
+ * /dev/null. Dispatch then polled ten minutes for a result, the agents sat
+ * idle with empty inputs, the panes it had split stayed behind as bare
+ * shells, and there was nothing anywhere to say why.
+ */
+export function getAgentRuntimeSupervisorLogPath(requestId: string): string {
+  return pathResolver.shared(`logs/agent-runtime-supervisor/${requestId}.log`);
+}
+
+export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsureRequest): string {
+  const requestPath = getAgentRuntimeEnsureRequestPath(request.request_id);
+  const resourceId = `agent-runtime-supervisor:${request.request_id}`;
+  let logFd: number | 'ignore' = 'ignore';
+  try {
+    logFd = safeOpenAppendFile(getAgentRuntimeSupervisorLogPath(request.request_id));
+  } catch (error: unknown) {
+    // Never block a start on logging; say so in the event stream instead.
+    appendSupervisorEvent({
+      decision: 'agent_runtime_supervisor_log_unavailable',
+      request_id: request.request_id,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+  spawnManagedProcess({
+    resourceId,
+    kind: 'service',
+    ownerId: request.requested_by,
+    ownerType: 'agent-runtime-supervisor',
+    command: 'node',
+    args: ['dist/scripts/run_agent_runtime_supervisor.js', '--request', requestPath],
+    spawnOptions: {
+      cwd: rootDir(),
+      env: process.env,
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+    },
+    shutdownPolicy: 'detached',
+    metadata: {
+      requestId: request.request_id,
+      missionId: request.mission_id,
+      teamRoles: request.team_roles || [],
+    },
+  });
+  return requestPath;
+}
+
+export async function waitForMissionTeamPrewarmResult(
+  requestId: string,
+  timeoutMs = 600_000,
+  pollIntervalMs = 1_000
+): Promise<AgentRuntimeEnsureResult> {
+  const resultPath = getAgentRuntimeEnsureResultPath(requestId);
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (safeExistsSync(resultPath)) {
+      return loadMissionTeamPrewarmResultAtPath(resultPath, requestId);
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  appendSupervisorEvent({
+    decision: 'agent_runtime_prewarm_timeout',
+    request_id: requestId,
+  });
+  throw new Error(`Timed out waiting for agent runtime prewarm result: ${requestId}`);
+}
+
+/** Load one persisted prewarm result through the shared schema and request binding. */
+export function loadMissionTeamPrewarmResultAtPath(
+  resultPath: string,
+  expectedRequestId: string
+): AgentRuntimeEnsureResult {
+  const safeResultPath = safeQueuePath(resultPath, RESULTS_DIR);
+  if (!safeLstat(safeResultPath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_RESULT] result must be a regular file: ${resultPath}`);
+  }
+  const result = agentRuntimeEnsureResultCatalogAtPath(safeResultPath).load();
+  if (result.request_id !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] result belongs to ${result.request_id}, expected ${expectedRequestId}`
+    );
+  }
+  if (result.runtime_plan.mission_id.toUpperCase() !== result.mission_id.toUpperCase()) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] runtime plan belongs to ${result.runtime_plan.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  if (
+    result.scope.mission_id &&
+    result.scope.mission_id.toUpperCase() !== result.mission_id.toUpperCase()
+  ) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] scope belongs to ${result.scope.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  return result;
+}
+
+export async function ensureMissionTeamRuntimeViaSupervisor(
+  options: EnsureMissionTeamRuntimeViaSupervisorOptions
+): Promise<AgentRuntimeEnsureResult> {
+  const request = enqueueMissionTeamPrewarmRequest({
+    missionId: options.missionId,
+    teamRoles: options.teamRoles,
+    requestedBy: options.requestedBy,
+    reason: options.reason,
+    scope: options.scope,
+  });
+  startAgentRuntimeSupervisorForRequest(request);
+  return waitForMissionTeamPrewarmResult(
+    request.request_id,
+    options.timeoutMs,
+    options.pollIntervalMs
+  );
+}
+
+export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Promise<AgentHandle> {
+  const runtimeScope = resolveRuntimeScope({
+    missionId: options.missionId,
+    scope: options.scope,
+  });
+  assertRuntimeNhiScope(runtimeScope);
+  const existing = getAgentRuntimeHandle(options.agentId || '');
+  if (existing) assertRuntimeScopeCompatible(existing.getRecord()?.scope, runtimeScope);
+  const taskModelHint = options.runtimeMetadata?.task_model_hint;
+  appendSupervisorEvent({
+    decision: 'agent_runtime_ensure_requested',
+    agent_id: options.agentId,
+    mission_id: options.missionId,
+    scope: runtimeScope,
+    requested_by: options.requestedBy,
+    provider: options.provider,
+    model_id: options.modelId,
+    task_model_hint: taskModelHint,
+  });
+  const handle = await agentLifecycle.spawn({ ...options, scope: runtimeScope });
+  const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
+  const resolvedAgentId = options.agentId || handle.agentId;
+  const snapshot = getAgentRuntimeSnapshot(resolvedAgentId, 20);
+  const actualModelId = snapshot?.agent.modelId || handle.getRecord()?.modelId || options.modelId;
+  if (runtimeRecord) {
+    runtimeSupervisor.update(runtimeRecord.resourceId, {
+      ownerId: options.runtimeOwnerId || runtimeRecord.ownerId,
+      ownerType: options.runtimeOwnerType || runtimeRecord.ownerType,
+      metadata: {
+        ...(runtimeRecord.metadata || {}),
+        ...(options.runtimeMetadata || {}),
+        requestedBy: options.requestedBy,
+      },
+    });
+  }
+  // Keep this as a one-shot check. ACP, stateless CLI and app-server
+  // runtimes do not expose a pane transcript here; their logs can remain
+  // empty until the first prompt. Adapter-level settlePrompts owns startup
+  // prompts, so waiting for a generic ready marker here would make those
+  // runtimes fail after an arbitrary timeout.
+  const readiness = classifyAgentReadiness(
+    (snapshot?.logs || []).map((entry) => entry.content).join('\n')
+  );
+  if (readiness.state === 'awaiting_human') {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_awaiting_human',
+      agent_id: resolvedAgentId,
+      mission_id: options.missionId,
+      scope: runtimeScope,
+      requested_by: options.requestedBy,
+      provider: options.provider,
+      signature_id: readiness.signatureId,
+      prompt_excerpt: readiness.promptExcerpt,
+    });
+    // Fail here rather than let a caller wait. Nothing about waiting longer
+    // answers a question, and the message carries the screen so whoever
+    // reads it can act.
+    throw new Error(`[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(readiness)}`);
+  }
+
+  appendSupervisorEvent({
+    decision: 'agent_runtime_ensure_completed',
+    agent_id: resolvedAgentId,
+    mission_id: options.missionId,
+    scope: runtimeScope,
+    requested_by: options.requestedBy,
+    provider: options.provider,
+    model_id: actualModelId,
+    task_model_hint: taskModelHint,
+    readiness: readiness.state,
+  });
+  return handle;
+}
+
+registerAgentRuntimeEnsurer(ensureAgentRuntime);
+
+export async function stopAgentRuntime(agentId: string, requestedBy: string): Promise<void> {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
+  appendSupervisorEvent({
+    decision: 'agent_runtime_stop_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    scope,
+  });
+  await agentLifecycle.shutdown(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_stopped',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    scope,
+  });
+}
+
+export async function shutdownAllAgentRuntimes(requestedBy: string): Promise<void> {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_shutdown_all_requested',
+    requested_by: requestedBy,
+  });
+  await agentLifecycle.shutdownAll();
+  appendSupervisorEvent({
+    decision: 'agent_runtime_shutdown_all_completed',
+    requested_by: requestedBy,
+  });
+}
+
+export function listAgentRuntimeSnapshots(): AgentRuntimeSnapshot[] {
+  return agentLifecycle.listSnapshots();
+}
+
+export function listAgentRuntimeLeaseSummaries(): Array<{
+  agent_id: string;
+  owner_id: string;
+  owner_type: string;
+  metadata?: Record<string, unknown>;
+}> {
+  return runtimeSupervisor
+    .snapshot()
+    .filter((entry) => entry.kind === 'agent')
+    .map((entry) => ({
+      agent_id: entry.resourceId,
+      owner_id: entry.ownerId,
+      owner_type: entry.ownerType,
+      metadata: entry.metadata,
+    }));
+}
+
+export function getAgentRuntimeSnapshot(
+  agentId: string,
+  logLimit?: number
+): AgentRuntimeSnapshot | null {
+  return agentLifecycle.getSnapshot(agentId, logLimit) || null;
+}
+
+export function getAgentRuntimeHandle(agentId: string): AgentHandle | null {
+  return agentLifecycle.getHandle(agentId) || null;
+}
+
+export function getAgentRuntimeLog(agentId: string, limit = 50) {
+  return agentLifecycle.getLog(agentId, limit);
+}
+
+export async function askAgentRuntime(
+  agentId: string,
+  prompt: string,
+  requestedBy: string,
+  options: {
+    timeoutMs?: number;
+    taskModelHint?: TaskModelHint;
+    correlationId?: string;
+    missionId?: string;
+    scope?: EventScopeInput;
+    /** SO-05 / OP-01: declared reasoning tier for this ask, recorded on both events below. */
+    modelTier?: 'fast' | 'standard' | 'deep';
+  } = {}
+): Promise<string> {
+  const startedAt = Date.now();
+  const handle = getAgentRuntimeHandle(agentId);
+  const record = handle?.getRecord();
+  const runtimeScope = resolveRuntimeScope({
+    missionId: options.missionId || record?.missionId,
+    scope: options.scope || record?.scope,
+  });
+  assertRuntimeNhiScope(runtimeScope);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_ask_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    correlation_id: options.correlationId,
+    mission_id: options.missionId || record?.missionId,
+    scope: runtimeScope,
+    task_model_hint: options.taskModelHint,
+    declared_model_tier: options.modelTier,
+  });
+  try {
+    if (!handle) {
+      throw new Error(`Agent ${agentId} not found or not ready`);
+    }
+    const response = await handle.ask(prompt, {
+      timeoutMs: options.timeoutMs,
+      model_tier: options.modelTier,
+    });
+    const snapshot = getAgentRuntimeSnapshot(agentId, 20);
+    const provider = snapshot?.agent.provider || handle.getRecord()?.provider;
+    const modelId = snapshot?.agent.modelId || handle.getRecord()?.modelId;
+    const usage = snapshot?.metrics.usage;
+    const durationMs = Date.now() - startedAt;
+    const rawInputTokens = Number(usage?.inputTokens);
+    const rawOutputTokens = Number(usage?.outputTokens);
+    const resolvedUsage = resolveRuntimeTokenUsage({
+      reportedInputTokens: rawInputTokens,
+      reportedOutputTokens: rawOutputTokens,
+      promptChars: snapshot?.metrics.lastPromptChars || prompt.length,
+      responseChars: snapshot?.metrics.lastResponseChars || response.length,
+    });
+    const { inputTokens, outputTokens, usageEstimated, usageStatus } = resolvedUsage;
+    appendSupervisorEvent({
+      decision: 'agent_runtime_ask_completed',
+      agent_id: agentId,
+      requested_by: requestedBy,
+      provider,
+      model_id: modelId,
+      duration_ms: durationMs,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      usage_estimated: usageEstimated,
+      correlation_id: options.correlationId,
+      mission_id: options.missionId || record?.missionId,
+      scope: runtimeScope,
+      task_model_hint: options.taskModelHint,
+      declared_model_tier: options.modelTier,
+    });
+
+    if (inputTokens > 0 || outputTokens > 0) {
+      const promptTokens = inputTokens;
+      const completionTokens = outputTokens;
+      const model = String(modelId || 'default');
+      try {
+        metrics.record('agent-runtime:ask', durationMs, 'success', {
+          agent: agentId,
+          provider,
+          model,
+          mission_id: options.missionId || record?.missionId,
+          scope: runtimeScope,
+          correlation_id: options.correlationId,
+          usage: {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+          },
+          estimated: usageEstimated,
+        });
+        const rates = resolveCostRates(model);
+        if (promptTokens > 0) {
+          metrics.recordResourceUsage({
+            resource_kind: 'llm',
+            actor_id: agentId,
+            mission_id: options.missionId || record?.missionId,
+            quantity: promptTokens,
+            unit: 'input_token',
+            unit_cost_usd: rates.prompt,
+            status: usageStatus,
+            source: 'agent-runtime-supervisor',
+            scope: runtimeScope,
+            metadata: {
+              model,
+              provider,
+              correlation_id: options.correlationId,
+              token_kind: 'input',
+            },
+          });
+        }
+        if (completionTokens > 0) {
+          metrics.recordResourceUsage({
+            resource_kind: 'llm',
+            actor_id: agentId,
+            mission_id: options.missionId || record?.missionId,
+            quantity: completionTokens,
+            unit: 'output_token',
+            unit_cost_usd: rates.completion,
+            status: usageStatus,
+            source: 'agent-runtime-supervisor',
+            scope: runtimeScope,
+            metadata: {
+              model,
+              provider,
+              correlation_id: options.correlationId,
+              token_kind: 'output',
+            },
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          `[agent-runtime-supervisor] usage persistence failed for ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+    return response;
+  } catch (error) {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_ask_failed',
+      agent_id: agentId,
+      requested_by: requestedBy,
+      duration_ms: Date.now() - startedAt,
+      correlation_id: options.correlationId,
+      mission_id: options.missionId || record?.missionId,
+      scope: runtimeScope,
+      task_model_hint: options.taskModelHint,
+      declared_model_tier: options.modelTier,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+export async function refreshAgentRuntime(agentId: string, requestedBy: string) {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
+  appendSupervisorEvent({
+    decision: 'agent_runtime_refresh_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    scope,
+  });
+  const result = await agentLifecycle.refreshContext(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_refreshed',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    mode: result.mode,
+    scope,
+  });
+  return result;
+}
+
+export async function restartAgentRuntime(
+  agentId: string,
+  requestedBy: string
+): Promise<AgentHandle> {
+  const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;
+  appendSupervisorEvent({
+    decision: 'agent_runtime_restart_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    scope,
+  });
+  const handle = await agentLifecycle.restart(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_restarted',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    scope,
+  });
+  return handle;
+}

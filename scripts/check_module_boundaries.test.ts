@@ -29,8 +29,8 @@ describe('module boundary ratchet', () => {
     expect(report.violations).toEqual([]);
     expect(report.directionViolations).toEqual([]);
     expect(report.directionExceptions).toEqual([
-      'libs/core/secure-io.ts -> libs/core/audit-chain.ts',
-      'libs/core/secure-io.ts -> libs/core/sandbox-policy.ts',
+      'libs/core/secure-io.ts -> libs/core/governance/audit-chain.ts',
+      'libs/core/secure-io.ts -> libs/core/shell/sandbox-policy.ts',
       'libs/core/secure-io.ts -> libs/core/tier-guard.ts',
     ]);
     expect(report.staleDirectionExceptions).toEqual([]);
@@ -41,8 +41,8 @@ describe('module boundary ratchet', () => {
   });
 
   it('does not treat type-only imports as runtime cycles', () => {
-    expect(report.cycles.some((cycle) => cycle.includes('libs/core/deployment-adapter.ts'))).toBe(
-      false
-    );
+    expect(
+      report.cycles.some((cycle) => cycle.includes('libs/core/actuator/deployment-adapter.ts'))
+    ).toBe(false);
   });
 });

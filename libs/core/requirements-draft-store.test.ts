@@ -17,7 +17,7 @@ vi.mock('./tier-guard.js', () => ({
   detectTier: () => 'public',
 }));
 
-vi.mock('./policy-engine.js', () => ({
+vi.mock('./governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
@@ -31,7 +31,7 @@ import {
   saveRequirementsDraft,
   writeRequirementsDraftAtPath,
 } from './requirements-draft-store.js';
-import type { ExtractedRequirements } from './reasoning-backend.js';
+import type { ExtractedRequirements } from './reasoning/reasoning-backend.js';
 
 const sampleExtracted: ExtractedRequirements = {
   functional_requirements: [

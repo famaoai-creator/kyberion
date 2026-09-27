@@ -32,7 +32,7 @@ status: archived
 
 ### Task 1: 突合エンジン — `claude-sonnet-4`
 
-1. `libs/core/intent-reconciliation.ts` を新設: `reconcileCompletion({ goal, deliverables, evidence }): { satisfied, delivered[], gaps[], confidence }`。判定は (a) goal.success_condition の各項が成果物/evidence で満たされるかの構造チェック + (b) reasoning backend が非 stub なら「この成果物は『<goal>』を満たすか、満たさない点は何か」の 1 回問い合わせ。stub 時は構造チェックのみ + `confidence: low`。
+1. `libs/core/intent/intent-reconciliation.ts` を新設: `reconcileCompletion({ goal, deliverables, evidence }): { satisfied, delivered[], gaps[], confidence }`。判定は (a) goal.success_condition の各項が成果物/evidence で満たされるかの構造チェック + (b) reasoning backend が非 stub なら「この成果物は『<goal>』を満たすか、満たさない点は何か」の 1 回問い合わせ。stub 時は構造チェックのみ + `confidence: low`。
 2. IL-03 のドリフト判定とロジック(goal 充足方向の評価)を共有する。
 3. unit test: 充足/部分充足(gap 抽出)/未充足、stub と非 stub。
 
@@ -60,8 +60,8 @@ status: archived
 
 ## 実装メモ
 
-- `libs/core/intent-reconciliation.ts` を新設し、`goal.success_condition` と evidence を構造的に突合する `reconcileCompletion` / `reconcileCompletionStructurally` を実装した。
-- `libs/core/task-session.ts` の完了保存時に突合ゲートを追加し、未充足のまま `completed` にできないようにした。
+- `libs/core/intent/intent-reconciliation.ts` を新設し、`goal.success_condition` と evidence を構造的に突合する `reconcileCompletion` / `reconcileCompletionStructurally` を実装した。
+- `libs/core/task/task-session.ts` の完了保存時に突合ゲートを追加し、未充足のまま `completed` にできないようにした。
 - 完了時には `completion_summary` と `completion_next_action` を task-session に永続化し、`task-session.schema.json` でもトップレベル項目として受けるようにした。
 - task-session 完了時の intent_id がある場合は `recordIntentContractOutcome` へ `completion_summary` を書き戻し、`intent-contract-memory` に満足/ギャップの学習結果を残すようにした。
 - ミッション finish 側は `scripts/refactor/mission-lifecycle.ts` で突合結果を取り込み、完了サマリと次アクションを state.context に残すようにした。

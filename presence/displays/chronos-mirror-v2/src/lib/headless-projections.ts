@@ -1,18 +1,18 @@
-import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
-import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
+import { buildAgentCollaborationProjection } from '@agent/core/agent/agent-collaboration-projection';
+import { collectOperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 import {
   getWorkItem,
   listWorkItems,
   updateWorkItem,
   type WorkItemStatus,
-} from '@agent/core/work-coordination';
+} from '@agent/core/workforce/work-coordination';
 import type { EventScopeKind } from '@agent/core/event-scope';
-import type { OperatorHomeScopeFilter } from '@agent/core/operator-home-summary';
+import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import {
   buildWorkVisibilityProjection,
   type WorkVisibilityScope,
   type WorkVisibilityView,
-} from '@agent/core/work-visibility';
+} from '@agent/core/workforce/work-visibility';
 import type { ViewerContext } from './viewer-context';
 import {
   strictViewerScopeOrganizationIds,

@@ -116,7 +116,7 @@ The following invariants apply in every roadmap milestone:
 **Primary paths**
 
 - New: `libs/core/browser-extension-session-store.ts`, `libs/core/browser-extension-native-host.ts`
-- Update: `libs/core/browser-extension-bridge.ts`, `libs/core/approval-store.ts`, `knowledge/product/governance/approval-policy.json`
+- Update: `libs/core/browser/browser-extension-bridge.ts`, `libs/core/governance/approval-store.ts`, `knowledge/product/governance/approval-policy.json`
 - Update: `tools/adf-replay-extension/background.js`, `content.js`, `sidepanel.js`, `manifest.json`
 - New contracts: execution-lease schema and native-host request/receipt schema
 
@@ -140,7 +140,7 @@ The following invariants apply in every roadmap milestone:
 
 **Primary paths**
 
-- Update: `pipelines/fragments/memory-distillation.json`, `libs/core/memory-promotion-workflow.ts`, `libs/core/distill-candidate-registry.ts`
+- Update: `pipelines/fragments/memory-distillation.json`, `libs/core/knowledge/memory-promotion-workflow.ts`, `libs/core/knowledge/distill-candidate-registry.ts`
 - New: `libs/core/trace-memory-assessment.ts`, `libs/core/promoted-memory-renderer.ts`
 - Update: `knowledge/product/governance/mission-distill-markdown-policy.json`, corporate memory documentation
 
@@ -164,7 +164,7 @@ The following invariants apply in every roadmap milestone:
 **Primary paths**
 
 - Update: `tests/mesh-peer-network.bootstrap.json`, `scripts/mesh_hub_inspect.ts`, `knowledge/product/orchestration/mesh-hub-inspection.md`
-- Update: `libs/core/mesh-hub-inspection.ts`, `libs/core/mesh-hub-peer-messaging-adapter.ts`
+- Update: `libs/core/mesh/mesh-hub-inspection.ts`, `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`
 - New: two-peer integration and operator-journey tests
 
 **Exit criteria**
@@ -187,7 +187,7 @@ The following invariants apply in every roadmap milestone:
 **Primary paths**
 
 - New: `libs/core/mesh-peer-identity.ts`, `libs/core/mesh-envelope-signature.ts`
-- Update: `libs/core/peer-messaging.ts`, `libs/core/mesh-hub-peer-messaging-adapter.ts`, Mesh schemas and policy
+- Update: `libs/core/mesh/peer-messaging.ts`, `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`, Mesh schemas and policy
 - New governance: peer identity, key rotation, revocation, and cryptographic-agility ADRs
 
 **Exit criteria**
@@ -210,7 +210,7 @@ The following invariants apply in every roadmap milestone:
 
 **Primary paths**
 
-- Update: `knowledge/product/governance/model-registry.json`, `libs/core/reasoning-model-routing.ts`, Mesh presence/capability contracts
+- Update: `knowledge/product/governance/model-registry.json`, `libs/core/reasoning/reasoning-model-routing.ts`, Mesh presence/capability contracts
 - New: `libs/core/routing-advice.ts`, `knowledge/product/governance/routing-policy.json`
 - Tests: deterministic advice, policy denial, budget exhaustion, stale telemetry, counterfactual recording, and no-secret telemetry tests
 

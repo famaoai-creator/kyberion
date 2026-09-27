@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { KbTalkingAvatarProps } from '@agent/core/a2ui-catalog';
+import type { KbTalkingAvatarProps } from '@agent/core/surface/a2ui-catalog';
 import { TalkingAvatar } from './talking-avatar.js';
 
 /**

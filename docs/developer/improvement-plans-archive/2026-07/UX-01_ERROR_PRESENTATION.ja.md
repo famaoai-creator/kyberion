@@ -41,7 +41,7 @@ status: archived
 
 ### Task 1: ユーザー向けエラー封筒の共通実装 — `claude-sonnet-4`
 
-1. `libs/core/surface-response-blocks.ts` 周辺(surface 系の共通整形の既存の家)を確認し、`buildUserFacingError(err, opts: { locale, surface, traceId? }): { title, body, nextAction }` を実装する。
+1. `libs/core/surface/surface-response-blocks.ts` 周辺(surface 系の共通整形の既存の家)を確認し、`buildUserFacingError(err, opts: { locale, surface, traceId? }): { title, body, nextAction }` を実装する。
    - 内部エラーを既知カテゴリ(接続失敗 / タイムアウト / 承認待ち / 権限 / 不明)に分類し、`knowledge/product/orchestration/user-facing-vocabulary.json` に追加するエラー語彙(en/ja ペア)から文言を引く。
    - `traceId` があれば「詳細は trace <id>」の一行を付ける。生 `err.message` は**含めない**(logger には全量渡す)。
 2. 語彙カタログへのエントリ追加は既存のスキーマ・`check:catalogs` に従う。

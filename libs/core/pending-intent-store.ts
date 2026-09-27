@@ -11,7 +11,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
+import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
 
 export interface PendingIntentRecord {
   kind: 'pending-intent';

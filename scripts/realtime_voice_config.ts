@@ -9,7 +9,7 @@ import {
   type RealtimeVoicePersonalVoiceMode,
   type RealtimeVoiceReasoningEffort,
   type RealtimeVoiceReasoningTier,
-} from '@agent/core/realtime-voice-preferences';
+} from '@agent/core/voice/realtime-voice-preferences';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type Command = 'show' | 'set' | 'reset' | 'help';

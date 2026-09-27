@@ -30,7 +30,7 @@ import {
   registerMeetingJoinDriver,
   validateMeetingTarget,
   type MeetingJoinDriver,
-} from '@agent/core/meeting-join-driver';
+} from '@agent/core/meeting/meeting-join-driver';
 import {
   abortableAudioChunks,
   type AudioChunk,
@@ -38,8 +38,8 @@ import {
   type MeetingSessionState,
   type MeetingTarget,
   type TranscriptChunk,
-} from '@agent/core/meeting-session-types';
-import type { AudioBus } from '@agent/core/audio-bus';
+} from '@agent/core/meeting/meeting-session-types';
+import type { AudioBus } from '@agent/core/voice/audio-bus';
 import {
   MEET_IN_MEETING_SELECTORS,
   MEET_SELECTORS,

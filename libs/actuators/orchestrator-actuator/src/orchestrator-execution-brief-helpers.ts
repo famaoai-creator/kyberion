@@ -13,9 +13,9 @@ import {
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import type {

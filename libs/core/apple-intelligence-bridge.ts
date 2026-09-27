@@ -13,7 +13,7 @@ import {
   type SpeechToTextCapabilities,
   type TranscribeInput,
   type TranscribeResult,
-} from './speech-to-text-bridge.js';
+} from './voice/speech-to-text-bridge.js';
 import { rootResolve } from './path-resolver.js';
 import { isAppleSilicon } from './platform.js';
 import { safeWriteFile } from './secure-io.js';

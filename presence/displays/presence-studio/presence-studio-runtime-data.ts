@@ -12,18 +12,18 @@ import {
   createBrowserConversationSession,
   getActiveBrowserConversationSession,
   saveBrowserConversationSession,
-} from '@agent/core/browser-conversation-session';
+} from '@agent/core/browser/browser-conversation-session';
 import {
   buildSurfaceLauncherNextActions,
   buildSurfaceLauncherRecommendations,
   getSurfaceDirectory,
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
-} from '@agent/core/surface-ux';
+} from '@agent/core/surface/surface-ux';
 import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
-import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
-import { listProjectRecords } from '@agent/core/project-registry';
-import { listTaskSessions } from '@agent/core/task-session';
+import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
+import { listProjectRecords } from '@agent/core/project/project-registry';
+import { listTaskSessions } from '@agent/core/task/task-session';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -36,12 +36,12 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
-import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser-onboarding';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
+import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser/browser-onboarding';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
-import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createCompanionWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
-import { installShellSpeechToTextBridgeIfAvailable } from '@agent/core/speech-to-text-bridge';
+import { installShellSpeechToTextBridgeIfAvailable } from '@agent/core/voice/speech-to-text-bridge';
 import { validateA2UIMessage as validateCoreA2UIMessage, type A2UIMessage } from '@agent/core/a2ui';
 import { buildPresenceSurfaceFrame, type PresenceTimelineAdf } from '@agent/core/presence-surface';
 import { parseGuspStimulusLine, type GuspStimulus } from '../../bridge/nexus-stimulus.js';
@@ -69,7 +69,7 @@ import {
   readPresenceHeadlessOverview,
 } from './headless.js';
 import { probeMicCapture } from '@agent/core/mic-capture';
-import { resolveEmailTriagePath } from '@agent/core/email-workflow';
+import { resolveEmailTriagePath } from '@agent/core/integrations/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
 import { registerFrontDeskAuxPages, registerFrontDeskHomeWorkPages } from './front-desk-pages.js';
 import { registerUiGalleryRoutes } from './ui-gallery-routes.js';

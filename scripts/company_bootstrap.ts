@@ -25,7 +25,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { getRegisteredEnvText, readTextFile, setRegisteredEnv } from '@agent/core/foundation';
-import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
+import { loadOrganizationProfileAtPath } from '@agent/core/organization/organization-profile';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;

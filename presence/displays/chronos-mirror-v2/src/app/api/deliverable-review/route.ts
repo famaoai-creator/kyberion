@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadArtifactRecord } from '@agent/core/artifact-record';
+import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,

@@ -16,7 +16,7 @@ vi.mock('@agent/core', () => ({
   collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
 }));
 
-vi.mock('@agent/core/operator-home-summary', () => ({
+vi.mock('@agent/core/surface/operator-home-summary', () => ({
   collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
 }));
 

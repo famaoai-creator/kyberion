@@ -1,5 +1,5 @@
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 const DEPLOYMENT_SCHEMA = {
   type: 'object',

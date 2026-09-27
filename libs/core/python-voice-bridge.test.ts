@@ -22,7 +22,7 @@ import {
   getVoiceBridge,
   stubVoiceBridge,
   type RoleplayTurn,
-} from './voice-bridge.js';
+} from './voice/voice-bridge.js';
 
 const mockExec = execFileSync as ReturnType<typeof vi.fn>;
 const mockExists = nodefs.existsSync as ReturnType<typeof vi.fn>;

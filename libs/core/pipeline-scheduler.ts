@@ -1,2 +1,2 @@
 /** Public facade for governed pipeline scheduling. */
-export * from './src/pipeline-scheduler.js';
+export * from './pipeline/pipeline-scheduler.js';

@@ -32,7 +32,7 @@ import {
   safeMkdir,
   safeMoveSync,
 } from './secure-io.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { logger } from './core.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 

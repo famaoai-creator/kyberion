@@ -37,7 +37,7 @@ tags: [browser-bridge, intent-loop, capability, pipeline, approval, multi-agent]
 | 能力                                                        | 状態                            | 主な実体                                                                                                                |
 | ----------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | DOM意味込みの実演レコーダー                                 | ✅ 完成                         | `tools/adf-replay-extension/content.js`, `background.js`, `sidepanel.js`                                                |
-| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser-extension-bridge.ts:490`                                     |
+| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser/browser-extension-bridge.ts:490`                             |
 | 承認 / lease / receipt / トラスト境界                       | ✅ 完成                         | `scripts/browser_bridge_host.ts`, `libs/core/risky-op-registry.ts`, `knowledge/product/governance/approval-policy.json` |
 | 秘密入力の非記録（redaction）                               | ✅ 完成                         | `content.js`（password/OTP/token/WebAuthn を記録しない）                                                                |
 | **① 手順レジストリ＆意図解決**                              | ❌ 欠落                         | —                                                                                                                       |
@@ -126,9 +126,9 @@ tags: [browser-bridge, intent-loop, capability, pipeline, approval, multi-agent]
 
 ## 6. 共有契約（★ここを最初に凍結する★）
 
-並行実装の衝突を防ぐため、以下の型・スキーマを**先に1つのコミットで確定**してから各エージェントが着手する。型は `libs/core/procedure-types.ts`（新規）に集約する。
+並行実装の衝突を防ぐため、以下の型・スキーマを**先に1つのコミットで確定**してから各エージェントが着手する。型は `libs/core/knowledge/procedure-types.ts`（新規）に集約する。
 
-> **【決定: substrate 中立で凍結】** 意図解決レジストリ／結晶化→昇格／自己修復は本質的にブラウザ固有ではない（actuator は11ドメインあり、サービスAPI合成・デスクトップGUI・メール triage 等が同じ形を持つ。§13参照）。よって契約は最初から substrate 中立とし、ブラウザは**最初のアダプタ**として実装する。実装が動くのはブラウザのみだが、後からサービス/デスクトップ アダプタを**凍結済み契約を壊さずに**追加できる。昇格機構は新規実装せず**既存 `libs/core/distill-candidate-registry.ts`（`DistillCandidateRecord`, status: proposed|promoted|archived）を再利用**する。
+> **【決定: substrate 中立で凍結】** 意図解決レジストリ／結晶化→昇格／自己修復は本質的にブラウザ固有ではない（actuator は11ドメインあり、サービスAPI合成・デスクトップGUI・メール triage 等が同じ形を持つ。§13参照）。よって契約は最初から substrate 中立とし、ブラウザは**最初のアダプタ**として実装する。実装が動くのはブラウザのみだが、後からサービス/デスクトップ アダプタを**凍結済み契約を壊さずに**追加できる。昇格機構は新規実装せず**既存 `libs/core/knowledge/distill-candidate-registry.ts`（`DistillCandidateRecord`, status: proposed|promoted|archived）を再利用**する。
 
 ### 6.1 手順レジストリ・エントリ（substrate 中立な知識駆動カタログ）
 
@@ -165,7 +165,7 @@ tags: [browser-bridge, intent-loop, capability, pipeline, approval, multi-agent]
 ### 6.2 意図解決の結果型
 
 ```ts
-// libs/core/procedure-types.ts
+// libs/core/knowledge/procedure-types.ts
 export interface ProcedureResolution {
   outcome: 'matched' | 'ambiguous' | 'unmatched';
   best?: { procedure_id: string; confidence: number /*0..1*/ };
@@ -213,13 +213,13 @@ export interface ProcedureDelta {
 
 - **要件**: NL意図から `ProcedureResolution` を返す。2回目以降の発話で確実にパターンBへ入る。**全 substrate 共通の解決層**（ブラウザ手順もサービス手順も同じ resolver で引ける）。
 - **設計**:
-  - 新規 `libs/core/procedure-registry.ts`
+  - 新規 `libs/core/knowledge/procedure-registry.ts`
     - `loadProcedures(tier): ProcedureEntry[]` — secure-io 経由で `procedures.json` を読む（無ければ空＋コードフォールバック）。
     - `resolveProcedure(intent: string, opts?: {origin?: string; substrate?: string}): Promise<ProcedureResolution>`
       - **2段構え**：(1) 安価な前処理＝`intent_phrases`/`target.name`/`origin` に対する正規化キーワード・identifier 一致でプレフィルタ（Capability Broker と同じ完全一致思想）。(2) 候補が1件に絞れない時のみ `getReasoningBackend().delegateTask(prompt, context)` に意味ランキングを委譲（曖昧マッチはここだけ）。stub backend 時は前処理結果のみで決定（オフライン決定性を維持）。
       - `substrate`/`adapter`/`target` 以外の共通フィールドだけで解決する。substrate 固有の同定（origin一致など）は `target` の解釈に閉じ込める。
   - Capability Broker（プロバイダ解決）とは**別物**。混ぜない。解決の語彙（sole/preferred/best-match）を参考にしてよいが流用ではない。
-- **対象ファイル**: `libs/core/procedure-registry.ts`(新), `procedure-types.ts`(新), `knowledge/product/orchestration/procedures.json`(新)
+- **対象ファイル**: `libs/core/knowledge/procedure-registry.ts`(新), `procedure-types.ts`(新), `knowledge/product/orchestration/procedures.json`(新)
 - **受入条件**: 登録済み意図はbackend無し(stub)でも `matched` を返す。未登録は `unmatched`＋`recommendedPattern:'A'`。曖昧時は複数 `candidates` を信頼度付きで返す。origin/identifier が一致するエントリを優先する。substrate を跨いでも resolver が破綻しない（browser 以外のエントリ型を受理できる）。
 
 ### Layer② 実演レコーダーのインタラクティブ意図抽出（既存への追加）
@@ -238,17 +238,17 @@ export interface ProcedureDelta {
   - `extractGoldenScenario(rehearsalResult): GoldenScenario` — 終端の成功 DOM（トースト等）を §6.4 形式で同梱。
   - 秘密参照は `{{secrets.*}}` へ。Service preset 認証（`auth:secret-guard` + `AUTHORIZED_SCOPE` + `KYBERION_PERSONA`）の3点に接続。
   - **【追加要件 / agyレビュー A】SPA・iframe 動的ロード対応**: 勤怠/社内系は SPA（同一URLでDOM書き換え）と iframe を多用するため、(a) 各 step の ref に「対象がDOMに出現しかつ操作可能(interactable)になるまでの自動待機（タイムアウト付き）」を必須化、(b) ref メタに iframe コンテキスト（frame chain / origin）を保持し、再生時に自動でフレーム切替する。固定 `wait` 秒（既存プロトタイプの1秒）は使わず条件待機にする。
-- **対象ファイル**: `libs/core/browser-extension-bridge.ts`, 新規 `libs/core/browser-recording-compiler.ts`（肥大化する場合は分離）, `knowledge/product/pipeline-templates/automate-browser-workflow.json`, `tools/adf-replay-extension/content.js`（再生時の interactable 待機・iframe 切替）
+- **対象ファイル**: `libs/core/browser/browser-extension-bridge.ts`, 新規 `libs/core/browser/browser-recording-compiler.ts`（肥大化する場合は分離）, `knowledge/product/pipeline-templates/automate-browser-workflow.json`, `tools/adf-replay-extension/content.js`（再生時の interactable 待機・iframe 切替）
 - **受入条件**: 全 step の ref が selector 解決 or 明示的に「要人手」に分類される。dry-run 成功時のみ Golden が付く。draft は依然 `_draft:true` で、人間レビュー通過まで `pipelines/` へ昇格しない。**SPA再描画・iframe内要素・遅延出現要素を含む手順が、固定待機なしで安定再生される（回帰テストあり）。**
 
 ### Layer C 実行ディスパッチャ＆基盤振り分け
 
 - **要件**: `ProcedureResolution(matched)` を受け、§4 の基盤へ振り分けて実行し、receipt と Golden 検証結果を返す。パターンA時はレコーダー起動を促す。
-- **設計**: 新規 `libs/core/procedure-dispatcher.ts`
+- **設計**: 新規 `libs/core/knowledge/procedure-dispatcher.ts`
   - `dispatch(resolution, inputs, ctx)`：`adapter.executor` で実行系を選ぶ。substrate=browser かつ `execution_substrate==='extension'` → 既存 `extension_session` 経路（lease発行→拡張実行）。`'playwright'` → `browser:pipeline`。他 substrate のアダプタは後続フェーズ（§13）で追加。
   - 高リスク step は既存 approval-gate を必ず通す（`risky-op-registry.ts`）。
   - 実行後 Golden Scenario と receipt を突合し、成功/失敗を判定。
-- **対象ファイル**: `libs/core/procedure-dispatcher.ts`(新), `scripts/browser_bridge_host.ts`（lease に procedure_id/mission を載せる, 仕様§4.2 未配線分）
+- **対象ファイル**: `libs/core/knowledge/procedure-dispatcher.ts`(新), `scripts/browser_bridge_host.ts`（lease に procedure_id/mission を載せる, 仕様§4.2 未配線分）
 - **受入条件**: extension 経路で承認→lease→実行→receipt→Golden検証が一気通貫。未承認の高リスクはブロック。lease 失効・origin不一致は拒否（既存回帰）。
 
 ### Layer④ 自己修復・差分学習
@@ -256,8 +256,8 @@ export interface ProcedureDelta {
 - **要件**: ambiguity停止やハンドオフ時、人の手動解決を `ProcedureDelta` として捕捉し、該当 step へ差し込んで version を上げる。
 - **設計**:
   - 停止/ハンドオフ時に「ここから手動で」をUI提示（既存 pause/resume を活用）。手動操作を delta として録画（既存レコーダー再利用、anchor=失敗step）。
-  - `accrueProcedureDelta(delta): {updated_pipeline_ref, new_version}` — 既存 promoted pipeline の該当 step 後に挿入。**昇格は人間レビュー必須**（自動上書き禁止）。昇格候補は新規実装せず**既存 `libs/core/distill-candidate-registry.ts` の `DistillCandidateRecord`（status: proposed→promoted）を再利用**。`browser-distill-candidate.ts` の評価器は汎用 interface のブラウザ実装と位置づけ直す。
-- **対象ファイル**: `libs/core/procedure-registry.ts`（version管理）, `libs/core/distill-candidate-registry.ts`（再利用）, `tools/adf-replay-extension/background.js`（ハンドオフ→delta録画）, 新規 delta スキーマ
+  - `accrueProcedureDelta(delta): {updated_pipeline_ref, new_version}` — 既存 promoted pipeline の該当 step 後に挿入。**昇格は人間レビュー必須**（自動上書き禁止）。昇格候補は新規実装せず**既存 `libs/core/knowledge/distill-candidate-registry.ts` の `DistillCandidateRecord`（status: proposed→promoted）を再利用**。`browser-distill-candidate.ts` の評価器は汎用 interface のブラウザ実装と位置づけ直す。
+- **対象ファイル**: `libs/core/knowledge/procedure-registry.ts`（version管理）, `libs/core/knowledge/distill-candidate-registry.ts`（再利用）, `tools/adf-replay-extension/background.js`（ハンドオフ→delta録画）, 新規 delta スキーマ
 - **受入条件**: 同じ手順が「壊れた→人が直した→次回は直った版で通る」を回帰で再現。delta は人間レビュー無しに promoted を書き換えない。
 
 ### Layer⑤ MFA中継ゲート＆Vault

@@ -1,5 +1,5 @@
 import { isRecord, nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
-import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -20,8 +20,11 @@ import {
   resolveWriteArtifactSpec,
 } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
-import { runAdfActuatorPipeline, defineActuatorPipelineBase } from '@agent/core/actuator-sdk';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,

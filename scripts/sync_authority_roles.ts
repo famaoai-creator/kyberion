@@ -3,7 +3,7 @@ import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
-import { loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex } from '@agent/core/mission-team-index';
+import { loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex } from '@agent/core/mission/mission-team-index';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 type AuthorityRoleRecord = {

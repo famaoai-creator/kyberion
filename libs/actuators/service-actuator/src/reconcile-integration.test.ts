@@ -61,15 +61,17 @@ vi.mock('@agent/core/secure-io', () => ({
   safeOpenAppendFile: vi.fn(),
 }));
 vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
-vi.mock('@agent/core/runtime-supervisor', () => ({ runtimeSupervisor: mocks.runtimeSupervisor }));
+vi.mock('@agent/core/tool/runtime-supervisor', () => ({
+  runtimeSupervisor: mocks.runtimeSupervisor,
+}));
 vi.mock('@agent/core/managed-process', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
   stopManagedProcess: vi.fn(),
 }));
-vi.mock('@agent/core/pipeline-contract', () => ({
+vi.mock('@agent/core/pipeline/pipeline-contract', () => ({
   derivePipelineStatus: mocks.derivePipelineStatus,
 }));
-vi.mock('@agent/core/service-binding', () => ({
+vi.mock('@agent/core/service/service-binding', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
 }));
 vi.mock('@agent/core/path-resolver', () => ({
@@ -77,11 +79,11 @@ vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: mocks.pathResolver,
   capabilityEntry: (id: string) => `dist/${id}.js`,
 }));
-vi.mock('@agent/core/service-engine', () => ({
+vi.mock('@agent/core/service/service-engine', () => ({
   executeServicePreset: mocks.executeServicePreset,
   executeMcp: vi.fn(),
 }));
-vi.mock('@agent/core/service-validator', () => ({
+vi.mock('@agent/core/service/service-validator', () => ({
   validateServiceAuth: mocks.validateServiceAuth,
 }));
 vi.mock('@agent/core/cloudflare-os-control-plane', () => ({

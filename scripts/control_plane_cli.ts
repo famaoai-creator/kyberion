@@ -11,9 +11,9 @@ import {
 import {
   findIntentOutcomePattern,
   loadIntentOutcomePatterns,
-} from '@agent/core/intent-outcome-patterns';
-import { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
-import { summarizeMissionSeedAssessment } from '@agent/core/mission-seed-assessment';
+} from '@agent/core/intent/intent-outcome-patterns';
+import { listMemoryPromotionCandidates } from '@agent/core/knowledge/memory-promotion-queue';
+import { summarizeMissionSeedAssessment } from '@agent/core/mission/mission-seed-assessment';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -894,7 +894,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       let inflightCount = 0;
       try {
         const { listAgentRuntimesViaDaemon } =
-          await import('@agent/core/agent-runtime-supervisor-client');
+          await import('@agent/core/agent/agent-runtime-supervisor-client');
         const runtimes = await listAgentRuntimesViaDaemon();
         inflightCount = runtimes.filter((r) => r.status === 'busy').length;
       } catch (err) {
@@ -922,7 +922,7 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       let inflightCount = 0;
       try {
         const { listAgentRuntimesViaDaemon } =
-          await import('@agent/core/agent-runtime-supervisor-client');
+          await import('@agent/core/agent/agent-runtime-supervisor-client');
         const runtimes = await listAgentRuntimesViaDaemon();
         inflightCount = runtimes.filter((r) => r.status === 'busy').length;
       } catch (err) {

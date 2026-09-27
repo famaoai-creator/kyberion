@@ -5,8 +5,8 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile, safeRmSync } from './secure-io.js';
 import { withoutSchemaMetadata } from './test-governance-payload.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import { compileUserIntentFlow } from './intent-contract.js';
+import { resolveIntentResolutionPacket } from './intent/intent-resolution.js';
+import { compileUserIntentFlow } from './intent/intent-contract.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

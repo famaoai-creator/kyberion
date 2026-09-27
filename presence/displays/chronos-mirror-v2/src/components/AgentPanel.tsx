@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, X, Terminal, RotateCcw } from 'lucide-react';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
   Button,
   Callout,

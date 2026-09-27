@@ -6,8 +6,11 @@ import {
   BACKEND_CAPABILITY_PROFILES,
   type BackendUtilityFit,
 } from './backend-capability-profile.js';
-import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
-import { loadModelRoleFitnessRecords, normalizeFitnessProviderId } from './model-role-fitness.js';
+import { providerIdForReasoningIdentifier } from './provider/provider-egress-gate.js';
+import {
+  loadModelRoleFitnessRecords,
+  normalizeFitnessProviderId,
+} from './reasoning/model-role-fitness.js';
 
 /**
  * TC-17: is what we DECLARE about a backend what we have MEASURED?

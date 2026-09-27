@@ -23,7 +23,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/voice-stt.ts (resolveVoiceSttServerConfig: WhisperKit / mlx-audio / OpenAI-compatible server; the base URL may be local or remote, so privacy is not guaranteed)"
+            "libs/core/voice/voice-stt.ts (resolveVoiceSttServerConfig: WhisperKit / mlx-audio / OpenAI-compatible server; the base URL may be local or remote, so privacy is not guaranteed)"
           ]
         },
         "fluid_audio": {
@@ -53,7 +53,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/voice-selection-preferences.ts (managed mlx-whisper runtime on Apple Silicon)",
+            "libs/core/voice/voice-selection-preferences.ts (managed mlx-whisper runtime on Apple Silicon)",
             "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py (default model whisper-large-v3-turbo)"
           ]
         },
@@ -69,7 +69,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/voice-selection-preferences.ts (faster-whisper Python runtime on Windows, KYBERION_WINDOWS_STT_BACKEND=faster_whisper)"
+            "libs/core/voice/voice-selection-preferences.ts (faster-whisper Python runtime on Windows, KYBERION_WINDOWS_STT_BACKEND=faster_whisper)"
           ]
         },
         "whisper_cpp": {
@@ -84,7 +84,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/voice-selection-preferences.ts (whisper.cpp CLI with the ggml-small model under active/shared/tmp/whisper.cpp)"
+            "libs/core/voice/voice-selection-preferences.ts (whisper.cpp CLI with the ggml-small model under active/shared/tmp/whisper.cpp)"
           ]
         },
         "native_speech": {

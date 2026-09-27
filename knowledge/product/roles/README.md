@@ -36,7 +36,7 @@ Each persona directory holds:
    silent no-op (logged as a warning) — check the mission log if a procedure you expected
    isn't showing up.
 3. **Injection**: `buildRolePersonaProcedureInjectionProvider`
-   (`libs/core/mission-orchestration-worker.ts`) reads that `ROLE_PROCEDURE.md` back and
+   (`libs/core/mission/mission-orchestration-worker.ts`) reads that `ROLE_PROCEDURE.md` back and
    registers it as a one-shot dynamic injection — it enters the first task's worker prompt
    for that mission, and re-fires after any context-compaction event, the same lifecycle
    `working-principles` uses (`libs/core/dynamic-injection.ts`).

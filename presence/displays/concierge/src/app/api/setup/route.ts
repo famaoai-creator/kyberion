@@ -5,23 +5,23 @@ import {
   applyBrowserOnboarding,
   getBrowserOnboardingState,
   saveBrowserOnboardingVoiceSample,
-} from '@agent/core/browser-onboarding';
-import { getInstalledReasoningMode } from '@agent/core/reasoning-bootstrap';
-import { listAgentIdentities } from '@agent/core/agent-identity';
+} from '@agent/core/browser/browser-onboarding';
+import { getInstalledReasoningMode } from '@agent/core/reasoning/reasoning-bootstrap';
+import { listAgentIdentities } from '@agent/core/agent/agent-identity';
 import {
   listTenantProfileSlugs,
   readTenantProfile,
   writeTenantProfile,
-} from '@agent/core/tenant-registry';
-import { loadNotificationPreferences } from '@agent/core/operator-notifications';
+} from '@agent/core/organization/tenant-registry';
+import { loadNotificationPreferences } from '@agent/core/surface/operator-notifications';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
 } from '@agent/core/personal-identity-reader';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
-import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
+import { loadSurfaceRoleCatalog } from '@agent/core/surface/surface-role-catalog';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';

@@ -1,4 +1,4 @@
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export interface ActionResult {

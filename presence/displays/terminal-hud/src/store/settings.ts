@@ -1,4 +1,4 @@
-import { getInstalledReasoningMode } from '@agent/core/reasoning-bootstrap';
+import { getInstalledReasoningMode } from '@agent/core/reasoning/reasoning-bootstrap';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { pathResolver } from '@agent/core/path-resolver';
 import { activeCustomer } from '@agent/core/customer-resolver';

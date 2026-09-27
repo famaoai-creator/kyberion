@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
   Button,

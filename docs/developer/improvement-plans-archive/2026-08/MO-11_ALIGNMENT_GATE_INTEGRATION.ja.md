@@ -19,14 +19,14 @@ status: archived
 
 ### 検証済みの現状(2026-08-03 時点)
 
-| 要素                    | 実体                                                                                          | 出典                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| ゲート定義の永続化      | `<missionDir>/gates/definitions/<GATE_ID>.json`(`plan-tasks` が phase_specs から生成)         | `libs/core/mission-process-planning.ts:114` |
-| ゲート評価              | 14 種のチェック種別(`command_succeeds` / `reviewer_approved` / `evidence_exists` ほか)        | `libs/core/mission-gate-engine.ts:194-488`  |
-| ゲート実行 CLI          | `mission_controller gate-pass <ID> <GATE_ID>`                                                 | `scripts/mission_controller.ts:1729`        |
-| 状態遷移                | 初回ゲート通過で `planned` → `active`                                                         | `libs/core/mission-process-planning.ts:412` |
-| ミッション初期状態      | `create` は `status: 'planned'` で生成                                                        | `libs/core/mission-creation.ts:340`         |
-| `create` の物理影響範囲 | ミッション専用マイクロリポジトリ(`active/missions/<ID>/.git`)の `git init` + 初期コミットのみ | `libs/core/mission-git.ts:23`               |
+| 要素                    | 実体                                                                                          | 出典                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| ゲート定義の永続化      | `<missionDir>/gates/definitions/<GATE_ID>.json`(`plan-tasks` が phase_specs から生成)         | `libs/core/mission/mission-process-planning.ts:114` |
+| ゲート評価              | 14 種のチェック種別(`command_succeeds` / `reviewer_approved` / `evidence_exists` ほか)        | `libs/core/mission/mission-gate-engine.ts:194-488`  |
+| ゲート実行 CLI          | `mission_controller gate-pass <ID> <GATE_ID>`                                                 | `scripts/mission_controller.ts:1729`                |
+| 状態遷移                | 初回ゲート通過で `planned` → `active`                                                         | `libs/core/mission/mission-process-planning.ts:412` |
+| ミッション初期状態      | `create` は `status: 'planned'` で生成                                                        | `libs/core/mission/mission-creation.ts:340`         |
+| `create` の物理影響範囲 | ミッション専用マイクロリポジトリ(`active/missions/<ID>/.git`)の `git init` + 初期コミットのみ | `libs/core/mission/mission-git.ts:23`               |
 
 ### 発見1: 接合点は既に存在する — `status: 'planned'`
 
@@ -53,15 +53,15 @@ if (humanConfirmed && check.kind === 'human_override') params.allow = true;
 
 **承認は既に「どのサーフェスからでも下せる」形で実装されている。** alignment-gate 専用の HTML サーバを独立した承認窓口として立てるのは、この基盤と並列な第二の承認経路を作ることになり、誤りである。
 
-| 層                 | 実体                                                                                                  | 出典                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| 正本ストア         | `active/shared/coordination/channels/<ch>/approvals/requests/<id>.json`                               | `libs/core/approval-store.ts:355`             |
-| イベントログ       | `active/shared/observability/channels/<ch>/approvals.jsonl`                                           | `libs/core/approval-store.ts:359`             |
-| 生成 / 読取 / 決裁 | `createApprovalRequest` / `loadApprovalRequest` / `listApprovalRequests` / `decideApprovalRequest`    | `libs/core/approval-store.ts:363,659,668,710` |
-| 人間性の強制       | `validateHumanFinalDecision` — `human_only` なら人間・認証済み・payloadHash・effectBinding 一致を要求 | `libs/core/approval-store.ts:325`             |
-| 効果への束縛       | `computeApprovalPayloadHash`(正規化 JSON の SHA-256)                                                  | `libs/core/approval-store.ts:308`             |
-| 事前執行ゲート     | 「承認が得られるまで統制対象操作をブロックする層」                                                    | `libs/core/approval-gate.ts`                  |
-| サーフェス描画     | `surface-approval-ui.ts`(slack/telegram/discord/imessage/presence)、`slack-approval-ui.ts`            | `libs/core/surface-approval-ui.ts:18`         |
+| 層                 | 実体                                                                                                  | 出典                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 正本ストア         | `active/shared/coordination/channels/<ch>/approvals/requests/<id>.json`                               | `libs/core/governance/approval-store.ts:355`             |
+| イベントログ       | `active/shared/observability/channels/<ch>/approvals.jsonl`                                           | `libs/core/governance/approval-store.ts:359`             |
+| 生成 / 読取 / 決裁 | `createApprovalRequest` / `loadApprovalRequest` / `listApprovalRequests` / `decideApprovalRequest`    | `libs/core/governance/approval-store.ts:363,659,668,710` |
+| 人間性の強制       | `validateHumanFinalDecision` — `human_only` なら人間・認証済み・payloadHash・effectBinding 一致を要求 | `libs/core/governance/approval-store.ts:325`             |
+| 効果への束縛       | `computeApprovalPayloadHash`(正規化 JSON の SHA-256)                                                  | `libs/core/governance/approval-store.ts:308`             |
+| 事前執行ゲート     | 「承認が得られるまで統制対象操作をブロックする層」                                                    | `libs/core/governance/approval-gate.ts`                  |
+| サーフェス描画     | `surface-approval-ui.ts`(slack/telegram/discord/imessage/presence)、`slack-approval-ui.ts`            | `libs/core/surface/surface-approval-ui.ts:18`            |
 
 既に承認キューを表示・決裁しているサーフェス: **concierge**(`/api/approvals/[id]`)、**chronos-mirror-v2**、**presence-studio**、**ターミナル系**(`cli.ts` / `kyberion_home.ts` / `virtual_office.ts`)、**Slack**。
 
@@ -283,9 +283,9 @@ pnpm build
 node dist/scripts/check_workflow_catalog_refs.js
 node dist/scripts/check_mission_process_bindings.js
 node dist/scripts/check_governance_rules.js
-pnpm vitest run libs/core/mission-orchestration-scenario-pack.test.ts
-pnpm vitest run libs/core/mission-process-planning.test.ts
-pnpm vitest run libs/core/approval-store.test.ts
+pnpm vitest run libs/core/mission/mission-orchestration-scenario-pack.test.ts
+pnpm vitest run libs/core/mission/mission-process-planning.test.ts
+pnpm vitest run libs/core/governance/approval-store.test.ts
 pnpm vitest run presence/displays/concierge/test/concierge-contract.test.ts
 ```
 

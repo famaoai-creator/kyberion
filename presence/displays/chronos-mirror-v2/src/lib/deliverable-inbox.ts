@@ -1,9 +1,9 @@
 import path from 'node:path';
-import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
+import { listArtifactRecords, type ArtifactRecord } from '@agent/core/workforce/artifact-record';
 import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core/deliverable-inbox';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { clamp } from '@agent/core/foundation';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';

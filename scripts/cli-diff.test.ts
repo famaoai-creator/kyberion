@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { generateNativeDocx } from '@agent/core/media-contracts';
+import { generateNativeDocx } from '@agent/core/media/media-contracts';
 import { distillXlsxDesign } from '@agent/core/xlsx-utils';
-import type { DocxDesignProtocol } from '@agent/core/types/docx-protocol';
+import type { DocxDesignProtocol } from '@agent/core/contracts/docx-protocol';
 import { diffDesigns, runDiffCommand, DIFF_USAGE } from './cli-diff.js';
 
 function makeDocxProtocol(text: string): DocxDesignProtocol {

@@ -5,7 +5,7 @@ import {
   listEmailAccountProviders,
   readEmailDraftArtifact,
   resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
+} from '@agent/core/integrations/email-workflow';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -103,7 +103,7 @@ async function main(argv: string[], dryRun = false) {
         tone: getString(args, '--tone', 'clear and concise'),
       };
     }
-    const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
+    const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
     const backend = getReasoningBackend();
     const result = await generateEmailReplyDraft({
       requestId: getString(args, '--request-id'),

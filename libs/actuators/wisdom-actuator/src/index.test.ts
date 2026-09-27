@@ -3,7 +3,7 @@ import { indexHistoryEntry } from '@agent/core/history-search-index';
 import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
-} from '@agent/core/actuator-forwarding-port';
+} from '@agent/core/actuator/actuator-forwarding-port';
 
 const mocks = vi.hoisted(() => ({
   loadJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),

@@ -1,0 +1,353 @@
+import * as path from 'node:path';
+import { safeExistsSync } from '../secure-io.js';
+import { safeLstat } from '../secure-io.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { loadPipelineAdfAtPath } from './pipeline-contract.js';
+import { pathResolver } from '../path-resolver.js';
+import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface PreviewStep {
+  index: number;
+  id?: string;
+  type: string;
+  op: string;
+  description: string; // human-readable description of what this step does
+  resolvedParams: Record<string, any>; // params with variables resolved where possible
+  warnings: string[]; // e.g. "ref path does not exist", "unresolved variable {{x}}"
+  children?: PreviewStep[]; // for ref sub-pipelines
+}
+
+export interface PipelinePreview {
+  valid: boolean;
+  totalSteps: number; // including sub-pipeline steps
+  warnings: string[];
+  errors: string[];
+  steps: PreviewStep[];
+  graph?: {
+    nodes: Array<{ id: string; op: string; dependencies: string[] }>;
+    edges: GraphEdge[];
+    mermaid: string;
+  };
+}
+
+/** Validate a preview resource before it is exposed to the operator/model. */
+export function assertPipelinePreviewResourcePath(filePath: string): void {
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[PIPELINE_PREVIEW_SCOPE] resource is outside the repository root: ${filePath}`
+    );
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) {
+        throw new Error(
+          `[PIPELINE_PREVIEW_SCOPE] resource cannot traverse a symbolic link: ${relative}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[PIPELINE_PREVIEW_SCOPE]')) {
+        throw error;
+      }
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new Error(`[PIPELINE_PREVIEW_SCOPE] resource does not exist: ${filePath}`);
+      }
+      throw new Error(
+        `[PIPELINE_PREVIEW_SCOPE] resource could not be inspected safely: ${relative}`
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Preview a pipeline without executing it.
+ * Validates structure, resolves refs, checks variable availability.
+ */
+export function previewPipeline(
+  pipelineJson: any,
+  availableContext?: Record<string, any>
+): PipelinePreview {
+  const preview: PipelinePreview = {
+    valid: true,
+    totalSteps: 0,
+    warnings: [],
+    errors: [],
+    steps: [],
+  };
+
+  if (!pipelineJson?.steps || !Array.isArray(pipelineJson.steps)) {
+    preview.valid = false;
+    preview.errors.push('Pipeline has no steps array');
+    return preview;
+  }
+
+  const ctx: Record<string, any> = { ...pipelineJson.context, ...availableContext };
+
+  for (const [i, step] of pipelineJson.steps.entries()) {
+    const ps = previewStep(step, i, ctx);
+    preview.steps.push(ps);
+    preview.totalSteps += 1 + countChildren(ps);
+    preview.warnings.push(...ps.warnings);
+  }
+
+  const graph = deriveExecutionGraph(pipelineJson.steps);
+  preview.graph = {
+    nodes: graph.graph.nodes.map((node) => ({
+      id: node.id,
+      op: String((node.value as any).op || '?'),
+      dependencies: node.dependencies,
+    })),
+    edges: graph.graph.edges,
+    mermaid: renderGraphMermaid(graph.graph.nodes, graph.graph.edges),
+  };
+  for (const error of graph.errors) preview.errors.push(error.message);
+  if (graph.errors.length > 0) preview.valid = false;
+
+  return preview;
+}
+
+export function renderGraphMermaid(
+  nodes: Array<{ id: string; value: any }>,
+  edges: GraphEdge[]
+): string {
+  const lines = ['flowchart TD'];
+  for (const node of nodes) {
+    const label = String(node.value?.op || node.id).replace(/["\n\r]/g, ' ');
+    lines.push(`  ${mermaidId(node.id)}["${label}"]`);
+  }
+  for (const edge of edges) {
+    const label =
+      edge.kind === 'data' && edge.channel
+        ? `|data:${edge.channel}|`
+        : edge.kind === 'when'
+          ? '|when|'
+          : '';
+    lines.push(`  ${mermaidId(edge.from)} -->${label} ${mermaidId(edge.to)}`);
+  }
+  return lines.join('\n');
+}
+
+function mermaidId(value: string): string {
+  return `n_${value.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+}
+
+// ---------------------------------------------------------------------------
+// Internals
+// ---------------------------------------------------------------------------
+
+function countChildren(ps: PreviewStep): number {
+  if (!ps.children) return 0;
+  let total = ps.children.length;
+  for (const child of ps.children) {
+    total += countChildren(child);
+  }
+  return total;
+}
+
+function previewStep(step: any, index: number, ctx: Record<string, any>): PreviewStep {
+  const ps: PreviewStep = {
+    index,
+    id: step.id,
+    type: step.type || 'unknown',
+    op: step.op || 'unknown',
+    description: describeStep(step),
+    resolvedParams: {},
+    warnings: [],
+  };
+  const policyParts: string[] = [];
+  if (step.effort) policyParts.push(`effort=${step.effort}`);
+  if (step.budget && typeof step.budget === 'object') {
+    const budget = step.budget as Record<string, unknown>;
+    if (typeof budget.cost_cap_tokens === 'number') {
+      policyParts.push(`cost cap ${budget.cost_cap_tokens} tokens`);
+    }
+    if (typeof budget.max_prompt_chars === 'number') {
+      policyParts.push(`prompt <= ${budget.max_prompt_chars} chars`);
+    }
+    if (typeof budget.max_response_chars === 'number') {
+      policyParts.push(`response <= ${budget.max_response_chars} chars`);
+    }
+    if (typeof budget.max_combined_chars === 'number') {
+      policyParts.push(`combined <= ${budget.max_combined_chars} chars`);
+    }
+    if (budget.approval_required === true) {
+      policyParts.push('approval required on overrun');
+    }
+  }
+  if (policyParts.length > 0) {
+    ps.description += ` (${policyParts.join(', ')})`;
+  }
+
+  // Check for unresolved template variables
+  const paramStr = JSON.stringify(step.params || {});
+  const unresolvedVars = paramStr.match(/\{\{([^}]+)\}\}/g) || [];
+  for (const v of unresolvedVars) {
+    const varName = v.replace(/[{}]/g, '').trim().split('.')[0];
+    if (!(varName in ctx)) {
+      ps.warnings.push(`Unresolved variable: ${v}`);
+    }
+  }
+
+  // Resolve what we can
+  try {
+    ps.resolvedParams = parseSafeJsonInput(
+      paramStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+        const parts = key.trim().split('.');
+        let val: any = ctx;
+        for (const p of parts) val = val?.[p];
+        return val !== undefined ? String(val) : `{{${key}}}`;
+      }),
+      'pipeline preview resolved params'
+    );
+  } catch {
+    ps.resolvedParams = step.params || {};
+  }
+
+  // Check ref paths
+  if (step.op === 'ref' && step.params?.path) {
+    const refPathRaw = String(step.params.path).replace(/\{\{[^}]+\}\}/g, '_');
+    try {
+      const refPath = pathResolver.rootResolve(refPathRaw);
+      assertPipelinePreviewResourcePath(refPath);
+      const subPipeline = loadPipelineAdfAtPath(refPath);
+      if (subPipeline.steps.length > 0) {
+        const children = subPipeline.steps.map((s: any, j: number) =>
+          previewStep(s, j, { ...ctx, ...step.params?.bind })
+        );
+        ps.children = children;
+        ps.description += ` (${children.length} sub-steps)`;
+      }
+    } catch {
+      ps.warnings.push(`ref path not readable: ${step.params.path}`);
+    }
+  }
+
+  // Check on_error
+  if (step.on_error) {
+    if (step.on_error.ref) {
+      let safe = true;
+      try {
+        const errRefPath = pathResolver.rootResolve(step.on_error.ref);
+        assertPipelinePreviewResourcePath(errRefPath);
+        if (!safeExistsSync(errRefPath)) safe = false;
+      } catch {
+        safe = false;
+      }
+      if (!safe) {
+        ps.warnings.push(`on_error ref path not found: ${step.on_error.ref}`);
+      }
+    }
+  }
+
+  // Control flow children: while / loop-until / retry-until-quality
+  if (
+    (step.op === 'while' ||
+      step.op === 'core:while' ||
+      step.op === 'loop_until' ||
+      step.op === 'core:loop_until' ||
+      step.op === 'retry_until_quality' ||
+      step.op === 'core:retry_until_quality') &&
+    step.params?.pipeline
+  ) {
+    const children = step.params.pipeline.map((s: any, j: number) => previewStep(s, j, ctx));
+    ps.children = children;
+    ps.description += ` (loop body: ${children.length} steps, max ${step.params.max_iterations || '\u221e'} iterations)`;
+  }
+
+  // Control flow children: parallel foreach / accumulate
+  if (
+    (step.op === 'parallel_foreach' || step.op === 'accumulate' || step.op === 'team_lead') &&
+    step.params?.do
+  ) {
+    const children = step.params.do.map((s: any, j: number) => previewStep(s, j, ctx));
+    ps.children = children;
+    if (step.op === 'parallel_foreach') {
+      ps.description += ` (parallel body: ${children.length} steps, concurrency ${step.params.concurrency || step.params.parallelism || 2})`;
+    } else {
+      ps.description += ` (accumulate body: ${children.length} steps, target ${step.params.target_count || step.params.targetCount || '?'} items, dry streak ${step.params.dry_streak_limit || step.params.dryStreakLimit || 2})`;
+    }
+  }
+
+  // Control flow children: if
+  if (step.op === 'if' && step.params?.then) {
+    const thenChildren = step.params.then.map((s: any, j: number) => previewStep(s, j, ctx));
+    const elseChildren = Array.isArray(step.params?.else)
+      ? step.params.else.map((s: any, j: number) => previewStep(s, j, ctx))
+      : [];
+    ps.children = [...thenChildren, ...elseChildren];
+    ps.description += ` (then: ${thenChildren.length} steps${elseChildren.length ? `, else: ${elseChildren.length} steps` : ''})`;
+  }
+
+  return ps;
+}
+
+function describeStep(step: any): string {
+  const op = step.op || '?';
+  const type = step.type || '?';
+  switch (op) {
+    case 'judge_route':
+    case 'core:judge_route':
+      return `Judge route (${Array.isArray(step.params?.routes) ? step.params.routes.length : 0} routes; unmatched=${step.params?.on_no_match || 'abort'})`;
+    case 'await_decision':
+    case 'core:await_decision':
+      return `Await human decision: ${step.params?.approval?.summary || step.params?.summary || '?'}`;
+    case 'goto':
+      return `Navigate to ${step.params?.url || '?'}`;
+    case 'click':
+      return `Click ${step.params?.selector || '?'}`;
+    case 'fill':
+      return `Fill ${step.params?.selector || '?'}`;
+    case 'evaluate':
+      return `Execute JavaScript`;
+    case 'screenshot':
+      return `Take screenshot \u2192 ${step.params?.path || '?'}`;
+    case 'wait':
+      return step.params?.duration
+        ? `Wait ${step.params.duration}ms`
+        : `Wait for ${step.params?.selector || '?'}`;
+    case 'log':
+      return `Log: ${step.params?.message || '?'}`;
+    case 'ref':
+      return `Execute sub-pipeline: ${step.params?.path || '?'}`;
+    case 'if':
+      return `Condition: ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+    case 'while':
+      return `Loop while ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+    case 'loop_until':
+      return `Loop until ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+    case 'retry_until_quality':
+      return `Retry until quality ${step.params?.condition?.from || step.params?.quality_condition?.from || '?'} ${step.params?.condition?.operator || step.params?.quality_condition?.operator || '?'} ${step.params?.condition?.value || step.params?.quality_condition?.value || '?'}`;
+    case 'parallel_foreach':
+      return `Parallel foreach over ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s)`;
+    case 'accumulate':
+      return `Accumulate ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s) toward ${step.params?.target_count || step.params?.targetCount || '?'} target`;
+    case 'pptx_extract':
+      return `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`;
+    case 'xlsx_extract':
+      return `Extract XLSX design from ${step.params?.path || '?'} (raw-preserving)`;
+    case 'pdf_to_pptx_design':
+      return `Convert PDF design to PPTX design`;
+    case 'pdf_to_xlsx_design':
+      return `Convert PDF design to XLSX design`;
+    case 'pptx_render':
+      return `Render PPTX to ${step.params?.path || '?'}`;
+    case 'xlsx_render':
+      return `Render XLSX to ${step.params?.path || '?'}`;
+    case 'pptx_patch':
+      return `Patch PPTX text in ${step.params?.source || '?'} \u2192 ${step.params?.path || '?'}`;
+    default:
+      return `${type}:${op}`;
+  }
+}

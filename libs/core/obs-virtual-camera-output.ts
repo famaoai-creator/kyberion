@@ -417,7 +417,7 @@ export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
     }
   }
 
-  health(): import('./video-route.js').VideoRouteHealth {
+  health(): import('./video/video-route.js').VideoRouteHealth {
     return {
       status: this.status,
       input_process_alive: false,
@@ -432,7 +432,7 @@ export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
     };
   }
 
-  metrics(): import('./video-route.js').VideoRouteMetrics {
+  metrics(): import('./video/video-route.js').VideoRouteMetrics {
     return {
       frames_in: 0,
       // OBS does not expose per-frame counters through this bridge.

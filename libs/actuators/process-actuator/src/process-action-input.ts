@@ -1,4 +1,7 @@
-import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core/runtime-supervisor';
+import type {
+  RuntimeResourceKind,
+  RuntimeShutdownPolicy,
+} from '@agent/core/tool/runtime-supervisor';
 import { isRecord } from '@agent/core/foundation';
 
 export interface ProcessAction {

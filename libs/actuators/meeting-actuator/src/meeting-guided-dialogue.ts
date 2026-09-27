@@ -25,7 +25,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { delegateMeetingReasoning } from './meeting-intelligence-ops.js';
 

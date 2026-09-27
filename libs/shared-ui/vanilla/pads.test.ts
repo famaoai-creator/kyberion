@@ -14,7 +14,7 @@ import {
   KB_DRAWING_ACTIONS as CORE_DRAWING_ACTIONS,
   KB_DRAWING_TOOLS as CORE_DRAWING_TOOLS,
   KB_TOOLBAR_ACTIONS as CORE_TOOLBAR_ACTIONS,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { disposeA2UI, renderA2UI } from './kyberion-ui.js';
 import {
   KB_DIALOG_ACTIONS,

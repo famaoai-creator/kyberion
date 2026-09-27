@@ -16,7 +16,7 @@ import {
   validateAutomationBlueprintBindings,
 } from './automation-blueprint.js';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
-import { loadScheduleRegistry } from './src/pipeline-scheduler.js';
+import { loadScheduleRegistry } from './pipeline/pipeline-scheduler.js';
 import { pathResolver } from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
 

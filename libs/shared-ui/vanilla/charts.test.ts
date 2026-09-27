@@ -4,7 +4,7 @@
 // vanilla DOM build. React ↔ vanilla equality is covered by parity.test.tsx.
 import { describe, expect, it } from 'vitest';
 import { getUiMessageBundle } from '@agent/core';
-import { KB_STATUS_TONES } from '@agent/core/a2ui-catalog';
+import { KB_STATUS_TONES } from '@agent/core/surface/a2ui-catalog';
 import {
   KB_CHART_MESSAGE_KEYS,
   KB_CHART_STATUS_TONES,

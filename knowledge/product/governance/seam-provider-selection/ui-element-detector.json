@@ -27,7 +27,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/ui-element-detector.ts (BrowserDomDetector: boxes are the browser snapshot's getBoundingClientRect of interactive elements with @eN refs; only available when a browser snapshot of the same viewport is supplied)"
+            "libs/core/surface/ui-element-detector.ts (BrowserDomDetector: boxes are the browser snapshot's getBoundingClientRect of interactive elements with @eN refs; only available when a browser snapshot of the same viewport is supplied)"
           ]
         },
         "ocr_text": {
@@ -44,7 +44,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/ui-element-detector.ts (OcrTextDetector: text lines from the ocr-provider seam in mode 'local_only' by default; finds labelled controls on any screenshot but not unlabelled icons)"
+            "libs/core/surface/ui-element-detector.ts (OcrTextDetector: text lines from the ocr-provider seam in mode 'local_only' by default; finds labelled controls on any screenshot but not unlabelled icons)"
           ]
         },
         "os_accessibility": {
@@ -61,8 +61,8 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/os-accessibility-detector.ts (OsAccessibilityDetector: boxes are the OS accessibility tree's position/size of interactive elements in the front window, macOS System Events via JXA, one Apple event per property per tree level (~0.2 s per level measured on macOS 2026-09-27); only available when the request declares live_screen, the platform is darwin and AXIsProcessTrusted passes; native apps on this machine's live screen only)",
-            "libs/core/os-accessibility-detector.ts (Windows: .NET UI Automation through an encoded powershell.exe script, foreground window only, breadth-first with one cached FindAll(Children) per node, per-monitor DPI aware so rects and the primary screen size are physical pixels; available when live_screen is declared, the platform is win32 and the UIA probe loads; live smoke on the windows-latest CI job via os-accessibility-detector.live.test.ts)"
+            "libs/core/virtual/os-accessibility-detector.ts (OsAccessibilityDetector: boxes are the OS accessibility tree's position/size of interactive elements in the front window, macOS System Events via JXA, one Apple event per property per tree level (~0.2 s per level measured on macOS 2026-09-27); only available when the request declares live_screen, the platform is darwin and AXIsProcessTrusted passes; native apps on this machine's live screen only)",
+            "libs/core/virtual/os-accessibility-detector.ts (Windows: .NET UI Automation through an encoded powershell.exe script, foreground window only, breadth-first with one cached FindAll(Children) per node, per-monitor DPI aware so rects and the primary screen size are physical pixels; available when live_screen is declared, the platform is win32 and the UIA probe loads; live smoke on the windows-latest CI job via os-accessibility-detector.live.test.ts)"
           ]
         },
         "pixel_regions": {

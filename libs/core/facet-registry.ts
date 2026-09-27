@@ -4,7 +4,10 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import { readTextFile } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
-import { isManagedPluginActivationAllowed, listManagedPlugins } from './plugin-managed-install.js';
+import {
+  isManagedPluginActivationAllowed,
+  listManagedPlugins,
+} from './plugin/plugin-managed-install.js';
 import { type ResourceProvenance, type ResourceTrust } from './resource-provenance.js';
 
 export type FacetKind = 'persona' | 'policy' | 'instruction' | 'output-contract';

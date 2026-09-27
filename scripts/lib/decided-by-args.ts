@@ -15,7 +15,7 @@
  * on that in-flight work.
  */
 import { getOptionValue } from '../refactor/mission-cli-args.js';
-import type { HumanDecidedBy, HumanDecidedByRole } from '@agent/core/mission-types';
+import type { HumanDecidedBy, HumanDecidedByRole } from '@agent/core/mission/mission-types';
 
 export const DECIDED_BY_ID_PATTERN = /^user:[a-z][a-z0-9-]{1,30}$/;
 export const DECIDED_BY_ROLES: readonly HumanDecidedByRole[] = ['owner', 'approver', 'viewer'];

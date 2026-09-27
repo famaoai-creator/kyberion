@@ -11,15 +11,15 @@ export type {
   TranscriptChunk,
   VideoFormat,
   VideoFrame,
-} from './meeting-session-types.js';
+} from './meeting/meeting-session-types.js';
 
-export { abortableAudioChunks } from './meeting-session-types.js';
+export { abortableAudioChunks } from './meeting/meeting-session-types.js';
 
 export * from './barge-in-controller.js';
 
-export { StubAudioBus } from './audio-bus.js';
+export { StubAudioBus } from './voice/audio-bus.js';
 
-export type { AudioBus, AudioBusProbe } from './audio-bus.js';
+export type { AudioBus, AudioBusProbe } from './voice/audio-bus.js';
 
 export { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 
@@ -29,49 +29,55 @@ export { PulseAudioBus } from './pulse-audio-bus.js';
 
 export type { PulseAudioBusOptions } from './pulse-audio-bus.js';
 
-export { resolveAudioBus } from './audio-bus-resolver.js';
+export { resolveAudioBus } from './voice/audio-bus-resolver.js';
 
-export type { AudioBusId } from './audio-bus-resolver.js';
+export type { AudioBusId } from './voice/audio-bus-resolver.js';
 
-export * from './audio-route.js';
+export * from './voice/audio-route.js';
 
 export * from './bounded-audio-queue.js';
 
-export * from './audio-text-similarity.js';
+export * from './voice/audio-text-similarity.js';
 
 export * from './coreaudio-device-inventory.js';
 
 export * from './coreaudio-output-bridge.js';
 
-export * from './tts-loopback-verifier.js';
+export * from './voice/tts-loopback-verifier.js';
 
-export * from './audio-device-lease.js';
+export * from './voice/audio-device-lease.js';
 
-export { StubVideoFrameBus } from './video-frame-bus.js';
+export { StubVideoFrameBus } from './video/video-frame-bus.js';
 
 export type {
   VideoFrameBus,
   VideoFrameBusProbe,
   VideoFrameBusId,
   StubVideoFrameBusOptions,
-} from './video-frame-bus.js';
+} from './video/video-frame-bus.js';
 
-export * from './video-route.js';
+export * from './video/video-route.js';
 
 export * from './bounded-video-queue.js';
 
-export * from './video-device-lease.js';
+export * from './video/video-device-lease.js';
 
 export {
   pipeMp4ToVideoFrameBus,
   readVideoFramesFromMp4,
   writeVideoFrameBusToMp4,
   writeVideoFramesToMp4,
-} from './video-frame-archive.js';
+} from './video/video-frame-archive.js';
 
-export type { VideoFrameArchiveOptions, VideoFrameArchiveResult } from './video-frame-archive.js';
+export type {
+  VideoFrameArchiveOptions,
+  VideoFrameArchiveResult,
+} from './video/video-frame-archive.js';
 
-export { SCREEN_CAPTURE_BRIDGE_ID, createScreenCaptureBridge } from './screen-capture-bridge.js';
+export {
+  SCREEN_CAPTURE_BRIDGE_ID,
+  createScreenCaptureBridge,
+} from './virtual/screen-capture-bridge.js';
 
 export type {
   ScreenCaptureBridge,
@@ -81,23 +87,23 @@ export type {
   ScreenCaptureRequest,
   ScreenCaptureStreamRequest,
   ScreenCaptureResult,
-} from './screen-capture-bridge.js';
+} from './virtual/screen-capture-bridge.js';
 
 export {
   SCREEN_RECORDING_BRIDGE_ID,
   createScreenRecordingBridge,
-} from './screen-recording-bridge.js';
+} from './virtual/screen-recording-bridge.js';
 
 export type {
   ScreenRecordingBridge,
   ScreenRecordingBridgeOptions,
   ScreenRecordingBridgeProbe,
-} from './screen-recording-bridge.js';
+} from './virtual/screen-recording-bridge.js';
 
 export {
   SCREEN_DISPLAY_INVENTORY_BRIDGE_ID,
   createScreenDisplayInventoryBridge,
-} from './screen-display-inventory-bridge.js';
+} from './virtual/screen-display-inventory-bridge.js';
 
 export type {
   ScreenDisplayInventoryBridge,
@@ -105,35 +111,35 @@ export type {
   ScreenDisplayInventoryProbe,
   ScreenDisplayInventory,
   ScreenDisplayRecord,
-} from './screen-display-inventory-bridge.js';
+} from './virtual/screen-display-inventory-bridge.js';
 
 export {
   VIRTUAL_AUDIO_DEVICE_BRIDGE_ID,
   createVirtualAudioDeviceBridge,
-} from './virtual-audio-device-bridge.js';
+} from './virtual/virtual-audio-device-bridge.js';
 
 export type {
   VirtualAudioDeviceBridge,
   VirtualAudioDeviceBridgeOptions,
   VirtualAudioDeviceBridgeProbe,
-} from './virtual-audio-device-bridge.js';
+} from './virtual/virtual-audio-device-bridge.js';
 
 export {
   VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID,
   createVirtualAudioOutputPlaybackBridge,
-} from './virtual-audio-output-playback-bridge.js';
+} from './virtual/virtual-audio-output-playback-bridge.js';
 
 export type {
   VirtualAudioOutputPlaybackBridge,
   VirtualAudioOutputPlaybackBridgeOptions,
   VirtualAudioOutputPlaybackProbe,
   VirtualAudioOutputPlaybackTargetResult,
-} from './virtual-audio-output-playback-bridge.js';
+} from './virtual/virtual-audio-output-playback-bridge.js';
 
 export {
   VIRTUAL_AUDIO_INPUT_RECORDING_BRIDGE_ID,
   createVirtualAudioInputRecordingBridge,
-} from './virtual-audio-input-recording-bridge.js';
+} from './virtual/virtual-audio-input-recording-bridge.js';
 
 export type {
   VirtualAudioInputRecordingBridge,
@@ -141,12 +147,12 @@ export type {
   VirtualAudioInputRecordingProbe,
   VirtualAudioInputRecordingRequest,
   VirtualAudioInputRecordingTargetResult,
-} from './virtual-audio-input-recording-bridge.js';
+} from './virtual/virtual-audio-input-recording-bridge.js';
 
 export {
   VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID,
   createVirtualDeviceInventoryBridge,
-} from './virtual-device-inventory-bridge.js';
+} from './virtual/virtual-device-inventory-bridge.js';
 
 export type {
   VirtualDeviceInventory,
@@ -155,12 +161,12 @@ export type {
   VirtualDeviceInventoryProbe,
   VirtualDeviceKind,
   VirtualDeviceRecord,
-} from './virtual-device-inventory-bridge.js';
+} from './virtual/virtual-device-inventory-bridge.js';
 
 export {
   VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID,
   createVirtualInputDeviceInventoryBridge,
-} from './virtual-input-device-inventory-bridge.js';
+} from './virtual/virtual-input-device-inventory-bridge.js';
 
 export type {
   VirtualInputDeviceInventory,
@@ -169,9 +175,12 @@ export type {
   VirtualInputDeviceInventoryProbe,
   VirtualInputDeviceKind,
   VirtualInputDeviceRecord,
-} from './virtual-input-device-inventory-bridge.js';
+} from './virtual/virtual-input-device-inventory-bridge.js';
 
-export { VIRTUAL_CAMERA_BRIDGE_ID, createVirtualCameraBridge } from './virtual-camera-bridge.js';
+export {
+  VIRTUAL_CAMERA_BRIDGE_ID,
+  createVirtualCameraBridge,
+} from './virtual/virtual-camera-bridge.js';
 
 export type {
   VirtualCameraBackendId,
@@ -181,12 +190,12 @@ export type {
   VirtualCameraCaptureRequest,
   VirtualCameraCaptureResult,
   VirtualCameraCaptureStreamRequest,
-} from './virtual-camera-bridge.js';
+} from './virtual/virtual-camera-bridge.js';
 
 export {
   VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
   createVirtualCameraInjectionBridge,
-} from './virtual-camera-injection-bridge.js';
+} from './virtual/virtual-camera-injection-bridge.js';
 
 export type {
   VirtualCameraInjectionBackendId,
@@ -198,7 +207,7 @@ export type {
   VirtualCameraInjectionRequest,
   VirtualCameraInjectionResult,
   VirtualCameraInjectionStatus,
-} from './virtual-camera-injection-bridge.js';
+} from './virtual/virtual-camera-injection-bridge.js';
 
 export {
   V4L2_VIRTUAL_CAMERA_BRIDGE_ID,
@@ -212,7 +221,7 @@ export type { V4l2VirtualCameraOutputOptions } from './v4l2-virtual-camera-outpu
 export {
   VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID,
   createVirtualMediaDeviceControlBridge,
-} from './virtual-media-device-control-bridge.js';
+} from './virtual/virtual-media-device-control-bridge.js';
 
 export type {
   VirtualMediaDeviceControlAction,
@@ -222,50 +231,54 @@ export type {
   VirtualMediaDeviceControlResult,
   VirtualMediaDeviceControlScope,
   VirtualMediaDeviceSelection,
-} from './virtual-media-device-control-bridge.js';
+} from './virtual/virtual-media-device-control-bridge.js';
 
 export {
   StubStreamingSpeechToTextBridge,
   getStreamingSttBridge,
   registerStreamingSttBridge,
   resetStreamingSttBridges,
-} from './streaming-stt-bridge.js';
+} from './voice/streaming-stt-bridge.js';
 
-export type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
+export type { StreamingSpeechToTextBridge } from './voice/streaming-stt-bridge.js';
 
 export {
   StubStreamingTextToSpeechBridge,
   getStreamingTtsBridge,
   registerStreamingTtsBridge,
   resetStreamingTtsBridges,
-} from './streaming-tts-bridge.js';
+} from './voice/streaming-tts-bridge.js';
 
-export type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
+export type { StreamingTextToSpeechBridge } from './voice/streaming-tts-bridge.js';
 
 export {
   ShellStreamingSpeechToTextBridge,
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridge,
   installShellStreamingSttBridgeFromEnv,
-} from './shell-streaming-stt-bridge.js';
+} from './shell/shell-streaming-stt-bridge.js';
 
-export type { ShellStreamingSttOptions } from './shell-streaming-stt-bridge.js';
+export type { ShellStreamingSttOptions } from './shell/shell-streaming-stt-bridge.js';
 
 export {
   ShellStreamingTextToSpeechBridge,
   installShellStreamingTtsBridge,
   installShellStreamingTtsBridgeFromEnv,
-} from './shell-streaming-tts-bridge.js';
+} from './shell/shell-streaming-tts-bridge.js';
 
-export type { ShellStreamingTtsOptions } from './shell-streaming-tts-bridge.js';
+export type { ShellStreamingTtsOptions } from './shell/shell-streaming-tts-bridge.js';
 
-export { EnergyVad, computeChunkDurationMs, computeChunkRms } from './voice-activity-detector.js';
+export {
+  EnergyVad,
+  computeChunkDurationMs,
+  computeChunkRms,
+} from './voice/voice-activity-detector.js';
 
 export type {
   EnergyVadOptions,
   VoiceActivityDetector,
   VoiceActivityState,
-} from './voice-activity-detector.js';
+} from './voice/voice-activity-detector.js';
 
 export {
   StubMeetingJoinDriver,
@@ -273,27 +286,27 @@ export {
   listMeetingJoinDriversFor,
   registerMeetingJoinDriver,
   resetMeetingJoinDriverRegistry,
-} from './meeting-join-driver.js';
+} from './meeting/meeting-join-driver.js';
 
-export type { MeetingJoinDriver } from './meeting-join-driver.js';
+export type { MeetingJoinDriver } from './meeting/meeting-join-driver.js';
 
 export {
   MeetingParticipationCoordinator,
   checkMeetingParticipationConsent,
-} from './meeting-participation-coordinator.js';
+} from './meeting/meeting-participation-coordinator.js';
 
 export type {
   ConversationAgent,
   MeetingParticipationOptions,
   MeetingParticipationReport,
-} from './meeting-participation-coordinator.js';
+} from './meeting/meeting-participation-coordinator.js';
 
 export {
   redactMeetingUrl,
   resolveMeetingPlatform,
   resolveMeetingPlatformFromUrl,
   validateMeetingTarget,
-} from './meeting-join-driver.js';
+} from './meeting/meeting-join-driver.js';
 
 export {
   installObsVirtualCameraOutputBridge,
@@ -354,5 +367,5 @@ export {
   signA2AContent,
   verifyA2AContent,
   canonicalA2AEnvelopeContent,
-} from './a2a-envelope-signature.js';
+} from './mesh/a2a-envelope-signature.js';
 // NI-02: actor-string verification against the NHI registry (warn -> enforce).
