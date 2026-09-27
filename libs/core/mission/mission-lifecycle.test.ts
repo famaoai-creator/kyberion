@@ -199,7 +199,7 @@ describe('mission lifecycle finish gate', () => {
     safeWriteFile(
       sidecarPath,
       JSON.stringify({
-        $schema: '../../../schemas/volatile-knowledge.schema.json',
+        $schema: '../../schemas/volatile-knowledge.schema.json',
         scope: 'mission',
         scope_ref: missionId,
         cadence: 'resident',

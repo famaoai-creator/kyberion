@@ -35,7 +35,7 @@ function pptxFixture(): Buffer {
   );
   add(
     'ppt/slides/_rels/slide1.xml.rels',
-    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImg" Type="${REL}/image" Target="../media/image1.png"/></Relationships>`
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImg" Type="${REL}/image" Target="./media/image1.png"/></Relationships>`
   );
   zip.addFile('ppt/media/image1.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
   return zip.toBuffer();

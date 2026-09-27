@@ -149,7 +149,7 @@ describe('realtime voice conversation', () => {
   it('rejects traversal-shaped session ids and request tags before artifact generation', () => {
     expect(() =>
       buildRealtimeVoiceGenerationPayload({
-        sessionId: '../outside',
+        sessionId: './outside',
         profileId: 'unused',
         language: 'ja',
         text: 'こんにちは。',
@@ -161,7 +161,7 @@ describe('realtime voice conversation', () => {
     expect(() =>
       buildRealtimeVoiceGenerationPayload({
         sessionId: 'rtc-safe',
-        requestTag: '../outside',
+        requestTag: './outside',
         profileId: 'unused',
         language: 'ja',
         text: 'こんにちは。',

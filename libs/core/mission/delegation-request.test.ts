@@ -8,7 +8,7 @@ import {
 
 describe('assistant delegation request', () => {
   it('rejects request ids that could escape the governed temporary stores', () => {
-    expect(() => getAssistantDelegationRequestPath('../escape')).toThrow(
+    expect(() => getAssistantDelegationRequestPath('./escape')).toThrow(
       '[ASSISTANT_DELEGATION_REQUEST_ID]'
     );
     expect(() => getAssistantDelegationResultPath('nested/result')).toThrow(

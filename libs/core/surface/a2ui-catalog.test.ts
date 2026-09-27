@@ -292,7 +292,7 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     images: {
       neutral: '/assets/avatars/kyberion-neutral.svg',
       joy: 'https://cdn.example.com/joy.png',
-      mouth_open: '../mouth.png',
+      mouth_open: './mouth.png',
     },
     expression: 'joy',
     state: 'speaking',

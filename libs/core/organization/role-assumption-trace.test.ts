@@ -149,7 +149,7 @@ describe('RN-01 role assumption trace', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       expect(resolveRoleAssumptionTracePath('knowledge/public/trace.jsonl')).toBeNull();
-      expect(resolveRoleAssumptionTracePath('../outside/trace.jsonl')).toBeNull();
+      expect(resolveRoleAssumptionTracePath('./outside/trace.jsonl')).toBeNull();
       // The shared tmp root itself is no longer enough: a dedicated directory is required.
       expect(resolveRoleAssumptionTracePath('active/shared/tmp/trace.jsonl')).toBeNull();
       expect(resolveRoleAssumptionTracePath('active/shared/runtime/x.jsonl')).toBeNull();

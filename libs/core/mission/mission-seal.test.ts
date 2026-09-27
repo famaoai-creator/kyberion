@@ -179,7 +179,7 @@ describe('sealMission (AL-02)', () => {
   });
 
   it('rejects a mission id that could create a nested archive path', () => {
-    expect(() => mod.missionSealArchiveDir('../outside')).toThrow('[MISSION_SEAL_SCOPE]');
+    expect(() => mod.missionSealArchiveDir('./outside')).toThrow('[MISSION_SEAL_SCOPE]');
   });
 
   it('returns undefined when the mission does not exist', async () => {

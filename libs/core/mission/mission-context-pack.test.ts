@@ -996,7 +996,7 @@ describe('mission-context-pack', () => {
     const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
       records: Array<Record<string, unknown>>;
     };
-    manifest.records[0].response_path = pathResolver.rootResolve('../external-response.json');
+    manifest.records[0].response_path = pathResolver.rootResolve('./external-response.json');
     safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
 
     const pack = makePack();
@@ -1015,7 +1015,7 @@ describe('mission-context-pack', () => {
         task_result: {
           summary: 'valid summary',
           artifacts: [
-            { path: '../external-artifact.md', kind: 'markdown' },
+            { path: './external-artifact.md', kind: 'markdown' },
             { path: 'knowledge/product/architecture/valid-artifact.md', kind: 'markdown' },
           ],
         },

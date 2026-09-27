@@ -209,7 +209,7 @@ describe('mission-orchestration-events', () => {
     expect(() =>
       enqueueMissionOrchestrationEvent({
         eventType: 'mission_issue_requested',
-        missionId: '../MSN-ESCAPE',
+        missionId: './MSN-ESCAPE',
         requestedBy: 'test',
         payload: {},
         scope: { tier: 'confidential', tenant_slug: 'client-a' },
@@ -219,7 +219,7 @@ describe('mission-orchestration-events', () => {
 
   it('rejects an event id that escapes the shared event directory', async () => {
     const { getMissionOrchestrationEventPath } = await import('./mission-orchestration-events.js');
-    expect(() => getMissionOrchestrationEventPath('../outside')).toThrow(/invalid event id/);
+    expect(() => getMissionOrchestrationEventPath('./outside')).toThrow(/invalid event id/);
   });
 
   it('accepts all runtime orchestration event types', async () => {

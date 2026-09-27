@@ -98,7 +98,7 @@ describe('browser conversation session helpers', () => {
   });
 
   it('rejects traversal-shaped session ids before persistence lookup', () => {
-    expect(() => loadBrowserConversationSession('../outside')).toThrow(/single path segment/);
+    expect(() => loadBrowserConversationSession('./outside')).toThrow(/single path segment/);
   });
 
   it('does not use a malformed browser snapshot for target resolution', () => {

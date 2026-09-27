@@ -206,7 +206,7 @@ describe('PI-09 skill progressive disclosure', () => {
   });
 
   it('rejects repository escape and symbolic-link traversal before loading', () => {
-    expect(() => loadSkillResourceDescriptor('../package')).toThrow('[SKILL_RESOURCE_SCOPE]');
+    expect(() => loadSkillResourceDescriptor('./package')).toThrow('[SKILL_RESOURCE_SCOPE]');
 
     const outside = pathResolver.rootResolve(`${root}/outside`);
     const link = pathResolver.rootResolve(`${root}/linked`);

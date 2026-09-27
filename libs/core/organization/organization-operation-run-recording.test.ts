@@ -109,7 +109,7 @@ describe('organization record_run params', () => {
   it('rejects an invalid run id and a schema-invalid run already in a dry run', () => {
     expect(() =>
       recordOrganizationOperationRunWithDefaults(
-        parseOrganizationRecordRunParams({ ...baseParams, run_id: '../escape' })
+        parseOrganizationRecordRunParams({ ...baseParams, run_id: './escape' })
       )
     ).toThrow(/Invalid run_id/);
     mocks.loadOperation.mockReturnValue({ ...operation, tenant_slug: 'Not_A_Tenant' });

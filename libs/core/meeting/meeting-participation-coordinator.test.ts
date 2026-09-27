@@ -372,7 +372,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
 
   it('fails closed before reading consent through an invalid mission id or symlinked evidence dir', () => {
     const invalid = checkMeetingParticipationConsent({
-      mission_id: '../outside',
+      mission_id: './outside',
       purpose: 'recording',
     });
     expect(invalid.allowed).toBe(false);

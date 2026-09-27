@@ -70,14 +70,14 @@ describe('peer conversation', () => {
         localPeerId: 'peer-a-test',
         remotePeerId: 'peer-b-test',
         tenantId: TENANT_ID,
-        sessionId: '../../outside',
+        sessionId: '../outside',
         topic: 'invalid-session',
       })
     ).toThrow('invalid_peer_conversation_session_id');
-    expect(() => loadPeerConversationSession(TENANT_ID, '../outside', 'PCS-test')).toThrow(
+    expect(() => loadPeerConversationSession(TENANT_ID, './outside', 'PCS-test')).toThrow(
       'invalid_peer_conversation_peer_id'
     );
-    expect(() => clearPeerConversationRuntime('../outside', 'peer-a-test')).toThrow(
+    expect(() => clearPeerConversationRuntime('./outside', 'peer-a-test')).toThrow(
       'invalid_peer_conversation_tenant_id'
     );
   });
@@ -345,8 +345,8 @@ describe('peer conversation peer listing, transcript tails, and edges', () => {
   });
 
   it('returns empty arrays for an invalid tenant id without throwing', () => {
-    expect(listPeerConversationPeers('../outside')).toEqual([]);
-    expect(collectPeerTranscriptTails('../outside')).toEqual([]);
-    expect(readPeerConversationEdges('../outside')).toEqual([]);
+    expect(listPeerConversationPeers('./outside')).toEqual([]);
+    expect(collectPeerTranscriptTails('./outside')).toEqual([]);
+    expect(readPeerConversationEdges('./outside')).toEqual([]);
   });
 });

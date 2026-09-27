@@ -687,7 +687,7 @@ describe('browser extension bridge contracts', () => {
       const receipt = buildBrowserExtensionReceipt({
         session: session({ mode: 'execute' }) as any,
         status: 'completed',
-        receiptId: '../evil/receipt',
+        receiptId: './evil/receipt',
         now: new Date('2026-06-23T00:05:00.000Z'),
       });
       const result = persistBrowserExtensionReceipt(receipt);

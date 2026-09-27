@@ -55,7 +55,7 @@ describe('validatePipelineGuardrails', () => {
   it('keeps runtime wrapper detection aligned for alternate executable forms', () => {
     expect(isScriptWrapperCommand('/usr/bin/node', ['scripts/task.ts'])).toBe(true);
     expect(
-      isScriptWrapperCommand('node', ['--import', '../scripts/ts-loader.mjs', 'scripts/task.ts'])
+      isScriptWrapperCommand('node', ['--import', './scripts/ts-loader.mjs', 'scripts/task.ts'])
     ).toBe(true);
     expect(isScriptWrapperCommand('tsx', ['scripts/task.ts'])).toBe(true);
     expect(isScriptWrapperCommand('node', ['--version'])).toBe(false);

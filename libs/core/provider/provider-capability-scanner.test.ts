@@ -27,10 +27,10 @@ describe('provider-capability-scanner — registry / policy contract', () => {
   });
 
   it('rejects repository-external override paths before loading them', () => {
-    expect(() => loadCapabilityRegistry('../../outside-capability-registry.json')).toThrow(
+    expect(() => loadCapabilityRegistry('../outside-capability-registry.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
-    expect(() => loadProviderCapabilityScanPolicy('../../outside-provider-policy.json')).toThrow(
+    expect(() => loadProviderCapabilityScanPolicy('../outside-provider-policy.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
   });

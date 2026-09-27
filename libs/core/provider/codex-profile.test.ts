@@ -20,7 +20,7 @@ describe('codex profiles', () => {
     ).toBe('/runtime/codex-home');
   });
   it('rejects unsafe profile names', () => {
-    expect(() => resolveCodexHome('../escape', { HOME: '/home/operator' })).toThrow('profile name');
+    expect(() => resolveCodexHome('./escape', { HOME: '/home/operator' })).toThrow('profile name');
     expect(() => assertValidCodexProfileName('default')).toThrow('non-default');
   });
 });

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 // Static JSON import (not secure-io) so this schema check stays independent
 // of the secure-io/path-resolver mocks below — mirrors the pattern in
 // theme-registry.test.ts.
-import providerCapabilityRegistrySchema from '../../knowledge/product/schemas/provider-capability-registry.schema.json';
+import providerCapabilityRegistrySchema from '../../../knowledge/product/schemas/provider-capability-registry.schema.json';
 import type { ProbeExecFn } from './provider-capability-registry.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;

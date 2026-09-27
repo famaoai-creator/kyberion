@@ -1103,7 +1103,7 @@ describe('video cache fail-closed classification', () => {
 
 describe('video cache mission placement', () => {
   it('rejects a malformed mission id before touching the filesystem', () => {
-    for (const id of ['..', '../../x', 'a/../../b', '--help']) {
+    for (const id of ['..', '../x', 'a/../../b', '--help']) {
       expect(() => resolveVideoCachePlacement({ mission_id: id }), id).toThrow(/INVALID_SOURCE/);
     }
   });

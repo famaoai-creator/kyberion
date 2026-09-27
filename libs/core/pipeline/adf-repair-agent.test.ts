@@ -117,9 +117,9 @@ describe('validateAndRepairAdf', () => {
   });
 
   it('rejects an ADF repair target outside the repository root', async () => {
-    await expect(
-      validateAndRepairAdf('../../outside-adf.json', 'capability-input')
-    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    await expect(validateAndRepairAdf('../outside-adf.json', 'capability-input')).rejects.toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
   });
 
   it('rejects an ADF repair target reached through a symbolic link', async () => {

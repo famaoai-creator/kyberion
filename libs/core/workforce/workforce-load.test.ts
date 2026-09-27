@@ -6,8 +6,8 @@ import {
   resolveWorkforceLoad,
   type WorkforceLoadIndex,
 } from './workforce-load.js';
-import { workerLoadPenalty } from './workforce/worker-assignment-policy.js';
-import { selectAgentForTeamRole } from './organization/team-role-assignment-selection.js';
+import { workerLoadPenalty } from './workforce/workforce/worker-assignment-policy.js';
+import { selectAgentForTeamRole } from './workforce/organization/team-role-assignment-selection.js';
 
 const ROLE = {
   description: 'Implementer role',

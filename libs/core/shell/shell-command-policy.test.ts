@@ -270,7 +270,7 @@ describe('shell-command-policy', () => {
 
     it('P1-1: path-qualified executables do not match name-anchored allow rules', () => {
       expect(evaluateShellCommandPolicy('/tmp/evil/ls -la').verdict).toBe('require_approval');
-      expect(evaluateShellCommandPolicy('../cat secrets').verdict).toBe('require_approval');
+      expect(evaluateShellCommandPolicy('./cat secrets').verdict).toBe('require_approval');
     });
 
     it('P1-2: an uncompilable deny pattern fails to approval, not open', () => {

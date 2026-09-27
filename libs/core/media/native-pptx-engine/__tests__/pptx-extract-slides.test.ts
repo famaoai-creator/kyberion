@@ -106,7 +106,7 @@ describe('extractPptxSlides — real-deck structure', () => {
       'ppt/slides/_rels/slide3.xml.rels',
       read('ppt/slides/_rels/slide3.xml.rels').replace(
         '</Relationships>',
-        '<Relationship Id="rIdNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../../../src/native-pptx-engine/notesSlides/notesSlide1.xml"/></Relationships>'
+        '<Relationship Id="rIdNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>'
       )
     );
     deckPath = path.join(workDir, 'deck.pptx');
