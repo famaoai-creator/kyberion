@@ -368,6 +368,7 @@
 - [Document File Reading Playbook (PDF / PPTX / XLSX / DOCX → text, tables, OCR)](./product/orchestration/document-file-reading-playbook.md) (public | Ecosystem Architect)
 - [Full Graph Handoff and Recovery Flow](./product/orchestration/full-graph-handoff-recovery-flow.md) (public | Unknown)
 - [Guided Coordination Protocol](./product/orchestration/guided-coordination-protocol.md) (public | Codex)
+- [Human Intervention Census — measuring where a human is still needed](./product/orchestration/human-intervention-census.md) (public | Ecosystem Architect)
 - [Hypothesis Tree Protocol](./product/orchestration/hypothesis-tree-protocol.md) (public | Ecosystem Architect)
 - [Intuition Capture Protocol](./product/orchestration/intuition-capture-protocol.md) (public | Ecosystem Architect)
 - [Kyberion Development Workflow](./product/orchestration/kyberion-development-workflow.md) (public | Ecosystem Architect)
