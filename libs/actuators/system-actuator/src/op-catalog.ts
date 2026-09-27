@@ -5,6 +5,9 @@ import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',
   'record_screen',
+  'record_audio',
+  'capture_photo',
+  'record_camera',
   'clipboard_read',
   'get_focused_input',
   'get_screen_size',
