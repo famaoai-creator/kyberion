@@ -1,21 +1,21 @@
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import {
   PIN_FILE_VERSION,
   pinActorId as actorId,
   readPinFile,
   updatePinFile,
   type PinnedEntry,
-} from './provider-pins-store.js';
-import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+} from './provider/provider-pins-store.js';
+import { discoverProviders, type ProviderInfo } from './provider/provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
-import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
+import type { CapabilityResolveOptions } from './agent/agent-provider-resolution.js';
 import {
   isInstanceDemoted,
   resolveCapabilityTargetWithHealth,
   selectHealthyInstance,
   type HealthAwareResolution,
-} from './provider-health-registry.js';
+} from './provider/provider-health-registry.js';
 
 /**
  * Capability Broker v1.0
@@ -45,12 +45,12 @@ export interface ResolveProviderDecisionOptions extends CapabilityResolveOptions
   now?: number;
 }
 
-export type { PinnedEntry, SeamPinnedEntry } from './provider-pins-store.js';
+export type { PinnedEntry, SeamPinnedEntry } from './provider/provider-pins-store.js';
 export {
   loadSeamProviderPin,
   pinSeamProviderDecision,
   unpinSeamProviderDecision,
-} from './provider-pins-store.js';
+} from './provider/provider-pins-store.js';
 
 export function loadPinnedDecision(decisionKey: string): PinnedEntry | null {
   return readPinFile().pins[decisionKey] ?? null;

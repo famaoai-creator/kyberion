@@ -32,5 +32,5 @@ export { handleAction, parseProcessAction };
 if (isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'process-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

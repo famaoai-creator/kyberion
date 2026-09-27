@@ -14,9 +14,9 @@ import {
 import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import type { DealRecord, DealStage } from './deal-store.js';
-import type { ExtractedRequirements } from './reasoning-backend.js';
-import { getReasoningBackend } from './reasoning-backend.js';
-import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
+import type { ExtractedRequirements } from './reasoning/reasoning-backend.js';
+import { getReasoningBackend } from './reasoning/reasoning-backend.js';
+import { getSpeechToTextBridge } from './voice/speech-to-text-bridge.js';
 
 /**
  * Customer conversation modes — the direct-to-customer paths (sales,

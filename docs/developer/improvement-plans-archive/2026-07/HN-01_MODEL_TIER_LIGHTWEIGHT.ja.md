@@ -63,7 +63,7 @@ status: archived
 ### Task 1 slice — 2026-07-04
 
 - `knowledge/product/governance/model-registry.json` に `execution_tier` (`fast` / `standard` / `deep`) を追加し、`reasoning-model-routing.ts` の `resolveTaskModelHint` が `execution_tier` を返すようにした。
-- `libs/core/reasoning-model-routing.test.ts` で `execution_tier` の決定論性を固定した。
+- `libs/core/reasoning/reasoning-model-routing.test.ts` で `execution_tier` の決定論性を固定した。
 
 ### Task 3 slice — 2026-07-04
 
@@ -73,5 +73,5 @@ status: archived
 
 ### Task 4 slice — 2026-07-04
 
-- `libs/core/mission-context-pack.ts` で fast-tier context pack に、同一 mission の過去 work item dispatch の response / reflection を seed として自動添付するようにした。
-- `libs/core/mission-context-pack.test.ts` で prior work item 出力が `task_guidance.seed` に入ることを固定した。
+- `libs/core/mission/mission-context-pack.ts` で fast-tier context pack に、同一 mission の過去 work item dispatch の response / reflection を seed として自動添付するようにした。
+- `libs/core/mission/mission-context-pack.test.ts` で prior work item 出力が `task_guidance.seed` に入ることを固定した。

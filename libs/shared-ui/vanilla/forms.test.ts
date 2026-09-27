@@ -8,7 +8,7 @@
 // every track stopped on capture / confirm / cancel / re-render / pagehide).
 import { describe, expect, it, vi } from 'vitest';
 import { getUiMessageBundle } from '@agent/core';
-import { KB_FORM_ACTIONS as CORE_FORM_ACTIONS } from '@agent/core/a2ui-catalog';
+import { KB_FORM_ACTIONS as CORE_FORM_ACTIONS } from '@agent/core/surface/a2ui-catalog';
 import { disposeA2UI, renderA2UI } from './kyberion-ui.js';
 import {
   KB_FORM_ACTIONS,

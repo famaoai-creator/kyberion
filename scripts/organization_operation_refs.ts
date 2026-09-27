@@ -1,1 +1,1 @@
-export { assertScopedOperationRunRef } from '@agent/core/organization-operation-run-recording';
+export { assertScopedOperationRunRef } from '@agent/core/organization/organization-operation-run-recording';

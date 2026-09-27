@@ -13,8 +13,8 @@ status: archived
 
 ### A. ハードコードされた個人環境パス
 
-- `libs/core/src/native-xlsx-engine/examples/gen_wbs.ts:458` — `/Users/motonobu.ichimura/Downloads/...xlsx`
-- `libs/core/src/native-pptx-engine/examples/gen_project_plan.ts:496` — `/Users/motonobu.ichimura/Downloads/...pptx`
+- `libs/core/media/native-xlsx-engine/examples/gen_wbs.ts:458` — `/Users/motonobu.ichimura/Downloads/...xlsx`
+- `libs/core/media/native-pptx-engine/examples/gen_project_plan.ts:496` — `/Users/motonobu.ichimura/Downloads/...pptx`
 - `libs/actuators/media-generation-actuator/src/media-generation-helpers.ts:35` — `/Users/famaoai/Documents/comfy/ComfyUI/output`(env フォールバック付き・`governance-allow-abs-path` 注釈あり)
 - `libs/actuators/media-generation-actuator/src/index.js:9` — 同パスだが**注釈なしのコンパイル済み `.js` がソースツリーにコミットされている**
 

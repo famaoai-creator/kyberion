@@ -9,7 +9,7 @@ import type {
   GraphNodeStatus,
   GraphExecutionOutcome,
 } from './graph-scheduler.js';
-import { hashPipelineOutput } from './pipeline-run-journal.js';
+import { hashPipelineOutput } from './pipeline/pipeline-run-journal.js';
 import { nowIso } from './foundation/time.js';
 
 export interface GraphRunArtifactNode {

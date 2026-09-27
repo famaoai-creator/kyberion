@@ -1,9 +1,12 @@
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { executionPersonaText } from './foundation/execution-scope.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
-import { policyEngine, type PolicyDecision } from './policy-engine.js';
-import { consumeTenantBudget, TenantRateLimitExceededError } from './tenant-rate-limiter.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
+import { policyEngine, type PolicyDecision } from './governance/policy-engine.js';
+import {
+  consumeTenantBudget,
+  TenantRateLimitExceededError,
+} from './organization/tenant-rate-limiter.js';
 
 /**
  * SA-05: fire the declarative policy engine for operation types beyond

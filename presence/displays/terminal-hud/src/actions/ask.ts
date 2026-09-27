@@ -1,5 +1,5 @@
-import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { auditAction } from './dispatch.js';
 

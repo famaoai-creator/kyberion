@@ -78,7 +78,7 @@ vi.mock('@agent/core/foundation', () => ({
       .filter(Boolean)
       .map((line) => JSON.parse(line) as T),
 }));
-vi.mock('@agent/core/mission-state', () => ({
+vi.mock('@agent/core/mission/mission-state', () => ({
   loadStateAtPath: <T>(value: string) => {
     const raw = files[value];
     return raw ? (JSON.parse(raw) as T) : null;

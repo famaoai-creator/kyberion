@@ -35,7 +35,7 @@
             "deny_everything": "declared",
             "permit_everything": "declared"
           },
-          "evidence": ["libs/core/surface-authorization.ts"]
+          "evidence": ["libs/core/surface/surface-authorization.ts"]
         },
         "member-membership": {
           "traits": {
@@ -56,7 +56,7 @@
             "deny_everything": "declared",
             "permit_everything": "declared"
           },
-          "evidence": ["libs/core/member-registry.ts", "libs/core/front-desk-roles.ts"]
+          "evidence": ["libs/core/organization/member-registry.ts", "libs/core/front-desk-roles.ts"]
         },
         "policy-file": {
           "traits": {

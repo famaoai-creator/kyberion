@@ -8,10 +8,10 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import type { ImageGenerationRequest } from '@agent/core/image-generation-types';
+import type { ImageGenerationRequest } from '@agent/core/media/image-generation-types';
 
 const mocks = vi.hoisted(() => ({ generateImage: vi.fn(), planImageGeneration: vi.fn() }));
-vi.mock('@agent/core/image-generation-bridge', () => ({
+vi.mock('@agent/core/media/image-generation-bridge', () => ({
   generateImage: mocks.generateImage,
   planImageGeneration: mocks.planImageGeneration,
 }));

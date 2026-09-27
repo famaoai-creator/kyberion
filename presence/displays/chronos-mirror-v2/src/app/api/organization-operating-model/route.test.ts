@@ -12,11 +12,11 @@ const mocks = vi.hoisted(() => ({
   viewerErrorResponse: vi.fn((error: Error) => new Response(error.message, { status: 403 })),
 }));
 
-vi.mock('@agent/core/organization-operating-model-management', () => ({
+vi.mock('@agent/core/organization/organization-operating-model-management', () => ({
   buildOrganizationManagementView: mocks.buildOrganizationManagementView,
 }));
 
-vi.mock('@agent/core/tenant-registry', () => ({
+vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: () => ['acme'],
 }));
 

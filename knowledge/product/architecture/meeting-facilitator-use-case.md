@@ -252,7 +252,7 @@ from the driver over the WS control channel
 | `admit [name]`                               | waiting-room admission  | admit-all when offered, else visible buttons; name narrows by row text (best effort); ack event `admitted` with count for audit |
 
 Driver surface: `MeetingSession.raiseHand()` / `admit(name?)`
-(`libs/core/meeting-session-types.ts`, optional — Playwright
+(`libs/core/meeting/meeting-session-types.ts`, optional — Playwright
 sessions omit them). `meeting:join` accepts `raise_hand: true`
 (join → raise → capture → leave) for listen-only presence.
 

@@ -34,7 +34,7 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { findMissionPath as resolveMissionPath } from '@agent/core/path-resolver';
 import {
   loadMissionBriefAtPath,

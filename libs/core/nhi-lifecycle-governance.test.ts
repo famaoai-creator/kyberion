@@ -41,11 +41,11 @@ const WRITER_LEASE_SCHEMAS = ['writer-lease.schema.json', 'writer-lease-metrics.
 
 let tmpRoot: string;
 let governance: typeof import('./nhi-lifecycle-governance.js');
-let identity: typeof import('./agent-identity.js');
+let identity: typeof import('./agent/agent-identity.js');
 let authority: typeof import('./authority.js');
-let closure: typeof import('./mission-artifact-closure.js');
+let closure: typeof import('./mission/mission-artifact-closure.js');
 let verification: typeof import('./nhi-actor-verification.js');
-let members: typeof import('./member-registry.js');
+let members: typeof import('./organization/member-registry.js');
 
 let journalCounter = 0;
 
@@ -130,11 +130,11 @@ beforeAll(async () => {
   );
 
   governance = await import('./nhi-lifecycle-governance.js');
-  identity = await import('./agent-identity.js');
+  identity = await import('./agent/agent-identity.js');
   authority = await import('./authority.js');
-  closure = await import('./mission-artifact-closure.js');
+  closure = await import('./mission/mission-artifact-closure.js');
   verification = await import('./nhi-actor-verification.js');
-  members = await import('./member-registry.js');
+  members = await import('./organization/member-registry.js');
 });
 
 afterAll(() => {

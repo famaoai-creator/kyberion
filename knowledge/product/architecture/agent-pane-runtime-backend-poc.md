@@ -59,8 +59,8 @@ pnpm tool:setup -- --tools herdr,imagesnap,blackhole-2ch --apply
 
 ## Seam shape
 
-- Declaration: `libs/core/agent-pane-runtime-bridge.ts`
-- First vendor adapter: `libs/core/agent-pane-runtime-herdr.ts` (vendor name stays here only)
+- Declaration: `libs/core/agent/agent-pane-runtime-bridge.ts`
+- First vendor adapter: `libs/core/agent/agent-pane-runtime-herdr.ts` (vendor name stays here only)
 - Lifecycle / A2A consume `pipe` \| `pane` only
 
 ## Smoke

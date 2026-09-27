@@ -152,7 +152,7 @@ describe('ios-actuator', () => {
     });
 
     it('preflightにはplaceholder解決後の実値を渡す', async () => {
-      const { registerOpPreflightListener } = await import('@agent/core/op-preflight');
+      const { registerOpPreflightListener } = await import('@agent/core/pipeline/op-preflight');
       const seen: unknown[] = [];
       const unregister = registerOpPreflightListener({
         id: 'test:ios-preflight-resolved-params',

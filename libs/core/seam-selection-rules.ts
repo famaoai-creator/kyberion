@@ -22,13 +22,13 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

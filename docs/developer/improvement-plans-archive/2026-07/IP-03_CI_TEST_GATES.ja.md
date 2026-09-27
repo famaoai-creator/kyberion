@@ -74,9 +74,9 @@ status: archived
 - `libs/core/semaphore.test.ts:15`(5ms)
 - `libs/core/core.test.ts:129`(25ms)
 - `libs/core/tier-guard-tenant.test.ts:35`(25ms ポーリング)
-- `libs/core/video-render-runtime.test.ts:78`、`libs/core/voice-generation-runtime.test.ts:117-123`
+- `libs/core/video/video-render-runtime.test.ts:78`、`libs/core/voice/voice-generation-runtime.test.ts:117-123`
 - `libs/actuators/video-composition-actuator/src/index.test.ts:614,685,759,772`
-- 60秒タイムアウト組(`libs/core/reasoning-bootstrap.test.ts:123`、`tests/core-runtime-import-contract.test.ts:47`、`tests/a2a-lifecycle.test.ts:61,78,111`)は、サブプロセス起動が本質なら timeout 維持でよいが、共通 fixture でプロセスを再利用できないか検討する。
+- 60秒タイムアウト組(`libs/core/reasoning/reasoning-bootstrap.test.ts:123`、`tests/core-runtime-import-contract.test.ts:47`、`tests/a2a-lifecycle.test.ts:61,78,111`)は、サブプロセス起動が本質なら timeout 維持でよいが、共通 fixture でプロセスを再利用できないか検討する。
 
 ### Task 6: 最終レビュー — `claude-opus`
 

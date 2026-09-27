@@ -52,7 +52,7 @@ libs/core/automation-blueprint-slack.test.ts`（2 files / 5 tests）。
   しない境界を揃えた。Telegram/Discord は persisted fallback の回帰、Slack は API 応答の
   current event 除外、iMessage は共通 runtime が current message を付加するため provider 側
   context から除外する回帰を持つ。viewer scope の materialization は
-  `libs/core/surface-mutation-guard.ts` の `resolveSurfaceViewerScope` に正本化し、Chronos /
+  `libs/core/surface/surface-mutation-guard.ts` の `resolveSurfaceViewerScope` に正本化し、Chronos /
   Concierge / Presence Studio / Computer Surface が共通の credential、registration、tenant、
   loopback、tier policy を利用する。request parsing、rate limit、remote-safe path、wire shape
   は framework/surface 固有の adapter に残している。provider API や外部送信 gate は変更して

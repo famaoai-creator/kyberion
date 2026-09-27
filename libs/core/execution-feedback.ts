@@ -9,7 +9,7 @@ import {
   saveDistillCandidateRecord,
   updateDistillCandidateRecord,
   type DistillCandidateRecord,
-} from './distill-candidate-registry.js';
+} from './knowledge/distill-candidate-registry.js';
 import { t } from './t.js';
 
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(

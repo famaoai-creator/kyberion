@@ -33,7 +33,7 @@ import {
   type JudgmentBackend,
   type JudgmentQuestion,
   type JudgmentRequest,
-} from './judgment-backend.js';
+} from './reasoning/judgment-backend.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 

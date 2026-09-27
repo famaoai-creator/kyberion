@@ -7,7 +7,7 @@ import {
   loadNotificationPreferences,
   notifyOperatorSync,
   resolveOperatorNotificationRoute,
-} from './operator-notifications.js';
+} from './surface/operator-notifications.js';
 import { createHash } from 'node:crypto';
 import {
   appendOpsAlertLogRecord,

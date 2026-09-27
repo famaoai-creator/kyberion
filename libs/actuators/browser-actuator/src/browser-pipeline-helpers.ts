@@ -6,8 +6,8 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
-import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -16,7 +16,7 @@ import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
-import { getSecret } from '@agent/core/secret-guard';
+import { getSecret } from '@agent/core/secret/secret-guard';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';

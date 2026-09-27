@@ -1,5 +1,12 @@
-import { mutateTenant, type TenantLifecycleVerb, listTenants } from '@agent/core/tenant-governance';
-import { readTenantProfile, recordTenantProviderAttestation } from '@agent/core/tenant-registry';
+import {
+  mutateTenant,
+  type TenantLifecycleVerb,
+  listTenants,
+} from '@agent/core/organization/tenant-governance';
+import {
+  readTenantProfile,
+  recordTenantProviderAttestation,
+} from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

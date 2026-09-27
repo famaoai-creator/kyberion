@@ -26,7 +26,7 @@ import {
   recordCliUsage,
   recordPostToolUse,
   summarizeTranscriptUsage,
-} from '@agent/core/claude-code-hook';
+} from '@agent/core/provider/claude-code-hook';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { parseSafeJsonInput } from '@agent/core/foundation';

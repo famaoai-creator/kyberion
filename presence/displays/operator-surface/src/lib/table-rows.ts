@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { KbTableCell } from '@agent/core/a2ui-catalog';
+import type { KbTableCell } from '@agent/core/surface/a2ui-catalog';
 
 /**
  * One operator table row for the shared `Table` (`@agent/shared-ui`): a

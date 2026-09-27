@@ -1,6 +1,6 @@
 /**
- * Thin re-export shim: the implementation moved to `libs/core/mission-state.ts`
+ * Thin re-export shim: the implementation moved to `libs/core/mission/mission-state.ts`
  * (SO-01, @agent/core/mission-state). This file exists only to keep existing
  * scripts/-relative importers working unchanged. Do not add logic here.
  */
-export * from '@agent/core/mission-state';
+export * from '@agent/core/mission/mission-state';

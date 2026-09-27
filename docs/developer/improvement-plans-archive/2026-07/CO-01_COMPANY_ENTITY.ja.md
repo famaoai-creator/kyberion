@@ -64,7 +64,7 @@ status: archived
 - 2026-07-05: `scripts/refactor/mission-creation.ts` の `normalizeMissionVisionRef` を公開し、`company://` / `vision://` / legacy free string の正規化を contract test で固定した。
 - 2026-07-05: `scripts/refactor/mission-controller-router.ts` で mission の routing decision に `vision_ref_summary` を載せ、Company vision 参照が mission state の経路記録にも残るようにした。
 - 2026-07-05: `libs/core/outcome-contract.ts` に `vision_ref` を追加し、mission outcome contract でも `company://<tenant>/vision` の構造化参照を保持できるようにした。
-- 2026-07-05: `libs/core/mission-context-pack.ts` / `.test.ts` でも mission outcome contract の `vision_ref` をそのまま pack に保持することを固定し、context pack 層で構造化参照が落ちないようにした。
+- 2026-07-05: `libs/core/mission/mission-context-pack.ts` / `.test.ts` でも mission outcome contract の `vision_ref` をそのまま pack に保持することを固定し、context pack 層で構造化参照が落ちないようにした。
 
 ## 実装メモ 追記 (2026-07-06)
 

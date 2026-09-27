@@ -20,16 +20,16 @@
  *   allow-all / deny-all — test & lockdown providers
  */
 
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { isVitestProcess } from './foundation/env.js';
 import { createLogger } from './logger.js';
 import type { ActorKind } from './actor.js';
-import type { MemberRegistryPathOptions } from './member-registry.js';
+import type { MemberRegistryPathOptions } from './organization/member-registry.js';
 import type {
   SurfaceAuthorizationReasonCode,
   SurfaceAuthorizationRole,
   SurfacePermission,
-} from './surface-authorization.js';
+} from './surface/surface-authorization.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,

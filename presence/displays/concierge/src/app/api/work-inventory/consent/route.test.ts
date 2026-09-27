@@ -46,13 +46,13 @@ vi.mock('../../../../lib/i18n', () => ({
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
 }));
-vi.mock('@agent/core/member-registry', () => ({
+vi.mock('@agent/core/organization/member-registry', () => ({
   resolveMemberByPrincipal: mocks.resolveMember,
 }));
-vi.mock('@agent/core/work-inventory-consent', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/work-inventory-consent')>(
-    '@agent/core/work-inventory-consent'
-  );
+vi.mock('@agent/core/workforce/work-inventory-consent', async () => {
+  const actual = await vi.importActual<
+    typeof import('@agent/core/workforce/work-inventory-consent')
+  >('@agent/core/workforce/work-inventory-consent');
   return {
     ...actual,
     grantWorkInventoryConsent: mocks.grant,
@@ -62,7 +62,7 @@ vi.mock('@agent/core/work-inventory-consent', async () => {
 });
 
 import { GET, POST } from './route.js';
-import { WorkInventoryConsentError } from '@agent/core/work-inventory-consent';
+import { WorkInventoryConsentError } from '@agent/core/workforce/work-inventory-consent';
 
 function request(body?: unknown): NextRequest {
   return {

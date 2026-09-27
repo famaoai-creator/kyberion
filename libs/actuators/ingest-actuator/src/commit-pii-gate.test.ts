@@ -19,12 +19,12 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { enqueueTierPromotionCandidate } from '@agent/core/ingest-tier-gate';
 import {
   loadMemoryPromotionCandidate,
   updateMemoryPromotionCandidateStatus,
-} from '@agent/core/memory-promotion-queue';
+} from '@agent/core/knowledge/memory-promotion-queue';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readAssetLedger } from '@agent/core/ingest-asset-ledger';
 import {

@@ -12,7 +12,7 @@ import type {
   TaskResultKnowledgeFeedback,
   TaskResultProvenance,
   TaskReviewFinding,
-} from './channel-surface-types.js';
+} from './surface/channel-surface-types.js';
 
 export const PlanningPacketTaskSchema: z.ZodType<PlanningPacketTask> = z
   .object({

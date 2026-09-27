@@ -1,10 +1,10 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export * from './voice-selection-preferences.js';
+export * from './voice/voice-selection-preferences.js';
 
-export * from './realtime-voice-preferences.js';
+export * from './voice/realtime-voice-preferences.js';
 
-export * from './native-speech-listen-bridge.js';
+export * from './media/native-speech-listen-bridge.js';
 
 export {
   AppleVisionOcrProvider,
@@ -19,52 +19,52 @@ export {
 
 export * from './ocr-types.js';
 
-export * from './knowledge-context.js';
+export * from './knowledge/knowledge-context.js';
 
-export * from './knowledge-adapter.js';
+export * from './knowledge/knowledge-adapter.js';
 
-export * from './secret-bridge.js';
+export * from './secret/secret-bridge.js';
 
-export * from './secret-types.js';
+export * from './secret/secret-types.js';
 
-export * from './email-bridge.js';
+export * from './integrations/email-bridge.js';
 
-export * from './email-types.js';
+export * from './integrations/email-types.js';
 
-export * from './image-generation-bridge.js';
+export * from './media/image-generation-bridge.js';
 
-export * from './image-generation-types.js';
+export * from './media/image-generation-types.js';
 
-export * from './image-generation-policy.js';
+export * from './media/image-generation-policy.js';
 
-export * from './music-generation-bridge.js';
+export * from './media/music-generation-bridge.js';
 
-export * from './music-generation-types.js';
+export * from './media/music-generation-types.js';
 
-export * from './music-generation-policy.js';
+export * from './media/music-generation-policy.js';
 
-export * from './tool-runtime-policy.js';
+export * from './tool/tool-runtime-policy.js';
 
-export * from './tool-runtime-registry.js';
-export * from './provider-managed-env.js';
+export * from './tool/tool-runtime-registry.js';
+export * from './provider/provider-managed-env.js';
 
-export * from './tool-binary-resolvers.js';
+export * from './tool/tool-binary-resolvers.js';
 
-export * from './service-runtime-policy.js';
+export * from './service/service-runtime-policy.js';
 
-export * from './service-runtime-registry.js';
+export * from './service/service-runtime-registry.js';
 
-export * from './service-pid-registry.js';
+export * from './service/service-pid-registry.js';
 
-export * from './voice-tts-config.js';
+export * from './voice/voice-tts-config.js';
 
-export * from './voice-runtime-policy.js';
+export * from './voice/voice-runtime-policy.js';
 
-export * from './voice-profile-registry.js';
+export * from './voice/voice-profile-registry.js';
 
-export * from './voice-transcript-alignment.js';
+export * from './voice/voice-transcript-alignment.js';
 
-export * from './voice-profile-promotion.js';
+export * from './voice/voice-profile-promotion.js';
 
 export * from './presentation-preference-registry.js';
 
@@ -72,53 +72,53 @@ export * from './imessage-bridge.js';
 
 export * from './imessage-utils.js';
 
-export * from './bluebubbles-adapter.js';
+export * from './integrations/bluebubbles-adapter.js';
 
 export * from './history-search-index.js';
 
-export * from './voice-engine-registry.js';
+export * from './voice/voice-engine-registry.js';
 
-export * from './media-backend-registry.js';
+export * from './media/media-backend-registry.js';
 
-export * from './adapter-default-preferences.js';
+export * from './actuator/adapter-default-preferences.js';
 
-export * from './adapter-default-selection.js';
+export * from './actuator/adapter-default-selection.js';
 
-export * from './intent-execution-profile-registry.js';
+export * from './intent/intent-execution-profile-registry.js';
 
-export * from './voice-sample-ingestion-policy.js';
+export * from './voice/voice-sample-ingestion-policy.js';
 
-export * from './voice-sample-collection.js';
+export * from './voice/voice-sample-collection.js';
 
-export * from './voice-sample-recorder.js';
+export * from './voice/voice-sample-recorder.js';
 
-export * from './voice-text-chunking.js';
+export * from './voice/voice-text-chunking.js';
 
-export * from './voice-generation-runtime.js';
+export * from './voice/voice-generation-runtime.js';
 
-export * from './video-composition-contract.js';
+export * from './video/video-composition-contract.js';
 
-export * from './video-content-brief-contract.js';
+export * from './video/video-content-brief-contract.js';
 
-export * from './video-composition-template-registry.js';
+export * from './video/video-composition-template-registry.js';
 
-export * from './video-render-runtime-policy.js';
+export * from './video/video-render-runtime-policy.js';
 
-export * from './video-render-runtime.js';
+export * from './video/video-render-runtime.js';
 
-export * from './video-composition-compiler.js';
+export * from './video/video-composition-compiler.js';
 
-export * from './narrated-video-brief-compiler.js';
+export * from './video/narrated-video-brief-compiler.js';
 
-export * from './video-content-brief-compiler.js';
+export * from './video/video-content-brief-compiler.js';
 
-export * from './video-render-backend.js';
+export * from './video/video-render-backend.js';
 
-export * from './surface-action-routing.js';
+export * from './surface/surface-action-routing.js';
 
 export * from './platform.js';
 
-export { terminalBridge } from './terminal-bridge.js';
+export { terminalBridge } from './shell/terminal-bridge.js';
 
 export { ReflexTerminal } from './reflex-terminal.js';
 
@@ -128,35 +128,35 @@ export * from './sensor-engine.js';
 
 export * from './sensory-memory.js';
 
-export * from './provider-capability-scanner.js';
+export * from './provider/provider-capability-scanner.js';
 
-export * from './provider-capability-overview.js';
+export * from './provider/provider-capability-overview.js';
 
-export * from './provider-bridge.js';
+export * from './provider/provider-bridge.js';
 
-export * from './provider-permission-profiles.js';
+export * from './provider/provider-permission-profiles.js';
 
-export * from './sandbox-policy.js';
+export * from './shell/sandbox-policy.js';
 
 export * from './permission-presets.js';
 
-export * from './tool-repeat-advisor.js';
+export * from './tool/tool-repeat-advisor.js';
 
 export * from './spill-result.js';
 
-export * from './claude-task-runner.js';
+export * from './provider/claude-task-runner.js';
 
-export * from './claude-task-session-executor.js';
+export * from './provider/claude-task-session-executor.js';
 
-export * from './actuator-op-registry.js';
+export * from './actuator/actuator-op-registry.js';
 
 export * from './stimuli-journal.js';
 
 // Mission Status Guard
 
-export { isValidTransition, transitionStatus } from './mission-status.js';
+export { isValidTransition, transitionStatus } from './mission/mission-status.js';
 
-export type { MissionStatus } from './mission-status.js';
+export type { MissionStatus } from './mission/mission-status.js';
 
 // Gate Status Guard
 
@@ -238,7 +238,7 @@ export {
   getRecordedDelegationTimeouts,
   UNKNOWN_DELEGATION_PROVIDER,
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
-} from './delegation-concurrency.js';
+} from './mission/delegation-concurrency.js';
 
 export {
   startDelegatedTaskTrace,
@@ -281,7 +281,7 @@ export type {
   DelegationChildRecord,
   WithWallClockBudgetOptions,
   DelegationTimeoutRecord,
-} from './delegation-concurrency.js';
+} from './mission/delegation-concurrency.js';
 
 // Data Vault (external data source reference cache)
 
@@ -313,9 +313,9 @@ export type { ProcessLogEntry, ProcessLogLevel, ProcessLoggerOptions } from './p
 
 // Service Engine (vault-cached variant)
 
-export type { ServicePresetCacheOptions } from './service-engine.js';
+export type { ServicePresetCacheOptions } from './service/service-engine.js';
 
-export { executeServicePresetCached } from './service-engine.js';
+export { executeServicePresetCached } from './service/service-engine.js';
 
 // Path helpers (log sub-directories)
 
@@ -330,81 +330,81 @@ export {
 // A2UI Protocol
 
 export * from './a2ui.js';
-export * from './a2ui-catalog.js';
+export * from './surface/a2ui-catalog.js';
 
 export * from './headless-surface-contract.js';
-export * from './surface-authorization.js';
+export * from './surface/surface-authorization.js';
 
 // PTY Engine (Logical Kernel)
 
-export * from './pty-engine.js';
+export * from './shell/pty-engine.js';
 
-export * from './terminal-keys.js';
+export * from './shell/terminal-keys.js';
 
-export * from './agent-mediator.js';
+export * from './agent/agent-mediator.js';
 
-export * from './acp-mediator.js';
+export * from './mesh/acp-mediator.js';
 
-export * from './copilot-acp-reasoning-backend.js';
+export * from './provider/copilot-acp-reasoning-backend.js';
 
-export * from './cursor-cli-reasoning-backend.js';
+export * from './provider/cursor-cli-reasoning-backend.js';
 
-export * from './cursor-cli-session-adapter.js';
+export * from './provider/cursor-cli-session-adapter.js';
 
 export * from './opencode-cli-reasoning-backend.js';
 
-export * from './agent-adapter.js';
+export * from './agent/agent-adapter.js';
 
 // Agent Registry & Lifecycle
 
-export * from './agent-registry.js';
+export * from './agent/agent-registry.js';
 
-export * from './agent-lifecycle.js';
+export * from './agent/agent-lifecycle.js';
 
-export * from './agent-pane-runtime-bridge.js';
+export * from './agent/agent-pane-runtime-bridge.js';
 
-export * from './agent-exec-adapter-bridge.js';
+export * from './agent/agent-exec-adapter-bridge.js';
 
-export * from './audio-bus-bridge.js';
+export * from './voice/audio-bus-bridge.js';
 
-export * from './browser-automation-runtime-bridge.js';
+export * from './browser/browser-automation-runtime-bridge.js';
 
-export * from './calendar-provider-bridge.js';
+export * from './meeting/calendar-provider-bridge.js';
 
 export * from './temporal-context.js';
 
-export * from './calendar-slot-planner.js';
+export * from './meeting/calendar-slot-planner.js';
 
-export * from './a2a-bridge.js';
+export * from './mesh/a2a-bridge.js';
 
-export * from './a2a-conversation-store.js';
+export * from './mesh/a2a-conversation-store.js';
 
-export * from './agent-manifest.js';
+export * from './agent/agent-manifest.js';
 
-export * from './provider-discovery.js';
+export * from './provider/provider-discovery.js';
 
-export * from './reasoning-endpoint-discovery.js';
+export * from './reasoning/reasoning-endpoint-discovery.js';
 
-export * from './provider-capability-registry.js';
+export * from './provider/provider-capability-registry.js';
 
-export * from './provider-egress-gate.js';
+export * from './provider/provider-egress-gate.js';
 
-export * from './provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
+export * from './provider/provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
 
 export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
 
-export * from './agent-provider-resolution.js';
+export * from './agent/agent-provider-resolution.js';
 
-export * from './provider-health-registry.js';
+export * from './provider/provider-health-registry.js';
 
 export * from './capability-broker.js';
 
-export * from './runtime-supervisor.js';
+export * from './tool/runtime-supervisor.js';
 
-export * from './surface-runtime.js';
+export * from './surface/surface-runtime.js';
 
-export * from './organization-profile.js';
+export * from './organization/organization-profile.js';
 
-export * from './organization-operating-model.js';
+export * from './organization/organization-operating-model.js';
 
-export * from './artifact-store.js';
+export * from './workforce/artifact-store.js';

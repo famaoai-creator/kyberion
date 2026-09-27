@@ -333,7 +333,7 @@ describe('secure-io core', () => {
     });
 
     it('fails closed when policy evaluation itself throws (SA-05)', async () => {
-      const { policyEngine } = await import('./policy-engine.js');
+      const { policyEngine } = await import('./governance/policy-engine.js');
       const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
         throw new Error('policy file parse failure');
       });

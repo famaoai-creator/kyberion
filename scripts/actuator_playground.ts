@@ -10,7 +10,7 @@ import {
   loadActuatorManifest,
   type ActuatorManifestFile,
 } from '@agent/core/actuator-manifest-index';
-import { planActuatorDryRun, resolveCliActionKind } from '@agent/core/actuator-sdk';
+import { planActuatorDryRun, resolveCliActionKind } from '@agent/core/actuator/actuator-sdk';
 import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';

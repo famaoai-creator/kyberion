@@ -45,7 +45,10 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { withExecutionContext } from '@agent/core/authority';
-import { memberBindingDenied, resolveMemberByPrincipal } from '@agent/core/member-registry';
+import {
+  memberBindingDenied,
+  resolveMemberByPrincipal,
+} from '@agent/core/organization/member-registry';
 import * as intelligenceData from './intelligence-observation-data';
 import * as intelligenceControlData from './intelligence-control-data';
 import { parseChronosIntelligenceInput } from './intelligence-input';

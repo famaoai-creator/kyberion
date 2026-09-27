@@ -92,7 +92,7 @@ Other `not implemented` markers are intentional/deferred, not this bug class: pl
 
 Integration was tool-level (MCP) plus soft-prompt. The stronger integration point is governance at the tool lifecycle via hooks. Added a Claude Code plugin under `plugins/kyberion-claude-code/` with plugin manifest, hooks, MCP config, and commands.
 
-Hook logic lives in `libs/core/claude-code-hook.ts`, with `scripts/claude_code_hook.ts` as the stdin/stdout CLI:
+Hook logic lives in `libs/core/provider/claude-code-hook.ts`, with `scripts/claude_code_hook.ts` as the stdin/stdout CLI:
 
 - **PreToolUse** gates protected-tier writes (`personal`/`confidential`) through `validateWritePermission`; public/source/tmp paths pass.
 - **PostToolUse** records Claude-Code-initiated tool activity into the audit chain.
@@ -105,7 +105,7 @@ Hook logic lives in `libs/core/claude-code-hook.ts`, with `scripts/claude_code_h
 
 The `claude-agent` backend kept `delegateTask` on a pure one-shot path, so delegation was not agentic. Added an opt-in governed agentic path so the SDK sub-agent acts as a Kyberion citizen rather than a raw Claude Code instance.
 
-- `libs/core/claude-agent-governance.ts` adds `createKyberionCanUseTool()`, reusing Direction A's `evaluatePreToolUse` for file-write tier checks; read-only and `kyberion.*` MCP tools pass, Bash is allowed/audited, unknown tools are denied.
+- `libs/core/provider/claude-agent-governance.ts` adds `createKyberionCanUseTool()`, reusing Direction A's `evaluatePreToolUse` for file-write tier checks; read-only and `kyberion.*` MCP tools pass, Bash is allowed/audited, unknown tools are denied.
 - `buildKyberionMcpServerConfig()` wires Kyberion's MCP surface into the sub-agent, and `buildGovernedAgentSystemPrompt()` injects deterministic-first, tier, mission, and knowledge context.
 - `claude-agent-query.ts` adds `runClaudeAgentTask()` for multi-turn, tools-enabled task execution.
 - `claude-agent-reasoning-backend.ts` routes `delegateTask` through the governed path only when `KYBERION_CLAUDE_AGENT_TOOLS=1`; structured `extract*` ops stay pure.

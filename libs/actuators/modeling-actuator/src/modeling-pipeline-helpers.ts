@@ -7,8 +7,8 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
-import type { AdfEngineContext } from '@agent/core/adf-engine';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -27,11 +27,11 @@ import {
   buildAgenticSourceReviewParticipants,
   compileAgenticSourceReviewPlan,
   validateAgenticSourceReviewPlan,
-} from '@agent/core/agentic-source-review';
+} from '@agent/core/agent/agentic-source-review';
 import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
-} from '@agent/core/agentic-source-review-verification';
+} from '@agent/core/agent/agentic-source-review-verification';
 import {
   createAjv,
   defineCatalog,

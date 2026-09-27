@@ -18,7 +18,7 @@ status: archived
 
 ## 原因
 
-`libs/core/mission-work-reconciliation.test.ts:121,151` が `tenant_slug: 'public'` で work item を作る。
+`libs/core/mission/mission-work-reconciliation.test.ts:121,151` が `tenant_slug: 'public'` で work item を作る。
 `audit-chain.ts:417` は「slug があればテナント別に `customer/{slug}/logs/audit/` へミラーする」ため、監査ミラーが `customer/public/` を生やす。
 
 同型で `tenant-meeting-ops`（`libs/actuators/wisdom-actuator/src/meeting-ops.test.ts:32`）もあるが、そちらは単なる fixture スラッグであり命名としては不正でない。
@@ -76,9 +76,9 @@ status: archived
 
 `afterEach` にプロジェクトワークスペースの削除を追加:
 
-- `libs/core/mission-orchestration-worker.test.ts`（`MSN-FOLLOWUP`）
-- `libs/core/mission-orchestration-worker.kp05-trace.test.ts`（`MSN-KP05-TRACE-${pid}`）
-- `libs/core/mission-orchestration-worker.ni03-delegation.test.ts`（`MSN-NI03-CHAIN-${pid}`）
+- `libs/core/mission/mission-orchestration-worker.test.ts`（`MSN-FOLLOWUP`）
+- `libs/core/mission/mission-orchestration-worker.kp05-trace.test.ts`（`MSN-KP05-TRACE-${pid}`）
+- `libs/core/mission/mission-orchestration-worker.ni03-delegation.test.ts`（`MSN-NI03-CHAIN-${pid}`）
 
 観測ストリームを「vitest 下では書かない」と gate している `observability-gate.ts` が「ミッション配下は gate しない — suite が意図的に fixture を作るため」と明記しているとおり、**ここは gate ではなく後片付けで閉じるのが設計意図**に沿う。
 
@@ -86,7 +86,7 @@ status: archived
 
 `PRJ-PMC-TEST-BOOT` だけはテスト側を直しても残った。`active/projects/confidential/shared/PRJ-PMC-TEST-BOOT/state/project-state.json` が生成され続けたためで、これは**テスト残骸ではなく実装バグ**だった。
 
-`bootstrapManagedProject`（`libs/core/project-management.ts`）が `saveProjectOperationalState` を呼ぶ際、`tier` は渡すが **`tenant_slug` を渡していなかった**。状態ファイルの置き場は tier と tenant の両方で区画されるため、slug が無いと `shared` にフォールバックする。結果:
+`bootstrapManagedProject`（`libs/core/project/project-management.ts`）が `saveProjectOperationalState` を呼ぶ際、`tier` は渡すが **`tenant_slug` を渡していなかった**。状態ファイルの置き場は tier と tenant の両方で区画されるため、slug が無いと `shared` にフォールバックする。結果:
 
 - **confidential なプロジェクトの状態が `shared` 区画に書かれる** — テナント境界の外
 - テナントスコープの問い合わせから**見えなくなる**（`listProjectOperationalStates({tenantSlug})` は `tenant_slug || 'shared'` で突合するため）
@@ -99,7 +99,7 @@ status: archived
 
 原因 1 を直した直後、drift の形が **「未登録ワークスペース」から「登録済みだがワークスペースが無い」に反転**した。ワークスペースは消えるようになったが、テストが `saveProjectRecord()` で書いた**レジストリレコード**が残るため。
 
-- `libs/core/analysis-intent-support.test.ts` — `PRJ-REVIEW` / `PRJ-BIND`
+- `libs/core/analysis/analysis-intent-support.test.ts` — `PRJ-REVIEW` / `PRJ-BIND`
 - `libs/actuators/media-actuator/src/index.test.ts` — `PRJ-MEDIA-BRAND` / `PRJ-DESIGN-REF`
 
 `projectRecordPath()` で消す `afterEach` を追加した。

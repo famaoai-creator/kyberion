@@ -1,13 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core/shell-streaming-stt-bridge', () => ({
+vi.mock('@agent/core/shell/shell-streaming-stt-bridge', () => ({
   installShellStreamingSttBridgeFromEnv: () => ({ installed: false }),
   installManagedMlxWhisperStreamingSttBridgeIfAvailable: () => ({ installed: false }),
 }));
 
 const { registerStreamingSttBridge, resetStreamingSttBridges } =
-  await import('@agent/core/streaming-stt-bridge');
+  await import('@agent/core/voice/streaming-stt-bridge');
 const { pcmToWav } = await import('@agent/core/pcm-wav');
 const { pathResolver } = await import('@agent/core/path-resolver');
 const { safeMkdir, safeRmSync, safeWriteFile } = await import('@agent/core/secure-io');
@@ -16,8 +16,8 @@ const {
   pcmChunks,
   streamingSttBridgeCalibrationAdapter: adapter,
 } = await import('./streaming-stt-bridge.js');
-type AudioChunk = import('@agent/core/meeting-session-types').AudioChunk;
-type StreamingBridge = import('@agent/core/streaming-stt-bridge').StreamingSpeechToTextBridge;
+type AudioChunk = import('@agent/core/meeting/meeting-session-types').AudioChunk;
+type StreamingBridge = import('@agent/core/voice/streaming-stt-bridge').StreamingSpeechToTextBridge;
 
 const dir = pathResolver.sharedTmp('streaming-stt-calibration-test');
 const wavPath = path.join(dir, 'sample.wav');

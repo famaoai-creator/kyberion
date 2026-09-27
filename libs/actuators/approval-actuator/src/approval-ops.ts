@@ -1,7 +1,7 @@
 import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
-import { enforceApprovalGate } from '@agent/core/approval-gate';
-import { isApprovalRequestExpired } from '@agent/core/approval-store';
+import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
+import { isApprovalRequestExpired } from '@agent/core/governance/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 

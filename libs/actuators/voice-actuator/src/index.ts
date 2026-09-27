@@ -1,22 +1,22 @@
-import { collectVoiceSamples } from '@agent/core/voice-sample-collection';
+import { collectVoiceSamples } from '@agent/core/voice/voice-sample-collection';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration,
-} from '@agent/core/voice-sample-ingestion-policy';
+} from '@agent/core/voice/voice-sample-ingestion-policy';
 import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
-} from '@agent/core/voice-engine-registry';
+} from '@agent/core/voice/voice-engine-registry';
 import {
   getVoiceProfileRecord,
   getWritableVoiceProfileRegistryForTier,
   materializeVoiceProfileSampleRefs,
   writeVoiceProfileRegistry,
-} from '@agent/core/voice-profile-registry';
-import { getVoiceRuntimePolicy } from '@agent/core/voice-runtime-policy';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+} from '@agent/core/voice/voice-profile-registry';
+import { getVoiceRuntimePolicy } from '@agent/core/voice/voice-runtime-policy';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
 import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation';
 import {
@@ -28,19 +28,19 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordInteraction } from '@agent/core/relationship-graph-store';
-import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
-import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
-import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
-import { verifyVoiceTranscript } from '@agent/core/voice-transcript-alignment';
-import { resolveVoicePath } from '@agent/core/voice-path-policy';
-import { VoiceGenerationRuntime } from '@agent/core/voice-generation-runtime';
-import { splitVoiceTextIntoChunks } from '@agent/core/voice-text-chunking';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
-import { resolveVoiceBackend } from '@agent/core/media-backend-registry';
-import { createVoiceCapabilityBridge } from '@agent/core/voice-capability-bridge';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
+import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
+import { verifyVoiceTranscript } from '@agent/core/voice/voice-transcript-alignment';
+import { resolveVoicePath } from '@agent/core/voice/voice-path-policy';
+import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
+import { splitVoiceTextIntoChunks } from '@agent/core/voice/voice-text-chunking';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
+import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
+import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
@@ -1343,5 +1343,5 @@ const main = async () => {
 if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'voice-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

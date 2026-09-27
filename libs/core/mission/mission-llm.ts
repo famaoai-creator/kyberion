@@ -1,0 +1,478 @@
+/**
+ * scripts/refactor/mission-llm.ts
+ * LLM resolution and invocation layer for mission distillation.
+ */
+
+import { type ZodType } from 'zod';
+import * as customerResolver from '../customer-resolver.js';
+import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { isRecord } from '../foundation/text.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeExec } from '../secure-io.js';
+import { runCodexCliQuery } from '../provider/codex-cli-query.js';
+import { runGeminiCliQuery } from '../provider/gemini-cli-backend.js';
+import {
+  loadOrganizationProfile,
+  type OrganizationProfile,
+} from '../organization/organization-profile.js';
+import { loadPersonalIdentityAtPath } from '../personal-identity-state.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+
+export interface LlmProfile {
+  description?: string;
+  command: string;
+  args: string[];
+  timeout_ms?: number;
+  response_format?: string;
+  adapter?: string;
+}
+
+export interface LlmPolicyConfig {
+  profiles?: Record<string, LlmProfile>;
+  purpose_map?: Record<string, string>;
+  default_profile?: string;
+}
+
+export interface UserLlmTools {
+  available?: string[];
+  profile_overrides?: Record<string, Partial<LlmProfile>>;
+}
+
+export interface LlmResolutionOptions {
+  userTools?: UserLlmTools;
+  isCommandAvailable?: (command: string) => { available: boolean; reason?: string };
+  organizationProfile?: OrganizationProfile | null;
+}
+
+export interface LlmResolutionStatus {
+  purpose: string;
+  selectedProfile: string | null;
+  selectedCommand: string | null;
+  checkedProfiles: Array<{
+    name: string;
+    command: string;
+    available: boolean;
+    reason?: string;
+  }>;
+}
+
+export const BUILTIN_FALLBACK: LlmProfile = {
+  command: 'codex',
+  args: [],
+  timeout_ms: 120_000,
+  response_format: 'json_envelope',
+  adapter: 'codex-cli',
+};
+
+/** Profile weight for fallback ordering: heavy → standard → light */
+export const PROFILE_FALLBACK_ORDER = ['heavy', 'standard', 'light'];
+
+const commandAvailabilityCache = new Map<string, { available: boolean; reason?: string }>();
+
+export interface StructuredRunner<T = unknown> {
+  (params: {
+    profile: LlmProfile;
+    prompt: string;
+    schema: ZodType<T>;
+    systemPrompt?: string;
+  }): Promise<T>;
+}
+
+const structuredRunnerSeam = createSeam<StructuredRunner>({
+  key: 'structured-runner',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerStructuredRunner(
+  name: string,
+  runner: StructuredRunner,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/mission/mission-llm.ts',
+  }
+): () => void {
+  return structuredRunnerSeam.register(name, runner, metadata);
+}
+
+function ensureStructuredRunner(name: string, runner: StructuredRunner): void {
+  if (!structuredRunnerSeam.getOptional(name)) registerStructuredRunner(name, runner);
+}
+
+function inferAdapter(profile: LlmProfile): string {
+  return profile.adapter || 'shell-json';
+}
+
+function registerDefaultStructuredRunners(): void {
+  ensureStructuredRunner('codex-cli', async ({ profile, prompt, schema, systemPrompt }) => {
+    return runCodexCliQuery({
+      systemPrompt: systemPrompt || 'Return exactly one JSON object that matches the schema.',
+      userPrompt: prompt,
+      schema,
+      mode: 'workspace-write',
+      options: profile as any,
+    });
+  });
+
+  ensureStructuredRunner('gemini-cli', async ({ profile, prompt, schema, systemPrompt }) => {
+    return runGeminiCliQuery({
+      systemPrompt: systemPrompt || 'Return exactly one JSON object that matches the schema.',
+      userPrompt: prompt,
+      schema,
+      options: profile as any,
+    });
+  });
+
+  ensureStructuredRunner('shell-json', async ({ profile, prompt, schema }) => {
+    const raw = invokeShellProfile(prompt, profile);
+    const parsed = parseLlmResponse(raw, profile.response_format || 'json_envelope');
+    const safe = schema.safeParse(parsed);
+    if (!safe.success) {
+      throw new Error(`[shell-json] schema validation failed: ${safe.error.message}`);
+    }
+    return safe.data;
+  });
+
+  const shellRunner = structuredRunnerSeam.getOptional('shell-json');
+  if (shellRunner) {
+    ensureStructuredRunner('claude-cli', shellRunner);
+    ensureStructuredRunner('shell-claude-cli', shellRunner);
+  }
+}
+
+export function loadUserLlmTools(): UserLlmTools {
+  const identityPath =
+    customerResolver.customerRoot('my-identity.json') ??
+    pathResolver.knowledge('personal/my-identity.json');
+  const identity = loadPersonalIdentityAtPath(identityPath);
+  const llmTools = identity?.llm_tools;
+  return llmTools && typeof llmTools === 'object' && !Array.isArray(llmTools)
+    ? (llmTools as UserLlmTools)
+    : {};
+}
+
+export function isToolAvailable(command: string, userTools: UserLlmTools): boolean {
+  if (!userTools.available || userTools.available.length === 0) return true;
+  return userTools.available.includes(command);
+}
+
+export function probeLlmCommandAvailability(command: string): {
+  available: boolean;
+  reason?: string;
+} {
+  const cached = commandAvailabilityCache.get(command);
+  if (cached) return cached;
+
+  try {
+    safeExec(command, ['--version'], { timeoutMs: 5_000, maxOutputMB: 1 });
+    const result = { available: true };
+    commandAvailabilityCache.set(command, result);
+    return result;
+  } catch (err: any) {
+    const reason =
+      err?.stderr?.toString?.().trim?.() || err?.message || `failed to execute ${command}`;
+    const result = { available: false, reason };
+    commandAvailabilityCache.set(command, result);
+    return result;
+  }
+}
+
+export function invokeShellProfile(prompt: string, profile: LlmProfile): string {
+  const args = profile.args.map((arg) => (arg === '{prompt}' ? prompt : arg));
+  const timeoutMs = profile.timeout_ms || 120_000;
+  const stdout = safeExec(profile.command, args, { timeoutMs });
+  return stdout;
+}
+
+function resolveCandidateProfileNames(purpose: string, policy?: LlmPolicyConfig): string[] {
+  const purposeMap = policy?.purpose_map || {};
+  const defaultName = policy?.default_profile || 'standard';
+  const overrideProfile = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim();
+  if (overrideProfile === 'stub') return ['stub'];
+  const targetName = overrideProfile || purposeMap[purpose] || defaultName;
+  const profiles = Object.keys(policy?.profiles || {});
+
+  return Array.from(
+    new Set([targetName, ...PROFILE_FALLBACK_ORDER, ...profiles, 'stub'].filter(Boolean))
+  );
+}
+
+export function inspectLlmResolution(
+  purpose: string,
+  policy?: LlmPolicyConfig,
+  options: LlmResolutionOptions = {}
+): LlmResolutionStatus {
+  const userTools = options.userTools ?? loadUserLlmTools();
+  const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
+  const profiles = policy?.profiles || {};
+  const checkedProfiles: LlmResolutionStatus['checkedProfiles'] = [];
+  const candidateNames = resolveCandidateProfileNames(purpose, policy);
+  const forceStubMode = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
+
+  for (const name of candidateNames) {
+    if (name === 'stub') {
+      checkedProfiles.push({
+        name,
+        command: BUILTIN_FALLBACK.command,
+        available: false,
+        reason: 'stub mode requested or no usable profile found',
+      });
+      continue;
+    }
+
+    const profile = profiles[name];
+    if (!profile) continue;
+    const orgOverride = organizationProfile?.llm?.profile_overrides?.[name];
+    const userOverride = userTools.profile_overrides?.[name];
+    const effectiveProfile = {
+      ...profile,
+      ...(orgOverride || {}),
+      ...(userOverride || {}),
+    } as LlmProfile;
+    if (!isToolAvailable(effectiveProfile.command, userTools)) {
+      checkedProfiles.push({
+        name,
+        command: effectiveProfile.command,
+        available: false,
+        reason: 'command blocked by user tool allowlist',
+      });
+      continue;
+    }
+    const availability =
+      options.isCommandAvailable?.(effectiveProfile.command) ??
+      probeLlmCommandAvailability(effectiveProfile.command);
+    checkedProfiles.push({
+      name,
+      command: effectiveProfile.command,
+      available: availability.available,
+      reason: availability.reason,
+    });
+    if (availability.available) {
+      return {
+        purpose,
+        selectedProfile: name,
+        selectedCommand: effectiveProfile.command,
+        checkedProfiles,
+      };
+    }
+  }
+
+  if (forceStubMode) {
+    return {
+      purpose,
+      selectedProfile: null,
+      selectedCommand: null,
+      checkedProfiles,
+    };
+  }
+
+  const fallbackAvailability =
+    options.isCommandAvailable?.(BUILTIN_FALLBACK.command) ??
+    probeLlmCommandAvailability(BUILTIN_FALLBACK.command);
+  checkedProfiles.push({
+    name: 'builtin-fallback',
+    command: BUILTIN_FALLBACK.command,
+    available: fallbackAvailability.available,
+    reason: fallbackAvailability.reason,
+  });
+
+  return {
+    purpose,
+    selectedProfile: fallbackAvailability.available ? 'builtin-fallback' : null,
+    selectedCommand: fallbackAvailability.available ? BUILTIN_FALLBACK.command : null,
+    checkedProfiles,
+  };
+}
+
+/**
+ * Resolves the LLM profile for a given purpose.
+ * Resolution order: user override → org profile → builtin fallback
+ */
+export function resolveLlmConfig(
+  purpose: string,
+  policy?: LlmPolicyConfig,
+  options: LlmResolutionOptions = {}
+): LlmProfile {
+  const userTools = options.userTools ?? loadUserLlmTools();
+  const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
+  const profiles = policy?.profiles || {};
+  const status = inspectLlmResolution(purpose, policy, {
+    ...options,
+    userTools,
+    organizationProfile,
+  });
+
+  for (const entry of status.checkedProfiles) {
+    if (entry.available && entry.name !== 'builtin-fallback') {
+      const profile = profiles[entry.name];
+      if (!profile) continue;
+      const orgOverride = organizationProfile?.llm?.profile_overrides?.[entry.name];
+      const userOverride = userTools.profile_overrides?.[entry.name];
+      const merged = { ...profile, ...(orgOverride || {}), ...(userOverride || {}) } as LlmProfile;
+      if (userOverride?.command && isToolAvailable(userOverride.command, userTools)) {
+        logger.info(
+          `🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (user override, cmd=${merged.command})`
+        );
+        return merged;
+      }
+      logger.info(
+        `🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (cmd=${merged.command})`
+      );
+      return merged;
+    }
+  }
+
+  if (status.selectedProfile === 'builtin-fallback' && status.selectedCommand) {
+    logger.warn(`⚠️ LLM fallback to builtin default for purpose="${purpose}"`);
+    return BUILTIN_FALLBACK;
+  }
+
+  const details = status.checkedProfiles
+    .map((entry) => `${entry.name}:${entry.command}${entry.reason ? ` (${entry.reason})` : ''}`)
+    .join('; ');
+  throw new Error(
+    `No usable LLM tool available for purpose "${purpose}". ` +
+      `Set KYBERION_WISDOM_LLM_PROFILE, update wisdom-policy.json, or use stub distillation. ` +
+      `Checks: ${details || 'none'}`
+  );
+}
+
+export function invokeLlm(prompt: string, purpose: string, policy?: LlmPolicyConfig): string {
+  const profile = resolveLlmConfig(purpose, policy);
+  logger.info(`🤖 Invoking LLM: ${profile.command} (timeout: ${profile.timeout_ms || 120_000}ms)`);
+  return invokeShellProfile(prompt, profile);
+}
+
+export async function runStructuredLlmProfile<T>(
+  profile: LlmProfile,
+  prompt: string,
+  schema: ZodType<T>,
+  options: { systemPrompt?: string } = {}
+): Promise<T> {
+  registerDefaultStructuredRunners();
+
+  // Custom adapter takes absolute precedence if registered
+  const adapter = inferAdapter(profile);
+  const runner = structuredRunnerSeam.getOptional(adapter);
+  if (runner) {
+    return (await runner({
+      profile,
+      prompt,
+      schema,
+      systemPrompt: options.systemPrompt,
+    })) as T;
+  }
+
+  // Fallback to shell invocation only if using standard adapter
+  if (adapter === 'shell-json') {
+    const shellRunner = structuredRunnerSeam.getOptional('shell-json');
+    if (shellRunner) {
+      return (await shellRunner({
+        profile,
+        prompt,
+        schema,
+        systemPrompt: options.systemPrompt,
+      })) as T;
+    }
+  }
+
+  throw new Error(`No structured runner registered for adapter "${adapter}"`);
+}
+
+/**
+ * Parses the raw LLM output into a structured object.
+ * Supported formats: "json_envelope", "raw_json", "text"
+ */
+export function parseLlmResponse(raw: string, responseFormat?: string): unknown {
+  const format = responseFormat || 'json_envelope';
+
+  let content: string;
+  if (format === 'json_envelope') {
+    const parsedEnvelope = parseSafeJsonInput(raw, 'mission LLM envelope');
+    if (!isRecord(parsedEnvelope) || !Object.hasOwn(parsedEnvelope, 'result')) {
+      throw new Error('mission LLM envelope must be a JSON object with a result field');
+    }
+    const result = parsedEnvelope.result;
+    content = typeof result === 'string' ? result : JSON.stringify(result) || '';
+  } else {
+    content = raw;
+  }
+
+  try {
+    return parseSafeJsonInput(content, 'mission LLM response');
+  } catch (err) {
+    logger.warn(`[mission-llm] suppressed error in parseLlmResponse: ${err}`);
+  }
+
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    return parseSafeJsonInput(jsonMatch[1].trim(), 'mission LLM fenced response');
+  }
+
+  return parseSafeJsonInput(content.trim(), 'mission LLM response');
+}
+
+function isQuotaError(err: unknown): boolean {
+  if (!isRecord(err)) return false;
+  const cause = isRecord(err.cause) ? err.cause : undefined;
+  return (
+    cause?.code === 429 ||
+    (typeof err.message === 'string' && err.message.includes('QUOTA_EXHAUSTED'))
+  );
+}
+
+/**
+ * Runs a structured LLM query with automatic model fallback on quota exhaustion.
+ */
+export async function runAdaptiveStructuredLlmProfile<T>(
+  purpose: string,
+  prompt: string,
+  schema: ZodType<T>,
+  options: {
+    systemPrompt?: string;
+    policy?: LlmPolicyConfig;
+    isCommandAvailable?: (command: string) => { available: boolean; reason?: string };
+  } = {}
+): Promise<T> {
+  const { policy, systemPrompt, isCommandAvailable } = options;
+  const candidateNames = resolveCandidateProfileNames(purpose, policy);
+  const profiles = policy?.profiles || {};
+
+  logger.info(`🤖 Adaptive LLM loop: candidates=${candidateNames.length}`);
+
+  for (const name of candidateNames) {
+    if (name === 'stub') {
+      logger.info(`  [Skip] ${name}: stub backend`);
+      continue;
+    }
+
+    const profile = profiles[name];
+    if (!profile) {
+      logger.info(`  [Skip] ${name}: not configured`);
+      continue;
+    }
+
+    const availability =
+      isCommandAvailable?.(profile.command) ?? probeLlmCommandAvailability(profile.command);
+    if (!availability.available) {
+      logger.info(`  [Skip] ${name}: ${availability.reason || 'unavailable'}`);
+      continue;
+    }
+
+    logger.info(`  [Try] ${name}: executing`);
+    try {
+      return await runStructuredLlmProfile(profile, prompt, schema, { systemPrompt });
+    } catch (err: unknown) {
+      if (isQuotaError(err)) {
+        logger.warn(`⚠️ Model "${name}" exhausted, trying next...`);
+        continue;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`❌ Model "${name}" failed with non-quota error: ${message}`);
+      throw err;
+    }
+  }
+  throw new Error(`All LLM models exhausted for purpose "${purpose}"`);
+}

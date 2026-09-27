@@ -21,7 +21,7 @@ import {
 } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
-import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {

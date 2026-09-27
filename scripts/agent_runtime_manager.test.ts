@@ -49,15 +49,15 @@ vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: vi.fn(),
 }));
 
-vi.mock('@agent/core/agent-lifecycle', () => ({
+vi.mock('@agent/core/agent/agent-lifecycle', () => ({
   agentLifecycle: { spawn: mocks.spawn, shutdown: mocks.shutdown, getSnapshot: mocks.getSnapshot },
 }));
 
-vi.mock('@agent/core/agent-registry', () => ({
+vi.mock('@agent/core/agent/agent-registry', () => ({
   agentRegistry: { list: mocks.list, get: mocks.get },
 }));
 
-vi.mock('@agent/core/agent-manifest', () => ({
+vi.mock('@agent/core/agent/agent-manifest', () => ({
   loadAgentManifests: mocks.loadAgentManifests,
   getAgentManifest: mocks.getAgentManifest,
 }));
@@ -66,7 +66,7 @@ vi.mock('@agent/core/core', () => ({
   logger: mocks.logger,
 }));
 
-vi.mock('@agent/core/audit-chain', () => ({
+vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: mocks.record },
 }));
 

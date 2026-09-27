@@ -1,0 +1,166 @@
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../tier-guard.js', () => ({
+  detectTier: (p: string) =>
+    p.includes('knowledge/personal')
+      ? 'personal'
+      : p.includes('knowledge/confidential')
+        ? 'confidential'
+        : 'public',
+  validateWritePermission: (p: string) =>
+    p.includes('knowledge/personal')
+      ? { allowed: false, reason: 'persona not authorized for personal tier' }
+      : { allowed: true },
+}));
+
+const recordSpy = vi.fn((entry: any) => ({ id: 'AUD-TEST-1', ...entry }));
+vi.mock('../governance/audit-chain.js', () => ({
+  auditChain: { record: (e: any) => recordSpy(e) },
+}));
+vi.mock('../shell/shell-command-policy.js', () => ({
+  evaluateShellCommandPolicy: (command: string) =>
+    command.startsWith('pdftotext')
+      ? {
+          verdict: 'deny',
+          command,
+          executable: 'pdftotext',
+          args: [],
+          matchedRuleId: 'document-hand-extraction',
+          reason:
+            'Reading office / PDF files by hand is blocked — use `pnpm kyberion read <file>`.',
+        }
+      : command.includes('pnpm install')
+        ? {
+            verdict: 'require_approval',
+            command,
+            executable: 'pnpm',
+            args: ['install'],
+            reason: 'Shell command requires approval under Kyberion governance.',
+          }
+        : {
+            verdict: 'allow',
+            command,
+            executable: 'ls',
+            args: [],
+            reason: 'Allowed by shell command policy.',
+          },
+}));
+
+import {
+  buildSessionStartContext,
+  buildStopContext,
+  buildUserPromptSubmitContext,
+  evaluatePreToolUse,
+  evaluatePreToolUseShellDeny,
+  recordPostToolUse,
+} from './claude-code-hook.js';
+
+describe('claude-code-hook — PreToolUse tier-guard', () => {
+  it('policy-gates Bash commands', () => {
+    const out = evaluatePreToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' } });
+    expect(out.hookSpecificOutput.permissionDecision).toBe('allow');
+
+    const denied = evaluatePreToolUse({
+      tool_name: 'Bash',
+      tool_input: { command: 'pnpm install' },
+    });
+    expect(denied.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('approval');
+  });
+
+  it('deny-only Bash gate blocks hand-rolled document extraction and stays silent otherwise', () => {
+    const denied = evaluatePreToolUseShellDeny({
+      tool_name: 'Bash',
+      tool_input: { command: 'pdftotext -layout active/shared/tmp/job/final.pdf -' },
+    });
+    expect(denied?.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(denied?.hookSpecificOutput.permissionDecisionReason).toContain('pnpm kyberion read');
+    // Not allowlisted, but not denied either: defer to Claude Code's own prompts.
+    expect(
+      evaluatePreToolUseShellDeny({ tool_name: 'Bash', tool_input: { command: 'pnpm install' } })
+    ).toBeNull();
+    expect(
+      evaluatePreToolUseShellDeny({ tool_name: 'Write', tool_input: { file_path: 'a.ts' } })
+    ).toBeNull();
+  });
+
+  it('allows writes to ordinary source paths (public tier — not gated)', () => {
+    const out = evaluatePreToolUse({
+      tool_name: 'Write',
+      tool_input: { file_path: 'libs/core/foo.ts' },
+    });
+    expect(out.hookSpecificOutput.permissionDecision).toBe('allow');
+  });
+
+  it('denies writes into a protected knowledge tier, surfacing the tier + reason', () => {
+    const out = evaluatePreToolUse({
+      tool_name: 'Edit',
+      tool_input: { file_path: 'knowledge/personal/secret.md' },
+    });
+    expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain('personal tier');
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain('not authorized');
+  });
+});
+
+describe('claude-code-hook — PostToolUse audit', () => {
+  it('records Write into the audit chain with tier metadata', () => {
+    recordSpy.mockClear();
+    const res = recordPostToolUse({
+      tool_name: 'Write',
+      tool_input: { file_path: 'knowledge/public/x.md' },
+      cwd: '/repo',
+    });
+    expect(res.recorded).toBe(true);
+    expect(res.entryId).toBe('AUD-TEST-1');
+    const entry = recordSpy.mock.calls[0][0];
+    expect(entry).toMatchObject({ agentId: 'claude-code', operation: 'Write' });
+    expect(entry.metadata).toMatchObject({ file_path: 'knowledge/public/x.md', tier: 'public' });
+  });
+
+  it('records Bash with a truncated command', () => {
+    recordSpy.mockClear();
+    const res = recordPostToolUse({ tool_name: 'Bash', tool_input: { command: 'pnpm test' } });
+    expect(res.recorded).toBe(true);
+    expect(recordSpy.mock.calls[0][0].metadata.command).toBe('pnpm test');
+  });
+
+  it('does not audit untracked tools', () => {
+    recordSpy.mockClear();
+    const res = recordPostToolUse({ tool_name: 'Read', tool_input: { file_path: 'x' } });
+    expect(res.recorded).toBe(false);
+    expect(recordSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('claude-code-hook — SessionStart', () => {
+  it('mentions tier-guard, audit, and the lifecycle commands', () => {
+    const ctx = buildSessionStartContext();
+    expect(ctx).toContain('tier-guard');
+    expect(ctx).toContain('audit chain');
+    expect(ctx).toContain('/ky-baseline');
+  });
+});
+
+describe('claude-code-hook — UserPromptSubmit and Stop', () => {
+  it('summarizes the prompt and suggests the next Kyberion step', () => {
+    const ctx = buildUserPromptSubmitContext({
+      prompt: 'Presentation deck for a proposal. Please validate the slides and open a mission.',
+      cwd: '/repo',
+    });
+
+    expect(ctx).toContain('Prompt summary');
+    expect(ctx).toContain('presentation preference profile');
+    expect(ctx).toContain('mission');
+  });
+
+  it('summarizes stop events and nudges review completion', () => {
+    const ctx = buildStopContext({
+      reason: 'Stopping after the first draft and validation pass.',
+      cwd: '/repo',
+    });
+
+    expect(ctx).toContain('Stop summary');
+    expect(ctx).toContain('/ky-review');
+  });
+});

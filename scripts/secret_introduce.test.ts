@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
-vi.mock('@agent/core/secret-introduction', () => ({
+vi.mock('@agent/core/secret/secret-introduction', () => ({
   proposeSecretIntroduction: vi.fn(() => ({
     approvalId: '11111111-1111-1111-1111-111111111111',
     status: 'approved',
@@ -59,7 +59,7 @@ describe('secret_introduce CLI', () => {
 
     const lines: string[] = [];
     const { runSecretCli } = await import('./secret_introduce.js');
-    const { applySecretIntroduction } = await import('@agent/core/secret-introduction');
+    const { applySecretIntroduction } = await import('@agent/core/secret/secret-introduction');
 
     try {
       const result = await runSecretCli(

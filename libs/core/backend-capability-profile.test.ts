@@ -8,13 +8,13 @@ import {
   resolveConstrainedSampling,
   resolveThinkingLevel,
 } from './backend-capability-profile.js';
-import { loadReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { listReasoningProviderDescriptors } from './reasoning-provider-registry.js';
+import { loadReasoningRoutePolicy } from './reasoning/reasoning-route-resolver.js';
+import { listReasoningProviderDescriptors } from './reasoning/reasoning-provider-registry.js';
 import {
   buildFailoverReasoningBackend,
   stubReasoningBackend,
   type ReasoningBackend,
-} from './reasoning-backend.js';
+} from './reasoning/reasoning-backend.js';
 
 describe('backend capability profiles (QM-06)', () => {
   it('every profile is self-consistent (mode key matches declaration)', () => {

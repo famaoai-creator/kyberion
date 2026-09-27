@@ -1,2 +1,2 @@
 /** Public package boundary for intent compilation. */
-export * from './src/intent-compiler.js';
+export * from './intent/intent-compiler.js';

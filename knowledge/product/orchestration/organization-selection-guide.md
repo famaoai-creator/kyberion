@@ -50,12 +50,12 @@ If you need machine-readable output instead of the compact summaries, add
 
 Common questions:
 
-| Question | Best Command |
-| --- | --- |
-| "What organization is selected right now?" | `organization-profile --summary` |
-| "Which customer orgs are missing a profile?" | `organization-profiles --missing-only --summary` |
-| "Which team template overlays are active for this org?" | `organization-catalogs --selected-only --summary` |
-| "Do I need JSON for another tool?" | add `--json` to the same command and use the matching report schema |
+| Question                                                | Best Command                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| "What organization is selected right now?"              | `organization-profile --summary`                                    |
+| "Which customer orgs are missing a profile?"            | `organization-profiles --missing-only --summary`                    |
+| "Which team template overlays are active for this org?" | `organization-catalogs --selected-only --summary`                   |
+| "Do I need JSON for another tool?"                      | add `--json` to the same command and use the matching report schema |
 
 ## 2. Resolution Order
 
@@ -305,9 +305,9 @@ The main files are:
 - `knowledge/product/orchestration/organization-discovery-reports.md`
 - `knowledge/product/orchestration/README.md`
 - `knowledge/product/orchestration/mission-team-templates.json`
-- `libs/core/organization-profile.ts`
-- `libs/core/mission-team-index.ts`
-- `libs/core/mission-team-plan-composer.ts`
+- `libs/core/organization/organization-profile.ts`
+- `libs/core/mission/mission-team-index.ts`
+- `libs/core/mission/mission-team-plan-composer.ts`
 - `scripts/refactor/mission-runtime.ts`
 - `scripts/mission_controller.ts`
 - `scripts/compose_mission_team.ts`

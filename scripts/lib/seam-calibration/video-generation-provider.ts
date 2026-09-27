@@ -8,7 +8,7 @@
  */
 
 import * as path from 'node:path';
-import { getMediaBackendRecord } from '@agent/core/media-backend-registry';
+import { getMediaBackendRecord } from '@agent/core/media/media-backend-registry';
 import type { SeamCalibrationAdapter } from '@agent/core/seam-calibration';
 import type { SeamProviderCandidate } from '@agent/core/seam-provider-selection';
 import { safeExistsSync, safeStat } from '@agent/core/secure-io';

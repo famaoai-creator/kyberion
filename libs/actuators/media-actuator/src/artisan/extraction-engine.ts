@@ -5,7 +5,7 @@ import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile, safeUnlink } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import AdmZip from 'adm-zip';
-import { distillPdfDesign, distillPptxDesign } from '@agent/core/media-contracts';
+import { distillPdfDesign, distillPptxDesign } from '@agent/core/media/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 
 /**

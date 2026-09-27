@@ -41,11 +41,11 @@ vi.mock('./seam-selection-rules.js', () => ({
   getSeamTraitOverrides: (seam: string) => overlay.overrides[seam] ?? {},
 }));
 
-vi.mock('./audit-chain.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
 
-vi.mock('./provider-pins-store.js', () => ({
+vi.mock('./provider/provider-pins-store.js', () => ({
   loadSeamProviderPin: (seam: string, key: string) => pins.get(`${seam}:${key}`) ?? null,
   pinSeamProviderDecision: (seam: string, key: string, providerId: string, purpose?: string) => {
     const entry = {

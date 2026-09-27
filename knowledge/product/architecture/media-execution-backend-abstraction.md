@@ -55,7 +55,7 @@ It provides a small, governed list of backends for:
 - `video`
 - `music`
 
-For local FLUX image generation, use the governed image backend `media-generation.local_flux` and the environment policy defined in `libs/core/image-generation-policy.ts`:
+For local FLUX image generation, use the governed image backend `media-generation.local_flux` and the environment policy defined in `libs/core/media/image-generation-policy.ts`:
 
 - `KYBERION_MFLUX_PACKAGE`
 - `KYBERION_MFLUX_MODEL`
@@ -70,15 +70,15 @@ provider preference falls back to `local_flux` and then ComfyUI.
 
 The backend launch command itself is now resolved through the governed tool runtime abstraction:
 
-- `libs/core/tool-runtime-policy.ts`
-- `libs/core/tool-runtime-registry.ts`
+- `libs/core/tool/tool-runtime-policy.ts`
+- `libs/core/tool/tool-runtime-registry.ts`
 - `knowledge/product/governance/tool-runtime-policy.json`
 - `knowledge/product/governance/tool-runtime-registry.json`
 
 For long-lived services such as ComfyUI, the same idea applies one layer up via the service runtime abstraction:
 
-- `libs/core/service-runtime-policy.ts`
-- `libs/core/service-runtime-registry.ts`
+- `libs/core/service/service-runtime-policy.ts`
+- `libs/core/service/service-runtime-registry.ts`
 - `knowledge/product/governance/service-runtime-policy.json`
 - `knowledge/product/governance/service-runtime-registry.json`
 

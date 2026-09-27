@@ -18,7 +18,7 @@ import {
   type RoleplayTurn,
   registerVoiceBridge,
   resetVoiceBridge,
-} from './voice-bridge.js';
+} from './voice/voice-bridge.js';
 
 export interface PythonVoiceBridgeOptions {
   profileId: string;

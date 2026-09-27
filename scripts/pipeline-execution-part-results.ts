@@ -8,7 +8,7 @@ import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { runFeedbackLoop } from '@agent/core/feedback-loop';
 import { getSemanticDecideDegradations } from '@agent/core/semantic-decide';
 import { appendSemanticDegradationRun } from '@agent/core/semantic-degradation-log';
@@ -16,10 +16,10 @@ import {
   PROMOTION_CANDIDATE_MIN_RUNS,
   recordAdhocPipelineRun,
 } from '@agent/core/promotion-candidates';
-import { killSwitch } from '@agent/core/kill-switch';
+import { killSwitch } from '@agent/core/governance/kill-switch';
 import { resolveIdentityContext } from '@agent/core/authority';
-import { runAdfLifecycle } from '@agent/core/adf-lifecycle';
-import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import { runAdfLifecycle } from '@agent/core/pipeline/adf-lifecycle';
+import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
@@ -27,7 +27,7 @@ import {
 import {
   withReasoningPayloadScope,
   type ReasoningPayloadScope,
-} from '@agent/core/reasoning-egress-scope';
+} from '@agent/core/reasoning/reasoning-egress-scope';
 import {
   createPipelineRunJournal,
   loadPipelineRunJournal,
@@ -35,14 +35,14 @@ import {
   openPipelineRunJournal,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
-} from '@agent/core/pipeline-run-journal';
-import { assessPipelineDryRun } from '@agent/core/pipeline-dry-run';
+} from '@agent/core/pipeline/pipeline-run-journal';
+import { assessPipelineDryRun } from '@agent/core/pipeline/pipeline-dry-run';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
 
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { resetRouterSync } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import {
   formatPipelineFailure,
   logNextActionForPipelineFailure,

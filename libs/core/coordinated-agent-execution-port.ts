@@ -5,14 +5,14 @@ import {
   updateWorkItem,
   type WorkItem,
   type WorkItemStatus,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 import type {
   AgentExecutionPort,
   AgentExecutionReceipt,
   AgentTaskEnvelope,
-} from './agent-execution-port.js';
+} from './agent/agent-execution-port.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
-import { getAgentExecutionPort } from './agent-execution-port.js';
+import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {

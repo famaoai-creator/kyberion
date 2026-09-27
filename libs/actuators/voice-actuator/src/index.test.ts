@@ -382,19 +382,19 @@ vi.mock('@agent/core/async-utils', async () => {
     await vi.importActual<typeof import('@agent/core/async-utils')>('@agent/core/async-utils');
   return { ...actual, retry: mocks.retry, sleep: vi.fn(async () => undefined) };
 });
-vi.mock('@agent/core/virtual-audio-output-playback-bridge', () => ({
+vi.mock('@agent/core/virtual/virtual-audio-output-playback-bridge', () => ({
   createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
 }));
-vi.mock('@agent/core/virtual-device-inventory-bridge', () => ({
+vi.mock('@agent/core/virtual/virtual-device-inventory-bridge', () => ({
   createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
 }));
-vi.mock('@agent/core/voice-path-policy', () => ({
+vi.mock('@agent/core/voice/voice-path-policy', () => ({
   resolveVoicePath: vi.fn((value: string) => value),
 }));
-vi.mock('@agent/core/voice-engine-registry', async () => {
+vi.mock('@agent/core/voice/voice-engine-registry', async () => {
   // Pure selection helpers stay real; registry reads stay doubled.
-  const actual = await vi.importActual<typeof import('@agent/core/voice-engine-registry')>(
-    '@agent/core/voice-engine-registry'
+  const actual = await vi.importActual<typeof import('@agent/core/voice/voice-engine-registry')>(
+    '@agent/core/voice/voice-engine-registry'
   );
   return {
     ...actual,
@@ -409,7 +409,7 @@ vi.mock('@agent/core/seam-selection-rules', () => ({
   matchSeamSelectionRule: vi.fn(() => null),
   getSeamTraitOverrides: vi.fn(() => ({})),
 }));
-vi.mock('@agent/core/media-backend-registry', () => ({
+vi.mock('@agent/core/media/media-backend-registry', () => ({
   resolveVoiceBackend: vi.fn(() => ({
     backend_id: 'voice.local_say',
     modality: 'voice',
@@ -430,41 +430,41 @@ vi.mock('@agent/core/recovery-policy', () => ({
     jitter: false,
   })),
 }));
-vi.mock('@agent/core/voice-profile-registry', () => ({
+vi.mock('@agent/core/voice/voice-profile-registry', () => ({
   getVoiceProfileRecord: mocks.getVoiceProfileRecord,
   getWritableVoiceProfileRegistryForTier: mocks.getWritableVoiceProfileRegistryForTier,
   materializeVoiceProfileSampleRefs: mocks.materializeVoiceProfileSampleRefs,
   writeVoiceProfileRegistry: mocks.writeVoiceProfileRegistry,
 }));
-vi.mock('@agent/core/voice-runtime-policy', () => ({
+vi.mock('@agent/core/voice/voice-runtime-policy', () => ({
   getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
 }));
-vi.mock('@agent/core/voice-tts-config', () => ({
+vi.mock('@agent/core/voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
-vi.mock('@agent/core/voice-sample-ingestion-policy', () => ({
+vi.mock('@agent/core/voice/voice-sample-ingestion-policy', () => ({
   getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
 }));
-vi.mock('@agent/core/voice-sample-collection', () => ({
+vi.mock('@agent/core/voice/voice-sample-collection', () => ({
   collectVoiceSamples: mocks.collectVoiceSamples,
 }));
-vi.mock('@agent/core/voice-sample-recorder', () => ({
+vi.mock('@agent/core/voice/voice-sample-recorder', () => ({
   recordVoiceSample: mocks.recordVoiceSample,
 }));
-vi.mock('@agent/core/voice-text-chunking', () => ({
+vi.mock('@agent/core/voice/voice-text-chunking', () => ({
   splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
 }));
-vi.mock('@agent/core/tool-runtime-registry', () => ({
+vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   listToolRuntimeInventory: mocks.listToolRuntimeInventory,
 }));
-vi.mock('@agent/core/voice-capability-bridge', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/voice-capability-bridge')>(
-    '@agent/core/voice-capability-bridge'
+vi.mock('@agent/core/voice/voice-capability-bridge', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/voice/voice-capability-bridge')>(
+    '@agent/core/voice/voice-capability-bridge'
   );
   return actual;
 });
-vi.mock('@agent/core/voice-generation-runtime', () => ({
+vi.mock('@agent/core/voice/voice-generation-runtime', () => ({
   VoiceGenerationRuntime: class {
     private packet: any = null;
     private listeners = new Set<(packet: any) => void>();

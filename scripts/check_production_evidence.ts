@@ -2,8 +2,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { nowIso } from '@agent/core/foundation';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { resolveOnboardingText } from '@agent/core/onboarding-flow-policy';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOnboardingText } from '@agent/core/organization/onboarding-flow-policy';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { resolveProductionEvidenceSummaryPolicy } from '@agent/core/production-evidence-summary-policy';
 import {
   loadProductionEvidenceRegister,

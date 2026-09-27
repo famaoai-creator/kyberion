@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { probeSurfaceHealth } from '@agent/core/surface-runtime';
+import { probeSurfaceHealth } from '@agent/core/surface/surface-runtime';
 
 describe('Runtime surface health probe', () => {
   const originalFetch = globalThis.fetch;
@@ -10,10 +10,11 @@ describe('Runtime surface health probe', () => {
   });
 
   it('returns healthy for an HTTP 200 surface endpoint', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response('ok', {
-        status: 200,
-      }),
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response('ok', {
+          status: 200,
+        })
     ) as typeof fetch;
 
     const result = await probeSurfaceHealth({

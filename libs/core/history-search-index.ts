@@ -15,8 +15,8 @@ import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readJsonLines } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { clamp, isRecord } from './foundation/text.js';
-import { validateTraceReplay } from './trace-schema.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { validateTraceReplay } from './analysis/trace-schema.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.

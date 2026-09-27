@@ -6,9 +6,9 @@ import {
   type MarkTargetResolution,
   type ResolveMarkTargetOptions,
 } from '@agent/core/mark-target-resolver';
-import { dhashFile } from '@agent/core/image-dhash';
+import { dhashFile } from '@agent/core/media/image-dhash';
 import { pathResolver } from '@agent/core/path-resolver';
-import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
+import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
 import { safeLstat, safeRmSync } from '@agent/core/secure-io';
 
 /**

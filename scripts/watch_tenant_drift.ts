@@ -26,9 +26,9 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { nowIso } from '@agent/core/foundation';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const TENANT_DRIFT_USAGE = 'Usage: pnpm watch:tenant-drift [--json] [--quiet] [--alert]';

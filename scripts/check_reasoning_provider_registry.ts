@@ -1,5 +1,5 @@
-import { listReasoningProviderDescriptors } from '@agent/core/reasoning-provider-registry';
-import { loadReasoningBackendPolicy } from '@agent/core/reasoning-backend-policy';
+import { listReasoningProviderDescriptors } from '@agent/core/reasoning/reasoning-provider-registry';
+import { loadReasoningBackendPolicy } from '@agent/core/reasoning/reasoning-backend-policy';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

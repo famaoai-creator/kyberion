@@ -23,9 +23,12 @@ import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { applySurfaceApprovalDecision } from '@agent/core/surface-approval-ui';
+import { applySurfaceApprovalDecision } from '@agent/core/surface/surface-approval-ui';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { listApprovalRequests, type ApprovalRequestRecord } from '@agent/core/approval-store';
+import {
+  listApprovalRequests,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
 import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';

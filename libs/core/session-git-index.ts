@@ -15,11 +15,11 @@
  */
 
 import * as path from 'node:path';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { createLogger } from './logger.js';
 import { shared } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
-import { checkWorkspaceBudget, type WorkspaceBudgetOptions } from './workspace-budget.js';
+import { checkWorkspaceBudget, type WorkspaceBudgetOptions } from './workforce/workspace-budget.js';
 import {
   annotateWorkspace,
   deleteRegisteredWorkspace,
@@ -33,12 +33,12 @@ import {
   type WorkspaceLedgerOptions,
   type WorkspaceOwner,
   type WorkspaceRecord,
-} from './workspace-ledger.js';
+} from './workforce/workspace-ledger.js';
 import {
   isRecordedChildAlive,
   processStartMarker,
   type ProcessIdentityProbe,
-} from './workspace-process-identity.js';
+} from './workforce/workspace-process-identity.js';
 
 const logger = createLogger('session-git-index');
 

@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -11,7 +11,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
-import { validateTraceReplay } from '@agent/core/trace-schema';
+import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { isJsonRecord, optionalStringField } from './json-record';
 

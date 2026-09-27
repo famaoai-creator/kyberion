@@ -4,7 +4,7 @@
     "source": "migrated-from-code",
     "updated_by": "agent:claude",
     "updated_at": "2026-05-29",
-    "note": "Provider/model capability catalog. Migrated out of libs/core/provider-discovery.ts so capabilities can evolve as knowledge without code changes. Dynamic probing may append/update entries; humans may also edit. Keep `source` honest per entry change (manual | probe | migrated-from-code)."
+    "note": "Provider/model capability catalog. Migrated out of libs/core/provider/provider-discovery.ts so capabilities can evolve as knowledge without code changes. Dynamic probing may append/update entries; humans may also edit. Keep `source` honest per entry change (manual | probe | migrated-from-code)."
   },
   "providers": {
     "gemini": {

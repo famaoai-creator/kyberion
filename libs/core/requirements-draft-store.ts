@@ -20,7 +20,7 @@ import type {
   OpenQuestion,
   RequirementAssumption,
   RequirementConstraint,
-} from './reasoning-backend.js';
+} from './reasoning/reasoning-backend.js';
 
 const DRAFT_FILE = 'requirements-draft.json';
 const DRAFT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/requirements-draft.schema.json');

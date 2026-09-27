@@ -5,12 +5,12 @@ import {
   shouldFailEntityGovernance,
 } from '../../scripts/check_entity_governance.js';
 import { ENTITY_SCOPE_HIERARCHY } from './entity-scope.js';
-import { createMission } from './mission-creation.js';
-import { createManagedProject } from './project-management.js';
-import { createWorkItem } from './work-coordination.js';
-import { saveOrganizationOperationalState } from './organization-operating-model-persistence.js';
+import { createMission } from './mission/mission-creation.js';
+import { createManagedProject } from './project/project-management.js';
+import { createWorkItem } from './workforce/work-coordination.js';
+import { saveOrganizationOperationalState } from './organization/organization-operating-model-persistence.js';
 import { withExecutionContext } from './authority.js';
-import { tenantProfilePath, writeTenantProfile } from './tenant-registry.js';
+import { tenantProfilePath, writeTenantProfile } from './organization/tenant-registry.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeMkdir,

@@ -27,7 +27,7 @@ import * as customerResolver from '@agent/core/customer-resolver';
 import { classifyError, formatClassification } from '@agent/core/error-classifier';
 import { getRegisteredEnv } from '@agent/core/env-validator';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeNativeTts } from '@agent/core/native-tts';
+import { probeNativeTts } from '@agent/core/media/native-tts';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -37,7 +37,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
 import { isWindows } from '@agent/core/platform';
-import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   defineScript,
   isDirectScript,

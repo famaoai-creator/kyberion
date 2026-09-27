@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
@@ -14,8 +14,8 @@ import {
   SurfaceViewerScopeError,
   resolveSurfaceViewerTierAccess,
   type SurfaceViewerScope,
-} from '@agent/core/surface-mutation-guard';
-import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+} from '@agent/core/surface/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { toWireError } from '@agent/core/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
@@ -27,7 +27,7 @@ import {
   type ChronosAccessRole,
 } from './api-guard';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 
 export interface ViewerContext extends Omit<
   SurfaceViewerScope,

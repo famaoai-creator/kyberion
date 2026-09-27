@@ -1,10 +1,13 @@
-import { assertObservationOpMappingsValid, chooseNativeOps } from '@agent/core/native-op-mapping';
-import { buildDesktopRecording } from '@agent/core/desktop-recording';
+import {
+  assertObservationOpMappingsValid,
+  chooseNativeOps,
+} from '@agent/core/media/native-op-mapping';
+import { buildDesktopRecording } from '@agent/core/virtual/desktop-recording';
 import { prepareDistillationEgress } from '@agent/core/frame-redaction';
 import {
   reconstructDesktopIntent,
   validateDesktopIntentDraft,
-} from '@agent/core/desktop-intent-reconstruction';
+} from '@agent/core/virtual/desktop-intent-reconstruction';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface EvalResult {

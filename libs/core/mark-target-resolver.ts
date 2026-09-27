@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { dhashFile, hamming } from './image-dhash.js';
+import { dhashFile, hamming } from './media/image-dhash.js';
 import { assertVolatileId, findMissionPath, pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';

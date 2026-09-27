@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { guardRequest } from '../../../lib/api-guard';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadArtifactRecord } from '@agent/core/artifact-record';
+import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

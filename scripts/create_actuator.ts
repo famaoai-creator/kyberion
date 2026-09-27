@@ -125,7 +125,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
 }
 
 function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
-  return `import { defineActuator } from '@agent/core/actuator-sdk';
+  return `import { defineActuator } from '@agent/core/actuator/actuator-sdk';
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { nowIso } from '@agent/core/foundation';

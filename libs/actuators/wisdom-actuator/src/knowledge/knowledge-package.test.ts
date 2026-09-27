@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { _resetA2ASecretCacheForTests } from '@agent/core/a2a-envelope-signature';
+import { _resetA2ASecretCacheForTests } from '@agent/core/mesh/a2a-envelope-signature';
 import {
   assertKnowledgePackage,
   assertKnowledgePackageOriginScope,

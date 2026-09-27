@@ -2,13 +2,13 @@
 import { extractHintsFromTrace } from '@agent/core/feedback-loop';
 import { matchesCron } from '@agent/core/cron-utils';
 import type { Trace, TraceSpan } from '@agent/core/trace';
-import { loadOrganizationOperationalState } from '@agent/core/organization-operating-model';
-import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import { loadOrganizationOperationalState } from '@agent/core/organization/organization-operating-model';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline/pipeline-contract';
 import {
   loadOnboardingApplyInputAtPath,
   type OnboardingApplyInput,
-} from '@agent/core/onboarding-apply-input';
-import { loadProjectRecord } from '@agent/core/project-registry';
+} from '@agent/core/organization/onboarding-apply-input';
+import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -16,7 +16,7 @@ import {
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import {
   getRegisteredEnvText,
   parseSafeJsonInput,

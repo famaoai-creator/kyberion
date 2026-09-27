@@ -4,7 +4,7 @@ import {
   runtimeSupervisor,
   type RuntimeResourceKind,
   type RuntimeShutdownPolicy,
-} from './runtime-supervisor.js';
+} from './tool/runtime-supervisor.js';
 import { createLogger } from './logger.js';
 import { clamp } from './foundation/text.js';
 

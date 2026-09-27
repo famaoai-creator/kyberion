@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildAgentActivityBoard } from '@agent/core/agent-activity-board';
+import { buildAgentActivityBoard } from '@agent/core/agent/agent-activity-board';
 import {
   buildAgentTrackRecords,
   composeOfficeSnapshot,
   deriveProviderPressure,
 } from '@agent/core/ce-adoption';
-import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
-import { listWorkItems } from '@agent/core/work-coordination';
-import { buildWorkVisibilityProjection } from '@agent/core/work-visibility';
+import { listAgentRuntimeSnapshots } from '@agent/core/agent/agent-runtime-supervisor';
+import { listWorkItems } from '@agent/core/workforce/work-coordination';
+import { buildWorkVisibilityProjection } from '@agent/core/workforce/work-visibility';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

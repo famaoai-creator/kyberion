@@ -7,7 +7,7 @@ import {
   loadWorkInventoryEntry,
   loadWorkInventoryTaxonomy,
   saveWorkInventoryEntry,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import {
   applyWorkInventoryPromotion,
   buildCalibrationSamples,
@@ -20,13 +20,13 @@ import {
   runWorkInventoryLearningCycle,
   type WorkInventoryCollectSignals,
   type WorkInventoryPromotionPlan,
-} from '@agent/core/work-inventory-promotion';
-import { collectKyberionDemandSignals } from '@agent/core/work-inventory-harvest';
+} from '@agent/core/workforce/work-inventory-promotion';
+import { collectKyberionDemandSignals } from '@agent/core/workforce/work-inventory-harvest';
 import {
   calibrateFromOutcomes,
   loadWorkInventoryCalibration,
   type WorkInventoryCalibration,
-} from '@agent/core/work-inventory-scoring';
+} from '@agent/core/workforce/work-inventory-scoring';
 import type { OperationalLearningSignal } from '@agent/core/operational-learning';
 import {
   csv,

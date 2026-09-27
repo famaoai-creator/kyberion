@@ -29,15 +29,15 @@ Source repository reviewed: `nrslib/takt` (v0.59.1). This note records implement
 ## Kyberion fit
 
 - `libs/core/graph-scheduler.ts` + `scripts/run_pipeline.ts` — judge-then-route op (`core:judge_route`), loop detectors, `max_iterations` omission lint (TK-01/02).
-- `libs/core/approval-gate.ts` + `pipeline-run-journal.ts` — suspend/resume human gate (`core:await_decision`) (TK-03).
+- `libs/core/governance/approval-gate.ts` + `pipeline-run-journal.ts` — suspend/resume human gate (`core:await_decision`) (TK-03).
 - `knowledge/product/roles/`, `libs/core/working-principles.ts`, `mission-context-pack.ts` — facet registry with tenant → product → managed-pack layering (TK-04/09).
-- `libs/core/reasoning-backend.ts`, `provider-permission-profiles.ts`, `reasoning-route-policy.json` — step-level provider/model/permission/promotion and routing table (TK-05).
-- `libs/core/reasoning-runtime-instructions.ts` + `scripts/generate_subagent_definitions.ts` — provider runtime-instructions hook and Claude/AGY generation ceremony (TK-06). Codex/Gemini provider state remains derived runtime state rather than an additional hand-maintained artifact.
+- `libs/core/reasoning/reasoning-backend.ts`, `provider-permission-profiles.ts`, `reasoning-route-policy.json` — step-level provider/model/permission/promotion and routing table (TK-05).
+- `libs/core/reasoning/reasoning-runtime-instructions.ts` + `scripts/generate_subagent_definitions.ts` — provider runtime-instructions hook and Claude/AGY generation ceremony (TK-06). Codex/Gemini provider state remains derived runtime state rather than an additional hand-maintained artifact.
 - `libs/core/report-contract.ts` — post-perform report validation against registered contracts or product JSON Schemas (TK-07).
 - `libs/core/facet-registry.ts` — approved managed plugin facet declarations are resolved after product facets (TK-09).
-- `libs/core/src/trace.ts` — opt-in OTLP/HTTP projection while preserving stable JSONL Trace (TK-10).
+- `libs/core/analysis/trace.ts` — opt-in OTLP/HTTP projection while preserving stable JSONL Trace (TK-10).
 - `scripts/eval_facets.ts` + `eval/facets/` — deterministic facet-content contract checks, separate from engine tests (TK-11).
-- `libs/core/background-review-runner.ts` — already equivalent to advisory companion review; keep the "advice never changes routing" line.
+- `libs/core/workforce/background-review-runner.ts` — already equivalent to advisory companion review; keep the "advice never changes routing" line.
 
 ## Not adopted
 

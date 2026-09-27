@@ -14,7 +14,7 @@
 import {
   getBrowserAutomationRuntimeCapabilities,
   listBrowserAutomationRuntimeBridges,
-} from '@agent/core/browser-automation-runtime-bridge';
+} from '@agent/core/browser/browser-automation-runtime-bridge';
 import type {
   SeamCalibrationAdapter,
   SeamCalibrationTrialContext,

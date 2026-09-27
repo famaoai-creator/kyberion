@@ -27,7 +27,7 @@ last_updated: 2026-05-31
 ## 再開手順
 
 1. `pnpm build`
-2. `pnpm exec vitest run libs/core/video-content-brief-contract.test.ts libs/core/narrated-video-brief-compiler.test.ts libs/core/video-composition-compiler.test.ts libs/actuators/video-composition-actuator/src/index.test.ts`
+2. `pnpm exec vitest run libs/core/video/video-content-brief-contract.test.ts libs/core/video/narrated-video-brief-compiler.test.ts libs/core/video/video-composition-compiler.test.ts libs/actuators/video-composition-actuator/src/index.test.ts`
 3. `pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json`
 4. sandbox 側で blackdetect が落ちる場合は、sandbox 外で同じ pipeline を再実行する
 5. `ffprobe` と frame extract で mp4 を確認する

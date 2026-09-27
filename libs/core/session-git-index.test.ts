@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { commitFromSessionIndex } from './mission-git.js';
+import { commitFromSessionIndex } from './mission/mission-git.js';
 import * as pathResolver from './path-resolver.js';
 import {
   safeExecResult,
@@ -12,8 +12,8 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { prepareSessionGitIndex, type PrepareSessionGitIndexOptions } from './session-git-index.js';
-import { listWorkspaces } from './workspace-ledger.js';
-import { sweepRegisteredWorkspaces } from './workspace-sweep.js';
+import { listWorkspaces } from './workforce/workspace-ledger.js';
+import { sweepRegisteredWorkspaces } from './workforce/workspace-sweep.js';
 
 let base: string;
 let repo: string;

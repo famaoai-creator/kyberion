@@ -4,7 +4,7 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { AgentTaskEnvelope } from '@agent/core/agent-execution-port';
+import type { AgentTaskEnvelope } from '@agent/core/agent/agent-execution-port';
 import type { AgentAction } from './agent-actuator-helpers.js';
 
 const mocks = vi.hoisted(() => {
@@ -62,8 +62,8 @@ vi.mock('@agent/core/core', async (importOriginal) => ({
   logger: { info: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@agent/core/agent-registry', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/agent-registry')>()),
+vi.mock('@agent/core/agent/agent-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/agent/agent-registry')>()),
   agentRegistry: {
     get: vi.fn(),
     updateStatus: vi.fn(),
@@ -73,19 +73,19 @@ vi.mock('@agent/core/agent-registry', async (importOriginal) => ({
   },
 }));
 
-vi.mock('@agent/core/a2a-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/a2a-bridge')>()),
+vi.mock('@agent/core/mesh/a2a-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mesh/a2a-bridge')>()),
   a2aBridge: { route: vi.fn() },
 }));
 
-vi.mock('@agent/core/mission-team-plan-composer', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/mission-team-plan-composer')>()),
+vi.mock('@agent/core/mission/mission-team-plan-composer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mission/mission-team-plan-composer')>()),
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   getMissionTeamAssignment: mocks.getMissionTeamAssignment,
 }));
 
-vi.mock('@agent/core/agent-runtime-supervisor', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/agent-runtime-supervisor')>()),
+vi.mock('@agent/core/agent/agent-runtime-supervisor', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/agent/agent-runtime-supervisor')>()),
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
   enqueueMissionTeamPrewarmRequest: mocks.enqueueMissionTeamPrewarmRequest,
   startAgentRuntimeSupervisorForRequest: mocks.startAgentRuntimeSupervisorForRequest,
@@ -99,8 +99,8 @@ vi.mock('@agent/core/agent-runtime-supervisor', async (importOriginal) => ({
   shutdownAllAgentRuntimes: vi.fn(),
 }));
 
-vi.mock('@agent/core/agent-runtime-supervisor-client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/agent-runtime-supervisor-client')>()),
+vi.mock('@agent/core/agent/agent-runtime-supervisor-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/agent/agent-runtime-supervisor-client')>()),
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
   askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
   getAgentRuntimeStatusViaDaemon: mocks.getAgentRuntimeStatusViaDaemon,
@@ -110,8 +110,8 @@ vi.mock('@agent/core/agent-runtime-supervisor-client', async (importOriginal) =>
   restartAgentRuntimeViaDaemon: mocks.restartAgentRuntimeViaDaemon,
 }));
 
-vi.mock('@agent/core/agent-execution-port', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/agent-execution-port')>()),
+vi.mock('@agent/core/agent/agent-execution-port', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/agent/agent-execution-port')>()),
   getAgentExecutionPort: mocks.getAgentExecutionPort,
 }));
 
@@ -125,8 +125,8 @@ vi.mock('@agent/core/cli-utils', async (importOriginal) => importOriginal());
 
 vi.mock('@agent/core/async-utils', async (importOriginal) => importOriginal());
 vi.mock('@agent/core/recovery-policy', async (importOriginal) => importOriginal());
-vi.mock('@agent/core/op-preflight', async (importOriginal) => importOriginal());
-vi.mock('@agent/core/op-preflight-defaults', async (importOriginal) => importOriginal());
+vi.mock('@agent/core/pipeline/op-preflight', async (importOriginal) => importOriginal());
+vi.mock('@agent/core/pipeline/op-preflight-defaults', async (importOriginal) => importOriginal());
 
 vi.mock('@agent/core/path-resolver', async (importOriginal) => importOriginal());
 
@@ -445,7 +445,7 @@ describe('agent-actuator team composition actions', () => {
       status: 'ready',
     });
     mocks.askAgentRuntimeViaDaemon.mockResolvedValue({ text: 'daemon response' });
-    const agentRegistry = (await import('@agent/core/agent-registry')).agentRegistry as any;
+    const agentRegistry = (await import('@agent/core/agent/agent-registry')).agentRegistry as any;
     agentRegistry.get.mockReturnValue({ status: 'ready' });
 
     const { handleAction } = await import('./index.js');
@@ -500,7 +500,7 @@ describe('agent-actuator team composition actions', () => {
   });
 
   it('throws when ask is called for non-existent agent', async () => {
-    const agentRegistry = (await import('@agent/core/agent-registry')).agentRegistry as any;
+    const agentRegistry = (await import('@agent/core/agent/agent-registry')).agentRegistry as any;
     agentRegistry.get.mockReturnValue(null);
 
     const { handleAction } = await import('./index.js');
@@ -510,7 +510,7 @@ describe('agent-actuator team composition actions', () => {
   });
 
   it('throws when ask is called for agent not in ready/busy state', async () => {
-    const agentRegistry = (await import('@agent/core/agent-registry')).agentRegistry as any;
+    const agentRegistry = (await import('@agent/core/agent/agent-registry')).agentRegistry as any;
     agentRegistry.get.mockReturnValue({ status: 'error' });
 
     const { handleAction } = await import('./index.js');
@@ -533,7 +533,7 @@ describe('agent-actuator team composition actions', () => {
   });
 
   it('list returns all agents', async () => {
-    const agentRegistry = (await import('@agent/core/agent-registry')).agentRegistry as any;
+    const agentRegistry = (await import('@agent/core/agent/agent-registry')).agentRegistry as any;
     agentRegistry.list.mockReturnValue([{ agentId: 'agent-1' }, { agentId: 'agent-2' }]);
 
     const { handleAction } = await import('./index.js');

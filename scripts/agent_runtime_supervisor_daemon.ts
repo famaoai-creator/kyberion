@@ -13,7 +13,7 @@ import {
   restartAgentRuntime,
   shutdownAllAgentRuntimes,
   stopAgentRuntime,
-} from '@agent/core/agent-runtime-supervisor';
+} from '@agent/core/agent/agent-runtime-supervisor';
 import {
   enqueueDelegatedTaskInbox,
   hasPendingDelegatedTaskInbox,
@@ -21,16 +21,16 @@ import {
   recordDelegatedTaskActivationFailure,
   spawnDelegatedTaskWorkerProcess,
 } from '@agent/core/delegated-task-observability';
-import { appendSupervisorEvent } from '@agent/core/agent-runtime-events';
+import { appendSupervisorEvent } from '@agent/core/agent/agent-runtime-events';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
-import { recordRuntimeHealthSample } from '@agent/core/runtime-health-history';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
+import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
   computeSupervisorCodeStamp,
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
-} from '@agent/core/agent-runtime-supervisor-client';
+} from '@agent/core/agent/agent-runtime-supervisor-client';
 import {
   getRegisteredEnvText,
   parseSafeJsonInput,
@@ -48,7 +48,7 @@ import {
   safeCreateExclusiveFileSync,
   safeChmodSync,
 } from '@agent/core/secure-io';
-import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
+import type { TaskModelHint } from '@agent/core/reasoning/reasoning-model-routing';
 import { installProcessGuards } from '@agent/core/process-guards';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.

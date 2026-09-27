@@ -15,7 +15,7 @@ status: archived
 
 コスト会計の部品は揃っているのに、**主要経路が計測していない・集計が誰にも呼ばれない・上限が効かない**。
 
-- **直接 Anthropic SDK 経路がコストを記録しない**(最大の穴): `libs/core/anthropic-reasoning-backend.ts` は `metrics` を import せず、`callParse` が返す `usage` ブロックも捕捉しない。**この経路の消費は完全に不可視**。一方 claude-agent(Agent SDK)経路は記録する(`claude-agent-query.ts:37-55`、`sdk_cost_usd` は `total_cost_usd` 由来 `:135`)。
+- **直接 Anthropic SDK 経路がコストを記録しない**(最大の穴): `libs/core/provider/anthropic-reasoning-backend.ts` は `metrics` を import せず、`callParse` が返す `usage` ブロックも捕捉しない。**この経路の消費は完全に不可視**。一方 claude-agent(Agent SDK)経路は記録する(`claude-agent-query.ts:37-55`、`sdk_cost_usd` は `total_cost_usd` 由来 `:135`)。
 - **予算/上限が効かない**: `costCapTokens`(`reasoning-backend.ts:66`)は**プロンプト文字列として注入されるだけ**(`anthropic-reasoning-backend.ts:443`、`claude-agent-reasoning-backend.ts:395`)。超過時に中断・throttle・拒否する仕組みは無い。日次/ミッション単位の spend ceiling も皆無。
 - **集計 API が誰にも呼ばれない**: `metrics.ts` の `reportFromHistory()`/`summarize()`/`detectRegressions()` は実装・テスト済みだが**呼び出し元ゼロ**。`totalCostUSD` はメモリ内で算出され捨てられる。per-mission コストロールアップも無い。(**分担 2026-07-03**: 本計画は `reportFromHistory`/`summarize` による**コスト集計**を所有。`detectRegressions()` の**劣化検知**配線は OP-04 が所有 — 重複しない。)
 - **コストの二重ソース**: `record()` はトークン×レジストリで再計算(`metrics.ts:185`)、Agent SDK は `total_cost_usd` も返す(未使用)→ ドリフト可能性。

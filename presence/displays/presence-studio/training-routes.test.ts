@@ -12,15 +12,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
 
-vi.mock('@agent/core/member-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/member-registry')>(
-    '@agent/core/member-registry'
+vi.mock('@agent/core/organization/member-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/organization/member-registry')>(
+    '@agent/core/organization/member-registry'
   );
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
 
-import { resolveMemberByPrincipal, writeMemberProfile } from '@agent/core/member-registry';
-import type { MemberProfile } from '@agent/core/member-registry';
+import {
+  resolveMemberByPrincipal,
+  writeMemberProfile,
+} from '@agent/core/organization/member-registry';
+import type { MemberProfile } from '@agent/core/organization/member-registry';
 import { readTrainingProgress, writeTrainingProgress } from '@agent/core/training-catalog';
 import { registerTrainingRoutes } from './training-routes.js';
 

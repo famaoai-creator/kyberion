@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
 
-vi.mock('../libs/core/service-engine.js', () => ({
+vi.mock('../libs/core/service/service-engine.js', () => ({
   executeServicePreset: vi.fn(async () => {
     throw new Error('gws unavailable');
   }),
 }));
 
-import { executeGmailDelivery, readEmailDraftArtifact, resolveEmailDraftDir } from '../libs/core/email-workflow.js';
+import {
+  executeGmailDelivery,
+  readEmailDraftArtifact,
+  resolveEmailDraftDir,
+} from '../libs/core/integrations/email-workflow.js';
 
 describe('email workflow draft fallback', () => {
   afterEach(() => {
@@ -38,6 +42,8 @@ describe('email workflow draft fallback', () => {
     expect(artifact.subject).toBe('Fallback subject');
     expect(artifact.to).toBe('test@example.com');
     expect(artifact.draft_markdown).toContain('Hello from a local fallback test.');
-    expect(String(safeReadFile(result.json_path, { encoding: 'utf8' }))).toContain('local-fallback');
+    expect(String(safeReadFile(result.json_path, { encoding: 'utf8' }))).toContain(
+      'local-fallback'
+    );
   });
 });

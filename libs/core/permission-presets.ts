@@ -2,8 +2,12 @@
 
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
-import { resolveSandboxPolicy, type SandboxMode, type SandboxPolicy } from './sandbox-policy.js';
+import type { ProviderPermissionProfileName } from './provider/provider-permission-profiles.js';
+import {
+  resolveSandboxPolicy,
+  type SandboxMode,
+  type SandboxPolicy,
+} from './shell/sandbox-policy.js';
 
 export type PermissionPresetName = 'readonly' | 'edit' | 'full';
 export type ApprovalPolicy = 'strict' | 'relaxed' | 'plan';

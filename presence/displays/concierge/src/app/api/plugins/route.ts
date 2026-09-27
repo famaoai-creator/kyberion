@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import { authorizeSkillPlugin, readSkillPluginsConfig } from '@agent/core/skill-plugin-loader';
-import { listManagedPlugins } from '@agent/core/plugin-managed-install';
-import { loadApprovalRequest } from '@agent/core/approval-store';
+import {
+  authorizeSkillPlugin,
+  readSkillPluginsConfig,
+} from '@agent/core/plugin/skill-plugin-loader';
+import { listManagedPlugins } from '@agent/core/plugin/plugin-managed-install';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';

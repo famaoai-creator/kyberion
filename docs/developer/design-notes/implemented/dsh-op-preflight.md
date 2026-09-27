@@ -4,7 +4,7 @@ status: implemented
 decision_date: 2026-08-17
 scope: operation dispatch and ADF execution
 decision: Adopt a serial preflight waterfall with repaired input and terminal block/ask outcomes.
-evidence: libs/core/op-preflight.test.ts; scripts/check_op_preflight_coverage.ts; run_pipeline regression tests
+evidence: libs/core/pipeline/op-preflight.test.ts; scripts/check_op_preflight_coverage.ts; run_pipeline regression tests
 ---
 
 The operation boundary is the policy seam. Scope, ADF, egress, spend, and approval checks run

@@ -173,10 +173,10 @@ Work Loop や Enterprise Kernel は、このループを組織スケールに拡
 
 実装候補:
 
-- 新規: `libs/core/intent-resolution-contract.ts`
+- 新規: `libs/core/intent/intent-resolution-contract.ts`
 - 新規: `schemas/intent-resolution.schema.json`
-- 更新: `libs/core/intent-resolution.ts`
-- 追加: `libs/core/intent-resolution-contract.test.ts`
+- 更新: `libs/core/intent/intent-resolution.ts`
+- 追加: `libs/core/intent/intent-resolution-contract.test.ts`
 
 最小フィールド:
 
@@ -201,7 +201,7 @@ interface IntentResolutionContract {
 
 実装状況:
 
-- `libs/core/intent-resolution-contract.ts` と `libs/core/intent-resolution-contract.test.ts` で固定済み。
+- `libs/core/intent/intent-resolution-contract.ts` と `libs/core/intent/intent-resolution-contract.test.ts` で固定済み。
 - `schemas/intent-resolution.schema.json` と `scripts/check_contract_schemas.ts` に接続済み。
 
 ### P1-1. Outcome Contract を開始条件にする
@@ -214,7 +214,7 @@ interface IntentResolutionContract {
 
 - 新規: `libs/core/outcome-contract.ts`
 - 新規: `schemas/outcome-contract.schema.json`
-- 更新: `libs/core/task-session.ts`
+- 更新: `libs/core/task/task-session.ts`
 - 更新: `scripts/mission_controller.ts`
 
 最小フィールド:
@@ -250,7 +250,7 @@ interface OutcomeContract {
 
 実装候補:
 
-- 新規: `libs/core/artifact-registry.ts`
+- 新規: `libs/core/workforce/artifact-registry.ts`
 - 新規: `knowledge/product/schemas/artifact-ownership-record.schema.json`
 - 保存先: `active/shared/artifacts/registry.jsonl`
 - 更新候補: `artifact-actuator`、`media-actuator`、`task-session` artifact path 周辺
@@ -280,7 +280,7 @@ interface ArtifactRecord {
 
 実装状況:
 
-- `libs/core/artifact-registry.ts` と `libs/core/artifact-registry.test.ts` で固定済み。
+- `libs/core/workforce/artifact-registry.ts` と `libs/core/workforce/artifact-registry.test.ts` で固定済み。
 - `knowledge/product/schemas/artifact-ownership-record.schema.json` と契約ゲートに接続済み。
 
 ### P1-3. Surface UX Contract Tests を追加する
@@ -291,8 +291,8 @@ interface ArtifactRecord {
 
 実装候補:
 
-- 新規: `libs/core/surface-ux-contract.ts`
-- 新規: `libs/core/surface-ux-contract.test.ts`
+- 新規: `libs/core/surface/surface-ux-contract.ts`
+- 新規: `libs/core/surface/surface-ux-contract.test.ts`
 - 更新: `docs/USER_EXPERIENCE_CONTRACT.md`
 
 受け入れ条件:
@@ -303,7 +303,7 @@ interface ArtifactRecord {
 
 実装状況:
 
-- `libs/core/surface-ux-contract.ts` と `libs/core/surface-ux-contract.test.ts` で固定済み。
+- `libs/core/surface/surface-ux-contract.ts` と `libs/core/surface/surface-ux-contract.test.ts` で固定済み。
 
 ### P2-1. Intent Delta をライフサイクル遷移に接続する
 
@@ -313,9 +313,9 @@ interface ArtifactRecord {
 
 実装候補:
 
-- 更新: `libs/core/mission-orchestration-worker.ts`
+- 更新: `libs/core/mission/mission-orchestration-worker.ts`
 - 更新: `scripts/mission_controller.ts`
-- 更新: `libs/core/intent-delta.ts`
+- 更新: `libs/core/intent/intent-delta.ts`
 - 追加: checkpoint / verify / finish 時の delta emission test
 
 受け入れ条件:
@@ -337,7 +337,7 @@ interface ArtifactRecord {
 
 実装候補:
 
-- 新規: `libs/core/memory-promotion-queue.ts`
+- 新規: `libs/core/knowledge/memory-promotion-queue.ts`
 - 新規: `schemas/memory-candidate.schema.json`
 - 保存先: `active/shared/memory/promotion-queue.jsonl`
 - 更新: `libs/core/heuristic-feedback.ts`
@@ -366,7 +366,7 @@ interface MemoryCandidate {
 
 実装状況:
 
-- `libs/core/memory-promotion-queue.ts` と `libs/core/memory-promotion-queue.test.ts` で固定済み。
+- `libs/core/knowledge/memory-promotion-queue.ts` と `libs/core/knowledge/memory-promotion-queue.test.ts` で固定済み。
 
 ### P2-3. Management Control Plane の next action を deterministic にする
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { pathResolver } = await import('@agent/core/path-resolver');
 const { safeMkdir, safeRmSync, safeWriteFile } = await import('@agent/core/secure-io');
-const { getVoiceEngineRecord } = await import('@agent/core/voice-engine-registry');
+const { getVoiceEngineRecord } = await import('@agent/core/voice/voice-engine-registry');
 const { registerSeamCalibrationAdapter, runSeamCalibration } =
   await import('@agent/core/seam-calibration');
 const { createVoiceTtsEngineCalibrationAdapter, voiceTtsEngineCalibrationAdapter } =

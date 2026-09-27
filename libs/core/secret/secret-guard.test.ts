@@ -1,0 +1,154 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getSecret, getActiveSecrets, secretGuard } from './secret-guard.js';
+import { validateSovereignBoundary } from '../tier-guard.js';
+import * as secureIo from '../secure-io.js';
+import { withPluginExecutionFrame } from '../shell/sandbox-policy.js';
+
+describe('secret-guard core', () => {
+  beforeEach(() => {
+    vi.stubEnv('TEST_SECRET_KEY', 'super-secret-value-123');
+  });
+
+  it('should retrieve secrets from environment variables', () => {
+    const val = getSecret('TEST_SECRET_KEY');
+    expect(val).toBe('super-secret-value-123');
+  });
+
+  it('should register retrieved secrets for masking', () => {
+    getSecret('TEST_SECRET_KEY');
+    const secrets = getActiveSecrets();
+    expect(secrets).toContain('super-secret-value-123');
+  });
+
+  it('should detect registered secrets via validateSovereignBoundary', () => {
+    getSecret('TEST_SECRET_KEY');
+    const content = 'The secret is super-secret-value-123 inside log.';
+    const result = validateSovereignBoundary(content, getActiveSecrets());
+    expect(result.safe).toBe(false);
+    expect(result.detected.some((d) => d.includes('SECRET_LEAK'))).toBe(true);
+  });
+
+  it('rejects a connection resource before reading when its repository path is unsafe', () => {
+    const pathAssertion = vi.spyOn(secureIo, 'assertSafeRepositoryPath').mockImplementation(() => {
+      throw new Error('[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link');
+    });
+
+    try {
+      expect(() => secretGuard.loadConnectionDocument('unsafe-connection')).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+      expect(pathAssertion).toHaveBeenCalled();
+    } finally {
+      pathAssertion.mockRestore();
+    }
+  });
+
+  describe('TIBA Scoped Identity', () => {
+    beforeEach(() => {
+      vi.stubEnv('SLACK_BOT_TOKEN', 'xoxb-mock-token');
+      vi.stubEnv('GITHUB_TOKEN', 'ghp-mock-token');
+      // Reset variables
+      delete process.env.AUTHORIZED_SCOPE;
+      delete process.env.MISSION_ID;
+    });
+
+    it('should allow access if AUTHORIZED_SCOPE matches the requested scope', () => {
+      process.env.AUTHORIZED_SCOPE = 'slack';
+      const val = getSecret('SLACK_BOT_TOKEN', 'slack');
+      expect(val).toBe('xoxb-mock-token');
+    });
+
+    it('should deny access (TIBA_VIOLATION) if AUTHORIZED_SCOPE does not match', () => {
+      process.env.AUTHORIZED_SCOPE = 'github';
+      expect(() => getSecret('SLACK_BOT_TOKEN', 'slack')).toThrow(/TIBA_VIOLATION/);
+    });
+
+    it('should deny access (SHIELD_VIOLATION) if key prefix does not match scope', () => {
+      process.env.AUTHORIZED_SCOPE = 'slack';
+      // Requesting a key that doesn't start with SLACK_, even if scope is 'slack'
+      expect(() => getSecret('GITHUB_TOKEN', 'slack')).toThrow(/SHIELD_VIOLATION/);
+    });
+
+    it('should allow access if legacy MISSION_ID has an active grant', () => {
+      // We will mock _loadGrants indirectly by bypassing the file read if we could,
+      // but for now we expect the code to fallback to AUTHORIZED_SCOPE.
+      // If neither is present, it should throw.
+      expect(() => getSecret('SLACK_BOT_TOKEN', 'slack')).toThrow(/TIBA_VIOLATION/);
+    });
+  });
+});
+
+describe('secret-guard plugin grants (EP-03)', () => {
+  const frame = (secrets: string[]) => ({
+    pluginId: 'secret-plugin',
+    grant: {
+      network: { mode: 'none' as const, hosts: [] },
+      fs: { mode: 'none' as const, paths: [] },
+      ops_invoke: [],
+      env: [],
+      secrets,
+    },
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('PLUGIN_GRANTED_KEY', 'granted-secret-value');
+    vi.stubEnv('PLUGIN_OTHER_KEY', 'other-secret-value');
+  });
+
+  it('denies secrets the executing plugin was not granted', () => {
+    withPluginExecutionFrame(frame(['PLUGIN_GRANTED_*']), () => {
+      expect(getSecret('PLUGIN_GRANTED_KEY')).toBe('granted-secret-value');
+      expect(() => getSecret('PLUGIN_OTHER_KEY')).toThrow(
+        "[PLUGIN_GRANT_DENIED] plugin 'secret-plugin' is not granted secrets 'PLUGIN_OTHER_KEY'"
+      );
+      expect(() => secretGuard.loadConnectionDocument('slack')).toThrow(
+        "not granted secrets 'connection:slack'"
+      );
+    });
+    expect(getSecret('PLUGIN_OTHER_KEY')).toBe('other-secret-value');
+  });
+
+  it('never exposes the raw active secret list to plugin code, but still masks', async () => {
+    getSecret('PLUGIN_OTHER_KEY');
+    expect(getActiveSecrets()).toContain('other-secret-value');
+    withPluginExecutionFrame(frame(['*']), () => {
+      expect(() => getActiveSecrets()).toThrow(
+        "[PLUGIN_GRANT_DENIED] plugin 'secret-plugin' is not granted secrets 'active-secrets'"
+      );
+      expect(() => secretGuard.getActiveSecrets()).toThrow('[PLUGIN_GRANT_DENIED]');
+      expect(secretGuard.maskActiveSecrets('token=other-secret-value;')).toBe(
+        'token=[REDACTED_SECRET];'
+      );
+    });
+    const { redactSensitiveString } = await import('../network.js');
+    expect(
+      // Host log redaction masks non-granted secrets too: a governed op the
+      // plugin invoked may carry host secrets it was never granted.
+      withPluginExecutionFrame(frame([]), () => redactSensitiveString('x other-secret-value y'))
+    ).toBe('x [REDACTED_SECRET] y');
+  });
+
+  it('masks only granted secrets inside a plugin frame, so masking is no oracle (N9)', () => {
+    getSecret('PLUGIN_GRANTED_KEY');
+    getSecret('PLUGIN_OTHER_KEY');
+    const text = 'a=granted-secret-value b=other-secret-value';
+    expect(secretGuard.maskActiveSecrets(text)).toBe('a=[REDACTED_SECRET] b=[REDACTED_SECRET]');
+    withPluginExecutionFrame(frame(['PLUGIN_GRANTED_*']), () => {
+      expect(secretGuard.maskActiveSecrets(text, '#', 0)).toBe('a=# b=other-secret-value');
+      // Nested frames: a secret must be granted by every enclosing plugin.
+      withPluginExecutionFrame(frame([]), () => {
+        expect(secretGuard.maskActiveSecrets(text)).toBe(text);
+      });
+    });
+    expect(secretGuard.maskActiveSecrets(text, '#', 0)).toBe('a=# b=#');
+  });
+
+  it('never lets plugin code mint auth grants, even with a wildcard secrets grant', async () => {
+    withPluginExecutionFrame(frame(['*']), () => {
+      expect(() => secretGuard.grantAccess('MSN-X', 'slack')).toThrow('[PLUGIN_GRANT_DENIED]');
+    });
+    await expect(
+      withPluginExecutionFrame(frame(['*']), () => secretGuard.grantAccessGuarded('MSN-X', 'slack'))
+    ).rejects.toThrow('[PLUGIN_GRANT_DENIED]');
+  });
+});

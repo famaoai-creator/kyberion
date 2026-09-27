@@ -1,5 +1,5 @@
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 export const COMPUTE_ACTUATOR_CAPTURE_OPS = ['poll_status', 'collect_artifact'] as const;
 export const COMPUTE_ACTUATOR_APPLY_OPS = ['submit_job', 'cancel_job'] as const;

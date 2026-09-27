@@ -1,1 +1,1 @@
-export { extractBodyMarkdownFromDraft } from '@agent/core/email-workflow';
+export { extractBodyMarkdownFromDraft } from '@agent/core/integrations/email-workflow';

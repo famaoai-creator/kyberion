@@ -5,7 +5,7 @@ import { readTextFile } from '@agent/core/foundation';
 import {
   isEncryptedConnectionEnvelope,
   overrideSecretEncryptionKeyForTests,
-} from '@agent/core/secret-encryption';
+} from '@agent/core/secret/secret-encryption';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeMkdir,

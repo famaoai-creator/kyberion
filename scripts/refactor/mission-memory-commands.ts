@@ -1,21 +1,21 @@
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   assertMemoryPromotionReviewReady,
   reviewMemoryPromotionCandidate,
   reviewMemoryPromotionQueue,
   type MemoryPromotionReview,
-} from '@agent/core/memory-promotion-review';
+} from '@agent/core/knowledge/memory-promotion-review';
 import {
   listMemoryPromotionCandidates,
   updateMemoryPromotionCandidateStatus,
   type MemoryCandidate,
   type MemoryKnowledgeDomain,
-} from '@agent/core/memory-promotion-queue';
-import type { HumanDecidedBy } from '@agent/core/mission-types';
+} from '@agent/core/knowledge/memory-promotion-queue';
+import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import {
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,
-} from '@agent/core/memory-promotion-workflow';
+} from '@agent/core/knowledge/memory-promotion-workflow';
 import { logger } from '@agent/core/core';
 import { getRegisteredEnv, parseSafeJsonInput } from '@agent/core/foundation';
 import { getOptionValue } from './mission-cli-args.js';

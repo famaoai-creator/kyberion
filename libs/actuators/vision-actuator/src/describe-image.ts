@@ -5,11 +5,11 @@ import {
   describeImage as coreDescribeImage,
   type DescribeImageOptions,
   type PayloadTier,
-} from '@agent/core/image-description-bridge';
+} from '@agent/core/media/image-description-bridge';
 import {
   createRedactedImageCopy,
   type RedactedImageCopy,
-} from '@agent/core/screen-frame-redaction';
+} from '@agent/core/virtual/screen-frame-redaction';
 import {
   assertMissionTenant,
   resolveVisionScope,

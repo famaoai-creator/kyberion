@@ -6,11 +6,11 @@ import {
   resolveGovernedArtifactPath,
   writeGovernedArtifactJson,
   type GovernedArtifactRole,
-} from '@agent/core/artifact-store';
+} from '@agent/core/workforce/artifact-store';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 

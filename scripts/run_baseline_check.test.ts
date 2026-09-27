@@ -286,7 +286,7 @@ describe('run_baseline_check', () => {
 
     it('(b) fresh registry (peek → non-null) is reported as cached, no forced re-probe', () => {
       // The "no re-probe within TTL" behavior itself lives in and is already
-      // covered by libs/core/provider-capability-registry.test.ts
+      // covered by libs/core/provider/provider-capability-registry.test.ts
       // ("re-probes on TTL expiry using an injectable clock"); this test only
       // asserts run_baseline_check's own report-shape responsibility: a fresh
       // peek must be surfaced as `cached: true` in the baseline report.

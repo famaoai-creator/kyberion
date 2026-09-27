@@ -18,7 +18,7 @@ export {
   loadApprovalRequest,
   decideApprovalRequest,
   listApprovalRequests,
-} from './approval-store.js';
+} from './governance/approval-store.js';
 export type {
   ApprovalApplyResult,
   ApprovalDecisionPayload,
@@ -31,5 +31,5 @@ export type {
   ApprovalStage,
   ApprovalTargetDescriptor,
   ApprovalWorkflowState,
-} from './approval-store.js';
+} from './governance/approval-store.js';
 export type { IdentityContext, Persona, Authority } from './types.js';

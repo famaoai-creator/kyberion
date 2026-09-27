@@ -21,25 +21,25 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { listApprovalRequests } from '@agent/core/approval-store';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { listDeals } from '@agent/core/deal-store';
 import { listInboxEntries } from '@agent/core/deliverable-inbox';
-import { listProcessImprovementProposals } from '@agent/core/mission-retrospective';
-import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
+import { listProcessImprovementProposals } from '@agent/core/mission/mission-retrospective';
+import { listAgentRuntimeSnapshots } from '@agent/core/agent/agent-runtime-supervisor';
 import {
   composeOfficeSnapshot as composeChronosOfficeSnapshot,
   type OfficeSnapshot as ChronosOfficeSnapshot,
 } from '@agent/core/ce-adoption';
-import { loadOrganizationProfile } from '@agent/core/organization-profile';
-import { loadOnboardingContextBinding } from '@agent/core/onboarding-context';
-import { getProjectManagementView } from '@agent/core/project-management';
-import { listProjectRecords } from '@agent/core/project-registry';
-import { listTenants } from '@agent/core/tenant-governance';
-import { listTaskSessions } from '@agent/core/task-session';
-import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
-import { loadAgentPerformanceIndex } from '@agent/core/agent-performance-index';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
+import { loadOnboardingContextBinding } from '@agent/core/organization/onboarding-context';
+import { getProjectManagementView } from '@agent/core/project/project-management';
+import { listProjectRecords } from '@agent/core/project/project-registry';
+import { listTenants } from '@agent/core/organization/tenant-governance';
+import { listTaskSessions } from '@agent/core/task/task-session';
+import { loadAgentProfileIndex } from '@agent/core/mission/mission-team-index';
+import { loadAgentPerformanceIndex } from '@agent/core/agent/agent-performance-index';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { readOpsAlertLogRecords } from '@agent/core/ops-alert';
 import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -51,7 +51,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
-import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
+import { readCanonicalWorkGraph } from '@agent/core/workforce/work-graph-projection';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 // ---------- data collection ----------

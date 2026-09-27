@@ -1,22 +1,22 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { loadStandardIntentCatalog } from './intent-resolution.js';
+import { loadStandardIntentCatalog } from './intent/intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
 import {
   assessContextualClarification,
   type ContextualClarificationExecutionShape,
 } from './contextual-intent-clarification-policy.js';
-import { getMeetingBriefQuestions } from './meeting-operations-profile.js';
-import { notifyOperator } from './operator-notifications.js';
-import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
+import { getMeetingBriefQuestions } from './meeting/meeting-operations-profile.js';
+import { notifyOperator } from './surface/operator-notifications.js';
+import { getNarratedVideoBriefQuestions } from './video/narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
 import { clamp, slugify } from './foundation/text.js';
-import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
-import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
-import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
-import type { NarratedVideoPreferenceProfile } from './src/types/narrated-video-preference-profile.js';
+import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
+import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
+import type { MeetingOperationsProfile } from './contracts/meeting-operations-profile.js';
+import type { NarratedVideoPreferenceProfile } from './contracts/narrated-video-preference-profile.js';
 import { logger } from './core.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(

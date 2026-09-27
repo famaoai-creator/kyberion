@@ -8,7 +8,7 @@ import {
   listOrganizationIncidents,
   listOrganizationOperationalStates,
   reconcileOrganizationState,
-} from '@agent/core/organization-operating-model-management';
+} from '@agent/core/organization/organization-operating-model-management';
 import {
   buildOrganizationDomainRecord,
   buildOrganizationLearningCandidate,
@@ -25,7 +25,7 @@ import {
   saveOrganizationDecision,
   loadOrganizationIncident,
   saveOrganizationIncident,
-} from '@agent/core/organization-operating-model-operations';
+} from '@agent/core/organization/organization-operating-model-operations';
 import {
   loadOrganizationOperatingModelCatalog,
   resolveOrganizationWork,
@@ -38,12 +38,12 @@ import {
   assertOrganizationParent,
   setOrganizationParent,
   transitionOrganizationLifecycle,
-} from '@agent/core/organization-operating-model-persistence';
+} from '@agent/core/organization/organization-operating-model-persistence';
 import {
   removeOrganizationEntity,
   retireOrganizationEntity,
   type OrganizationTier,
-} from '@agent/core/organization-operating-model';
+} from '@agent/core/organization/organization-operating-model';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
@@ -52,13 +52,13 @@ import {
   createOrganizationIncident,
   transitionOrganizationIncident,
   transitionOrganizationDecision,
-} from '@agent/core/organization-interventions';
+} from '@agent/core/organization/organization-interventions';
 import { verifyDecisionApprovalRef } from './organization_decision_approval.js';
 import {
   defaultOperationRunId,
   recordOrganizationOperationRun,
   type OrganizationOperationRunOutcome,
-} from '@agent/core/organization-operation-run-recording';
+} from '@agent/core/organization/organization-operation-run-recording';
 import { validateWritePermission } from '@agent/core/tier-guard';
 import type {
   OrganizationCadenceRecord,
@@ -68,7 +68,7 @@ import type {
   OrganizationOperationalState,
   OrganizationOperationRecord,
   OrganizationServiceRecord,
-} from '@agent/core/organization-operating-model';
+} from '@agent/core/organization/organization-operating-model';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

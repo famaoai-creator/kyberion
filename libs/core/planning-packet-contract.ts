@@ -1,5 +1,5 @@
 import { PlanningPacketSchema, formatZodIssues } from './structured-output-contracts.js';
-import type { PlanningPacket } from './channel-surface-types.js';
+import type { PlanningPacket } from './surface/channel-surface-types.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface PlanningPacketValidationResult {

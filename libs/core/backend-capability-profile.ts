@@ -12,7 +12,7 @@
  * declared capability as proven until that lands.
  */
 
-import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
 
 export type BackendTransport = 'cli' | 'sdk' | 'api' | 'local-server' | 'in-process';
 /** Whether prompts stay on this machine or are sent to a hosted provider. */

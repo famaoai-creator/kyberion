@@ -170,14 +170,14 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
 - [x] Migration helper: `pnpm customer:migrate-from-personal`
 - [ ] Integration in `path-resolver.ts` consumers
-  - [x] Connections consumer (`libs/core/service-engine.ts`)
-  - [x] Policy consumer (`libs/core/approval-policy.ts`)
-  - [x] Mission seeds consumer (`libs/core/mission-seed-registry.ts`)
-  - [x] Voice profile registry consumer (`libs/core/voice-profile-registry.ts`)
+  - [x] Connections consumer (`libs/core/service/service-engine.ts`)
+  - [x] Policy consumer (`libs/core/governance/approval-policy.ts`)
+  - [x] Mission seeds consumer (`libs/core/mission/mission-seed-registry.ts`)
+  - [x] Voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)
   - [x] Vital check consumer (`scripts/vital_check.ts`)
   - [x] Baseline check consumer (`scripts/run_baseline_check.ts`)
 - [x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)
-- [x] Slack onboarding consumer (`libs/core/slack-onboarding.ts`)
+- [x] Slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)
   - [x] Mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)
 
 # Marketing Policy And Brand Overlay

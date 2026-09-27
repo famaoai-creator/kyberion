@@ -22,13 +22,13 @@ import {
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { estimateSpeechDurationMs } from '@agent/core/presence-surface';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
   type VoiceEngineRecord,
-} from '@agent/core/voice-engine-registry';
-import { resolveVoiceTtsAdapter } from '@agent/core/voice-provider-adapters';
+} from '@agent/core/voice/voice-engine-registry';
+import { resolveVoiceTtsAdapter } from '@agent/core/voice/voice-provider-adapters';
 import {
   NATIVE_TTS_FILE_TIMEOUT_MS,
   SPEECH_SYNTHESIZE_MAX_AUDIO_BYTES,

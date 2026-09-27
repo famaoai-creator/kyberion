@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { secretGuard } from './secret-guard.js';
+import { secretGuard } from './secret/secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -9,8 +9,8 @@ import {
   resolveEgressPayloadContext,
   type EgressPayloadContext,
 } from './egress-policy.js';
-import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
+import { auditChain } from './governance/audit-chain.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';

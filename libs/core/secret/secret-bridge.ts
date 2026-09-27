@@ -1,0 +1,478 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+import { spawn } from 'node:child_process';
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
+import { getRegisteredEnvBool, getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
+import {
+  safeChmodSync,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+  safeMkdir,
+  safeExecResult,
+} from '../secure-io.js';
+import { SecretProvider, RegistryEntry } from './secret-types.js';
+
+// Resolve vault/knowledge paths lazily so importing this module (via
+// secret-guard fallthrough) does not require a fully-mocked pathResolver.
+function keychainRegistryPath(): string {
+  return pathResolver.vault('secrets/keychain-registry.json');
+}
+function fileSecretsPath(): string {
+  return pathResolver.vault('secrets/file-secrets.json');
+}
+function keychainRegistrySchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/keychain-registry.schema.json');
+}
+function fileSecretsSchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/file-secrets.schema.json');
+}
+
+// Helper to manage the registry catalog
+interface KeychainRegistry {
+  entries: RegistryEntry[];
+}
+
+function keychainRegistryCatalog() {
+  return defineCatalog<KeychainRegistry>({
+    id: 'keychain-registry',
+    path: keychainRegistryPath(),
+    schema: keychainRegistrySchemaPath(),
+  });
+}
+
+function fileSecretsCatalog(filePath: string) {
+  return defineCatalog<Record<string, Record<string, string>>>({
+    id: 'file-secrets',
+    path: filePath,
+    schema: fileSecretsSchemaPath(),
+  });
+}
+
+function loadRegistry(): KeychainRegistry {
+  const registryPath = keychainRegistryPath();
+  if (!safeExistsSync(registryPath)) return { entries: [] };
+  try {
+    return keychainRegistryCatalog().load();
+  } catch {
+    return { entries: [] };
+  }
+}
+
+function saveRegistry(registry: KeychainRegistry): void {
+  const registryPath = keychainRegistryPath();
+  const dir = path.dirname(registryPath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  const validated = keychainRegistryCatalog().validate(registry, registryPath);
+  safeWriteFile(registryPath, JSON.stringify(validated, null, 2));
+}
+
+export function registryAdd(service: string, account: string): void {
+  const registry = loadRegistry();
+  const existing = registry.entries.findIndex(
+    (e) => e.service === service && e.account === account
+  );
+  const entry: RegistryEntry = { service, account, addedAt: nowIso() };
+  if (existing >= 0) {
+    registry.entries[existing] = entry;
+  } else {
+    registry.entries.push(entry);
+  }
+  saveRegistry(registry);
+}
+
+export function registryRemove(service: string, account: string): void {
+  const registry = loadRegistry();
+  registry.entries = registry.entries.filter(
+    (e) => !(e.service === service && e.account === account)
+  );
+  saveRegistry(registry);
+}
+
+// 1. macOS Keychain native provider
+export class MacKeychainSecretProvider implements SecretProvider {
+  readonly id = 'mac_keychain';
+
+  async isAvailable(): Promise<boolean> {
+    return process.platform === 'darwin';
+  }
+
+  async get(service: string, account: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      const child = spawn(
+        'security',
+        ['find-generic-password', '-a', account, '-s', service, '-w'],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
+      let stdout = '';
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk);
+      });
+      child.on('close', (code) => {
+        if (code === 0 && stdout.trim()) {
+          resolve(stdout.trim());
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  async set(service: string, account: string, value: string): Promise<void> {
+    // Delete first to overwrite safely
+    await this.delete(service, account);
+
+    // Write via a short-lived Swift helper that reads service/account/value from
+    // stdin — never place the secret on process argv (unlike `security -w`).
+    const script = [
+      'import Foundation',
+      'import Security',
+      'guard let service = readLine(), let account = readLine() else { exit(2) }',
+      'let passwordData = FileHandle.standardInput.readDataToEndOfFile()',
+      'guard !passwordData.isEmpty else { exit(3) }',
+      'let query: [String: Any] = [',
+      '  kSecClass as String: kSecClassGenericPassword,',
+      '  kSecAttrService as String: service,',
+      '  kSecAttrAccount as String: account,',
+      ']',
+      'SecItemDelete(query as CFDictionary)',
+      'var add = query',
+      'add[kSecValueData as String] = passwordData',
+      'let status = SecItemAdd(add as CFDictionary, nil)',
+      'exit(status == errSecSuccess ? 0 : Int32(status))',
+    ].join('\n');
+
+    return new Promise((resolve, reject) => {
+      const child = spawn('swift', ['-e', script], {
+        stdio: ['pipe', 'ignore', 'pipe'],
+      });
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on('error', (err) => reject(err));
+      child.on('close', (code) => {
+        if (code === 0) {
+          registryAdd(service, account);
+          resolve();
+        } else {
+          reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
+        }
+      });
+      child.stdin?.write(`${service}\n${account}\n${value}`);
+      child.stdin?.end();
+    });
+  }
+
+  async delete(service: string, account: string): Promise<void> {
+    return new Promise((resolve) => {
+      const child = spawn('security', ['delete-generic-password', '-a', account, '-s', service], {
+        stdio: ['ignore', 'ignore', 'ignore'],
+      });
+      child.on('close', () => {
+        registryRemove(service, account);
+        resolve();
+      });
+    });
+  }
+}
+
+// Windows Credential Manager provider. The Win32 CredRead/CredWrite APIs are
+// hosted in a short-lived PowerShell process so Node never needs to load a
+// platform-specific native module. Values are sent over stdin, never argv.
+export class WindowsCredentialManagerSecretProvider implements SecretProvider {
+  readonly id = 'windows_credential_manager';
+
+  async isAvailable(): Promise<boolean> {
+    return process.platform === 'win32';
+  }
+
+  private run(
+    operation: 'get' | 'set' | 'delete',
+    service: string,
+    account: string,
+    value?: string
+  ) {
+    const script = `
+Add-Type @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+public struct KCredential {
+  public uint Flags; public uint Type; public IntPtr TargetName; public IntPtr Comment;
+  public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+  public uint CredentialBlobSize; public IntPtr CredentialBlob; public uint Persist;
+  public uint AttributeCount; public IntPtr Attributes; public IntPtr TargetAlias; public IntPtr UserName;
+}
+public static class KCredentialApi {
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredRead(string target, uint type, uint flags, out IntPtr credential);
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredWrite(ref KCredential credential, uint flags);
+  [DllImport("Advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CredDelete(string target, uint type, uint flags);
+  [DllImport("Advapi32.dll")] public static extern void CredFree(IntPtr buffer);
+}
+'@
+$target = [Console]::In.ReadLine()
+$account = [Console]::In.ReadLine()
+$value = [Console]::In.ReadToEnd()
+if ('${operation}' -eq 'get') {
+  $ptr = [IntPtr]::Zero
+  if (-not [KCredentialApi]::CredRead($target, 1, 0, [ref]$ptr)) { exit 2 }
+  try {
+    $cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [type][KCredential])
+    if ($cred.CredentialBlobSize -gt 0) {
+      $bytes = New-Object byte[] $cred.CredentialBlobSize
+      [Runtime.InteropServices.Marshal]::Copy($cred.CredentialBlob, $bytes, 0, $bytes.Length)
+      [Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes))
+    }
+  } finally { [KCredentialApi]::CredFree($ptr) }
+  exit 0
+}
+if ('${operation}' -eq 'delete') {
+  if (-not [KCredentialApi]::CredDelete($target, 1, 0)) { exit 2 }
+  exit 0
+}
+$targetPtr = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($target)
+$userPtr = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($account)
+$bytes = [Text.Encoding]::UTF8.GetBytes($value)
+$blobPtr = [Runtime.InteropServices.Marshal]::AllocCoTaskMem($bytes.Length)
+[Runtime.InteropServices.Marshal]::Copy($bytes, 0, $blobPtr, $bytes.Length)
+$cred = New-Object KCredential
+$cred.Type = 1; $cred.TargetName = $targetPtr; $cred.UserName = $userPtr
+$cred.CredentialBlob = $blobPtr; $cred.CredentialBlobSize = $bytes.Length; $cred.Persist = 2
+try { if (-not [KCredentialApi]::CredWrite([ref]$cred, 0)) { exit 2 } }
+finally {
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($targetPtr)
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($userPtr)
+  [Runtime.InteropServices.Marshal]::FreeCoTaskMem($blobPtr)
+}
+`;
+    const input = `${service}\n${account}\n${value ?? ''}`;
+    return safeExecResult('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      timeoutMs: 10_000,
+      maxOutputMB: 2,
+      input,
+    });
+  }
+
+  async get(service: string, account: string): Promise<string | null> {
+    const result = this.run('get', service, account);
+    return result.status === 0 ? result.stdout : null;
+  }
+
+  async set(service: string, account: string, value: string): Promise<void> {
+    const result = this.run('set', service, account, value);
+    if (result.status !== 0)
+      throw new Error(`Windows Credential Manager write failed: ${result.stderr || result.status}`);
+    registryAdd(service, account);
+  }
+
+  async delete(service: string, account: string): Promise<void> {
+    const result = this.run('delete', service, account);
+    if (result.status !== 0 && result.status !== 2)
+      throw new Error(
+        `Windows Credential Manager delete failed: ${result.stderr || result.status}`
+      );
+    registryRemove(service, account);
+  }
+}
+
+// 2. Local File Secret Provider (Fallback for Headless Linux/Windows)
+export class FileSecretProvider implements SecretProvider {
+  readonly id = 'file_secrets';
+
+  constructor(private readonly secretsPath = fileSecretsPath()) {}
+
+  async isAvailable(): Promise<boolean> {
+    // Opt-in only. Never a silent default on darwin/win32 (keychain wins first
+    // anyway) and never an implicit Linux store without operator acknowledgement.
+    return getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true;
+  }
+
+  private readSecretsFile(): Record<string, Record<string, string>> {
+    if (!safeExistsSync(this.secretsPath)) return {};
+    this.assertNotSymlink(this.secretsPath, 'secret file');
+    try {
+      return fileSecretsCatalog(this.secretsPath).load();
+    } catch {
+      return {};
+    }
+  }
+
+  private writeSecretsFile(secrets: Record<string, Record<string, string>>): void {
+    const dir = path.dirname(this.secretsPath);
+    if (safeExistsSync(dir)) {
+      this.assertNotSymlink(dir, 'secret directory');
+    } else {
+      safeMkdir(dir, { recursive: true, mode: 0o700 });
+    }
+    safeChmodSync(dir, 0o700);
+    if (safeExistsSync(this.secretsPath)) {
+      this.assertNotSymlink(this.secretsPath, 'secret file');
+    }
+    const validated = fileSecretsCatalog(this.secretsPath).validate(secrets, this.secretsPath);
+    safeWriteFile(this.secretsPath, JSON.stringify(validated, null, 2), { mode: 0o600 });
+    // Also repair permissions of files created by older versions.
+    safeChmodSync(this.secretsPath, 0o600);
+  }
+
+  private assertNotSymlink(targetPath: string, label: string): void {
+    if (safeLstat(targetPath).isSymbolicLink()) {
+      throw new Error(`[SECURITY] Refusing ${label} symbolic link: ${targetPath}`);
+    }
+  }
+
+  async get(service: string, account: string): Promise<string | null> {
+    const secrets = this.readSecretsFile();
+    return secrets[service]?.[account] || null;
+  }
+
+  async set(service: string, account: string, value: string): Promise<void> {
+    const secrets = this.readSecretsFile();
+    if (!secrets[service]) secrets[service] = {};
+    secrets[service][account] = value;
+    this.writeSecretsFile(secrets);
+    registryAdd(service, account);
+  }
+
+  async delete(service: string, account: string): Promise<void> {
+    const secrets = this.readSecretsFile();
+    if (secrets[service]) {
+      delete secrets[service][account];
+      if (Object.keys(secrets[service]).length === 0) {
+        delete secrets[service];
+      }
+      this.writeSecretsFile(secrets);
+    }
+    registryRemove(service, account);
+  }
+}
+
+// 3. Environment Variable Secret Provider
+export class EnvSecretProvider implements SecretProvider {
+  readonly id = 'env_secrets';
+
+  async isAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  private envKey(service: string, account: string): string {
+    return `SECRET_${service.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+  }
+
+  async get(service: string, account: string): Promise<string | null> {
+    const key = this.envKey(service, account);
+    return getRegisteredEnvText(key) || null;
+  }
+
+  async set(service: string, account: string, value: string): Promise<void> {
+    const key = this.envKey(service, account);
+    setRegisteredEnv(key, value);
+    registryAdd(service, account);
+  }
+
+  async delete(service: string, account: string): Promise<void> {
+    const key = this.envKey(service, account);
+    setRegisteredEnv(key, undefined);
+    registryRemove(service, account);
+  }
+}
+
+// Adaptive policy router
+export class SecretPolicyRouter {
+  private providers: Map<string, SecretProvider> = new Map();
+
+  constructor(providers: SecretProvider[]) {
+    for (const p of providers) {
+      this.providers.set(p.id, p);
+    }
+  }
+
+  async selectProvider(): Promise<SecretProvider> {
+    // Platform priority: native keychain on macOS, file secrets/env secrets on others
+    const chain = ['mac_keychain', 'windows_credential_manager', 'file_secrets', 'env_secrets'];
+    for (const id of chain) {
+      const provider = this.providers.get(id);
+      if (provider && (await provider.isAvailable())) {
+        return provider;
+      }
+    }
+    throw new Error('No available Secret Provider resolved.');
+  }
+}
+
+let globalRouter: SecretPolicyRouter | null = null;
+
+function getRouter(): SecretPolicyRouter {
+  if (!globalRouter) {
+    globalRouter = new SecretPolicyRouter([
+      new MacKeychainSecretProvider(),
+      new WindowsCredentialManagerSecretProvider(),
+      new FileSecretProvider(),
+      new EnvSecretProvider(),
+    ]);
+  }
+  return globalRouter;
+}
+
+export async function fetchSecret(service: string, account: string): Promise<string | null> {
+  const router = getRouter();
+  const provider = await router.selectProvider();
+  return await provider.get(service, account);
+}
+
+/**
+ * Synchronous lookup for secret-guard fallthrough. Prefer async {@link fetchSecret}
+ * for new call sites. Never logs the value.
+ */
+export function fetchSecretSync(service: string, account: string): string | null {
+  if (process.platform === 'darwin') {
+    const result = safeExecResult(
+      'security',
+      ['find-generic-password', '-a', account, '-s', service, '-w'],
+      { timeoutMs: 10_000, maxOutputMB: 1 }
+    );
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  }
+
+  if (getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true) {
+    try {
+      const provider = new FileSecretProvider();
+      // FileSecretProvider.get is async but the body is sync I/O; drive via deasync-free path.
+      const secrets = (
+        provider as unknown as { readSecretsFile: () => Record<string, Record<string, string>> }
+      ).readSecretsFile();
+      const value = secrets[service]?.[account];
+      if (typeof value === 'string' && value.length > 0) return value;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const envKey = `SECRET_${service.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+  return getRegisteredEnvText(envKey) || null;
+}
+
+export async function storeSecret(service: string, account: string, value: string): Promise<void> {
+  const router = getRouter();
+  const provider = await router.selectProvider();
+  await provider.set(service, account, value);
+}
+
+export async function removeSecret(service: string, account: string): Promise<void> {
+  const router = getRouter();
+  const provider = await router.selectProvider();
+  await provider.delete(service, account);
+}
+
+export function listSecrets(service?: string): { status: string; entries: RegistryEntry[] } {
+  const registry = loadRegistry();
+  const entries = service
+    ? registry.entries.filter((e) => e.service === service)
+    : registry.entries;
+  return { status: 'success', entries };
+}

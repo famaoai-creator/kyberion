@@ -1,6 +1,6 @@
 # A2A Signing Operations (AA-03)
 
-Host-internal A2A envelopes are HMAC-SHA256 signed via `libs/core/a2a-envelope-signature.ts`.
+Host-internal A2A envelopes are HMAC-SHA256 signed via `libs/core/mesh/a2a-envelope-signature.ts`.
 
 ## Key resolution order
 

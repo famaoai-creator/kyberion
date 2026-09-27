@@ -35,19 +35,19 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 ## L2: LLM 判断配置
 
 - **正本**: [`knowledge/product/governance/llm-invocation-rubric.md`](../governance/llm-invocation-rubric.md) — 6段ラダーと判定質問。pipeline/タスク設計時はこれを先に読む。
-- **lint**: `libs/core/adf-guardrails.ts` — `llm-decide-without-distill` / `llm-decide-without-fallback`(warn)。蒸留なし・fallback 宣言なしの `llm_decide` を preflight で警告。
-- **プリミティブ**: `libs/core/semantic-decide.ts` `decideFromObservation`(選択>生成、options 外は拒否→null)、`delegateStructured<T>`(schema 強制+retry)、`delegateBestOf`(N案+judge)— すべて `libs/core/reasoning-backend.ts`。
+- **lint**: `libs/core/pipeline/adf-guardrails.ts` — `llm-decide-without-distill` / `llm-decide-without-fallback`(warn)。蒸留なし・fallback 宣言なしの `llm_decide` を preflight で警告。
+- **プリミティブ**: `libs/core/semantic-decide.ts` `decideFromObservation`(選択>生成、options 外は拒否→null)、`delegateStructured<T>`(schema 強制+retry)、`delegateBestOf`(N案+judge)— すべて `libs/core/reasoning/reasoning-backend.ts`。
 - **蒸留→判断の全面展開**(AR-07 完了): `llm_decide` は全5 actuator で利用可能。op 本体は共通ヘルパ `executeLlmDecideOp`(semantic-decide.ts)。蒸留段: browser `distill_dom` / android `summarize_ui_tree` / system `distill_output` / network `distill_response`(後2者は `libs/core/observation-distill.ts` — head/tail/error行・JSON shape・HTML title+links)/ terminal は observation 明示必須。
 - ワーカーへの周知: `libs/core/working-principles.ts` の strategist 追補にラダー参照が入る(全 worker prompt に注入)。
 
 ## L3: 縮退防止(stub へのサイレント縮退の遮断)
 
-| 経路                             | 防衛線                                                                                                                                                                                                 | どこ                                                                                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 実行中のプロバイダ障害           | (元から安全)failover → warn + demotion → 全滅時 throw。stub は failover 候補に入らない                                                                                                                 | `reasoning-backend.ts` `FailoverReasoningBackend`                                                                                            |
-| インストール時にチェーン構築失敗 | marker 書き込み + `notifyOperator` 1回 + **baseline-check が `needs_attention`**(report に `reasoning_degraded`)                                                                                       | `libs/core/reasoning-degradation.ts` + `reasoning-bootstrap.ts` + `scripts/run_baseline_check.ts`。旧挙動は `KYBERION_ALLOW_STUB_FALLBACK=1` |
-| stub が判断を返して偽成功        | **stub-taint**: stub 全メソッドの呼び出しを記録し、完了突合(`reconcileCompletionStructurally`)が taint 検出時に `satisfied=false` + `reasoning_stub_served` gap を強制                                 | `reasoning-backend.ts` `getStubServedOps` + `intent-reconciliation.ts`。明示 `KYBERION_REASONING_BACKEND=stub`(決定論テスト)は免除           |
-| `llm_decide` の null 縮退        | 理由付き記録(model_error / option_rejected / empty_decision)+ `<export_as>_degraded` export + run summary 表示。`on_degraded: fail` + `degraded_threshold`(既定3)で連続 model_error を step failure 化 | `semantic-decide.ts` 縮退レジストリ + browser `llm_decide` op                                                                                |
+| 経路                             | 防衛線                                                                                                                                                                                                 | どこ                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 実行中のプロバイダ障害           | (元から安全)failover → warn + demotion → 全滅時 throw。stub は failover 候補に入らない                                                                                                                 | `reasoning-backend.ts` `FailoverReasoningBackend`                                                                                                      |
+| インストール時にチェーン構築失敗 | marker 書き込み + `notifyOperator` 1回 + **baseline-check が `needs_attention`**(report に `reasoning_degraded`)                                                                                       | `libs/core/reasoning/reasoning-degradation.ts` + `reasoning-bootstrap.ts` + `scripts/run_baseline_check.ts`。旧挙動は `KYBERION_ALLOW_STUB_FALLBACK=1` |
+| stub が判断を返して偽成功        | **stub-taint**: stub 全メソッドの呼び出しを記録し、完了突合(`reconcileCompletionStructurally`)が taint 検出時に `satisfied=false` + `reasoning_stub_served` gap を強制                                 | `reasoning-backend.ts` `getStubServedOps` + `intent-reconciliation.ts`。明示 `KYBERION_REASONING_BACKEND=stub`(決定論テスト)は免除                     |
+| `llm_decide` の null 縮退        | 理由付き記録(model_error / option_rejected / empty_decision)+ `<export_as>_degraded` export + run summary 表示。`on_degraded: fail` + `degraded_threshold`(既定3)で連続 model_error を step failure 化 | `semantic-decide.ts` 縮退レジストリ + browser `llm_decide` op                                                                                          |
 
 ## L4: 人間フィードバック(却下→理由→再実行→学習)
 
@@ -85,6 +85,6 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 
 1. **完了判定を触るなら** `reconcileCompletionStructurally` が単一の関所(task-session close と mission finish の両方が通る)。ここに条件を足せば全 shape に効く。
 2. **却下理由の消費者を増やすなら** イベント JSONL(`active/shared/observability/channels/<ch>/approvals.jsonl`)と review-reentry レコード(`active/shared/coordination/review-reentry/<MISSION>/`)を読む。nested workflow record は読まない(死蔵の旧経路)。
-3. **hints の読み書き**は `persistHints` / `readHintsByCategory`(`libs/core/src/feedback-loop.ts`)。カテゴリ = ファイル名。topic で dedup される。100件でローテーション。
+3. **hints の読み書き**は `persistHints` / `readHintsByCategory`(`libs/core/knowledge/feedback-loop.ts`)。カテゴリ = ファイル名。topic で dedup される。100件でローテーション。
 4. **テストの定石**: governed artifact を触るテストは secure-io をモックし、**論理パスを KYBERION_ROOT 起点で解決する**こと(`libs/core/review-reentry.test.ts` 冒頭のコメント参照。素通しの fs モックだと実リポジトリに書いてしまう)。
 5. **フォローアップ接続も実装済み**(2026-07-13 後続): (a) ワーカー brief に直近の却下教訓を注入(`buildRejectionLessonLines`)、(b) `llm_decide` 縮退の週次集計が operator packet に載る(`libs/core/semantic-degradation-log.ts` → orchestrator status report)、(c) アドホック ADF の成功3回で昇格候補として run_pipeline と operator packet に提示(`libs/core/promotion-candidates.ts`)、(d) Slack 承認却下の ask-why ボタン(`slack_approval_askwhy` action → `annotateApprovalRejectionReason` で決定後の理由をイベントストリームに追記)。真の残りは iMessage/Telegram ブリッジへの同型展開と、会話文中の修正意図検知(IL-05)のみ。

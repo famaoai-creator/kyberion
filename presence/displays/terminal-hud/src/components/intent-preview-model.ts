@@ -1,4 +1,4 @@
-import type { IntentAuthorityLevel } from '@agent/core/intent-resolution-contract';
+import type { IntentAuthorityLevel } from '@agent/core/intent/intent-resolution-contract';
 
 export type IntentAuthorityVocabularyKey =
   | 'tui:tui_cockpit_authority_approval'

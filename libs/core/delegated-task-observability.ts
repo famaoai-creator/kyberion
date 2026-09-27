@@ -5,8 +5,8 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
-import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent-input-queue.js';
-import { enqueueDelegationNotification } from './delegation-notifications.js';
+import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent/agent-input-queue.js';
+import { enqueueDelegationNotification } from './mission/delegation-notifications.js';
 import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -17,7 +17,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { spawnManagedProcess, type ManagedProcessHandle } from './managed-process.js';
 
 export interface DelegatedTaskTrace {
@@ -865,7 +865,7 @@ export async function resumeDelegatedTask(
     // Existing reasoning/delegation cycle is tracked by the module-boundary baseline.
     const backend =
       // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
-      options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
+      options.backend ?? (await import('./reasoning/reasoning-backend.js')).getReasoningBackend();
     const inboxEntries = record.continuable
       ? await (async () => {
           if (!options.fromInbox) {

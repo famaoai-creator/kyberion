@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { safeReadFile, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { createAgentCollaborationEvent } from './agent-collaboration-events.js';
-import { composeAgentCollaborationProjection } from './agent-collaboration-projection.js';
+import { createAgentCollaborationEvent } from './agent/agent-collaboration-events.js';
+import { composeAgentCollaborationProjection } from './agent/agent-collaboration-projection.js';
 import { deriveExecutionGraph } from './graph-scheduler.js';
 import {
   createGraphRunArtifact,

@@ -28,7 +28,7 @@ status: archived
 
 ## 実装状況 (2026-07-05)
 
-- **完了(Task 1)**: `libs/core/intent-handoff.ts` を新設(`writeIntentGoalHandoff` / `consumeIntentGoalHandoff`)。surface の mission 昇格 2 経路(`handleGovernedExecutionHint` の missionAction=create / shouldPromoteToMission)が `compiledFlow.intentContract` の source_text・goal・outcome_ids を governed tmp のハンドオフファイルに書き、`mission_controller create --intent-goal <path>` で渡す。ハンドオフは consume 時に read+delete(削除失敗時は janitor の tmp TTL がバックストップ)。失敗許容 — goal 供給の失敗はミッション作成を妨げない。
+- **完了(Task 1)**: `libs/core/intent/intent-handoff.ts` を新設(`writeIntentGoalHandoff` / `consumeIntentGoalHandoff`)。surface の mission 昇格 2 経路(`handleGovernedExecutionHint` の missionAction=create / shouldPromoteToMission)が `compiledFlow.intentContract` の source_text・goal・outcome_ids を governed tmp のハンドオフファイルに書き、`mission_controller create --intent-goal <path>` で渡す。ハンドオフは consume 時に read+delete(削除失敗時は janitor の tmp TTL がバックストップ)。失敗許容 — goal 供給の失敗はミッション作成を妨げない。
 - **完了(Task 2)**: `inferMissionOutcomeContract` が `intentGoal` を受け、goal.summary(無ければ source_text)を `requested_result` に、success_condition を `success_criteria` に採用。未供給時は従来の汎用文フォールバック(受入4)。`evidence_required` の変更は計画のリスク注記どおり見送り(IL-04 で goal ベース判定と併せて)。
 - **完了(Task 3)**: task_session 経路は `inferTaskSessionOutcomeContract` が既に classified goal(summary + success_condition)を outcome contract に保持していることを確認(追加変更不要)。
 - **完了(受入3)**: `mission-state.json` に `intent`(source_text / goal_summary / success_condition / outcome_ids)を永続化。UX-02 / IL-04 が参照可能。

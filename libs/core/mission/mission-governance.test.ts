@@ -1,0 +1,283 @@
+import * as fs from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { hashArtifactForReview } from '../workforce/artifact-review.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeExec, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { createArtifactRecord, saveArtifactRecord } from '../workforce/artifact-record.js';
+import {
+  validateMarketingMissionCompletionGate,
+  validateMissionArtifactReviewGate,
+  validateMissionQuality,
+} from './mission-governance.js';
+
+const previousPersona = process.env.KYBERION_PERSONA;
+const previousRole = process.env.MISSION_ROLE;
+
+function prepareMission(missionId: string): string {
+  const missionPath = pathResolver.missionDir(missionId, 'public');
+  const latestCommit = safeExec('git', ['rev-parse', 'HEAD'], {
+    cwd: pathResolver.rootDir(),
+  }).trim();
+  if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+  safeWriteFile(
+    `${missionPath}/mission-state.json`,
+    JSON.stringify(
+      {
+        mission_id: missionId,
+        tier: 'public',
+        status: 'completed',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'tester',
+        confidence_score: 1,
+        git: {
+          branch: 'test',
+          start_commit: 'abc123',
+          latest_commit: latestCommit,
+          checkpoints: [],
+        },
+        history: [],
+      },
+      null,
+      2
+    )
+  );
+  return missionPath;
+}
+
+beforeEach(() => {
+  process.env.KYBERION_PERSONA = 'worker';
+  process.env.MISSION_ROLE = 'mission_controller';
+});
+
+afterEach(() => {
+  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousRole === undefined) delete process.env.MISSION_ROLE;
+  else process.env.MISSION_ROLE = previousRole;
+});
+
+describe('mission-governance quality validation', () => {
+  it('rejects symlinked mission paths before artifact review or marketing reads', () => {
+    const boundaryRoot = pathResolver.sharedTmp('mission-governance-boundary');
+    const targetPath = `${boundaryRoot}/target`;
+    const linkedPath = `${boundaryRoot}/linked-mission`;
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.symlinkSync(targetPath, linkedPath, 'dir');
+
+    try {
+      const review = validateMissionArtifactReviewGate({
+        missionId: 'MSN-GOVERNANCE-SYMLINK',
+        missionPath: linkedPath,
+      });
+      expect(review.ok).toBe(false);
+      expect(review.reason).toContain('[RESOURCE_PATH_SYMLINK]');
+
+      const marketing = validateMarketingMissionCompletionGate({
+        missionType: 'marketing',
+        missionPath: linkedPath,
+      });
+      expect(marketing.ok).toBe(false);
+      expect(marketing.reason).toContain('[RESOURCE_PATH_SYMLINK]');
+      expect(fs.existsSync(targetPath)).toBe(true);
+    } finally {
+      fs.rmSync(linkedPath, { force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails the artifact review gate closed for malformed task entries', () => {
+    const missionId = 'MSN-GOVERNANCE-MALFORMED-TASKS';
+    const missionPath = prepareMission(missionId);
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'review-task', status: 'completed' }, null])
+    );
+
+    const review = validateMissionArtifactReviewGate({ missionId, missionPath });
+    expect(review.ok).toBe(false);
+    expect(review.reason).toBe('NEXT_TASKS.json must contain an array of safe objects.');
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+
+  it('blocks finish when a mission artifact fails deliverable quality', async () => {
+    const missionId = 'MSN-GOVERNANCE-QUALITY-FAIL';
+    const missionPath = prepareMission(missionId);
+    const artifact = createArtifactRecord({
+      mission_id: missionId,
+      kind: 'code',
+      storage_class: 'artifact_store',
+      path: `${missionPath}/evidence/bad-code.json`,
+      preview_text: 'broken artifact',
+      metadata: {
+        build_passed: false,
+        lint_passed: true,
+        tests_passed: true,
+      },
+    });
+    saveArtifactRecord(artifact);
+
+    const quality = await validateMissionQuality(missionId);
+    expect(quality.ok).toBe(false);
+    expect(quality.reason).toContain('build failed');
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+
+  it('allows finish when mission artifacts satisfy deliverable quality', async () => {
+    const missionId = 'MSN-GOVERNANCE-QUALITY-PASS';
+    const missionPath = prepareMission(missionId);
+    const artifact = createArtifactRecord({
+      mission_id: missionId,
+      kind: 'doc',
+      storage_class: 'artifact_store',
+      path: `${missionPath}/evidence/good-doc.md`,
+      preview_text: [
+        '# Mission Summary',
+        '',
+        '## Outcome',
+        '',
+        'This document contains structured content with enough detail to pass the baseline gate.',
+      ].join('\n'),
+    });
+    saveArtifactRecord(artifact);
+
+    const quality = await validateMissionQuality(missionId);
+    expect(quality.ok).toBe(true);
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+
+  it('accepts a completed independent specialist review bound to the current artifact hash', async () => {
+    const missionId = 'MSN-GOVERNANCE-ARTIFACT-REVIEW-PASS';
+    const missionPath = prepareMission(missionId);
+    const artifactPath = `${missionPath}/deliverables/reviewed.md`;
+    const receiptPath = `${missionPath}/evidence/reviews/review-task-r1.json`;
+    safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(artifactPath, '# Reviewed artifact\n\nVerified content.');
+    const artifactReference = pathResolver.toRepoRelative(artifactPath);
+    const artifactHash = hashArtifactForReview(artifactPath);
+    safeWriteFile(
+      receiptPath,
+      JSON.stringify(
+        {
+          kind: 'artifact-review-receipt',
+          version: '1.0.0',
+          review_id: 'review-task-r1',
+          mission_id: missionId,
+          review_task_id: 'review-task',
+          review_target_task_id: 'implementation-task',
+          artifact: { path: artifactReference, sha256: artifactHash, kind: 'doc' },
+          reviewer: {
+            agent_id: 'independent-reviewer',
+            team_role: 'reviewer',
+            specialist_roles: ['content-reviewer'],
+            independent_from: ['implementation-agent'],
+            independence_verified: true,
+          },
+          verdict: 'approved',
+          findings: [],
+          acceptance_criteria: ['Content is accurate and complete.'],
+          reviewed_at: '2026-07-13T00:00:00.000Z',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'review-task',
+            status: 'completed',
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+            review_target: 'implementation-task',
+            artifact_review_receipt: 'evidence/reviews/review-task-r1.json',
+            artifact_review_profile: {
+              artifact_path: artifactReference,
+              artifact_sha256: artifactHash,
+              required_reviewer_roles: ['content-reviewer'],
+              independence_required: true,
+              implementer_agent_ids: ['implementation-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const quality = await validateMissionQuality(missionId);
+    expect(quality.ok).toBe(true);
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+
+  it('invalidates a completed review when the reviewed artifact changes', async () => {
+    const missionId = 'MSN-GOVERNANCE-ARTIFACT-REVIEW-INVALIDATED';
+    const missionPath = prepareMission(missionId);
+    const artifactPath = `${missionPath}/deliverables/reviewed.md`;
+    const receiptPath = `${missionPath}/evidence/reviews/review-task-r1.json`;
+    safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(artifactPath, '# Original artifact');
+    const artifactReference = pathResolver.toRepoRelative(artifactPath);
+    const approvedHash = hashArtifactForReview(artifactPath);
+    safeWriteFile(
+      receiptPath,
+      JSON.stringify(
+        {
+          kind: 'artifact-review-receipt',
+          version: '1.0.0',
+          review_id: 'review-task-r1',
+          mission_id: missionId,
+          review_task_id: 'review-task',
+          review_target_task_id: 'implementation-task',
+          artifact: { path: artifactReference, sha256: approvedHash, kind: 'doc' },
+          reviewer: {
+            agent_id: 'independent-reviewer',
+            team_role: 'reviewer',
+            specialist_roles: ['content-reviewer'],
+            independent_from: ['implementation-agent'],
+            independence_verified: true,
+          },
+          verdict: 'approved',
+          findings: [],
+          acceptance_criteria: ['Content is accurate and complete.'],
+          reviewed_at: '2026-07-13T00:00:00.000Z',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'review-task',
+            status: 'completed',
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+            review_target: 'implementation-task',
+            artifact_review_receipt: 'evidence/reviews/review-task-r1.json',
+            artifact_review_profile: {
+              artifact_path: artifactReference,
+              artifact_sha256: approvedHash,
+              required_reviewer_roles: ['content-reviewer'],
+              independence_required: true,
+              implementer_agent_ids: ['implementation-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(artifactPath, '# Changed after review');
+
+    const quality = await validateMissionQuality(missionId);
+    expect(quality.ok).toBe(false);
+    expect(quality.reason).toContain('invalidated by artifact change');
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+});

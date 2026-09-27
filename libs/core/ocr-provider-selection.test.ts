@@ -9,7 +9,7 @@ import { setSeamSelectionRule } from './seam-selection-rules.js';
 // policy file, mocking only the audit chain so tests stay hermetic. MISSION_ID
 // is kept unset so no pin file is ever written.
 const record = vi.fn();
-vi.mock('./audit-chain.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
 

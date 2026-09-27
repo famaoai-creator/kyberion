@@ -1,8 +1,8 @@
-import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
-import { executeServicePreset } from './service-engine.js';
+import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service/service-binding.js';
+import { executeServicePreset } from './service/service-engine.js';
 import { nowIso } from './foundation/time.js';
-import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
-import { getServicePresetRecord } from './service-preset-registry.js';
+import { loadConnectionDocument, storeConnectionDocument } from './secret/secret-guard.js';
+import { getServicePresetRecord } from './service/service-preset-registry.js';
 import { assertAuthConfigMutationSource } from './cloudflare-os-control-plane.js';
 import {
   buildCodeChallenge,

@@ -16,13 +16,13 @@ import type { SupportedLocale } from '@agent/core/locale-normalize';
 import {
   proposeWorkDecomposition,
   type ProposeWorkDecompositionInput,
-} from '@agent/core/work-inventory-decompose';
+} from '@agent/core/workforce/work-inventory-decompose';
 import type {
   WorkInventoryFrequency,
   WorkInventoryScope,
   WorkInventoryStep,
   WorkTriggerKind,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import type { HearingRecord } from './hearing.js';
 import { sanitizeGeneratedCanvasHtml } from './hearing-canvas.js';
 

@@ -1,4 +1,4 @@
-import type { WorkItemStatus } from '@agent/core/work-coordination';
+import type { WorkItemStatus } from '@agent/core/workforce/work-coordination';
 
 export const CHRONOS_WORK_ITEM_STATUSES: readonly WorkItemStatus[] = [
   'backlog',

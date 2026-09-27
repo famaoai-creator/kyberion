@@ -4,7 +4,7 @@
  */
 import * as path from 'node:path';
 import { safeWriteFile } from '@agent/core/secure-io';
-import type { SpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
+import type { SpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import type { MediaTool, PerceptionDeps } from './perception.js';
 
 export interface FakeDepsOptions {

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn<(p: string, opts?: unknown) => string>(),
 }));
 
-vi.mock('@agent/core/approval-store', () => ({
+vi.mock('@agent/core/governance/approval-store', () => ({
   findMissionPath: mocks.findMissionPath,
   listApprovalRequests: mocks.listApprovalRequests,
   computeApprovalPayloadHash: mocks.computeApprovalPayloadHash,

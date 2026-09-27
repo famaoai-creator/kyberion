@@ -19,7 +19,7 @@ import type {
   DecomposedTaskPlan,
   ExtractedDesignSpec,
   ExtractedTestPlan,
-} from './reasoning-backend.js';
+} from './reasoning/reasoning-backend.js';
 
 const DESIGN_FILE = 'design-spec.json';
 const TEST_PLAN_FILE = 'test-plan.json';

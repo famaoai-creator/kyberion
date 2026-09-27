@@ -1,5 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -8,7 +8,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation';
-import { loadServicePidRegistryAtPath } from '@agent/core/service-pid-registry';
+import { loadServicePidRegistryAtPath } from '@agent/core/service/service-pid-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import type { KbDrawingPaletteProps, KbSketchBoardProps } from '@agent/core/a2ui-catalog';
+import type { KbDrawingPaletteProps, KbSketchBoardProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import { safeHref } from '../safety.js';
 import {

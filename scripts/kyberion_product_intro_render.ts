@@ -6,7 +6,7 @@
  */
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeExec, safeMkdir } from '@agent/core/secure-io';
-import { resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
 import { handleAction as handleVoiceAction } from '../libs/actuators/voice-actuator/src/index.js';
 import { handleAction as handleVideoAction } from '../libs/actuators/video-composition-actuator/src/index.js';
 import { defineScript, isDirectScript } from './lib/harness.js';

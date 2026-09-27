@@ -60,11 +60,11 @@ Cloudflare 社内で全職種が使う「会社のための AI 生産性 OS」�
 
 **cloudflare-os の設計**: 全副作用は `ApprovalQueue.submitAction()` で `ActionRecord {state: "pending", caller, description}` として Overseer DO に積まれ、承認は `approveAction → applyPendingAction()`(唯一のチョークポイント)が gatekeeper の `applyAction(n)` を呼ぶ。`resolvedBy` / `autoApproved` / `appliedAt` は**必須引数**で、監査帰属を飛ばせる経路が構造的に存在しない。却下は `rejectAction(n)` でブローカー側状態を掃除。シミュレート不能なアクションは `awaitDecision` を立て、その場合のみ turn を停止し、全承認後に「承認・適用済み。read は反映済み」という合成メッセージで再開する。
 
-**kyberion の現状**: `enforceApprovalGate`(`libs/core/approval-gate.ts`)は `pending` を返すだけで、**通常 op の呼び出し側は run を放棄する**(`procedure-dispatcher.ts:486-517` — `approval_required` で終了し、承認後の再 dispatch が `correlationId` で承認済みレコードを拾う)。承認時に自動実行される held action は SO-04 steering 専用(`ApprovalSteeringAction` → `scheduleSteeringApprovalExecution` → `executeApprovedMissionSteeringApproval`、`drainPendingSteeringApprovalExecutions`)。つまり**器はある**(approval-store のライフサイクル、`payloadHash`+`effectBinding` によるハッシュ束縛、event 投影 `approval_request/response`)が、steering 以外に一般化されていない。
+**kyberion の現状**: `enforceApprovalGate`(`libs/core/governance/approval-gate.ts`)は `pending` を返すだけで、**通常 op の呼び出し側は run を放棄する**(`procedure-dispatcher.ts:486-517` — `approval_required` で終了し、承認後の再 dispatch が `correlationId` で承認済みレコードを拾う)。承認時に自動実行される held action は SO-04 steering 専用(`ApprovalSteeringAction` → `scheduleSteeringApprovalExecution` → `executeApprovedMissionSteeringApproval`、`drainPendingSteeringApprovalExecutions`)。つまり**器はある**(approval-store のライフサイクル、`payloadHash`+`effectBinding` によるハッシュ束縛、event 投影 `approval_request/response`)が、steering 以外に一般化されていない。
 
 **実装**:
 
-1. `libs/core/approval-store.ts` の `ApprovalSteeringAction` パターンを一般化した `ApprovalHeldAction`(`{op, params, effectBinding, missionId, taskId, submittedBy}`)を導入。`decideApprovalRequest(approved)` 時に held action を実行する generic executor を追加し、steering は最初の移行例としてこの経路に載せ替える。
+1. `libs/core/governance/approval-store.ts` の `ApprovalSteeringAction` パターンを一般化した `ApprovalHeldAction`(`{op, params, effectBinding, missionId, taskId, submittedBy}`)を導入。`decideApprovalRequest(approved)` 時に held action を実行する generic executor を追加し、steering は最初の移行例としてこの経路に載せ替える。
 2. 実行は単一チョークポイント(`applyHeldAction`)経由のみとし、`resolvedBy` / `autoApproved` / `appliedAt` を cloudflare-os 同様**必須引数**にする(省略可能にしない)。適用結果は `ApprovalApplyResult` として record に残し、失敗は `failed` + 再試行可否を記録。
 3. 却下時は held action を `cancelled` にし、投入元(mission/task)へ `approval_response` イベントで通知。有効期限切れ(`expired`)も同様。
 4. 投入側 API: `submitHeldAction()` を `enforceApprovalGate` の隣に追加し、procedure-dispatcher の `approval_required` 中断経路から「中断せず held に積んで続行」を選べるようにする(選択は op ごとの宣言 — OS-02 のシミュレーション可否と連動)。
@@ -79,8 +79,8 @@ Cloudflare 社内で全職種が使う「会社のための AI 生産性 OS」�
 
 **実装**:
 
-1. actuator op 契約に任意実装の `simulate(params, ctx): SimulatedResult` を追加(`libs/core/actuator-op-registry.ts` にメタデータ `simulatable: boolean` を登録。boundary-test 登録セレモニー対象)。`SimulatedResult` は provisional ID 台帳(`~N` 形式を踏襲)と「この結果はシミュレーションである」フラグを持ち、actuator-trace に `simulated: true` で記録。
-2. 参照実装は 2 つに絞る: **slack 投稿**(`satellites/slack-bridge` 経由の外部投稿。post → provisional ts、thread 返信の連鎖)と **email 送信**(`libs/core/email-bridge.ts`。送信 → provisional message-id)。GitHub 級のオーバーレイ read は初期スコープ外(効果対効き目が薄い)。
+1. actuator op 契約に任意実装の `simulate(params, ctx): SimulatedResult` を追加(`libs/core/actuator/actuator-op-registry.ts` にメタデータ `simulatable: boolean` を登録。boundary-test 登録セレモニー対象)。`SimulatedResult` は provisional ID 台帳(`~N` 形式を踏襲)と「この結果はシミュレーションである」フラグを持ち、actuator-trace に `simulated: true` で記録。
+2. 参照実装は 2 つに絞る: **slack 投稿**(`satellites/slack-bridge` 経由の外部投稿。post → provisional ts、thread 返信の連鎖)と **email 送信**(`libs/core/integrations/email-bridge.ts`。送信 → provisional message-id)。GitHub 級のオーバーレイ read は初期スコープ外(効果対効き目が薄い)。
 3. pipeline / procedure 実行系: 外部効果ステップが `simulatable` なら OS-01 の held に積んで simulated 結果で続行、そうでなければ従来どおり `approval_required` 中断(= `awaitDecision` 相当)。後続ステップの成果物には provisional 参照が残り得るため、**mission finish は未解決 provisional がゼロであることを検査**する(未承認のまま完了させない)。
 4. 却下時: provisional に依存する後続 held アクションをカスケード `cancelled` にし、投入元 task を `blocked` に落として通知(Gadget 再起動に相当する安全側の運転)。
 

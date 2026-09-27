@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { resolveMissionWorkflowDesign } from '../libs/core/mission-workflow-catalog.js';
+import { resolveMissionWorkflowDesign } from '../libs/core/mission/mission-workflow-catalog.js';
 
 type PipelineTemplate = {
   name?: string;

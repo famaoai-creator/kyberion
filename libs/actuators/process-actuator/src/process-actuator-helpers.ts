@@ -7,14 +7,14 @@ import {
 import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
-import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { parseProcessAction, type ProcessAction } from './process-action-input.js';
 
 const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(

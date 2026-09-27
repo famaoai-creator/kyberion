@@ -1,8 +1,8 @@
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
-import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
+import { loadSurfaceRoleCatalog } from '@agent/core/surface/surface-role-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const UX_CONTRACT_DOCS = [

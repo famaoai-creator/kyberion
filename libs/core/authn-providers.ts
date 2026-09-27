@@ -44,10 +44,10 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvBool, isVitestProcess } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
-import { getAgentIdentity, deriveAgentNhiId } from './agent-identity.js';
+import { getAgentIdentity, deriveAgentNhiId } from './agent/agent-identity.js';
 import { resolveAssumedRole, resolveExecutionPersona, withExecutionContext } from './authority.js';
 import { frontDeskRoleAuthority } from './front-desk-roles.js';
-import { isValidMemberId } from './member-id-grammar.js';
+import { isValidMemberId } from './organization/member-id-grammar.js';
 import {
   externalIdentityBindingDenied,
   findMemberByExternalIdentity,
@@ -55,7 +55,7 @@ import {
   readMemberProfile,
   resolveMemberByPrincipal,
   type MemberProfile,
-} from './member-registry.js';
+} from './organization/member-registry.js';
 import {
   NhiActorPolicyError,
   enforceNhiActorPolicy,
@@ -63,11 +63,11 @@ import {
 } from './nhi-actor-verification.js';
 import { parseNhiId } from './nhi-id.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
-import { secretGuard } from './secret-guard.js';
+import { secretGuard } from './secret/secret-guard.js';
 import {
   defaultSurfaceViewerTierAccess,
   resolveSurfaceViewerTierAccess,
-} from './surface-mutation-guard.js';
+} from './surface/surface-mutation-guard.js';
 import {
   AuthnError,
   authnEnvText,

@@ -68,7 +68,7 @@ CLI に移すだけになる。
 [narrated-video-production-playbook](./narrated-video-production-playbook.md)
 にある。
 
-`draw` は `see` の逆。統合層は画像生成ブリッジ（`libs/core/image-generation-bridge.ts`
+`draw` は `see` の逆。統合層は画像生成ブリッジ（`libs/core/media/image-generation-bridge.ts`
 の `generateImage` / `planImageGeneration`）で、プロバイダの選択は既に 1 つのルーターに
 隠れていた。行が空だった理由は外部送信の判断だったので、動詞はそこだけを受け持つ。
 既定では、データを端末の外に出さず無人で完了するプロバイダだけが候補になる。

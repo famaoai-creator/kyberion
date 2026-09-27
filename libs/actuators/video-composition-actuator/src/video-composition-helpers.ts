@@ -4,7 +4,7 @@ import {
   loadRecoveryPolicy as loadRecoveryPolicyFromManifest,
 } from '@agent/core/recovery-policy';
 import { waitForJob } from '@agent/core/job-lifecycle';
-import { VideoRenderRuntime } from '@agent/core/video-render-runtime';
+import { VideoRenderRuntime } from '@agent/core/video/video-render-runtime';
 import { compileSchema } from '@agent/core/foundation';
 
 export const videoCompositionActionValidate = compileSchema(

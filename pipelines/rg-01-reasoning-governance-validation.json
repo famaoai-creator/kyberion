@@ -23,7 +23,7 @@
       "role": "source",
       "op": "system:probe",
       "produces": { "channel": "resolver", "type": "ProbeResult" },
-      "params": { "path": "libs/core/reasoning-route-resolver.ts" }
+      "params": { "path": "libs/core/reasoning/reasoning-route-resolver.ts" }
     },
     {
       "id": "probe_cli",

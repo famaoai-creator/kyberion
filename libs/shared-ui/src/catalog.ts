@@ -4,7 +4,7 @@ import type {
   KbStatusTone,
   KyberionBaseAlias,
   KyberionBaseComponentType,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   KB_ALIASES as KB_ALIASES_SOURCE,
   KB_RENDERED_TYPES,

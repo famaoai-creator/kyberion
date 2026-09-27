@@ -3,7 +3,7 @@ import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync } from '@agent/core/secure-io';
-import { loadSurfaceManifest, probeSurfaceHealth } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest, probeSurfaceHealth } from '@agent/core/surface/surface-runtime';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';

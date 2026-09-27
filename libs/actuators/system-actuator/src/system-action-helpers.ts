@@ -1,8 +1,8 @@
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -18,8 +18,8 @@ import {
   emptyFinderTrash,
   revealFinderPath,
   openFinderPath,
-} from '@agent/core/os-automation';
-import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
+} from '@agent/core/virtual/os-automation';
+import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';

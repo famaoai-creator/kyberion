@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadIntentRoutingMap, resolveSurfaceIntent } from './router-contract.js';
-import { classifySurfaceQueryIntent } from './surface-query.js';
-import { classifyBrowserConversationCommand } from './browser-conversation-session.js';
+import { classifySurfaceQueryIntent } from './surface/surface-query.js';
+import { classifyBrowserConversationCommand } from './browser/browser-conversation-session.js';
 
 describe('router-contract', () => {
   it('routes direct replies through the shared intent resolver', () => {

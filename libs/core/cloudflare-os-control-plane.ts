@@ -1,7 +1,7 @@
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { fromJSONSchema, z } from 'zod';
-import { auditChain } from './audit-chain.js';
-import { computeApprovalPayloadHash } from './approval-store.js';
+import { auditChain } from './governance/audit-chain.js';
+import { computeApprovalPayloadHash } from './governance/approval-store.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';

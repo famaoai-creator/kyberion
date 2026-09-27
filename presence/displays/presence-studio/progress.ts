@@ -20,7 +20,7 @@
  * inbox entry can only ever be `can_verdict: false` here — never fake a
  * verdict eligibility that doesn't exist.
  */
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
 import { estimateTaskSessionPercent } from './home.js';
 
 export { estimateTaskSessionPercent };

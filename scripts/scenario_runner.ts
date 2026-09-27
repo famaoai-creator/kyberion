@@ -20,15 +20,15 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { loadScenarioFile, type ScenarioLane } from '@agent/core/scenario-definition';
-import { runScenario, type ScenarioPipelineRunner } from '@agent/core/scenario-executor';
+import { loadScenarioFile, type ScenarioLane } from '@agent/core/scenario/scenario-definition';
+import { runScenario, type ScenarioPipelineRunner } from '@agent/core/scenario/scenario-executor';
 import {
   isFailingScenarioStatus,
   renderScenarioReportMarkdown,
   type ScenarioReport,
   type ScenarioRunStatus,
-} from '@agent/core/scenario-report';
-import type { TrajectoryRecord } from '@agent/core/scenario-trajectory';
+} from '@agent/core/scenario/scenario-report';
+import type { TrajectoryRecord } from '@agent/core/scenario/scenario-trajectory';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runValidatedSteps } from './run_pipeline.js';

@@ -26,7 +26,7 @@ describe('channel adapter adoption checker', () => {
   it('requires the shared thread formatter to be imported from the canonical module', () => {
     expect(
       hasSharedThreadFormatterImport(
-        "import { formatChannelThreadContext } from '@agent/core/channel-adapter';"
+        "import { formatChannelThreadContext } from '@agent/core/surface/channel-adapter';"
       )
     ).toBe(true);
     expect(

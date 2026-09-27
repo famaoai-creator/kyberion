@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "agent-prompt-response-policy.schema.json",
   "title": "Agent Prompt Response Policy",
-  "description": "How a pane agent runtime responds when an agent stops on a prompt (workspace trust, tool permission, confirmation). Product file ships defaults; knowledge/personal/governance/agent-prompt-response-policy.json overlays it per installation. Consumed by libs/core/agent-prompt-response.ts.",
+  "description": "How a pane agent runtime responds when an agent stops on a prompt (workspace trust, tool permission, confirmation). Product file ships defaults; knowledge/personal/governance/agent-prompt-response-policy.json overlays it per installation. Consumed by libs/core/agent/agent-prompt-response.ts.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

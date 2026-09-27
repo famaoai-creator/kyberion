@@ -8,8 +8,8 @@ import {
   resolvePluginHostPollMs,
   type PluginHost,
   type PluginHostStatus,
-} from '@agent/core/plugin-host';
-import { resolveTenant } from '@agent/core/tenant-registry';
+} from '@agent/core/plugin/plugin-host';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 
 /**
  * PH-01: the Chronos in-process plugin host. Off unless

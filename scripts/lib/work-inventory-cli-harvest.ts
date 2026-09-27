@@ -9,7 +9,7 @@ import {
   saveWorkInventoryEntry,
   WorkInventoryStoreError,
   type WorkInventoryEntry,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import {
   attachDemandSignals,
   collectKyberionDemandSignalsWithStats,
@@ -17,7 +17,7 @@ import {
   suggestEntriesFromSignals,
   type DemandSignal,
   type DemandSignalHarvestStats,
-} from '@agent/core/work-inventory-harvest';
+} from '@agent/core/workforce/work-inventory-harvest';
 import {
   formatTable,
   hasFlag,

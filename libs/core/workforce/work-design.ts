@@ -1,0 +1,754 @@
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
+import { DEFAULT_SPECIALIST_ID } from '../specialist-ids.js';
+import { listDistillCandidateRecords } from '../knowledge/distill-candidate-registry.js';
+import {
+  loadStandardIntentCatalog,
+  type StandardIntentDefinition,
+} from '../intent/intent-resolution.js';
+import { resolveMissionClassification } from '../mission/mission-classification.js';
+import { resolveMissionWorkflowDesign } from '../mission/mission-workflow-catalog.js';
+import { resolveMissionReviewDesign } from '../mission/mission-review-gates.js';
+import {
+  normalizeExecutionShape,
+  projectExecutionShapeToWorkflowShape,
+  type WorkflowExecutionShape,
+} from '../execution-shape.js';
+import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+
+const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
+const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/specialist-catalog.json'
+);
+const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
+const OUTCOME_CATALOG_PATH = pathResolver.knowledge('product/governance/outcome-catalog.json');
+const SPECIALIST_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/specialist-catalog.schema.json'
+);
+const EXECUTION_BOUNDARY_PROFILES_PATH = pathResolver.knowledge(
+  'product/governance/execution-boundary-profiles.json'
+);
+const EXECUTION_BOUNDARY_PROFILES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/execution-boundary-profiles.schema.json'
+);
+const RUNTIME_DESIGN_PROFILES_PATH = pathResolver.knowledge(
+  'product/governance/runtime-design-profiles.json'
+);
+const RUNTIME_DESIGN_PROFILES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/runtime-design-profiles.schema.json'
+);
+
+export interface OutcomeDefinition {
+  id: string;
+  label: string;
+  description: string;
+  deliverable_kind: string;
+  downloadable: boolean;
+  previewable: boolean;
+}
+
+export interface SpecialistDefinition {
+  id: string;
+  label: string;
+  description: string;
+  conversation_agent: string;
+  team_roles: string[];
+  capabilities: string[];
+}
+
+interface OutcomeCatalogFile {
+  outcomes?: Record<string, Omit<OutcomeDefinition, 'id'>>;
+}
+
+interface SpecialistCatalogFile {
+  version?: string;
+  specialists?: Record<string, Omit<SpecialistDefinition, 'id'>>;
+}
+
+interface BoundaryProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['execution_boundary']>;
+}
+
+interface RuntimeDesignProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['runtime_design']>;
+}
+
+interface RoutingMatch {
+  intent_ids?: string[];
+  task_types?: string[];
+  query_types?: string[];
+  shapes?: string[];
+  catalog_shapes?: string[];
+}
+
+interface SpecialistRoutingPolicyFile {
+  rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    specialist_id?: string;
+  }>;
+  fallback_specialist_id?: string;
+}
+
+interface WorkDesignProfileRoutingFile {
+  execution_boundary_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  runtime_design_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  defaults?: {
+    execution_boundary_profile_id?: string;
+    runtime_design_profile_id?: string;
+  };
+}
+
+interface WorkDesignRulesFile {
+  process_checklist_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    items?: string[];
+  }>;
+  execution_shape_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    shape?: OrganizationWorkLoopSummary['resolution']['execution_shape'];
+  }>;
+  intent_label_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    label?: string;
+    label_from?: 'intentId' | 'taskType' | 'queryType';
+  }>;
+}
+
+interface WorkPolicyFile {
+  version: string;
+  specialist_routing: SpecialistRoutingPolicyFile;
+  profile_routing: WorkDesignProfileRoutingFile;
+  design_rules: WorkDesignRulesFile;
+}
+
+const workPolicyCatalog = defineCatalog<WorkPolicyFile>({
+  id: 'work-policy',
+  path: () => pathResolver.knowledge('product/governance/work-policy.json'),
+  schema: WORK_POLICY_SCHEMA_PATH,
+});
+
+const specialistCatalogCache = new Map<string, GovernedCatalog<SpecialistCatalogFile>>();
+
+const executionBoundaryProfilesCatalog = defineCatalog<BoundaryProfileFile>({
+  id: 'execution-boundary-profiles',
+  path: EXECUTION_BOUNDARY_PROFILES_PATH,
+  schema: EXECUTION_BOUNDARY_PROFILES_SCHEMA_PATH,
+});
+
+const runtimeDesignProfilesCatalog = defineCatalog<RuntimeDesignProfileFile>({
+  id: 'runtime-design-profiles',
+  path: RUNTIME_DESIGN_PROFILES_PATH,
+  schema: RUNTIME_DESIGN_PROFILES_SCHEMA_PATH,
+});
+
+export interface WorkDesignSummary {
+  primary_specialist: SpecialistDefinition | null;
+  conversation_agent: string | null;
+  team_roles: string[];
+  outcomes: OutcomeDefinition[];
+  reusable_refs: Array<{
+    candidate_id: string;
+    title: string;
+    target_kind: string;
+    promoted_ref?: string;
+  }>;
+}
+
+export interface OrganizationWorkLoopSummary {
+  intent: {
+    label: string;
+  };
+  context: {
+    project_id?: string;
+    project_name?: string;
+    track_id?: string;
+    track_name?: string;
+    tier: 'personal' | 'confidential' | 'public';
+    locale?: string;
+    service_bindings: string[];
+  };
+  resolution: {
+    execution_shape: WorkflowExecutionShape;
+    selected_execution_shape?: WorkflowExecutionShape;
+    recommended_execution_shape?: WorkflowExecutionShape;
+    mismatch_reason?: string;
+    task_type?: string;
+  };
+  workflow_design: {
+    workflow_id: string;
+    pattern: string;
+    stage: string;
+    phases: string[];
+    rationale: string;
+  };
+  review_design: {
+    review_mode: 'lean' | 'standard' | 'strict';
+    required_gate_ids: string[];
+    all_gate_ids: string[];
+    rationale: string;
+  };
+  outcome_design: {
+    outcome_ids: string[];
+    labels: string[];
+  };
+  process_design: {
+    plan_outline: string[];
+    intake_requirements: string[];
+    operator_checklist: string[];
+  };
+  runtime_design: {
+    owner_model: 'single_actor' | 'single_owner_multi_worker';
+    assignment_policy: 'direct_specialist' | 'lease_aware_capability' | 'dependency_first';
+    coordination: {
+      bus: 'none' | 'mission_coordination_bus';
+      channels: string[];
+    };
+    memory: {
+      store: 'none' | 'mission_working_memory';
+      scope: 'none' | 'mission_local';
+      purpose: string[];
+    };
+  };
+  execution_boundary: {
+    llm_zone: {
+      allowed: string[];
+      forbidden: string[];
+    };
+    knowledge_zone: {
+      owns: string[];
+    };
+    compiler_zone: {
+      responsibilities: string[];
+    };
+    executor_zone: {
+      responsibilities: string[];
+    };
+    rule: string;
+  };
+  teaming: {
+    specialist_id?: string;
+    specialist_label?: string;
+    conversation_agent?: string;
+    team_roles: string[];
+  };
+  authority: {
+    requires_approval: boolean;
+  };
+  learning: {
+    reusable_refs: string[];
+  };
+  work_scope_decision?: WorkScopeDecision;
+}
+
+/**
+ * Preserve an LLM-authored work-loop plan while replacing policy-controlled
+ * fields with the deterministic compiler result.
+ */
+export function overlayCanonicalWorkScopeDecision(
+  workLoop: OrganizationWorkLoopSummary,
+  canonical: OrganizationWorkLoopSummary
+): OrganizationWorkLoopSummary {
+  return {
+    ...workLoop,
+    resolution: {
+      ...workLoop.resolution,
+      execution_shape: canonical.resolution.execution_shape,
+      selected_execution_shape: canonical.resolution.selected_execution_shape,
+      recommended_execution_shape: canonical.resolution.recommended_execution_shape,
+      mismatch_reason: canonical.resolution.mismatch_reason,
+      task_type: canonical.resolution.task_type,
+    },
+    authority: {
+      ...workLoop.authority,
+      requires_approval: canonical.authority.requires_approval,
+    },
+    work_scope_decision: canonical.work_scope_decision,
+  };
+}
+
+function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | 'public' {
+  return value === 'personal' || value === 'public' ? value : 'confidential';
+}
+
+function loadSpecialistCatalogFromPath(filePath: string): SpecialistCatalogFile {
+  const safePath = assertSafeRepositoryPath(filePath);
+  const cached = specialistCatalogCache.get(safePath);
+  if (cached) return cached.load();
+  const catalog = defineCatalog<SpecialistCatalogFile>({
+    id: 'specialist-catalog',
+    path: safePath,
+    schema: SPECIALIST_CATALOG_SCHEMA_PATH,
+  });
+  specialistCatalogCache.set(safePath, catalog);
+  return catalog.load();
+}
+
+function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile {
+  const dir = assertSafeRepositoryPath(pathResolver.rootResolve(dirPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(dir)) {
+    throw new Error(`Specialist catalog directory not found: ${dir}`);
+  }
+
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
+  if (!files.length) {
+    throw new Error(`Specialist catalog directory is empty: ${dir}`);
+  }
+
+  const specialists: Record<string, Omit<SpecialistDefinition, 'id'>> = {};
+  let version = '';
+
+  for (const file of files) {
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
+    if (!safeStat(filePath).isFile()) continue;
+    const parsed = loadSpecialistCatalogFromPath(filePath);
+    const entries = parsed.specialists || {};
+    const specialistIds = Object.keys(entries);
+    if (specialistIds.length !== 1) {
+      throw new Error(`Specialist catalog file ${file} must contain exactly one specialist`);
+    }
+    const specialistId = specialistIds[0];
+    if (file.replace(/\.json$/i, '') !== specialistId) {
+      throw new Error(`Specialist catalog file ${file} must match specialist id ${specialistId}`);
+    }
+    if (parsed.version && !version) {
+      version = parsed.version;
+    } else if (parsed.version && version && parsed.version !== version) {
+      throw new Error(`Specialist catalog version mismatch in ${file}`);
+    }
+    specialists[specialistId] = entries[specialistId];
+  }
+
+  return {
+    version: version || '1.0.0',
+    specialists,
+  };
+}
+
+export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
+  const parsed = outcomeCatalog.load();
+  const entries = parsed.outcomes || {};
+  return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
+}
+
+const outcomeCatalog = defineCatalog<OutcomeCatalogFile>({
+  id: 'outcome-catalog',
+  path: OUTCOME_CATALOG_PATH,
+  schema: pathResolver.knowledge('product/schemas/outcome-catalog.schema.json'),
+});
+
+export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
+  const directoryPath = assertSafeRepositoryPath(DEFAULT_SPECIALIST_CATALOG_DIR, {
+    allowMissingLeaf: true,
+  });
+  const parsed = safeExistsSync(directoryPath)
+    ? loadSpecialistCatalogDirectory(directoryPath)
+    : loadSpecialistCatalogFromPath(DEFAULT_SPECIALIST_CATALOG_PATH);
+  const entries = parsed.specialists || {};
+  return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
+}
+
+function loadExecutionBoundaryProfiles(): Record<
+  string,
+  OrganizationWorkLoopSummary['execution_boundary']
+> {
+  const parsed = executionBoundaryProfilesCatalog.load();
+  return parsed.profiles || {};
+}
+
+function loadRuntimeDesignProfiles(): Record<
+  string,
+  OrganizationWorkLoopSummary['runtime_design']
+> {
+  const parsed = runtimeDesignProfilesCatalog.load();
+  return parsed.profiles || {};
+}
+
+function loadWorkPolicy(): WorkPolicyFile {
+  return workPolicyCatalog.load();
+}
+
+function loadSpecialistRoutingPolicy(): SpecialistRoutingPolicyFile {
+  return loadWorkPolicy().specialist_routing;
+}
+
+function loadWorkDesignProfileRouting(): WorkDesignProfileRoutingFile {
+  return loadWorkPolicy().profile_routing;
+}
+
+function loadWorkDesignRules(): WorkDesignRulesFile {
+  return loadWorkPolicy().design_rules;
+}
+
+function findIntentDefinition(intentId?: string) {
+  if (!intentId) return null;
+  return (
+    loadStandardIntentCatalog().find(
+      (intent: StandardIntentDefinition) => intent?.id === intentId
+    ) || null
+  );
+}
+
+function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
+  if (!expected?.length) return true;
+  if (!value) return false;
+  return expected.includes(value);
+}
+
+function ruleMatches(
+  input: {
+    intentId?: string;
+    taskType?: string;
+    queryType?: string;
+    shape?: string;
+    catalogShape?: string;
+  },
+  match?: RoutingMatch
+): boolean {
+  if (!match) return false;
+  const wildcardMatches = (value: string | undefined, expected: string[] | undefined): boolean => {
+    if (!expected?.length) return true;
+    if (expected.includes('*')) return Boolean(value);
+    return matchesRoutingValue(value, expected);
+  };
+  return (
+    wildcardMatches(input.intentId, match.intent_ids) &&
+    wildcardMatches(input.taskType, match.task_types) &&
+    wildcardMatches(input.queryType, match.query_types) &&
+    wildcardMatches(input.shape, match.shapes) &&
+    wildcardMatches(input.catalogShape, match.catalog_shapes)
+  );
+}
+
+function buildProcessDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['process_design'] {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const planOutline = Array.isArray(intentDefinition?.plan_outline)
+    ? intentDefinition!.plan_outline.map(String).filter(Boolean)
+    : [];
+  const intakeRequirements = Array.isArray(intentDefinition?.intake_requirements)
+    ? intentDefinition!.intake_requirements.map(String).filter(Boolean)
+    : [];
+  const rules = loadWorkDesignRules();
+  const checklistRuleInput = {
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape === 'task_session' || input.taskType ? 'task_session' : input.shape,
+  };
+
+  const operatorChecklist = [
+    ...planOutline,
+    ...(rules.process_checklist_rules || [])
+      .filter((rule) => ruleMatches(checklistRuleInput, rule.match))
+      .flatMap((rule) => (rule.items || []).map(String)),
+  ].filter(Boolean);
+
+  return {
+    plan_outline: planOutline,
+    intake_requirements: intakeRequirements,
+    operator_checklist: operatorChecklist,
+  };
+}
+
+function buildExecutionBoundary(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['execution_boundary'] {
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadExecutionBoundaryProfiles();
+  const matched = (routing.execution_boundary_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
+  const defaultProfileId =
+    routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.default_governed_execution;
+}
+
+function buildRuntimeDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['runtime_design'] {
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadRuntimeDesignProfiles();
+  const matched = (routing.runtime_design_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
+  const defaultProfileId = routing.defaults?.runtime_design_profile_id || 'single_actor_delivery';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.single_actor_delivery;
+}
+
+function inferExecutionShape(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}): WorkflowExecutionShape {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const catalogShape = intentDefinition?.resolution?.shape;
+  const normalizedInputShape = projectExecutionShapeToWorkflowShape(
+    normalizeExecutionShape(input.shape || catalogShape)
+  );
+  const rules = loadWorkDesignRules();
+  const matchedRule = (rules.execution_shape_rules || []).find(
+    (rule) =>
+      Boolean(rule.shape) &&
+      ruleMatches(
+        { ...input, shape: normalizedInputShape, catalogShape: normalizedInputShape },
+        rule.match
+      )
+  );
+  return matchedRule?.shape || normalizedInputShape || 'direct_reply';
+}
+
+function inferIntentLabel(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+}): string {
+  const rules = loadWorkDesignRules();
+  const matchedRule = (rules.intent_label_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
+  if (!matchedRule) return 'general_request';
+  if (matchedRule.label) return matchedRule.label;
+  if (matchedRule.label_from) return input[matchedRule.label_from] || 'general_request';
+  return 'general_request';
+}
+
+function specialistIdForIntent(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+}): string {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  if (
+    typeof intentDefinition?.specialist_id === 'string' &&
+    intentDefinition.specialist_id.trim()
+  ) {
+    return intentDefinition.specialist_id;
+  }
+  const policy = loadSpecialistRoutingPolicy();
+  const matched = (policy.rules || []).find((rule) => ruleMatches(input, rule.match));
+  return matched?.specialist_id || policy.fallback_specialist_id || DEFAULT_SPECIALIST_ID;
+}
+
+export function resolveWorkDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+  outcomeIds?: string[];
+  tier?: 'personal' | 'confidential' | 'public';
+}): WorkDesignSummary {
+  const specialists = loadSpecialistCatalog();
+  const outcomes = loadOutcomeCatalog();
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const primary = specialists[specialistIdForIntent(input)] || null;
+  const requestedOutcomeIds =
+    input.outcomeIds && input.outcomeIds.length
+      ? input.outcomeIds
+      : Array.isArray(intentDefinition?.outcome_ids)
+        ? intentDefinition.outcome_ids
+        : [];
+  const tier = normalizeKnowledgeTier(input.tier);
+  const resolvedOutcomes = requestedOutcomeIds
+    .map((id) => outcomes[id])
+    .filter((value): value is OutcomeDefinition => Boolean(value));
+  const reusableRefs = listDistillCandidateRecords()
+    .filter((candidate) => candidate.status === 'promoted')
+    .filter((candidate) => normalizeKnowledgeTier(candidate.tier) === tier)
+    .filter((candidate) => {
+      if (primary?.id && candidate.specialist_id && candidate.specialist_id === primary.id)
+        return true;
+      if (input.taskType && candidate.metadata?.task_type === input.taskType) return true;
+      if (
+        requestedOutcomeIds.length &&
+        requestedOutcomeIds.some(
+          (id) =>
+            candidate.summary.includes(id) ||
+            candidate.evidence_refs?.some((ref) => ref.includes(id))
+        )
+      )
+        return true;
+      return false;
+    })
+    .slice(0, 4)
+    .map((candidate) => ({
+      candidate_id: candidate.candidate_id,
+      title: candidate.title,
+      target_kind: candidate.target_kind,
+      promoted_ref: candidate.promoted_ref,
+    }));
+
+  return {
+    primary_specialist: primary,
+    conversation_agent: primary?.conversation_agent || null,
+    team_roles: primary?.team_roles || [],
+    outcomes: resolvedOutcomes,
+    reusable_refs: reusableRefs,
+  };
+}
+
+export function buildOrganizationWorkLoopSummary(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+  missionTypeHint?: string;
+  utterance?: string;
+  artifactPaths?: string[];
+  progressSignals?: string[];
+  outcomeIds?: string[];
+  tier?: 'personal' | 'confidential' | 'public';
+  projectId?: string;
+  projectName?: string;
+  trackId?: string;
+  trackName?: string;
+  locale?: string;
+  serviceBindings?: string[];
+  requiresApproval?: boolean;
+  artifactEstimate?: number;
+  externalAudience?: boolean;
+  regulatoryAudience?: boolean;
+  replayOrVariantLikelihood?: boolean;
+  repetitionEstimate?: number;
+  multipleLegitimateViewpoints?: boolean;
+  stakeholderCount?: number;
+  approvalRequired?: boolean;
+  crossSystemMutation?: boolean;
+  expectedContinuationBeyondSession?: boolean;
+  highStakesAction?: boolean;
+  highStakesOrDogfoodEvidence?: boolean;
+  customerSignoff?: boolean;
+  productionRelease?: boolean;
+  missionHandoff?: boolean;
+  securitySensitiveCrossSystemChange?: boolean;
+}): OrganizationWorkLoopSummary {
+  const tier = normalizeKnowledgeTier(input.tier);
+  const executionShape = inferExecutionShape(input);
+  const missionClassification = resolveMissionClassification({
+    missionTypeHint: input.missionTypeHint,
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: executionShape,
+    utterance: input.utterance,
+    artifactPaths: input.artifactPaths,
+    progressSignals: input.progressSignals,
+  });
+  const workflowDesign = resolveMissionWorkflowDesign({
+    missionClass: missionClassification.mission_class,
+    deliveryShape: missionClassification.delivery_shape,
+    riskProfile: missionClassification.risk_profile,
+    stage: missionClassification.stage,
+    executionShape,
+    intentId: input.intentId,
+    taskType: input.taskType,
+  });
+  const reviewDesign = resolveMissionReviewDesign({
+    missionClass: missionClassification.mission_class,
+    deliveryShape: missionClassification.delivery_shape,
+    riskProfile: missionClassification.risk_profile,
+    workflowPattern: workflowDesign.pattern,
+    stage: missionClassification.stage,
+  });
+  const workScopeDecision = resolveWorkScopeDecision({
+    catalogMinimumShape: executionShape,
+    artifactEstimate: input.artifactEstimate,
+    externalAudience: input.externalAudience,
+    regulatoryAudience: input.regulatoryAudience,
+    replayOrVariantLikelihood: input.replayOrVariantLikelihood,
+    repetitionEstimate: input.repetitionEstimate,
+    multipleLegitimateViewpoints: input.multipleLegitimateViewpoints,
+    stakeholderCount: input.stakeholderCount,
+    approvalRequired: input.approvalRequired ?? input.requiresApproval,
+    crossSystemMutation: input.crossSystemMutation,
+    expectedContinuationBeyondSession: input.expectedContinuationBeyondSession,
+    highStakesAction: input.highStakesAction,
+    highStakesOrDogfoodEvidence: input.highStakesOrDogfoodEvidence,
+    customerSignoff: input.customerSignoff,
+    productionRelease: input.productionRelease,
+    missionHandoff: input.missionHandoff,
+    securitySensitiveCrossSystemChange: input.securitySensitiveCrossSystemChange,
+  });
+  const design = resolveWorkDesign({
+    intentId: input.intentId,
+    taskType: input.taskType,
+    queryType: input.queryType,
+    shape: input.shape,
+    outcomeIds: input.outcomeIds,
+    tier,
+  });
+  return {
+    intent: {
+      label: inferIntentLabel(input),
+    },
+    context: {
+      project_id: input.projectId,
+      project_name: input.projectName,
+      track_id: input.trackId,
+      track_name: input.trackName,
+      tier,
+      locale: input.locale,
+      service_bindings: Array.isArray(input.serviceBindings) ? input.serviceBindings : [],
+    },
+    resolution: {
+      execution_shape: executionShape,
+      selected_execution_shape: executionShape,
+      recommended_execution_shape: projectExecutionShapeToWorkflowShape(
+        workScopeDecision.execution_shape
+      ),
+      mismatch_reason:
+        projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape) === executionShape
+          ? undefined
+          : `work scope decision recommends ${projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape)} because ${workScopeDecision.rationale}`,
+      task_type: input.taskType,
+    },
+    workflow_design: workflowDesign,
+    review_design: reviewDesign,
+    outcome_design: {
+      outcome_ids: design.outcomes.map((outcome) => outcome.id),
+      labels: design.outcomes.map((outcome) => outcome.label),
+    },
+    process_design: buildProcessDesign(input),
+    runtime_design: buildRuntimeDesign(input),
+    execution_boundary: buildExecutionBoundary(input),
+    teaming: {
+      specialist_id: design.primary_specialist?.id,
+      specialist_label: design.primary_specialist?.label,
+      conversation_agent: design.conversation_agent || undefined,
+      team_roles: design.team_roles,
+    },
+    authority: {
+      requires_approval: Boolean(input.requiresApproval),
+    },
+    learning: {
+      // Distinct candidates can promote the same ref; the contract wants refs, not candidates.
+      reusable_refs: [...new Set(design.reusable_refs.map((ref) => ref.promoted_ref || ref.title))],
+    },
+    work_scope_decision: workScopeDecision,
+  };
+}

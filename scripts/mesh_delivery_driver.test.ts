@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core/mesh-delivery-driver', () => ({
+vi.mock('@agent/core/mesh/mesh-delivery-driver', () => ({
   runMeshDeliveryPass: mocks.runMeshDeliveryPass,
   formatMeshDeliveryPassReport: vi.fn(() => 'mesh delivery report'),
 }));

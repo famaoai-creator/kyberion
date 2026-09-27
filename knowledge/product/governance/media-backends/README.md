@@ -8,7 +8,7 @@ Canonical source for media backend records (RSP-19).
   `knowledge/product/schemas/media-backend-registry.schema.json` as-is.
 - The legacy single file `media-backend-registry.json` has been removed
   (snapshot abolished). Voice backends are still merged at runtime from
-  `voice-engine-registry`. Loader: `libs/core/media-backend-registry.ts`
+  `voice-engine-registry`. Loader: `libs/core/media/media-backend-registry.ts`
   (`KYBERION_MEDIA_BACKEND_REGISTRY_DIR` / `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`).
 
 - `index.json` pins the canonical item order (model-registry precedent); loaders require an exact set match.

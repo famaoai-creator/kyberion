@@ -4,9 +4,9 @@ import {
   formatChannelDirectoryEntry,
   getChannelDirectoryEntry,
   listChannelDirectoryEntries,
-} from '@agent/core/channel-directory';
-import type { ChannelDirectoryEntry } from '@agent/core/channel-directory';
-import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+} from '@agent/core/surface/channel-directory';
+import type { ChannelDirectoryEntry } from '@agent/core/surface/channel-directory';
+import { isSurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 export function resolveChannelDirectoryEntries(channel: unknown): ChannelDirectoryEntry[] {

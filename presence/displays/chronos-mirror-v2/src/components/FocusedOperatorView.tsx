@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { KbStatus, KbTone } from '@agent/core/a2ui-catalog';
+import type { KbStatus, KbTone } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
   Button,

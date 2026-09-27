@@ -7,7 +7,7 @@ import { listDeals } from '@agent/core/deal-store';
 import {
   listDistillCandidateRecords,
   updateDistillCandidateRecord,
-} from '@agent/core/distill-candidate-registry';
+} from '@agent/core/knowledge/distill-candidate-registry';
 import {
   materializeExecutionFeedbackCandidate,
   recordExecutionFeedback,

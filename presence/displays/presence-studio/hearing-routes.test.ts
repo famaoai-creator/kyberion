@@ -21,9 +21,9 @@ import { t as catalogT } from '@agent/core/t';
 import { withExecutionContext } from '@agent/core/authority';
 import type express from 'express';
 
-vi.mock('@agent/core/member-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/member-registry')>(
-    '@agent/core/member-registry'
+vi.mock('@agent/core/organization/member-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/organization/member-registry')>(
+    '@agent/core/organization/member-registry'
   );
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
@@ -37,12 +37,12 @@ vi.mock('./hearing-canvas.js', async () => {
   return { ...actual, generateHearingCanvas: vi.fn() };
 });
 
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import {
   createWorkInventoryEntry,
   loadWorkInventoryEntry,
   saveWorkInventoryEntry,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
 import { generateHearingCanvas } from './hearing-canvas.js';

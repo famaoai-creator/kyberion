@@ -111,7 +111,7 @@ first run?_
 reasons unrelated to your change: `scripts/check_governance_rules.test.ts`
 writes `knowledge/product/governance/test-governance-deterministic.json` into
 the real governance directory (so `scripts/check_contract_schemas.test.ts`
-fails if it runs meanwhile), and `libs/core/memory-promotion-workflow.test.ts`
+fails if it runs meanwhile), and `libs/core/knowledge/memory-promotion-workflow.test.ts`
 can append a `MEM-…` note (evidence `MSN-TEST-AUTOPROMOTE`) to the real
 `knowledge/product/governance/HINTS.md`. Rerun a failing file
 in isolation before trusting it, and check `git status` after every full run —
@@ -355,7 +355,7 @@ Patterns proven in yc-software/qm and adopted as repo-wide discipline
   `withExecutionContext` set it for ordinary human runs, so never infer who
   started a run from it — trace origin marks a run `agent` only when
   `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` is set (`deriveTraceOrigin` in
-  `libs/core/src/trace.ts`).
+  `libs/core/analysis/trace.ts`).
 - **Tighten monotonically, never replace.** A security floor (posture,
   approval requirements) is applied as a union on top of the base
   resolution — an early-return floor that REPLACES stronger requirements

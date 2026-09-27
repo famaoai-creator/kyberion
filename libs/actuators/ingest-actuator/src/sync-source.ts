@@ -11,7 +11,7 @@ import {
   recordSyncFailure,
   type SyncCursorKind,
 } from '@agent/core/ingest-sync-cursors';
-import { executeServicePreset } from '@agent/core/service-engine';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import {
   getSourceWalker,
   type PageWalkResult,

@@ -8,7 +8,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
 import { retry } from '@agent/core/async-utils';
 import {
   filterPptxSlides,
@@ -18,7 +18,7 @@ import {
   generateNativeXlsx,
   patchPptxText,
   patchPptxParagraphs,
-} from '@agent/core/media-contracts';
+} from '@agent/core/media/media-contracts';
 import {
   assertMediaProtocolLayoutReady,
   summarizeMediaPptxLayout,

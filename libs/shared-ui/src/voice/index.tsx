@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { KbVoiceInputProps, KbVoiceStateProps } from '@agent/core/a2ui-catalog';
+import type { KbVoiceInputProps, KbVoiceStateProps } from '@agent/core/surface/a2ui-catalog';
 import { VoiceInput } from './voice-input.js';
 import { VoiceState } from './voice-state.js';
 

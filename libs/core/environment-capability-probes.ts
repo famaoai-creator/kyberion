@@ -33,7 +33,7 @@ import {
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isMacOS, isWindows } from './platform.js';
-import { normalizePersistedAuditEntry } from './audit-chain.js';
+import { normalizePersistedAuditEntry } from './governance/audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
@@ -43,7 +43,7 @@ import {
   registerEnvironmentCapabilityProbe,
   type RegisteredProbe,
 } from './environment-capability.js';
-import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
+import { probeShellClaudeCliAvailability } from './shell/shell-claude-cli-backend.js';
 import {
   probeNemotronBackendAvailability,
   probeOpenAiCompatibleBackendAvailability,
@@ -53,15 +53,15 @@ import {
   probeLlamaCppBackendAvailability,
   probeMlxBackendAvailability,
   probeLocalAiBackendAvailability,
-} from './openai-compatible-backend.js';
-import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
-import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
-import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
-import { probeAnthropicApiBackendAvailability } from './anthropic-api-probe.js';
+} from './provider/openai-compatible-backend.js';
+import { probeOpenRouterBackendAvailability } from './provider/openrouter-backend.js';
+import { probeGeminiApiBackendAvailability } from './provider/gemini-api-backend.js';
+import { probeGrokApiBackendAvailability } from './provider/grok-api-backend.js';
+import { probeAnthropicApiBackendAvailability } from './provider/anthropic-api-probe.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
-} from './reasoning-backend-policy.js';
+} from './reasoning/reasoning-backend-policy.js';
 
 export function installCoreEnvironmentProbes(): void {
   const coreProbes: Array<[string, RegisteredProbe]> = [

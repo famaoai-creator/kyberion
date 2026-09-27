@@ -6,7 +6,7 @@ import {
   markToolRuntimeInstalled,
   probeToolRuntime,
   resolveManagedToolPythonBin,
-} from '@agent/core/tool-runtime-registry';
+} from '@agent/core/tool/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';

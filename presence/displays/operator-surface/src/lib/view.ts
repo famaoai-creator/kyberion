@@ -1,5 +1,5 @@
 import { formatDateTime, formatNumber, resolveTimeZone } from '@agent/core/format';
-import type { KbStatus, KbStatusDomain } from '@agent/core/a2ui-catalog';
+import type { KbStatus, KbStatusDomain } from '@agent/core/surface/a2ui-catalog';
 import { createTranslator, statusLabel } from '@agent/shared-ui/vanilla';
 import { operatorUiMessages, type OperatorLocale, type OperatorTranslate } from './i18n';
 

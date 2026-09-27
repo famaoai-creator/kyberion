@@ -11,7 +11,7 @@ describe('runtime supervisor lifecycle', () => {
     const clearToken = { unref } as any;
     const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(clearToken);
 
-    const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
+    const { runtimeSupervisor } = await import('@agent/core/tool/runtime-supervisor');
     // Other modules in the import graph may arm their own timers (kill-switch
     // monitor, deferred auto-sweep) — reset so we assert startSweep alone.
     runtimeSupervisor.stopSweep();
@@ -30,7 +30,7 @@ describe('runtime supervisor lifecycle', () => {
   it('installs runtime exit hooks lazily on first resource registration', async () => {
     const onceSpy = vi.spyOn(process, 'once');
 
-    const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
+    const { runtimeSupervisor } = await import('@agent/core/tool/runtime-supervisor');
     expect(onceSpy).not.toHaveBeenCalled();
 
     runtimeSupervisor.register({
@@ -51,7 +51,7 @@ describe('runtime supervisor lifecycle', () => {
     const clearToken = { unref } as any;
     const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(clearToken);
 
-    const { agentLifecycle } = await import('@agent/core/agent-lifecycle');
+    const { agentLifecycle } = await import('@agent/core/agent/agent-lifecycle');
     const beforeUnrefCalls = unref.mock.calls.length;
     agentLifecycle.startHealthMonitor(4321);
 
@@ -65,7 +65,7 @@ describe('runtime supervisor lifecycle', () => {
     const cleanupA = vi.fn(async () => {});
     const cleanupB = vi.fn(async () => {});
 
-    const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
+    const { runtimeSupervisor } = await import('@agent/core/tool/runtime-supervisor');
     runtimeSupervisor.register({
       resourceId: 'proc:a',
       kind: 'agent',

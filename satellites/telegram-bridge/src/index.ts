@@ -9,7 +9,7 @@ import {
   readJson,
   readJsonLines,
 } from '@agent/core/foundation';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
@@ -25,7 +25,7 @@ import {
   formatChannelThreadContext,
   runChannelTurn,
   type ChannelAdapter,
-} from '@agent/core/channel-adapter';
+} from '@agent/core/surface/channel-adapter';
 import {
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
@@ -35,19 +35,22 @@ import {
 } from '@agent/core/bridge-error-reply';
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
-import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
+import {
+  createSurfaceOutboxDrainGuard,
+  drainSurfaceOutbox,
+} from '@agent/core/surface/surface-delivery';
 import {
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
-} from '@agent/core/surface-mission-proposals';
+} from '@agent/core/surface/surface-mission-proposals';
 import {
   buildSurfaceApprovalActions,
   buildSurfaceApprovalText,
   createSurfaceApprovalRequest,
   resolveSurfaceApprovalReply,
   runSurfaceMessageConversation,
-} from '@agent/core/channel-surface';
-import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+} from '@agent/core/surface/channel-surface';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface/surface-access-policy';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import * as path from 'node:path';
 

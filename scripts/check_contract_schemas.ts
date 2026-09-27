@@ -1,5 +1,5 @@
 import { buildPromotedMemoryRecord } from '@agent/core/promoted-memory';
-import { createDistillCandidateRecord } from '@agent/core/distill-candidate-registry';
+import { createDistillCandidateRecord } from '@agent/core/knowledge/distill-candidate-registry';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import {

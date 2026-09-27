@@ -1,5 +1,5 @@
 import type { A2UIMessage } from '@agent/core/a2ui';
-import type { OperatorHomeSummary } from '@agent/core/operator-home-summary';
+import type { OperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 
 function statusForA2UI(status: OperatorHomeSummary['status']): string {
   if (status === 'ready') return 'ok';

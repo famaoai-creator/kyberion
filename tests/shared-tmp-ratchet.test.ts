@@ -4,7 +4,7 @@
  * `active/shared/tmp/` is a 24h-TTL consumables floor, but tmp-by-default
  * became a habit: scope-owned artifacts (mission outputs, reports, evidence)
  * were landing on the same floor as throwaway intermediates and losing their
- * scope. AL-02 introduced `writeScopedArtifact` (libs/core/artifact-store.ts)
+ * scope. AL-02 introduced `writeScopedArtifact` (libs/core/workforce/artifact-store.ts)
  * as the sanctioned placement API and fixes the existing call sites at zero
  * growth via this ceremony (same style as tests/core-fs-exception-boundary.test.ts):
  *
@@ -31,7 +31,7 @@ const CLASSIFICATIONS = ['legit-tmp', 'migrate-candidate'] as const;
 const GUIDANCE =
   `New sharedTmp() usage detected. active/shared/tmp/ is a 24h-TTL consumables floor — ` +
   `scope-owned artifacts do not belong there. Use writeScopedArtifact() from ` +
-  `libs/core/artifact-store.ts (scope: tenant/project/mission/task/session + artifact_class) ` +
+  `libs/core/workforce/artifact-store.ts (scope: tenant/project/mission/task/session + artifact_class) ` +
   `so the artifact lands in its canonical scope directory and is indexed for lifecycle GC. ` +
   `If the data is genuinely a consumable intermediate, consciously register the call site in ` +
   `${LEDGER_REPO_PATH} with classification "legit-tmp" (or "migrate-candidate" with a note).`;

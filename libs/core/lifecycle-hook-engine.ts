@@ -25,13 +25,13 @@ import { isRecord } from './foundation/text.js';
 import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeLstat } from './secure-io.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import { getDefaultWorkerEventStream } from './workforce/worker-event-stream.js';
 import {
   createApprovalRequest,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from './approval-store.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
+} from './governance/approval-store.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 
 export const LIFECYCLE_HOOK_EVENTS = [
   'pre_tool_use',

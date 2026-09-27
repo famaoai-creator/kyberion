@@ -15,12 +15,12 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { OcrRequest, OcrResult } from '@agent/core/ocr-types';
-import type { describeImage } from '@agent/core/image-description-bridge';
+import type { describeImage } from '@agent/core/media/image-description-bridge';
 import type {
   SpeechToTextBridge,
   TranscribeResult,
   TranscriptSegment,
-} from '@agent/core/speech-to-text-bridge';
+} from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './harness.js';
 
 export type MediaTool = 'ffmpeg' | 'ffprobe';
@@ -41,13 +41,13 @@ export const defaultPerceptionDeps: PerceptionDeps = {
     return ocrImage(request);
   },
   async describe(request) {
-    const { describeImage } = await import('@agent/core/image-description-bridge');
+    const { describeImage } = await import('@agent/core/media/image-description-bridge');
     return describeImage(request);
   },
   async sttBridges() {
     // Same install order as minutes:record — synchronous local backends
     // first; Apple's on-device recognizers only when nothing else registered.
-    const stt = await import('@agent/core/speech-to-text-bridge');
+    const stt = await import('@agent/core/voice/speech-to-text-bridge');
     stt.installAvailableSpeechToTextBridges();
     if (stt.getSpeechToTextBridge().name === 'stub') {
       const { installAppleSpeechToTextBridgeIfAvailable } =
@@ -231,7 +231,7 @@ export async function transcribeWav(
   options: { language?: string; preferTimestamps?: boolean }
 ): Promise<TranscriptOutcome> {
   const { normalizeSpeechToTextResult, getSpeechToTextCapabilities } =
-    await import('@agent/core/speech-to-text-bridge');
+    await import('@agent/core/voice/speech-to-text-bridge');
   const bridges = (await deps.sttBridges())
     .filter((bridge) => bridge.name !== 'stub')
     .sort((left, right) => {

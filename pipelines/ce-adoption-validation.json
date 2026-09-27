@@ -22,8 +22,8 @@
       "params": {
         "files": [
           "libs/core/ce-adoption.test.ts",
-          "libs/core/worker-event-stream.test.ts",
-          "libs/core/work-coordination.test.ts"
+          "libs/core/workforce/worker-event-stream.test.ts",
+          "libs/core/workforce/work-coordination.test.ts"
         ]
       }
     },

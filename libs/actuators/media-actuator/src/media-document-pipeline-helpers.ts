@@ -3,16 +3,16 @@ import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
-import { designDefaultsFromMediaTheme } from '@agent/core/native-pptx-engine/design-cascade';
+import { designDefaultsFromMediaTheme } from '@agent/core/media/native-pptx-engine/design-cascade';
 import {
   generateNativeDocx,
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
-} from '@agent/core/media-contracts';
-import type { PdfDesignProtocol } from '@agent/core/types/pdf-protocol';
-import type { PptxDesignProtocol, PptxSlide } from '@agent/core/types/pptx-protocol';
-import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
+} from '@agent/core/media/media-contracts';
+import type { PdfDesignProtocol } from '@agent/core/contracts/pdf-protocol';
+import type { PptxDesignProtocol, PptxSlide } from '@agent/core/contracts/pptx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectInput } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
-import { loadVocabularyCatalog } from './vocabulary-catalog.js';
+import { loadVocabularyCatalog } from './knowledge/vocabulary-catalog.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';

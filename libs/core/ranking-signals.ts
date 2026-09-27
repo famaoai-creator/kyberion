@@ -2,7 +2,7 @@
  * Shared ranking signals (KM-02 Task 4).
  *
  * Two rankers coexist: scripts/context_ranker.ts (pipeline-facing document
- * ranking CLI) and libs/core/src/knowledge-index.ts (runtime retrieval).
+ * ranking CLI) and libs/core/knowledge/knowledge-index.ts (runtime retrieval).
  * Their scoring definitions historically lived inline in each, so a tuning
  * fix in one never reached the other. The formulas below are the single
  * source of truth; both rankers import them. Full unification (making the

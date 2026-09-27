@@ -1,12 +1,12 @@
 import {
   loadCapabilityRegistry,
   probeProviderAvailability,
-} from '@agent/core/provider-capability-scanner';
-import { resolveProviderCliCapabilityReportPolicy } from '@agent/core/provider-cli-capability-report-policy';
+} from '@agent/core/provider/provider-capability-scanner';
+import { resolveProviderCliCapabilityReportPolicy } from '@agent/core/provider/provider-cli-capability-report-policy';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
-import type { CapabilityRegistryEntry } from '@agent/core/provider-capability-scanner';
+import type { CapabilityRegistryEntry } from '@agent/core/provider/provider-capability-scanner';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 type AdapterEntry = {

@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   createCalendarEvent: vi.fn(),
 }));
 
-vi.mock('@agent/core/calendar-workflow', () => ({
+vi.mock('@agent/core/meeting/calendar-workflow', () => ({
   readGwsAuthStatus: mocks.readGwsAuthStatus,
   listCalendars: mocks.listCalendars,
   listCalendarAgenda: mocks.listCalendarAgenda,

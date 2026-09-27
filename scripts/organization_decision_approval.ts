@@ -1,5 +1,5 @@
-import { loadApprovalRequest } from '@agent/core/approval-store';
-import type { OrganizationDecisionRecord } from '@agent/core/organization-operating-model';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
+import type { OrganizationDecisionRecord } from '@agent/core/organization/organization-operating-model';
 
 export function verifyDecisionApprovalRef(
   ref: string | undefined,

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
-import { loadChannelRegistry, type ChannelRegistry } from '@agent/core/channel-registry';
+import { loadChannelRegistry, type ChannelRegistry } from '@agent/core/surface/channel-registry';
 import {
   assertSafeRepositoryPath,
   safeAppendFile,

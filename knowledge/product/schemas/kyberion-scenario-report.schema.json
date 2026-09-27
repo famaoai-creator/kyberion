@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/kyberion-scenario-report.schema.json",
   "title": "Kyberion scenario report",
-  "description": "Result of one scenario run (kyberion-scenario-report.v1), produced by libs/core/scenario-report.ts. evidence_class is derived from the scenario's executionProfile; a 'simulated' report is never provider evidence.",
+  "description": "Result of one scenario run (kyberion-scenario-report.v1), produced by libs/core/scenario/scenario-report.ts. evidence_class is derived from the scenario's executionProfile; a 'simulated' report is never provider evidence.",
   "type": "object",
   "additionalProperties": false,
   "required": [

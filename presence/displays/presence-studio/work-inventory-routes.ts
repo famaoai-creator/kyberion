@@ -8,24 +8,24 @@
 import type express from 'express';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import {
   listWorkInventoryEntries,
   type WorkEntryStatus,
   type WorkInventoryEntry,
   type WorkInventoryScope,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import {
   loadWorkInventoryCalibration,
   rankWorkInventoryCandidates,
   type WorkInventoryScoreBasisEffort,
   type WorkInventoryScoreBasisRuns,
-} from '@agent/core/work-inventory-scoring';
-import { listWorkInventoryConsents } from '@agent/core/work-inventory-consent';
-import { listObservationSummaries } from '@agent/core/work-inventory-observation';
+} from '@agent/core/workforce/work-inventory-scoring';
+import { listWorkInventoryConsents } from '@agent/core/workforce/work-inventory-consent';
+import { listObservationSummaries } from '@agent/core/workforce/work-inventory-observation';
 import {
   PresenceStudioViewerError,
   resolvePresenceStudioViewerContext,

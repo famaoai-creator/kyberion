@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kyberion.ai/schemas/plugin-view-declaration.schema.json",
   "title": "Plugin View Declaration",
-  "description": "EP-05: one entry of a plugin manifest's provides.views. in-process-a2ui views are declarative A2UI documents rendered with the kyberion-base catalog and never execute plugin code; PH-02 sandboxed-iframe views are one self-contained HTML document served with a sandbox CSP in an opaque-origin iframe. Validated by libs/core/plugin-view-contract.ts (and plugin-view-frame.ts), which also enforces the document, vocabulary, capability and action rules this schema cannot express.",
+  "description": "EP-05: one entry of a plugin manifest's provides.views. in-process-a2ui views are declarative A2UI documents rendered with the kyberion-base catalog and never execute plugin code; PH-02 sandboxed-iframe views are one self-contained HTML document served with a sandbox CSP in an opaque-origin iframe. Validated by libs/core/plugin/plugin-view-contract.ts (and plugin-view-frame.ts), which also enforces the document, vocabulary, capability and action rules this schema cannot express.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "titleKey", "document", "isolation", "roleGate"],

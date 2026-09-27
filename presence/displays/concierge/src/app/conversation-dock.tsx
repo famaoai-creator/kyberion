@@ -15,7 +15,7 @@ import type {
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract-parser';
+} from '@agent/core/intent/intent-resolution-contract-parser';
 
 type DockMessage = {
   id: string;

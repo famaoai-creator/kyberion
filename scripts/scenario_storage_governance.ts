@@ -4,7 +4,7 @@
  * Run: node dist/scripts/scenario_storage_governance.js
  */
 
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   fetchWithVaultCache,
   getVaultEntry,

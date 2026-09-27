@@ -20,14 +20,14 @@ import type { Request, Response } from 'express';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
 import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -36,7 +36,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { listApprovalRequests } from '@agent/core/approval-store';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import {
   PresenceStudioViewerError,
   resolvePresenceStudioViewerContext,

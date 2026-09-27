@@ -5,12 +5,12 @@ import * as crypto from 'node:crypto';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HarnessSubagentDispatcher } from './agent-dispatch.js';
-import type { ReasoningBackend } from './reasoning-backend.js';
+import { HarnessSubagentDispatcher } from './agent/agent-dispatch.js';
+import type { ReasoningBackend } from './reasoning/reasoning-backend.js';
 import { resolveCapabilityProfileForTeamRole } from './subagent-capability-profiles.js';
-import { extractSurfaceBlocks } from './surface-response-blocks.js';
+import { extractSurfaceBlocks } from './surface/surface-response-blocks.js';
 import { PlanningReviewVerdictSchema } from './structured-output-contracts.js';
-import type { TaskResultBlock } from './channel-surface-types.js';
+import type { TaskResultBlock } from './surface/channel-surface-types.js';
 import {
   WorkCoordinationError,
   claimWorkItem,
@@ -20,7 +20,7 @@ import {
   importExternalWorkItem,
   releaseWorkItem,
   setWorkCoordinationNamespace,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 
 /**
  * CT-03: minimal CLI subagent team, exercised end-to-end purely on file

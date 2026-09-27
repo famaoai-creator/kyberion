@@ -6,7 +6,7 @@ const applySecretIntroduction = vi.fn(
   }
 );
 
-vi.mock('@agent/core/secret-introduction', () => ({
+vi.mock('@agent/core/secret/secret-introduction', () => ({
   applySecretIntroduction,
   proposeSecretIntroduction: vi.fn(),
   describeIntroductionReadiness: vi.fn(),

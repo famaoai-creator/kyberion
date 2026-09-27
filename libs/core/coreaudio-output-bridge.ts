@@ -7,7 +7,7 @@ import {
 import { rootResolve } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
-import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import type { AudioChunk, AudioFormat } from './meeting/meeting-session-types.js';
 import {
   createCoreAudioDeviceInventoryBridge,
   type CoreAudioDeviceInventoryBridge,
@@ -19,7 +19,7 @@ import {
   type AudioRouteHealth,
   type AudioRouteMetrics,
   type AudioRouteProbe,
-} from './audio-route.js';
+} from './voice/audio-route.js';
 
 export interface CoreAudioOutputBridgeOptions {
   inventory_bridge?: CoreAudioDeviceInventoryBridge;

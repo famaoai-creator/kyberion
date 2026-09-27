@@ -3,8 +3,8 @@ import {
   registerJudgmentBackend,
   resetJudgmentBackends,
   type JudgmentBackend,
-} from './judgment-backend.js';
-import { registerOrganizationWorkJudgment } from './organization-operating-model-persistence.js';
+} from './reasoning/judgment-backend.js';
+import { registerOrganizationWorkJudgment } from './organization/organization-operating-model-persistence.js';
 import { classifyError } from './error-classifier.js';
 import {
   classifyErrorAssisted,
@@ -146,7 +146,10 @@ describe('classifyErrorAssisted', () => {
     expect(question.options).toContain('tier_violation');
     expect(question.options).not.toContain('unknown');
     for (const option of question.options) {
-      expect(question.optionDescriptions?.[option], `missing description for ${option}`).toBeTruthy();
+      expect(
+        question.optionDescriptions?.[option],
+        `missing description for ${option}`
+      ).toBeTruthy();
     }
   });
 });

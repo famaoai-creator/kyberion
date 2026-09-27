@@ -5,7 +5,7 @@ import {
   loadPeerNetworkCatalog,
   resolvePeerDispatchTarget,
   sendPeerMessage,
-} from '@agent/core/peer-messaging';
+} from '@agent/core/mesh/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { parseSafeJsonInput } from './lib/json-input.js';

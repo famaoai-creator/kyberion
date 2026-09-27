@@ -42,8 +42,8 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
-import { auditChain } from './audit-chain.js';
-import { getAgentIdentity, NHI_ID_PREFIX, parseNhiId } from './agent-identity.js';
+import { auditChain } from './governance/audit-chain.js';
+import { getAgentIdentity, NHI_ID_PREFIX, parseNhiId } from './agent/agent-identity.js';
 
 // ---------------------------------------------------------------------------
 // Mode

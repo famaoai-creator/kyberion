@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 const enqueue = vi.hoisted(() => vi.fn());
 const loadProfile = vi.hoisted(() => vi.fn(() => ({ organization_id: 'org-test' })));
 vi.mock('./core.js', () => ({ logger: { warn: vi.fn() } }));
-vi.mock('./organization-profile.js', () => ({ loadOrganizationProfile: loadProfile }));
-vi.mock('./organization-operating-model.js', () => ({
+vi.mock('./organization/organization-profile.js', () => ({ loadOrganizationProfile: loadProfile }));
+vi.mock('./organization/organization-operating-model.js', () => ({
   enqueueOrganizationLearningCandidate: enqueue,
 }));
 

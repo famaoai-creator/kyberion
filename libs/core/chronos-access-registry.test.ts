@@ -76,7 +76,7 @@ describe('issueChronosAccessToken', () => {
   it('appends a hashed registration to the connection document and returns the plaintext token once', async () => {
     vi.resetModules();
     const stored: { tokens?: unknown[] } = {};
-    vi.doMock('./secret-guard.js', () => ({
+    vi.doMock('./secret/secret-guard.js', () => ({
       secretGuard: {
         loadConnectionDocument: vi.fn(() => stored),
         storeConnectionDocument: vi.fn((_id: string, patch: { tokens: unknown[] }) => {
@@ -102,6 +102,6 @@ describe('issueChronosAccessToken', () => {
       createHash('sha256').update(issued.token).digest('hex')
     );
 
-    vi.doUnmock('./secret-guard.js');
+    vi.doUnmock('./secret/secret-guard.js');
   });
 });

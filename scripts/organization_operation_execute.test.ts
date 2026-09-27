@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   saveIncident: vi.fn(),
   pipeline: vi.fn(),
 }));
-vi.mock('@agent/core/organization-operating-model-operations', () => ({
+vi.mock('@agent/core/organization/organization-operating-model-operations', () => ({
   loadOrganizationOperation: mocks.loadOperation,
   listOrganizationOperations: mocks.listOperations,
   loadOrganizationOperationState: mocks.loadState,
@@ -22,7 +22,7 @@ vi.mock('@agent/core/organization-operating-model-operations', () => ({
   saveOrganizationIncident: mocks.saveIncident,
 }));
 vi.mock('@agent/core/path-resolver', () => ({ pathResolver: { rootDir: () => '/repo' } }));
-vi.mock('@agent/core/organization-interventions', () => ({
+vi.mock('@agent/core/organization/organization-interventions', () => ({
   createOrganizationIncident: (input: Record<string, unknown>) => ({
     incident_id: input.incidentId,
     operation_id: input.operationId,

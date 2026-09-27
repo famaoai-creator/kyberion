@@ -110,16 +110,16 @@ is tracked as a follow-up — for now, paste the JSON into the
 
 ## 7. Failure modes
 
-| Failure | Detection | Response |
-|---|---|---|
-| Brokered mission attempts a tenant not on the list | `tier-guard.tenant.scope_violation` audit event | Reject; investigate why the access was attempted |
-| `cross_tenant_brokerage.source_tenants` empty | `mission_controller create` validation rejects | Add at least 2 tenants or use a regular tenant-bound mission |
-| Brokered mission lives in `confidential/` rather than `public/` | tier-guard treats the mission's own dir as tenant-bound | Move mission to public tier; reissue authorizations |
-| Audit forwarder fails to deliver `tenant.broker_access` to one tenant's SIEM | Quarterly compliance check; local chain authoritative | Backfill from local hash chain |
+| Failure                                                                      | Detection                                               | Response                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| Brokered mission attempts a tenant not on the list                           | `tier-guard.tenant.scope_violation` audit event         | Reject; investigate why the access was attempted             |
+| `cross_tenant_brokerage.source_tenants` empty                                | `mission_controller create` validation rejects          | Add at least 2 tenants or use a regular tenant-bound mission |
+| Brokered mission lives in `confidential/` rather than `public/`              | tier-guard treats the mission's own dir as tenant-bound | Move mission to public tier; reissue authorizations          |
+| Audit forwarder fails to deliver `tenant.broker_access` to one tenant's SIEM | Quarterly compliance check; local chain authoritative   | Backfill from local hash chain                               |
 
 ## 8. Reference
 
 - [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)
 - [`libs/core/tier-guard.ts`](libs/core/tier-guard.ts) — `checkTenantScope`
-- [`libs/core/audit-forwarder.ts`](libs/core/audit-forwarder.ts) — `TenantFilteringAuditForwarder`
+- [`libs/core/governance/audit-forwarder.ts`](libs/core/governance/audit-forwarder.ts) — `TenantFilteringAuditForwarder`
 - [`scripts/refactor/mission-types.ts`](scripts/refactor/mission-types.ts) — `MissionState.cross_tenant_brokerage`

@@ -1,7 +1,7 @@
 import { parseEventScopeFromRecord } from '@agent/core/event-scope';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
-import type { WorkerEventEnvelope } from '@agent/core/worker-event-stream';
+import type { WorkerEventEnvelope } from '@agent/core/workforce/worker-event-stream';
 
 export interface CollaborationStreamEvent {
   id: string;

@@ -6,15 +6,21 @@ const mocks = vi.hoisted(() => ({
   record: vi.fn(),
   guard: vi.fn(),
 }));
-vi.mock('@agent/core/organization-operating-model-operations', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  loadOrganizationOperation: mocks.loadOperation,
-  listOrganizationOperationRuns: mocks.listRuns,
-}));
-vi.mock('@agent/core/organization-operation-run-recording', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  recordOrganizationOperationRun: mocks.record,
-}));
+vi.mock(
+  '@agent/core/organization/organization-operating-model-operations',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    loadOrganizationOperation: mocks.loadOperation,
+    listOrganizationOperationRuns: mocks.listRuns,
+  })
+);
+vi.mock(
+  '@agent/core/organization/organization-operation-run-recording',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    recordOrganizationOperationRun: mocks.record,
+  })
+);
 vi.mock('@agent/core/tier-guard', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   validateWritePermission: mocks.guard,

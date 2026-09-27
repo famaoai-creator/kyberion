@@ -4,7 +4,7 @@ import {
   readSurfaceLogTail,
   type SurfaceRuntimeDefinition,
   type SurfaceRuntimeStateRecord,
-} from '@agent/core/surface-runtime';
+} from '@agent/core/surface/surface-runtime';
 import {
   listDaemonHeartbeatStatuses,
   type DaemonHeartbeatStatus,

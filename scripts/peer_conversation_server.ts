@@ -1,16 +1,16 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
-import { createPeerMessagingServer } from '@agent/core/peer-messaging';
-import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh-hub-peer-messaging-adapter';
-import { createPeerConversationResponder } from '@agent/core/peer-conversation';
+import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
+import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
+import { createPeerConversationResponder } from '@agent/core/mesh/peer-conversation';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
   registerMeshPeer,
-} from '@agent/core/mesh-peer-directory';
+} from '@agent/core/mesh/mesh-peer-directory';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import type { MeshRequest } from '@agent/core/mesh-hub-contract';
+import type { MeshRequest } from '@agent/core/mesh/mesh-hub-contract';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 

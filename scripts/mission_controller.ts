@@ -16,43 +16,43 @@
  */
 
 import * as path from 'node:path';
-import { auditChain } from '@agent/core/audit-chain';
-import { discoverProviders } from '@agent/core/provider-discovery';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { discoverProviders } from '@agent/core/provider/provider-discovery';
 // Registers the canonical A2A route as an import side effect. Without it
 // `getA2ARoute()` is undefined and every agent_runtime dispatch fails with
 // "has no A2A/runtime route" — the surface is selectable but unreachable.
-import '@agent/core/a2a-bridge';
+import '@agent/core/mesh/a2a-bridge';
 // Lets pane agents escalate prompts they stop on as approval requests.
-import '@agent/core/agent-prompt-approval';
-import { discoverReasoningEndpoints } from '@agent/core/reasoning-endpoint-discovery';
+import '@agent/core/agent/agent-prompt-approval';
+import { discoverReasoningEndpoints } from '@agent/core/reasoning/reasoning-endpoint-discovery';
 import {
   getInstalledReasoningMode,
   installReasoningBackends,
-} from '@agent/core/reasoning-bootstrap';
+} from '@agent/core/reasoning/reasoning-bootstrap';
 import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { logger } from '@agent/core/core';
 import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
-import { resolveMissionClassification } from '@agent/core/mission-classification';
-import { resolveMissionWorkflowDesign } from '@agent/core/mission-workflow-catalog';
+import { resolveMissionClassification } from '@agent/core/mission/mission-classification';
+import { resolveMissionWorkflowDesign } from '@agent/core/mission/mission-workflow-catalog';
 import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { TraceContext, persistTrace } from '@agent/core/trace';
-import { killSwitch } from '@agent/core/kill-switch';
+import { killSwitch } from '@agent/core/governance/kill-switch';
 import { renderStatus } from '@agent/core/ux-vocabulary';
-import { buildHandoffPacket } from '@agent/core/handoff-packet';
-import { recordMissionGateOverride } from '@agent/core/mission-gate-engine';
-import { missionLifecycleService } from '@agent/core/mission-lifecycle-service';
-import { releaseOrchestratorSessionForMissionBestEffort } from '@agent/core/orchestrator-session';
+import { buildHandoffPacket } from '@agent/core/mesh/handoff-packet';
+import { recordMissionGateOverride } from '@agent/core/mission/mission-gate-engine';
+import { missionLifecycleService } from '@agent/core/mission/mission-lifecycle-service';
+import { releaseOrchestratorSessionForMissionBestEffort } from '@agent/core/mission/orchestrator-session';
 import { resumeAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
-import { reassignMissionToProject } from '@agent/core/project-management';
-import { recordMissionHandoff } from '@agent/core/work-coordination';
-import type { ArtifactReviewFinding } from '@agent/core/artifact-review';
-import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission-work-reconciliation';
+import { reassignMissionToProject } from '@agent/core/project/project-management';
+import { recordMissionHandoff } from '@agent/core/workforce/work-coordination';
+import type { ArtifactReviewFinding } from '@agent/core/workforce/artifact-review';
+import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission/mission-work-reconciliation';
 import {
   runMissionTriage,
   runScopeApproveRequestApproval,
 } from './refactor/mission-triage-commands.js';
-import type { HumanDecidedBy } from '@agent/core/mission-types';
+import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 
 type Print = (value: unknown) => void;
 

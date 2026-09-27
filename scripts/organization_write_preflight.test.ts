@@ -6,15 +6,21 @@ const mocks = vi.hoisted(() => ({
   buildLearning: vi.fn(),
   guard: vi.fn(),
 }));
-vi.mock('@agent/core/organization-operating-model-management', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  reconcileOrganizationState: mocks.reconcile,
-}));
-vi.mock('@agent/core/organization-operating-model-operations', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  enqueueOrganizationLearningCandidate: mocks.enqueue,
-  buildOrganizationLearningCandidate: mocks.buildLearning,
-}));
+vi.mock(
+  '@agent/core/organization/organization-operating-model-management',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    reconcileOrganizationState: mocks.reconcile,
+  })
+);
+vi.mock(
+  '@agent/core/organization/organization-operating-model-operations',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    enqueueOrganizationLearningCandidate: mocks.enqueue,
+    buildOrganizationLearningCandidate: mocks.buildLearning,
+  })
+);
 vi.mock('@agent/core/tier-guard', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   validateWritePermission: mocks.guard,

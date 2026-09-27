@@ -9,8 +9,8 @@
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { AudioChunk } from './meeting-session-types.js';
-import { resolveFfmpegBin } from './tool-binary-resolvers.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
+import { resolveFfmpegBin } from './tool/tool-binary-resolvers.js';
 
 export interface MicCaptureOptions {
   /** Input device: avfoundation index (":0") on darwin, ALSA device on linux. */

@@ -19,21 +19,21 @@ import {
   saveWorkInventoryEntry,
   workInventoryRoot,
   type WorkInventoryStep,
-} from '@agent/core/work-inventory';
-import { grantWorkInventoryConsent } from '@agent/core/work-inventory-consent';
+} from '@agent/core/workforce/work-inventory';
+import { grantWorkInventoryConsent } from '@agent/core/workforce/work-inventory-consent';
 import {
   observationSummaryPath,
   type WorkInventoryObservationSummary,
-} from '@agent/core/work-inventory-observation';
+} from '@agent/core/workforce/work-inventory-observation';
 
-vi.mock('@agent/core/member-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/member-registry')>(
-    '@agent/core/member-registry'
+vi.mock('@agent/core/organization/member-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/organization/member-registry')>(
+    '@agent/core/organization/member-registry'
   );
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
 
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import {
   registerWorkInventoryRoutes,
   resolveWorkInventoryScopeForViewer,

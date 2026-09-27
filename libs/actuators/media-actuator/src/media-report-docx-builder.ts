@@ -1,6 +1,6 @@
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
-import { resolveDocumentContentsLabel } from '@agent/core/document-contents-policy';
-import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
+import { resolveDocumentContentsLabel } from '@agent/core/media/document-contents-policy';
+import { resolveReportSectionTitle } from '@agent/core/media/document-outline-label-policy';
 import { nowIso } from '@agent/core/foundation';
 import { normalizeStructuredSection } from './media-structured-content.js';
 import {

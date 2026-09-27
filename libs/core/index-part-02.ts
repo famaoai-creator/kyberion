@@ -35,20 +35,20 @@ export {
   loadVocabularyCatalog,
   resolveVocabularyEntry,
   _resetVocabularyCatalogCacheForTests,
-} from './vocabulary-catalog.js';
+} from './knowledge/vocabulary-catalog.js';
 // UI-01d: the shared UI kit's per-locale message bundle (`ui` vocabulary domain).
 export { buildUiMessageBundle, UI_VOCABULARY_DOMAIN } from './locale-normalize.js';
 export type { UiMessageBundle } from './locale-normalize.js';
 
-export type { VocabularyCatalogFile, VocabularyEntry } from './vocabulary-catalog.js';
+export type { VocabularyCatalogFile, VocabularyEntry } from './knowledge/vocabulary-catalog.js';
 
-export * from './operator-home-summary.js';
+export * from './surface/operator-home-summary.js';
 
 export { resolveActiveProfileRoot } from './profile-root.js';
 
-export * from './browser-onboarding.js';
+export * from './browser/browser-onboarding.js';
 
-export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
+export { resolveOperatorDisplayName, resolveOperatorLocale } from './surface/operator-identity.js';
 // I18N-01: single source of truth for locale resolution.
 
 export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
@@ -80,14 +80,14 @@ export * from './i18n-hardcoding-baseline.js';
 
 export * from './frontmatter-exclusions.js';
 
-export * from './knowledge-usage-aggregate.js';
-export * from './knowledge-index-cache.js';
+export * from './knowledge/knowledge-usage-aggregate.js';
+export * from './knowledge/knowledge-index-cache.js';
 
-export * from './analysis-config.js';
+export * from './analysis/analysis-config.js';
 
-export * from './knowledge-index-usage.js';
+export * from './knowledge/knowledge-index-usage.js';
 
-export * from './knowledge-taxonomy.js';
+export * from './knowledge/knowledge-taxonomy.js';
 export * from './volatile-knowledge.js';
 
 export * from './financial-model.js';
@@ -102,7 +102,7 @@ export * from './decision-rights.js';
 
 export * from './vision-resolver.js';
 
-export * from './approval-audit.js';
+export * from './governance/approval-audit.js';
 
 export * from './org-chart.js';
 
@@ -120,9 +120,9 @@ export * from './health-degradation.js';
 
 export * from './aidlc-phase-state.js';
 
-export * from './handoff-history.js';
+export * from './mesh/handoff-history.js';
 
-export * from './secret-encryption.js';
+export * from './secret/secret-encryption.js';
 
 export * from './spend-guard.js';
 
@@ -134,7 +134,7 @@ export * from './chain-integrity.js';
 
 export * as classifier from './classifier.js';
 
-export * from './knowledge-provider.js';
+export * from './knowledge/knowledge-provider.js';
 
 export {
   buildKnowledgeIndex,
@@ -145,13 +145,13 @@ export {
   KnowledgeHintIndex,
   DEFAULT_SCOPE,
   computeScopeHash,
-} from './src/knowledge-index.js';
+} from './knowledge/knowledge-index.js';
 
 export type {
   KnowledgeHint,
   KnowledgeQueryOptions,
   KnowledgeScope,
-} from './src/knowledge-index.js';
+} from './knowledge/knowledge-index.js';
 
 // Networking
 
@@ -178,26 +178,26 @@ export {
   sendPeerMessageToPeer,
   signPeerMessage,
   verifyPeerMessage,
-} from './peer-messaging.js';
+} from './mesh/peer-messaging.js';
 
-export { buildPeerBackupArtifactReferenceNotification } from './peer-backup-reference.js';
+export { buildPeerBackupArtifactReferenceNotification } from './mesh/peer-backup-reference.js';
 
 export {
   createPeerRuntimeRecoveryApprovalRequest,
   resumePeerRuntimeFromQuarantine,
   RECOVERY_APPROVAL_CHANNEL,
-} from './peer-runtime-recovery.js';
+} from './mesh/peer-runtime-recovery.js';
 
 export type {
   PeerRuntimeRecoveryApprovalInput,
   PeerRuntimeRecoveryResumeInput,
   PeerRuntimeRecoveryResult,
-} from './peer-runtime-recovery.js';
+} from './mesh/peer-runtime-recovery.js';
 
 export type {
   BuildPeerBackupArtifactReferenceInput,
   PeerBackupArtifactReference,
-} from './peer-backup-reference.js';
+} from './mesh/peer-backup-reference.js';
 
 export type {
   BuildPeerMessageInput,
@@ -216,7 +216,7 @@ export type {
   RegisterPeerNetworkPeerInput,
   RegisterPeerNetworkPeerResult,
   ResolvedPeerDispatchTarget,
-} from './peer-messaging.js';
+} from './mesh/peer-messaging.js';
 
 export {
   advertiseMeshCapabilities,
@@ -226,7 +226,7 @@ export {
   recordMeshHeartbeat,
   registerMeshPeer,
   resolveMeshPeer,
-} from './mesh-peer-directory.js';
+} from './mesh/mesh-peer-directory.js';
 
 export type {
   AdvertiseMeshCapabilitiesInput,
@@ -234,14 +234,14 @@ export type {
   MeshPeerDirectoryPolicyContext,
   RecordMeshHeartbeatInput,
   RegisterMeshPeerInput,
-} from './mesh-peer-directory.js';
+} from './mesh/mesh-peer-directory.js';
 
 export {
   clearMeshTopicRegistryNamespace,
   listMeshTopicSubscriptions,
   resolveMeshTopicRecipients,
   subscribeMeshTopic,
-} from './mesh-topic-registry.js';
+} from './mesh/mesh-topic-registry.js';
 
 export type {
   MeshTopicRegistryPolicyContext,
@@ -249,7 +249,7 @@ export type {
   MeshTopicResolutionOptions,
   MeshTopicSubscriptionFilter,
   MeshTopicSubscriptionInput,
-} from './mesh-topic-registry.js';
+} from './mesh/mesh-topic-registry.js';
 
 export {
   clearMeshHubPeerMessagingAdapterNamespace,
@@ -257,7 +257,7 @@ export {
   decideMeshHubRecipientProposal,
   listMeshHubRecipientProposals,
   MeshHubPeerMessagingAdapter,
-} from './mesh-hub-peer-messaging-adapter.js';
+} from './mesh/mesh-hub-peer-messaging-adapter.js';
 
 export type {
   MeshHubDispatchInput,
@@ -265,20 +265,20 @@ export type {
   MeshHubRecipientProposalDecision,
   MeshHubRecipientProposalRecord,
   MeshHubRecipientProposalView,
-} from './mesh-hub-peer-messaging-adapter.js';
+} from './mesh/mesh-hub-peer-messaging-adapter.js';
 
-export type { MeshRequest } from './mesh-hub-contract.js';
+export type { MeshRequest } from './mesh/mesh-hub-contract.js';
 
-export { routeMeshRequest } from './mesh-router.js';
+export { routeMeshRequest } from './mesh/mesh-router.js';
 
 export type {
   MeshRouteCandidate,
   MeshRouteDecision,
   MeshRouteExclusion,
   MeshRouteOptions,
-} from './mesh-router.js';
+} from './mesh/mesh-router.js';
 
-export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh-hub-inspection.js';
+export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh/mesh-hub-inspection.js';
 
 export type {
   MeshHubDeliveryInspection,
@@ -286,7 +286,7 @@ export type {
   MeshHubInspectionReport,
   MeshHubPeerInspection,
   MeshHubTopicInspection,
-} from './mesh-hub-inspection.js';
+} from './mesh/mesh-hub-inspection.js';
 
 export {
   appendCoordinationEvent,
@@ -316,7 +316,7 @@ export {
   setWorkCoordinationNamespace,
   WorkCoordinationError,
   updateWorkItem,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 
 export type {
   AppendCoordinationEventInput,
@@ -342,11 +342,11 @@ export type {
   WorkItemStatus,
   WorkLease,
   WorkLeaseStatus,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 
 export type {
   WorkCoordinationPeerCommandEnvelope,
   WorkCoordinationPeerCommandPayload,
   WorkCoordinationPeerCommandResult,
   WorkCoordinationPeerCommandType,
-} from './work-coordination-peer.js';
+} from './workforce/work-coordination-peer.js';

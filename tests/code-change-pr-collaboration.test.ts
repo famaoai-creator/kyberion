@@ -39,18 +39,18 @@ function makeTaskResultText(input: {
   ].join('\n');
 }
 
-vi.mock('../libs/core/a2a-bridge.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../libs/core/a2a-bridge.js')>();
+vi.mock('../libs/core/mesh/a2a-bridge.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../libs/core/mesh/a2a-bridge.js')>();
   return { ...actual, a2aBridge: { ...actual.a2aBridge, route: mocks.route } };
 });
-vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
+vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
 }));
 // Spread the real module: graph dispatch also calls loadMissionTeamPlan, which
 // a factory listing only the two resolvers would leave undefined.
-vi.mock('../libs/core/mission-team-plan-composer.js', async (importOriginal) => {
+vi.mock('../libs/core/mission/mission-team-plan-composer.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../libs/core/mission-team-plan-composer.js')>();
+    await importOriginal<typeof import('../libs/core/mission/mission-team-plan-composer.js')>();
   return {
     ...actual,
     resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
@@ -58,7 +58,7 @@ vi.mock('../libs/core/mission-team-plan-composer.js', async (importOriginal) => 
   };
 });
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
-vi.mock('../libs/core/mission-task-events.js', () => ({
+vi.mock('../libs/core/mission/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   // Must stay inside the repository: the secure-io resource-path scope rejects
   // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
@@ -146,7 +146,7 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     setWorkCoordinationNamespace('code-change-pr');
     clearWorkCoordinationStore();
 
@@ -178,7 +178,7 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
     const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     const missionPath = missionDir(MISSION, 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
     clearWorkCoordinationStore();
@@ -208,7 +208,7 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
       });
 
       const { dispatchMissionNextTasks } =
-        await import('../libs/core/mission-orchestration-worker.js');
+        await import('../libs/core/mission/mission-orchestration-worker.js');
       await dispatchMissionNextTasks(MISSION);
 
       const diffPath = `${missionPath}/evidence/prs/task-1/diff.patch`;
@@ -249,7 +249,7 @@ describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, 
     });
 
     const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission-orchestration-worker.js');
+      await import('../libs/core/mission/mission-orchestration-worker.js');
     await expect(dispatchMissionNextTasks(MISSION)).rejects.toThrow(
       /code_change missions require at least one reviewer\/qa task/
     );

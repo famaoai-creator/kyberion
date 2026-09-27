@@ -16,7 +16,7 @@ import {
   resetDefaultDynamicInjectionRegistry,
 } from './dynamic-injection.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
-import { compactWorkerContext } from './worker-context-compaction.js';
+import { compactWorkerContext } from './workforce/worker-context-compaction.js';
 
 beforeEach(() => resetDefaultDynamicInjectionRegistry());
 afterEach(() => resetDefaultDynamicInjectionRegistry());

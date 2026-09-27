@@ -12,8 +12,8 @@ import {
   collectOperatorHomeSummary,
   type OperatorHomeScopeFilter,
   type OperatorHomeSummary,
-} from './operator-home-summary.js';
-import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
+} from './surface/operator-home-summary.js';
+import { listSurfaceNotificationsAcrossChannels } from './surface/surface-ux.js';
 import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
 

@@ -11,8 +11,8 @@ import {
   saveProjectRecord,
   saveProjectTrackRecord,
 } from '@agent/core';
-import * as killSwitch from '@agent/core/kill-switch';
-import * as orchestratorSession from '@agent/core/orchestrator-session';
+import * as killSwitch from '@agent/core/governance/kill-switch';
+import * as orchestratorSession from '@agent/core/mission/orchestrator-session';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,

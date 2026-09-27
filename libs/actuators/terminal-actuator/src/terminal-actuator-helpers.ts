@@ -1,14 +1,14 @@
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
-import { ptyEngine } from '@agent/core/pty-engine';
+import { ptyEngine } from '@agent/core/shell/pty-engine';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
-import { encodeTerminalInput } from '@agent/core/terminal-keys';
-import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
+import { encodeTerminalInput } from '@agent/core/shell/terminal-keys';
+import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import * as pathResolver from '@agent/core/path-resolver';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
 import { resolveShellAdapter } from '@agent/core/platform-command-adapters';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as path from 'node:path';
 

@@ -7,7 +7,7 @@ import {
   A2UI_BASE_ALIASES,
   A2UI_BASE_COMPONENT_TYPES,
   resolveKyberionBaseType,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   A2UIRenderer,
   KB_ALIASES,

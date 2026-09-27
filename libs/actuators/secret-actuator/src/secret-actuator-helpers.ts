@@ -15,10 +15,10 @@ import {
   storeSecret,
   removeSecret,
   listSecrets as coreListSecrets,
-} from '@agent/core/secret-bridge';
+} from '@agent/core/secret/secret-bridge';
 import * as pathResolver from '@agent/core/path-resolver';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import * as path from 'node:path';
 
 /**

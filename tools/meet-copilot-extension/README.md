@@ -4,7 +4,7 @@ Drives meeting participation for **Google Meet, Microsoft Teams, and Zoom (web
 client)** from the Kyberion meeting coordinator **through the operator's own
 signed-in Chrome**, instead of a Playwright/CDP session (which Meet rejects as a
 bot). The extension talks to the `chrome-extension` meeting driver
-(`libs/core/chrome-extension-meeting-driver.ts`) over a **local WebSocket** channel.
+(`libs/core/browser/chrome-extension-meeting-driver.ts`) over a **local WebSocket** channel.
 
 ## Platforms
 

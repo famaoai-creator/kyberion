@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { DescribeImageOptions } from '@agent/core/image-description-bridge';
+import type { DescribeImageOptions } from '@agent/core/media/image-description-bridge';
 import { handleDescribeImage } from './describe-image.js';
 
 const succeeded = {

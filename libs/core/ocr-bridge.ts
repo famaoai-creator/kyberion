@@ -4,11 +4,11 @@ import { secureFetch } from './network.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
-import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { resolveRuntimeModelId } from './tool/runtime-model-defaults.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { resolveGeminiApiKey } from './gemini-api-backend.js';
+import { resolveGeminiApiKey } from './provider/gemini-api-backend.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,

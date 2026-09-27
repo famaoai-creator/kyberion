@@ -3,7 +3,7 @@ import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js
 import {
   loadActuatorOpRegistry,
   type ActuatorOpRegistryFile,
-} from '@agent/core/actuator-op-registry';
+} from '@agent/core/actuator/actuator-op-registry';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';

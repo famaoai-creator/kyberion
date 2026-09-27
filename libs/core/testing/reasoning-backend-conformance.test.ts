@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stubReasoningBackend } from '../reasoning-backend.js';
+import { stubReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { runReasoningBackendConformance } from './reasoning-backend-conformance.js';
 
 describe('reasoning backend conformance', () => {

@@ -25,42 +25,42 @@
  *     --max-minutes 30
  */
 
-import { EnergyVad } from '@agent/core/voice-activity-detector';
-import { MeetingParticipationCoordinator } from '@agent/core/meeting-participation-coordinator';
+import { EnergyVad } from '@agent/core/voice/voice-activity-detector';
+import { MeetingParticipationCoordinator } from '@agent/core/meeting/meeting-participation-coordinator';
 import {
   StubMeetingJoinDriver,
   getMeetingJoinDriver,
   registerMeetingJoinDriver,
   validateMeetingTarget,
   type MeetingJoinDriver,
-} from '@agent/core/meeting-join-driver';
+} from '@agent/core/meeting/meeting-join-driver';
 import { installInRoomMeetingJoinDriver } from '@agent/core/in-room-meeting-driver';
-import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
-import { selectStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
-import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
-import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
-import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { installChromeExtensionMeetingJoinDriver } from '@agent/core/browser/chrome-extension-meeting-driver';
+import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell/shell-streaming-stt-bridge';
 import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
-import { resolveVadBackend, shouldSelectVadBackend } from '@agent/core/vad-registry';
-import type { VoiceActivityDetector } from '@agent/core/voice-activity-detector';
-import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
+import { resolveVadBackend, shouldSelectVadBackend } from '@agent/core/voice/vad-registry';
+import type { VoiceActivityDetector } from '@agent/core/voice/voice-activity-detector';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
 import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
-import { resolveAudioBus } from '@agent/core/audio-bus-resolver';
-import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting-participation-runtime-plan';
+import { resolveAudioBus } from '@agent/core/voice/audio-bus-resolver';
+import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting/meeting-participation-runtime-plan';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { setRegisteredEnv } from '@agent/core/foundation';
 import type {
   AudioFormat,
   MeetingSession,
   MeetingTarget,
   TranscriptChunk,
-} from '@agent/core/meeting-session-types';
+} from '@agent/core/meeting/meeting-session-types';
 import { startMeetingCommandLoop } from './meeting_commands.js';
-import type { ConversationAgent } from '@agent/core/meeting-participation-coordinator';
+import type { ConversationAgent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';

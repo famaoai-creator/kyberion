@@ -7,8 +7,8 @@ import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
-import { getReasoningBackend } from './reasoning-backend.js';
-import { enforceApprovalGate } from './approval-gate.js';
+import { getReasoningBackend } from './reasoning/reasoning-backend.js';
+import { enforceApprovalGate } from './governance/approval-gate.js';
 import {
   composeAudienceFloor,
   evaluateAudienceEgress,
@@ -16,7 +16,7 @@ import {
   type AudienceEgressFloor,
 } from './egress-policy.js';
 import { sendOpsAlert } from './ops-alert.js';
-import { notifyOperator } from './operator-notifications.js';
+import { notifyOperator } from './surface/operator-notifications.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,

@@ -26,17 +26,17 @@
  * built-in set lives in `authn-providers.ts` and self-registers on import.
  */
 
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { isVitestProcess, getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 import type { ActorRef, ActorKind } from './actor.js';
 import type { ChronosAccessRole, ChronosTokenRegistration } from './chronos-access-registry.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
-import type { MemberRegistryPathOptions } from './member-registry.js';
+import type { MemberRegistryPathOptions } from './organization/member-registry.js';
 import type {
   SurfaceViewerConfiguredCredential,
   SurfaceViewerScope,
-} from './surface-mutation-guard.js';
+} from './surface/surface-mutation-guard.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,

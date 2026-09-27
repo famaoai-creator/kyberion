@@ -1,5 +1,5 @@
-import { withDelegationSlot } from './delegation-concurrency.js';
-import { resourceClaimsConflict, type ResourceClaim } from './tool-call-scheduler.js';
+import { withDelegationSlot } from './mission/delegation-concurrency.js';
+import { resourceClaimsConflict, type ResourceClaim } from './tool/tool-call-scheduler.js';
 
 /**
  * Small, deterministic frontier scheduler shared by pipeline and mission

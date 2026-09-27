@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
-import type { KbDialogProps } from '@agent/core/a2ui-catalog';
+import type { KbDialogProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import {
   activeElementFor,

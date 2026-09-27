@@ -44,8 +44,8 @@ import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
 import {
   renderRuntimeInstructions,
   runtimeInstructionsForProvider,
-} from '@agent/core/reasoning-runtime-instructions';
-import { loadTeamRoleIndex } from '@agent/core/mission-team-index';
+} from '@agent/core/reasoning/reasoning-runtime-instructions';
+import { loadTeamRoleIndex } from '@agent/core/mission/mission-team-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveCapabilityProfileForTeamRole } from '@agent/core/subagent-capability-profiles';
 import { readTextFile } from '@agent/core/foundation';
@@ -103,7 +103,7 @@ export const DEFAULT_PROFILE: SubagentProfileName =
 // XP-04 §"The read/write matrix" projection, re-exported from the shared
 // framing SSoT (libs/core/subagent-prompt-framing.ts) so this committed
 // generation ceremony and the runtime `--agents` projection (CN-02,
-// libs/core/claude-native-subagent.ts) quote the same text.
+// libs/core/provider/claude-native-subagent.ts) quote the same text.
 export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
   SUBAGENT_SHARED_DIRECTORY_RULES_LINES;
 

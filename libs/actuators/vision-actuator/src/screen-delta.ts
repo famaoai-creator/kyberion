@@ -8,7 +8,7 @@ import {
   type ScreenDeltaResult,
   type TileGrid,
 } from '@agent/core/dirty-tile-describer';
-import type { PayloadTier } from '@agent/core/image-description-bridge';
+import type { PayloadTier } from '@agent/core/media/image-description-bridge';
 import {
   assertMissionTenant,
   requireVisionSessionId,

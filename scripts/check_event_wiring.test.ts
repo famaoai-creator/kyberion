@@ -95,7 +95,7 @@ describe('check_event_wiring', () => {
     it('emit されないイベント型を検出する', () => {
       const violations = checkWorkerEventTypeEmitters(
         sources({
-          'libs/core/worker-event-stream.ts':
+          'libs/core/workforce/worker-event-stream.ts':
             "export const WORKER_EVENT_TYPES = ['turn_begin', 'never_emitted'] as const;",
           'libs/core/somewhere.ts': "stream.emit('turn_begin', {});",
         })

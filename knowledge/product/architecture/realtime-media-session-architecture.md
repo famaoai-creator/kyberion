@@ -44,10 +44,10 @@ through adapters and projections.
 The repository already provides useful lower-level seams:
 
 - `MeetingSession` exposes inbound/outbound audio and optional native captions
-  in `libs/core/meeting-session-types.ts`.
+  in `libs/core/meeting/meeting-session-types.ts`.
 - `MeetingParticipationCoordinator` composes a meeting driver, audio bus, STT,
   TTS, VAD, agent, consent, and audit in
-  `libs/core/meeting-participation-coordinator.ts`.
+  `libs/core/meeting/meeting-participation-coordinator.ts`.
 - `realtime-voice-loop.ts` provides VAD-driven turn handling, streaming STT,
   sentence-level TTS, optional barge-in, transcript persistence, and metrics.
 - `meeting-intelligence-ops.ts` extracts action items and records speaker
@@ -411,7 +411,7 @@ bound to one identity.
 ## 13. Turn-taking contract (2026-09-24)
 
 `startRealtimeVoiceLoop` composes the turn-taking parts in
-`libs/core/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
+`libs/core/voice/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
 `voice-eot-scorer.ts`, `voice-respond-gate.ts`, `voice-phrase-chunker.ts`,
 `voice-first-phrase-cache.ts`, and `voice-speculative-policy.ts`. The pure
 `VoiceTurnTakingMachine` / voice workbench replays the same decisions on a

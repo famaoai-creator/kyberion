@@ -23,20 +23,20 @@ import {
   buildDelegationSpawnEnv,
   newDelegationSessionId,
   spawnWithDelegationEnv,
-} from './provider-spawn-env.js';
-import { resolveProviderCliCommand } from './provider-managed-env.js';
+} from './provider/provider-spawn-env.js';
+import { resolveProviderCliCommand } from './provider/provider-managed-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
-} from './provider-permission-profiles.js';
-import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+} from './provider/provider-permission-profiles.js';
+import { assertReasoningEgressAllowed } from './reasoning/reasoning-egress-scope.js';
 import {
   delegationChildHandleFromChildProcess,
   withWallClockBudget,
   DelegationWallClockExceededError,
-} from './delegation-concurrency.js';
+} from './mission/delegation-concurrency.js';
 import * as pathResolver from './path-resolver.js';
 import {
   runStructuredReasoningOp,
@@ -66,7 +66,7 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
   ReasoningCallOptions,
-} from './reasoning-backend.js';
+} from './reasoning/reasoning-backend.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

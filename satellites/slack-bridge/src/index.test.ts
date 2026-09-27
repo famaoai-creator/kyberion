@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ChannelAdapter } from '@agent/core/channel-adapter';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import type { ChannelAdapter } from '@agent/core/surface/channel-adapter';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
-} from '@agent/core/channel-surface-types';
-import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
+} from '@agent/core/surface/channel-surface-types';
+import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -19,8 +19,8 @@ const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
 }));
 
-vi.mock('@agent/core/channel-surface', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
+vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {

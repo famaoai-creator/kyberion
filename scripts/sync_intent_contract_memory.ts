@@ -2,7 +2,7 @@ import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { physicalScopedPath } from '@agent/core/physical-namespace';
-import { resolveIntentContractMemoryPaths } from '@agent/core/intent-contract-learning';
+import { resolveIntentContractMemoryPaths } from '@agent/core/intent/intent-contract-learning';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';

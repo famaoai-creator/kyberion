@@ -9,7 +9,7 @@ import {
   parseOpencodeRunJson,
   probeOpencodeCliAvailability,
 } from './opencode-cli-reasoning-backend.js';
-import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './shell/sandbox-policy.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, spawn: spawnMock };
 });
 
-vi.mock('./delegation-concurrency.js', () => ({
+vi.mock('./mission/delegation-concurrency.js', () => ({
   delegationChildHandleFromChildProcess: (child: MockChildProcess) => ({
     pid: child.pid,
     kill: (signal: NodeJS.Signals) => child.kill(signal),

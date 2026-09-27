@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Disclosure, KeyValue, StatusPill } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 import type { WorkLoopPreview } from './MissionIntelligenceTypes';
 

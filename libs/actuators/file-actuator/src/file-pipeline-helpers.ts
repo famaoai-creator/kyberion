@@ -4,7 +4,7 @@ import {
   parseSafeJsonObjectValue,
   readJson,
 } from '@agent/core/foundation';
-import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -27,11 +27,14 @@ import {
   resolveWriteArtifactSpec,
   resolveRequiredStringParam,
 } from '@agent/core/logic-utils';
-import { validateOpInput } from '@agent/core/op-input-contracts';
+import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
-import { skipAdfStep } from '@agent/core/adf-engine';
-import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
-import { runAdfActuatorPipeline, defineActuatorPipelineBase } from '@agent/core/actuator-sdk';
+import { skipAdfStep } from '@agent/core/pipeline/adf-engine';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,

@@ -24,16 +24,16 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 import { buildSafeExecEnv } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
-import { registerVadBackend, type VadFactoryOptions } from './vad-registry.js';
-import { parseVadBridgeLine } from './vad-bridge-protocol.js';
+import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
+import { registerVadBackend, type VadFactoryOptions } from './voice/vad-registry.js';
+import { parseVadBridgeLine } from './voice/vad-bridge-protocol.js';
 import {
   computeChunkDurationMs,
   EnergyVad,
   type VoiceActivityDetector,
   type VoiceActivityState,
-} from './voice-activity-detector.js';
-import type { AudioChunk } from './meeting-session-types.js';
+} from './voice/voice-activity-detector.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 export interface SileroVadOptions {
   /** Python interpreter (default: KYBERION_SILERO_VAD_PYTHON → KYBERION_PYTHON_BIN → python3). */

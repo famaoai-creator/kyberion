@@ -5,13 +5,13 @@ import {
   modelRegistrySnapshotFromDirectory,
   readModelRegistryDirectory,
   type ModelRegistryDirectoryIndex,
-} from '@agent/core/model-registry-directory';
-import { loadModelRegistry } from '@agent/core/reasoning-model-routing';
+} from '@agent/core/reasoning/model-registry-directory';
+import { loadModelRegistry } from '@agent/core/reasoning/reasoning-model-routing';
 import type {
   GovernedModelRegistryEntry,
   GovernedModelRegistrySnapshot,
-} from '@agent/core/model-registry-contract';
-import { validateModelRegistrySnapshot } from '@agent/core/model-registry-contract';
+} from '@agent/core/reasoning/model-registry-contract';
+import { validateModelRegistrySnapshot } from '@agent/core/reasoning/model-registry-contract';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';

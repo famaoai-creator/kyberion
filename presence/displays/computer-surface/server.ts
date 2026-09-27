@@ -2,15 +2,15 @@ import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { createServer } from 'node:http';
 import * as path from 'node:path';
-import { type SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
-import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
+import { type SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
 } from '@agent/core/headless-surface-contract';
 import { validateA2UIMessage, type A2UIMessage } from '@agent/core/a2ui';
-import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+import { parseIntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,

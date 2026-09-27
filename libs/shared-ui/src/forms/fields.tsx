@@ -10,7 +10,7 @@ import type {
   KbSwitchProps,
   KbTextFieldProps,
   KbTextareaProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import {
   KB_FORM_MESSAGE_KEYS,

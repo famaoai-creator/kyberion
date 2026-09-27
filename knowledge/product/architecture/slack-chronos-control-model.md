@@ -115,7 +115,7 @@ Service binding resolves authenticated access to external services without turni
 
 Current implementation anchor:
 
-- `libs/core/service-binding.ts`
+- `libs/core/service/service-binding.ts`
 
 Service-binding responsibilities:
 

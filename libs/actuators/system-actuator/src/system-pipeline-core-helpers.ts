@@ -18,28 +18,31 @@ import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { retry } from '@agent/core/async-utils';
-import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual-media-device-control-bridge';
-import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
-import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual-audio-input-recording-bridge';
-import { createVirtualInputDeviceInventoryBridge } from '@agent/core/virtual-input-device-inventory-bridge';
-import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
-import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
+import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual/virtual-media-device-control-bridge';
+import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
+import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual/virtual-audio-input-recording-bridge';
+import { createVirtualInputDeviceInventoryBridge } from '@agent/core/virtual/virtual-input-device-inventory-bridge';
+import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';
+import { createScreenRecordingBridge } from '@agent/core/virtual/screen-recording-bridge';
 import {
   redactScreenVideoFrame,
   redactScreenCaptureFile,
-} from '@agent/core/screen-frame-redaction';
-import { createScreenDisplayInventoryBridge } from '@agent/core/screen-display-inventory-bridge';
-import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
-import { listServiceRuntimeInventory } from '@agent/core/service-runtime-registry';
+} from '@agent/core/virtual/screen-frame-redaction';
+import { createScreenDisplayInventoryBridge } from '@agent/core/virtual/screen-display-inventory-bridge';
+import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
+import { listServiceRuntimeInventory } from '@agent/core/service/service-runtime-registry';
 import { probeSileroVad } from '@agent/core/silero-vad-bridge';
-import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import type {
   ScreenDisplayInventory,
   ScreenDisplayRecord,
-} from '@agent/core/screen-display-inventory-bridge';
-import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
-import { writeVideoFramesToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
-import type { VideoFrame } from '@agent/core/meeting-session-types';
+} from '@agent/core/virtual/screen-display-inventory-bridge';
+import { StubVideoFrameBus } from '@agent/core/video/video-frame-bus';
+import {
+  writeVideoFramesToMp4,
+  pipeMp4ToVideoFrameBus,
+} from '@agent/core/video/video-frame-archive';
+import type { VideoFrame } from '@agent/core/meeting/meeting-session-types';
 import {
   runRecordAudioOp,
   runCapturePhotoOp,
@@ -70,7 +73,7 @@ import {
   parseSafeJsonObjectValue,
   readJson,
 } from '@agent/core/foundation';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
@@ -82,9 +85,9 @@ import {
   getWindowList,
   clipboardRead,
   listChromeTabs,
-} from '@agent/core/os-automation';
-import type { FocusedInputState } from '@agent/core/os-automation';
-import { validateOpInput } from '@agent/core/op-input-contracts';
+} from '@agent/core/virtual/os-automation';
+import type { FocusedInputState } from '@agent/core/virtual/os-automation';
+import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
@@ -781,7 +784,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'mission_list_data']: data };
     }
     case 'list_projects': {
-      const { listProjectRecords } = await import('@agent/core/project-registry');
+      const { listProjectRecords } = await import('@agent/core/project/project-registry');
       const projects = listProjectRecords();
       const data = { status: 'ok', project_list: projects, count: projects.length };
       return { ...ctx, [params.export_as || 'project_list_data']: data };

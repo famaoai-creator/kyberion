@@ -46,21 +46,21 @@ status: active
 
 ## 既存の資産
 
-| 領域                         | 既存の実装                                                                                  | 状態                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 承認の正本                   | `libs/core/approval-store.ts`、`approval-gate.ts`、`approval-policy.ts`                     | 実装済み                                |
-| リスク点数化                 | `libs/core/autonomous-ops-gate.ts` + `autonomous-ops-policy.json`                           | 実装済み。対象は保守作業6種類のみ       |
-| スマホ向けの承認             | `satellites/telegram-bridge`、`satellites/slack-bridge`、`libs/core/surface-approval-ui.ts` | 実装済み                                |
-| 通知                         | `libs/core/operator-notifications.ts`(`knowledge/personal/notification-preferences.json`)   | 実装済み。APNs / FCM などの push はない |
-| チャットからのミッション操作 | `libs/core/surface-mission-steering.ts`、`surface-mission-proposals.ts`                     | 実装済み                                |
-| 計画の承認ゲート             | `scripts/mission-alignment-gate/`、`mission_alignment_request.ts`                           | 実装済み                                |
-| 作業の排他取得               | `libs/core/work-coordination.ts`(claim / lease / reap)                                      | 実装済み                                |
-| ミッション内の相互レビュー   | `mission_controller review-task`、`libs/core/mission-review-gates.ts`                       | 実装済み                                |
-| 自律ループ・常駐             | `worker-goal-driver.ts`、`agent_runtime_supervisor_daemon.ts`、`chronos_daemon.ts`          | 実装済み                                |
-| 緊急停止                     | `libs/core/kill-switch.ts`                                                                  | 実装済み                                |
-| 反論役                       | `team-roles/devils_advocate.json`、decision-support 系                                      | 実装済み                                |
-| PR 作成                      | `scripts/publish_pull_request.ts`(`pnpm kyberion pr create`)                                | 実装済み                                |
-| パスキー承認                 | `knowledge/product/architecture/passkey-push-protocol.md`                                   | 設計のみ                                |
+| 領域                         | 既存の実装                                                                                          | 状態                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 承認の正本                   | `libs/core/governance/approval-store.ts`、`approval-gate.ts`、`approval-policy.ts`                  | 実装済み                                |
+| リスク点数化                 | `libs/core/governance/autonomous-ops-gate.ts` + `autonomous-ops-policy.json`                        | 実装済み。対象は保守作業6種類のみ       |
+| スマホ向けの承認             | `satellites/telegram-bridge`、`satellites/slack-bridge`、`libs/core/surface/surface-approval-ui.ts` | 実装済み                                |
+| 通知                         | `libs/core/surface/operator-notifications.ts`(`knowledge/personal/notification-preferences.json`)   | 実装済み。APNs / FCM などの push はない |
+| チャットからのミッション操作 | `libs/core/surface/surface-mission-steering.ts`、`surface-mission-proposals.ts`                     | 実装済み                                |
+| 計画の承認ゲート             | `scripts/mission-alignment-gate/`、`mission_alignment_request.ts`                                   | 実装済み                                |
+| 作業の排他取得               | `libs/core/workforce/work-coordination.ts`(claim / lease / reap)                                    | 実装済み                                |
+| ミッション内の相互レビュー   | `mission_controller review-task`、`libs/core/mission/mission-review-gates.ts`                       | 実装済み                                |
+| 自律ループ・常駐             | `worker-goal-driver.ts`、`agent_runtime_supervisor_daemon.ts`、`chronos_daemon.ts`                  | 実装済み                                |
+| 緊急停止                     | `libs/core/governance/kill-switch.ts`                                                               | 実装済み                                |
+| 反論役                       | `team-roles/devils_advocate.json`、decision-support 系                                              | 実装済み                                |
+| PR 作成                      | `scripts/publish_pull_request.ts`(`pnpm kyberion pr create`)                                        | 実装済み                                |
+| パスキー承認                 | `knowledge/product/architecture/passkey-push-protocol.md`                                           | 設計のみ                                |
 
 ## 不足している部分
 
@@ -186,7 +186,7 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 ### P1-1〜P1-4 の実装(2026-09-27、ミッション `MSN-APPROVAL-STORE-HYGIENE-20260927`)
 
 - **P1-1(実装済み)** 承認ストアのパスを `approvalStoreRoots()` に集約した。vitest の実行中は `active/shared/runtime/vitest-approvals/` に書く。この場所は保存期間カタログで1日後に消える。本番の場所に書かないことを `approval-store.test.ts` の契約テストで確認している。
-- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。ごみ箱に書けるのは sovereign ペルソナだけなので、`--apply` は `KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply` で実行する。ペルソナがないと、何も変更せずに実行すべきコマンドを表示して終了する。
+- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/governance/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。ごみ箱に書けるのは sovereign ペルソナだけなので、`--apply` は `KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply` で実行する。ペルソナがないと、何も変更せずに実行すべきコマンドを表示して終了する。
 - **P1-3(実装済み)** 秘密情報のポリシー自動承認は `decidedBy: policy:secret-introduction-local-low-risk`、`decidedByType: service` で記録する(スキーマの非人間の値は `service` / `ai_agent`)。依頼した人は note に残す。
 - **P1-4(期限切れは実装済み、ダイジェストへの掲載は P1-8)** 秘密情報の申請は作成から24時間で期限切れにする。掃除の処理は、`expiresAt` を過ぎた申請と、期限なしで14日を超えて放置された申請を、承認ストアの正規の遷移で `expired` にする。イベントには `reason` を記録する。定期実行への組み込みは未実施。
 

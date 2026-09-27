@@ -10,7 +10,7 @@ import {
   loadArtifactRecord,
   saveArtifactRecord,
   type ArtifactRecord,
-} from '@agent/core/artifact-record';
+} from '@agent/core/workforce/artifact-record';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 import type { RejectionReasonCategory } from '@agent/core/rejection-reason';
 import { nowIso } from '@agent/core/foundation';

@@ -73,7 +73,7 @@ vi.mock('../libs/core/core.js', () => ({
 
 const backendPrompt = vi.hoisted(() => vi.fn());
 const backendExtractRequirements = vi.hoisted(() => vi.fn());
-vi.mock('../libs/core/reasoning-backend.js', () => ({
+vi.mock('../libs/core/reasoning/reasoning-backend.js', () => ({
   getReasoningBackend: () => ({
     name: 'claude-agent',
     prompt: backendPrompt,
@@ -85,16 +85,16 @@ const opsAlerts = vi.hoisted(() => vi.fn());
 vi.mock('../libs/core/ops-alert.js', () => ({ sendOpsAlert: opsAlerts }));
 
 const gate = vi.hoisted(() => vi.fn());
-vi.mock('../libs/core/approval-gate.js', () => ({ enforceApprovalGate: gate }));
+vi.mock('../libs/core/governance/approval-gate.js', () => ({ enforceApprovalGate: gate }));
 
 const notify = vi.hoisted(() => vi.fn().mockResolvedValue(true));
-vi.mock('../libs/core/operator-notifications.js', () => ({ notifyOperator: notify }));
+vi.mock('../libs/core/surface/operator-notifications.js', () => ({ notifyOperator: notify }));
 
 const memoryQueue = vi.hoisted(() => ({
   create: vi.fn((input: Record<string, unknown>) => ({ candidate_id: 'MEM-TEST-1', ...input })),
   enqueue: vi.fn(() => 'queued'),
 }));
-vi.mock('../libs/core/memory-promotion-queue.js', () => ({
+vi.mock('../libs/core/knowledge/memory-promotion-queue.js', () => ({
   createMemoryPromotionCandidate: memoryQueue.create,
   enqueueMemoryPromotionCandidate: memoryQueue.enqueue,
 }));
@@ -818,7 +818,7 @@ describe('customer dialogue (E2E-06)', () => {
 
   it('ingests a call recording into the deal requirements draft via the STT bridge', async () => {
     const modes = await import('../libs/core/customer-conversation-modes.js');
-    const stt = await import('../libs/core/speech-to-text-bridge.js');
+    const stt = await import('../libs/core/voice/speech-to-text-bridge.js');
     stt.registerSpeechToTextBridge({
       name: 'test-stt',
       async transcribe() {

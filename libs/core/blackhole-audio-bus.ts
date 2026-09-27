@@ -9,15 +9,15 @@
 
 import { logger } from './core.js';
 import { buildSafeExecEnv, safeExecResult } from './secure-io.js';
-import { resolveFfmpegBin } from './tool-binary-resolvers.js';
+import { resolveFfmpegBin } from './tool/tool-binary-resolvers.js';
 import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
 } from './managed-process.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
-import type { AudioBus, AudioBusProbe } from './audio-bus.js';
-import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import type { AudioBus, AudioBusProbe } from './voice/audio-bus.js';
+import type { AudioChunk, AudioFormat } from './meeting/meeting-session-types.js';
 import {
   createCoreAudioDeviceInventoryBridge,
   resolveAudioDevice,
@@ -31,9 +31,9 @@ import {
   type AudioDeviceDescriptor,
   type AudioRouteHealth,
   type AudioRouteMetrics,
-} from './audio-route.js';
-import type { AudioOutputPort } from './audio-route.js';
-import { AudioDeviceLeaseManager, type AudioDeviceLease } from './audio-device-lease.js';
+} from './voice/audio-route.js';
+import type { AudioOutputPort } from './voice/audio-route.js';
+import { AudioDeviceLeaseManager, type AudioDeviceLease } from './voice/audio-device-lease.js';
 
 export interface BlackHoleBusOptions {
   /** Exact display label used only when no CoreAudio UID is available. */

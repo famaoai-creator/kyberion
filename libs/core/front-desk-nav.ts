@@ -11,7 +11,7 @@
  * Pure and deterministic — the only I/O is the optional, best-effort
  * manifest read in `readFrontDeskSurfacePorts()`, which never throws.
  */
-import { loadSurfaceManifest } from './surface-runtime.js';
+import { loadSurfaceManifest } from './surface/surface-runtime.js';
 
 export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
 

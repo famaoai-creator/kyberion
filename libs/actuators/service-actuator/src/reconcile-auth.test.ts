@@ -9,12 +9,12 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
 }));
 
-vi.mock('../../../core/service-binding.js', () => ({
+vi.mock('../../../core/service/service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
-vi.mock('../../../core/secret-guard.js', () => ({
+vi.mock('../../../core/secret/secret-guard.js', () => ({
   secretGuard: {
     getSecret: mocks.getSecret,
   },
@@ -23,7 +23,7 @@ vi.mock('../../../core/secret-guard.js', () => ({
 // `inspectServiceAuth` validates the preset path with `assertSafeRepositoryPath`
 // before ever reading it, so this seam must keep the real (pure, fs-boundary)
 // implementation instead of dropping it — only the actual read/exec calls are
-// faked. See libs/core/src/pfc/ServiceValidator.ts:123.
+// faked. See libs/core/pfc/ServiceValidator.ts:123.
 vi.mock('../../../core/secure-io.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../core/secure-io.js')>()),
   safeReadFile: mocks.safeReadFile,
@@ -37,14 +37,14 @@ vi.mock('../../../core/secure-io.js', async (importOriginal) => ({
 // branching, not for catalog/schema plumbing, so mock the registry seam
 // directly and keep parsing the same `mocks.safeReadFile` fixture the tests
 // already configure.
-vi.mock('../../../core/service-preset-registry.js', () => ({
+vi.mock('../../../core/service/service-preset-registry.js', () => ({
   loadServicePresetAtPath: (presetPath: string, expectedServiceId?: string) => {
     const raw = JSON.parse(String(mocks.safeReadFile(presetPath)));
     return { service_id: raw.service_id || expectedServiceId, ...raw };
   },
 }));
 
-import { validateServiceAuth } from '../../../core/src/pfc/ServiceValidator.js';
+import { validateServiceAuth } from '../../../core/pfc/ServiceValidator.js';
 
 describe('service-actuator: validateServiceAuth', () => {
   const MOCK_PRESET_PATH = 'mock-preset.json';

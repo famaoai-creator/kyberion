@@ -4,11 +4,11 @@ import {
   childDelegationEnv,
   currentDelegationDepth,
 } from './operation-policy-gate.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { withExecutionContextAsync } from './authority.js';
-import { policyEngine } from './policy-engine.js';
+import { policyEngine } from './governance/policy-engine.js';
 
-vi.mock('./audit-chain.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
 }));
 

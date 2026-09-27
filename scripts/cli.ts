@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
+import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
   assertSafeRepositoryPath,
@@ -15,7 +15,7 @@ import {
 import { loadActuatorExampleCatalog } from '@agent/core/actuator-example-catalog';
 import type { ActuatorExampleRecord } from '@agent/core/actuator-example-catalog';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import { checkAllActuatorCapabilities } from '@agent/core/actuator-capability';
 import { assertPipelinePreviewResourcePath, previewPipeline } from '@agent/core/pipeline-preview';
@@ -28,9 +28,9 @@ import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
-import { createProjectTrustApprovalRequest } from '@agent/core/project-trust';
+import { createProjectTrustApprovalRequest } from '@agent/core/project/project-trust';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import { isMacOS, isWindows } from '@agent/core/platform';

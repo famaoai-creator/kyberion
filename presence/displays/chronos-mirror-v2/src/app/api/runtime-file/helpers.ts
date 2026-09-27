@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { listProjectRecords, type ProjectRecord } from '@agent/core/project-registry';
+import { listProjectRecords, type ProjectRecord } from '@agent/core/project/project-registry';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { normalizeScopedReadPath } from '../../../lib/scoped-read-path';
 

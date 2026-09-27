@@ -8,23 +8,29 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/logic-utils';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import { getVoiceBridge } from '@agent/core/voice-bridge';
-import { consumeTenantBudget, TenantRateLimitExceededError } from '@agent/core/tenant-rate-limiter';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { getVoiceBridge } from '@agent/core/voice/voice-bridge';
+import {
+  consumeTenantBudget,
+  TenantRateLimitExceededError,
+} from '@agent/core/organization/tenant-rate-limiter';
 import {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
-} from '@agent/core/distill-knowledge-injector';
-import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
+} from '@agent/core/knowledge/distill-knowledge-injector';
+import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
 import {
   resolveReasoningParticipant,
   renderReasoningParticipantContext,
   type ReasoningParticipant,
-} from '@agent/core/reasoning-participant';
+} from '@agent/core/reasoning/reasoning-participant';
 import { validateContextOutputTier } from '@agent/core/context-security-scope';
 import type { GovernedContextFragment } from '@agent/core/context-security-scope';
-import type { ReasoningCallOptions, ToolDefinition } from '@agent/core/reasoning-backend-contracts';
-import { curateBackgroundReviewProposals } from '@agent/core/background-review-curator';
+import type {
+  ReasoningCallOptions,
+  ToolDefinition,
+} from '@agent/core/reasoning/reasoning-backend-contracts';
+import { curateBackgroundReviewProposals } from '@agent/core/workforce/background-review-curator';
 import { generateKnowledgeCurationReport } from '@agent/core/knowledge-curation-report';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { deriveExecutionGraph, executeGraph } from '@agent/core/graph-scheduler';

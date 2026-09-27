@@ -1,7 +1,7 @@
 import { getAllFiles } from '@agent/core/fs-utils';
-import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineInputPlaceholders } from '@agent/core/pipeline-input-contract';
+import { resolvePipelineInputPlaceholders } from '@agent/core/pipeline/pipeline-input-contract';
 import { createAjv } from '@agent/core/foundation';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

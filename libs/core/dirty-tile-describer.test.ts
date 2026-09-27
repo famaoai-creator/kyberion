@@ -13,8 +13,8 @@ import {
   ImageDescriptionUnavailableError,
   createReasoningVisionDescribeFn,
   type DescribeFn,
-} from './image-description-bridge.js';
-import type { ReasoningBackend } from './reasoning-backend-contracts.js';
+} from './media/image-description-bridge.js';
+import type { ReasoningBackend } from './reasoning/reasoning-backend-contracts.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 

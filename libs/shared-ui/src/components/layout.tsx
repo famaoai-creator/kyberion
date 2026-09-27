@@ -6,7 +6,7 @@ import type {
   KbNextActionProps,
   KbSectionProps,
   KbStackProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { asArray } from '../safety.js';
 import { ActionRefButton, type ActionRefLike } from './controls.js';
 import { toneAttr } from './feedback.js';

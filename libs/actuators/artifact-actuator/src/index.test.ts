@@ -3,7 +3,7 @@ import AjvModule from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
-import { registerOpGuard, resetOpPreflight } from '@agent/core/op-preflight';
+import { registerOpGuard, resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { handleArtifactAction } from './artifact-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BoundedVideoQueue } from './bounded-video-queue.js';
-import type { VideoFrame } from './meeting-session-types.js';
+import type { VideoFrame } from './meeting/meeting-session-types.js';
 
 function frame(ts_ms: number, payload: number[] = [1, 2, 3]): VideoFrame {
   return {

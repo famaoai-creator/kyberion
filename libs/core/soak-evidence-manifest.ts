@@ -1,7 +1,7 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { assertNotSimulatedEvidence } from './scenario-evidence-class.js';
+import { assertNotSimulatedEvidence } from './scenario/scenario-evidence-class.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 export interface SoakEvidenceManifest {

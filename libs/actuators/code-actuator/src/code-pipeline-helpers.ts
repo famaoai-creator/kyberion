@@ -6,7 +6,7 @@ import {
   parseSafeJsonObjectValue,
   readJson,
 } from '@agent/core/foundation';
-import type { AdfEngineContext } from '@agent/core/adf-engine';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -17,7 +17,7 @@ import {
   safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -27,13 +27,13 @@ import * as pathResolver from '@agent/core/path-resolver';
 import {
   loadCapabilityRegistry,
   scanProviderCapabilities,
-} from '@agent/core/provider-capability-scanner';
+} from '@agent/core/provider/provider-capability-scanner';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runGovernedCommand, runGovernedShellScript } from '@agent/core/command-runner';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -610,7 +610,7 @@ export async function impactAnalysisOp(input: {
     .slice(0, 400)
     .map((file) => path.relative(repoPath, file));
 
-  const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
+  const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
   const prompt = [
     'You are performing an impact analysis for a change request against an existing codebase.',
     'Return JSON only, exactly this shape:',

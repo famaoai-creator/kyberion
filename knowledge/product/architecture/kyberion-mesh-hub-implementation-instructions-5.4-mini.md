@@ -170,7 +170,7 @@ Every task is one patch. Read the listed current code and tests before editing. 
 - `knowledge/product/schemas/mesh-delivery-record.schema.json`
 - `knowledge/product/schemas/mesh-topic-subscription.schema.json`
 - `knowledge/product/governance/mesh-hub-policy.json`
-- `libs/core/mesh-hub-contract.ts`
+- `libs/core/mesh/mesh-hub-contract.ts`
 - focused schema/contract tests
 
 **Acceptance:**
@@ -188,8 +188,8 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 **Add:**
 
-- `libs/core/mesh-peer-directory.ts`
-- `libs/core/mesh-peer-directory.test.ts`
+- `libs/core/mesh/mesh-peer-directory.ts`
+- `libs/core/mesh/mesh-peer-directory.test.ts`
 - narrowly scoped exports in `libs/core/index.ts`
 
 **Required APIs:**
@@ -216,8 +216,8 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 **Add:**
 
-- `libs/core/mesh-message-broker.ts`
-- `libs/core/mesh-message-broker.test.ts`
+- `libs/core/mesh/mesh-message-broker.ts`
+- `libs/core/mesh/mesh-message-broker.test.ts`
 
 **Required APIs:**
 
@@ -249,8 +249,8 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 **Add:**
 
-- `libs/core/mesh-router.ts`
-- `libs/core/mesh-topic-registry.ts`
+- `libs/core/mesh/mesh-router.ts`
+- `libs/core/mesh/mesh-topic-registry.ts`
 - corresponding focused tests
 
 **Required behavior:**
@@ -275,8 +275,8 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 **Add:**
 
-- `libs/core/mesh-hub-peer-messaging-adapter.ts`
-- `libs/core/mesh-hub-peer-messaging-adapter.test.ts`
+- `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`
+- `libs/core/mesh/mesh-hub-peer-messaging-adapter.test.ts`
 - focused adapter tests
 
 **Compatibility boundary:**
@@ -392,7 +392,7 @@ Run every command from the repository root (`/Users/famao/kyberion`), where the 
 
 ```bash
 pnpm run check -- --scope full --only contract-schemas
-pnpm exec vitest run libs/core/mesh-*.test.ts libs/core/peer-messaging.test.ts libs/core/a2a-bridge.test.ts libs/core/work-coordination*.test.ts
+pnpm exec vitest run libs/core/mesh-*.test.ts libs/core/mesh/peer-messaging.test.ts libs/core/mesh/a2a-bridge.test.ts libs/core/work-coordination*.test.ts
 pnpm build
 pnpm run validate
 ```

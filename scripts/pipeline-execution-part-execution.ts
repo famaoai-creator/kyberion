@@ -5,12 +5,12 @@ import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io
 import { readTextFile } from '@agent/core/foundation';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
+import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   createApprovalRequest,
   isApprovalRequestExpired,
   loadApprovalRequest,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
 import { compactStepOutputContext } from '@agent/core/output-artifacts';
 import {
@@ -21,25 +21,25 @@ import {
   type AdfStep,
   type AdfStepHandlers,
   type AdfStepHooks,
-} from '@agent/core/adf-engine';
+} from '@agent/core/pipeline/adf-engine';
 import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
 } from '@agent/core/lifecycle-hook-engine';
-import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import {
   withActuatorForwardingPort,
   type ActuatorForwardRequest,
   type ActuatorForwardingPort,
-} from '@agent/core/actuator-forwarding-port';
-import { runToolCallBatch } from '@agent/core/tool-call-scheduler';
-import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/op-input-contracts';
+} from '@agent/core/actuator/actuator-forwarding-port';
+import { runToolCallBatch } from '@agent/core/tool/tool-call-scheduler';
+import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/pipeline/op-input-contracts';
 import {
   hashPipelineOutput,
   pipelineJournalChannelSnapshot,
-} from '@agent/core/pipeline-run-journal';
+} from '@agent/core/pipeline/pipeline-run-journal';
 import { deriveExecutionGraph } from '@agent/core/graph-scheduler';
-import type { ResourceClaim } from '@agent/core/tool-call-scheduler';
+import type { ResourceClaim } from '@agent/core/tool/tool-call-scheduler';
 import {
   createGraphRunArtifact,
   persistGraphRunArtifact,
@@ -48,7 +48,7 @@ import {
 } from '@agent/core/graph-run-artifact';
 
 import { z } from 'zod';
-import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { formatPipelineFailure } from './pipeline-result-reporting.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';

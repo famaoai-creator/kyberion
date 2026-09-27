@@ -39,7 +39,7 @@ status: archived
 
 ### Task 2: TraceContext・監査への相関 ID — `claude-sonnet-4`
 
-1. TraceContext(`libs/core/src/trace.ts`)のスパン/イベントに相関 ID 属性を付与し、intent 経路の各段(compile・clarify・execute・verify)が同一 ID を持つようにする。
+1. TraceContext(`libs/core/analysis/trace.ts`)のスパン/イベントに相関 ID 属性を付与し、intent 経路の各段(compile・clarify・execute・verify)が同一 ID を持つようにする。
 2. 監査チェーン(SA-01)のエントリにも相関 ID を含める(intent 起点の操作の追跡)。
 3. フィールド追加のみで既存読み手を壊さない。
 

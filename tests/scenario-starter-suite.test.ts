@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadScenarioFile } from '@agent/core/scenario-definition';
-import { runScenario } from '@agent/core/scenario-executor';
+import { loadScenarioFile } from '@agent/core/scenario/scenario-definition';
+import { runScenario } from '@agent/core/scenario/scenario-executor';
 import { collectScenarioFiles, createInProcessPipelineRunner } from '../scripts/scenario_runner.js';
 
 const files = collectScenarioFiles('eval/scenarios');

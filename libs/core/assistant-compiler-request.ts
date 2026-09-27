@@ -10,20 +10,20 @@ import {
   inferGovernedDeliveryMode,
   type IntentCompilerProvider,
   type IntentContract,
-} from './intent-contract.js';
+} from './intent/intent-contract.js';
 import {
   buildOrganizationWorkLoopSummary,
   overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
-} from './work-design.js';
-import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
+} from './workforce/work-design.js';
+import { resolveWorkScopeSignalOptions } from './workforce/work-scope-decision.js';
 import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
 } from './execution-brief.js';
-import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
-import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
+import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
+import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
 
 const REQUEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/assistant-compiler-request.schema.json'

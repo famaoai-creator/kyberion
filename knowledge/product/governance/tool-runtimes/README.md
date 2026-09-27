@@ -7,7 +7,7 @@ Canonical source for tool runtime records (RSP-17).
   single-element `tools` array, validating against
   `knowledge/product/schemas/tool-runtime-registry.schema.json` as-is.
 - The legacy single file `tool-runtime-registry.json` has been removed
-  (snapshot abolished). Loader: `libs/core/tool-runtime-registry.ts`
+  (snapshot abolished). Loader: `libs/core/tool/tool-runtime-registry.ts`
   (`KYBERION_TOOL_RUNTIME_REGISTRY_DIR` / `KYBERION_TOOL_RUNTIME_REGISTRY_PATH`).
 
 - `index.json` pins the canonical item order (model-registry precedent); loaders require an exact set match.

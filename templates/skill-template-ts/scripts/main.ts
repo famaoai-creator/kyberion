@@ -4,7 +4,7 @@
  */
 
 import { logger } from '@agent/core/core';
-import { runSkillAsync } from '@agent/core/skill-wrapper';
+import { runSkillAsync } from '@agent/core/plugin/skill-wrapper';
 import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 

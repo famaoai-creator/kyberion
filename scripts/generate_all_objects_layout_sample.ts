@@ -1,4 +1,4 @@
-import { generateNativePptx } from '@agent/core/media-contracts';
+import { generateNativePptx } from '@agent/core/media/media-contracts';
 import {
   PPTX_PALETTE as C,
   textElement as txt,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { loadIntentDomainOntologyCatalog } from '@agent/core/intent-resolution';
+import { loadIntentDomainOntologyCatalog } from '@agent/core/intent/intent-resolution';
 import { checkIntentDomainCoverage } from './check_intent_domain_coverage.js';
 
 describe('intent domain coverage checker', () => {

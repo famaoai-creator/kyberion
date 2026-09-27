@@ -5,33 +5,36 @@ import {
   probeManifest,
 } from '@agent/core/environment-capability';
 import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
-import { inspectMeshHub } from '@agent/core/mesh-hub-inspection';
-import { getGovernanceControlSummary } from '@agent/core/governance-status';
+import { inspectMeshHub } from '@agent/core/mesh/mesh-hub-inspection';
+import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
 import { listScheduledPipelines } from '@agent/core/pipeline-scheduler';
 import {
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
   listSurfaceOutboxMessages,
-} from '@agent/core/surface-coordination-store';
-import { isSurfaceOutboxDue } from '@agent/core/surface-delivery';
-import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+} from '@agent/core/surface/surface-coordination-store';
+import { isSurfaceOutboxDue } from '@agent/core/surface/surface-delivery';
+import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import {
   assessDesktopObservationReadiness,
   listDesktopObservationSources,
-} from '@agent/core/desktop-recording';
+} from '@agent/core/virtual/desktop-recording';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { formatEnvValidationReport, validateEnv } from '@agent/core/env-validator';
 import { evaluateDegradation, loadHealthThresholds } from '@agent/core/health-degradation';
-import { discoverProviders } from '@agent/core/provider-discovery';
-import { listDemotedProviders } from '@agent/core/provider-health-view';
+import { discoverProviders } from '@agent/core/provider/provider-discovery';
+import { listDemotedProviders } from '@agent/core/provider/provider-health-view';
 import { metrics } from '@agent/core/metrics';
 import type { EnvValidationReport } from '@agent/core/env-validator';
 import type { LatencyRegression } from '@agent/core/health-degradation';
 import { getEmbeddingBackend } from '@agent/core/embedding-backend';
 import { installEmbeddingBackendIfAvailable } from '@agent/core/embedding-bootstrap';
 import { probeAppleIntelligence } from '@agent/core/apple-intelligence-bridge';
-import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core/mission-hygiene';
+import {
+  collectMissionHygieneReport,
+  formatMissionHygieneLine,
+} from '@agent/core/mission/mission-hygiene';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';

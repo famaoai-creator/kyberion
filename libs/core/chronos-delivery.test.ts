@@ -6,11 +6,11 @@ import {
   resolveChronosDeliveryChannel,
   validateChronosDeliveryTarget,
 } from './chronos-delivery.js';
-import { validatePipelineAdf } from './pipeline-contract.js';
+import { validatePipelineAdf } from './pipeline/pipeline-contract.js';
 import {
   clearSurfaceOutboxMessage,
   listSurfaceOutboxMessages,
-} from './surface-coordination-store.js';
+} from './surface/surface-coordination-store.js';
 
 const createdMessageIds: string[] = [];
 

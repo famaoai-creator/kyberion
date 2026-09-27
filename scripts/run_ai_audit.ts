@@ -22,11 +22,11 @@ import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
+import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   getInstalledReasoningMode,
   installReasoningBackends,
-} from '@agent/core/reasoning-bootstrap';
+} from '@agent/core/reasoning/reasoning-bootstrap';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';

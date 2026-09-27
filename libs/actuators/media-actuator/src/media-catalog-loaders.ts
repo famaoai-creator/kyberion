@@ -4,11 +4,11 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
 import {
   loadTenantDesignOverride,
   type TenantDesignOverride,
-} from '@agent/core/tenant-design-override';
+} from '@agent/core/organization/tenant-design-override';
 import {
   defineCatalog,
   isRecord,

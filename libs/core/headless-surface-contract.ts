@@ -2,7 +2,7 @@ import {
   type SurfaceAuthorizationContext,
   type SurfaceAuthorizationRole,
   type SurfacePermission,
-} from './surface-authorization.js';
+} from './surface/surface-authorization.js';
 import { nowIso } from './foundation/time.js';
 
 /**

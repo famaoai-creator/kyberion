@@ -14,8 +14,8 @@ status: archived
 サービス実行エンジン(`libs/core/service-engine*.ts`)は api/cli/mcp(stdio・HTTP)の4トランスポートを持つ本格実装で、OAuth 基盤(`oauth-broker.ts` の PKCE 込み full flow + `scripts/oauth_callback_surface.ts` のコールバックサーバ)も production 級。しかし:
 
 - **OAuth を実際に使うプリセットは 32 中 2 つだけ**(canva, xapi)。github/slack/notion/jira 等の主要どころは**手動トークン貼付**で、失効・ローテーションの運用が脆い。
-- **トークンは平文 JSON で保存**(`libs/core/secret-guard.ts` → `vault/secrets/`・`knowledge/personal/connections/`。fsync/backup/監査はあるが暗号化なし)。外部 KMS リゾルバはコメント上のフックのみ。
-- **日本企業向け SaaS の API 連携がゼロ**: LINE WORKS / Teams(チャット) / kintone / freee / Box / Chatwork 等は preset が無く、USE_CASES に登場する freee 等は**ブラウザ自動化(procedure registry)だけが経路**(`libs/core/procedure-registry.test.ts` の `attendance.approve.freee`)。`service-binding.test.ts` は `kintone:approval` バインディングを参照するが kintone preset は存在しない。
+- **トークンは平文 JSON で保存**(`libs/core/secret/secret-guard.ts` → `vault/secrets/`・`knowledge/personal/connections/`。fsync/backup/監査はあるが暗号化なし)。外部 KMS リゾルバはコメント上のフックのみ。
+- **日本企業向け SaaS の API 連携がゼロ**: LINE WORKS / Teams(チャット) / kintone / freee / Box / Chatwork 等は preset が無く、USE_CASES に登場する freee 等は**ブラウザ自動化(procedure registry)だけが経路**(`libs/core/knowledge/procedure-registry.test.ts` の `attendance.approve.freee`)。`service-binding.test.ts` は `kintone:approval` バインディングを参照するが kintone preset は存在しない。
 - SBI グループ運用(6 テナント)では kintone / LINE WORKS 系の需要が現実的に見込まれる。
 
 ## スコープの限定(重要)
@@ -39,7 +39,7 @@ status: archived
 
 ### 実装状況 (2026-07-11 — Task 2)
 
-- `libs/core/secret-encryption.ts`: `KYBERION_SECRET_ENCRYPTION=none|keychain`(既定 none=現行互換、未知値は fail-closed で throw)。keychain モードは macOS `security` CLI(secure-io の safeExecResult 経由)に保持した 32 バイト鍵で AES-256-GCM。読込は自動判別(平文互換)、暗号化済み文書の復号失敗は loud に throw(起動スキャンのみ warn+skip)。バックアップは raw バイト(暗号文書に平文 .bak を作らない)。
+- `libs/core/secret/secret-encryption.ts`: `KYBERION_SECRET_ENCRYPTION=none|keychain`(既定 none=現行互換、未知値は fail-closed で throw)。keychain モードは macOS `security` CLI(secure-io の safeExecResult 経由)に保持した 32 バイト鍵で AES-256-GCM。読込は自動判別(平文互換)、暗号化済み文書の復号失敗は loud に throw(起動スキャンのみ warn+skip)。バックアップは raw バイト(暗号文書に平文 .bak を作らない)。
 - `pnpm secrets:encrypt`(`--decrypt` で平文エクスポート=鍵全損時の脱出経路)。migrate は各ファイルの raw .bak を先に書く。
 - テスト: モード解決(未知値拒否)、roundtrip、改竄/鍵違い拒否、migrate の encrypt→skip 冪等→decrypt 復元(計21件緑、鍵はテスト注入で keychain 非接触)。
 - 残: age モード(非 Mac)、OAuth プリセット拡大(Task 1/3)、kintone(Task 4)。

@@ -87,8 +87,8 @@ video-content-brief
 追加:
 
 - `knowledge/product/schemas/video-content-brief.schema.json`
-- `libs/core/video-content-brief-contract.ts`
-- `libs/core/video-content-brief-compiler.ts`
+- `libs/core/video/video-content-brief-contract.ts`
+- `libs/core/video/video-content-brief-compiler.ts`
 
 想定 contract:
 
@@ -157,12 +157,12 @@ video-content-brief
 
 初期 mapping:
 
-| content_type | beats |
-|---|---|
-| `howto` | hook, process, proof, cta |
-| `product-walkthrough` | hook, context, demo, proof, cta |
-| `decision-support` | problem, evidence, recommendation, next-action |
-| `docs-demo` | promise, steps, artifact, validation |
+| content_type          | beats                                          |
+| --------------------- | ---------------------------------------------- |
+| `howto`               | hook, process, proof, cta                      |
+| `product-walkthrough` | hook, context, demo, proof, cta                |
+| `decision-support`    | problem, evidence, recommendation, next-action |
+| `docs-demo`           | promise, steps, artifact, validation           |
 
 完了条件:
 
@@ -226,11 +226,11 @@ semantic 初期セット:
 
 初期マッピング:
 
-| presentation_mode | 目的 | 既定 layout | 主テンプレート |
-|---|---|---|---|
-| `howto` | 手順・検証・再現性を見せる | `process-flow` | `howto-guide` |
-| `promo` | 価値・訴求・CTA を強く見せる | `promo-spot` | `promo-spot` |
-| `vtuber` | 人格・対話・ライブ感を見せる | `vtuber-stage` | `vtuber-stage` |
+| presentation_mode | 目的                         | 既定 layout    | 主テンプレート |
+| ----------------- | ---------------------------- | -------------- | -------------- |
+| `howto`           | 手順・検証・再現性を見せる   | `process-flow` | `howto-guide`  |
+| `promo`           | 価値・訴求・CTA を強く見せる | `promo-spot`   | `promo-spot`   |
+| `vtuber`          | 人格・対話・ライブ感を見せる | `vtuber-stage` | `vtuber-stage` |
 
 完了条件:
 
@@ -245,9 +245,9 @@ semantic 初期セット:
 
 変更対象:
 
-- `libs/core/narrated-video-brief-compiler.ts`
-- `libs/core/video-composition-contract.ts`
-- `libs/core/video-composition-compiler.ts`
+- `libs/core/video/narrated-video-brief-compiler.ts`
+- `libs/core/video/video-composition-contract.ts`
+- `libs/core/video/video-composition-compiler.ts`
 - `libs/core/index.ts`
 
 実装:
@@ -275,7 +275,7 @@ semantic 初期セット:
 
 変更対象:
 
-- `libs/core/video-composition-compiler.ts`
+- `libs/core/video/video-composition-compiler.ts`
 - `knowledge/product/governance/video-composition-template-registry.json`
 
 追加 content fields:
@@ -290,14 +290,14 @@ semantic 初期セット:
 
 template 方針:
 
-| template | role | content |
-|---|---|---|
-| `basic-title-card` | hook | headline, body, caption |
-| `howto-guide` | process/demo | headline, body, visual_steps |
-| `split-highlight` | proof/evidence | headline, body, visual_steps/evidence_items/screen_ref |
-| `promo-spot` | hook/value/proof/cta | headline, body, value_points, social_proof |
-| `vtuber-stage` | hook/persona/demo/cta | headline, body, chat_messages, stage_notes |
-| `logo-outro` | cta/outro | headline, body, cta |
+| template           | role                  | content                                                |
+| ------------------ | --------------------- | ------------------------------------------------------ |
+| `basic-title-card` | hook                  | headline, body, caption                                |
+| `howto-guide`      | process/demo          | headline, body, visual_steps                           |
+| `split-highlight`  | proof/evidence        | headline, body, visual_steps/evidence_items/screen_ref |
+| `promo-spot`       | hook/value/proof/cta  | headline, body, value_points, social_proof             |
+| `vtuber-stage`     | hook/persona/demo/cta | headline, body, chat_messages, stage_notes             |
+| `logo-outro`       | cta/outro             | headline, body, cta                                    |
 
 完了条件:
 
@@ -407,8 +407,8 @@ GPT 5.4 に渡す作業順は以下。
 ```bash
 pnpm --filter @agent/core build
 pnpm exec vitest run \
-  libs/core/narrated-video-brief-compiler.test.ts \
-  libs/core/video-composition-compiler.test.ts \
+  libs/core/video/narrated-video-brief-compiler.test.ts \
+  libs/core/video/video-composition-compiler.test.ts \
   libs/actuators/video-composition-actuator/src/index.test.ts
 pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json
 ffprobe -hide_banner active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-demo.mp4

@@ -33,23 +33,23 @@ import {
   persistBrowserExtensionObservation,
   loadBrowserExtensionObservations,
   loadBrowserExtensionRecordingAtPath,
-} from '@agent/core/browser-extension-bridge';
+} from '@agent/core/browser/browser-extension-bridge';
 import {
   applyProcedureDelta,
   classifyFailure,
   createProcedureDelta,
   loadProcedureDelta,
   saveProcedureDelta,
-} from '@agent/core/procedure-self-repair';
-import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
-import { promoteBrowserProcedure } from '@agent/core/browser-procedure-promotion';
-import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
-import { collectProcedureUserInputs } from '@agent/core/procedure-inputs';
+} from '@agent/core/knowledge/procedure-self-repair';
+import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
+import { promoteBrowserProcedure } from '@agent/core/browser/browser-procedure-promotion';
+import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
+import { collectProcedureUserInputs } from '@agent/core/knowledge/procedure-inputs';
 import {
   loadProcedures,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-} from '@agent/core/procedure-registry';
+} from '@agent/core/knowledge/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -58,19 +58,22 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   createDistillCandidateRecord,
   saveDistillCandidateRecord,
-} from '@agent/core/distill-candidate-registry';
+} from '@agent/core/knowledge/distill-candidate-registry';
 import { withExecutionContext } from '@agent/core/authority';
-import { getReasoningBackend, delegateTaskWithUntrustedData } from '@agent/core/reasoning-backend';
+import {
+  getReasoningBackend,
+  delegateTaskWithUntrustedData,
+} from '@agent/core/reasoning/reasoning-backend';
 import type {
   BrowserExtensionRecording,
   BrowserExtensionLease,
   BrowserExtensionSessionRequest,
-} from '@agent/core/browser-extension-bridge';
-import type { ProcedureEntry } from '@agent/core/procedure-types';
+} from '@agent/core/browser/browser-extension-bridge';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { nowIso } from '@agent/core/foundation';
 import { formatWireError } from '@agent/core/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';

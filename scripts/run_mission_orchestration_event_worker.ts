@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { processMissionOrchestrationEventPath } from '@agent/core/mission-orchestration-worker';
+import { processMissionOrchestrationEventPath } from '@agent/core/mission/mission-orchestration-worker';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function parseEventPath(argv: string[]): string {

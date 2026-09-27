@@ -4,8 +4,8 @@ const missionStateMocks = vi.hoisted(() => ({
   loadState: vi.fn(),
 }));
 
-vi.mock('@agent/core/mission-state', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/mission-state')>();
+vi.mock('@agent/core/mission/mission-state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/mission/mission-state')>();
   return {
     ...actual,
     listMissionsInSearchDirs: () => [

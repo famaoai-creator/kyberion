@@ -9,7 +9,7 @@ import {
   KB_STATUS_FAMILY_GLYPHS,
   KB_STATUS_VALUES,
   validateA2UIComponentProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { renderStatusFamilyGlyphRules } from '../../../scripts/design-token-utils.js';
 import { KB_STATUS_GLYPHS, layoutChart } from '../vanilla/charts.js';
 import {

@@ -1,32 +1,32 @@
-import { formatMissionTeamPlanView } from '@agent/core/mission-team-view';
+import { formatMissionTeamPlanView } from '@agent/core/mission/mission-team-view';
 /**
  * scripts/refactor/mission-controller-router.ts
  * Command routing for the Mission Controller CLI.
  */
 
 import { logger } from '@agent/core/core';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   clearSurfaceOutboxMessage,
   listSurfaceOutboxMessages,
-} from '@agent/core/surface-coordination-store';
-import { resolveIntentTrackGate } from '@agent/core/intent-track-resolver';
-import { saveProjectTrackRecord } from '@agent/core/project-track-registry';
-import { writeIntentGoalHandoff } from '@agent/core/intent-handoff';
+} from '@agent/core/surface/surface-coordination-store';
+import { resolveIntentTrackGate } from '@agent/core/intent/intent-track-resolver';
+import { saveProjectTrackRecord } from '@agent/core/project/project-track-registry';
+import { writeIntentGoalHandoff } from '@agent/core/intent/intent-handoff';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   collectMissionHygieneReport,
   formatMissionHygieneLine,
   notifyMissionHygiene,
-} from '@agent/core/mission-hygiene';
+} from '@agent/core/mission/mission-hygiene';
 import {
   applyProcessImprovementProposal,
   decideProcessImprovementProposal,
   listProcessImprovementProposals,
   runMissionRetrospective,
-} from '@agent/core/mission-retrospective';
-import { generateMissionWorkReconciliationScaffold } from '@agent/core/mission-work-reconciliation';
-import type { HumanDecidedBy } from '@agent/core/mission-types';
+} from '@agent/core/mission/mission-retrospective';
+import { generateMissionWorkReconciliationScaffold } from '@agent/core/mission/mission-work-reconciliation';
+import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
 import { resolveDecidedByFromArgv } from '../lib/decided-by-args.js';
@@ -259,7 +259,7 @@ export interface MissionControllerRoutingContext {
     candidateId: string,
     note?: string,
     tenantSlug?: string,
-    knowledgeDomain?: import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain,
+    knowledgeDomain?: import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain,
     ownerNhi?: string,
     curationJson?: string,
     decidedBy?: HumanDecidedBy,
@@ -992,7 +992,7 @@ export async function runMissionControllerAction(
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
         getValue('--knowledge-domain', context.argv) as
-          import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
+          import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
         getValue('--owner-nhi', context.argv),
         getValue('--curation-json', context.argv),
         decidedBy,

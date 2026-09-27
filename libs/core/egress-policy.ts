@@ -3,15 +3,15 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
+import { loadServiceEndpointsCatalog } from './service/service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { getActiveSandboxPolicy, isSandboxNetworkHostAllowed } from './sandbox-policy.js';
+import { getActiveSandboxPolicy, isSandboxNetworkHostAllowed } from './shell/sandbox-policy.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import {
   _resetProviderEndpointDomainsForTests,
   providerEndpointDomains,
-} from './provider-endpoint-domains.js';
+} from './provider/provider-endpoint-domains.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 

@@ -12,7 +12,7 @@ import {
   verifyLedgerEntryHash,
   type ChainAlg,
 } from './chain-integrity.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import {
   eventScopeMatches,
   normalizeEventScope,

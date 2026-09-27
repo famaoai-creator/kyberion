@@ -1,7 +1,7 @@
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract-parser';
+} from '@agent/core/intent/intent-resolution-contract-parser';
 import { isRecord } from '@agent/core/foundation/primitives';
 
 const CONVERSATION_RESPONSE_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

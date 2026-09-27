@@ -1,5 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { assessPipelineDryRun } from '@agent/core/pipeline-dry-run';
+import { assessPipelineDryRun } from '@agent/core/pipeline/pipeline-dry-run';
 import { pathResolver } from '@agent/core/path-resolver';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';

@@ -8,7 +8,7 @@ export type {
   KnowledgeGapRecord,
   SlackKnowledgeReactionInput,
   KnowledgeFeedbackCap,
-} from './src/knowledge-feedback-loop.js';
+} from './knowledge/knowledge-feedback-loop.js';
 
 // KP-06: effectiveness-driven curation + freshness SLO report, built from
 // KP-05's delivery/usage aggregate. Candidates only — no auto demotion.
@@ -21,7 +21,7 @@ export {
   writeCurationReport,
   knowledgeCurationReportPath,
   knowledgeCurationSloConfigPath,
-} from './src/knowledge-curation-report.js';
+} from './knowledge/knowledge-curation-report.js';
 
 export type {
   CurationSloConfig,
@@ -29,18 +29,18 @@ export type {
   CurationFreshnessBreach,
   CurationArchiveAdvisory,
   KnowledgeCurationReport,
-} from './src/knowledge-curation-report.js';
+} from './knowledge/knowledge-curation-report.js';
 // DA-08: tenant-ingested cards join the weekly curation cycle (advisory only).
 
 export {
   computeTenantIngestCuration,
   TENANT_INGEST_DEFAULT_KIND,
-} from './src/knowledge-curation-tenant-ingest.js';
+} from './knowledge/knowledge-curation-tenant-ingest.js';
 
 export type {
   TenantIngestCurationEntry,
   TenantIngestCurationSection,
-} from './src/knowledge-curation-tenant-ingest.js';
+} from './knowledge/knowledge-curation-tenant-ingest.js';
 
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 
@@ -58,9 +58,9 @@ export {
   JSON_ARRAY_CONSTRAINTS,
   jsonOutputConstraints,
   VALIDATOR_CHAIN_PATTERN,
-} from './prompt-constraints.js';
+} from './reasoning/prompt-constraints.js';
 
-export type { ValidatorName } from './prompt-constraints.js';
+export type { ValidatorName } from './reasoning/prompt-constraints.js';
 
 // BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
 
@@ -86,38 +86,42 @@ export type {
   GoldenScenario,
   GoldenSuccessCondition,
   ProcedureRiskClass,
-} from './procedure-types.js';
+} from './knowledge/procedure-types.js';
 
-export { PROCEDURE_RESOLUTION_THRESHOLDS } from './procedure-types.js';
+export { PROCEDURE_RESOLUTION_THRESHOLDS } from './knowledge/procedure-types.js';
 
 export {
   loadProcedures,
   invalidateProcedureCache,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-} from './procedure-registry.js';
+} from './knowledge/procedure-registry.js';
 
-export type { ResolveOptions } from './procedure-registry.js';
+export type { ResolveOptions } from './knowledge/procedure-registry.js';
 
-export { isDryRunSafe, compileBrowserRecording } from './browser-recording-compiler.js';
+export { isDryRunSafe, compileBrowserRecording } from './browser/browser-recording-compiler.js';
 
 export type {
   CompiledBrowserStep,
   CompileOptions,
   CompileRecordingResult,
-} from './browser-recording-compiler.js';
+} from './browser/browser-recording-compiler.js';
 
-export { promoteBrowserProcedure } from './browser-procedure-promotion.js';
+export { promoteBrowserProcedure } from './browser/browser-procedure-promotion.js';
 
 export type {
   PromoteBrowserProcedureOptions,
   PromoteBrowserProcedureResult,
-} from './browser-procedure-promotion.js';
+} from './browser/browser-procedure-promotion.js';
 // dispatchProcedure — re-exports extendLeaseForMfa from browser-extension-bridge (already exported above)
 
-export { dispatchProcedure } from './procedure-dispatcher.js';
+export { dispatchProcedure } from './knowledge/procedure-dispatcher.js';
 
-export type { DispatchInput, DispatchResult, DispatchStatus } from './procedure-dispatcher.js';
+export type {
+  DispatchInput,
+  DispatchResult,
+  DispatchStatus,
+} from './knowledge/procedure-dispatcher.js';
 
 export {
   classifyFailure,
@@ -126,38 +130,41 @@ export {
   loadProcedureDelta,
   suggestRepairAnchor,
   applyProcedureDelta,
-} from './procedure-self-repair.js';
+} from './knowledge/procedure-self-repair.js';
 
-export { collectProcedureUserInputs } from './procedure-inputs.js';
+export { collectProcedureUserInputs } from './knowledge/procedure-inputs.js';
 
-export type { ProcedureInputField } from './procedure-inputs.js';
+export type { ProcedureInputField } from './knowledge/procedure-inputs.js';
 // Service substrate (intent-driven automation adapter)
 
 export {
   validateServiceRecording,
   isExternalEffectStep,
   collectServiceInputNames,
-} from './service-recording.js';
+} from './service/service-recording.js';
 
-export type { ServiceRecording, ServiceRecordingStep } from './service-recording.js';
+export type { ServiceRecording, ServiceRecordingStep } from './service/service-recording.js';
 
-export { serviceRecordingContentHash } from './service-recording.js';
+export { serviceRecordingContentHash } from './service/service-recording.js';
 
-export { compileServiceRecording } from './service-recording-compiler.js';
+export { compileServiceRecording } from './service/service-recording-compiler.js';
 
-export type { CompileServiceOptions, CompileServiceResult } from './service-recording-compiler.js';
+export type {
+  CompileServiceOptions,
+  CompileServiceResult,
+} from './service/service-recording-compiler.js';
 
 export {
   assessServiceDistillCandidate,
   buildServiceProcedureCandidate,
-} from './service-distill-candidate.js';
+} from './service/service-distill-candidate.js';
 
 export type {
   BuildServiceProcedureCandidateOptions,
   ServiceDistillCandidateAssessment,
   ServiceDistillCandidateAssessmentInput,
   ServiceProcedureCandidateResult,
-} from './service-distill-candidate.js';
+} from './service/service-distill-candidate.js';
 
 export {
   ServiceRecordingSession,
@@ -165,32 +172,35 @@ export {
   recordServiceCall,
   startServiceRecordingSession,
   stopServiceRecordingSession,
-} from './service-recording-session.js';
+} from './service/service-recording-session.js';
 
 export type {
   RecordedServiceCall,
   ServiceCallObservation,
   ServiceRecordedParameterKind,
   ServiceRecordingSessionOptions,
-} from './service-recording-session.js';
+} from './service/service-recording-session.js';
 
-export { promoteServiceProcedure } from './service-procedure-promotion.js';
+export { promoteServiceProcedure } from './service/service-procedure-promotion.js';
 
 export type {
   PromoteServiceProcedureOptions,
   PromoteServiceProcedureResult,
-} from './service-procedure-promotion.js';
+} from './service/service-procedure-promotion.js';
 
-export { executeServiceProcedure, resolveServiceParams } from './service-procedure-executor.js';
+export {
+  executeServiceProcedure,
+  resolveServiceParams,
+} from './service/service-procedure-executor.js';
 
 export type {
   ServicePresetRunner,
   ServiceStepResult,
   ExecuteServiceProcedureInput,
   ExecuteServiceProcedureResult,
-} from './service-procedure-executor.js';
+} from './service/service-procedure-executor.js';
 
-export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+export { SERVICE_EXTERNAL_EFFECT_OP } from './knowledge/procedure-dispatcher.js';
 
 // KD-04: untrusted input injection framing contract
 
@@ -251,11 +261,11 @@ export {
   scannableCommand,
   scannableUnits,
   simpleCommands,
-} from './shell-command-normalize.js';
+} from './shell/shell-command-normalize.js';
 
-export { shellCommandApprovalDescriptor } from './shell-command-policy.js';
+export { shellCommandApprovalDescriptor } from './shell/shell-command-policy.js';
 
-export type { SimpleCommand } from './shell-command-normalize.js';
+export type { SimpleCommand } from './shell/shell-command-normalize.js';
 
 // QM-07: git-imported plugin packs (provenance-gated, archive-not-delete).
 
@@ -267,7 +277,7 @@ export type {
   PackImportRecord,
   ImportPluginPackParams,
   ImportPluginPackResult,
-} from './plugin-pack.js';
+} from './plugin/plugin-pack.js';
 
 export {
   loadPluginPackRegistry,
@@ -276,7 +286,7 @@ export {
   packIdFromUrl,
   discoverPackPluginDirs,
   importPluginPack,
-} from './plugin-pack.js';
+} from './plugin/plugin-pack.js';
 
 // QM-06: declared backend capability profiles + failover reset-on-switch.
 

@@ -6,7 +6,7 @@ import {
   loadPeerConversationSession,
   savePeerConversationSession,
   sendPeerConversationMessageToPeer,
-} from '@agent/core/peer-conversation';
+} from '@agent/core/mesh/peer-conversation';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';

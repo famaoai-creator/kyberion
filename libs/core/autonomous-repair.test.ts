@@ -18,7 +18,7 @@ vi.mock('./ops-alert.js', () => ({
 const { validateAndRepairAdfMock } = vi.hoisted(() => ({
   validateAndRepairAdfMock: vi.fn(),
 }));
-vi.mock('./adf-repair-agent.js', () => ({
+vi.mock('./pipeline/adf-repair-agent.js', () => ({
   validateAndRepairAdf: validateAndRepairAdfMock,
 }));
 

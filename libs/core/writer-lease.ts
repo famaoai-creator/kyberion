@@ -12,7 +12,7 @@ import * as crypto from 'node:crypto';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { withLock, withLockSync } from './src/lock-utils.js';
+import { withLock, withLockSync } from './foundation/lock-utils.js';
 
 export interface FencedWriterLease {
   resource_id: string;

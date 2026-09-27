@@ -1,50 +1,53 @@
 /** DH-03: inspect the runtime seam catalog without mutating provider state. */
 import { coreSeamCatalog, type SeamBindingSnapshot } from '../libs/core/seam.js';
-import { peekProviderDiscovery, type ProviderInfo } from '../libs/core/provider-discovery.js';
-import { resolveReasoningBackendSelectionFromContext } from '../libs/core/reasoning-backend-policy.js';
+import {
+  peekProviderDiscovery,
+  type ProviderInfo,
+} from '../libs/core/provider/provider-discovery.js';
+import { resolveReasoningBackendSelectionFromContext } from '../libs/core/reasoning/reasoning-backend-policy.js';
 
 // Import only modules that declare production seams. Keeping this list explicit
 // makes the dump deterministic and prevents a CLI inspection from booting the
 // entire core barrel (which may discover credentials or external providers).
-import '../libs/core/agent-execution-port.js';
-import '../libs/core/a2a-route-port.js';
-import '../libs/core/actuator-forwarding-port.js';
-import '../libs/core/actuator-op-registry.js';
-import '../libs/core/agent-exec-adapter-bridge.js';
-import '../libs/core/agent-pane-runtime-bridge.js';
-import '../libs/core/audio-bus-bridge.js';
-import '../libs/core/audit-forwarder.js';
-import '../libs/core/browser-automation-runtime-bridge.js';
-import '../libs/core/calendar-provider-bridge.js';
+import '../libs/core/agent/agent-execution-port.js';
+import '../libs/core/mesh/a2a-route-port.js';
+import '../libs/core/actuator/actuator-forwarding-port.js';
+import '../libs/core/actuator/actuator-op-registry.js';
+import '../libs/core/agent/agent-exec-adapter-bridge.js';
+import '../libs/core/agent/agent-pane-runtime-bridge.js';
+import '../libs/core/voice/audio-bus-bridge.js';
+import '../libs/core/governance/audit-forwarder.js';
+import '../libs/core/browser/browser-automation-runtime-bridge.js';
+import '../libs/core/meeting/calendar-provider-bridge.js';
 import '../libs/core/camera-output-bridge.js';
-import '../libs/core/provider-bundles/index.js';
-import '../libs/core/deployment-adapter.js';
+import '../libs/core/provider/bundles/index.js';
+import '../libs/core/actuator/deployment-adapter.js';
 import '../libs/core/embedding-backend.js';
-import '../libs/core/email-account-catalog.js';
-import '../libs/core/knowledge-adapter.js';
-import '../libs/core/image-generation-bridge.js';
-import '../libs/core/intent-extractor.js';
-import '../libs/core/judgment-backend.js';
+import '../libs/core/integrations/email-account-catalog.js';
+import '../libs/core/knowledge/knowledge-adapter.js';
+import '../libs/core/media/image-generation-bridge.js';
+import '../libs/core/intent/intent-extractor.js';
+import '../libs/core/reasoning/judgment-backend.js';
 import '../libs/core/identity-context-bridge.js';
-import '../libs/core/meeting-join-driver.js';
-import '../libs/core/mission-llm.js';
-import '../libs/core/mission-orchestration-worker-dispatch-port.js';
+import '../libs/core/meeting/meeting-join-driver.js';
+import '../libs/core/mission/mission-llm.js';
+import '../libs/core/mission/mission-orchestration-worker-dispatch-port.js';
 import '../libs/core/ocr-bridge.js';
-import '../libs/core/reasoning-backend.js';
+import '../libs/core/reasoning/reasoning-backend.js';
 import '../libs/core/risky-op-approval-port.js';
-import '../libs/core/secret-resolver.js';
-import '../libs/core/speech-to-text-bridge.js';
-import '../libs/core/streaming-stt-bridge.js';
-import '../libs/core/streaming-tts-bridge.js';
+import '../libs/core/secret/secret-resolver.js';
+import '../libs/core/voice/speech-to-text-bridge.js';
+import '../libs/core/voice/streaming-stt-bridge.js';
+import '../libs/core/voice/streaming-tts-bridge.js';
 import '../libs/core/super-nerve-execution-port.js';
-import '../libs/core/src/actuator-capability.js';
-import '../libs/core/surface-interaction-model.js';
-import '../libs/core/task-plan-coordinator-port.js';
-import '../libs/core/task-session.js';
-import '../libs/core/ui-element-detector.js';
-import '../libs/core/virtual-camera-bridge.js';
-import '../libs/core/voice-bridge.js';
-import '../libs/core/vad-registry.js';
+import '../libs/core/actuator/actuator-capability.js';
+import '../libs/core/surface/surface-interaction-model.js';
+import '../libs/core/task/task-plan-coordinator-port.js';
+import '../libs/core/task/task-session.js';
+import '../libs/core/surface/ui-element-detector.js';
+import '../libs/core/virtual/virtual-camera-bridge.js';
+import '../libs/core/voice/voice-bridge.js';
+import '../libs/core/voice/vad-registry.js';
 import '../libs/core/environment-capability.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

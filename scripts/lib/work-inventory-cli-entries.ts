@@ -17,14 +17,14 @@ import {
   type WorkInventoryStep,
   type WorkMethod,
   type WorkTriggerKind,
-} from '@agent/core/work-inventory';
-import { proposeWorkDecomposition } from '@agent/core/work-inventory-decompose';
+} from '@agent/core/workforce/work-inventory';
+import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
 import {
   loadWorkInventoryCalibration,
   rankWorkInventoryCandidates,
   scoreWorkInventoryEntry,
   type WorkInventoryScoreResult,
-} from '@agent/core/work-inventory-scoring';
+} from '@agent/core/workforce/work-inventory-scoring';
 import {
   csv,
   formatTable,

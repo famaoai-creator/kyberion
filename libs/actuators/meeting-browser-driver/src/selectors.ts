@@ -9,7 +9,7 @@
  * easy to add fallback selectors as platforms re-skin.
  */
 
-import type { MeetingPlatform } from '@agent/core/meeting-session-types';
+import type { MeetingPlatform } from '@agent/core/meeting/meeting-session-types';
 
 export interface MeetingPreJoinSelectors {
   /** Optional input where the AI's display name goes (Meet for guests). */

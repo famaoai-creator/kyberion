@@ -106,20 +106,20 @@ vi.mock('./foundation/json.js', async () => {
   };
 });
 
-vi.mock('./service-binding.js', () => ({
+vi.mock('./service/service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
-vi.mock('./service-preset-registry.js', () => ({
+vi.mock('./service/service-preset-registry.js', () => ({
   getServicePresetRecord: mocks.getServicePresetRecord,
 }));
 
-vi.mock('./service-engine.js', () => ({
+vi.mock('./service/service-engine.js', () => ({
   executeServicePreset: mocks.executeServicePreset,
 }));
 
-vi.mock('./secret-guard.js', () => ({
+vi.mock('./secret/secret-guard.js', () => ({
   loadConnectionDocument: mocks.loadConnectionDocument,
   storeConnectionDocument: mocks.storeConnectionDocument,
 }));

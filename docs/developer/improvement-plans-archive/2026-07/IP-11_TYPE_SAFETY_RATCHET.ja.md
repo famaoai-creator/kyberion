@@ -13,7 +13,7 @@ status: archived
 
 - `tsconfig.json:8-9` が `"strict": false`, `"noImplicitAny": false`。strict 系フラグはゼロ。
 - `eslint.config.js:85-92` が `@typescript-eslint/no-explicit-any` を含む型安全系ルールを全て off。
-- 結果、ソース全体で `: any` **1,727** + `as any` **1,175**(約2,900箇所)。ホットスポットは `media-actuator`(index.ts 123、test 94、helpers 46+40 で最悪クラスタ)、`libs/core/agent-adapter.ts`(32)、`satellites/voice-hub/server.ts`(34)。`@ts-ignore` が 6 箇所(`libs/core/acp-mediator.ts:128`、`agent-adapter.ts:299,317,406`、`media-actuator/src/artisan/extraction-engine.ts:7,163`)。
+- 結果、ソース全体で `: any` **1,727** + `as any` **1,175**(約2,900箇所)。ホットスポットは `media-actuator`(index.ts 123、test 94、helpers 46+40 で最悪クラスタ)、`libs/core/agent/agent-adapter.ts`(32)、`satellites/voice-hub/server.ts`(34)。`@ts-ignore` が 6 箇所(`libs/core/mesh/acp-mediator.ts:128`、`agent-adapter.ts:299,317,406`、`media-actuator/src/artisan/extraction-engine.ts:7,163`)。
 - ADF・intent contract・推論結果という「構造で正しさを担保する」設計の中核が、境界の `any` で無効化されている。
 
 ## 方針
@@ -53,7 +53,7 @@ status: archived
 
 ### Task 5: agent-adapter / voice-hub の境界型付け — `claude-sonnet-4`
 
-- `libs/core/agent-adapter.ts`(as any 32・@ts-ignore 3)は外部エージェント連携の境界。外部レスポンスは `unknown` で受けて型ガードで絞る形へ書き換える。voice-hub は IP-10 フェーズ2(分割)の後に実施する方が安全なので、分割前なら**スキップして報告**。
+- `libs/core/agent/agent-adapter.ts`(as any 32・@ts-ignore 3)は外部エージェント連携の境界。外部レスポンスは `unknown` で受けて型ガードで絞る形へ書き換える。voice-hub は IP-10 フェーズ2(分割)の後に実施する方が安全なので、分割前なら**スキップして報告**。
 
 ## リスクと注意
 
@@ -63,7 +63,7 @@ status: archived
 ## 実装メモ
 
 - `scripts/check_type_ratchet.ts` を追加し、baseline を `scripts/check_type_ratchet.baseline.json` に置いた。fixture ベースの unit test も追加し、`check:type-ratchet` を `validate` チェーンへ接続した。
-- **Task 3 完了(2026-07-13)**: `@ts-ignore` 6箇所を精査。`libs/core/acp-mediator.ts:252`(`this.connection: any` — 元々 any なので ts-ignore 自体が死んでいた)、`libs/core/agent-adapter.ts:377,396,490`(同じく `this.connection: any` 配下、死んでいた3箇所)、`media-actuator/src/artisan/extraction-engine.ts:7`(`pdfjs-dist/legacy/build/pdf.mjs` の import — 現行 tsconfig では ts-ignore 無しでもエラーにならず死んでいた)は削除のみで解消(各ファイルを一時的に ts-ignore 抜きで `tsc`/`build:actuators` にかけ、エラーが出ないことを確認してから削除 — 型修正ではなく単なる死んだ抑制コメントの除去)。残り1箇所(`extraction-engine.ts:167`、`mammoth.convertToMarkdown`)は本物の型ギャップだった: `node_modules/mammoth/lib/index.d.ts` が `convertToHtml`/`extractRawText`/`embedStyleMap` のみ宣言しており `convertToMarkdown` が抜けている(ただし `lib/index.js` には 1.x から実装済み — ランタイムには存在する、パッケージ側の型定義が追いついていないだけ)。`@ts-expect-error` ではなく、呼び出し箇所限定の型拡張(`type MammothWithMarkdown = typeof mammoth & {...}` + キャスト)で解消し、コメントで理由を記録。ランタイム呼び出し(引数・フォールバック処理)は無変更。
+- **Task 3 完了(2026-07-13)**: `@ts-ignore` 6箇所を精査。`libs/core/mesh/acp-mediator.ts:252`(`this.connection: any` — 元々 any なので ts-ignore 自体が死んでいた)、`libs/core/agent/agent-adapter.ts:377,396,490`(同じく `this.connection: any` 配下、死んでいた3箇所)、`media-actuator/src/artisan/extraction-engine.ts:7`(`pdfjs-dist/legacy/build/pdf.mjs` の import — 現行 tsconfig では ts-ignore 無しでもエラーにならず死んでいた)は削除のみで解消(各ファイルを一時的に ts-ignore 抜きで `tsc`/`build:actuators` にかけ、エラーが出ないことを確認してから削除 — 型修正ではなく単なる死んだ抑制コメントの除去)。残り1箇所(`extraction-engine.ts:167`、`mammoth.convertToMarkdown`)は本物の型ギャップだった: `node_modules/mammoth/lib/index.d.ts` が `convertToHtml`/`extractRawText`/`embedStyleMap` のみ宣言しており `convertToMarkdown` が抜けている(ただし `lib/index.js` には 1.x から実装済み — ランタイムには存在する、パッケージ側の型定義が追いついていないだけ)。`@ts-expect-error` ではなく、呼び出し箇所限定の型拡張(`type MammothWithMarkdown = typeof mammoth & {...}` + キャスト)で解消し、コメントで理由を記録。ランタイム呼び出し(引数・フォールバック処理)は無変更。
 - **再発防止**: `eslint.config.js` の `@typescript-eslint/ban-ts-comment` を `off` から `{'ts-ignore': true, 'ts-expect-error': 'allow-with-description', 'ts-nocheck': true, 'ts-check': false}` に変更 — `@ts-ignore`/`@ts-nocheck` は error、`@ts-expect-error` は理由コメント必須で許可。リポジトリ全体で `npx eslint .` を実走し、新規違反ゼロを確認(既存の `@ts-expect-error`/`@ts-nocheck` は元々ゼロ件だった)。
 - 検証: `npx tsc --noEmit` 緑、`pnpm run build:actuators` 緑、`npx eslint .` 緑(無関係な `docs/lp/` scratch ディレクトリの既存エラーのみ)、影響3ファイルのテスト(acp-mediator/agent-adapter/extraction-engine)計11本緑。
 - **残**: Task 2(strict系フラグの段階有効化)、Task 4(media-actuator の any 半減)、Task 5(agent-adapter/voice-hub の境界型付け)は未着手 — 規模が大きいため独立の増分として計画通り別途進める。

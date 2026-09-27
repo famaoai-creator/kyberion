@@ -8,7 +8,7 @@ import {
   loadApprovalRequest,
   validateHumanFinalDecision,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
@@ -18,7 +18,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { listProjectRecords } from '@agent/core/project-registry';
+import { listProjectRecords } from '@agent/core/project/project-registry';
 import { withExecutionContext } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

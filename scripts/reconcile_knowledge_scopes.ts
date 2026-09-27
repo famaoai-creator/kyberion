@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** KO-19: weekly tenant-scope reconciliation and steward-facing report. */
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { sendOpsAlert } from '@agent/core/ops-alert';
@@ -8,7 +8,7 @@ import { withExecutionContextAsync } from '@agent/core/authority';
 import type { ScopeContext } from '@agent/core/scope-context';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
-import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge-weight-recalculation';
+import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge/knowledge-weight-recalculation';
 import { buildPlan } from './migrate_physical_namespaces.js';
 import { scanKnowledgeScopeHealth, buildHealthAlert } from './watch_knowledge_scope_health.js';
 import { scan as scanKnowledgeScopeBoundaries } from './check_knowledge_scope_boundaries.js';

@@ -2,7 +2,7 @@ import {
   collectOperatorHomeSummary,
   type OperatorHomeScopeFilter,
   type OperatorHomeSummary,
-} from '@agent/core/operator-home-summary';
+} from '@agent/core/surface/operator-home-summary';
 import { currentScope, type ScopeContext } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadAgentGraph } from './agent-graph.js';

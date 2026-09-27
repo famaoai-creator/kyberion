@@ -12,15 +12,15 @@
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
-import { loadDesktopRecordingAtPath } from '@agent/core/desktop-recording';
-import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
+import { loadDesktopRecordingAtPath } from '@agent/core/virtual/desktop-recording';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
 import {
   loadWorkInventoryEntry,
   saveWorkInventoryEntry,
   type WorkInventoryEntry,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import {
   grantWorkInventoryConsent,
   listWorkInventoryConsents,
@@ -28,7 +28,7 @@ import {
   type WorkInventoryConsent,
   type WorkInventoryConsentSource,
   type WorkInventoryObservationKind,
-} from '@agent/core/work-inventory-consent';
+} from '@agent/core/workforce/work-inventory-consent';
 import {
   attachObservationToEntry,
   confirmObservationSummary,
@@ -39,7 +39,7 @@ import {
   summarizeRecordingForInventory,
   type InventoryRecording,
   type WorkInventoryObservationSummary,
-} from '@agent/core/work-inventory-observation';
+} from '@agent/core/workforce/work-inventory-observation';
 import { readSafeJsonValueFile } from './json-input.js';
 import { resolveDecidedByFromArgv } from './decided-by-args.js';
 import {

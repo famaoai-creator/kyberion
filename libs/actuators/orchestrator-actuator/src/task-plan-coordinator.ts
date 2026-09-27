@@ -1,4 +1,7 @@
-import { getAgentExecutionPort, type AgentExecutionPort } from '@agent/core/agent-execution-port';
+import {
+  getAgentExecutionPort,
+  type AgentExecutionPort,
+} from '@agent/core/agent/agent-execution-port';
 import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation';
 import { missionEvidenceDir } from '@agent/core/path-resolver';
@@ -9,7 +12,7 @@ import type {
   ExecuteTaskPlanResult,
   TaskExecutionRecord,
   TaskPlanCoordinatorPort,
-} from '@agent/core/task-plan-coordinator-port';
+} from '@agent/core/task/task-plan-coordinator-port';
 import * as path from 'node:path';
 
 const LOG_FILE = 'task-execution-log.jsonl';

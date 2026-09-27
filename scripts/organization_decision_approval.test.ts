@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const load = vi.hoisted(() => vi.fn());
-vi.mock('@agent/core/approval-store', () => ({ loadApprovalRequest: load }));
+vi.mock('@agent/core/governance/approval-store', () => ({ loadApprovalRequest: load }));
 
 import { verifyDecisionApprovalRef } from './organization_decision_approval.js';
-import type { OrganizationDecisionRecord } from '@agent/core/organization-operating-model';
+import type { OrganizationDecisionRecord } from '@agent/core/organization/organization-operating-model';
 
 const decision = {
   decision_id: 'DEC-1',

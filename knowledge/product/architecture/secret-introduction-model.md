@@ -35,7 +35,7 @@ The root of trust is the approval workflow. Concierge and Chronos are surfaces; 
 | secret-guard / env  | `{SERVICE}_{SUFFIX}`      | `GEMINI_API_KEY`                                                    |
 | Connection document | field = suffix snake      | `knowledge/personal/connections/gemini.json` → `{ "api_key": "…" }` |
 
-Canonical helpers live in `libs/core/secret-identity.ts`.
+Canonical helpers live in `libs/core/secret/secret-identity.ts`.
 
 ## Dual-write apply
 
@@ -67,5 +67,5 @@ Low-risk local sessions (`risk=low`, terminal/concierge surface) may auto-approv
 ## Related
 
 - [secret-mutation-approval-model.md](./secret-mutation-approval-model.md)
-- `libs/core/secret-introduction.ts`
+- `libs/core/secret/secret-introduction.ts`
 - `scripts/secret_introduce.ts`

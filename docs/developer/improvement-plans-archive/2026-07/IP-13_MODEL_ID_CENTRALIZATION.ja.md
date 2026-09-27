@@ -12,12 +12,12 @@ status: archived
 ## 背景と課題
 
 - LLM のモデルIDがアダプタ各所にリテラルで散在しており、モデル世代の移行時に漏れが出る構造になっている。
-  - `libs/core/anthropic-reasoning-backend.ts:39` — `DEFAULT_MODEL = 'claude-opus-4-7'`(ヘッダコメント `:3` も "Opus 4.7")。**現行世代より古い**。
-  - `libs/core/agent-lifecycle.ts:95-96` — `gemini-2.5-flash`, `claude-sonnet-4`
-  - `libs/core/acp-mediator.ts:125` — リテラル
-  - `libs/core/agent-adapter.ts:302,404` — `gemini-2.5-flash`
+  - `libs/core/provider/anthropic-reasoning-backend.ts:39` — `DEFAULT_MODEL = 'claude-opus-4-7'`(ヘッダコメント `:3` も "Opus 4.7")。**現行世代より古い**。
+  - `libs/core/agent/agent-lifecycle.ts:95-96` — `gemini-2.5-flash`, `claude-sonnet-4`
+  - `libs/core/mesh/acp-mediator.ts:125` — リテラル
+  - `libs/core/agent/agent-adapter.ts:302,404` — `gemini-2.5-flash`
   - テスト内にも `gpt-5` / `gemini-2.5-pro` 等が散在
-- 一方で `libs/core/reasoning-model-routing.ts` というルーティングモジュールが既に存在するのに、アダプタはそれを通っていない。
+- 一方で `libs/core/reasoning/reasoning-model-routing.ts` というルーティングモジュールが既に存在するのに、アダプタはそれを通っていない。
 
 ## ゴール(受入条件)
 
@@ -30,11 +30,11 @@ status: archived
 
 ## 実装状況 (2026-07-03)
 
-- **完了(代表スライス)**: `libs/core/runtime-model-defaults.ts` を追加し、runtime 用の既定モデルを `resolveRuntimeModelId(role, env)` に集約した。`anthropic-*`、`gemini-*`、`openai-vision`、`codex-default`、`copilot-default` を対象に env override を持つ。
+- **完了(代表スライス)**: `libs/core/tool/runtime-model-defaults.ts` を追加し、runtime 用の既定モデルを `resolveRuntimeModelId(role, env)` に集約した。`anthropic-*`、`gemini-*`、`openai-vision`、`codex-default`、`copilot-default` を対象に env override を持つ。
 - **完了(代表スライス)**: `agent-lifecycle`、`acp-mediator`、`agent-adapter`、`reasoning-bootstrap`、`intent-contract`、`codex-cli-query`、`anthropic-*`、`GeminiCliBackend`、OCR bridge の実行既定値を routing/defaults 経由に寄せた。
 - **完了(代表スライス)**: 公式 docs 確認に基づき、Anthropic は `claude-opus-4-8` / `claude-sonnet-5`、Gemini は `gemini-3.5-flash` / `gemini-3.1-flash-lite`、OpenAI/Codex primary は `gpt-5.5` を既定にした。`gpt-5.4-mini` は fast lane の既存 candidate として維持。
 - **完了(代表スライス)**: `knowledge/product/governance/model-registry.json` と `reasoning-level-policy.json` の primary route を `openai:gpt-5.5` に更新した。
-- **検証済み**: `pnpm exec vitest run libs/core/reasoning-model-routing.test.ts`、`pnpm run typecheck`、`pnpm run check -- --scope full --only contract-schemas`、`pnpm check -- --scope full --only catalogs`、`pnpm lint`。
+- **検証済み**: `pnpm exec vitest run libs/core/reasoning/reasoning-model-routing.test.ts`、`pnpm run typecheck`、`pnpm run check -- --scope full --only contract-schemas`、`pnpm check -- --scope full --only catalogs`、`pnpm lint`。
 - **完了**: `provider-discovery.ts` と `metrics.ts` の fallback は knowledge tier の fallback JSON に外出しし、コード内の model ID リテラルを消した。`provider-discovery.ts` / `metrics.ts` の code ヒットは routing / settings 以外になくなった。
 
 ### Task 1: 現状マップの作成 — `claude-haiku`
@@ -54,10 +54,10 @@ status: archived
 
 ## 検証メモ (2026-07-03)
 
-- `pnpm exec vitest run libs/core/provider-capability-catalog.test.ts libs/core/provider-capability-catalog-writer.test.ts libs/core/agent-provider-resolution.test.ts`
+- `pnpm exec vitest run libs/core/provider/provider-capability-catalog.test.ts libs/core/provider/provider-capability-catalog-writer.test.ts libs/core/agent/agent-provider-resolution.test.ts`
 - `pnpm lint`
 - `pnpm run typecheck`
-- `rg -n "claude-|gemini-|gpt-" libs/core/provider-discovery.ts libs/core/metrics.ts` はヒットなし
+- `rg -n "claude-|gemini-|gpt-" libs/core/provider/provider-discovery.ts libs/core/metrics.ts` はヒットなし
 
 ## リスクと注意
 

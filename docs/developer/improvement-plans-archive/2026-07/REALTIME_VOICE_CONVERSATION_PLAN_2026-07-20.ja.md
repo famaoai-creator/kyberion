@@ -9,13 +9,13 @@ status: archived
 
 - 作成日: 2026-07-20
 - ステータス: **Phase 0〜4 実装済 (2026-07-20)**
-  - Phase 0: `libs/core/vad-turn-recorder.ts` (VAD endpoint 駆動発話区切り + ノイズフロア較正 + `VadTurnSegmenter` として共通化)、`libs/core/pcm-wav.ts`
+  - Phase 0: `libs/core/voice/vad-turn-recorder.ts` (VAD endpoint 駆動発話区切り + ノイズフロア較正 + `VadTurnSegmenter` として共通化)、`libs/core/pcm-wav.ts`
   - Phase 1: `segmented-voice-playback.ts` (文単位合成×先行再生パイプライン)、`audio-playback.ts` (停止可能な PlaybackHandle)、actuator `--serve` 常駐モード (`cli-utils.ts`) + `actuator-serve-client.ts` (ウォームクライアント)、streaming STT のターン内接続 (partial は発話中に処理、endpoint で final、バッチ STT フォールバック)
   - Phase 2: `realtime-voice-loop.ts` (LISTENING→THINKING→SPEAKING 状態機械、barge-in はオプトイン `--barge-in`: 閾値×2 + 250ms デバウンス、割り込み音声は次ターン先頭として保持)。`audio-tee.ts` を coordinator から共通抽出
   - Phase 3: `vad-registry.ts` (`KYBERION_VAD=energy|silero`、fail-soft で energy に明示degrade)、`silero-vad-bridge.ts` + `silero_vad_bridge.py` (NDJSON サブプロセス契約、失敗時 EnergyVad フォールバック)
   - Phase 4: 録音同意ゲート (`--mission`、coordinator と同じ fail-closed 契約)、TraceContext イベント + ターン毎レイテンシ計測 (stt/llm/first-audio/speak)、`live-voice-preflight` にマイク/再生バイナリ検査、`voice-health-check` に silero ブリッジ検査、手順書更新、hermetic E2E (`realtime-voice-loop.test.ts`)
   - 残課題 (今後): AEC (エコーキャンセル) 導入評価、LLM トークンストリーミング→文単位 TTS 直結、会議側 coordinator への barge-in 部品還元
-- 対象: `scripts/run_realtime_voice_conversation.ts` / `libs/core/realtime-voice-conversation.ts` とその周辺の音声基盤
+- 対象: `scripts/run_realtime_voice_conversation.ts` / `libs/core/voice/realtime-voice-conversation.ts` とその周辺の音声基盤
 - 関連: [IP-08 エラーハンドリング規律](./IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) · [E2E-01 会議→価値](./E2E-01_MEETING_TO_VALUE.ja.md)
 
 ## 1. ゴール
@@ -36,16 +36,16 @@ status: archived
 
 ### 2.1 既にある資産
 
-| 資産                                                                                         | 場所                                                                                      | 状態                                                                                                |
-| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| VAD インターフェース + RMS 実装 (`EnergyVad`)                                                | `libs/core/voice-activity-detector.ts`                                                    | 実装済・テスト済。endpoint 検出 (既定 700ms 無音)                                                   |
-| マイクキャプチャ (ffmpeg avfoundation / arecord)                                             | `libs/core/mic-capture.ts`                                                                | 実装済。`AudioChunk` 非同期イテレータ、`command` オーバーライドでフィクスチャ再生テスト可能         |
-| mic → VAD → セグメント WAV → バッチ STT の参照実装                                           | `libs/core/in-room-minutes-recorder.ts`                                                   | 実装済 (議事録用途)。録音同意ゲート (fail-closed) 付き                                              |
-| **ストリーミング会話ループ (audio bus → tee → streaming STT + VAD → agent → streaming TTS)** | `libs/core/meeting-participation-coordinator.ts`                                          | 実装済 (会議参加用)。ただし VAD は診断用に流しているだけで、発話タイミング制御・barge-in には未接続 |
-| ストリーミング STT 契約 (stub + `KYBERION_STT_COMMAND` シェルアダプタ、NDJSON partial/final) | `libs/core/streaming-stt-bridge.ts` / `shell-streaming-stt-bridge.ts`                     | 実装済。実バックエンド (whisper.cpp stream 等) は環境変数で差し込み                                 |
-| ストリーミング TTS 契約 (stub + gemini + シェルアダプタ)                                     | `libs/core/streaming-tts-bridge.ts` / `shell-streaming-tts-bridge.ts`                     | 契約は実装済。ただし Gemini 実装は全文集約後に一括合成しており実質非ストリーミング                  |
-| 文単位チャンク分割                                                                           | `libs/core/voice-text-chunking.ts`                                                        | 実装済 (voice-actuator のレンダリングで使用)                                                        |
-| ターン制会話本体                                                                             | `libs/core/realtime-voice-conversation.ts` + `scripts/run_realtime_voice_conversation.ts` | 実装済。セッション永続化・音声プロファイル/同意ゲート・presence timeline 連携あり                   |
+| 資産                                                                                         | 場所                                                                                            | 状態                                                                                                |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| VAD インターフェース + RMS 実装 (`EnergyVad`)                                                | `libs/core/voice/voice-activity-detector.ts`                                                    | 実装済・テスト済。endpoint 検出 (既定 700ms 無音)                                                   |
+| マイクキャプチャ (ffmpeg avfoundation / arecord)                                             | `libs/core/mic-capture.ts`                                                                      | 実装済。`AudioChunk` 非同期イテレータ、`command` オーバーライドでフィクスチャ再生テスト可能         |
+| mic → VAD → セグメント WAV → バッチ STT の参照実装                                           | `libs/core/in-room-minutes-recorder.ts`                                                         | 実装済 (議事録用途)。録音同意ゲート (fail-closed) 付き                                              |
+| **ストリーミング会話ループ (audio bus → tee → streaming STT + VAD → agent → streaming TTS)** | `libs/core/meeting/meeting-participation-coordinator.ts`                                        | 実装済 (会議参加用)。ただし VAD は診断用に流しているだけで、発話タイミング制御・barge-in には未接続 |
+| ストリーミング STT 契約 (stub + `KYBERION_STT_COMMAND` シェルアダプタ、NDJSON partial/final) | `libs/core/voice/streaming-stt-bridge.ts` / `shell-streaming-stt-bridge.ts`                     | 実装済。実バックエンド (whisper.cpp stream 等) は環境変数で差し込み                                 |
+| ストリーミング TTS 契約 (stub + gemini + シェルアダプタ)                                     | `libs/core/voice/streaming-tts-bridge.ts` / `shell-streaming-tts-bridge.ts`                     | 契約は実装済。ただし Gemini 実装は全文集約後に一括合成しており実質非ストリーミング                  |
+| 文単位チャンク分割                                                                           | `libs/core/voice/voice-text-chunking.ts`                                                        | 実装済 (voice-actuator のレンダリングで使用)                                                        |
+| ターン制会話本体                                                                             | `libs/core/voice/realtime-voice-conversation.ts` + `scripts/run_realtime_voice_conversation.ts` | 実装済。セッション永続化・音声プロファイル/同意ゲート・presence timeline 連携あり                   |
 
 ### 2.2 リアルタイム化を阻んでいるギャップ
 
@@ -89,7 +89,7 @@ status: archived
 
 ### Phase 2 — barge-in と全二重ループ
 
-新規 `libs/core/realtime-voice-loop.ts` (状態機械: `IDLE → LISTENING → THINKING → SPEAKING → LISTENING`) を追加し、CLI をこれに載せ替える。
+新規 `libs/core/voice/realtime-voice-loop.ts` (状態機械: `IDLE → LISTENING → THINKING → SPEAKING → LISTENING`) を追加し、CLI をこれに載せ替える。
 
 1. **再生停止ハンドル**: 再生 (afplay / 再生子プロセス) を `PlaybackHandle { stop(): Promise<void> }` として抽象化。`native-tts.ts` の timeout kill と同じ機構を外部公開する形。TTS 合成チェーンにもキャンセルトークンを通す (合成途中の破棄)。
 2. **SPEAKING 中のマイク監視**: マイクは常時開き、`teeInbound` (coordinator 実装を共通化して流用) で VAD へ分岐。SPEAKING 中に `speaking: true` が **闾値引き上げ + 最小継続時間 (例 250ms) のデバウンス**付きで検出されたら、再生停止 → バッファリセット → LISTENING へ遷移。

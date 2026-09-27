@@ -14,7 +14,7 @@ export const TEST_SUITES = {
   unit: ['libs/core/', 'libs/actuators/'],
   core: ['libs/core/', '--no-file-parallelism'],
   'meeting-dry-run': [
-    'libs/core/meeting-participation-coordinator.test.ts',
+    'libs/core/meeting/meeting-participation-coordinator.test.ts',
     'libs/actuators/meeting-browser-driver/src/index.test.ts',
   ],
   'ui-voice-browser-smoke': [
@@ -33,7 +33,7 @@ export const TEST_SUITES = {
   'meet-copilot': [
     'tests/meet-copilot-extension.test.ts',
     'tests/meet-copilot-built-in-ai.test.ts',
-    'libs/core/chrome-extension-meeting-driver.test.ts',
+    'libs/core/browser/chrome-extension-meeting-driver.test.ts',
   ],
   coverage: ['--coverage'],
   tui: ['presence/displays/terminal-hud/'],

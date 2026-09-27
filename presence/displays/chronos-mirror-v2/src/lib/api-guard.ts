@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consumeTenantBudget } from '@agent/core/tenant-rate-limiter';
+import { consumeTenantBudget } from '@agent/core/organization/tenant-rate-limiter';
 import {
   extractSurfaceBearerToken,
   resolveSurfaceViewerToken,
-} from '@agent/core/surface-mutation-guard';
+} from '@agent/core/surface/surface-mutation-guard';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,

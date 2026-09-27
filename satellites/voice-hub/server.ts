@@ -21,36 +21,39 @@ import {
   createPresenceVoiceStimulus,
   estimateSpeechDurationMs,
 } from '@agent/core/presence-surface';
-import { getSurfaceAgentCatalogEntry } from '@agent/core/surface-agent-catalog';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
-import { getVoiceProfileRecord } from '@agent/core/voice-profile-registry';
+import { getSurfaceAgentCatalogEntry } from '@agent/core/surface/surface-agent-catalog';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceProfileRecord } from '@agent/core/voice/voice-profile-registry';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
   type VoiceEngineRecord,
-} from '@agent/core/voice-engine-registry';
-import { getVoiceSelectionSnapshot } from '@agent/core/voice-selection-preferences';
+} from '@agent/core/voice/voice-engine-registry';
+import { getVoiceSelectionSnapshot } from '@agent/core/voice/voice-selection-preferences';
 import {
   resolveVoiceSttAdapter,
   resolveVoiceTtsAdapter,
   type VoiceSttAdapterDescriptor,
-} from '@agent/core/voice-provider-adapters';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
+} from '@agent/core/voice/voice-provider-adapters';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual/virtual-device-inventory-bridge';
 import {
   parseVoiceSttBackend,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
   type VoiceSttAvailability,
   type VoiceSttBackend,
-} from '@agent/core/voice-stt';
-import { ShellSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
-import { formatChannelTurnText } from '@agent/core/channel-adapter';
+} from '@agent/core/voice/voice-stt';
+import { ShellSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
+import { formatChannelTurnText } from '@agent/core/surface/channel-adapter';
 import { t } from '@agent/core/t';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract';
-import { runSurfaceConversation, runSurfaceMessageConversation } from '@agent/core/channel-surface';
+} from '@agent/core/intent/intent-resolution-contract';
+import {
+  runSurfaceConversation,
+  runSurfaceMessageConversation,
+} from '@agent/core/surface/channel-surface';
 import {
   assertSafeRepositoryPath,
   buildSafeExecEnv,
@@ -60,11 +63,14 @@ import {
   safeMkdir,
   safeRmSync,
 } from '@agent/core/secure-io';
-import { resolveManagedToolPythonBin, probeToolRuntime } from '@agent/core/tool-runtime-registry';
-import { listenNativeSpeech } from '@agent/core/native-speech-listen-bridge';
-import { buildNativeTtsCommand } from '@agent/core/native-tts';
+import {
+  resolveManagedToolPythonBin,
+  probeToolRuntime,
+} from '@agent/core/tool/tool-runtime-registry';
+import { listenNativeSpeech } from '@agent/core/media/native-speech-listen-bridge';
+import { buildNativeTtsCommand } from '@agent/core/media/native-tts';
 import { normalizeEventScope } from '@agent/core/event-scope';
-import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
+import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
 import { logger } from '@agent/core/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';

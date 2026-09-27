@@ -13,7 +13,7 @@ status: archived
 
 ## 背景 — 調査で確認した3系統の問題
 
-切り分けの正本は2次元モデル([mission-task-classification-roadmap-5.4-mini](../../../../knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md) §3): `execution_shape` の単調な6段ラダー(`direct_reply → actuator_action/browser_session → task_session → pipeline → mission → project_bootstrap`)と、必須トリガー(1つで mission)+蓄積トリガー(2つで mission)の昇格ルール。これは [work-scope-policy.json](../../../../knowledge/product/governance/work-scope-policy.json) + `libs/core/work-scope-decision.ts` として機械化され、`libs/core/surface-runtime-orchestrator.ts:1531` に強制点(`mission_controller create` の自動起票+ガバナンスレシート)まで実装済みである。問題は正本自体ではなく、その周辺にある。
+切り分けの正本は2次元モデル([mission-task-classification-roadmap-5.4-mini](../../../../knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md) §3): `execution_shape` の単調な6段ラダー(`direct_reply → actuator_action/browser_session → task_session → pipeline → mission → project_bootstrap`)と、必須トリガー(1つで mission)+蓄積トリガー(2つで mission)の昇格ルール。これは [work-scope-policy.json](../../../../knowledge/product/governance/work-scope-policy.json) + `libs/core/workforce/work-scope-decision.ts` として機械化され、`libs/core/surface/surface-runtime-orchestrator.ts:1531` に強制点(`mission_controller create` の自動起票+ガバナンスレシート)まで実装済みである。問題は正本自体ではなく、その周辺にある。
 
 ### A. 機械ゲートが実運用で機能していない(コード)
 

@@ -141,8 +141,8 @@ import {
   TRASH_REPO_SUBPATH,
   type DelegationChildRecord,
 } from './storage-janitor.js';
-import { SUPERVISOR_EVENTS_LEGACY_FILE } from './agent-runtime-events.js';
-import type { WorkspaceRecord } from './workspace-ledger.js';
+import { SUPERVISOR_EVENTS_LEGACY_FILE } from './agent/agent-runtime-events.js';
+import type { WorkspaceRecord } from './workforce/workspace-ledger.js';
 import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,

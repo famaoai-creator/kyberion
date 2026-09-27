@@ -11,24 +11,24 @@ import { randomUUID } from 'node:crypto';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { humanActor } from '@agent/core/actor';
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { frontDeskRoleFromViewerScope, type FrontDeskRole } from '@agent/core/front-desk-identity';
 import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import {
   findHearingScenario,
   type HearingScenarioCatalogEntry,
 } from '@agent/core/hearing-scenario-catalog';
-import { proposeWorkDecomposition } from '@agent/core/work-inventory-decompose';
+import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
 import {
   saveWorkInventoryEntry,
   WorkInventoryStoreError,
   type WorkInventoryScope,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
 import {
   PresenceStudioViewerError,

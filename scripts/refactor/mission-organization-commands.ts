@@ -3,8 +3,8 @@ import * as customerResolver from '@agent/core/customer-resolver';
 import {
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
   resolveOrganizationMissionTeamTemplateCatalogId,
-} from '@agent/core/mission-team-index';
-import { loadOrganizationProfile } from '@agent/core/organization-profile';
+} from '@agent/core/mission/mission-team-index';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
