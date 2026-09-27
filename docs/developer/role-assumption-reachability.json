@@ -3791,10 +3791,8 @@
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
         "chronos_gateway",
-        "ecosystem_architect",
         "infrastructure_sentinel",
         "knowledge_steward",
-        "mission_controller",
         "slack_bridge"
       ]
     },
@@ -4256,7 +4254,7 @@
         }
       },
       "unresolved_sites": [],
-      "policy_roles_not_reachable": ["ecosystem_architect", "knowledge_steward"]
+      "policy_roles_not_reachable": ["knowledge_steward"]
     },
     "system_configurator": {
       "entries": ["scripts/config_mission.ts", "scripts/run_pipeline.ts"],
