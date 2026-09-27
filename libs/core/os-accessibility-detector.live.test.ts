@@ -4,7 +4,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import {
   OS_ACCESSIBILITY_LIVE_SMOKE_ENV,
   OsAccessibilityDetector,
-  powerShellArgs,
+  powerShellStdinArgs,
   windowsPowerShellEnv,
 } from './os-accessibility-detector.js';
 import { pathResolver } from './path-resolver.js';
@@ -99,10 +99,11 @@ try {
 [Console]::Out.WriteLine((@{ width = $w; height = $h; saved = $saved; error = $failure } | ConvertTo-Json -Compress))`;
 
 function runPowerShell(script: string, env: Record<string, string> = {}) {
-  const result = safeExecResult('powershell.exe', powerShellArgs(script), {
+  const result = safeExecResult('powershell.exe', powerShellStdinArgs(), {
     timeoutMs: 60_000,
     maxOutputMB: 1,
     env: { ...windowsPowerShellEnv(), ...env },
+    input: script,
   });
   const line = String(result.stdout)
     .split('\n')
