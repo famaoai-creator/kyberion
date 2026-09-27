@@ -305,7 +305,7 @@
       "executable": "node",
       "args": ["dist/scripts/check_dist_workspace_imports.js"],
       "owner": "quality",
-      "rationale": "Catches dist/presence, dist/satellites, and dist/scripts entry points whose bare workspace-package imports resolve fine under tsconfig paths at typecheck time but are never linked into node_modules, so `node <entry>` fails with ERR_MODULE_NOT_FOUND at process startup (e.g. nexus-daemon and @actuator/service)."
+      "rationale": "Catches dist/presence, dist/satellites, and dist/scripts entry points whose bare imports resolve fine at typecheck time (via tsconfig paths, or a source package's own local node_modules) but are never linked into the shared root node_modules the compiled flat dist tree actually resolves from, so `node <entry>` fails with ERR_MODULE_NOT_FOUND at process startup. Covers both workspace-package imports (e.g. nexus-daemon and @actuator/service) and third-party imports declared as a real dependency somewhere in the repo (e.g. discord-bridge and discord.js)."
     },
     {
       "id": "catalogs",
