@@ -9,9 +9,15 @@ import {
   powerShellStdinArgs,
   windowsPowerShellEnv,
 } from './os-accessibility-detector.js';
+import { dhashFile } from './image-dhash.js';
+import { clearMarks, resolveMarkTarget, saveMarks } from './mark-target-resolver.js';
+import { clickAt } from './os-automation.js';
 import { pathResolver } from './path-resolver.js';
+import { createScreenCaptureBridge } from './screen-capture-bridge.js';
 import { safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
-import type { SomBox, SomCandidate } from './set-of-marks.js';
+import { fuseSetOfMarks, type SomBox, type SomCandidate } from './set-of-marks.js';
+import { inspectSomImage } from './som-overlay.js';
+import { runWindowsPointerActions } from './windows-os-automation.js';
 
 /**
  * Live smoke of the Windows UI Automation path. Two targets, each brought to the
@@ -19,9 +25,19 @@ import type { SomBox, SomCandidate } from './set-of-marks.js';
  * which the runner's UIA may only report as a Pane: at least one unlabelled
  * editable element inside the window) and a WPF window with native UIA
  * providers (a labelled Button, a CheckBox and an unlabelled editable TextBox).
+ * The third case clicks the WPF window's OK button through its Set-of-Marks mark
+ * (detector -> fuseSetOfMarks -> saveMarks -> resolveMarkTarget -> the
+ * os-automation clickAt of the platform, i.e. the DPI-aware Windows pointer
+ * script) and checks the button handler ran (it renames the window).
  * Runs only on Windows with KYBERION_UIA_LIVE_SMOKE=1 (the
  * windows-latest job of cross-os.yml); GitHub's Windows runners have an
  * interactive desktop session.
+ *
+ * Display scaling: hosted runners run at 100 % (96 DPI, logged by the click
+ * case), where logical and physical pixels coincide, so the live run cannot tell
+ * a DPI-unaware click from a DPI-aware one. The scaled-display mapping is
+ * covered by the hermetic tests in windows-os-automation.test.ts; this smoke
+ * proves the real click path lands on a mark end to end.
  */
 const LIVE =
   process.platform === 'win32' && getRegisteredEnvText(OS_ACCESSIBILITY_LIVE_SMOKE_ENV) === '1';
@@ -40,6 +56,8 @@ public static class KyberionUiaSmoke {
   [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern uint GetDpiForSystem();
 }
 '@`;
 
@@ -75,6 +93,7 @@ $panel = New-Object System.Windows.Controls.StackPanel
 $button = New-Object System.Windows.Controls.Button
 $button.Content = 'OK'
 $button.Margin = New-Object System.Windows.Thickness(8)
+$button.Add_Click({ $window.Title = $env:UIA_SMOKE_TITLE + ' clicked' })
 $check = New-Object System.Windows.Controls.CheckBox
 $check.Content = 'Remember me'
 $check.Margin = New-Object System.Windows.Thickness(8)
@@ -143,6 +162,22 @@ try {
 } catch { $failure = $_.Exception.Message }
 [Console]::Out.WriteLine((@{ width = $w; height = $h; saved = $saved; error = $failure } | ConvertTo-Json -Compress))`;
 
+// Waits up to 5 s for a top-level window titled UIA_SMOKE_TITLE and reports the
+// DPI of the window handle in UIA_SMOKE_HWND and of the system.
+const WAIT_TITLE_SCRIPT = `$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+${WIN32_TYPE}
+$found = [IntPtr]::Zero
+for ($i = 0; $i -lt 25 -and $found -eq [IntPtr]::Zero; $i++) {
+  $found = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
+  if ($found -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 200 }
+}
+$windowDpi = 0
+$systemDpi = 0
+try { $windowDpi = [int][KyberionUiaSmoke]::GetDpiForWindow([IntPtr]::new([long]$env:UIA_SMOKE_HWND)) } catch { }
+try { $systemDpi = [int][KyberionUiaSmoke]::GetDpiForSystem() } catch { }
+[Console]::Out.WriteLine((@{ found = ($found -ne [IntPtr]::Zero); window_dpi = $windowDpi; system_dpi = $systemDpi } | ConvertTo-Json -Compress))`;
+
 function runPowerShell(script: string, env: Record<string, string> = {}) {
   const result = safeExecResult('powershell.exe', powerShellStdinArgs(), {
     timeoutMs: 60_000,
@@ -183,6 +218,7 @@ interface LiveResult {
   snapshot: AccessibilitySnapshot;
   within: SomCandidate[];
   windowElements: AccessibilityElement[];
+  image: { width: number; height: number };
 }
 
 /**
@@ -261,7 +297,7 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       outcome = `no candidates inside the ${target.label} window`;
       continue;
     }
-    return { snapshot, within, windowElements };
+    return { snapshot, within, windowElements, image: request.image_size };
   }
   throw new Error(`[uia-smoke:${target.label}] ${outcome}`);
 }
@@ -335,6 +371,100 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       // The typed text never becomes a label.
       expect(labels.filter((label) => label?.includes('typed value'))).toEqual([]);
     } finally {
+      killAll(pids);
+      if (safeExistsSync(shotDir)) safeRmSync(shotDir);
+    }
+  }, 180_000);
+  it('clicks the WPF OK button through its mark with the DPI-aware pointer path', async () => {
+    safeMkdir(shotDir, { recursive: true });
+    const title = `Kyberion UIA click smoke ${process.pid}`;
+    const session = `uia-click-smoke-${process.pid}`;
+    const shotPath = path.join(shotDir, `wpf-click-${process.pid}.png`);
+    let pids: number[] = [];
+    try {
+      const launch = runPowerShell(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title });
+      console.log('[uia-smoke:click] launch', JSON.stringify(launch));
+      pids = pidsOf(launch);
+      expect(Number(launch.hwnd), 'WPF window did not appear').toBeGreaterThan(0);
+      const { within, windowElements, image, snapshot } = await detectLive({
+        label: 'click',
+        hwnd: Number(launch.hwnd),
+        application: 'powershell',
+        shotPath,
+      });
+      const walker = (snapshot.diagnostics as { walker?: unknown } | undefined)?.walker;
+      console.log('[uia-smoke:click] walker', JSON.stringify(walker ?? null));
+
+      // Detector candidates -> numbered marks -> stored for the session.
+      const marks = fuseSetOfMarks(within, { imageSize: image });
+      const ok = marks.find((mark) => mark.label === 'OK');
+      expect(ok, 'no mark labelled OK').toBeDefined();
+      const scale = image.width / (snapshot.screen?.width ?? image.width);
+      clearMarks(session);
+      saveMarks({
+        session_id: session,
+        marks,
+        image,
+        image_dhash: await dhashFile(shotPath),
+        scale,
+      });
+
+      // The real resolver checks the screen is unchanged, then the platform click path runs.
+      const currentPath = path.join(shotDir, `wpf-click-current-${process.pid}.png`);
+      runPowerShell(SCREENSHOT_SCRIPT, { UIA_SMOKE_SHOT_PATH: currentPath });
+      const point = await resolveMarkTarget(`mark:${ok!.n}`, {
+        session_id: session,
+        current_image_path: currentPath,
+      });
+      console.log('[uia-smoke:click] target', JSON.stringify({ mark: ok, scale, point }));
+      clickAt(point.x, point.y);
+
+      const pointer = runWindowsPointerActions([]);
+      const wait = runPowerShell(WAIT_TITLE_SCRIPT, {
+        UIA_SMOKE_TITLE: `${title} clicked`,
+        UIA_SMOKE_HWND: String(launch.hwnd),
+      });
+      console.log('[uia-smoke:click] after click', JSON.stringify({ pointer, wait }));
+
+      // The cursor (read per-monitor DPI aware) sits inside the button's UIA rect: the
+      // click and the detector share one physical coordinate space.
+      const button = windowElements.find(
+        (element) => element.role === 'AXButton' && element.title === 'OK'
+      );
+      expect(button).toBeDefined();
+      expect(pointer.dpi_awareness).toBe('per_monitor_v2');
+      expect(
+        inside(
+          { x: pointer.cursor.x, y: pointer.cursor.y, width: 1, height: 1 },
+          { x: button!.x, y: button!.y, width: button!.width, height: button!.height },
+          0
+        )
+      ).toBe(true);
+      expect(wait.found, 'the OK button handler did not run').toBe(true);
+
+      // The governed Windows screen capture (ffmpeg gdigrab) must be physical pixels
+      // for marks on it to map with scale 1; checked when ffmpeg is installed.
+      const bridgeShot = path.join(shotDir, `gdigrab-${process.pid}.png`);
+      try {
+        await createScreenCaptureBridge({ preferred_backend: 'platform' }).captureScreenshot({
+          save_path: bridgeShot,
+        });
+      } catch (error) {
+        console.log('[uia-smoke:click] gdigrab capture skipped', (error as Error).message);
+      }
+      if (safeExistsSync(bridgeShot)) {
+        const captured = (await inspectSomImage(bridgeShot)).image;
+        console.log(
+          '[uia-smoke:click] gdigrab capture',
+          JSON.stringify({ captured, virtual_screen: pointer.virtual_screen })
+        );
+        expect(captured).toEqual({
+          width: pointer.virtual_screen.width,
+          height: pointer.virtual_screen.height,
+        });
+      }
+    } finally {
+      clearMarks(session);
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }

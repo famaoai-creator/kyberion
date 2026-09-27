@@ -181,6 +181,52 @@ describe('service-actuator: RECONCILE with auth check', () => {
     );
   });
 
+  it('never lets a service manifest env set execution authority (DR-01)', async () => {
+    const manifest = {
+      'env-service': {
+        path: 'src/env-service.ts',
+        env: {
+          PORT: '3317',
+          SYSTEM_ROLE: 'ecosystem_architect',
+          MISSION_ROLE: 'mission_controller',
+          KYBERION_PERSONA: 'sovereign',
+          KYBERION_DELEGATED_ROLE: 'ecosystem_architect@nexus_daemon',
+          KYBERION_SUDO: 'true',
+        },
+      },
+    };
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockImplementation((p: string) =>
+      String(p).includes('pid') ? '{}' : JSON.stringify(manifest)
+    );
+    mocks.validateServiceAuth.mockResolvedValue({ valid: true });
+    mocks.spawnManagedProcess.mockReturnValue({
+      resourceId: 'service:env-service',
+      child: { pid: 4242, unref: vi.fn() },
+    });
+
+    await handleAction({
+      service_id: 'manager',
+      mode: 'RECONCILE',
+      action: 'reconcile',
+      params: { manifest_path: 'services.json' },
+    });
+
+    expect(mocks.spawnManagedProcess).toHaveBeenCalledTimes(1);
+    const env = mocks.spawnManagedProcess.mock.calls[0][0].spawnOptions.env as NodeJS.ProcessEnv;
+    expect(env.PORT).toBe('3317');
+    for (const key of [
+      'SYSTEM_ROLE',
+      'MISSION_ROLE',
+      'KYBERION_PERSONA',
+      'KYBERION_DELEGATED_ROLE',
+      'KYBERION_SUDO',
+    ]) {
+      // Only this process's own value (if any) may reach the service.
+      expect(env[key], key).toBe(process.env[key]);
+    }
+  });
+
   it('rejects a malformed manifest before reconcile or cleanup can mutate services', async () => {
     mocks.safeExistsSync.mockReturnValue(true);
     mocks.safeReadFile.mockReturnValue(

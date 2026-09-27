@@ -26,6 +26,7 @@ import { isLinux, isMacOS } from '@agent/core/platform';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { safeOpenAppendFile } from '@agent/core/secure-io';
+import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { inspectServiceAuth } from '@agent/core/service-validator';
 import { auditChain } from '@agent/core/audit-chain';
@@ -244,6 +245,37 @@ function buildSurfaceNextAction(
   });
 }
 
+/**
+ * The env a surface is started with: this process's env plus the manifest's,
+ * then the surface's own identity (DR-01): `SYSTEM_ROLE=<surface id with - ->
+ * _>`, `AUTHORIZED_SCOPE=<service id>`, and no MISSION_ROLE or delegated role
+ * inherited from this launcher (buildSystemRoleLaunchEnv). MISSION_ROLE is the
+ * manifest's own, if it declares one; the persona is the manifest's explicit
+ * KYBERION_PERSONA, else `worker` — the persona the `pnpm surfaces` launch
+ * contract gives surface_runtime and its surfaces — never one inherited from
+ * whoever started this runtime. A manifest cannot set SYSTEM_ROLE or
+ * KYBERION_DELEGATED_ROLE.
+ */
+export function buildSurfaceLaunchEnv(
+  surfaceId: string,
+  serviceId: string,
+  manifestEnv: Record<string, string | undefined> = {},
+  baseEnv: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  return buildSystemRoleLaunchEnv(
+    {
+      ...baseEnv,
+      ...manifestEnv,
+      AUTHORIZED_SCOPE: serviceId, // Inject scoped identity for TIBA
+    },
+    surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
+    {
+      persona: manifestEnv.KYBERION_PERSONA || 'worker',
+      ...(manifestEnv.MISSION_ROLE ? { missionRole: manifestEnv.MISSION_ROLE } : {}),
+    }
+  );
+}
+
 export async function startSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
   const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
@@ -335,12 +367,7 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
     shutdownPolicy: normalized.shutdownPolicy,
     spawnOptions: {
       cwd,
-      env: {
-        ...process.env,
-        ...(normalized.env || {}),
-        AUTHORIZED_SCOPE: serviceId, // Inject scoped identity for TIBA
-        SYSTEM_ROLE: surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
-      },
+      env: buildSurfaceLaunchEnv(surfaceId, serviceId, normalized.env),
       detached: normalized.shutdownPolicy === 'detached',
       stdio: ['ignore', out, out],
     },

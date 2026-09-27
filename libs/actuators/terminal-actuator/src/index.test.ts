@@ -163,6 +163,26 @@ describe('terminal-actuator direct actions', () => {
     expect(result.sessionId).toBeDefined();
   });
 
+  it('drops execution-authority keys from a caller-supplied spawn env (DR-01)', async () => {
+    const { handleAction } = await import('./index');
+    const { ptyEngine } = await import('@agent/core/pty-engine');
+    await handleAction({
+      action: 'spawn',
+      params: {
+        env: {
+          FOO: 'bar',
+          SYSTEM_ROLE: 'ecosystem_architect',
+          MISSION_ROLE: 'mission_controller',
+          KYBERION_PERSONA: 'sovereign',
+          KYBERION_DELEGATED_ROLE: 'ecosystem_architect@terminal_bridge',
+          KYBERION_SUDO: 'true',
+        },
+      },
+    } as unknown as Parameters<typeof handleAction>[0]);
+    const calls = vi.mocked(ptyEngine.spawn).mock.calls;
+    expect(calls[calls.length - 1]?.[3]).toEqual({ FOO: 'bar' });
+  });
+
   it('list action returns all sessions', async () => {
     const { handleAction } = await import('./index');
     await handleAction({ action: 'spawn', params: {} } as any);

@@ -34,6 +34,7 @@
  * reachable role is missing from role-assumption-policy.json.
  */
 import * as path from 'node:path';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
@@ -285,6 +286,15 @@ export function buildReachabilityReport(
         }
       }
     }
+    // DR-01: delegations issued for a child under THIS system role by an env
+    // literal that sets SYSTEM_ROLE, wherever the spawning code lives.
+    for (const delegation of analyzer.foreignDelegations) {
+      if (!delegation.anySystemRole && !delegation.systemRoles.has(systemRole)) continue;
+      for (const role of [...delegation.roles].sort()) {
+        reachable[role] ??= { example_path: [delegation.site] };
+      }
+      for (const reason of delegation.unresolved) addUnresolved(delegation.site, reason);
+    }
     // A child entry the program does not hold cannot be walked: any role.
     for (const rel of entryFiles) {
       if (!program.getSourceFile(ws.abs(rel))) {
@@ -374,11 +384,17 @@ export const main = defineGenerator({
   id: 'role-assumption-reachability',
   outputs: [REACHABILITY_REPORT_PATH],
   normalize: normalizeReachabilityReport,
-  render() {
+  async render() {
+    // Emit the committed (prettier) layout so a regeneration after a merge
+    // (`pnpm kyberion resolve generated`) does not rewrite every line.
+    const config = (await resolvePrettierConfig(REACHABILITY_REPORT_PATH)) ?? {};
     return [
       {
         path: REACHABILITY_REPORT_PATH,
-        content: renderReachabilityReport(buildReachabilityReport()),
+        content: await prettierFormat(renderReachabilityReport(buildReachabilityReport()), {
+          ...config,
+          parser: 'json',
+        }),
       },
     ];
   },

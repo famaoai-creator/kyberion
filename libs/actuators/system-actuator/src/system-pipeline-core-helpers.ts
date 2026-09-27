@@ -1,6 +1,7 @@
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
 import { logger } from '@agent/core/core';
+import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -444,7 +445,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
               {
                 login: true,
                 cwd: rootDir,
-                env: params.env || {},
+                env: stripAuthorityEnvOverrides(params.env),
               }
             ).trim(),
           buildRetryOptions(params.retry)
@@ -526,7 +527,8 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       assertUnsafeShellAllowed();
       const command = resolve(params.command);
       const args = params.args ? params.args.map((a: any) => resolve(a)) : [];
-      const env = params.env ? params.env : {};
+      // Pipeline-supplied env may not set execution authority (DR-01).
+      const env = stripAuthorityEnvOverrides(params.env);
       const result = await retry(
         async () =>
           safeExecResult(command, args, {

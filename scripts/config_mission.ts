@@ -44,6 +44,7 @@ import {
 } from '@agent/core/config-mission';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import * as pathResolver from '@agent/core/path-resolver';
+import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 // ---------------------------------------------------------------------------
@@ -518,11 +519,8 @@ async function cmdApply(argv: string[]): Promise<void> {
     );
     safeExec('node', ['dist/scripts/run_pipeline.js', '--input', pipelinePath], {
       cwd: pathResolver.rootDir(),
-      env: {
-        KYBERION_PERSONA: 'worker',
-        SYSTEM_ROLE: 'system_configurator',
-        ...inputEnv,
-      },
+      // A new SYSTEM_ROLE: none of this process's own role/delegation carries over (DR-01).
+      env: buildSystemRoleLaunchEnv(inputEnv, 'system_configurator', { persona: 'worker' }),
     });
 
     brief.status = 'applied';
