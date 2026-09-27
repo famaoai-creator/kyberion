@@ -161,6 +161,8 @@
     ]
   },
   "dependencies": {
+    "@actuator/meeting-browser-driver": "workspace:*",
+    "@actuator/service": "workspace:*",
     "@actuator/system": "workspace:*",
     "@agent/core": "workspace:*",
     "@agent/shared-media": "workspace:*",
