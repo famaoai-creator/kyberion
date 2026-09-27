@@ -8,7 +8,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { readTextFile } from '@agent/core/foundation';
 import { loadFrontmatterExclusions } from '@agent/core/frontmatter-exclusions';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
@@ -190,9 +190,7 @@ function withKnowledgeAccess<T>(operation: () => T): T {
   return withExecutionContext('ecosystem_architect', operation, 'ecosystem_architect');
 }
 
-function renderKnowledgeIndexFiles(): GeneratedFile[] {
-  const kbRoot = pathResolver.knowledge('');
-  const allFiles = walk(kbRoot, kbRoot);
+function validateKnowledgeTree(allFiles: readonly string[]): void {
   const exclusionFailures = validateFrontmatterExclusions(allFiles);
   if (exclusionFailures.length > 0) {
     throw new Error(
@@ -205,6 +203,14 @@ function renderKnowledgeIndexFiles(): GeneratedFile[] {
       frontmatterFailures.map((failure) => `[generate_knowledge_index] ${failure}`).join('\n')
     );
   }
+}
+
+function renderKnowledgeIndexFiles(options: { validate?: boolean } = {}): GeneratedFile[] {
+  const kbRoot = pathResolver.knowledge('');
+  const allFiles = walk(kbRoot, kbRoot);
+  // The build refreshes the local manifest only; a frontmatter violation is the
+  // catalogs gate's finding and must not fail `pnpm build`.
+  if (options.validate !== false) validateKnowledgeTree(allFiles);
 
   const manifestEntries: ManifestEntry[] = [];
   const indexEntries: IndexEntry[] = [];
@@ -281,18 +287,6 @@ function renderKnowledgeIndexFiles(): GeneratedFile[] {
   ];
 }
 
-function normalizeManifest(content: string): string {
-  try {
-    const parsed = parseSafeJsonInput(content, 'knowledge integrity manifest') as {
-      files?: unknown[];
-    };
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return content;
-    return JSON.stringify(parsed.files || []);
-  } catch {
-    return content.replace(/"generated": ".*?",\n/g, '');
-  }
-}
-
 function normalizeIndex(content: string): string {
   return content
     .split(/\r?\n/)
@@ -301,17 +295,17 @@ function normalizeIndex(content: string): string {
     .join('\n');
 }
 
+/**
+ * Freshness covers the tracked navigation index only. The size manifest is a
+ * gitignored local inventory (GF-01): it is rebuilt by `pnpm build` and the
+ * generator, and nothing verifies it against a committed baseline, so comparing
+ * it would only measure how recently this checkout ran the generator.
+ */
 function generatedFilesAreCurrent(files: readonly GeneratedFile[]): boolean {
-  const expected = new Map(files.map((file) => [file.path, file.content]));
-  const existingManifest = readKnowledgeTextFile(KNOWLEDGE_MANIFEST_PATH);
-  const existingIndex = readKnowledgeTextFile(KNOWLEDGE_INDEX_PATH);
-  const expectedManifest = expected.get(KNOWLEDGE_MANIFEST_PATH);
-  const expectedIndex = expected.get(KNOWLEDGE_INDEX_PATH);
+  const expectedIndex = files.find((file) => file.path === KNOWLEDGE_INDEX_PATH)?.content;
+  if (expectedIndex === undefined || !safeExistsSync(KNOWLEDGE_INDEX_PATH)) return false;
   return (
-    expectedManifest !== undefined &&
-    expectedIndex !== undefined &&
-    normalizeManifest(existingManifest) === normalizeManifest(expectedManifest) &&
-    normalizeIndex(existingIndex) === normalizeIndex(expectedIndex)
+    normalizeIndex(readKnowledgeTextFile(KNOWLEDGE_INDEX_PATH)) === normalizeIndex(expectedIndex)
   );
 }
 
@@ -329,11 +323,40 @@ export function generateIndex(checkOnly = false, print: Print = () => undefined)
   }
 }
 
+function isManifestOnly(flags: readonly string[] | undefined): boolean {
+  return flags?.includes('--manifest-only') ?? false;
+}
+
+/**
+ * `--manifest-only` (used by `pnpm build`) refreshes the untracked manifest
+ * without rewriting the tracked `_index.md`, so a build can never mask a stale
+ * index before the catalogs gate runs. `--check` compares the tracked index
+ * only (see generatedFilesAreCurrent). Every mode except `--manifest-only`
+ * validates frontmatter and exclusions.
+ */
+export function selectKnowledgeIndexOutputs(
+  files: readonly GeneratedFile[],
+  options: { check?: boolean; unknownFlags?: readonly string[] }
+): GeneratedFile[] {
+  if (isManifestOnly(options.unknownFlags)) {
+    return files.filter((file) => file.path === KNOWLEDGE_MANIFEST_PATH);
+  }
+  if (options.check) return files.filter((file) => file.path === KNOWLEDGE_INDEX_PATH);
+  return [...files];
+}
+
 export const runGenerateKnowledgeIndex = defineGenerator({
   id: 'knowledge-index',
   outputs: [KNOWLEDGE_MANIFEST_PATH, KNOWLEDGE_INDEX_PATH],
   executionContext: 'ecosystem_architect',
-  render: () => withKnowledgeAccess(() => renderKnowledgeIndexFiles()),
+  normalize: (content) => normalizeIndex(content),
+  render: (context) =>
+    withKnowledgeAccess(() =>
+      selectKnowledgeIndexOutputs(
+        renderKnowledgeIndexFiles({ validate: !isManifestOnly(context.unknownFlags) }),
+        context
+      )
+    ),
 });
 
 if (

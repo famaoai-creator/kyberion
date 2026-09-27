@@ -240,8 +240,8 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
      you will stage;
   2. for any `knowledge/` edit, run `pnpm generate:knowledge-index` (it also
      picks up other agents' uncommitted knowledge edits — check the diff);
-  3. stage explicit paths plus `knowledge/_index.md` and
-     `knowledge/_integrity-manifest.json`, and confirm no newly added
+  3. stage explicit paths plus `knowledge/_index.md` (the size manifest
+     `knowledge/_integrity-manifest.json` is gitignored), and confirm no newly added
      `.js`/`.d.ts` shadows a `.ts` source (the `.husky/pre-commit` check);
   4. only then `git -c core.hooksPath=/dev/null commit`.
 - Set up every new worktree from scratch (install with
