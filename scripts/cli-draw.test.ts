@@ -67,6 +67,11 @@ function createFakeDrawDeps(
   const requests: ImageGenerationRequest[] = [];
   const plans: ImageGenerationRequest[] = [];
   const media: { tool: MediaTool; args: string[] }[] = [];
+  /** Pending host hand-offs by target, like libs/core/host-image-handoff.ts. */
+  /** Host hand-off requests by target (prompt + file before the request), like libs/core/host-image-handoff.ts. */
+  const handoffs = new Map<string, { prompt: string; prior: string | null }>();
+  const contents = (file: string) =>
+    safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : null;
   const pick = (request: ImageGenerationRequest) => {
     const order = [...(request.providerPreference ?? []), ...PROVIDERS.map((p) => p.id)];
     const id = order.find(
@@ -105,20 +110,28 @@ function createFakeDrawDeps(
       requests.push(request);
       if (options.generateError) throw new Error(options.generateError);
       const info = pick(request)!;
-      // Like the real host bridges: an existing target is the host's output.
-      if (info.interactiveHandoff && safeExistsSync(request.targetPath!)) {
-        return { status: 'succeeded', provider: info.id, path: request.targetPath!, elapsedMs: 1 };
+      // Like the real host bridges: collect only a file changed since the request.
+      const target = request.targetPath!;
+      const pending = handoffs.get(target);
+      if (
+        info.interactiveHandoff &&
+        contents(target) !== null &&
+        pending?.prompt === request.prompt &&
+        pending.prior !== contents(target)
+      ) {
+        return { status: 'succeeded', provider: info.id, path: target, elapsedMs: 1 };
       }
       if (info.interactiveHandoff) {
+        if (pending?.prompt !== request.prompt) {
+          handoffs.set(target, { prompt: request.prompt, prior: contents(target) });
+        }
         throw new Error(
           `HOST_BRIDGE_IMAGE_GENERATION_REQUIRED: Codex host bridge is required. Please use your 'generate_image' tool.`
         );
       }
-      const target = options.siblingExt
-        ? request.targetPath!.replace(/\.[^.]+$/, options.siblingExt)
-        : request.targetPath!;
-      safeWriteFile(target, options.bytes ?? pngBytes(1024, 768));
-      return { status: 'succeeded', provider: info.id, path: target, elapsedMs: 5 };
+      const written = options.siblingExt ? target.replace(/\.[^.]+$/, options.siblingExt) : target;
+      safeWriteFile(written, options.bytes ?? pngBytes(1024, 768));
+      return { status: 'succeeded', provider: info.id, path: written, elapsedMs: 5 };
     },
     async consent(input) {
       return {
@@ -248,32 +261,29 @@ describe('pnpm kyberion draw', () => {
     });
   });
 
-  it('collects a hand-off only for an image saved after the request, with the same prompt', async () => {
+  it('passes the hand-off through: a pre-existing --out is re-requested, the answer is collected', async () => {
     const out = rel('fox.png');
     const target = path.join(workDir, 'fox.png');
+    safeWriteFile(target, pngBytes(8, 8));
     const argv = ['a', 'fox', '--out', out, '--allow-handoff'];
     const deps = createFakeDrawDeps({ available: ['codex_host_bridge'] });
     await expect(runDrawCommand(argv, () => {}, deps)).rejects.toMatchObject({
       code: DRAW_HANDOFF_EXIT_CODE,
     });
-    await new Promise((resolve) => setTimeout(resolve, 5));
     safeWriteFile(target, pngBytes(64, 64));
+    const collected = await runDrawCommand(argv, () => {}, deps);
+    expect(collected).toMatchObject({
+      status: 'succeeded',
+      provider: 'codex_host_bridge',
+      width: 64,
+    });
+    // Collection is idempotent; a different prompt needs a new host image.
+    await expect(runDrawCommand(argv, () => {}, deps)).resolves.toMatchObject({
+      status: 'succeeded',
+    });
     await expect(
       runDrawCommand(['a', 'wolf', '--out', out, '--allow-handoff'], () => {}, deps)
-    ).rejects.toThrow(/no hand-off was requested for it with this prompt/);
-    const collected = await runDrawCommand(argv, () => {}, deps);
-    expect(collected).toMatchObject({ status: 'succeeded', provider: 'codex_host_bridge' });
-    // The marker is consumed: the same file is not collected twice.
-    await expect(runDrawCommand(argv, () => {}, deps)).rejects.toThrow(/already exists/);
-  });
-
-  it('never collects a pre-existing --out as host output', async () => {
-    safeWriteFile(path.join(workDir, 'old.png'), pngBytes(8, 8));
-    const deps = createFakeDrawDeps({ available: ['codex_host_bridge'] });
-    await expect(
-      runDrawCommand(['x', '--out', rel('old.png'), '--allow-handoff'], () => {}, deps)
-    ).rejects.toThrow(/already exists and no hand-off was requested/);
-    expect(deps.requests).toHaveLength(0);
+    ).rejects.toMatchObject({ code: DRAW_HANDOFF_EXIT_CODE });
   });
 
   it('turns a dispatch-time consent denial into the consent hint', async () => {
