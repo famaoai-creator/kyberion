@@ -105,6 +105,16 @@ inputs are therefore not reachable by a verb:
 | URL / web page     | `network:fetch` (egress-governed) → save → `read` the saved file                                             | `read` refuses URLs by design (`document-reader.ts`); folding fetch into it would move an egress decision under a perception verb |
 | The current screen | `media-generation:capture_screen` / `capture_focused_window`, `system:list_displays`, `system:record_screen` | capture applies screen-frame redaction and lives on the action side; `see` only reads files                                       |
 
+Resolved 2026-09-27 (MSN-CAPTURE-RECORD-20260927): capture is now two verbs —
+`pnpm kyberion capture [--screen|--window|--camera]` (still, via
+`system:screenshot` / `system:capture_photo`) and
+`pnpm kyberion record screen|audio|camera` (time-series, via
+`system:record_screen` / `system:record_audio` / `system:record_camera`).
+The redaction gate stays in the actuator; the verbs own only arg parsing and
+repo-boundary checks. `see` remains file-only by design. Not folded: `read
+<url>` (egress gate still open), explicit `browser:record` (needs session
+lifecycle — deferred by design), mobile video (no device bridge).
+
 Both are two-step today, and both are cheap to fold into one verb (`read <url>`,
 `see --screen`) — the open question is where the egress and redaction gate is
 evaluated, not whether the engine exists.

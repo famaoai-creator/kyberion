@@ -75,6 +75,10 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText(t('cli_help_speak', locale));
   printText(t('cli_help_draw', locale));
   printText(t('cli_help_watch', locale));
+  printText(t('cli_help_capture', locale));
+  printText(t('cli_help_record_screen', locale));
+  printText(t('cli_help_record_audio', locale));
+  printText(t('cli_help_record_camera', locale));
   printText('');
   printText(t('cli_help_sec_pipelines', locale));
   printText(t('cli_help_preview', locale));
