@@ -87,7 +87,12 @@ describe('runSurfaceAction', () => {
       '--surface',
       'nexus-daemon',
     ]);
-    expect(captured?.env).toEqual({ KYBERION_PERSONA: 'worker', SYSTEM_ROLE: 'surface_runtime' });
+    expect(captured?.env).toEqual({
+      KYBERION_PERSONA: 'worker',
+      SYSTEM_ROLE: 'surface_runtime',
+      MISSION_ROLE: '',
+      KYBERION_DELEGATED_ROLE: '',
+    });
   });
 });
 
