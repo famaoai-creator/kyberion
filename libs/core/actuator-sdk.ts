@@ -1,5 +1,9 @@
 import { buildUnknownActuatorOpError, type PipelineStepType } from './actuator-op-registry.js';
 import { createAjv } from './foundation/ajv.js';
+import { createGovernedRetryOptionsBuilder } from './recovery-policy.js';
+import type { RetryOptions } from './src/retry-utils.js';
+import { getRegisteredEnv } from './foundation/env.js';
+import { isRecord } from './foundation/primitives.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 import { runOpPreflight } from './op-preflight.js';
 import { resolvePipelineInputPlaceholders } from './pipeline-input-contract.js';
@@ -688,4 +692,66 @@ export function defineCatalogBackedActuator(options: {
     })
   );
   return defineActuator({ id: options.id, ops });
+}
+
+/**
+ * DS-09: shared actuator pipeline scaffold. Collapses the per-actuator
+ * boilerplate (manifest-bound governed retry builder, step-level retry merge,
+ * unsafe-shell gate) into one declaration.
+ */
+export interface DefineActuatorPipelineBaseInput {
+  /** Absolute actuator manifest path (pathResolver.rootResolve'd). */
+  manifestPath: string;
+  /** Actuator-local retry defaults; manifest recovery_policy overrides these. */
+  retryDefaults: RetryOptions;
+  /** Error categories retried when the manifest declares none. */
+  retryFallbackCategories?: readonly string[];
+  /** Env flag that unlocks unsafe shell execution. */
+  unsafeShellEnv?: string;
+}
+
+export interface ActuatorPipelineBase {
+  manifestPath: string;
+  /** retry options: actuator defaults → manifest policy → explicit override. */
+  buildRetryOptions: (override?: Record<string, unknown>) => RetryOptions;
+  /** Step-level merge: step.retry + step.max_retries + step.retry_delay_ms. */
+  buildStepRetryOptions: (stepParams: Record<string, unknown>) => RetryOptions;
+  /** Fail closed unless the unsafe-shell env flag was set at module load. */
+  assertUnsafeShellAllowed: () => void;
+}
+
+export function defineActuatorPipelineBase(
+  input: DefineActuatorPipelineBaseInput
+): ActuatorPipelineBase {
+  const buildRetryOptions = createGovernedRetryOptionsBuilder({
+    manifestPath: input.manifestPath,
+    defaults: input.retryDefaults,
+    fallbackCategories: input.retryFallbackCategories,
+  });
+  const unsafeShellEnv = input.unsafeShellEnv ?? 'KYBERION_ALLOW_UNSAFE_SHELL';
+  const unsafeShellAllowed =
+    getRegisteredEnv<boolean>(unsafeShellEnv, { defaultValue: false }) === true;
+  return {
+    manifestPath: input.manifestPath,
+    buildRetryOptions,
+    buildStepRetryOptions: (stepParams) => {
+      const explicitRetry = isRecord(stepParams.retry)
+        ? { ...stepParams.retry }
+        : ({} as Record<string, unknown>);
+      if (stepParams.max_retries !== undefined) {
+        explicitRetry.maxRetries = Number(stepParams.max_retries);
+      }
+      if (stepParams.retry_delay_ms !== undefined) {
+        explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
+      }
+      return buildRetryOptions(explicitRetry);
+    },
+    assertUnsafeShellAllowed: () => {
+      if (!unsafeShellAllowed) {
+        throw new Error(
+          `[SECURITY] Shell execution disabled. Set ${unsafeShellEnv}=true to enable.`
+        );
+      }
+    },
+  };
 }

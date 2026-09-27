@@ -157,15 +157,28 @@ export function registerStreamingTtsBridge(
   return dispose;
 }
 
+/** Built-in bridges, registered as named seam providers like any other. */
+const BUILTIN_STREAMING_TTS_BRIDGES: Record<string, () => StreamingTextToSpeechBridge> = {
+  stub: () => new StubStreamingTextToSpeechBridge(),
+  gemini: () => new GeminiStreamingTextToSpeechBridge(),
+};
+
+function registerBuiltinStreamingTtsBridges(): void {
+  for (const [id, factory] of Object.entries(BUILTIN_STREAMING_TTS_BRIDGES)) {
+    if (!streamingTtsSeam.getOptional(id)) registerStreamingTtsBridge(id, factory);
+  }
+}
+
+registerBuiltinStreamingTtsBridges();
+
 export function resetStreamingTtsBridges(): void {
   for (const dispose of [...streamingTtsDisposers.values()]) dispose();
+  registerBuiltinStreamingTtsBridges();
 }
 
 export function getStreamingTtsBridge(
   id: string = getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE') ?? 'stub'
 ): StreamingTextToSpeechBridge {
-  if (id === 'stub') return new StubStreamingTextToSpeechBridge();
-  if (id === 'gemini') return new GeminiStreamingTextToSpeechBridge();
   const factory = streamingTtsSeam.getOptional(id);
   if (!factory) throw new Error(`[streaming-tts] unknown bridge id '${id}'`);
   return factory();
@@ -218,17 +231,9 @@ export function unmetStreamingTtsRequirements(
   return unmet;
 }
 
-/** Built-in bridges plus every registered named bridge. */
+/** Every registered named bridge, including the built-ins. */
 export function listStreamingTtsBridges(): StreamingTextToSpeechBridge[] {
-  const bridges: StreamingTextToSpeechBridge[] = [
-    new StubStreamingTextToSpeechBridge(),
-    new GeminiStreamingTextToSpeechBridge(),
-  ];
-  for (const record of streamingTtsSeam.list()) {
-    if (record.id === 'stub' || record.id === 'gemini') continue;
-    bridges.push(record.implementation());
-  }
-  return bridges;
+  return streamingTtsSeam.list().map((record) => record.implementation());
 }
 
 export interface SelectStreamingTtsBridgeOptions {

@@ -155,6 +155,22 @@ export function resolveAgentLaunchArgs(
   return [...args];
 }
 
+/**
+ * Per-kind model-override args. Only Claude CLI takes `--model`; a model id
+ * equal to the provider name or the literal 'claude' is already implied and
+ * must not be forwarded.
+ */
+export function resolveAgentModelArgs(
+  provider: string,
+  kind: string | undefined,
+  modelId?: string
+): string[] {
+  if (!modelId || kind !== 'claude') return [];
+  const normalized = modelId.trim().toLowerCase();
+  if (!normalized || normalized === 'claude' || normalized === provider.toLowerCase()) return [];
+  return ['--model', modelId];
+}
+
 export interface AgentPromptContext {
   /** From classifyAgentReadiness, or `agent_blocked` when only herdr knows. */
   signatureId: string;

@@ -117,6 +117,23 @@ export interface VideoStoryboardToNarratedBriefOptions {
   };
 }
 
+/** DS-06: single source of truth for semantic beat classification. */
+export function isHookSemantic(semantic: string | undefined): boolean {
+  return semantic === 'hook';
+}
+
+export function isProcessLikeSemantic(semantic: string | undefined): boolean {
+  return semantic === 'process' || semantic === 'steps' || semantic === 'demo';
+}
+
+export function isProofLikeSemantic(semantic: string | undefined): boolean {
+  return semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact';
+}
+
+export function isCtaLikeSemantic(semantic: string | undefined): boolean {
+  return semantic === 'cta' || semantic === 'validation';
+}
+
 type BeatPlanEntry = {
   id: string;
   title: (brief: VideoContentBrief) => string;
@@ -814,22 +831,20 @@ function inferLayoutVariant(
   total: number
 ): string {
   if (presentationMode === 'vtuber') {
-    if (role === 'hook' || semantic === 'hook') return 'focus-center';
-    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps')
-      return 'fullscreen-demo';
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || index === total - 1)
+    if (role === 'hook' || isHookSemantic(semantic)) return 'focus-center';
+    if (isProcessLikeSemantic(semantic)) return 'fullscreen-demo';
+    if (role === 'outro' || isCtaLikeSemantic(semantic) || index === total - 1)
       return 'split-right';
     return 'split-left';
   }
   if (presentationMode === 'promo') {
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || index === total - 1)
+    if (role === 'outro' || isCtaLikeSemantic(semantic) || index === total - 1)
       return 'split-right';
-    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact')
-      return 'fullscreen-demo';
+    if (isProofLikeSemantic(semantic)) return 'fullscreen-demo';
     return 'split-left';
   }
-  if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') return 'split-left';
-  if (role === 'outro' || semantic === 'cta' || semantic === 'validation') return 'split-right';
+  if (isProcessLikeSemantic(semantic)) return 'split-left';
+  if (role === 'outro' || isCtaLikeSemantic(semantic)) return 'split-right';
   return 'split-left';
 }
 
@@ -872,7 +887,7 @@ function resolveAssetRefs(brief: VideoContentBrief, entry: BeatPlanEntry): strin
   }
   if (
     brief.design_system_ref.logo_path &&
-    (entry.role === 'cta' || entry.semantic === 'validation' || entry.semantic === 'decision')
+    (entry.role === 'cta' || isCtaLikeSemantic(entry.semantic) || entry.semantic === 'decision')
   ) {
     refs.add(brief.design_system_ref.logo_path);
   }

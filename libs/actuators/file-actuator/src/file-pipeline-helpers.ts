@@ -21,7 +21,6 @@ import {
   safeRmSync,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   evaluateCondition,
@@ -32,7 +31,7 @@ import { validateOpInput } from '@agent/core/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { skipAdfStep } from '@agent/core/adf-engine';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { runAdfActuatorPipeline, defineActuatorPipelineBase } from '@agent/core/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -45,19 +44,16 @@ import {
 import * as path from 'node:path';
 import { isDirectEntry } from '@agent/core/direct-entry';
 
-const FILE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/file-actuator/manifest.json');
-const DEFAULT_FILE_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 150,
-  maxDelayMs: 1200,
-  factor: 2,
-  jitter: true,
-};
-
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: FILE_MANIFEST_PATH,
-  defaults: DEFAULT_FILE_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+const { buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/file-actuator/manifest.json'),
+  retryDefaults: {
+    maxRetries: 2,
+    initialDelayMs: 150,
+    maxDelayMs: 1200,
+    factor: 2,
+    jitter: true,
+  },
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 function resolveFilePath(value: string, allowMissingLeaf = true): string {

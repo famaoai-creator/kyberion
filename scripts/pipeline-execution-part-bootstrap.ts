@@ -616,7 +616,7 @@ export async function loadActuatorDispatch(
   if (domain === 'reasoning') {
     dispatchCache[domain] = async (op, params, ctx, type, _trace?, policy?) => {
       const backend = getReasoningBackend();
-      if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
+      if (REASONING_LEAF_OPS.has(op)) {
         const resolvedInstruction =
           typeof params.instruction === 'string'
             ? resolveVars(params.instruction, ctx)
@@ -801,30 +801,46 @@ export async function loadActuatorDispatch(
   return dispatchCache[domain];
 }
 
+/** Reasoning leaf ops served directly by the reasoning backend. */
+const REASONING_LEAF_OPS = new Set(['analyze', 'transform', 'synthesize']);
+
+/** Qualified op aliases: legacy `domain:action` spellings → canonical op. */
+const QUALIFIED_OP_ALIASES: Record<string, string> = {
+  'mission:list': 'system:list_missions',
+  'project:list': 'system:list_projects',
+  'knowledge:list': 'system:list_knowledge',
+  'capability:list': 'system:list_capabilities',
+  'agent:list-manifests': 'agent:list_manifests',
+  'agent:list_manifests': 'agent:list_manifests',
+  'agent:list-runtimes': 'agent:list_runtimes',
+  'agent:list_runtimes': 'agent:list_runtimes',
+};
+
+/** Bare control-flow aliases → canonical core:* ops. */
+const BARE_OP_ALIASES: Record<string, string> = {
+  if: 'core:if',
+  while: 'core:while',
+  loop_until: 'core:while',
+  retry_until_quality: 'core:retry_until_quality',
+  parallel_foreach: 'core:parallel_foreach',
+  team_lead: 'core:team_lead',
+  parallel_calls: 'core:parallel_calls',
+  accumulate: 'core:accumulate',
+  judge_route: 'core:judge_route',
+  await_decision: 'core:await_decision',
+};
+
 export function normalizePipelineOp(op: string): string {
   if (op.includes(':')) {
     const [domain, action] = op.split(':');
-    if (domain === 'mission' && action === 'list') return 'system:list_missions';
-    if (domain === 'project' && action === 'list') return 'system:list_projects';
-    if (domain === 'knowledge' && action === 'list') return 'system:list_knowledge';
-    if (domain === 'capability' && action === 'list') return 'system:list_capabilities';
-    if (domain === 'agent' && (action === 'list-manifests' || action === 'list_manifests'))
-      return 'agent:list_manifests';
-    if (domain === 'agent' && (action === 'list-runtimes' || action === 'list_runtimes'))
-      return 'agent:list_runtimes';
+    const alias = QUALIFIED_OP_ALIASES[op];
+    if (alias) return alias;
 
     if (domain === 'mission') return `system:${action}`;
     return op;
   }
-  if (op === 'if') return 'core:if';
-  if (op === 'while' || op === 'loop_until') return 'core:while';
-  if (op === 'retry_until_quality') return 'core:retry_until_quality';
-  if (op === 'parallel_foreach') return 'core:parallel_foreach';
-  if (op === 'team_lead') return 'core:team_lead';
-  if (op === 'parallel_calls') return 'core:parallel_calls';
-  if (op === 'accumulate') return 'core:accumulate';
-  if (op === 'judge_route') return 'core:judge_route';
-  if (op === 'await_decision') return 'core:await_decision';
+  const alias = BARE_OP_ALIASES[op];
+  if (alias) return alias;
   return `system:${op}`;
 }
 

@@ -33,6 +33,7 @@ import { getVoiceSelectionSnapshot } from '@agent/core/voice-selection-preferenc
 import {
   resolveVoiceSttAdapter,
   resolveVoiceTtsAdapter,
+  type VoiceSttAdapterDescriptor,
 } from '@agent/core/voice-provider-adapters';
 import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
 import {
@@ -40,6 +41,7 @@ import {
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
   type VoiceSttAvailability,
+  type VoiceSttBackend,
 } from '@agent/core/voice-stt';
 import { ShellSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
 import { formatChannelTurnText } from '@agent/core/channel-adapter';
@@ -510,6 +512,78 @@ async function transcribeWithOpenAiCompatibleServer(
   };
 }
 
+type SttTranscribeOutcome = { ok: boolean; text?: string; error?: string; backend?: string };
+
+interface SttAdapterBehavior {
+  /** Availability probe for the adapter kind. */
+  probe?: (adapter: VoiceSttAdapterDescriptor) => boolean;
+  /** Transcribe invocation for the adapter kind. */
+  transcribe?: (
+    inputPath: string,
+    locale: string,
+    adapter: VoiceSttAdapterDescriptor,
+    backend: VoiceSttBackend
+  ) => Promise<SttTranscribeOutcome>;
+}
+
+const STT_ADAPTER_BEHAVIORS: Record<string, SttAdapterBehavior> = {
+  openai_compatible_server: {
+    probe: () => resolveVoiceSttServerConfig(process.env) !== null,
+    transcribe: (inputPath, locale) => transcribeWithOpenAiCompatibleServer(inputPath, locale),
+  },
+  fluid_audio_native: {
+    probe: () =>
+      Boolean(
+        process.platform === 'darwin' &&
+        getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+      ),
+    transcribe: async (inputPath, locale) => {
+      const result = await transcribeWithFluidAudio(inputPath, locale);
+      return result.ok ? { ...result, backend: 'fluid_audio' } : result;
+    },
+  },
+  faster_whisper_python: {
+    probe: (adapter) =>
+      Boolean(
+        adapter.runtime_id &&
+        process.platform === 'win32' &&
+        (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
+          getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim()) &&
+        probeToolRuntime(adapter.runtime_id as string, 'installed').installed
+      ),
+    transcribe: async (inputPath, locale, adapter, backend) => {
+      const result = await transcribeWithManagedPythonBridge(inputPath, locale, adapter);
+      return result.ok ? { ...result, backend } : result;
+    },
+  },
+  managed_python_bridge: {
+    probe: (adapter) =>
+      Boolean(
+        adapter.runtime_id && probeToolRuntime(adapter.runtime_id as string, 'installed').installed
+      ),
+    transcribe: async (inputPath, locale, adapter, backend) => {
+      const result = await transcribeWithManagedPythonBridge(inputPath, locale, adapter);
+      return result.ok ? { ...result, backend } : result;
+    },
+  },
+  whisper_cpp_cli: {
+    probe: (adapter) =>
+      Boolean(
+        adapter.cli_path &&
+        adapter.model_path &&
+        safeExistsSync(pathResolver.resolve(adapter.cli_path)) &&
+        safeExistsSync(pathResolver.resolve(adapter.model_path))
+      ),
+    transcribe: async (inputPath, locale, adapter) => {
+      const result = await transcribeWithWhisperCpp(inputPath, locale, adapter);
+      return result.ok ? { ...result, backend: 'whisper_cpp' } : result;
+    },
+  },
+  native_speech: {
+    probe: () => safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')),
+  },
+};
+
 function getAvailableSttBackends() {
   const availability: VoiceSttAvailability = {
     server: false,
@@ -519,43 +593,18 @@ function getAvailableSttBackends() {
     whisperCpp: false,
     nativeSpeech: false,
   };
-  for (const backend of [
-    'server',
-    'fluid_audio',
-    'faster_whisper',
-    'mlx_whisper',
-    'whisper_cpp',
-    'native_speech',
-  ] as const) {
+  const probes: Array<[keyof VoiceSttAvailability, VoiceSttBackend]> = [
+    ['server', 'server'],
+    ['fluidAudio', 'fluid_audio'],
+    ['fasterWhisper', 'faster_whisper'],
+    ['mlxWhisper', 'mlx_whisper'],
+    ['whisperCpp', 'whisper_cpp'],
+    ['nativeSpeech', 'native_speech'],
+  ];
+  for (const [key, backend] of probes) {
     const adapter = resolveVoiceSttAdapter(backend);
-    if (adapter.adapter_id === 'openai_compatible_server') {
-      availability.server = resolveVoiceSttServerConfig(process.env) !== null;
-    } else if (adapter.adapter_id === 'fluid_audio_native') {
-      availability.fluidAudio = Boolean(
-        process.platform === 'darwin' &&
-        getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-      );
-    } else if (adapter.adapter_id === 'faster_whisper_python' && adapter.runtime_id) {
-      availability.fasterWhisper = Boolean(
-        process.platform === 'win32' &&
-        (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
-          getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim()) &&
-        probeToolRuntime(adapter.runtime_id, 'installed').installed
-      );
-    } else if (adapter.adapter_id === 'managed_python_bridge' && adapter.runtime_id) {
-      availability.mlxWhisper = probeToolRuntime(adapter.runtime_id, 'installed').installed;
-    } else if (adapter.adapter_id === 'whisper_cpp_cli') {
-      availability.whisperCpp = Boolean(
-        adapter.cli_path &&
-        adapter.model_path &&
-        safeExistsSync(pathResolver.resolve(adapter.cli_path)) &&
-        safeExistsSync(pathResolver.resolve(adapter.model_path))
-      );
-    } else if (adapter.adapter_id === 'native_speech') {
-      availability.nativeSpeech = safeExistsSync(
-        pathResolver.resolve('satellites/voice-hub/native-stt.swift')
-      );
-    }
+    const probe = STT_ADAPTER_BEHAVIORS[adapter.adapter_id]?.probe;
+    availability[key] = probe ? probe(adapter) : false;
   }
   return {
     ...availability,
@@ -595,37 +644,13 @@ async function transcribeRecordedAudio(
   let lastError = 'no_stt_backend_available';
   for (const backend of backendOrder) {
     try {
-      const adapter = resolveVoiceSttAdapter(parseVoiceSttBackend(backend));
-      if (adapter.adapter_id === 'openai_compatible_server') {
-        const result = await transcribeWithOpenAiCompatibleServer(inputPath, locale);
-        if (result.ok) return result;
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (adapter.adapter_id === 'fluid_audio_native') {
-        const result = await transcribeWithFluidAudio(inputPath, locale);
-        if (result.ok) return { ...result, backend: 'fluid_audio' };
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (
-        adapter.adapter_id === 'managed_python_bridge' ||
-        adapter.adapter_id === 'faster_whisper_python'
-      ) {
-        const result = await transcribeWithManagedPythonBridge(inputPath, locale, adapter);
-        if (result.ok) return { ...result, backend: parseVoiceSttBackend(backend) };
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (adapter.adapter_id === 'whisper_cpp_cli') {
-        const result = await transcribeWithWhisperCpp(inputPath, locale, adapter);
-        if (result.ok) return { ...result, backend: 'whisper_cpp' };
-        lastError = result.error || lastError;
-        continue;
-      }
+      const parsedBackend = parseVoiceSttBackend(backend);
+      const adapter = resolveVoiceSttAdapter(parsedBackend);
+      const behavior = STT_ADAPTER_BEHAVIORS[adapter.adapter_id];
+      if (!behavior?.transcribe) continue;
+      const result = await behavior.transcribe(inputPath, locale, adapter, parsedBackend);
+      if (result.ok) return result;
+      lastError = result.error || lastError;
     } catch (error: any) {
       lastError = error?.message || String(error);
     }
@@ -814,7 +839,26 @@ async function speakWithVoiceEngine(
 ): Promise<void> {
   const adapter = resolveVoiceTtsAdapter(engine);
   const languageProfile = getVoiceTtsLanguageConfig(language);
-  if (adapter.adapter_id === 'python_bridge') {
+  const behavior = TTS_ADAPTER_BEHAVIORS[adapter.adapter_id];
+  if (!behavior) {
+    throw new Error(
+      `TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`
+    );
+  }
+  return behavior(engine, text, language, profile, languageProfile);
+}
+
+const TTS_ADAPTER_BEHAVIORS: Record<
+  string,
+  (
+    engine: VoiceEngineRecord,
+    text: string,
+    language: string,
+    profile: any,
+    languageProfile: { voice?: string; rate?: number }
+  ) => Promise<void>
+> = {
+  python_bridge: async (engine, text, language, profile, languageProfile) => {
     const artifactPath = await runVoiceTtsPythonBridge(
       engine,
       text,
@@ -828,9 +872,8 @@ async function speakWithVoiceEngine(
     } finally {
       if (safeExistsSync(artifactPath)) safeRmSync(artifactPath, { force: true });
     }
-    return;
-  }
-  if (adapter.adapter_id === 'native_tts') {
+  },
+  native_tts: async (engine, text, _language, _profile, languageProfile) => {
     const command = buildNativeTtsCommand(text, {
       voice: languageProfile.voice,
       rate: languageProfile.rate,
@@ -866,10 +909,8 @@ async function speakWithVoiceEngine(
         reject(new Error(stderr.trim() || `native_tts_failed_${code || signal || 'unknown'}`));
       });
     });
-    return;
-  }
-  throw new Error(`TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`);
-}
+  },
+};
 
 function resolvePreferredTtsEngine(): VoiceEngineRecord {
   const selection = getVoiceSelectionSnapshot();
