@@ -28114,8 +28114,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -28150,8 +28149,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -28191,8 +28189,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {

@@ -489,7 +489,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           targets: { type: 'array', items: { type: 'string' } },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     capture_photo: {
@@ -504,7 +504,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           device_preference: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     record_camera: {
@@ -521,7 +521,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           device_preference: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     record_screen: {
