@@ -90,7 +90,7 @@ describe('service-engine-helpers template path tokens', () => {
   });
 
   it('rejects a traversal-shaped service id before resolving connection paths', () => {
-    expect(() => loadConnectionWithFallback('./active/shared/secret')).toThrow(
+    expect(() => loadConnectionWithFallback('../active/shared/secret')).toThrow(
       '[SERVICE_ID_INVALID]'
     );
     expect(() => loadConnectionWithFallback('nested/service')).toThrow('[SERVICE_ID_INVALID]');

@@ -124,7 +124,7 @@ describe('TtsLoopbackVerifier', () => {
         tts: tts('test'),
         stt: stt('test'),
         checkConsent: () => ({ allowed: true }),
-      }).verify(request({ request_id: './external-loopback' }))
+      }).verify(request({ request_id: '../external-loopback' }))
     ).rejects.toThrow('LOOPBACK_REQUEST_SCOPE');
   });
 });

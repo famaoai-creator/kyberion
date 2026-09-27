@@ -134,7 +134,7 @@ describe('project and artifact registries', () => {
   it('rejects a service binding id that escapes the binding directory', () => {
     expect(() =>
       saveServiceBindingRecord({
-        binding_id: './outside',
+        binding_id: '../outside',
         service_type: 'github',
         scope: 'repository',
         target: 'org/repo',
@@ -194,7 +194,7 @@ describe('project and artifact registries', () => {
   });
 
   it('rejects a project id that escapes the project record directory', () => {
-    expect(() => loadProjectRecord('./outside')).toThrow(/escapes its directory/);
+    expect(() => loadProjectRecord('../outside')).toThrow(/escapes its directory/);
   });
 
   it('emits artifact records that satisfy the schema', () => {

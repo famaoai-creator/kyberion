@@ -64,7 +64,7 @@ describe('knowledge-scope', () => {
     ).toBe(`${root}/guide.md`);
   });
 
-  it.each(['./escape', '.md/../../escape', '.md\\escape', '.', ''])(
+  it.each(['../escape', '.md/../../escape', '.md\\escape', '.', ''])(
     'rejects unsafe extension %j',
     (extension) => {
       expect(() => knowledgeWritePathFor({ tier: 'public' }, 'public', 'guide', extension)).toThrow(
@@ -89,7 +89,7 @@ describe('knowledge-scope', () => {
   it('rejects traversal even when normalization would land on an allowed root', () => {
     const scope = resolveKnowledgeScopeSet({ tier: 'public' });
     expect(assertKnowledgePathInScope('other/../public/secret.md', scope)).toBe(false);
-    expect(assertKnowledgePathInScope('./public/secret.md', scope)).toBe(false);
+    expect(assertKnowledgePathInScope('../public/secret.md', scope)).toBe(false);
   });
 
   it('requires explicit system authority for a system-wide confidential scan', () => {

@@ -43,7 +43,7 @@ describe('analysis config contract', () => {
   });
 
   it('rejects a config path outside the repository', () => {
-    expect(() => loadAnalysisConfigAtPath('./analysis-config.json')).toThrow(
+    expect(() => loadAnalysisConfigAtPath('../analysis-config.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
   });

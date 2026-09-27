@@ -17,8 +17,8 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
-import { dispatchMissionTickets } from '../scripts/refactor/mission-ticket-dispatch.js';
-import type { MissionState } from '../scripts/refactor/mission-types.js';
+import { dispatchMissionTickets } from '../../../scripts/refactor/mission-ticket-dispatch.js';
+import type { MissionState } from '../../../scripts/refactor/mission-types.js';
 import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 
 const missionId = 'MSN-RECOVERY-001';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scanFileForKanaLiterals } from '../scripts/check_i18n_hardcoding.js';
+import { scanFileForKanaLiterals } from '../../../scripts/check_i18n_hardcoding.js';
 import { pathResolver, safeReadFile } from '../index.js';
 
 const graphConsumerPaths = [

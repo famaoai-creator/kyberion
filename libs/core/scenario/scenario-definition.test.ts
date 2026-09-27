@@ -129,7 +129,7 @@ describe('parseScenarioDefinition', () => {
 
   it('rejects a seed file path that escapes the run root', () => {
     const raw = baseScenario({
-      seed: { files: [{ path: './outside.txt', content: 'x' }] },
+      seed: { files: [{ path: '../outside.txt', content: 'x' }] },
     } as unknown as Partial<ScenarioDefinition>);
     expect(() => parseScenarioDefinition(raw)).toThrow(/'\.\.' segments/);
   });

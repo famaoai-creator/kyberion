@@ -110,7 +110,7 @@ describe('service-runtime-registry', () => {
             platforms: ['any'],
             supported_modes: ['trial'],
             trial_probe: { kind: 'http', method: 'GET', path: 'health' },
-            managed_service_subpath: './outside',
+            managed_service_subpath: '../outside',
           },
         ],
       })
