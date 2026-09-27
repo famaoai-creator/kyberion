@@ -2445,6 +2445,25 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.results[0].error).toMatch(/needs exactly one input/);
     });
 
+    it('record_audio: fail-closes on invalid durations instead of silently defaulting', async () => {
+      const { handleAction } = await import('./index');
+
+      for (const duration of [0, -2, 'abc']) {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'record_audio',
+              params: { targets: ['Built-in Microphone'], duration },
+            },
+          ],
+        });
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toMatch(/duration must be 1-300/);
+      }
+    });
+
     it('capture_photo: saves a camera still to a governed path', async () => {
       const { handleAction } = await import('./index');
 
@@ -2521,6 +2540,18 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('failed');
       expect(result.results[0].error).toMatch(/1-60 seconds/);
+    });
+
+    it('record_camera: fail-closes on invalid fps instead of silently clamping', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'record_camera', params: { duration: 3, fps: 30 } }],
+      });
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/fps must be 1-5/);
     });
 
     it('screen_stream: captures repeated screen frames via bridge', async () => {

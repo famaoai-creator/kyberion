@@ -301,8 +301,14 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           `record_audio unavailable: ${availability.reason || 'audio input bridge unavailable'}`
         );
       }
-      const durationValue = Number(params.duration ?? params.duration_sec ?? 0);
-      const durationSec = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : 3;
+      const durationRaw = params.duration ?? params.duration_sec;
+      const durationValue = durationRaw === undefined ? 3 : Number(durationRaw);
+      if (!Number.isFinite(durationValue) || durationValue <= 0) {
+        throw new Error(
+          `record_audio duration must be 1-300 seconds, got "${String(durationRaw)}"`
+        );
+      }
+      const durationSec = durationValue;
       if (durationSec > 300) {
         throw new Error(`record_audio duration must be 1-300 seconds, got "${durationSec}"`);
       }
@@ -394,16 +400,26 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       // Camera video is photo-per-frame (see captureStream), so this is
       // low-fps by construction — timelapse grade, unlike screen recording.
       const bridge = createVirtualCameraBridge();
-      const fpsValue = Number(params.fps ?? 2);
-      const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? Math.min(5, fpsValue) : 2;
-      const durationValue = Number(params.duration ?? 0);
-      const durationSec = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : 5;
+      const fpsRaw = params.fps ?? 2;
+      const fpsValue = Number(fpsRaw);
+      if (!Number.isFinite(fpsValue) || fpsValue <= 0 || fpsValue > 5) {
+        throw new Error(`record_camera fps must be 1-5, got "${String(fpsRaw)}"`);
+      }
+      const fps = fpsValue;
+      const durationRaw = params.duration;
+      const durationValue = durationRaw === undefined ? 5 : Number(durationRaw);
+      if (!Number.isFinite(durationValue) || durationValue <= 0) {
+        throw new Error(
+          `record_camera duration must be 1-60 seconds, got "${String(durationRaw)}"`
+        );
+      }
+      const durationSec = durationValue;
       if (durationSec > 60) {
         throw new Error(`record_camera duration must be 1-60 seconds, got "${durationSec}"`);
       }
       const frameCount = Math.min(300, Math.max(1, Math.ceil(durationSec * fps)));
       const frameIntervalMs = Math.max(200, Math.round(1000 / fps));
-      const outputPath = resolveCanonicalCameraRecordingPath(params);
+      const outputPath = resolveCanonicalCameraRecordingPath(params, resolve);
       // Collect frames directly from the capture stream: draining a closed
       // StubVideoFrameBus yields nothing, and draining an open one blocks
       // once the buffer empties — both lose the recording.
@@ -546,6 +562,15 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       });
       const importBus = new StubVideoFrameBus();
       await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+      // Count re-imported frames (bounded: never wait past the exported
+      // count or a diagnostic timeout — an open bus blocks on empty).
+      let importedFrameCount = 0;
+      const importDeadline = Date.now() + 15_000;
+      for await (const frame of importBus.frameStream()) {
+        void frame;
+        importedFrameCount += 1;
+        if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
+      }
       await importBus.close();
       return {
         ...ctx,
@@ -556,7 +581,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           display_selection_source: displaySelection.selection_source,
           output_path: exported.output_path,
           exported_frame_count: exported.frame_count,
-          imported_frame_count: exported.frame_count,
+          imported_frame_count: importedFrameCount,
         },
       };
     }
@@ -1271,6 +1296,13 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       });
       const importBus = new StubVideoFrameBus();
       await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+      let importedFrameCount = 0;
+      const importDeadline = Date.now() + 15_000;
+      for await (const frame of importBus.frameStream()) {
+        void frame;
+        importedFrameCount += 1;
+        if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
+      }
       await importBus.close();
       const probe = await bridge.probe();
       return {
@@ -1280,7 +1312,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           selected_camera: probe.selected_camera,
           exported_mp4_path: exported.output_path,
           exported_frame_count: exported.frame_count,
-          imported_frame_count: exported.frame_count,
+          imported_frame_count: importedFrameCount,
         },
       };
     }
@@ -1764,10 +1796,13 @@ export function resolveCanonicalPhotoCapturePath(
   return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }
 
-export function resolveCanonicalCameraRecordingPath(params: Record<string, unknown>): string {
+export function resolveCanonicalCameraRecordingPath(
+  params: Record<string, unknown>,
+  resolve: (value: unknown) => unknown = (value) => value
+): string {
   const requested = typeof params.output === 'string' ? params.output.trim() : '';
   const candidate = requested
-    ? pathResolver.rootResolve(requested)
+    ? pathResolver.rootResolve(String(resolve(requested)))
     : pathResolver.shared(`runtime/computer/camera-recordings/camera-${Date.now()}.mp4`);
   const absolute = path.resolve(candidate);
   const allowedRoots = [
