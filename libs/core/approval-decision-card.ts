@@ -1,77 +1,53 @@
 import type { ApprovalRequestRecord } from './approval-store.js';
 import { evaluateVetoWindow, type VetoWindowState } from './approval-veto-window.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
+import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
 import { resolveLocale } from './locale.js';
 import type { SupportedLocale } from './locale-normalize.js';
-import type { NotificationChannelTarget } from './operator-notifications.js';
 import { t, type VocabularyKey } from './t.js';
+
+export type { InterventionLevel } from './decision-card.js';
 
 /**
  * Autonomous-operation P1-6: one answer to "do I need to do anything?".
  *
- * Every decision the agents raise is classified into four intervention levels,
- * derived from the autonomous-ops gate — never chosen by the acting agent:
+ * The stored card (`decision-card.ts`) says what is asked; this module says
+ * what the operator has to do about it. Every decision falls into one of four
+ * intervention levels, derived from the autonomous-ops gate — never chosen by
+ * the acting agent:
  *
- * | level    | gate                         | the operator …                       | phone rings? |
- * | -------- | ---------------------------- | ------------------------------------ | ------------ |
- * | `none`   | auto                         | does nothing; it is in the digest    | no           |
- * | `fyi`    | notify                       | does nothing; reads it in the digest | no           |
- * | `veto`   | notify + `veto_window_minutes`| acts only to object before deadline  | yes, once    |
- * | `decide` | approve                      | must decide; the work waits          | yes, once    |
+ * | level    | gate                           | the operator …                       | phone rings? |
+ * | -------- | ------------------------------ | ------------------------------------ | ------------ |
+ * | `none`   | auto                           | does nothing; it is in the digest    | no           |
+ * | `fyi`    | notify                         | does nothing; reads it in the digest | no           |
+ * | `veto`   | notify + `veto_window_minutes` | acts only to object before deadline  | yes, once    |
+ * | `decide` | approve                        | must decide; the work waits          | yes, once    |
  *
- * The card always states what happens if the operator does nothing, so the
- * operator never has to infer whether silence blocks, delays or approves.
+ * The rendered card always states what happens if the operator does nothing,
+ * so the operator never has to infer whether silence blocks, delays or approves.
  */
 
-export type InterventionLevel = 'none' | 'fyi' | 'veto' | 'decide';
 export type InterventionTiming = 'immediate' | 'digest';
-export type DecisionCardChoice = 'approve' | 'reject' | 'revise';
-export type DecisionCardActionKind = 'approve' | 'revise' | 'reject' | 'explain';
 
 /** Storage channel for decisions raised by autonomous operations. */
 export const AUTONOMY_APPROVAL_CHANNEL = 'autonomy';
 
 export const INTERVENTION_LEVELS: readonly InterventionLevel[] = ['decide', 'veto', 'fyi', 'none'];
 
-/** Stored on the approval record so every surface renders the same card. */
-export interface ApprovalDecisionCardContent {
-  level: InterventionLevel;
-  /** One sentence: what the operator is asked to decide. */
-  ask: string;
-  recommendation?: { choice: DecisionCardChoice; rationale: string };
-  /** Plain-language reasons a human is involved (from the gate's escalations). */
-  reasons: string[];
-  reversible: boolean;
-  evidence?: string[];
-  actionId?: string;
-  shadow?: boolean;
-  /** IANA timezone deadlines are shown in (the policy's active-hours timezone). */
-  timezone?: string;
-  /** Where the card was sent; replies are accepted only from that surface and chat. */
-  deliveredVia?: NotificationChannelTarget;
-}
-
-export interface DecisionCardAction {
-  kind: DecisionCardActionKind;
-  label: string;
-  callbackData: string;
-}
-
 export interface DecisionCardView {
   requestId: string;
   title: string;
   level: InterventionLevel;
-  ask: string;
-  recommendation?: ApprovalDecisionCardContent['recommendation'];
+  question: string;
+  recommendation?: string;
   reasons: string[];
   reversible: boolean;
-  evidence: string[];
+  evidence: DecisionCardEvidence[];
   shadow: boolean;
   vetoState?: VetoWindowState;
   /** The instant that changes the outcome: when a veto proceeds or a decision expires. */
   deadlineAt?: string;
   ifNoResponse: string;
-  actions: DecisionCardAction[];
 }
 
 const LEVEL_KEY: Record<InterventionLevel, VocabularyKey> = {
@@ -81,33 +57,12 @@ const LEVEL_KEY: Record<InterventionLevel, VocabularyKey> = {
   none: 'decision:level_none',
 };
 
-const CHOICE_KEY: Record<DecisionCardChoice, VocabularyKey> = {
-  approve: 'decision:recommend_approve',
-  reject: 'decision:recommend_reject',
-  revise: 'decision:recommend_revise',
-};
-
 export function interventionLevelLabel(
   level: InterventionLevel,
   locale: SupportedLocale = resolveLocale()
 ): string {
   return t(LEVEL_KEY[level], undefined, locale);
 }
-
-type GateLike = Pick<
-  AutonomousOpsGateResult,
-  | 'decision'
-  | 'vetoWindowMinutes'
-  | 'escalations'
-  | 'reason'
-  | 'axes'
-  | 'score'
-  | 'maxScore'
-  | 'highRiskPathMatches'
-  | 'actionClass'
-  | 'actionId'
-  | 'shadow'
->;
 
 export function resolveInterventionLevel(
   gate: Pick<AutonomousOpsGateResult, 'decision' | 'vetoWindowMinutes'>
@@ -133,76 +88,6 @@ export function resolveInterventionTiming(
   return 'digest';
 }
 
-function listText(values: readonly string[], max = 3): string {
-  const shown = values.slice(0, max).join(', ');
-  return values.length > max ? `${shown} +${values.length - max}` : shown;
-}
-
-/** Translate the gate's escalation codes into sentences an operator can act on. */
-export function describeGateEscalations(
-  gate: GateLike,
-  locale: SupportedLocale = resolveLocale()
-): string[] {
-  const reasons: string[] = [];
-  const axes = Object.entries(gate.axes)
-    .filter(([, score]) => score >= 3)
-    .map(([axis]) => axis);
-  const neverAuto = /never-auto class: ([^;]+)/.exec(gate.reason)?.[1]?.trim();
-  for (const escalation of gate.escalations) {
-    switch (escalation) {
-      case 'axis_max':
-        reasons.push(t('decision:reason_axis_max', { axes: axes.join(', ') }, locale));
-        break;
-      case 'irreversible':
-        reasons.push(t('decision:reason_irreversible', undefined, locale));
-        break;
-      case 'never_auto':
-        reasons.push(
-          t('decision:reason_never_auto', { classes: neverAuto || gate.actionClass || '' }, locale)
-        );
-        break;
-      case 'high_risk_path':
-        reasons.push(
-          t('decision:reason_high_risk_path', { paths: listText(gate.highRiskPathMatches) }, locale)
-        );
-        break;
-      case 'requested':
-        reasons.push(t('decision:reason_requested', undefined, locale));
-        break;
-      case 'budget':
-        reasons.push(t('decision:reason_budget', undefined, locale));
-        break;
-      default:
-        reasons.push(escalation);
-    }
-  }
-  if (reasons.length === 0 && gate.decision !== 'auto') {
-    reasons.push(
-      t('decision:reason_score', { score: String(gate.score), max: String(gate.maxScore) }, locale)
-    );
-  }
-  return reasons;
-}
-
-export function buildDecisionCardContent(params: {
-  gate: GateLike;
-  ask: string;
-  recommendation?: ApprovalDecisionCardContent['recommendation'];
-  evidence?: string[];
-  locale?: SupportedLocale;
-}): ApprovalDecisionCardContent {
-  return {
-    level: resolveInterventionLevel(params.gate),
-    ask: params.ask,
-    ...(params.recommendation ? { recommendation: params.recommendation } : {}),
-    reasons: describeGateEscalations(params.gate, params.locale),
-    reversible: (params.gate.axes.reversibility ?? 3) <= 1,
-    ...(params.evidence?.length ? { evidence: params.evidence } : {}),
-    actionId: params.gate.actionId,
-    ...(params.gate.shadow ? { shadow: true } : {}),
-  };
-}
-
 export function formatDecisionInstant(
   iso: string,
   locale: SupportedLocale = resolveLocale(),
@@ -220,10 +105,16 @@ export function formatDecisionInstant(
   }).format(new Date(ms));
 }
 
+function levelFromTier(card: DecisionCard): InterventionLevel {
+  if (card.level) return card.level;
+  if (card.riskTier === 'approve') return 'decide';
+  return card.riskTier === 'notify' ? 'fyi' : 'none';
+}
+
 /**
- * The effective level of a stored request right now. Records created before
- * decision cards existed are human approvals, so they read as `decide`; a veto
- * whose notification never arrived also becomes `decide`.
+ * The effective level of a stored request right now. A pending request with
+ * no card is a human approval, so it reads as `decide`; a veto whose
+ * notification never arrived also becomes `decide`.
  */
 export function effectiveInterventionLevel(
   record: Pick<ApprovalRequestRecord, 'decisionCard' | 'veto'>,
@@ -232,37 +123,27 @@ export function effectiveInterventionLevel(
   if (record.veto) {
     return evaluateVetoWindow(record.veto, now) === 'undelivered' ? 'decide' : 'veto';
   }
-  return record.decisionCard?.level ?? 'decide';
+  return record.decisionCard ? levelFromTier(record.decisionCard) : 'decide';
 }
 
-export function buildDecisionCardActions(
-  record: Pick<ApprovalRequestRecord, 'id'>,
-  level: InterventionLevel,
+const ACTION_LABEL_KEY: Record<
+  'approve' | 'changes' | 'reject' | 'explain',
+  { decide: VocabularyKey; veto: VocabularyKey }
+> = {
+  approve: { decide: 'decision:action_approve', veto: 'decision:action_proceed_now' },
+  changes: { decide: 'decision:action_revise', veto: 'decision:action_revise' },
+  reject: { decide: 'decision:action_reject', veto: 'decision:action_object' },
+  explain: { decide: 'decision:action_explain', veto: 'decision:action_explain' },
+};
+
+/** Button label for a card action; on a veto card "approve" means proceed now and "reject" means object. */
+export function decisionCardActionLabel(
+  record: Pick<ApprovalRequestRecord, 'decisionCard' | 'veto'>,
+  kind: keyof typeof ACTION_LABEL_KEY,
   locale: SupportedLocale = resolveLocale()
-): DecisionCardAction[] {
-  const veto = level === 'veto';
-  return [
-    {
-      kind: 'approve',
-      label: t(veto ? 'decision:action_proceed_now' : 'decision:action_approve', undefined, locale),
-      callbackData: `appr:${record.id}:approve`,
-    },
-    {
-      kind: 'revise',
-      label: t('decision:action_revise', undefined, locale),
-      callbackData: `appr:${record.id}:revise`,
-    },
-    {
-      kind: 'reject',
-      label: t(veto ? 'decision:action_object' : 'decision:action_reject', undefined, locale),
-      callbackData: `appr:${record.id}:reject`,
-    },
-    {
-      kind: 'explain',
-      label: t('decision:action_explain', undefined, locale),
-      callbackData: `appr:${record.id}:explain`,
-    },
-  ];
+): string {
+  const level = effectiveInterventionLevel(record);
+  return t(ACTION_LABEL_KEY[kind][level === 'veto' ? 'veto' : 'decide'], undefined, locale);
 }
 
 function describeIfNoResponse(
@@ -309,18 +190,19 @@ function describeIfNoResponse(
       locale
     ),
   ];
-  if (record.expiresAt) {
+  const deadline = record.decisionCard?.deadline ?? record.expiresAt;
+  if (deadline) {
     lines.push(
       t(
         'decision:if_no_response_decide_expires',
-        { deadline: formatDecisionInstant(record.expiresAt, locale, timezone) },
+        { deadline: formatDecisionInstant(deadline, locale, timezone) },
         locale
       )
     );
   }
   return {
     text: lines.join(locale === 'ja' ? '' : ' '),
-    ...(record.expiresAt ? { deadlineAt: record.expiresAt } : {}),
+    ...(deadline ? { deadlineAt: deadline } : {}),
   };
 }
 
@@ -334,45 +216,52 @@ export function viewDecisionCard(
   const level = effectiveInterventionLevel(record, now);
   const vetoState = record.veto ? evaluateVetoWindow(record.veto, now) : undefined;
   const noResponse = describeIfNoResponse(record, level, vetoState, locale);
-  const evidence = [...(card?.evidence ?? []), ...(record.justification?.evidence ?? [])];
+  const reasons = [
+    ...(card?.riskReasons ?? []),
+    ...(record.justification?.reason && !card?.riskReasons.includes(record.justification.reason)
+      ? [record.justification.reason]
+      : []),
+  ];
   return {
     requestId: record.id,
     title: record.title,
     level,
-    ask: card?.ask ?? record.summary,
+    question: card?.question ?? record.summary,
     ...(card?.recommendation ? { recommendation: card.recommendation } : {}),
-    reasons: card?.reasons ?? (record.justification?.reason ? [record.justification.reason] : []),
+    reasons,
     // Unknown reversibility is reported as irreversible: the safe reading.
     reversible: card?.reversible ?? false,
-    evidence: [...new Set(evidence)],
+    evidence: card?.evidence ?? [],
     shadow: Boolean(card?.shadow || record.veto?.shadow),
     ...(vetoState ? { vetoState } : {}),
     ...(noResponse.deadlineAt ? { deadlineAt: noResponse.deadlineAt } : {}),
     ifNoResponse: noResponse.text,
-    actions: buildDecisionCardActions(record, level, locale),
   };
 }
 
+function evidenceLine(item: DecisionCardEvidence): string {
+  return `- ${item.label}: ${item.ref}`;
+}
+
 /**
- * Plain-text card for chat surfaces. The order is fixed so the operator learns
- * where to look: level → ask → recommendation → why → undo → if-no-response.
+ * The card body shared by every surface, in a fixed order so the operator
+ * learns where to look: level → question → recommendation → why → undo →
+ * if-no-response → evidence.
  */
-export function renderDecisionCardText(
+export function renderDecisionCardLines(
   view: DecisionCardView,
   locale: SupportedLocale = resolveLocale()
-): string {
+): string[] {
   const lines = [
     `${interventionLevelLabel(view.level, locale)}${
       view.shadow ? ` ${t('decision:shadow_badge', undefined, locale)}` : ''
     }`,
     view.title,
     '',
-    `${t('decision:ask_label', undefined, locale)}: ${view.ask}`,
+    `${t('decision:ask_label', undefined, locale)}: ${view.question}`,
   ];
   if (view.recommendation) {
-    lines.push(
-      `${t('decision:recommendation_label', undefined, locale)}: ${t(CHOICE_KEY[view.recommendation.choice], undefined, locale)} — ${view.recommendation.rationale}`
-    );
+    lines.push(`${t('decision:recommendation_label', undefined, locale)}: ${view.recommendation}`);
   }
   if (view.reasons.length > 0) {
     lines.push(`${t('decision:why_human_label', undefined, locale)}:`);
@@ -387,15 +276,27 @@ export function renderDecisionCardText(
     `${t('decision:if_no_response_label', undefined, locale)}: ${view.ifNoResponse}`
   );
   if (view.evidence.length > 0) {
-    lines.push(`${t('decision:evidence_label', undefined, locale)}: ${listText(view.evidence)}`);
+    lines.push(
+      `${t('decision:evidence_label', undefined, locale)}:`,
+      ...view.evidence.map(evidenceLine)
+    );
   }
+  return lines;
+}
+
+/** Plain-text card for chat surfaces, with the reply vocabulary when a reply matters. */
+export function renderDecisionCardText(
+  view: DecisionCardView,
+  locale: SupportedLocale = resolveLocale()
+): string {
+  const lines = renderDecisionCardLines(view, locale);
   if (view.level === 'decide' || view.level === 'veto') {
     lines.push('', t('decision:reply_hint', { requestId: view.requestId }, locale));
   }
   return lines.join('\n');
 }
 
-/** The "ask why" answer: the reasons, the recommendation and the evidence, without deciding. */
+/** The "ask why" answer: the stored reasons, recommendation and evidence — never a model call. */
 export function renderDecisionCardExplanation(
   view: DecisionCardView,
   locale: SupportedLocale = resolveLocale()
@@ -407,14 +308,14 @@ export function renderDecisionCardExplanation(
     lines.push(t('decision:explain_no_reasons', undefined, locale));
   }
   if (view.recommendation) {
-    lines.push(
-      `${t('decision:recommendation_label', undefined, locale)}: ${t(CHOICE_KEY[view.recommendation.choice], undefined, locale)} — ${view.recommendation.rationale}`
-    );
+    lines.push(`${t('decision:recommendation_label', undefined, locale)}: ${view.recommendation}`);
   }
   lines.push(`${t('decision:if_no_response_label', undefined, locale)}: ${view.ifNoResponse}`);
   if (view.evidence.length > 0) {
-    lines.push(`${t('decision:evidence_label', undefined, locale)}:`);
-    lines.push(...view.evidence.map((item) => `- ${item}`));
+    lines.push(
+      `${t('decision:evidence_label', undefined, locale)}:`,
+      ...view.evidence.map(evidenceLine)
+    );
   }
   return lines.join('\n');
 }

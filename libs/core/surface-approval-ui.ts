@@ -6,6 +6,7 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
   annotateApprovalRejectionReason,
+  APPROVAL_CHANGE_INSTRUCTION_MAX,
   type ApprovalRecord,
   type ApprovalRequestDraft,
   type ApprovalRequestRecord,
@@ -20,40 +21,26 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
-import type { SupportedLocale } from './locale-normalize.js';
-import { t, type VocabularyKey } from './t.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
   renderDecisionCardExplanation,
+  renderDecisionCardLines,
   renderDecisionCardText,
   viewDecisionCard,
 } from './approval-decision-card.js';
+import type { DecisionCard } from './decision-card.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t, type VocabularyKey } from './t.js';
 
 /** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
 export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence' | 'brief';
 export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
 
-// `revise` carries the operator's instructions after a space; `explain` asks
-// the agent why the card reached them and decides nothing. The head is matched
-// by a fixed-shape regex and the free text is sliced off afterwards, so chat
-// input can never drive regex backtracking.
-const DECISION_TOKEN_HEAD =
-  /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected|revise|explain)(?=$|\s)/iu;
-
-/** Split `appr:<id>:<verb>[ <free text>]` into its parts in linear time. */
-export function parseDecisionToken(
-  text: string
-): { requestId: string; verb: string; trailing?: string } | null {
-  const head = DECISION_TOKEN_HEAD.exec(text);
-  if (!head) return null;
-  const trailing = text.slice(head[0].length).trim();
-  return {
-    requestId: head[1],
-    verb: head[2].toLowerCase(),
-    ...(trailing ? { trailing } : {}),
-  };
-}
+const DECISION_TOKEN = /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)$/iu;
+// `revise` is accepted as an alias of `changes`. The free text after the token
+// is sliced off, never matched, so chat input cannot drive regex backtracking.
+const CARD_TOKEN = /^appr:([0-9a-f-]{36}):(changes|revise|explain)(?=\s|$)/iu;
 
 export interface SurfaceApprovalAction {
   requestId: string;
@@ -91,6 +78,34 @@ function normalizeDecision(value: string): SurfaceApprovalDecision | undefined {
   return undefined;
 }
 
+/**
+ * Autonomy decision cards are pushed as top-level notifications, so they bind
+ * to the surface and chat they were delivered to rather than to a thread.
+ */
+function replyTargetsRecord(
+  record: ApprovalRequestRecord,
+  surface: SurfaceApproval,
+  channel: string,
+  threadTs: string
+): boolean {
+  if (record.storageChannel === AUTONOMY_APPROVAL_CHANNEL) {
+    const via = record.decisionCard?.deliveredVia;
+    return Boolean(via && via.surface === surface && via.target === channel);
+  }
+  return record.channel === channel && record.threadTs === threadTs;
+}
+
+function loadReplyTarget(
+  surface: SurfaceApproval,
+  requestId: string
+): ApprovalRequestRecord | null {
+  return (
+    loadApprovalRequest(surface, requestId) ||
+    loadApprovalRequest('background-review', requestId) ||
+    loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)
+  );
+}
+
 function approvalRole(
   surface: SurfaceApproval,
   storageChannel: string = surface
@@ -108,6 +123,7 @@ export function createSurfaceApprovalRequest(params: {
   draft: ApprovalRequestDraft;
   sourceText?: string;
   expiresAt?: string;
+  decisionCard?: DecisionCard;
 }): ApprovalRequestRecord {
   return createApprovalRequest(approvalRole(params.surface), {
     channel: params.channel,
@@ -119,7 +135,24 @@ export function createSurfaceApprovalRequest(params: {
     sourceText: params.sourceText,
     expiresAt: params.expiresAt,
     accountability: { finalDecision: 'human_only' },
+    ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
   });
+}
+
+/** The decision card body, shared by every text-based surface (Slack blocks included). */
+export function formatDecisionCardLines(
+  record: ApprovalRequestRecord,
+  options: { locale?: SupportedLocale; now?: number } = {}
+): string[] {
+  return renderDecisionCardLines(viewDecisionCard(record, options), options.locale);
+}
+
+/** "Ask why": the stored rationale only — never a model call. */
+export function explainApprovalRequest(
+  record: ApprovalRequestRecord,
+  options: { locale?: SupportedLocale } = {}
+): string {
+  return renderDecisionCardExplanation(viewDecisionCard(record, options), options.locale);
 }
 
 export function buildSurfaceApprovalText(
@@ -178,6 +211,29 @@ export function buildSurfaceApprovalActions(
       callbackData: `appr:${record.id}:reject`,
     },
   ];
+}
+
+export type DecisionCardActionKind = 'approve' | 'changes' | 'reject' | 'explain';
+
+export interface DecisionCardAction {
+  requestId: string;
+  kind: DecisionCardActionKind;
+  callbackData: string;
+}
+
+/**
+ * The four decision-card buttons. Requests without a card keep the
+ * original approve / reject pair.
+ */
+export function buildDecisionCardActions(record: ApprovalRequestRecord): DecisionCardAction[] {
+  const kinds: DecisionCardActionKind[] = record.decisionCard
+    ? ['approve', 'changes', 'reject', 'explain']
+    : ['approve', 'reject'];
+  return kinds.map((kind) => ({
+    requestId: record.id,
+    kind,
+    callbackData: `appr:${record.id}:${kind}`,
+  }));
 }
 
 const SURFACE_ASK_WHY_LABELS: Record<RejectionReasonCategory, string> = {
@@ -328,6 +384,8 @@ export function applySurfaceApprovalDecision(params: {
   note?: string;
   /** LC-10 closed vocabulary — the same set every surface uses. */
   reasonCategory?: RejectionReasonCategory;
+  /** A rejection that asks the requester to revise and re-submit. */
+  changeInstruction?: string;
 }): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.surface;
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -354,6 +412,34 @@ export function applySurfaceApprovalDecision(params: {
     effectBinding: record.accountability?.effectBinding,
     ...(params.note ? { note: params.note } : {}),
     ...(params.reasonCategory ? { reasonCategory: params.reasonCategory } : {}),
+    ...(params.changeInstruction !== undefined
+      ? { changeInstruction: params.changeInstruction }
+      : {}),
+  });
+}
+
+/** "Request changes": recorded as a rejection carrying the instruction. */
+export function applySurfaceApprovalChangeRequest(params: {
+  surface: SurfaceApproval;
+  requestId: string;
+  channel: string;
+  threadTs: string;
+  decidedBy: string;
+  instruction: string;
+  storageChannel?: string;
+  authMethod?: ApprovalRecord['authMethod'];
+}): ApprovalRequestRecord {
+  return applySurfaceApprovalDecision({
+    surface: params.surface,
+    requestId: params.requestId,
+    decision: 'rejected',
+    channel: params.channel,
+    threadTs: params.threadTs,
+    decidedBy: params.decidedBy,
+    storageChannel: params.storageChannel,
+    authMethod: params.authMethod,
+    note: 'changes_requested',
+    changeInstruction: params.instruction,
   });
 }
 
@@ -376,34 +462,96 @@ export interface SurfaceApprovalReply {
   handled: boolean;
   reply?: string;
   record?: ApprovalRequestRecord;
+  /** The reply asks for free text; surfaces that can should force a reply to it. */
+  forceReply?: boolean;
 }
 
-/**
- * Autonomy decision cards are pushed as top-level notifications, so they bind
- * to the surface and chat they were delivered to rather than to a thread.
- */
-function replyTargetsRecord(
-  record: ApprovalRequestRecord,
-  surface: SurfaceApproval,
-  channel: string,
-  threadTs: string
-): boolean {
-  if (record.storageChannel === AUTONOMY_APPROVAL_CHANNEL) {
-    const via = record.decisionCard?.deliveredVia;
-    return Boolean(via && via.surface === surface && via.target === channel);
+function resolveDecisionCardToken(params: {
+  surface: SurfaceApproval;
+  channel: string;
+  threadTs: string;
+  decidedBy: string;
+  requestId: string;
+  kind: 'changes' | 'explain';
+  instruction?: string;
+  locale: SupportedLocale;
+}): SurfaceApprovalReply {
+  const record = loadReplyTarget(params.surface, params.requestId);
+  if (!record) {
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_not_found', undefined, params.locale),
+    };
   }
-  return record.channel === channel && record.threadTs === threadTs;
-}
-
-function loadReplyTarget(
-  surface: SurfaceApproval,
-  requestId: string
-): ApprovalRequestRecord | null {
-  return (
-    loadApprovalRequest(surface, requestId) ||
-    loadApprovalRequest('background-review', requestId) ||
-    loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)
-  );
+  if (!replyTargetsRecord(record, params.surface, params.channel, params.threadTs)) {
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_other_thread', undefined, params.locale),
+    };
+  }
+  if (params.kind === 'explain') {
+    return {
+      handled: true,
+      record,
+      reply: explainApprovalRequest(record, { locale: params.locale }),
+    };
+  }
+  if (record.status !== 'pending' || !record.decisionCard) {
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_not_found', undefined, params.locale),
+    };
+  }
+  if (isApprovalRequestExpired(record)) {
+    const expired = expireApprovalRequest(approvalRole(params.surface, record.storageChannel), {
+      channel: record.channel,
+      storageChannel: record.storageChannel,
+      requestId: record.id,
+    });
+    return {
+      handled: true,
+      record: expired,
+      reply: t('bridge:approval_request_expired', undefined, params.locale),
+    };
+  }
+  const instruction = params.instruction?.trim();
+  if (!instruction) {
+    return {
+      handled: true,
+      record,
+      forceReply: true,
+      reply: t(
+        'bridge:decision_card_changes_prompt',
+        { title: record.title, token: `appr:${record.id}:changes` },
+        params.locale
+      ),
+    };
+  }
+  if (instruction.length > APPROVAL_CHANGE_INSTRUCTION_MAX) {
+    return {
+      handled: true,
+      record,
+      reply: t(
+        'bridge:decision_card_changes_too_long',
+        { max: APPROVAL_CHANGE_INSTRUCTION_MAX },
+        params.locale
+      ),
+    };
+  }
+  const updated = applySurfaceApprovalChangeRequest({
+    surface: params.surface,
+    requestId: record.id,
+    channel: record.channel,
+    threadTs: record.threadTs,
+    decidedBy: params.decidedBy,
+    instruction,
+    storageChannel: record.storageChannel,
+  });
+  return {
+    handled: true,
+    record: updated,
+    reply: t('bridge:decision_card_changes_recorded', { title: updated.title }, params.locale),
+  };
 }
 
 function resolveSurfaceApprovalRecord(params: {
@@ -414,8 +562,6 @@ function resolveSurfaceApprovalRecord(params: {
   threadTs: string;
   decision: SurfaceApprovalDecision;
   decidedBy: string;
-  note?: string;
-  revise?: boolean;
 }): SurfaceApprovalReply {
   if (params.record.status !== 'pending') {
     return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
@@ -439,15 +585,7 @@ function resolveSurfaceApprovalRecord(params: {
     threadTs: params.record.threadTs,
     decidedBy: params.decidedBy,
     storageChannel: params.storageChannel,
-    ...(params.note ? { note: params.note } : {}),
   });
-  if (params.revise) {
-    return {
-      handled: true,
-      record: updated,
-      reply: t('decision:revise_recorded', { title: updated.title }),
-    };
-  }
   return {
     handled: true,
     record: updated,
@@ -465,50 +603,33 @@ export function resolveSurfaceApprovalReply(params: {
   threadTs: string;
   text: string;
   decidedBy: string;
+  locale?: SupportedLocale;
 }): SurfaceApprovalReply {
   const text = params.text.trim();
-  const token = parseDecisionToken(text);
+  const cardToken = text.match(CARD_TOKEN);
+  if (cardToken) {
+    const instruction = text.slice(cardToken[0].length).trim();
+    return resolveDecisionCardToken({
+      surface: params.surface,
+      channel: params.channel,
+      threadTs: params.threadTs,
+      decidedBy: params.decidedBy,
+      requestId: cardToken[1].toLowerCase(),
+      kind: cardToken[2].toLowerCase() === 'explain' ? 'explain' : 'changes',
+      instruction: instruction || undefined,
+      locale: params.locale ?? 'ja',
+    });
+  }
+  const token = text.match(DECISION_TOKEN);
   let record: ApprovalRequestRecord | null = null;
   let decision: SurfaceApprovalDecision | undefined;
 
   if (token) {
-    const { verb, trailing } = token;
-    record = loadReplyTarget(params.surface, token.requestId);
-    if (verb === 'explain') {
-      if (!record || !replyTargetsRecord(record, params.surface, params.channel, params.threadTs)) {
-        return { handled: true, reply: t('decision:explain_not_found') };
-      }
-      return {
-        handled: true,
-        record,
-        reply: renderDecisionCardExplanation(viewDecisionCard(record)),
-      };
-    }
+    decision = normalizeDecision(token[2]);
+    record = loadReplyTarget(params.surface, token[1]);
     if (!record || record.status !== 'pending') {
       return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
     }
-    if (verb === 'revise') {
-      if (!trailing) {
-        return {
-          handled: true,
-          reply: t('decision:revise_needs_text', { requestId: record.id }),
-        };
-      }
-      // A change request settles this card as rejected; the instructions ride
-      // on the decision note so the agent redoes the work instead of retrying.
-      return resolveSurfaceApprovalRecord({
-        surface: params.surface,
-        record,
-        storageChannel: record.storageChannel,
-        channel: params.channel,
-        threadTs: params.threadTs,
-        decision: 'rejected',
-        decidedBy: params.decidedBy,
-        note: `revise: ${trailing}`,
-        revise: true,
-      });
-    }
-    decision = normalizeDecision(verb);
     if (!decision) return { handled: true, reply: '承認操作を解釈できませんでした。' };
     return resolveSurfaceApprovalRecord({
       surface: params.surface,
@@ -518,7 +639,6 @@ export function resolveSurfaceApprovalReply(params: {
       threadTs: params.threadTs,
       decision,
       decidedBy: params.decidedBy,
-      ...(trailing ? { note: trailing } : {}),
     });
   } else {
     decision = normalizeDecision(text);
