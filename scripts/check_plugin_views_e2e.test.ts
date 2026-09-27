@@ -13,6 +13,7 @@ import {
   surfaceRuntimeLaunchEnv,
   TENANT_SLUG,
 } from './check_plugin_views_e2e.js';
+import { buildSurfaceLaunchEnv } from './surface_runtime.js';
 
 describe('check_plugin_views_e2e helpers (PE-02)', () => {
   it('parses flags with a bounded overall timeout', () => {
@@ -42,13 +43,6 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
   });
 
   it('mirrors the environment surface_runtime gives the Chronos surface', () => {
-    const runtimeSource = String(
-      safeReadFile(pathResolver.rootResolve('scripts/surface_runtime.ts'), { encoding: 'utf8' })
-    );
-    expect(runtimeSource).toContain(
-      "SYSTEM_ROLE: surfaceId.replace(/-/g, '_'), // Inject role for secure-io"
-    );
-    expect(runtimeSource).toContain('AUTHORIZED_SCOPE: serviceId,');
     const [manifest] = (
       JSON.parse(
         String(
@@ -66,11 +60,10 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
     ) as { scripts: Record<string, string> };
     expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime');
     expect(manifest.env ?? {}).toEqual({});
-    expect(surfaceRuntimeLaunchEnv()).toEqual({
-      KYBERION_PERSONA: 'worker',
-      AUTHORIZED_SCOPE: manifest.service_id || manifest.id,
-      SYSTEM_ROLE: manifest.id.replace(/-/g, '_'),
-    });
+    // The env surface_runtime actually builds for this manifest (on an empty base).
+    expect(
+      buildSurfaceLaunchEnv(manifest.id, manifest.service_id || manifest.id, manifest.env, {})
+    ).toEqual(surfaceRuntimeLaunchEnv());
   });
 
   it('seeds the token registry through the governed issuance facade (TR-02)', () => {
