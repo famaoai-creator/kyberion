@@ -42,10 +42,7 @@ import {
   probeWindowsNativeImageGeneration,
 } from './windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
-import {
-  claimHostImageHandoffOutput,
-  recordHostImageHandoffRequest,
-} from './host-image-handoff.js';
+import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from './host-image-handoff.js';
 import { isAppleSilicon } from './platform.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 import {
@@ -1019,9 +1016,9 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
     const startedAt = Date.now();
     const targetPath = getFallbackTargetPath(request);
 
-    // Only an image the host saved for this request (same prompt, written
-    // after it) is collected; a file that was merely there is not host output.
-    if (claimHostImageHandoffOutput(targetPath, request.prompt)) {
+    // Only an image the host saved for this request (same prompt, changed
+    // since the request) is collected; a file that was merely there is not.
+    if (isHostImageHandoffOutput(targetPath, request.prompt)) {
       logger.info(
         `[image_generation_bridge] ${this.config.displayName} image collected from ${targetPath}.`
       );
