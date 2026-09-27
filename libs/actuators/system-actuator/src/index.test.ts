@@ -508,7 +508,7 @@ const createVirtualCameraBridge = vi.fn(() => ({
       })()
     );
   }),
-  capturePhoto: vi.fn(async (input?: any) => ({
+  capturePhoto: vi.fn(async (input?: { save_path?: string; camera_intent?: string }) => ({
     bridge_id: 'virtual-camera-bridge',
     platform: 'darwin',
     backend: 'stub',
@@ -516,7 +516,7 @@ const createVirtualCameraBridge = vi.fn(() => ({
     selected_camera: 'FaceTime HD Camera',
     camera_intent: input?.camera_intent || 'reference',
   })),
-  captureStream: vi.fn(async function* (input?: any) {
+  captureStream: vi.fn(async function* (input?: { max_frames?: number }) {
     const frameCount = Math.max(1, Number(input?.max_frames || 2));
     for (let index = 0; index < frameCount; index += 1) {
       yield {
@@ -583,7 +583,7 @@ const createScreenCaptureBridge = vi.fn(() => ({
     capture_mode: input?.capture_mode || 'screen',
     subject_hint: input?.subject_hint,
   })),
-  captureStream: vi.fn(async function* (input?: any) {
+  captureStream: vi.fn(async function* (input?: { max_frames?: number }) {
     const frameCount = Math.max(1, Number(input?.max_frames || 2));
     for (let index = 0; index < frameCount; index += 1) {
       yield {
@@ -738,8 +738,8 @@ const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
     format: { mime_type: 'image/jpeg', width: 640, height: 480 },
   };
 });
-const writeVideoFramesToMp4 = vi.fn(async (outputPath: string, frames: AsyncIterable<any>) => {
-  const collected: any[] = [];
+const writeVideoFramesToMp4 = vi.fn(async (outputPath: string, frames: AsyncIterable<unknown>) => {
+  const collected: unknown[] = [];
   for await (const frame of frames) {
     collected.push(frame);
   }
