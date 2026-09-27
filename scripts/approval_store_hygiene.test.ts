@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   formatApprovalStoreHygieneReport,
   runApprovalStoreHygiene,
@@ -77,6 +77,23 @@ describe('approval_store_hygiene', () => {
       expect(process.exitCode).toBe(2);
     } finally {
       process.exitCode = undefined;
+    }
+  });
+
+  it('refuses --apply without the sovereign persona and names the fix', async () => {
+    vi.stubEnv('KYBERION_PERSONA', 'analyst');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.exitCode = undefined;
+    try {
+      expect(await runApprovalStoreHygiene(['--apply'])).toBeUndefined();
+      expect(process.exitCode).toBe(2);
+      expect(errors.mock.calls.flat().join('\n')).toContain(
+        'KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply'
+      );
+    } finally {
+      process.exitCode = undefined;
+      errors.mockRestore();
+      vi.unstubAllEnvs();
     }
   });
 });
