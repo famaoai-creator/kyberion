@@ -411,6 +411,22 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.capture",
+      "command": "capture",
+      "noun": "capture",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.record.screen",
+      "command": "record screen",
+      "noun": "record",
+      "verb": "screen",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.run",
       "command": "run",
       "noun": "run",
@@ -593,6 +609,8 @@
         "watch",
         "speak",
         "draw",
+        "capture",
+        "record screen",
         "run",
         "preview",
         "intent",

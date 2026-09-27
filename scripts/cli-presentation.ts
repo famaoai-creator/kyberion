@@ -75,6 +75,11 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText(t('cli_help_speak', locale));
   printText(t('cli_help_draw', locale));
   printText(t('cli_help_watch', locale));
+  // P1: direct lines until the vocabulary-catalog promotion (P2). See MSN-CAPTURE-RECORD-20260927.
+  printText(
+    '  capture [--screen|--window]  Capture a still image (screen redacted) (--out, --json)'
+  );
+  printText('  record screen              Record the screen as video (--duration, --out, --json)');
   printText('');
   printText(t('cli_help_sec_pipelines', locale));
   printText(t('cli_help_preview', locale));
