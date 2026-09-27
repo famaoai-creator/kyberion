@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  assertValidArtifactReviewReceipt,
   buildArtifactReviewReceipt,
   evaluateArtifactReviews,
   hashArtifactForReview,
@@ -70,6 +71,24 @@ describe('artifact review contract', () => {
       reviewer: { independence_verified: true },
     });
     expect(validateArtifactReviewReceipt(built).valid).toBe(true);
+  });
+
+  it('refuses to record findings the receipt schema would reject (severity "major" is not blocking)', () => {
+    // A free-form severity used to be written anyway: verdict computed as
+    // approved, receipt unloadable, review task silently never satisfied.
+    const invalid = receipt({
+      findings: [{ severity: 'major', summary: 'stale output collected' }] as never,
+    });
+    expect(() => assertValidArtifactReviewReceipt(invalid)).toThrow(
+      /findings\/0\/severity[\s\S]*"severity":"blocking"\|"suggestion"/
+    );
+    expect(() =>
+      assertValidArtifactReviewReceipt(
+        receipt({
+          findings: [{ severity: 'suggestion', category: 'tests', description: 'Add a case.' }],
+        })
+      )
+    ).not.toThrow();
   });
 
   it('validates a hash-bound independent review receipt', () => {
