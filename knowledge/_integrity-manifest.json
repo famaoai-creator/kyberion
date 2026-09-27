@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 22539,
+      "size": 25741,
       "type": "md"
     },
     {
@@ -1641,7 +1641,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 155041,
+      "size": 155753,
       "type": "json"
     },
     {
@@ -3549,7 +3549,7 @@
     {
       "path": "product/governance/role-assumption-policy.json",
       "tier": "public",
-      "size": 18649,
+      "size": 19065,
       "type": "json"
     },
     {

@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
+import {
+  DELEGATED_ROLE_ENV,
+  resetRoleAssumptionPolicyCache,
+  resolveRole,
+  withExecutionContext,
+} from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { getFoundationIo, registerFoundationIo } from './foundation/io.js';
 import {
@@ -17,7 +22,13 @@ import {
   safeSymlinkSync,
 } from './secure-io.js';
 
-const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', ROLE_ASSUMPTION_TRACE_ENV];
+const ENV_KEYS = [
+  'SYSTEM_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
+  ROLE_ASSUMPTION_TRACE_ENV,
+  DELEGATED_ROLE_ENV,
+];
 
 function readTrace(file: string): Array<Record<string, unknown>> {
   return String(safeReadFile(file, { encoding: 'utf8' }))
@@ -91,6 +102,38 @@ describe('RN-01 role assumption trace', () => {
         system_role: null,
         assumed_role: 'mission_controller',
         allowed: true,
+      }),
+    ]);
+  });
+
+  it('records a delegated child role decision once, marked as a delegation (DR-01)', () => {
+    process.env[ROLE_ASSUMPTION_TRACE_ENV] = relativeTrace;
+    process.env.SYSTEM_ROLE = 'concierge';
+    process.env[DELEGATED_ROLE_ENV] = 'sovereign_concierge@concierge';
+    expect(resolveRole()).toBe('sovereign_concierge');
+    expect(resolveRole()).toBe('sovereign_concierge');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      process.env[DELEGATED_ROLE_ENV] = 'chronos_localadmin@concierge';
+      expect(resolveRole()).toBe('concierge');
+      expect(
+        warn.mock.calls.filter(([m]) => String(m).includes('ROLE_DELEGATION_DENIED'))
+      ).toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
+    expect(readTrace(traceFile)).toEqual([
+      expect.objectContaining({
+        system_role: 'concierge',
+        assumed_role: 'sovereign_concierge',
+        allowed: true,
+        source: 'delegation',
+      }),
+      expect.objectContaining({
+        system_role: 'concierge',
+        assumed_role: 'chronos_localadmin',
+        allowed: false,
+        source: 'delegation',
       }),
     ]);
   });
