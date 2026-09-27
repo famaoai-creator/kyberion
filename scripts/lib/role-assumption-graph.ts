@@ -51,6 +51,13 @@ function isInternalCodeSpecifier(specifier: string): boolean {
 }
 
 const ASSUMPTION_FUNCTIONS = new Set(['withExecutionContext', 'withExecutionContextAsync']);
+/**
+ * DR-01: `buildExecutionEnv(env, role)` delegates `role` to the child when the
+ * env carries SYSTEM_ROLE; the child then runs as `role` under the parent's
+ * SYSTEM_ROLE bounds, so the call is an assumption site of `role` for every
+ * system role that reaches it (the child entry itself is walked as a spawn).
+ */
+const DELEGATION_FUNCTION = 'buildExecutionEnv';
 const AUTHORITY_FILE = 'libs/core/authority.ts';
 
 /**
@@ -406,6 +413,7 @@ export class Analyzer {
     resolution: RoleResolution;
   }> = [];
   private readonly assumptionDeclarations = new Set<ts.Declaration>();
+  private readonly delegationDeclarations = new Set<ts.Declaration>();
   private readonly spawnHelperDeclarations = new Map<
     ts.Declaration,
     { inheritsByDefault: boolean; optionsIndex: number }
@@ -436,6 +444,9 @@ export class Analyzer {
         const name = statement.name.text;
         if (rel === AUTHORITY_FILE && ASSUMPTION_FUNCTIONS.has(name)) {
           this.assumptionDeclarations.add(statement);
+        }
+        if (rel === AUTHORITY_FILE && name === DELEGATION_FUNCTION) {
+          this.delegationDeclarations.add(statement);
         }
         const helper = CORE_SPAWN_HELPERS.find(
           (candidate) => candidate.file === rel && candidate.name.test(name)
@@ -767,6 +778,10 @@ export class Analyzer {
         ? this.resolveRoleExpression(roleArgument)
         : { ...emptyResolution(), unresolved: ['missing role argument'] };
       this.pendingForwards.push({ unit, site: this.position(call), resolution });
+      return;
+    }
+    if (callee && this.delegationDeclarations.has(callee)) {
+      this.recordDelegation(unit, call);
       return;
     }
     const spawnKind = this.spawnKind(call, callee);
@@ -1196,7 +1211,8 @@ export class Analyzer {
       if (resolution.roles.size > 0 || resolution.unresolved.length > 0) {
         this.roleRecords.push({
           unit,
-          site: unit.id === site ? site : `${unit.id} (via ${site})`,
+          site:
+            unit.id === site || site.startsWith(`${unit.id} [`) ? site : `${unit.id} (via ${site})`,
           roles: new Set(resolution.roles),
           unresolved: [...resolution.unresolved],
         });
@@ -1241,6 +1257,31 @@ export class Analyzer {
         }
       }
     }
+  }
+
+  /**
+   * DR-01: a `buildExecutionEnv(env, role)` whose env may carry SYSTEM_ROLE
+   * delegates `role` to the child: record it as an assumption of `role`
+   * (resolved like a withExecutionContext role argument, forwarded through
+   * wrapper parameters, "any role" when unresolvable). Without a role, or
+   * with an env that cannot carry SYSTEM_ROLE, nothing is delegated.
+   */
+  private recordDelegation(unit: Unit, call: ts.CallExpression): void {
+    const [baseEnv, roleArgument] = call.arguments;
+    if (!roleArgument) return;
+    const role = unwrapExpression(roleArgument);
+    if (
+      role.kind === ts.SyntaxKind.UndefinedKeyword ||
+      (ts.isIdentifier(role) && role.text === 'undefined')
+    ) {
+      return;
+    }
+    if (baseEnv && !this.envInherits(baseEnv)) return;
+    this.pendingForwards.push({
+      unit,
+      site: `${this.position(call)} [delegated child role]`,
+      resolution: this.resolveRoleExpression(roleArgument),
+    });
   }
 
   // -------------------------------------------------------------------------
