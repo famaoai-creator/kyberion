@@ -1,3 +1,9 @@
+import {
+  isCtaLikeSemantic,
+  isHookSemantic,
+  isProcessLikeSemantic,
+  isProofLikeSemantic,
+} from './video-content-brief-contract.js';
 import type { VideoStoryboard } from './video-content-brief-contract.js';
 import { clamp } from './foundation/text.js';
 import { createLogger } from './logger.js';
@@ -205,10 +211,10 @@ function buildStoryboardSceneContent(
     design_system_vars:
       storyboard.design_system_ref?.css_vars || brief.design_system.theme_tokens?.css_vars || {},
   };
-  if (beat.semantic === 'process' || beat.semantic === 'steps' || beat.semantic === 'demo') {
+  if (isProcessLikeSemantic(beat.semantic)) {
     content.visual_steps = deriveProcessSteps(storyboard);
   }
-  if (beat.semantic === 'proof' || beat.semantic === 'artifact' || beat.semantic === 'evidence') {
+  if (isProofLikeSemantic(beat.semantic)) {
     content.evidence_items = storyboard.desired_takeaway
       ? [storyboard.desired_takeaway, ...(storyboard.promise ? [storyboard.promise] : [])]
       : [brief.script.feature];
@@ -237,7 +243,7 @@ function buildStoryboardSceneContent(
       { speaker: 'kyberion', text: beat.message || beat.visual_intent || brief.script.cta },
     ];
   }
-  if (beat.semantic === 'cta' || beat.semantic === 'validation' || beat.role === 'outro') {
+  if (isCtaLikeSemantic(beat.semantic) || beat.role === 'outro') {
     content.callout = brief.script.cta;
   }
   return content;
@@ -253,7 +259,7 @@ function resolveDistinctSceneBody(
     beat.message,
     beat.visual_intent,
     beat.caption_intent,
-    beat.semantic === 'hook' ? brief.script.feature : undefined,
+    isHookSemantic(beat.semantic) ? brief.script.feature : undefined,
     beat.semantic === 'cta' || beat.role === 'outro' ? brief.script.feature : undefined,
     beat.semantic === 'process' || beat.semantic === 'steps' || beat.role === 'feature'
       ? brief.script.feature
@@ -454,16 +460,15 @@ function selectTemplateId(
   if (presentationMode === 'promo') {
     if (
       role === 'outro' ||
-      semantic === 'cta' ||
-      semantic === 'validation' ||
+      isCtaLikeSemantic(semantic) ||
       (typeof index === 'number' && typeof total === 'number' && index === total - 1)
     ) {
       return 'logo-outro';
     }
-    if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') {
+    if (isProcessLikeSemantic(semantic)) {
       return 'howto-guide';
     }
-    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact') {
+    if (isProofLikeSemantic(semantic)) {
       return 'split-highlight';
     }
     if (role === 'hook') {
@@ -477,34 +482,24 @@ function selectTemplateId(
   if (presentationMode === 'vtuber') {
     if (
       role === 'outro' ||
-      semantic === 'cta' ||
-      semantic === 'validation' ||
+      isCtaLikeSemantic(semantic) ||
       (typeof index === 'number' && typeof total === 'number' && index === total - 1)
     ) {
       return 'logo-outro';
     }
     return 'vtuber-stage';
   }
-  if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') {
+  if (isProcessLikeSemantic(semantic)) {
     return 'howto-guide';
   }
   if (
     role === 'outro' ||
-    semantic === 'validation' ||
-    semantic === 'cta' ||
+    isCtaLikeSemantic(semantic) ||
     (typeof index === 'number' && typeof total === 'number' && index === total - 1)
   ) {
     return 'logo-outro';
   }
-  if (
-    semantic === 'proof' ||
-    semantic === 'evidence' ||
-    semantic === 'artifact' ||
-    semantic === 'process' ||
-    semantic === 'steps' ||
-    semantic === 'demo' ||
-    role === 'feature'
-  ) {
+  if (isProofLikeSemantic(semantic) || isProcessLikeSemantic(semantic) || role === 'feature') {
     return 'split-highlight';
   }
   return 'basic-title-card';
@@ -522,13 +517,11 @@ function resolveSceneLayoutVariant(
     return fallback;
   }
   if (presentationMode === 'vtuber') {
-    if (role === 'hook' || semantic === 'hook') return 'focus-center';
-    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps')
-      return 'fullscreen-demo';
+    if (role === 'hook' || isHookSemantic(semantic)) return 'focus-center';
+    if (isProcessLikeSemantic(semantic)) return 'fullscreen-demo';
     if (
       role === 'outro' ||
-      semantic === 'cta' ||
-      semantic === 'validation' ||
+      isCtaLikeSemantic(semantic) ||
       (typeof index === 'number' && typeof total === 'number' && index === total - 1)
     ) {
       return 'split-right';
@@ -538,14 +531,12 @@ function resolveSceneLayoutVariant(
   if (presentationMode === 'promo') {
     if (
       role === 'outro' ||
-      semantic === 'cta' ||
-      semantic === 'validation' ||
+      isCtaLikeSemantic(semantic) ||
       (typeof index === 'number' && typeof total === 'number' && index === total - 1)
     ) {
       return 'split-right';
     }
-    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact')
-      return 'fullscreen-demo';
+    if (isProofLikeSemantic(semantic)) return 'fullscreen-demo';
     return 'split-left';
   }
   return fallback || 'split-left';

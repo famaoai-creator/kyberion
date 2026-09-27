@@ -1183,27 +1183,66 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
-async function mainImpl(args: string[] = [], print: Print = () => undefined) {
-  activeCliArgs = [...args];
-  const missionId = getRegisteredEnvText('MISSION_ID');
-  printMissionContextBanner(missionId);
+type CliCommandContext = {
+  command: string;
+  firstArg: string | undefined;
+  restArgs: string[];
+  normalizedArgs: string[];
+  args: string[];
+  actuators: ReturnType<typeof loadActuators>;
+  locale: ReturnType<typeof resolveLocale>;
+  print: Print;
+  missionId: string | undefined;
+};
 
-  const actuators = loadActuators();
-  const locale = resolveLocale(args);
-  const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
-  const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
+type CliCommandHandler = (ctx: CliCommandContext) => Promise<void> | void;
 
-  if (shouldBootstrapRuntime(normalizedArgs)) {
-    installReasoningBackends();
-    installPythonVoiceBridgeIfAvailable();
+const handleHelpHelpH: CliCommandHandler = async (ctx) => {
+  const { actuators, locale } = ctx;
+
+  printHelp(actuators, locale);
+  return;
+};
+
+const handleApproveReject: CliCommandHandler = async (ctx) => {
+  const { command, firstArg, restArgs } = ctx;
+
+  applyApprovalDecision(command as 'approve' | 'reject', firstArg, restArgs[0]);
+  return;
+};
+
+const handleSeeListenWatch: CliCommandHandler = async (ctx) => {
+  const { command, firstArg, restArgs, normalizedArgs } = ctx;
+
+  // Same contract as `read`: stdout carries the content, caveats arrive as
+  // `> [<command>]` lines, --verbose keeps runtime logs.
+  if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+  const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+  if (command === 'see') {
+    const { runSeeCommand } = await import('./cli-see.js');
+    await runSeeCommand(commandArgs, printText);
+  } else if (command === 'listen') {
+    const { runListenCommand } = await import('./cli-listen.js');
+    await runListenCommand(commandArgs, printText);
+  } else {
+    const { runWatchCommand } = await import('./cli-watch.js');
+    await runWatchCommand(commandArgs, printText);
   }
+  return;
+};
 
-  if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp(actuators, locale);
-    return;
-  }
+const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = {
+  help: handleHelpHelpH,
+  '--help': handleHelpHelpH,
+  '-h': handleHelpHelpH,
+  approve: handleApproveReject,
+  reject: handleApproveReject,
+  see: handleSeeListenWatch,
+  listen: handleSeeListenWatch,
+  watch: handleSeeListenWatch,
+  list: async (ctx) => {
+    const { normalizedArgs, actuators } = ctx;
 
-  if (command === 'list') {
     printActuatorList(actuators);
     const hasCheck = normalizedArgs.includes('--check');
     if (hasCheck) {
@@ -1225,15 +1264,17 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
       }
     }
     return;
-  }
+  },
+  search: async (ctx) => {
+    const { firstArg, actuators } = ctx;
 
-  if (command === 'search') {
     const matches = searchActuators(actuators, firstArg || '');
     printActuatorList(matches);
     return;
-  }
+  },
+  info: async (ctx) => {
+    const { firstArg, actuators } = ctx;
 
-  if (command === 'info') {
     if (!firstArg) {
       throw new Error('Missing actuator name. Try `pnpm kyberion list`.');
     }
@@ -1245,9 +1286,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printActuatorInfo(actuator);
     return;
-  }
+  },
+  examples: async (ctx) => {
+    const { firstArg, actuators } = ctx;
 
-  if (command === 'examples') {
     if (!firstArg) {
       printActuatorExampleSummary(actuators);
       return;
@@ -1260,9 +1302,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printActuatorExamples(actuator);
     return;
-  }
+  },
+  'mobile-profiles': async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'mobile-profiles') {
     if (!firstArg) {
       printMobileAppProfilesSummary();
       return;
@@ -1270,9 +1313,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printMobileAppProfile(firstArg);
     return;
-  }
+  },
+  'web-profiles': async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'web-profiles') {
     if (!firstArg) {
       printWebAppProfilesSummary();
       return;
@@ -1280,9 +1324,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printWebAppProfile(firstArg);
     return;
-  }
+  },
+  artifact: async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'artifact') {
     if (!firstArg) {
       throw new Error(
         'Missing artifact path. Try `pnpm kyberion artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
@@ -1291,9 +1336,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printArtifactInfo(firstArg);
     return;
-  }
+  },
+  'open-artifact': async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'open-artifact') {
     if (!firstArg) {
       throw new Error(
         'Missing artifact path. Try `pnpm kyberion open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
@@ -1302,9 +1348,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     openArtifact(firstArg);
     return;
-  }
+  },
+  packet: async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'packet') {
     if (!firstArg) {
       throw new Error(
         'Missing packet path. Try `pnpm kyberion packet active/shared/tmp/orchestrator/operator-interaction-packet.json`.'
@@ -1313,146 +1360,125 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
 
     printInteractionPacketFile(firstArg);
     return;
-  }
+  },
+  'accept-next-action': async (ctx) => {
+    const { firstArg, restArgs } = ctx;
 
-  if (command === 'accept-next-action') {
     if (!firstArg || !restArgs[0]) {
       throw new Error('Usage: pnpm kyberion accept-next-action <packet-path> <action-id>');
     }
 
     acceptNextAction(firstArg, restArgs[0]);
     return;
-  }
+  },
+  approvals: async (ctx) => {
+    const { firstArg } = ctx;
 
-  if (command === 'approvals') {
     printApprovalRequests(firstArg);
     return;
-  }
+  },
+  'project-trust': async (ctx) => {
+    const { firstArg, restArgs } = ctx;
 
-  if (command === 'approve' || command === 'reject') {
-    applyApprovalDecision(command, firstArg, restArgs[0]);
-    return;
-  }
-
-  if (command === 'project-trust') {
     if (firstArg !== 'request' || !restArgs[0]) {
       throw new Error('Usage: pnpm kyberion project-trust request <pipeline-path> [--json]');
     }
     requestProjectTrust(restArgs[0], restArgs.includes('--json'));
     return;
-  }
+  },
+  email: async (ctx) => {
+    const { firstArg, restArgs, locale, print } = ctx;
 
-  if (command === 'email') {
     await withWorkflowOutputPrinter(print, () =>
       handleEmailWorkflowCommand(firstArg, restArgs, locale)
     );
     return;
-  }
+  },
+  calendar: async (ctx) => {
+    const { firstArg, restArgs, locale, print } = ctx;
 
-  if (command === 'calendar') {
     await withWorkflowOutputPrinter(print, () =>
       handleCalendarWorkflowCommand(firstArg, restArgs, locale)
     );
     return;
-  }
+  },
+  memory: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'memory') {
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runMemoryCommand } = await import('./cli-memory.js');
     await runMemoryCommand(
       [firstArg, ...restArgs].filter((arg): arg is string => arg !== undefined)
     );
     return;
-  }
+  },
+  task: async (ctx) => {
+    const { firstArg, restArgs, locale, print } = ctx;
 
-  if (command === 'task') {
     await withWorkflowOutputPrinter(print, () => handleTaskCommand(firstArg, restArgs, locale));
     return;
-  }
+  },
+  offboard: async (ctx) => {
+    const { firstArg, restArgs, locale, print } = ctx;
 
-  if (command === 'offboard') {
     await withWorkflowOutputPrinter(print, () => handleOffboardCommand(firstArg, restArgs, locale));
     return;
-  }
+  },
+  read: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'read') {
     // stdout carries the document; keep runtime logs out of it. Errors still
     // print, and reader caveats arrive as `> [read]` warnings. --verbose keeps logs.
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runReadCommand } = await import('./cli-read.js');
     await runReadCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
-  }
+  },
+  write: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'write') {
     // Inverse of `read`: stdout carries the summary (or --json), not runtime logs.
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runWriteCommand } = await import('./cli-write.js');
     await runWriteCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
-  }
+  },
+  diff: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'diff') {
     // Fidelity check between two documents; stdout carries the diff summary (or --json).
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runDiffCommand } = await import('./cli-diff.js');
     await runDiffCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
-  }
+  },
+  speak: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'see' || command === 'listen' || command === 'watch') {
-    // Same contract as `read`: stdout carries the content, caveats arrive as
-    // `> [<command>]` lines, --verbose keeps runtime logs.
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
-    if (command === 'see') {
-      const { runSeeCommand } = await import('./cli-see.js');
-      await runSeeCommand(commandArgs, printText);
-    } else if (command === 'listen') {
-      const { runListenCommand } = await import('./cli-listen.js');
-      await runListenCommand(commandArgs, printText);
-    } else {
-      const { runWatchCommand } = await import('./cli-watch.js');
-      await runWatchCommand(commandArgs, printText);
-    }
-    return;
-  }
-
-  if (command === 'speak') {
     // Output is audio; stdout carries only the `[speak]` summary (or --json).
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runSpeakCommand } = await import('./cli-speak.js');
     await runSpeakCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
-  }
+  },
+  draw: async (ctx) => {
+    const { firstArg, restArgs, normalizedArgs } = ctx;
 
-  if (command === 'draw') {
     // Output is an image; stdout carries only the `[draw]` summary (or --json).
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runDrawCommand } = await import('./cli-draw.js');
     await runDrawCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
-  }
+  },
+  run: async (ctx) => {
+    const { firstArg, restArgs, actuators, missionId } = ctx;
 
-  const { dispatchCaptureCommand } = await import('./lib/capture-dispatch.js');
-  if (
-    await dispatchCaptureCommand({
-      command,
-      firstArg,
-      restArgs,
-      normalizedArgs,
-      print: (text: string) => printText(text),
-    })
-  ) {
-    return;
-  }
-
-  if (command === 'run') {
     runActuator(actuators, firstArg, restArgs, missionId);
     return;
-  }
+  },
+  preview: async (ctx) => {
+    const { firstArg, restArgs } = ctx;
 
-  if (command === 'preview') {
     const filePath = firstArg;
     if (!filePath) {
       throw new ScriptExitError(1, 'Usage: pnpm kyberion preview <pipeline.json>');
@@ -1487,9 +1513,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     }
     if (!preview.valid) throw new ScriptExitError(1, '', true);
     return;
-  }
+  },
+  intent: async (ctx) => {
+    const { normalizedArgs, print } = ctx;
 
-  if (command === 'intent') {
     // Free-text compatibility route → canonical ask resolution/execution
     // Usage: pnpm kyberion intent "仮説を発散させて" [--run|--clarify]
     const flags = normalizedArgs.filter((a) => a.startsWith('--'));
@@ -1508,9 +1535,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     // execute after the canonical resolver and approval gates have run.
     await routeLegacyIntentToAsk(utterance, doClarify ? 'clarify' : 'explain', print);
     return;
-  }
+  },
+  schedule: async (ctx) => {
+    const { firstArg, restArgs } = ctx;
 
-  if (command === 'schedule') {
     const subAction = firstArg; // register, list, remove
     if (subAction === 'list') {
       const schedules = listScheduledPipelines();
@@ -1557,6 +1585,38 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     } else {
       printText('Usage: pnpm kyberion schedule [list|register|remove]');
     }
+    return;
+  },
+};
+
+async function mainImpl(args: string[] = [], print: Print = () => undefined) {
+  activeCliArgs = [...args];
+  const missionId = getRegisteredEnvText('MISSION_ID');
+  printMissionContextBanner(missionId);
+
+  const actuators = loadActuators();
+  const locale = resolveLocale(args);
+  const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
+  const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
+
+  if (shouldBootstrapRuntime(normalizedArgs)) {
+    installReasoningBackends();
+    installPythonVoiceBridgeIfAvailable();
+  }
+
+  const handler = CLI_COMMAND_HANDLERS[command];
+  if (handler) {
+    await handler({
+      command,
+      firstArg,
+      restArgs,
+      normalizedArgs,
+      args,
+      actuators,
+      locale,
+      print,
+      missionId,
+    });
     return;
   }
 

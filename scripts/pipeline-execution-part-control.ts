@@ -457,6 +457,324 @@ export function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unkn
 }
 
 /** All non-control ops (system:*, core:wait/run_janitor/transform/ptc, reasoning:*, actuator dispatch). */
+type InlineOpDispatchContext = {
+  step: PipelineAdfStep;
+  domain: string;
+  action: string;
+  params: Record<string, unknown>;
+  ctx: Record<string, unknown>;
+  rootDir: string;
+  shellBin: SafeShell;
+  opts: RunStepsOptions;
+  stepPolicy: ReasoningStepPolicy;
+};
+
+type InlineOpHandler = (dctx: InlineOpDispatchContext) => unknown;
+
+const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
+  'core:ptc': async (dctx) => {
+    const { params, ctx, opts, rootDir, shellBin, stepPolicy } = dctx;
+
+    return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
+  },
+  'core:programmatic_tool_call': async (dctx) => {
+    const { params, ctx, opts, rootDir, shellBin, stepPolicy } = dctx;
+
+    return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
+  },
+  'core:run_pipeline': async (dctx) => {
+    const { params, ctx, opts, rootDir } = dctx;
+
+    if (!opts.runPipelineFile) {
+      throw new Error(
+        'core:run_pipeline requires the library pipeline runner; direct nested process spawning is not allowed'
+      );
+    }
+    const inputPath = String(params.input ?? params.pipeline ?? params.path ?? '').trim();
+    if (!inputPath) throw new Error('core:run_pipeline requires an input path');
+    // Guard the in-process nesting stack before dispatching: a cycle or an
+    // unbounded chain would otherwise recurse until the JS stack is exhausted.
+    const ancestry = resolveNestedPipelineAncestry(ctx, rootDir, opts.pipelinePath, inputPath);
+    // The child receives user-level data only; engine-derived context
+    // (`__pipeline_options`, `repo_root`, `run_utc_now`, mission paths, ...)
+    // is stripped so the nested pipeline computes its own.
+    //
+    // Out of scope here: `executePipelineFile` re-fires `session_start` /
+    // `before_agent_start` lifecycle hooks for every nested run, so a hook
+    // observes one event per pipeline rather than one per outermost run.
+    // That re-firing semantics is intentionally left unchanged.
+    const nestedContext = buildNestedPipelineContext(
+      ctx,
+      params.context && typeof params.context === 'object' && !Array.isArray(params.context)
+        ? (params.context as Record<string, unknown>)
+        : undefined,
+      ancestry
+    );
+    const nested = await opts.runPipelineFile(inputPath, {
+      context: nestedContext,
+      quiet: opts.quiet,
+      hasHuman: opts.hasHuman,
+    });
+    const exportKey = String(params.export_as || 'pipeline_result');
+    return {
+      ...ctx,
+      [exportKey]: {
+        status: nested.status || 'succeeded',
+        results: nested.results,
+        context: nested.context,
+      },
+    };
+  },
+  'system:log': async (dctx) => {
+    const { params, ctx } = dctx;
+
+    logger.info(resolveLogMessage(params, ctx));
+    return ctx;
+  },
+  'system:exec': async (dctx) => {
+    const { params, ctx, rootDir } = dctx;
+
+    return runInlineSystemExec(params, ctx, rootDir);
+  },
+  'system:write_file': async (dctx) => {
+    const { params, ctx, rootDir } = dctx;
+
+    return runInlineSystemWriteFile(params, ctx, rootDir);
+  },
+  'system:shell': async (dctx) => {
+    const { params, ctx, rootDir, shellBin } = dctx;
+
+    return runInlineSystemShell(params, ctx, rootDir, shellBin);
+  },
+  'core:wait': async (dctx) => {
+    const { params, ctx } = dctx;
+
+    return runInlineCoreWait(params, ctx);
+  },
+  'core:run_janitor': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCoreJanitor(step, params, ctx);
+  },
+  'core:run-janitor': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCoreJanitor(step, params, ctx);
+  },
+  'core:parse_proposal_brief': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineProposalBriefParse(step, params, ctx);
+  },
+  'core:validate_productivity_dry_run': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineProductivityDryRunValidation(step, params, ctx);
+  },
+  'core:calculate_productivity_score': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineProductivityScore(step, params, ctx);
+  },
+  'core:grant_voice_consent': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineVoiceConsentGrant(step, params, ctx);
+  },
+  'core:run_vitest': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineVitest(step, params, ctx);
+  },
+  'core:apply_onboarding': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineOnboardingApply(step, params, ctx);
+  },
+  'core:run_campaign_suite': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCampaignSuite(step, params, ctx);
+  },
+  'core:run_ai_audit': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineAiAudit(step, params, ctx);
+  },
+  'core:run_first_win_lifecycle': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineFirstWinLifecycle(step, params, ctx);
+  },
+  'core:run_dependency_vulnerability_scan': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineDependencyVulnerabilityScan(step, params, ctx);
+  },
+  'core:run_health_degradation_watch': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineHealthDegradationWatch(step, params, ctx);
+  },
+  'core:run_ui_ux_governance': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineUiUxGovernanceAudit(step, params, ctx);
+  },
+  'core:run_tenant_drift_watch': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineTenantDriftWatch(step, params, ctx);
+  },
+  'core:organization_digest': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineOrganizationDigest(step, params, ctx);
+  },
+  'core:organization_record_run': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineOrganizationRecordRun(step, params, ctx);
+  },
+  'core:run_auto_checkpoint': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineAutoCheckpoint(step, params, ctx);
+  },
+  'core:run_backup_create': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineBackupCreate(step, params, ctx);
+  },
+  'core:run_backup_restore_drill': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineBackupRestoreDrill(step, params, ctx);
+  },
+  'core:run_software_quality_report': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineSoftwareQualityReport(step, params, ctx);
+  },
+  'core:run_soak_endurance': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineSoakEndurance(step, params, ctx);
+  },
+  'core:run_soak_restart_e2e': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineSoakRestartE2E(step, params, ctx);
+  },
+  'core:run_marketing_video_dry_run': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineMarketingVideoDryRun(step, params, ctx);
+  },
+  'core:run_compliance_scan': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineComplianceScan(step, params, ctx);
+  },
+  'core:run_mesh_delivery': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineMeshDelivery(step, params, ctx);
+  },
+  'core:run_promote_procedure': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlinePromoteProcedure(step, params, ctx);
+  },
+  'core:run_i18n_hardcoding': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineI18nHardcoding(step, params, ctx);
+  },
+  'core:run_catalog_integrity': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCatalogIntegrity(step, params, ctx);
+  },
+  'core:run_translation_coverage': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineTranslationCoverage(step, params, ctx);
+  },
+  'core:run_doc_examples_check': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineDocExamplesCheck(step, params, ctx);
+  },
+  'core:run_registry_manager': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineRegistryManager(step, params, ctx);
+  },
+  'core:run_mission_create': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineMissionCreate(step, params, ctx);
+  },
+  'core:run_mission_start_from_issues': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineMissionStartFromIssues(step, params, ctx);
+  },
+  'core:capture_avatar_photo': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCaptureAvatarPhoto(step, params, ctx);
+  },
+  'core:generate_avatar': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineGenerateAvatar(step, params, ctx);
+  },
+  'core:register_avatar': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineRegisterAvatar(step, params, ctx);
+  },
+  'core:run_oauth_setup': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineOAuthSetup(step, params, ctx);
+  },
+  'core:transform': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCoreTransform(step, params, ctx);
+  },
+  'reasoning:analyze': async (dctx) => {
+    const { step, params, ctx, stepPolicy } = dctx;
+
+    return dispatchReasoningLeaf(
+      { ...params, _facets: step.facets, _step_id: step.id || step.op },
+      ctx,
+      stepPolicy
+    );
+  },
+  'reasoning:transform': async (dctx) => {
+    const { step, params, ctx, stepPolicy } = dctx;
+
+    return dispatchReasoningLeaf(
+      { ...params, _facets: step.facets, _step_id: step.id || step.op },
+      ctx,
+      stepPolicy
+    );
+  },
+  'reasoning:synthesize': async (dctx) => {
+    const { step, params, ctx, stepPolicy } = dctx;
+
+    return dispatchReasoningLeaf(
+      { ...params, _facets: step.facets, _step_id: step.id || step.op },
+      ctx,
+      stepPolicy
+    );
+  },
+};
+
 export async function dispatchLeafOp(
   step: PipelineAdfStep,
   ctx: Record<string, unknown>,
@@ -525,162 +843,19 @@ export async function dispatchLeafOp(
     );
   }
 
-  if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
-    return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
-  }
-
-  if (domain === 'core' && action === 'run_pipeline') {
-    if (!opts.runPipelineFile) {
-      throw new Error(
-        'core:run_pipeline requires the library pipeline runner; direct nested process spawning is not allowed'
-      );
-    }
-    const inputPath = String(params.input ?? params.pipeline ?? params.path ?? '').trim();
-    if (!inputPath) throw new Error('core:run_pipeline requires an input path');
-    // Guard the in-process nesting stack before dispatching: a cycle or an
-    // unbounded chain would otherwise recurse until the JS stack is exhausted.
-    const ancestry = resolveNestedPipelineAncestry(ctx, rootDir, opts.pipelinePath, inputPath);
-    // The child receives user-level data only; engine-derived context
-    // (`__pipeline_options`, `repo_root`, `run_utc_now`, mission paths, ...)
-    // is stripped so the nested pipeline computes its own.
-    //
-    // Out of scope here: `executePipelineFile` re-fires `session_start` /
-    // `before_agent_start` lifecycle hooks for every nested run, so a hook
-    // observes one event per pipeline rather than one per outermost run.
-    // That re-firing semantics is intentionally left unchanged.
-    const nestedContext = buildNestedPipelineContext(
+  const inlineHandler = INLINE_OP_HANDLERS[`${domain}:${action}`];
+  if (inlineHandler) {
+    return (await inlineHandler({
+      step,
+      domain,
+      action,
+      params,
       ctx,
-      params.context && typeof params.context === 'object' && !Array.isArray(params.context)
-        ? (params.context as Record<string, unknown>)
-        : undefined,
-      ancestry
-    );
-    const nested = await opts.runPipelineFile(inputPath, {
-      context: nestedContext,
-      quiet: opts.quiet,
-      hasHuman: opts.hasHuman,
-    });
-    const exportKey = String(params.export_as || 'pipeline_result');
-    return {
-      ...ctx,
-      [exportKey]: {
-        status: nested.status || 'succeeded',
-        results: nested.results,
-        context: nested.context,
-      },
-    };
-  }
-
-  if (domain === 'system' && action === 'log') {
-    logger.info(resolveLogMessage(params, ctx));
-    return ctx;
-  }
-  if (domain === 'system' && action === 'exec') return runInlineSystemExec(params, ctx, rootDir);
-  if (domain === 'system' && action === 'write_file') {
-    return runInlineSystemWriteFile(params, ctx, rootDir);
-  }
-  if (domain === 'system' && action === 'shell') {
-    return runInlineSystemShell(params, ctx, rootDir, shellBin);
-  }
-  if (domain === 'core' && action === 'wait') return runInlineCoreWait(params, ctx);
-  if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
-    return runInlineCoreJanitor(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'parse_proposal_brief') {
-    return runInlineProposalBriefParse(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'validate_productivity_dry_run') {
-    return runInlineProductivityDryRunValidation(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'calculate_productivity_score') {
-    return runInlineProductivityScore(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'grant_voice_consent') {
-    return runInlineVoiceConsentGrant(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_vitest') {
-    return runInlineVitest(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'apply_onboarding') {
-    return runInlineOnboardingApply(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_campaign_suite') {
-    return runInlineCampaignSuite(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_ai_audit') return runInlineAiAudit(step, params, ctx);
-  if (domain === 'core' && action === 'run_first_win_lifecycle') {
-    return runInlineFirstWinLifecycle(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_dependency_vulnerability_scan') {
-    return runInlineDependencyVulnerabilityScan(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_health_degradation_watch') {
-    return runInlineHealthDegradationWatch(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_ui_ux_governance') {
-    return runInlineUiUxGovernanceAudit(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_tenant_drift_watch') {
-    return runInlineTenantDriftWatch(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'organization_digest') {
-    return runInlineOrganizationDigest(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'organization_record_run') {
-    return runInlineOrganizationRecordRun(step, params, ctx);
-  }
-  if (domain === 'core' && action === 'run_auto_checkpoint')
-    return runInlineAutoCheckpoint(step, params, ctx);
-  if (domain === 'core' && action === 'run_backup_create')
-    return runInlineBackupCreate(step, params, ctx);
-  if (domain === 'core' && action === 'run_backup_restore_drill')
-    return runInlineBackupRestoreDrill(step, params, ctx);
-  if (domain === 'core' && action === 'run_software_quality_report')
-    return runInlineSoftwareQualityReport(step, params, ctx);
-  if (domain === 'core' && action === 'run_soak_endurance')
-    return runInlineSoakEndurance(step, params, ctx);
-  if (domain === 'core' && action === 'run_soak_restart_e2e')
-    return runInlineSoakRestartE2E(step, params, ctx);
-  if (domain === 'core' && action === 'run_marketing_video_dry_run')
-    return runInlineMarketingVideoDryRun(step, params, ctx);
-  if (domain === 'core' && action === 'run_compliance_scan')
-    return runInlineComplianceScan(step, params, ctx);
-  if (domain === 'core' && action === 'run_mesh_delivery')
-    return runInlineMeshDelivery(step, params, ctx);
-  if (domain === 'core' && action === 'run_promote_procedure')
-    return runInlinePromoteProcedure(step, params, ctx);
-  if (domain === 'core' && action === 'run_i18n_hardcoding')
-    return runInlineI18nHardcoding(step, params, ctx);
-  if (domain === 'core' && action === 'run_catalog_integrity')
-    return runInlineCatalogIntegrity(step, params, ctx);
-  if (domain === 'core' && action === 'run_translation_coverage')
-    return runInlineTranslationCoverage(step, params, ctx);
-  if (domain === 'core' && action === 'run_doc_examples_check')
-    return runInlineDocExamplesCheck(step, params, ctx);
-  if (domain === 'core' && action === 'run_registry_manager')
-    return runInlineRegistryManager(step, params, ctx);
-  if (domain === 'core' && action === 'run_mission_create')
-    return runInlineMissionCreate(step, params, ctx);
-  if (domain === 'core' && action === 'run_mission_start_from_issues')
-    return runInlineMissionStartFromIssues(step, params, ctx);
-  if (domain === 'core' && action === 'capture_avatar_photo')
-    return runInlineCaptureAvatarPhoto(step, params, ctx);
-  if (domain === 'core' && action === 'generate_avatar')
-    return runInlineGenerateAvatar(step, params, ctx);
-  if (domain === 'core' && action === 'register_avatar')
-    return runInlineRegisterAvatar(step, params, ctx);
-  if (domain === 'core' && action === 'run_oauth_setup')
-    return runInlineOAuthSetup(step, params, ctx);
-  if (domain === 'core' && action === 'transform') return runInlineCoreTransform(step, params, ctx);
-  if (
-    domain === 'reasoning' &&
-    (action === 'analyze' || action === 'transform' || action === 'synthesize')
-  ) {
-    return dispatchReasoningLeaf(
-      { ...params, _facets: step.facets, _step_id: step.id || step.op },
-      ctx,
-      stepPolicy
-    );
+      rootDir,
+      shellBin,
+      opts,
+      stepPolicy,
+    })) as Record<string, unknown>;
   }
 
   // Emit capability.missing before dispatch so the trace records the gap

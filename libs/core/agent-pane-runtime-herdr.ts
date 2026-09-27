@@ -22,6 +22,7 @@ import {
   decideAgentPromptResponse,
   loadAgentPromptResponsePolicy,
   resolveAgentLaunchArgs,
+  resolveAgentModelArgs,
   type AgentPromptResponsePolicy,
 } from './agent-prompt-response.js';
 import {
@@ -617,15 +618,10 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
       `[pane-runtime] starting ${this.paneAgentName} kind=${this.kind} pane=${paneId} workspace=${this.workspaceId}`
     );
 
-    const extraArgs: string[] = [];
-    if (this.modelId && this.kind === 'claude') {
-      const normalized = this.modelId.trim().toLowerCase();
-      if (normalized && normalized !== 'claude' && normalized !== this.provider.toLowerCase()) {
-        extraArgs.push('--model', this.modelId);
-      }
-    }
-
-    extraArgs.push(...resolveAgentLaunchArgs(this.promptPolicy, this.provider, this.kind));
+    const extraArgs: string[] = [
+      ...resolveAgentModelArgs(this.provider, this.kind, this.modelId),
+      ...resolveAgentLaunchArgs(this.promptPolicy, this.provider, this.kind),
+    ];
 
     this.client.startAgent({
       name: this.paneAgentName,
