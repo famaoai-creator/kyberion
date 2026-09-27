@@ -427,6 +427,22 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.record.audio",
+      "command": "record audio",
+      "noun": "record",
+      "verb": "audio",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.record.camera",
+      "command": "record camera",
+      "noun": "record",
+      "verb": "camera",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.run",
       "command": "run",
       "noun": "run",
@@ -611,6 +627,8 @@
         "draw",
         "capture",
         "record screen",
+        "record audio",
+        "record camera",
         "run",
         "preview",
         "intent",

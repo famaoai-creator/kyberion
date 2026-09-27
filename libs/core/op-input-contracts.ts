@@ -477,6 +477,53 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
   },
   system: {
+    record_audio: {
+      summary: 'Record microphone audio to WAV artifacts through the canonical audio-input bridge.',
+      examples: [{ output: 'active/shared/tmp/mic-recording.wav', duration: 5 }],
+      schema: {
+        type: 'object',
+        properties: {
+          output: { type: 'string', minLength: 1 },
+          duration: { type: 'number', minimum: 0 },
+          duration_sec: { type: 'number', minimum: 0 },
+          targets: { type: 'array', items: { type: 'string' } },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    capture_photo: {
+      summary: 'Capture a still photo from the camera through the canonical camera bridge.',
+      examples: [{ export_as: 'photo_path' }],
+      schema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', minLength: 1 },
+          camera_intent: { enum: ['record', 'share', 'reference', 'ocr_source'] },
+          subject_hint: { type: 'string', minLength: 1 },
+          device_preference: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    record_camera: {
+      summary:
+        'Record a low-fps camera video to MP4 (photo-per-frame) through the canonical camera bridge.',
+      examples: [{ output: 'active/shared/tmp/camera-recording.mp4', duration: 5 }],
+      schema: {
+        type: 'object',
+        properties: {
+          output: { type: 'string', minLength: 1 },
+          duration: { type: 'number', minimum: 0 },
+          fps: { type: 'number', exclusiveMinimum: 0, maximum: 5 },
+          subject_hint: { type: 'string', minLength: 1 },
+          device_preference: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     record_screen: {
       summary:
         'Record a bounded screen stream to an MP4 artifact through the canonical system bridge.',
