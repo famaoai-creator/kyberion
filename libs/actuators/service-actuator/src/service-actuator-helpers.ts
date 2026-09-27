@@ -22,6 +22,7 @@ import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-pro
 import { derivePipelineStatus } from '@agent/core/pipeline-contract';
 import { resolveServiceBinding } from '@agent/core/service-binding';
 import * as pathResolver from '@agent/core/path-resolver';
+import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { executeServicePreset, executeMcp } from '@agent/core/service-engine';
 import {
   beginServiceOAuth,
@@ -313,7 +314,9 @@ async function startService(id: string, service: ServiceManifestEntry, pids: Ser
   if (!safeExistsSync(path.dirname(logFile))) safeMkdir(path.dirname(logFile), { recursive: true });
   const out = safeOpenAppendFile(logFile);
 
-  const env = { ...process.env, ...(service.env || {}) };
+  // Manifest env may not set execution authority (DR-01): the service runs
+  // with this process's own SYSTEM_ROLE / role / persona.
+  const env = { ...process.env, ...stripAuthorityEnvOverrides(service.env) };
   const managed = spawnManagedProcess({
     resourceId: serviceResourceId(id),
     kind: 'service',

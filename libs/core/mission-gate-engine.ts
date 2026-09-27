@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { stripAuthorityEnvOverrides } from './authority.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
@@ -292,9 +293,12 @@ async function evaluateGateCheck(
             typeof params.timeoutMs === 'number' && Number.isFinite(params.timeoutMs)
               ? params.timeoutMs
               : undefined,
+          // Gate-supplied env may not set execution authority (DR-01).
           env:
             params.env && typeof params.env === 'object'
-              ? (params.env as NodeJS.ProcessEnv)
+              ? (stripAuthorityEnvOverrides(
+                  params.env as Record<string, string | undefined>
+                ) as NodeJS.ProcessEnv)
               : undefined,
         });
         return { passed: true };
