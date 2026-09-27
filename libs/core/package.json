@@ -563,7 +563,7 @@
       "types": "./dist/organization/organization-operating-model.d.ts",
       "default": "./dist/organization/organization-operating-model.js"
     },
-    "./workforce-scope-decision": {
+    "./work-scope-decision": {
       "types": "./dist/workforce/work-scope-decision.d.ts",
       "default": "./dist/workforce/work-scope-decision.js"
     },
@@ -2199,11 +2199,11 @@
       "types": "./dist/web-design-system.d.ts",
       "default": "./dist/web-design-system.js"
     },
-    "./workforce-coordination-peer": {
+    "./work-coordination-peer": {
       "types": "./dist/workforce/work-coordination-peer.d.ts",
       "default": "./dist/workforce/work-coordination-peer.js"
     },
-    "./workforce-coordination": {
+    "./work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",
       "default": "./dist/workforce/work-coordination.js"
     },
@@ -2211,11 +2211,11 @@
       "types": "./dist/co-session.d.ts",
       "default": "./dist/co-session.js"
     },
-    "./workforce-visibility": {
+    "./work-visibility": {
       "types": "./dist/workforce/work-visibility.d.ts",
       "default": "./dist/workforce/work-visibility.js"
     },
-    "./workforce-design": {
+    "./work-design": {
       "types": "./dist/workforce/work-design.d.ts",
       "default": "./dist/workforce/work-design.js"
     },
@@ -2931,7 +2931,7 @@
       "types": "./dist/subagent-prompt-framing.d.ts",
       "default": "./dist/subagent-prompt-framing.js"
     },
-    "./workforceing-principles": {
+    "./working-principles": {
       "types": "./dist/working-principles.d.ts",
       "default": "./dist/working-principles.js"
     },
@@ -2959,7 +2959,7 @@
       "types": "./dist/pipeline/adf-lifecycle.d.ts",
       "default": "./dist/pipeline/adf-lifecycle.js"
     },
-    "./workforceer-event-stream": {
+    "./worker-event-stream": {
       "types": "./dist/workforce/worker-event-stream.d.ts",
       "default": "./dist/workforce/worker-event-stream.js"
     },
@@ -3071,15 +3071,15 @@
       "types": "./dist/scope-offboarding.d.ts",
       "default": "./dist/scope-offboarding.js"
     },
-    "./workforce-coordination-import-catalog": {
+    "./work-coordination-import-catalog": {
       "types": "./dist/workforce/work-coordination-import-catalog.d.ts",
       "default": "./dist/workforce/work-coordination-import-catalog.js"
     },
-    "./workforce-integrations/github-issues": {
+    "./work-integrations/github-issues": {
       "types": "./dist/integrations/github-issues.d.ts",
       "default": "./dist/integrations/github-issues.js"
     },
-    "./workforce-integrations/jira-issues": {
+    "./work-integrations/jira-issues": {
       "types": "./dist/integrations/jira-issues.d.ts",
       "default": "./dist/integrations/jira-issues.js"
     },
@@ -3091,7 +3091,7 @@
       "types": "./dist/aidlc-phase-state.d.ts",
       "default": "./dist/aidlc-phase-state.js"
     },
-    "./workforce-graph-projection": {
+    "./work-graph-projection": {
       "types": "./dist/workforce/work-graph-projection.d.ts",
       "default": "./dist/workforce/work-graph-projection.js"
     },
@@ -3215,31 +3215,31 @@
       "types": "./dist/hearing-scenario-catalog.d.ts",
       "default": "./dist/hearing-scenario-catalog.js"
     },
-    "./workforce-inventory": {
+    "./work-inventory": {
       "types": "./dist/workforce/work-inventory.d.ts",
       "default": "./dist/workforce/work-inventory.js"
     },
-    "./workforce-inventory-scoring": {
+    "./work-inventory-scoring": {
       "types": "./dist/workforce/work-inventory-scoring.d.ts",
       "default": "./dist/workforce/work-inventory-scoring.js"
     },
-    "./workforce-inventory-consent": {
+    "./work-inventory-consent": {
       "types": "./dist/workforce/work-inventory-consent.d.ts",
       "default": "./dist/workforce/work-inventory-consent.js"
     },
-    "./workforce-inventory-observation": {
+    "./work-inventory-observation": {
       "types": "./dist/workforce/work-inventory-observation.d.ts",
       "default": "./dist/workforce/work-inventory-observation.js"
     },
-    "./workforce-inventory-decompose": {
+    "./work-inventory-decompose": {
       "types": "./dist/workforce/work-inventory-decompose.d.ts",
       "default": "./dist/workforce/work-inventory-decompose.js"
     },
-    "./workforce-inventory-harvest": {
+    "./work-inventory-harvest": {
       "types": "./dist/workforce/work-inventory-harvest.d.ts",
       "default": "./dist/workforce/work-inventory-harvest.js"
     },
-    "./workforce-inventory-promotion": {
+    "./work-inventory-promotion": {
       "types": "./dist/workforce/work-inventory-promotion.d.ts",
       "default": "./dist/workforce/work-inventory-promotion.js"
     },
@@ -3371,21 +3371,57 @@
       "types": "./dist/plugin/plugin-host.d.ts",
       "default": "./dist/plugin/plugin-host.js"
     },
-    "./workforcespace-ledger": {
+    "./workspace-ledger": {
       "types": "./dist/workforce/workspace-ledger.d.ts",
       "default": "./dist/workforce/workspace-ledger.js"
     },
-    "./workforcespace-budget": {
+    "./workspace-budget": {
       "types": "./dist/workforce/workspace-budget.d.ts",
       "default": "./dist/workforce/workspace-budget.js"
     },
-    "./workforcespace-sweep": {
+    "./workspace-sweep": {
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
     },
     "./vault-mount": {
       "types": "./dist/secret/vault-mount.d.ts",
       "default": "./dist/secret/vault-mount.js"
+    },
+    "./mesh/a2a-bridge": {
+      "types": "./dist/mesh/a2a-bridge.d.ts",
+      "default": "./dist/mesh/a2a-bridge.js"
+    },
+    "./mesh/a2a-conversation-store": {
+      "types": "./dist/mesh/a2a-conversation-store.d.ts",
+      "default": "./dist/mesh/a2a-conversation-store.js"
+    },
+    "./mesh/a2a-envelope-signature": {
+      "types": "./dist/mesh/a2a-envelope-signature.d.ts",
+      "default": "./dist/mesh/a2a-envelope-signature.js"
+    },
+    "./mesh/a2a-envelope": {
+      "types": "./dist/mesh/a2a-envelope.d.ts",
+      "default": "./dist/mesh/a2a-envelope.js"
+    },
+    "./mesh/a2a-route-port": {
+      "types": "./dist/mesh/a2a-route-port.d.ts",
+      "default": "./dist/mesh/a2a-route-port.js"
+    },
+    "./mesh/a2a-task-contract": {
+      "types": "./dist/mesh/a2a-task-contract.d.ts",
+      "default": "./dist/mesh/a2a-task-contract.js"
+    },
+    "./surface/a2ui-catalog": {
+      "types": "./dist/surface/a2ui-catalog.d.ts",
+      "default": "./dist/surface/a2ui-catalog.js"
+    },
+    "./mesh/acp-mediator-entry": {
+      "types": "./dist/mesh/acp-mediator-entry.d.ts",
+      "default": "./dist/mesh/acp-mediator-entry.js"
+    },
+    "./mesh/acp-mediator": {
+      "types": "./dist/mesh/acp-mediator.d.ts",
+      "default": "./dist/mesh/acp-mediator.js"
     },
     "./actuator/actuator-dependency-bundles": {
       "types": "./dist/actuator/actuator-dependency-bundles.d.ts",
@@ -3415,9 +3451,29 @@
       "types": "./dist/actuator/actuator-trace.d.ts",
       "default": "./dist/actuator/actuator-trace.js"
     },
-    "./actuator/deployment-adapter": {
-      "types": "./dist/actuator/deployment-adapter.d.ts",
-      "default": "./dist/actuator/deployment-adapter.js"
+    "./actuator/adapter-default-preferences": {
+      "types": "./dist/actuator/adapter-default-preferences.d.ts",
+      "default": "./dist/actuator/adapter-default-preferences.js"
+    },
+    "./actuator/adapter-default-selection": {
+      "types": "./dist/actuator/adapter-default-selection.d.ts",
+      "default": "./dist/actuator/adapter-default-selection.js"
+    },
+    "./pipeline/adf-engine": {
+      "types": "./dist/pipeline/adf-engine.d.ts",
+      "default": "./dist/pipeline/adf-engine.js"
+    },
+    "./pipeline/adf-guardrails": {
+      "types": "./dist/pipeline/adf-guardrails.d.ts",
+      "default": "./dist/pipeline/adf-guardrails.js"
+    },
+    "./pipeline/adf-lifecycle": {
+      "types": "./dist/pipeline/adf-lifecycle.d.ts",
+      "default": "./dist/pipeline/adf-lifecycle.js"
+    },
+    "./pipeline/adf-repair-agent": {
+      "types": "./dist/pipeline/adf-repair-agent.d.ts",
+      "default": "./dist/pipeline/adf-repair-agent.js"
     },
     "./agent/agent-activity-board": {
       "types": "./dist/agent/agent-activity-board.d.ts",
@@ -3426,6 +3482,10 @@
     "./agent/agent-adapter": {
       "types": "./dist/agent/agent-adapter.d.ts",
       "default": "./dist/agent/agent-adapter.js"
+    },
+    "./agent/agent-codex-app-server-adapter": {
+      "types": "./dist/agent/agent-codex-app-server-adapter.d.ts",
+      "default": "./dist/agent/agent-codex-app-server-adapter.js"
     },
     "./agent/agent-collaboration-events": {
       "types": "./dist/agent/agent-collaboration-events.d.ts",
@@ -3439,9 +3499,17 @@
       "types": "./dist/agent/agent-collaboration-tree.d.ts",
       "default": "./dist/agent/agent-collaboration-tree.js"
     },
+    "./agent/agent-dispatch": {
+      "types": "./dist/agent/agent-dispatch.d.ts",
+      "default": "./dist/agent/agent-dispatch.js"
+    },
     "./agent/agent-exec-adapter-bridge": {
       "types": "./dist/agent/agent-exec-adapter-bridge.d.ts",
       "default": "./dist/agent/agent-exec-adapter-bridge.js"
+    },
+    "./agent/agent-exec-adapter-providers": {
+      "types": "./dist/agent/agent-exec-adapter-providers.d.ts",
+      "default": "./dist/agent/agent-exec-adapter-providers.js"
     },
     "./agent/agent-execution-port": {
       "types": "./dist/agent/agent-execution-port.d.ts",
@@ -3451,6 +3519,14 @@
       "types": "./dist/agent/agent-identity.d.ts",
       "default": "./dist/agent/agent-identity.js"
     },
+    "./agent/agent-input-queue": {
+      "types": "./dist/agent/agent-input-queue.d.ts",
+      "default": "./dist/agent/agent-input-queue.js"
+    },
+    "./agent/agent-instruction-loader": {
+      "types": "./dist/agent/agent-instruction-loader.d.ts",
+      "default": "./dist/agent/agent-instruction-loader.js"
+    },
     "./agent/agent-lifecycle": {
       "types": "./dist/agent/agent-lifecycle.d.ts",
       "default": "./dist/agent/agent-lifecycle.js"
@@ -3458,6 +3534,10 @@
     "./agent/agent-manifest": {
       "types": "./dist/agent/agent-manifest.d.ts",
       "default": "./dist/agent/agent-manifest.js"
+    },
+    "./agent/agent-mediator": {
+      "types": "./dist/agent/agent-mediator.d.ts",
+      "default": "./dist/agent/agent-mediator.js"
     },
     "./agent/agent-pane-runtime-bridge": {
       "types": "./dist/agent/agent-pane-runtime-bridge.d.ts",
@@ -3471,9 +3551,17 @@
       "types": "./dist/agent/agent-performance-index.d.ts",
       "default": "./dist/agent/agent-performance-index.js"
     },
+    "./agent/agent-prompt-approval-port": {
+      "types": "./dist/agent/agent-prompt-approval-port.d.ts",
+      "default": "./dist/agent/agent-prompt-approval-port.js"
+    },
     "./agent/agent-prompt-approval": {
       "types": "./dist/agent/agent-prompt-approval.d.ts",
       "default": "./dist/agent/agent-prompt-approval.js"
+    },
+    "./agent/agent-prompt-response": {
+      "types": "./dist/agent/agent-prompt-response.d.ts",
+      "default": "./dist/agent/agent-prompt-response.js"
     },
     "./agent/agent-provider-resolution": {
       "types": "./dist/agent/agent-provider-resolution.d.ts",
@@ -3483,37 +3571,245 @@
       "types": "./dist/agent/agent-registry.d.ts",
       "default": "./dist/agent/agent-registry.js"
     },
+    "./agent/agent-runtime-contracts": {
+      "types": "./dist/agent/agent-runtime-contracts.d.ts",
+      "default": "./dist/agent/agent-runtime-contracts.js"
+    },
     "./agent/agent-runtime-events": {
       "types": "./dist/agent/agent-runtime-events.d.ts",
       "default": "./dist/agent/agent-runtime-events.js"
+    },
+    "./agent/agent-runtime-manual-drive-bridge": {
+      "types": "./dist/agent/agent-runtime-manual-drive-bridge.d.ts",
+      "default": "./dist/agent/agent-runtime-manual-drive-bridge.js"
     },
     "./agent/agent-runtime-manual-drive": {
       "types": "./dist/agent/agent-runtime-manual-drive.d.ts",
       "default": "./dist/agent/agent-runtime-manual-drive.js"
     },
-    "./agent/agent-runtime-supervisor": {
-      "types": "./dist/agent/agent-runtime-supervisor.d.ts",
-      "default": "./dist/agent/agent-runtime-supervisor.js"
+    "./agent/agent-runtime-port": {
+      "types": "./dist/agent/agent-runtime-port.d.ts",
+      "default": "./dist/agent/agent-runtime-port.js"
+    },
+    "./agent/agent-runtime-readiness": {
+      "types": "./dist/agent/agent-runtime-readiness.d.ts",
+      "default": "./dist/agent/agent-runtime-readiness.js"
+    },
+    "./agent/agent-runtime-root": {
+      "types": "./dist/agent/agent-runtime-root.d.ts",
+      "default": "./dist/agent/agent-runtime-root.js"
     },
     "./agent/agent-runtime-supervisor-client": {
       "types": "./dist/agent/agent-runtime-supervisor-client.d.ts",
       "default": "./dist/agent/agent-runtime-supervisor-client.js"
     },
-    "./agent/agentic-source-review": {
-      "types": "./dist/agent/agentic-source-review.d.ts",
-      "default": "./dist/agent/agentic-source-review.js"
+    "./agent/agent-runtime-supervisor": {
+      "types": "./dist/agent/agent-runtime-supervisor.d.ts",
+      "default": "./dist/agent/agent-runtime-supervisor.js"
+    },
+    "./agent/agent-slo": {
+      "types": "./dist/agent/agent-slo.d.ts",
+      "default": "./dist/agent/agent-slo.js"
     },
     "./agent/agentic-source-review-verification": {
       "types": "./dist/agent/agentic-source-review-verification.d.ts",
       "default": "./dist/agent/agentic-source-review-verification.js"
     },
+    "./agent/agentic-source-review": {
+      "types": "./dist/agent/agentic-source-review.d.ts",
+      "default": "./dist/agent/agentic-source-review.js"
+    },
+    "./provider/agy-cli-backend": {
+      "types": "./dist/provider/agy-cli-backend.d.ts",
+      "default": "./dist/provider/agy-cli-backend.js"
+    },
+    "./provider/agy-cli-intent-extractor": {
+      "types": "./dist/provider/agy-cli-intent-extractor.d.ts",
+      "default": "./dist/provider/agy-cli-intent-extractor.js"
+    },
+    "./provider/agy-cli-voice-bridge": {
+      "types": "./dist/provider/agy-cli-voice-bridge.d.ts",
+      "default": "./dist/provider/agy-cli-voice-bridge.js"
+    },
+    "./provider/agy-sdk-adapter": {
+      "types": "./dist/provider/agy-sdk-adapter.d.ts",
+      "default": "./dist/provider/agy-sdk-adapter.js"
+    },
     "./analysis/analysis-config": {
       "types": "./dist/analysis/analysis-config.d.ts",
       "default": "./dist/analysis/analysis-config.js"
     },
-    "./analysis/trace-schema": {
-      "types": "./dist/analysis/trace-schema.d.ts",
-      "default": "./dist/analysis/trace-schema.js"
+    "./analysis/analysis-contract": {
+      "types": "./dist/analysis/analysis-contract.d.ts",
+      "default": "./dist/analysis/analysis-contract.js"
+    },
+    "./analysis/analysis-corpus": {
+      "types": "./dist/analysis/analysis-corpus.d.ts",
+      "default": "./dist/analysis/analysis-corpus.js"
+    },
+    "./analysis/analysis-execution-contract": {
+      "types": "./dist/analysis/analysis-execution-contract.d.ts",
+      "default": "./dist/analysis/analysis-execution-contract.js"
+    },
+    "./analysis/analysis-findings": {
+      "types": "./dist/analysis/analysis-findings.d.ts",
+      "default": "./dist/analysis/analysis-findings.js"
+    },
+    "./analysis/analysis-impact-bands": {
+      "types": "./dist/analysis/analysis-impact-bands.d.ts",
+      "default": "./dist/analysis/analysis-impact-bands.js"
+    },
+    "./analysis/analysis-intent-support": {
+      "types": "./dist/analysis/analysis-intent-support.d.ts",
+      "default": "./dist/analysis/analysis-intent-support.js"
+    },
+    "./provider/anthropic-api-probe": {
+      "types": "./dist/provider/anthropic-api-probe.d.ts",
+      "default": "./dist/provider/anthropic-api-probe.js"
+    },
+    "./provider/anthropic-intent-extractor": {
+      "types": "./dist/provider/anthropic-intent-extractor.d.ts",
+      "default": "./dist/provider/anthropic-intent-extractor.js"
+    },
+    "./provider/anthropic-reasoning-backend": {
+      "types": "./dist/provider/anthropic-reasoning-backend.d.ts",
+      "default": "./dist/provider/anthropic-reasoning-backend.js"
+    },
+    "./provider/anthropic-voice-bridge": {
+      "types": "./dist/provider/anthropic-voice-bridge.d.ts",
+      "default": "./dist/provider/anthropic-voice-bridge.js"
+    },
+    "./governance/approval-audit": {
+      "types": "./dist/governance/approval-audit.d.ts",
+      "default": "./dist/governance/approval-audit.js"
+    },
+    "./governance/approval-cowork-adapter": {
+      "types": "./dist/governance/approval-cowork-adapter.d.ts",
+      "default": "./dist/governance/approval-cowork-adapter.js"
+    },
+    "./governance/approval-gate-summary": {
+      "types": "./dist/governance/approval-gate-summary.d.ts",
+      "default": "./dist/governance/approval-gate-summary.js"
+    },
+    "./governance/approval-gate": {
+      "types": "./dist/governance/approval-gate.d.ts",
+      "default": "./dist/governance/approval-gate.js"
+    },
+    "./governance/approval-policy": {
+      "types": "./dist/governance/approval-policy.d.ts",
+      "default": "./dist/governance/approval-policy.js"
+    },
+    "./governance/approval-store-hygiene": {
+      "types": "./dist/governance/approval-store-hygiene.d.ts",
+      "default": "./dist/governance/approval-store-hygiene.js"
+    },
+    "./governance/approval-store": {
+      "types": "./dist/governance/approval-store.d.ts",
+      "default": "./dist/governance/approval-store.js"
+    },
+    "./workforce/artifact-bundle": {
+      "types": "./dist/workforce/artifact-bundle.d.ts",
+      "default": "./dist/workforce/artifact-bundle.js"
+    },
+    "./workforce/artifact-record": {
+      "types": "./dist/workforce/artifact-record.d.ts",
+      "default": "./dist/workforce/artifact-record.js"
+    },
+    "./workforce/artifact-registry": {
+      "types": "./dist/workforce/artifact-registry.d.ts",
+      "default": "./dist/workforce/artifact-registry.js"
+    },
+    "./workforce/artifact-review": {
+      "types": "./dist/workforce/artifact-review.d.ts",
+      "default": "./dist/workforce/artifact-review.js"
+    },
+    "./workforce/artifact-store": {
+      "types": "./dist/workforce/artifact-store.d.ts",
+      "default": "./dist/workforce/artifact-store.js"
+    },
+    "./workforce/artifact-verification": {
+      "types": "./dist/workforce/artifact-verification.d.ts",
+      "default": "./dist/workforce/artifact-verification.js"
+    },
+    "./voice/audio-bus-bridge": {
+      "types": "./dist/voice/audio-bus-bridge.d.ts",
+      "default": "./dist/voice/audio-bus-bridge.js"
+    },
+    "./voice/audio-bus-providers": {
+      "types": "./dist/voice/audio-bus-providers.d.ts",
+      "default": "./dist/voice/audio-bus-providers.js"
+    },
+    "./voice/audio-bus-resolver": {
+      "types": "./dist/voice/audio-bus-resolver.d.ts",
+      "default": "./dist/voice/audio-bus-resolver.js"
+    },
+    "./voice/audio-bus": {
+      "types": "./dist/voice/audio-bus.d.ts",
+      "default": "./dist/voice/audio-bus.js"
+    },
+    "./voice/audio-device-lease": {
+      "types": "./dist/voice/audio-device-lease.d.ts",
+      "default": "./dist/voice/audio-device-lease.js"
+    },
+    "./voice/audio-playback": {
+      "types": "./dist/voice/audio-playback.d.ts",
+      "default": "./dist/voice/audio-playback.js"
+    },
+    "./voice/audio-route": {
+      "types": "./dist/voice/audio-route.d.ts",
+      "default": "./dist/voice/audio-route.js"
+    },
+    "./voice/audio-tee": {
+      "types": "./dist/voice/audio-tee.d.ts",
+      "default": "./dist/voice/audio-tee.js"
+    },
+    "./voice/audio-text-similarity": {
+      "types": "./dist/voice/audio-text-similarity.d.ts",
+      "default": "./dist/voice/audio-text-similarity.js"
+    },
+    "./governance/audit-chain": {
+      "types": "./dist/governance/audit-chain.d.ts",
+      "default": "./dist/governance/audit-chain.js"
+    },
+    "./governance/audit-forwarder": {
+      "types": "./dist/governance/audit-forwarder.d.ts",
+      "default": "./dist/governance/audit-forwarder.js"
+    },
+    "./organization/authority-role-registry": {
+      "types": "./dist/organization/authority-role-registry.d.ts",
+      "default": "./dist/organization/authority-role-registry.js"
+    },
+    "./governance/autonomous-ops-gate": {
+      "types": "./dist/governance/autonomous-ops-gate.d.ts",
+      "default": "./dist/governance/autonomous-ops-gate.js"
+    },
+    "./workforce/background-review-curator": {
+      "types": "./dist/workforce/background-review-curator.d.ts",
+      "default": "./dist/workforce/background-review-curator.js"
+    },
+    "./workforce/background-review-nudge": {
+      "types": "./dist/workforce/background-review-nudge.d.ts",
+      "default": "./dist/workforce/background-review-nudge.js"
+    },
+    "./workforce/background-review-patch": {
+      "types": "./dist/workforce/background-review-patch.d.ts",
+      "default": "./dist/workforce/background-review-patch.js"
+    },
+    "./workforce/background-review-policy": {
+      "types": "./dist/workforce/background-review-policy.d.ts",
+      "default": "./dist/workforce/background-review-policy.js"
+    },
+    "./workforce/background-review-runner": {
+      "types": "./dist/workforce/background-review-runner.d.ts",
+      "default": "./dist/workforce/background-review-runner.js"
+    },
+    "./integrations/bluebubbles-adapter": {
+      "types": "./dist/integrations/bluebubbles-adapter.d.ts",
+      "default": "./dist/integrations/bluebubbles-adapter.js"
+    },
+    "./meeting/booking-preference-profile": {
+      "types": "./dist/meeting/booking-preference-profile.d.ts",
+      "default": "./dist/meeting/booking-preference-profile.js"
     },
     "./browser/browser-automation-runtime-bridge": {
       "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
@@ -3523,9 +3819,21 @@
       "types": "./dist/browser/browser-conversation-session.d.ts",
       "default": "./dist/browser/browser-conversation-session.js"
     },
+    "./browser/browser-distill-candidate": {
+      "types": "./dist/browser/browser-distill-candidate.d.ts",
+      "default": "./dist/browser/browser-distill-candidate.js"
+    },
     "./browser/browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
+    },
+    "./browser/browser-judgment": {
+      "types": "./dist/browser/browser-judgment.d.ts",
+      "default": "./dist/browser/browser-judgment.js"
+    },
+    "./browser/browser-onboarding-state": {
+      "types": "./dist/browser/browser-onboarding-state.d.ts",
+      "default": "./dist/browser/browser-onboarding-state.js"
     },
     "./browser/browser-onboarding": {
       "types": "./dist/browser/browser-onboarding.d.ts",
@@ -3539,145 +3847,197 @@
       "types": "./dist/browser/browser-recording-compiler.d.ts",
       "default": "./dist/browser/browser-recording-compiler.js"
     },
+    "./meeting/calendar-provider-bridge": {
+      "types": "./dist/meeting/calendar-provider-bridge.d.ts",
+      "default": "./dist/meeting/calendar-provider-bridge.js"
+    },
+    "./meeting/calendar-slot-planner": {
+      "types": "./dist/meeting/calendar-slot-planner.d.ts",
+      "default": "./dist/meeting/calendar-slot-planner.js"
+    },
+    "./meeting/calendar-workflow": {
+      "types": "./dist/meeting/calendar-workflow.d.ts",
+      "default": "./dist/meeting/calendar-workflow.js"
+    },
+    "./surface/channel-adapter": {
+      "types": "./dist/surface/channel-adapter.d.ts",
+      "default": "./dist/surface/channel-adapter.js"
+    },
+    "./surface/channel-directory": {
+      "types": "./dist/surface/channel-directory.d.ts",
+      "default": "./dist/surface/channel-directory.js"
+    },
+    "./surface/channel-registry": {
+      "types": "./dist/surface/channel-registry.d.ts",
+      "default": "./dist/surface/channel-registry.js"
+    },
+    "./surface/channel-surface-types": {
+      "types": "./dist/surface/channel-surface-types.d.ts",
+      "default": "./dist/surface/channel-surface-types.js"
+    },
+    "./surface/channel-surface": {
+      "types": "./dist/surface/channel-surface.d.ts",
+      "default": "./dist/surface/channel-surface.js"
+    },
     "./browser/chrome-extension-meeting-driver": {
       "types": "./dist/browser/chrome-extension-meeting-driver.d.ts",
       "default": "./dist/browser/chrome-extension-meeting-driver.js"
     },
-    "./contracts/docx-protocol": {
-      "types": "./dist/contracts/docx-protocol.d.ts",
-      "default": "./dist/contracts/docx-protocol.js"
+    "./provider/claude-agent-governance": {
+      "types": "./dist/provider/claude-agent-governance.d.ts",
+      "default": "./dist/provider/claude-agent-governance.js"
     },
-    "./contracts/generation-job": {
-      "types": "./dist/contracts/generation-job.d.ts",
-      "default": "./dist/contracts/generation-job.js"
+    "./provider/claude-agent-intent-extractor": {
+      "types": "./dist/provider/claude-agent-intent-extractor.d.ts",
+      "default": "./dist/provider/claude-agent-intent-extractor.js"
     },
-    "./contracts/pdf-protocol": {
-      "types": "./dist/contracts/pdf-protocol.d.ts",
-      "default": "./dist/contracts/pdf-protocol.js"
+    "./provider/claude-agent-query": {
+      "types": "./dist/provider/claude-agent-query.d.ts",
+      "default": "./dist/provider/claude-agent-query.js"
     },
-    "./contracts/pptx-protocol": {
-      "types": "./dist/contracts/pptx-protocol.d.ts",
-      "default": "./dist/contracts/pptx-protocol.js"
+    "./provider/claude-agent-reasoning-backend": {
+      "types": "./dist/provider/claude-agent-reasoning-backend.d.ts",
+      "default": "./dist/provider/claude-agent-reasoning-backend.js"
     },
-    "./contracts/xlsx-protocol": {
-      "types": "./dist/contracts/xlsx-protocol.d.ts",
-      "default": "./dist/contracts/xlsx-protocol.js"
+    "./provider/claude-agent-voice-bridge": {
+      "types": "./dist/provider/claude-agent-voice-bridge.d.ts",
+      "default": "./dist/provider/claude-agent-voice-bridge.js"
     },
-    "./governance/approval-audit": {
-      "types": "./dist/governance/approval-audit.d.ts",
-      "default": "./dist/governance/approval-audit.js"
+    "./provider/claude-cli-auth-status": {
+      "types": "./dist/provider/claude-cli-auth-status.d.ts",
+      "default": "./dist/provider/claude-cli-auth-status.js"
     },
-    "./governance/approval-cowork-adapter": {
-      "types": "./dist/governance/approval-cowork-adapter.d.ts",
-      "default": "./dist/governance/approval-cowork-adapter.js"
+    "./provider/claude-cli-backend": {
+      "types": "./dist/provider/claude-cli-backend.d.ts",
+      "default": "./dist/provider/claude-cli-backend.js"
     },
-    "./governance/approval-gate": {
-      "types": "./dist/governance/approval-gate.d.ts",
-      "default": "./dist/governance/approval-gate.js"
+    "./provider/claude-cli-intent-extractor": {
+      "types": "./dist/provider/claude-cli-intent-extractor.d.ts",
+      "default": "./dist/provider/claude-cli-intent-extractor.js"
     },
-    "./governance/approval-store": {
-      "types": "./dist/governance/approval-store.d.ts",
-      "default": "./dist/governance/approval-store.js"
+    "./provider/claude-cli-resolution": {
+      "types": "./dist/provider/claude-cli-resolution.d.ts",
+      "default": "./dist/provider/claude-cli-resolution.js"
     },
-    "./governance/approval-store-hygiene": {
-      "types": "./dist/governance/approval-store-hygiene.d.ts",
-      "default": "./dist/governance/approval-store-hygiene.js"
+    "./provider/claude-cli-session-adapter": {
+      "types": "./dist/provider/claude-cli-session-adapter.d.ts",
+      "default": "./dist/provider/claude-cli-session-adapter.js"
     },
-    "./governance/audit-chain": {
-      "types": "./dist/governance/audit-chain.d.ts",
-      "default": "./dist/governance/audit-chain.js"
+    "./provider/claude-cli-voice-bridge": {
+      "types": "./dist/provider/claude-cli-voice-bridge.d.ts",
+      "default": "./dist/provider/claude-cli-voice-bridge.js"
     },
-    "./governance/autonomous-ops-gate": {
-      "types": "./dist/governance/autonomous-ops-gate.d.ts",
-      "default": "./dist/governance/autonomous-ops-gate.js"
+    "./provider/claude-code-hook": {
+      "types": "./dist/provider/claude-code-hook.d.ts",
+      "default": "./dist/provider/claude-code-hook.js"
     },
-    "./governance/governance-action-recorder": {
-      "types": "./dist/governance/governance-action-recorder.d.ts",
-      "default": "./dist/governance/governance-action-recorder.js"
+    "./provider/claude-native-subagent": {
+      "types": "./dist/provider/claude-native-subagent.d.ts",
+      "default": "./dist/provider/claude-native-subagent.js"
     },
-    "./governance/governance-status": {
-      "types": "./dist/governance/governance-status.d.ts",
-      "default": "./dist/governance/governance-status.js"
+    "./provider/claude-task-runner": {
+      "types": "./dist/provider/claude-task-runner.d.ts",
+      "default": "./dist/provider/claude-task-runner.js"
     },
-    "./governance/kill-switch": {
-      "types": "./dist/governance/kill-switch.d.ts",
-      "default": "./dist/governance/kill-switch.js"
+    "./provider/claude-task-session-executor": {
+      "types": "./dist/provider/claude-task-session-executor.d.ts",
+      "default": "./dist/provider/claude-task-session-executor.js"
     },
-    "./integrations/bluebubbles-adapter": {
-      "types": "./dist/integrations/bluebubbles-adapter.d.ts",
-      "default": "./dist/integrations/bluebubbles-adapter.js"
+    "./provider/codex-cli-intent-extractor": {
+      "types": "./dist/provider/codex-cli-intent-extractor.d.ts",
+      "default": "./dist/provider/codex-cli-intent-extractor.js"
     },
-    "./integrations/email-bridge": {
-      "types": "./dist/integrations/email-bridge.d.ts",
-      "default": "./dist/integrations/email-bridge.js"
+    "./provider/codex-cli-query": {
+      "types": "./dist/provider/codex-cli-query.d.ts",
+      "default": "./dist/provider/codex-cli-query.js"
     },
-    "./integrations/email-workflow": {
-      "types": "./dist/integrations/email-workflow.d.ts",
-      "default": "./dist/integrations/email-workflow.js"
+    "./provider/codex-cli-reasoning-backend": {
+      "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",
+      "default": "./dist/provider/codex-cli-reasoning-backend.js"
     },
-    "./integrations/github-issues": {
-      "types": "./dist/integrations/github-issues.d.ts",
-      "default": "./dist/integrations/github-issues.js"
+    "./provider/codex-cli-voice-bridge": {
+      "types": "./dist/provider/codex-cli-voice-bridge.d.ts",
+      "default": "./dist/provider/codex-cli-voice-bridge.js"
     },
-    "./integrations/jira-issues": {
-      "types": "./dist/integrations/jira-issues.d.ts",
-      "default": "./dist/integrations/jira-issues.js"
+    "./provider/codex-profile": {
+      "types": "./dist/provider/codex-profile.d.ts",
+      "default": "./dist/provider/codex-profile.js"
     },
-    "./integrations/slack-approval-ui": {
-      "types": "./dist/integrations/slack-approval-ui.d.ts",
-      "default": "./dist/integrations/slack-approval-ui.js"
+    "./virtual/computer-surface": {
+      "types": "./dist/virtual/computer-surface.d.ts",
+      "default": "./dist/virtual/computer-surface.js"
     },
-    "./integrations/slack-mission-proposal-ui": {
-      "types": "./dist/integrations/slack-mission-proposal-ui.d.ts",
-      "default": "./dist/integrations/slack-mission-proposal-ui.js"
+    "./provider/copilot-acp-reasoning-backend": {
+      "types": "./dist/provider/copilot-acp-reasoning-backend.d.ts",
+      "default": "./dist/provider/copilot-acp-reasoning-backend.js"
     },
-    "./integrations/slack-onboarding": {
-      "types": "./dist/integrations/slack-onboarding.d.ts",
-      "default": "./dist/integrations/slack-onboarding.js"
+    "./provider/cursor-cli-reasoning-backend": {
+      "types": "./dist/provider/cursor-cli-reasoning-backend.d.ts",
+      "default": "./dist/provider/cursor-cli-reasoning-backend.js"
     },
-    "./intent/intent-clarification-format": {
-      "types": "./dist/intent/intent-clarification-format.d.ts",
-      "default": "./dist/intent/intent-clarification-format.js"
+    "./provider/cursor-cli-session-adapter": {
+      "types": "./dist/provider/cursor-cli-session-adapter.d.ts",
+      "default": "./dist/provider/cursor-cli-session-adapter.js"
     },
-    "./intent/intent-contract": {
-      "types": "./dist/intent/intent-contract.d.ts",
-      "default": "./dist/intent/intent-contract.js"
+    "./mission/delegation-chain": {
+      "types": "./dist/mission/delegation-chain.d.ts",
+      "default": "./dist/mission/delegation-chain.js"
     },
-    "./intent/intent-contract-learning": {
-      "types": "./dist/intent/intent-contract-learning.d.ts",
-      "default": "./dist/intent/intent-contract-learning.js"
+    "./mission/delegation-child-registry": {
+      "types": "./dist/mission/delegation-child-registry.d.ts",
+      "default": "./dist/mission/delegation-child-registry.js"
     },
-    "./intent/intent-delta": {
-      "types": "./dist/intent/intent-delta.d.ts",
-      "default": "./dist/intent/intent-delta.js"
+    "./mission/delegation-concurrency": {
+      "types": "./dist/mission/delegation-concurrency.d.ts",
+      "default": "./dist/mission/delegation-concurrency.js"
     },
-    "./intent/intent-handoff": {
-      "types": "./dist/intent/intent-handoff.d.ts",
-      "default": "./dist/intent/intent-handoff.js"
+    "./mission/delegation-notifications": {
+      "types": "./dist/mission/delegation-notifications.d.ts",
+      "default": "./dist/mission/delegation-notifications.js"
     },
-    "./intent/intent-outcome-patterns": {
-      "types": "./dist/intent/intent-outcome-patterns.d.ts",
-      "default": "./dist/intent/intent-outcome-patterns.js"
+    "./mission/delegation-preflight": {
+      "types": "./dist/mission/delegation-preflight.d.ts",
+      "default": "./dist/mission/delegation-preflight.js"
     },
-    "./intent/intent-resolution": {
-      "types": "./dist/intent/intent-resolution.d.ts",
-      "default": "./dist/intent/intent-resolution.js"
+    "./mission/delegation-request": {
+      "types": "./dist/mission/delegation-request.d.ts",
+      "default": "./dist/mission/delegation-request.js"
     },
-    "./intent/intent-resolution-contract": {
-      "types": "./dist/intent/intent-resolution-contract.d.ts",
-      "default": "./dist/intent/intent-resolution-contract.js"
+    "./actuator/deployment-adapter": {
+      "types": "./dist/actuator/deployment-adapter.d.ts",
+      "default": "./dist/actuator/deployment-adapter.js"
     },
-    "./intent/intent-resolution-contract-parser": {
-      "types": "./dist/intent/intent-resolution-contract-parser.d.ts",
-      "default": "./dist/intent/intent-resolution-contract-parser.js"
+    "./virtual/desktop-event-feed": {
+      "types": "./dist/virtual/desktop-event-feed.d.ts",
+      "default": "./dist/virtual/desktop-event-feed.js"
     },
-    "./intent/intent-snapshot-store": {
-      "types": "./dist/intent/intent-snapshot-store.d.ts",
-      "default": "./dist/intent/intent-snapshot-store.js"
+    "./virtual/desktop-intent-reconstruction": {
+      "types": "./dist/virtual/desktop-intent-reconstruction.d.ts",
+      "default": "./dist/virtual/desktop-intent-reconstruction.js"
     },
-    "./intent/intent-track-resolver": {
-      "types": "./dist/intent/intent-track-resolver.d.ts",
-      "default": "./dist/intent/intent-track-resolver.js"
+    "./virtual/desktop-launch-adapter": {
+      "types": "./dist/virtual/desktop-launch-adapter.d.ts",
+      "default": "./dist/virtual/desktop-launch-adapter.js"
+    },
+    "./virtual/desktop-pipeline": {
+      "types": "./dist/virtual/desktop-pipeline.d.ts",
+      "default": "./dist/virtual/desktop-pipeline.js"
+    },
+    "./virtual/desktop-promotion-transaction": {
+      "types": "./dist/virtual/desktop-promotion-transaction.d.ts",
+      "default": "./dist/virtual/desktop-promotion-transaction.js"
+    },
+    "./virtual/desktop-recording-compiler": {
+      "types": "./dist/virtual/desktop-recording-compiler.d.ts",
+      "default": "./dist/virtual/desktop-recording-compiler.js"
+    },
+    "./virtual/desktop-recording": {
+      "types": "./dist/virtual/desktop-recording.d.ts",
+      "default": "./dist/virtual/desktop-recording.js"
+    },
+    "./provider/devin-cli-reasoning-backend": {
+      "types": "./dist/provider/devin-cli-reasoning-backend.d.ts",
+      "default": "./dist/provider/devin-cli-reasoning-backend.js"
     },
     "./knowledge/distill-candidate-registry": {
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
@@ -3686,66 +4046,6 @@
     "./knowledge/distill-knowledge-injector": {
       "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
       "default": "./dist/knowledge/distill-knowledge-injector.js"
-    },
-    "./knowledge/knowledge-scope": {
-      "types": "./dist/knowledge/knowledge-scope.d.ts",
-      "default": "./dist/knowledge/knowledge-scope.js"
-    },
-    "./knowledge/knowledge-scope-check-policy": {
-      "types": "./dist/knowledge/knowledge-scope-check-policy.d.ts",
-      "default": "./dist/knowledge/knowledge-scope-check-policy.js"
-    },
-    "./knowledge/knowledge-scope-health-history": {
-      "types": "./dist/knowledge/knowledge-scope-health-history.d.ts",
-      "default": "./dist/knowledge/knowledge-scope-health-history.js"
-    },
-    "./knowledge/knowledge-taxonomy": {
-      "types": "./dist/knowledge/knowledge-taxonomy.d.ts",
-      "default": "./dist/knowledge/knowledge-taxonomy.js"
-    },
-    "./knowledge/knowledge-weight-recalculation": {
-      "types": "./dist/knowledge/knowledge-weight-recalculation.d.ts",
-      "default": "./dist/knowledge/knowledge-weight-recalculation.js"
-    },
-    "./knowledge/memory-notebook": {
-      "types": "./dist/knowledge/memory-notebook.d.ts",
-      "default": "./dist/knowledge/memory-notebook.js"
-    },
-    "./knowledge/memory-promotion-queue": {
-      "types": "./dist/knowledge/memory-promotion-queue.d.ts",
-      "default": "./dist/knowledge/memory-promotion-queue.js"
-    },
-    "./knowledge/memory-promotion-review": {
-      "types": "./dist/knowledge/memory-promotion-review.d.ts",
-      "default": "./dist/knowledge/memory-promotion-review.js"
-    },
-    "./knowledge/memory-promotion-workflow": {
-      "types": "./dist/knowledge/memory-promotion-workflow.d.ts",
-      "default": "./dist/knowledge/memory-promotion-workflow.js"
-    },
-    "./knowledge/procedure-dispatcher": {
-      "types": "./dist/knowledge/procedure-dispatcher.d.ts",
-      "default": "./dist/knowledge/procedure-dispatcher.js"
-    },
-    "./knowledge/procedure-inputs": {
-      "types": "./dist/knowledge/procedure-inputs.d.ts",
-      "default": "./dist/knowledge/procedure-inputs.js"
-    },
-    "./knowledge/procedure-registry": {
-      "types": "./dist/knowledge/procedure-registry.d.ts",
-      "default": "./dist/knowledge/procedure-registry.js"
-    },
-    "./knowledge/procedure-self-repair": {
-      "types": "./dist/knowledge/procedure-self-repair.d.ts",
-      "default": "./dist/knowledge/procedure-self-repair.js"
-    },
-    "./knowledge/procedure-types": {
-      "types": "./dist/knowledge/procedure-types.d.ts",
-      "default": "./dist/knowledge/procedure-types.js"
-    },
-    "./knowledge/vocabulary-catalog": {
-      "types": "./dist/knowledge/vocabulary-catalog.d.ts",
-      "default": "./dist/knowledge/vocabulary-catalog.js"
     },
     "./media/document-contents-policy": {
       "types": "./dist/media/document-contents-policy.d.ts",
@@ -3763,9 +4063,81 @@
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
     },
+    "./integrations/email-account-catalog": {
+      "types": "./dist/integrations/email-account-catalog.d.ts",
+      "default": "./dist/integrations/email-account-catalog.js"
+    },
+    "./integrations/email-bridge": {
+      "types": "./dist/integrations/email-bridge.d.ts",
+      "default": "./dist/integrations/email-bridge.js"
+    },
+    "./integrations/email-types": {
+      "types": "./dist/integrations/email-types.d.ts",
+      "default": "./dist/integrations/email-types.js"
+    },
+    "./integrations/email-workflow": {
+      "types": "./dist/integrations/email-workflow.d.ts",
+      "default": "./dist/integrations/email-workflow.js"
+    },
+    "./provider/gemini-api-backend": {
+      "types": "./dist/provider/gemini-api-backend.d.ts",
+      "default": "./dist/provider/gemini-api-backend.js"
+    },
+    "./provider/gemini-cli-backend": {
+      "types": "./dist/provider/gemini-cli-backend.d.ts",
+      "default": "./dist/provider/gemini-cli-backend.js"
+    },
+    "./provider/gemini-cli-intent-extractor": {
+      "types": "./dist/provider/gemini-cli-intent-extractor.d.ts",
+      "default": "./dist/provider/gemini-cli-intent-extractor.js"
+    },
+    "./provider/gemini-cli-voice-bridge": {
+      "types": "./dist/provider/gemini-cli-voice-bridge.d.ts",
+      "default": "./dist/provider/gemini-cli-voice-bridge.js"
+    },
+    "./provider/gemini-embedding-backend": {
+      "types": "./dist/provider/gemini-embedding-backend.d.ts",
+      "default": "./dist/provider/gemini-embedding-backend.js"
+    },
+    "./governance/governance-action-recorder": {
+      "types": "./dist/governance/governance-action-recorder.d.ts",
+      "default": "./dist/governance/governance-action-recorder.js"
+    },
+    "./governance/governance-status": {
+      "types": "./dist/governance/governance-status.d.ts",
+      "default": "./dist/governance/governance-status.js"
+    },
+    "./provider/grok-api-backend": {
+      "types": "./dist/provider/grok-api-backend.d.ts",
+      "default": "./dist/provider/grok-api-backend.js"
+    },
+    "./provider/grok-cli-backend": {
+      "types": "./dist/provider/grok-cli-backend.d.ts",
+      "default": "./dist/provider/grok-cli-backend.js"
+    },
+    "./provider/grok-cli-intent-extractor": {
+      "types": "./dist/provider/grok-cli-intent-extractor.d.ts",
+      "default": "./dist/provider/grok-cli-intent-extractor.js"
+    },
+    "./provider/grok-cli-voice-bridge": {
+      "types": "./dist/provider/grok-cli-voice-bridge.d.ts",
+      "default": "./dist/provider/grok-cli-voice-bridge.js"
+    },
+    "./mesh/handoff-history": {
+      "types": "./dist/mesh/handoff-history.d.ts",
+      "default": "./dist/mesh/handoff-history.js"
+    },
+    "./mesh/handoff-packet": {
+      "types": "./dist/mesh/handoff-packet.d.ts",
+      "default": "./dist/mesh/handoff-packet.js"
+    },
     "./media/image-description-bridge": {
       "types": "./dist/media/image-description-bridge.d.ts",
       "default": "./dist/media/image-description-bridge.js"
+    },
+    "./media/image-description-types": {
+      "types": "./dist/media/image-description-types.d.ts",
+      "default": "./dist/media/image-description-types.js"
     },
     "./media/image-dhash": {
       "types": "./dist/media/image-dhash.d.ts",
@@ -3775,6 +4147,10 @@
       "types": "./dist/media/image-generation-bridge.d.ts",
       "default": "./dist/media/image-generation-bridge.js"
     },
+    "./media/image-generation-policy": {
+      "types": "./dist/media/image-generation-policy.d.ts",
+      "default": "./dist/media/image-generation-policy.js"
+    },
     "./media/image-generation-types": {
       "types": "./dist/media/image-generation-types.d.ts",
       "default": "./dist/media/image-generation-types.js"
@@ -3782,6 +4158,166 @@
     "./media/image-reference-consent": {
       "types": "./dist/media/image-reference-consent.d.ts",
       "default": "./dist/media/image-reference-consent.js"
+    },
+    "./intent/intent-clarification-format": {
+      "types": "./dist/intent/intent-clarification-format.d.ts",
+      "default": "./dist/intent/intent-clarification-format.js"
+    },
+    "./intent/intent-compilation-events": {
+      "types": "./dist/intent/intent-compilation-events.d.ts",
+      "default": "./dist/intent/intent-compilation-events.js"
+    },
+    "./intent/intent-contract-learning": {
+      "types": "./dist/intent/intent-contract-learning.d.ts",
+      "default": "./dist/intent/intent-contract-learning.js"
+    },
+    "./intent/intent-contract-types": {
+      "types": "./dist/intent/intent-contract-types.d.ts",
+      "default": "./dist/intent/intent-contract-types.js"
+    },
+    "./intent/intent-contract": {
+      "types": "./dist/intent/intent-contract.d.ts",
+      "default": "./dist/intent/intent-contract.js"
+    },
+    "./intent/intent-delivery-decision": {
+      "types": "./dist/intent/intent-delivery-decision.d.ts",
+      "default": "./dist/intent/intent-delivery-decision.js"
+    },
+    "./intent/intent-delta": {
+      "types": "./dist/intent/intent-delta.d.ts",
+      "default": "./dist/intent/intent-delta.js"
+    },
+    "./intent/intent-execution-profile-registry": {
+      "types": "./dist/intent/intent-execution-profile-registry.d.ts",
+      "default": "./dist/intent/intent-execution-profile-registry.js"
+    },
+    "./intent/intent-extractor": {
+      "types": "./dist/intent/intent-extractor.d.ts",
+      "default": "./dist/intent/intent-extractor.js"
+    },
+    "./intent/intent-flow-cache": {
+      "types": "./dist/intent/intent-flow-cache.d.ts",
+      "default": "./dist/intent/intent-flow-cache.js"
+    },
+    "./intent/intent-handoff": {
+      "types": "./dist/intent/intent-handoff.d.ts",
+      "default": "./dist/intent/intent-handoff.js"
+    },
+    "./intent/intent-input-context": {
+      "types": "./dist/intent/intent-input-context.d.ts",
+      "default": "./dist/intent/intent-input-context.js"
+    },
+    "./intent/intent-outcome-patterns": {
+      "types": "./dist/intent/intent-outcome-patterns.d.ts",
+      "default": "./dist/intent/intent-outcome-patterns.js"
+    },
+    "./intent/intent-path-utils": {
+      "types": "./dist/intent/intent-path-utils.d.ts",
+      "default": "./dist/intent/intent-path-utils.js"
+    },
+    "./intent/intent-reconciliation": {
+      "types": "./dist/intent/intent-reconciliation.d.ts",
+      "default": "./dist/intent/intent-reconciliation.js"
+    },
+    "./intent/intent-resolution-contract-parser": {
+      "types": "./dist/intent/intent-resolution-contract-parser.d.ts",
+      "default": "./dist/intent/intent-resolution-contract-parser.js"
+    },
+    "./intent/intent-resolution-contract": {
+      "types": "./dist/intent/intent-resolution-contract.d.ts",
+      "default": "./dist/intent/intent-resolution-contract.js"
+    },
+    "./intent/intent-resolution": {
+      "types": "./dist/intent/intent-resolution.d.ts",
+      "default": "./dist/intent/intent-resolution.js"
+    },
+    "./intent/intent-routing-decision": {
+      "types": "./dist/intent/intent-routing-decision.d.ts",
+      "default": "./dist/intent/intent-routing-decision.js"
+    },
+    "./intent/intent-snapshot-store": {
+      "types": "./dist/intent/intent-snapshot-store.d.ts",
+      "default": "./dist/intent/intent-snapshot-store.js"
+    },
+    "./intent/intent-track-resolver": {
+      "types": "./dist/intent/intent-track-resolver.d.ts",
+      "default": "./dist/intent/intent-track-resolver.js"
+    },
+    "./intent/intent-use-case-scenario": {
+      "types": "./dist/intent/intent-use-case-scenario.d.ts",
+      "default": "./dist/intent/intent-use-case-scenario.js"
+    },
+    "./reasoning/judgment-assist": {
+      "types": "./dist/reasoning/judgment-assist.d.ts",
+      "default": "./dist/reasoning/judgment-assist.js"
+    },
+    "./reasoning/judgment-backend": {
+      "types": "./dist/reasoning/judgment-backend.d.ts",
+      "default": "./dist/reasoning/judgment-backend.js"
+    },
+    "./reasoning/judgment-calibration-fit": {
+      "types": "./dist/reasoning/judgment-calibration-fit.d.ts",
+      "default": "./dist/reasoning/judgment-calibration-fit.js"
+    },
+    "./reasoning/judgment-callsite-eval": {
+      "types": "./dist/reasoning/judgment-callsite-eval.d.ts",
+      "default": "./dist/reasoning/judgment-callsite-eval.js"
+    },
+    "./governance/kill-switch": {
+      "types": "./dist/governance/kill-switch.d.ts",
+      "default": "./dist/governance/kill-switch.js"
+    },
+    "./knowledge/knowledge-adapter": {
+      "types": "./dist/knowledge/knowledge-adapter.d.ts",
+      "default": "./dist/knowledge/knowledge-adapter.js"
+    },
+    "./knowledge/knowledge-context": {
+      "types": "./dist/knowledge/knowledge-context.d.ts",
+      "default": "./dist/knowledge/knowledge-context.js"
+    },
+    "./knowledge/knowledge-index-cache": {
+      "types": "./dist/knowledge/knowledge-index-cache.d.ts",
+      "default": "./dist/knowledge/knowledge-index-cache.js"
+    },
+    "./knowledge/knowledge-index-usage": {
+      "types": "./dist/knowledge/knowledge-index-usage.d.ts",
+      "default": "./dist/knowledge/knowledge-index-usage.js"
+    },
+    "./knowledge/knowledge-provider": {
+      "types": "./dist/knowledge/knowledge-provider.d.ts",
+      "default": "./dist/knowledge/knowledge-provider.js"
+    },
+    "./knowledge/knowledge-relevance-judgment": {
+      "types": "./dist/knowledge/knowledge-relevance-judgment.d.ts",
+      "default": "./dist/knowledge/knowledge-relevance-judgment.js"
+    },
+    "./knowledge/knowledge-scope-check-policy": {
+      "types": "./dist/knowledge/knowledge-scope-check-policy.d.ts",
+      "default": "./dist/knowledge/knowledge-scope-check-policy.js"
+    },
+    "./knowledge/knowledge-scope-health-history": {
+      "types": "./dist/knowledge/knowledge-scope-health-history.d.ts",
+      "default": "./dist/knowledge/knowledge-scope-health-history.js"
+    },
+    "./knowledge/knowledge-scope": {
+      "types": "./dist/knowledge/knowledge-scope.d.ts",
+      "default": "./dist/knowledge/knowledge-scope.js"
+    },
+    "./knowledge/knowledge-slices": {
+      "types": "./dist/knowledge/knowledge-slices.d.ts",
+      "default": "./dist/knowledge/knowledge-slices.js"
+    },
+    "./knowledge/knowledge-taxonomy": {
+      "types": "./dist/knowledge/knowledge-taxonomy.d.ts",
+      "default": "./dist/knowledge/knowledge-taxonomy.js"
+    },
+    "./knowledge/knowledge-usage-aggregate": {
+      "types": "./dist/knowledge/knowledge-usage-aggregate.d.ts",
+      "default": "./dist/knowledge/knowledge-usage-aggregate.js"
+    },
+    "./knowledge/knowledge-weight-recalculation": {
+      "types": "./dist/knowledge/knowledge-weight-recalculation.d.ts",
+      "default": "./dist/knowledge/knowledge-weight-recalculation.js"
     },
     "./media/media-aws-icon-rules": {
       "types": "./dist/media/media-aws-icon-rules.d.ts",
@@ -3843,53 +4379,13 @@
       "types": "./dist/media/media-tone-style-map.d.ts",
       "default": "./dist/media/media-tone-style-map.js"
     },
-    "./media/music-generation-bridge": {
-      "types": "./dist/media/music-generation-bridge.d.ts",
-      "default": "./dist/media/music-generation-bridge.js"
-    },
-    "./media/music-generation-types": {
-      "types": "./dist/media/music-generation-types.d.ts",
-      "default": "./dist/media/music-generation-types.js"
-    },
-    "./media/music-workflow-compiler": {
-      "types": "./dist/media/music-workflow-compiler.d.ts",
-      "default": "./dist/media/music-workflow-compiler.js"
-    },
-    "./media/native-op-mapping": {
-      "types": "./dist/media/native-op-mapping.d.ts",
-      "default": "./dist/media/native-op-mapping.js"
-    },
-    "./media/native-pptx-engine/design-cascade": {
-      "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
-      "default": "./dist/media/native-pptx-engine/design-cascade.js"
-    },
-    "./media/native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
-    "./media/native-speech-listen-bridge": {
-      "types": "./dist/media/native-speech-listen-bridge.d.ts",
-      "default": "./dist/media/native-speech-listen-bridge.js"
-    },
-    "./media/native-tts": {
-      "types": "./dist/media/native-tts.d.ts",
-      "default": "./dist/media/native-tts.js"
-    },
-    "./meeting/calendar-provider-bridge": {
-      "types": "./dist/meeting/calendar-provider-bridge.d.ts",
-      "default": "./dist/meeting/calendar-provider-bridge.js"
-    },
-    "./meeting/calendar-slot-planner": {
-      "types": "./dist/meeting/calendar-slot-planner.d.ts",
-      "default": "./dist/meeting/calendar-slot-planner.js"
-    },
-    "./meeting/calendar-workflow": {
-      "types": "./dist/meeting/calendar-workflow.d.ts",
-      "default": "./dist/meeting/calendar-workflow.js"
-    },
     "./meeting/meeting-attendees": {
       "types": "./dist/meeting/meeting-attendees.d.ts",
       "default": "./dist/meeting/meeting-attendees.js"
+    },
+    "./meeting/meeting-environment-policy": {
+      "types": "./dist/meeting/meeting-environment-policy.d.ts",
+      "default": "./dist/meeting/meeting-environment-policy.js"
     },
     "./meeting/meeting-facilitator-policy": {
       "types": "./dist/meeting/meeting-facilitator-policy.d.ts",
@@ -3915,29 +4411,33 @@
       "types": "./dist/meeting/meeting-session-types.d.ts",
       "default": "./dist/meeting/meeting-session-types.js"
     },
-    "./mesh/a2a-bridge": {
-      "types": "./dist/mesh/a2a-bridge.d.ts",
-      "default": "./dist/mesh/a2a-bridge.js"
+    "./organization/member-id-grammar": {
+      "types": "./dist/organization/member-id-grammar.d.ts",
+      "default": "./dist/organization/member-id-grammar.js"
     },
-    "./mesh/a2a-envelope": {
-      "types": "./dist/mesh/a2a-envelope.d.ts",
-      "default": "./dist/mesh/a2a-envelope.js"
+    "./organization/member-registry": {
+      "types": "./dist/organization/member-registry.d.ts",
+      "default": "./dist/organization/member-registry.js"
     },
-    "./mesh/a2a-envelope-signature": {
-      "types": "./dist/mesh/a2a-envelope-signature.d.ts",
-      "default": "./dist/mesh/a2a-envelope-signature.js"
+    "./knowledge/memory-notebook": {
+      "types": "./dist/knowledge/memory-notebook.d.ts",
+      "default": "./dist/knowledge/memory-notebook.js"
     },
-    "./mesh/acp-mediator": {
-      "types": "./dist/mesh/acp-mediator.d.ts",
-      "default": "./dist/mesh/acp-mediator.js"
+    "./knowledge/memory-promotion-queue": {
+      "types": "./dist/knowledge/memory-promotion-queue.d.ts",
+      "default": "./dist/knowledge/memory-promotion-queue.js"
     },
-    "./mesh/handoff-history": {
-      "types": "./dist/mesh/handoff-history.d.ts",
-      "default": "./dist/mesh/handoff-history.js"
+    "./knowledge/memory-promotion-review": {
+      "types": "./dist/knowledge/memory-promotion-review.d.ts",
+      "default": "./dist/knowledge/memory-promotion-review.js"
     },
-    "./mesh/handoff-packet": {
-      "types": "./dist/mesh/handoff-packet.d.ts",
-      "default": "./dist/mesh/handoff-packet.js"
+    "./knowledge/memory-promotion-workflow": {
+      "types": "./dist/knowledge/memory-promotion-workflow.d.ts",
+      "default": "./dist/knowledge/memory-promotion-workflow.js"
+    },
+    "./knowledge/memory-scope": {
+      "types": "./dist/knowledge/memory-scope.d.ts",
+      "default": "./dist/knowledge/memory-scope.js"
     },
     "./mesh/mesh-delivery-driver": {
       "types": "./dist/mesh/mesh-delivery-driver.d.ts",
@@ -3955,33 +4455,53 @@
       "types": "./dist/mesh/mesh-hub-peer-messaging-adapter.d.ts",
       "default": "./dist/mesh/mesh-hub-peer-messaging-adapter.js"
     },
+    "./mesh/mesh-message-broker": {
+      "types": "./dist/mesh/mesh-message-broker.d.ts",
+      "default": "./dist/mesh/mesh-message-broker.js"
+    },
     "./mesh/mesh-peer-directory": {
       "types": "./dist/mesh/mesh-peer-directory.d.ts",
       "default": "./dist/mesh/mesh-peer-directory.js"
     },
-    "./mesh/peer-conversation": {
-      "types": "./dist/mesh/peer-conversation.d.ts",
-      "default": "./dist/mesh/peer-conversation.js"
+    "./mesh/mesh-router": {
+      "types": "./dist/mesh/mesh-router.d.ts",
+      "default": "./dist/mesh/mesh-router.js"
     },
-    "./mesh/peer-messaging": {
-      "types": "./dist/mesh/peer-messaging.d.ts",
-      "default": "./dist/mesh/peer-messaging.js"
+    "./mesh/mesh-topic-registry": {
+      "types": "./dist/mesh/mesh-topic-registry.d.ts",
+      "default": "./dist/mesh/mesh-topic-registry.js"
     },
-    "./mesh/peer-runtime-recovery": {
-      "types": "./dist/mesh/peer-runtime-recovery.d.ts",
-      "default": "./dist/mesh/peer-runtime-recovery.js"
+    "./mission/mission-advisory-panel": {
+      "types": "./dist/mission/mission-advisory-panel.d.ts",
+      "default": "./dist/mission/mission-advisory-panel.js"
     },
-    "./mission/delegation-concurrency": {
-      "types": "./dist/mission/delegation-concurrency.d.ts",
-      "default": "./dist/mission/delegation-concurrency.js"
+    "./mission/mission-artifact-closure": {
+      "types": "./dist/mission/mission-artifact-closure.d.ts",
+      "default": "./dist/mission/mission-artifact-closure.js"
     },
-    "./mission/delegation-request": {
-      "types": "./dist/mission/delegation-request.d.ts",
-      "default": "./dist/mission/delegation-request.js"
+    "./mission/mission-assessment": {
+      "types": "./dist/mission/mission-assessment.d.ts",
+      "default": "./dist/mission/mission-assessment.js"
     },
     "./mission/mission-classification": {
       "types": "./dist/mission/mission-classification.d.ts",
       "default": "./dist/mission/mission-classification.js"
+    },
+    "./mission/mission-context-pack-knowledge": {
+      "types": "./dist/mission/mission-context-pack-knowledge.d.ts",
+      "default": "./dist/mission/mission-context-pack-knowledge.js"
+    },
+    "./mission/mission-context-pack-types": {
+      "types": "./dist/mission/mission-context-pack-types.d.ts",
+      "default": "./dist/mission/mission-context-pack-types.js"
+    },
+    "./mission/mission-context-pack": {
+      "types": "./dist/mission/mission-context-pack.d.ts",
+      "default": "./dist/mission/mission-context-pack.js"
+    },
+    "./mission/mission-coordination-bus": {
+      "types": "./dist/mission/mission-coordination-bus.d.ts",
+      "default": "./dist/mission/mission-coordination-bus.js"
     },
     "./mission/mission-creation": {
       "types": "./dist/mission/mission-creation.d.ts",
@@ -3995,9 +4515,17 @@
       "types": "./dist/mission/mission-dispatch-lifecycle.d.ts",
       "default": "./dist/mission/mission-dispatch-lifecycle.js"
     },
+    "./mission/mission-distill-markdown-policy": {
+      "types": "./dist/mission/mission-distill-markdown-policy.d.ts",
+      "default": "./dist/mission/mission-distill-markdown-policy.js"
+    },
     "./mission/mission-distill": {
       "types": "./dist/mission/mission-distill.d.ts",
       "default": "./dist/mission/mission-distill.js"
+    },
+    "./mission/mission-evidence-doc": {
+      "types": "./dist/mission/mission-evidence-doc.d.ts",
+      "default": "./dist/mission/mission-evidence-doc.js"
     },
     "./mission/mission-execution-surface": {
       "types": "./dist/mission/mission-execution-surface.d.ts",
@@ -4015,6 +4543,14 @@
       "types": "./dist/mission/mission-governance.d.ts",
       "default": "./dist/mission/mission-governance.js"
     },
+    "./mission/mission-graph-handoff": {
+      "types": "./dist/mission/mission-graph-handoff.d.ts",
+      "default": "./dist/mission/mission-graph-handoff.js"
+    },
+    "./mission/mission-graph-run-journal": {
+      "types": "./dist/mission/mission-graph-run-journal.d.ts",
+      "default": "./dist/mission/mission-graph-run-journal.js"
+    },
     "./mission/mission-hygiene": {
       "types": "./dist/mission/mission-hygiene.d.ts",
       "default": "./dist/mission/mission-hygiene.js"
@@ -4027,13 +4563,25 @@
       "types": "./dist/mission/mission-journal-policy.d.ts",
       "default": "./dist/mission/mission-journal-policy.js"
     },
-    "./mission/mission-lifecycle": {
-      "types": "./dist/mission/mission-lifecycle.d.ts",
-      "default": "./dist/mission/mission-lifecycle.js"
+    "./mission/mission-ledger-policy": {
+      "types": "./dist/mission/mission-ledger-policy.d.ts",
+      "default": "./dist/mission/mission-ledger-policy.js"
+    },
+    "./mission/mission-lifecycle-completion": {
+      "types": "./dist/mission/mission-lifecycle-completion.d.ts",
+      "default": "./dist/mission/mission-lifecycle-completion.js"
+    },
+    "./mission/mission-lifecycle-operator-actions": {
+      "types": "./dist/mission/mission-lifecycle-operator-actions.d.ts",
+      "default": "./dist/mission/mission-lifecycle-operator-actions.js"
     },
     "./mission/mission-lifecycle-service": {
       "types": "./dist/mission/mission-lifecycle-service.d.ts",
       "default": "./dist/mission/mission-lifecycle-service.js"
+    },
+    "./mission/mission-lifecycle": {
+      "types": "./dist/mission/mission-lifecycle.d.ts",
+      "default": "./dist/mission/mission-lifecycle.js"
     },
     "./mission/mission-llm": {
       "types": "./dist/mission/mission-llm.d.ts",
@@ -4051,9 +4599,25 @@
       "types": "./dist/mission/mission-next-task-reader.d.ts",
       "default": "./dist/mission/mission-next-task-reader.js"
     },
+    "./mission/mission-orchestration-artifact-review": {
+      "types": "./dist/mission/mission-orchestration-artifact-review.d.ts",
+      "default": "./dist/mission/mission-orchestration-artifact-review.js"
+    },
+    "./mission/mission-orchestration-dispatch": {
+      "types": "./dist/mission/mission-orchestration-dispatch.d.ts",
+      "default": "./dist/mission/mission-orchestration-dispatch.js"
+    },
     "./mission/mission-orchestration-evaluator": {
       "types": "./dist/mission/mission-orchestration-evaluator.d.ts",
       "default": "./dist/mission/mission-orchestration-evaluator.js"
+    },
+    "./mission/mission-orchestration-event-contract": {
+      "types": "./dist/mission/mission-orchestration-event-contract.d.ts",
+      "default": "./dist/mission/mission-orchestration-event-contract.js"
+    },
+    "./mission/mission-orchestration-event-loader": {
+      "types": "./dist/mission/mission-orchestration-event-loader.d.ts",
+      "default": "./dist/mission/mission-orchestration-event-loader.js"
     },
     "./mission/mission-orchestration-events": {
       "types": "./dist/mission/mission-orchestration-events.d.ts",
@@ -4063,9 +4627,69 @@
       "types": "./dist/mission/mission-orchestration-journal.d.ts",
       "default": "./dist/mission/mission-orchestration-journal.js"
     },
+    "./mission/mission-orchestration-lifecycle-handlers": {
+      "types": "./dist/mission/mission-orchestration-lifecycle-handlers.d.ts",
+      "default": "./dist/mission/mission-orchestration-lifecycle-handlers.js"
+    },
+    "./mission/mission-orchestration-phase-gates": {
+      "types": "./dist/mission/mission-orchestration-phase-gates.d.ts",
+      "default": "./dist/mission/mission-orchestration-phase-gates.js"
+    },
+    "./mission/mission-orchestration-planning": {
+      "types": "./dist/mission/mission-orchestration-planning.d.ts",
+      "default": "./dist/mission/mission-orchestration-planning.js"
+    },
+    "./mission/mission-orchestration-progress": {
+      "types": "./dist/mission/mission-orchestration-progress.d.ts",
+      "default": "./dist/mission/mission-orchestration-progress.js"
+    },
+    "./mission/mission-orchestration-task-response": {
+      "types": "./dist/mission/mission-orchestration-task-response.d.ts",
+      "default": "./dist/mission/mission-orchestration-task-response.js"
+    },
+    "./mission/mission-orchestration-task-validation": {
+      "types": "./dist/mission/mission-orchestration-task-validation.d.ts",
+      "default": "./dist/mission/mission-orchestration-task-validation.js"
+    },
+    "./mission/mission-orchestration-worker-contracts": {
+      "types": "./dist/mission/mission-orchestration-worker-contracts.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-contracts.js"
+    },
+    "./mission/mission-orchestration-worker-dispatch-port": {
+      "types": "./dist/mission/mission-orchestration-worker-dispatch-port.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-dispatch-port.js"
+    },
+    "./mission/mission-orchestration-worker-part-context": {
+      "types": "./dist/mission/mission-orchestration-worker-part-context.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-part-context.js"
+    },
+    "./mission/mission-orchestration-worker-part-core": {
+      "types": "./dist/mission/mission-orchestration-worker-part-core.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-part-core.js"
+    },
+    "./mission/mission-orchestration-worker-part-dispatch-context": {
+      "types": "./dist/mission/mission-orchestration-worker-part-dispatch-context.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-part-dispatch-context.js"
+    },
+    "./mission/mission-orchestration-worker-part-dispatch": {
+      "types": "./dist/mission/mission-orchestration-worker-part-dispatch.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-part-dispatch.js"
+    },
+    "./mission/mission-orchestration-worker-part-results": {
+      "types": "./dist/mission/mission-orchestration-worker-part-results.d.ts",
+      "default": "./dist/mission/mission-orchestration-worker-part-results.js"
+    },
     "./mission/mission-orchestration-worker": {
       "types": "./dist/mission/mission-orchestration-worker.d.ts",
       "default": "./dist/mission/mission-orchestration-worker.js"
+    },
+    "./mission/mission-phase-gate-definition-reader": {
+      "types": "./dist/mission/mission-phase-gate-definition-reader.d.ts",
+      "default": "./dist/mission/mission-phase-gate-definition-reader.js"
+    },
+    "./mission/mission-planning-packet": {
+      "types": "./dist/mission/mission-planning-packet.d.ts",
+      "default": "./dist/mission/mission-planning-packet.js"
     },
     "./mission/mission-process-governance": {
       "types": "./dist/mission/mission-process-governance.d.ts",
@@ -4103,6 +4727,10 @@
       "types": "./dist/mission/mission-scope-approval.d.ts",
       "default": "./dist/mission/mission-scope-approval.js"
     },
+    "./mission/mission-scope-payload": {
+      "types": "./dist/mission/mission-scope-payload.d.ts",
+      "default": "./dist/mission/mission-scope-payload.js"
+    },
     "./mission/mission-seal": {
       "types": "./dist/mission/mission-seal.d.ts",
       "default": "./dist/mission/mission-seal.js"
@@ -4115,13 +4743,29 @@
       "types": "./dist/mission/mission-seed-registry.d.ts",
       "default": "./dist/mission/mission-seed-registry.js"
     },
+    "./mission/mission-state-reader": {
+      "types": "./dist/mission/mission-state-reader.d.ts",
+      "default": "./dist/mission/mission-state-reader.js"
+    },
     "./mission/mission-state": {
       "types": "./dist/mission/mission-state.d.ts",
       "default": "./dist/mission/mission-state.js"
     },
+    "./mission/mission-status": {
+      "types": "./dist/mission/mission-status.d.ts",
+      "default": "./dist/mission/mission-status.js"
+    },
     "./mission/mission-system": {
       "types": "./dist/mission/mission-system.d.ts",
       "default": "./dist/mission/mission-system.js"
+    },
+    "./mission/mission-task-events": {
+      "types": "./dist/mission/mission-task-events.d.ts",
+      "default": "./dist/mission/mission-task-events.js"
+    },
+    "./mission/mission-task-recovery": {
+      "types": "./dist/mission/mission-task-recovery.d.ts",
+      "default": "./dist/mission/mission-task-recovery.js"
     },
     "./mission/mission-team-binding": {
       "types": "./dist/mission/mission-team-binding.d.ts",
@@ -4130,6 +4774,10 @@
     "./mission/mission-team-brief-composer": {
       "types": "./dist/mission/mission-team-brief-composer.d.ts",
       "default": "./dist/mission/mission-team-brief-composer.js"
+    },
+    "./mission/mission-team-brief-utils": {
+      "types": "./dist/mission/mission-team-brief-utils.d.ts",
+      "default": "./dist/mission/mission-team-brief-utils.js"
     },
     "./mission/mission-team-index": {
       "types": "./dist/mission/mission-team-index.d.ts",
@@ -4147,9 +4795,17 @@
       "types": "./dist/mission/mission-team-view.d.ts",
       "default": "./dist/mission/mission-team-view.js"
     },
+    "./mission/mission-ticket-dispatch-manifest": {
+      "types": "./dist/mission/mission-ticket-dispatch-manifest.d.ts",
+      "default": "./dist/mission/mission-ticket-dispatch-manifest.js"
+    },
     "./mission/mission-ticket-dispatch": {
       "types": "./dist/mission/mission-ticket-dispatch.d.ts",
       "default": "./dist/mission/mission-ticket-dispatch.js"
+    },
+    "./mission/mission-ticket-provider-artifact": {
+      "types": "./dist/mission/mission-ticket-provider-artifact.d.ts",
+      "default": "./dist/mission/mission-ticket-provider-artifact.js"
     },
     "./mission/mission-triage": {
       "types": "./dist/mission/mission-triage.d.ts",
@@ -4167,17 +4823,105 @@
       "types": "./dist/mission/mission-workflow-catalog.d.ts",
       "default": "./dist/mission/mission-workflow-catalog.js"
     },
+    "./mission/mission-working-memory": {
+      "types": "./dist/mission/mission-working-memory.d.ts",
+      "default": "./dist/mission/mission-working-memory.js"
+    },
+    "./mission/mission-workitem-dispatch-execution": {
+      "types": "./dist/mission/mission-workitem-dispatch-execution.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-execution.js"
+    },
+    "./mission/mission-workitem-dispatch-internals": {
+      "types": "./dist/mission/mission-workitem-dispatch-internals.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-internals.js"
+    },
+    "./mission/mission-workitem-dispatch-manifest": {
+      "types": "./dist/mission/mission-workitem-dispatch-manifest.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-manifest.js"
+    },
+    "./mission/mission-workitem-dispatch-response": {
+      "types": "./dist/mission/mission-workitem-dispatch-response.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-response.js"
+    },
+    "./mission/mission-workitem-dispatch-review": {
+      "types": "./dist/mission/mission-workitem-dispatch-review.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-review.js"
+    },
+    "./mission/mission-workitem-dispatch-ticket": {
+      "types": "./dist/mission/mission-workitem-dispatch-ticket.d.ts",
+      "default": "./dist/mission/mission-workitem-dispatch-ticket.js"
+    },
     "./mission/mission-workitem-dispatch": {
       "types": "./dist/mission/mission-workitem-dispatch.d.ts",
       "default": "./dist/mission/mission-workitem-dispatch.js"
     },
-    "./mission/orchestrator-session": {
-      "types": "./dist/mission/orchestrator-session.d.ts",
-      "default": "./dist/mission/orchestrator-session.js"
+    "./reasoning/model-performance-index": {
+      "types": "./dist/reasoning/model-performance-index.d.ts",
+      "default": "./dist/reasoning/model-performance-index.js"
     },
-    "./organization/member-registry": {
-      "types": "./dist/organization/member-registry.d.ts",
-      "default": "./dist/organization/member-registry.js"
+    "./reasoning/model-registry-contract": {
+      "types": "./dist/reasoning/model-registry-contract.d.ts",
+      "default": "./dist/reasoning/model-registry-contract.js"
+    },
+    "./reasoning/model-registry-directory": {
+      "types": "./dist/reasoning/model-registry-directory.d.ts",
+      "default": "./dist/reasoning/model-registry-directory.js"
+    },
+    "./reasoning/model-role-fitness-runner": {
+      "types": "./dist/reasoning/model-role-fitness-runner.d.ts",
+      "default": "./dist/reasoning/model-role-fitness-runner.js"
+    },
+    "./reasoning/model-role-fitness": {
+      "types": "./dist/reasoning/model-role-fitness.d.ts",
+      "default": "./dist/reasoning/model-role-fitness.js"
+    },
+    "./media/music-generation-bridge": {
+      "types": "./dist/media/music-generation-bridge.d.ts",
+      "default": "./dist/media/music-generation-bridge.js"
+    },
+    "./media/music-generation-policy": {
+      "types": "./dist/media/music-generation-policy.d.ts",
+      "default": "./dist/media/music-generation-policy.js"
+    },
+    "./media/music-generation-types": {
+      "types": "./dist/media/music-generation-types.d.ts",
+      "default": "./dist/media/music-generation-types.js"
+    },
+    "./media/music-workflow-compiler": {
+      "types": "./dist/media/music-workflow-compiler.d.ts",
+      "default": "./dist/media/music-workflow-compiler.js"
+    },
+    "./video/narrated-video-brief-compiler": {
+      "types": "./dist/video/narrated-video-brief-compiler.d.ts",
+      "default": "./dist/video/narrated-video-brief-compiler.js"
+    },
+    "./video/narrated-video-preference-profile": {
+      "types": "./dist/video/narrated-video-preference-profile.d.ts",
+      "default": "./dist/video/narrated-video-preference-profile.js"
+    },
+    "./video/narrated-video-upload-package": {
+      "types": "./dist/video/narrated-video-upload-package.d.ts",
+      "default": "./dist/video/narrated-video-upload-package.js"
+    },
+    "./media/native-op-mapping": {
+      "types": "./dist/media/native-op-mapping.d.ts",
+      "default": "./dist/media/native-op-mapping.js"
+    },
+    "./media/native-speech-listen-bridge": {
+      "types": "./dist/media/native-speech-listen-bridge.d.ts",
+      "default": "./dist/media/native-speech-listen-bridge.js"
+    },
+    "./media/native-subagent-adopter": {
+      "types": "./dist/media/native-subagent-adopter.d.ts",
+      "default": "./dist/media/native-subagent-adopter.js"
+    },
+    "./media/native-tts": {
+      "types": "./dist/media/native-tts.d.ts",
+      "default": "./dist/media/native-tts.js"
+    },
+    "./analysis/observability-gate": {
+      "types": "./dist/analysis/observability-gate.d.ts",
+      "default": "./dist/analysis/observability-gate.js"
     },
     "./organization/onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -4199,6 +4943,62 @@
       "types": "./dist/organization/onboarding-summary-policy.d.ts",
       "default": "./dist/organization/onboarding-summary-policy.js"
     },
+    "./pipeline/op-input-contracts": {
+      "types": "./dist/pipeline/op-input-contracts.d.ts",
+      "default": "./dist/pipeline/op-input-contracts.js"
+    },
+    "./pipeline/op-preflight-defaults": {
+      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
+      "default": "./dist/pipeline/op-preflight-defaults.js"
+    },
+    "./pipeline/op-preflight": {
+      "types": "./dist/pipeline/op-preflight.d.ts",
+      "default": "./dist/pipeline/op-preflight.js"
+    },
+    "./pipeline/op-suggestions": {
+      "types": "./dist/pipeline/op-suggestions.d.ts",
+      "default": "./dist/pipeline/op-suggestions.js"
+    },
+    "./pipeline/op-vocabulary": {
+      "types": "./dist/pipeline/op-vocabulary.d.ts",
+      "default": "./dist/pipeline/op-vocabulary.js"
+    },
+    "./provider/openai-compatible-backend": {
+      "types": "./dist/provider/openai-compatible-backend.d.ts",
+      "default": "./dist/provider/openai-compatible-backend.js"
+    },
+    "./provider/openrouter-backend": {
+      "types": "./dist/provider/openrouter-backend.d.ts",
+      "default": "./dist/provider/openrouter-backend.js"
+    },
+    "./provider/openrouter-model-policy": {
+      "types": "./dist/provider/openrouter-model-policy.d.ts",
+      "default": "./dist/provider/openrouter-model-policy.js"
+    },
+    "./surface/operator-home-summary": {
+      "types": "./dist/surface/operator-home-summary.d.ts",
+      "default": "./dist/surface/operator-home-summary.js"
+    },
+    "./surface/operator-identity": {
+      "types": "./dist/surface/operator-identity.d.ts",
+      "default": "./dist/surface/operator-identity.js"
+    },
+    "./surface/operator-learning": {
+      "types": "./dist/surface/operator-learning.d.ts",
+      "default": "./dist/surface/operator-learning.js"
+    },
+    "./surface/operator-notifications": {
+      "types": "./dist/surface/operator-notifications.d.ts",
+      "default": "./dist/surface/operator-notifications.js"
+    },
+    "./surface/operator-provider-preferences": {
+      "types": "./dist/surface/operator-provider-preferences.d.ts",
+      "default": "./dist/surface/operator-provider-preferences.js"
+    },
+    "./mission/orchestrator-session": {
+      "types": "./dist/mission/orchestrator-session.d.ts",
+      "default": "./dist/mission/orchestrator-session.js"
+    },
     "./organization/organization-digest": {
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
@@ -4206,10 +5006,6 @@
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
       "default": "./dist/organization/organization-interventions.js"
-    },
-    "./organization/organization-operating-model": {
-      "types": "./dist/organization/organization-operating-model.d.ts",
-      "default": "./dist/organization/organization-operating-model.js"
     },
     "./organization/organization-operating-model-management": {
       "types": "./dist/organization/organization-operating-model-management.d.ts",
@@ -4223,6 +5019,10 @@
       "types": "./dist/organization/organization-operating-model-persistence.d.ts",
       "default": "./dist/organization/organization-operating-model-persistence.js"
     },
+    "./organization/organization-operating-model": {
+      "types": "./dist/organization/organization-operating-model.d.ts",
+      "default": "./dist/organization/organization-operating-model.js"
+    },
     "./organization/organization-operation-run-recording": {
       "types": "./dist/organization/organization-operation-run-recording.d.ts",
       "default": "./dist/organization/organization-operation-run-recording.js"
@@ -4235,9 +5035,841 @@
       "types": "./dist/organization/organization-profile.d.ts",
       "default": "./dist/organization/organization-profile.js"
     },
+    "./virtual/os-accessibility-detector": {
+      "types": "./dist/virtual/os-accessibility-detector.d.ts",
+      "default": "./dist/virtual/os-accessibility-detector.js"
+    },
+    "./virtual/os-app-adapters": {
+      "types": "./dist/virtual/os-app-adapters.d.ts",
+      "default": "./dist/virtual/os-app-adapters.js"
+    },
+    "./virtual/os-automation-bridge": {
+      "types": "./dist/virtual/os-automation-bridge.d.ts",
+      "default": "./dist/virtual/os-automation-bridge.js"
+    },
+    "./virtual/os-automation-platform": {
+      "types": "./dist/virtual/os-automation-platform.d.ts",
+      "default": "./dist/virtual/os-automation-platform.js"
+    },
+    "./virtual/os-automation": {
+      "types": "./dist/virtual/os-automation.d.ts",
+      "default": "./dist/virtual/os-automation.js"
+    },
+    "./pipeline/patch-decision": {
+      "types": "./dist/pipeline/patch-decision.d.ts",
+      "default": "./dist/pipeline/patch-decision.js"
+    },
+    "./mesh/peer-backup-reference": {
+      "types": "./dist/mesh/peer-backup-reference.d.ts",
+      "default": "./dist/mesh/peer-backup-reference.js"
+    },
+    "./mesh/peer-conversation": {
+      "types": "./dist/mesh/peer-conversation.d.ts",
+      "default": "./dist/mesh/peer-conversation.js"
+    },
+    "./mesh/peer-messaging": {
+      "types": "./dist/mesh/peer-messaging.d.ts",
+      "default": "./dist/mesh/peer-messaging.js"
+    },
+    "./mesh/peer-runtime-recovery": {
+      "types": "./dist/mesh/peer-runtime-recovery.d.ts",
+      "default": "./dist/mesh/peer-runtime-recovery.js"
+    },
+    "./pipeline/pipeline-approval-resume": {
+      "types": "./dist/pipeline/pipeline-approval-resume.d.ts",
+      "default": "./dist/pipeline/pipeline-approval-resume.js"
+    },
+    "./pipeline/pipeline-contract": {
+      "types": "./dist/pipeline/pipeline-contract.d.ts",
+      "default": "./dist/pipeline/pipeline-contract.js"
+    },
+    "./pipeline/pipeline-dry-run": {
+      "types": "./dist/pipeline/pipeline-dry-run.d.ts",
+      "default": "./dist/pipeline/pipeline-dry-run.js"
+    },
+    "./pipeline/pipeline-input-contract": {
+      "types": "./dist/pipeline/pipeline-input-contract.d.ts",
+      "default": "./dist/pipeline/pipeline-input-contract.js"
+    },
+    "./pipeline/pipeline-run-journal": {
+      "types": "./dist/pipeline/pipeline-run-journal.d.ts",
+      "default": "./dist/pipeline/pipeline-run-journal.js"
+    },
+    "./plugin/plugin-contributions": {
+      "types": "./dist/plugin/plugin-contributions.d.ts",
+      "default": "./dist/plugin/plugin-contributions.js"
+    },
+    "./plugin/plugin-grant-runtime": {
+      "types": "./dist/plugin/plugin-grant-runtime.d.ts",
+      "default": "./dist/plugin/plugin-grant-runtime.js"
+    },
+    "./plugin/plugin-host": {
+      "types": "./dist/plugin/plugin-host.d.ts",
+      "default": "./dist/plugin/plugin-host.js"
+    },
+    "./plugin/plugin-lifecycle": {
+      "types": "./dist/plugin/plugin-lifecycle.d.ts",
+      "default": "./dist/plugin/plugin-lifecycle.js"
+    },
+    "./plugin/plugin-managed-install": {
+      "types": "./dist/plugin/plugin-managed-install.d.ts",
+      "default": "./dist/plugin/plugin-managed-install.js"
+    },
+    "./plugin/plugin-manifest-candidates": {
+      "types": "./dist/plugin/plugin-manifest-candidates.d.ts",
+      "default": "./dist/plugin/plugin-manifest-candidates.js"
+    },
+    "./plugin/plugin-pack": {
+      "types": "./dist/plugin/plugin-pack.d.ts",
+      "default": "./dist/plugin/plugin-pack.js"
+    },
+    "./plugin/plugin-permissions": {
+      "types": "./dist/plugin/plugin-permissions.d.ts",
+      "default": "./dist/plugin/plugin-permissions.js"
+    },
+    "./plugin/plugin-source-trust": {
+      "types": "./dist/plugin/plugin-source-trust.d.ts",
+      "default": "./dist/plugin/plugin-source-trust.js"
+    },
+    "./plugin/plugin-view-actions": {
+      "types": "./dist/plugin/plugin-view-actions.d.ts",
+      "default": "./dist/plugin/plugin-view-actions.js"
+    },
+    "./plugin/plugin-view-contract": {
+      "types": "./dist/plugin/plugin-view-contract.d.ts",
+      "default": "./dist/plugin/plugin-view-contract.js"
+    },
+    "./plugin/plugin-view-frame": {
+      "types": "./dist/plugin/plugin-view-frame.d.ts",
+      "default": "./dist/plugin/plugin-view-frame.js"
+    },
+    "./governance/policy-engine": {
+      "types": "./dist/governance/policy-engine.d.ts",
+      "default": "./dist/governance/policy-engine.js"
+    },
+    "./knowledge/procedure-dispatcher": {
+      "types": "./dist/knowledge/procedure-dispatcher.d.ts",
+      "default": "./dist/knowledge/procedure-dispatcher.js"
+    },
+    "./knowledge/procedure-inputs": {
+      "types": "./dist/knowledge/procedure-inputs.d.ts",
+      "default": "./dist/knowledge/procedure-inputs.js"
+    },
+    "./knowledge/procedure-registry": {
+      "types": "./dist/knowledge/procedure-registry.d.ts",
+      "default": "./dist/knowledge/procedure-registry.js"
+    },
+    "./knowledge/procedure-self-repair": {
+      "types": "./dist/knowledge/procedure-self-repair.d.ts",
+      "default": "./dist/knowledge/procedure-self-repair.js"
+    },
+    "./knowledge/procedure-types": {
+      "types": "./dist/knowledge/procedure-types.d.ts",
+      "default": "./dist/knowledge/procedure-types.js"
+    },
+    "./project/project-management": {
+      "types": "./dist/project/project-management.d.ts",
+      "default": "./dist/project/project-management.js"
+    },
+    "./project/project-mission-ledger": {
+      "types": "./dist/project/project-mission-ledger.d.ts",
+      "default": "./dist/project/project-mission-ledger.js"
+    },
+    "./project/project-operational-state-links": {
+      "types": "./dist/project/project-operational-state-links.d.ts",
+      "default": "./dist/project/project-operational-state-links.js"
+    },
+    "./project/project-operational-state-registry": {
+      "types": "./dist/project/project-operational-state-registry.d.ts",
+      "default": "./dist/project/project-operational-state-registry.js"
+    },
+    "./project/project-registry": {
+      "types": "./dist/project/project-registry.d.ts",
+      "default": "./dist/project/project-registry.js"
+    },
+    "./project/project-state-sync": {
+      "types": "./dist/project/project-state-sync.d.ts",
+      "default": "./dist/project/project-state-sync.js"
+    },
+    "./project/project-track-registry": {
+      "types": "./dist/project/project-track-registry.d.ts",
+      "default": "./dist/project/project-track-registry.js"
+    },
+    "./project/project-trust": {
+      "types": "./dist/project/project-trust.d.ts",
+      "default": "./dist/project/project-trust.js"
+    },
+    "./reasoning/prompt-cache-discipline": {
+      "types": "./dist/reasoning/prompt-cache-discipline.d.ts",
+      "default": "./dist/reasoning/prompt-cache-discipline.js"
+    },
+    "./reasoning/prompt-constraints": {
+      "types": "./dist/reasoning/prompt-constraints.d.ts",
+      "default": "./dist/reasoning/prompt-constraints.js"
+    },
+    "./reasoning/prompt-visibility-ledger": {
+      "types": "./dist/reasoning/prompt-visibility-ledger.d.ts",
+      "default": "./dist/reasoning/prompt-visibility-ledger.js"
+    },
+    "./provider/provider-backend-resolver": {
+      "types": "./dist/provider/provider-backend-resolver.d.ts",
+      "default": "./dist/provider/provider-backend-resolver.js"
+    },
+    "./provider/provider-bridge": {
+      "types": "./dist/provider/provider-bridge.d.ts",
+      "default": "./dist/provider/provider-bridge.js"
+    },
+    "./provider/provider-capability-overview": {
+      "types": "./dist/provider/provider-capability-overview.d.ts",
+      "default": "./dist/provider/provider-capability-overview.js"
+    },
+    "./provider/provider-capability-registry": {
+      "types": "./dist/provider/provider-capability-registry.d.ts",
+      "default": "./dist/provider/provider-capability-registry.js"
+    },
+    "./provider/provider-capability-scanner": {
+      "types": "./dist/provider/provider-capability-scanner.d.ts",
+      "default": "./dist/provider/provider-capability-scanner.js"
+    },
+    "./provider/provider-cli-capability-report-policy": {
+      "types": "./dist/provider/provider-cli-capability-report-policy.d.ts",
+      "default": "./dist/provider/provider-cli-capability-report-policy.js"
+    },
+    "./provider/provider-config": {
+      "types": "./dist/provider/provider-config.d.ts",
+      "default": "./dist/provider/provider-config.js"
+    },
+    "./provider/provider-discovery": {
+      "types": "./dist/provider/provider-discovery.d.ts",
+      "default": "./dist/provider/provider-discovery.js"
+    },
+    "./provider/provider-egress-gate": {
+      "types": "./dist/provider/provider-egress-gate.d.ts",
+      "default": "./dist/provider/provider-egress-gate.js"
+    },
+    "./provider/provider-endpoint-domains": {
+      "types": "./dist/provider/provider-endpoint-domains.d.ts",
+      "default": "./dist/provider/provider-endpoint-domains.js"
+    },
+    "./provider/provider-health-registry": {
+      "types": "./dist/provider/provider-health-registry.d.ts",
+      "default": "./dist/provider/provider-health-registry.js"
+    },
+    "./provider/provider-health-view": {
+      "types": "./dist/provider/provider-health-view.d.ts",
+      "default": "./dist/provider/provider-health-view.js"
+    },
+    "./provider/provider-managed-env": {
+      "types": "./dist/provider/provider-managed-env.d.ts",
+      "default": "./dist/provider/provider-managed-env.js"
+    },
+    "./provider/provider-permission-profiles": {
+      "types": "./dist/provider/provider-permission-profiles.d.ts",
+      "default": "./dist/provider/provider-permission-profiles.js"
+    },
+    "./provider/provider-pins-store": {
+      "types": "./dist/provider/provider-pins-store.d.ts",
+      "default": "./dist/provider/provider-pins-store.js"
+    },
+    "./provider/provider-spawn-env": {
+      "types": "./dist/provider/provider-spawn-env.d.ts",
+      "default": "./dist/provider/provider-spawn-env.js"
+    },
+    "./shell/pty-engine": {
+      "types": "./dist/shell/pty-engine.d.ts",
+      "default": "./dist/shell/pty-engine.js"
+    },
+    "./voice/realtime-voice-conversation": {
+      "types": "./dist/voice/realtime-voice-conversation.d.ts",
+      "default": "./dist/voice/realtime-voice-conversation.js"
+    },
+    "./voice/realtime-voice-loop": {
+      "types": "./dist/voice/realtime-voice-loop.d.ts",
+      "default": "./dist/voice/realtime-voice-loop.js"
+    },
+    "./voice/realtime-voice-preferences": {
+      "types": "./dist/voice/realtime-voice-preferences.d.ts",
+      "default": "./dist/voice/realtime-voice-preferences.js"
+    },
+    "./reasoning/reasoning-api-provider": {
+      "types": "./dist/reasoning/reasoning-api-provider.d.ts",
+      "default": "./dist/reasoning/reasoning-api-provider.js"
+    },
+    "./reasoning/reasoning-auth-preflight": {
+      "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
+      "default": "./dist/reasoning/reasoning-auth-preflight.js"
+    },
+    "./reasoning/reasoning-backend-contracts": {
+      "types": "./dist/reasoning/reasoning-backend-contracts.d.ts",
+      "default": "./dist/reasoning/reasoning-backend-contracts.js"
+    },
+    "./reasoning/reasoning-backend-execution-adapter": {
+      "types": "./dist/reasoning/reasoning-backend-execution-adapter.d.ts",
+      "default": "./dist/reasoning/reasoning-backend-execution-adapter.js"
+    },
+    "./reasoning/reasoning-backend-policy": {
+      "types": "./dist/reasoning/reasoning-backend-policy.d.ts",
+      "default": "./dist/reasoning/reasoning-backend-policy.js"
+    },
+    "./reasoning/reasoning-backend": {
+      "types": "./dist/reasoning/reasoning-backend.d.ts",
+      "default": "./dist/reasoning/reasoning-backend.js"
+    },
+    "./reasoning/reasoning-bootstrap": {
+      "types": "./dist/reasoning/reasoning-bootstrap.d.ts",
+      "default": "./dist/reasoning/reasoning-bootstrap.js"
+    },
+    "./reasoning/reasoning-cli-provider": {
+      "types": "./dist/reasoning/reasoning-cli-provider.d.ts",
+      "default": "./dist/reasoning/reasoning-cli-provider.js"
+    },
+    "./reasoning/reasoning-degradation": {
+      "types": "./dist/reasoning/reasoning-degradation.d.ts",
+      "default": "./dist/reasoning/reasoning-degradation.js"
+    },
+    "./reasoning/reasoning-delegation-policy": {
+      "types": "./dist/reasoning/reasoning-delegation-policy.d.ts",
+      "default": "./dist/reasoning/reasoning-delegation-policy.js"
+    },
+    "./reasoning/reasoning-drift-watchdog": {
+      "types": "./dist/reasoning/reasoning-drift-watchdog.d.ts",
+      "default": "./dist/reasoning/reasoning-drift-watchdog.js"
+    },
+    "./reasoning/reasoning-egress-scope": {
+      "types": "./dist/reasoning/reasoning-egress-scope.d.ts",
+      "default": "./dist/reasoning/reasoning-egress-scope.js"
+    },
+    "./reasoning/reasoning-endpoint-discovery": {
+      "types": "./dist/reasoning/reasoning-endpoint-discovery.d.ts",
+      "default": "./dist/reasoning/reasoning-endpoint-discovery.js"
+    },
+    "./reasoning/reasoning-failover": {
+      "types": "./dist/reasoning/reasoning-failover.d.ts",
+      "default": "./dist/reasoning/reasoning-failover.js"
+    },
+    "./reasoning/reasoning-failure-taxonomy": {
+      "types": "./dist/reasoning/reasoning-failure-taxonomy.d.ts",
+      "default": "./dist/reasoning/reasoning-failure-taxonomy.js"
+    },
+    "./reasoning/reasoning-level-policy": {
+      "types": "./dist/reasoning/reasoning-level-policy.d.ts",
+      "default": "./dist/reasoning/reasoning-level-policy.js"
+    },
+    "./reasoning/reasoning-model-routing": {
+      "types": "./dist/reasoning/reasoning-model-routing.d.ts",
+      "default": "./dist/reasoning/reasoning-model-routing.js"
+    },
+    "./reasoning/reasoning-openai-compatible-provider": {
+      "types": "./dist/reasoning/reasoning-openai-compatible-provider.d.ts",
+      "default": "./dist/reasoning/reasoning-openai-compatible-provider.js"
+    },
+    "./reasoning/reasoning-participant": {
+      "types": "./dist/reasoning/reasoning-participant.d.ts",
+      "default": "./dist/reasoning/reasoning-participant.js"
+    },
+    "./reasoning/reasoning-provider-registry": {
+      "types": "./dist/reasoning/reasoning-provider-registry.d.ts",
+      "default": "./dist/reasoning/reasoning-provider-registry.js"
+    },
+    "./reasoning/reasoning-retry-policy": {
+      "types": "./dist/reasoning/reasoning-retry-policy.d.ts",
+      "default": "./dist/reasoning/reasoning-retry-policy.js"
+    },
+    "./reasoning/reasoning-route-doctor": {
+      "types": "./dist/reasoning/reasoning-route-doctor.d.ts",
+      "default": "./dist/reasoning/reasoning-route-doctor.js"
+    },
+    "./reasoning/reasoning-route-resolver": {
+      "types": "./dist/reasoning/reasoning-route-resolver.d.ts",
+      "default": "./dist/reasoning/reasoning-route-resolver.js"
+    },
+    "./reasoning/reasoning-runtime-instructions": {
+      "types": "./dist/reasoning/reasoning-runtime-instructions.d.ts",
+      "default": "./dist/reasoning/reasoning-runtime-instructions.js"
+    },
+    "./reasoning/reasoning-tier-declaration": {
+      "types": "./dist/reasoning/reasoning-tier-declaration.d.ts",
+      "default": "./dist/reasoning/reasoning-tier-declaration.js"
+    },
+    "./organization/role-assumption-trace": {
+      "types": "./dist/organization/role-assumption-trace.d.ts",
+      "default": "./dist/organization/role-assumption-trace.js"
+    },
+    "./tool/runtime-health-history": {
+      "types": "./dist/tool/runtime-health-history.d.ts",
+      "default": "./dist/tool/runtime-health-history.js"
+    },
+    "./tool/runtime-model-defaults": {
+      "types": "./dist/tool/runtime-model-defaults.d.ts",
+      "default": "./dist/tool/runtime-model-defaults.js"
+    },
+    "./tool/runtime-scope": {
+      "types": "./dist/tool/runtime-scope.d.ts",
+      "default": "./dist/tool/runtime-scope.js"
+    },
+    "./tool/runtime-supervisor": {
+      "types": "./dist/tool/runtime-supervisor.d.ts",
+      "default": "./dist/tool/runtime-supervisor.js"
+    },
+    "./shell/sandbox-policy": {
+      "types": "./dist/shell/sandbox-policy.d.ts",
+      "default": "./dist/shell/sandbox-policy.js"
+    },
+    "./scenario/scenario-definition": {
+      "types": "./dist/scenario/scenario-definition.d.ts",
+      "default": "./dist/scenario/scenario-definition.js"
+    },
+    "./scenario/scenario-evidence-class": {
+      "types": "./dist/scenario/scenario-evidence-class.d.ts",
+      "default": "./dist/scenario/scenario-evidence-class.js"
+    },
+    "./scenario/scenario-executor": {
+      "types": "./dist/scenario/scenario-executor.d.ts",
+      "default": "./dist/scenario/scenario-executor.js"
+    },
+    "./scenario/scenario-final-checks": {
+      "types": "./dist/scenario/scenario-final-checks.d.ts",
+      "default": "./dist/scenario/scenario-final-checks.js"
+    },
+    "./scenario/scenario-interceptor": {
+      "types": "./dist/scenario/scenario-interceptor.d.ts",
+      "default": "./dist/scenario/scenario-interceptor.js"
+    },
+    "./scenario/scenario-judge": {
+      "types": "./dist/scenario/scenario-judge.d.ts",
+      "default": "./dist/scenario/scenario-judge.js"
+    },
+    "./scenario/scenario-model-fixtures": {
+      "types": "./dist/scenario/scenario-model-fixtures.d.ts",
+      "default": "./dist/scenario/scenario-model-fixtures.js"
+    },
+    "./scenario/scenario-report": {
+      "types": "./dist/scenario/scenario-report.d.ts",
+      "default": "./dist/scenario/scenario-report.js"
+    },
+    "./scenario/scenario-run-context": {
+      "types": "./dist/scenario/scenario-run-context.d.ts",
+      "default": "./dist/scenario/scenario-run-context.js"
+    },
+    "./scenario/scenario-run-scope": {
+      "types": "./dist/scenario/scenario-run-scope.d.ts",
+      "default": "./dist/scenario/scenario-run-scope.js"
+    },
+    "./scenario/scenario-side-effect-log": {
+      "types": "./dist/scenario/scenario-side-effect-log.d.ts",
+      "default": "./dist/scenario/scenario-side-effect-log.js"
+    },
+    "./scenario/scenario-trajectory": {
+      "types": "./dist/scenario/scenario-trajectory.d.ts",
+      "default": "./dist/scenario/scenario-trajectory.js"
+    },
+    "./virtual/screen-capture-bridge": {
+      "types": "./dist/virtual/screen-capture-bridge.d.ts",
+      "default": "./dist/virtual/screen-capture-bridge.js"
+    },
+    "./virtual/screen-display-inventory-bridge": {
+      "types": "./dist/virtual/screen-display-inventory-bridge.d.ts",
+      "default": "./dist/virtual/screen-display-inventory-bridge.js"
+    },
+    "./virtual/screen-frame-redaction": {
+      "types": "./dist/virtual/screen-frame-redaction.d.ts",
+      "default": "./dist/virtual/screen-frame-redaction.js"
+    },
+    "./virtual/screen-recording-bridge": {
+      "types": "./dist/virtual/screen-recording-bridge.d.ts",
+      "default": "./dist/virtual/screen-recording-bridge.js"
+    },
+    "./secret/secret-bridge": {
+      "types": "./dist/secret/secret-bridge.d.ts",
+      "default": "./dist/secret/secret-bridge.js"
+    },
+    "./secret/secret-encryption": {
+      "types": "./dist/secret/secret-encryption.d.ts",
+      "default": "./dist/secret/secret-encryption.js"
+    },
+    "./secret/secret-guard-entry": {
+      "types": "./dist/secret/secret-guard-entry.d.ts",
+      "default": "./dist/secret/secret-guard-entry.js"
+    },
+    "./secret/secret-guard": {
+      "types": "./dist/secret/secret-guard.d.ts",
+      "default": "./dist/secret/secret-guard.js"
+    },
+    "./secret/secret-identity": {
+      "types": "./dist/secret/secret-identity.d.ts",
+      "default": "./dist/secret/secret-identity.js"
+    },
+    "./secret/secret-introduction": {
+      "types": "./dist/secret/secret-introduction.d.ts",
+      "default": "./dist/secret/secret-introduction.js"
+    },
+    "./secret/secret-resolver": {
+      "types": "./dist/secret/secret-resolver.d.ts",
+      "default": "./dist/secret/secret-resolver.js"
+    },
+    "./secret/secret-types": {
+      "types": "./dist/secret/secret-types.d.ts",
+      "default": "./dist/secret/secret-types.js"
+    },
+    "./service/service-authority-map": {
+      "types": "./dist/service/service-authority-map.d.ts",
+      "default": "./dist/service/service-authority-map.js"
+    },
+    "./service/service-binding-registry": {
+      "types": "./dist/service/service-binding-registry.d.ts",
+      "default": "./dist/service/service-binding-registry.js"
+    },
+    "./service/service-binding": {
+      "types": "./dist/service/service-binding.d.ts",
+      "default": "./dist/service/service-binding.js"
+    },
+    "./service/service-bootstrap-catalog": {
+      "types": "./dist/service/service-bootstrap-catalog.d.ts",
+      "default": "./dist/service/service-bootstrap-catalog.js"
+    },
+    "./service/service-connection-readiness": {
+      "types": "./dist/service/service-connection-readiness.d.ts",
+      "default": "./dist/service/service-connection-readiness.js"
+    },
+    "./service/service-distill-candidate": {
+      "types": "./dist/service/service-distill-candidate.d.ts",
+      "default": "./dist/service/service-distill-candidate.js"
+    },
+    "./service/service-endpoint-registry": {
+      "types": "./dist/service/service-endpoint-registry.d.ts",
+      "default": "./dist/service/service-endpoint-registry.js"
+    },
+    "./service/service-engine-execution": {
+      "types": "./dist/service/service-engine-execution.d.ts",
+      "default": "./dist/service/service-engine-execution.js"
+    },
+    "./service/service-engine-helpers": {
+      "types": "./dist/service/service-engine-helpers.d.ts",
+      "default": "./dist/service/service-engine-helpers.js"
+    },
+    "./service/service-engine": {
+      "types": "./dist/service/service-engine.d.ts",
+      "default": "./dist/service/service-engine.js"
+    },
+    "./service/service-harness": {
+      "types": "./dist/service/service-harness.d.ts",
+      "default": "./dist/service/service-harness.js"
+    },
+    "./service/service-onboarding-catalog": {
+      "types": "./dist/service/service-onboarding-catalog.d.ts",
+      "default": "./dist/service/service-onboarding-catalog.js"
+    },
+    "./service/service-pid-registry": {
+      "types": "./dist/service/service-pid-registry.d.ts",
+      "default": "./dist/service/service-pid-registry.js"
+    },
+    "./service/service-preset-policy": {
+      "types": "./dist/service/service-preset-policy.d.ts",
+      "default": "./dist/service/service-preset-policy.js"
+    },
+    "./service/service-preset-registry": {
+      "types": "./dist/service/service-preset-registry.d.ts",
+      "default": "./dist/service/service-preset-registry.js"
+    },
+    "./service/service-procedure-executor": {
+      "types": "./dist/service/service-procedure-executor.d.ts",
+      "default": "./dist/service/service-procedure-executor.js"
+    },
+    "./service/service-procedure-promotion": {
+      "types": "./dist/service/service-procedure-promotion.d.ts",
+      "default": "./dist/service/service-procedure-promotion.js"
+    },
+    "./service/service-recording-compiler": {
+      "types": "./dist/service/service-recording-compiler.d.ts",
+      "default": "./dist/service/service-recording-compiler.js"
+    },
+    "./service/service-recording-session": {
+      "types": "./dist/service/service-recording-session.d.ts",
+      "default": "./dist/service/service-recording-session.js"
+    },
+    "./service/service-recording": {
+      "types": "./dist/service/service-recording.d.ts",
+      "default": "./dist/service/service-recording.js"
+    },
+    "./service/service-runtime-policy": {
+      "types": "./dist/service/service-runtime-policy.d.ts",
+      "default": "./dist/service/service-runtime-policy.js"
+    },
+    "./service/service-runtime-registry": {
+      "types": "./dist/service/service-runtime-registry.d.ts",
+      "default": "./dist/service/service-runtime-registry.js"
+    },
+    "./service/service-secret-resolver": {
+      "types": "./dist/service/service-secret-resolver.d.ts",
+      "default": "./dist/service/service-secret-resolver.js"
+    },
+    "./service/service-validator": {
+      "types": "./dist/service/service-validator.d.ts",
+      "default": "./dist/service/service-validator.js"
+    },
+    "./shell/shell-claude-cli-backend": {
+      "types": "./dist/shell/shell-claude-cli-backend.d.ts",
+      "default": "./dist/shell/shell-claude-cli-backend.js"
+    },
+    "./shell/shell-claude-cli-intent-extractor": {
+      "types": "./dist/shell/shell-claude-cli-intent-extractor.d.ts",
+      "default": "./dist/shell/shell-claude-cli-intent-extractor.js"
+    },
+    "./shell/shell-command-normalize": {
+      "types": "./dist/shell/shell-command-normalize.d.ts",
+      "default": "./dist/shell/shell-command-normalize.js"
+    },
+    "./shell/shell-command-policy": {
+      "types": "./dist/shell/shell-command-policy.d.ts",
+      "default": "./dist/shell/shell-command-policy.js"
+    },
+    "./shell/shell-grok-cli-backend": {
+      "types": "./dist/shell/shell-grok-cli-backend.d.ts",
+      "default": "./dist/shell/shell-grok-cli-backend.js"
+    },
+    "./shell/shell-streaming-stt-bridge": {
+      "types": "./dist/shell/shell-streaming-stt-bridge.d.ts",
+      "default": "./dist/shell/shell-streaming-stt-bridge.js"
+    },
+    "./shell/shell-streaming-tts-bridge": {
+      "types": "./dist/shell/shell-streaming-tts-bridge.d.ts",
+      "default": "./dist/shell/shell-streaming-tts-bridge.js"
+    },
+    "./plugin/skill-index": {
+      "types": "./dist/plugin/skill-index.d.ts",
+      "default": "./dist/plugin/skill-index.js"
+    },
+    "./plugin/skill-install-package-map": {
+      "types": "./dist/plugin/skill-install-package-map.d.ts",
+      "default": "./dist/plugin/skill-install-package-map.js"
+    },
+    "./plugin/skill-plugin-loader": {
+      "types": "./dist/plugin/skill-plugin-loader.d.ts",
+      "default": "./dist/plugin/skill-plugin-loader.js"
+    },
+    "./plugin/skill-resource-loader": {
+      "types": "./dist/plugin/skill-resource-loader.d.ts",
+      "default": "./dist/plugin/skill-resource-loader.js"
+    },
+    "./plugin/skill-wrapper": {
+      "types": "./dist/plugin/skill-wrapper.d.ts",
+      "default": "./dist/plugin/skill-wrapper.js"
+    },
+    "./integrations/slack-approval-ui": {
+      "types": "./dist/integrations/slack-approval-ui.d.ts",
+      "default": "./dist/integrations/slack-approval-ui.js"
+    },
+    "./integrations/slack-mission-proposal-ui": {
+      "types": "./dist/integrations/slack-mission-proposal-ui.d.ts",
+      "default": "./dist/integrations/slack-mission-proposal-ui.js"
+    },
+    "./integrations/slack-onboarding": {
+      "types": "./dist/integrations/slack-onboarding.d.ts",
+      "default": "./dist/integrations/slack-onboarding.js"
+    },
+    "./voice/speech-languages": {
+      "types": "./dist/voice/speech-languages.d.ts",
+      "default": "./dist/voice/speech-languages.js"
+    },
+    "./voice/speech-to-text-bridge": {
+      "types": "./dist/voice/speech-to-text-bridge.d.ts",
+      "default": "./dist/voice/speech-to-text-bridge.js"
+    },
+    "./voice/streaming-stt-bridge": {
+      "types": "./dist/voice/streaming-stt-bridge.d.ts",
+      "default": "./dist/voice/streaming-stt-bridge.js"
+    },
+    "./voice/streaming-tts-bridge": {
+      "types": "./dist/voice/streaming-tts-bridge.d.ts",
+      "default": "./dist/voice/streaming-tts-bridge.js"
+    },
+    "./surface/surface-access-policy": {
+      "types": "./dist/surface/surface-access-policy.d.ts",
+      "default": "./dist/surface/surface-access-policy.js"
+    },
+    "./surface/surface-action-routing": {
+      "types": "./dist/surface/surface-action-routing.d.ts",
+      "default": "./dist/surface/surface-action-routing.js"
+    },
+    "./surface/surface-agent-catalog": {
+      "types": "./dist/surface/surface-agent-catalog.d.ts",
+      "default": "./dist/surface/surface-agent-catalog.js"
+    },
+    "./surface/surface-approval-ui": {
+      "types": "./dist/surface/surface-approval-ui.d.ts",
+      "default": "./dist/surface/surface-approval-ui.js"
+    },
+    "./surface/surface-artifact-store": {
+      "types": "./dist/surface/surface-artifact-store.d.ts",
+      "default": "./dist/surface/surface-artifact-store.js"
+    },
+    "./surface/surface-authn": {
+      "types": "./dist/surface/surface-authn.d.ts",
+      "default": "./dist/surface/surface-authn.js"
+    },
+    "./surface/surface-authorization": {
+      "types": "./dist/surface/surface-authorization.d.ts",
+      "default": "./dist/surface/surface-authorization.js"
+    },
+    "./surface/surface-coordination-role-map": {
+      "types": "./dist/surface/surface-coordination-role-map.d.ts",
+      "default": "./dist/surface/surface-coordination-role-map.js"
+    },
+    "./surface/surface-coordination-store": {
+      "types": "./dist/surface/surface-coordination-store.d.ts",
+      "default": "./dist/surface/surface-coordination-store.js"
+    },
+    "./surface/surface-delivery": {
+      "types": "./dist/surface/surface-delivery.d.ts",
+      "default": "./dist/surface/surface-delivery.js"
+    },
+    "./surface/surface-ingress-contract": {
+      "types": "./dist/surface/surface-ingress-contract.d.ts",
+      "default": "./dist/surface/surface-ingress-contract.js"
+    },
+    "./surface/surface-interaction-model": {
+      "types": "./dist/surface/surface-interaction-model.d.ts",
+      "default": "./dist/surface/surface-interaction-model.js"
+    },
+    "./surface/surface-mission-proposals": {
+      "types": "./dist/surface/surface-mission-proposals.d.ts",
+      "default": "./dist/surface/surface-mission-proposals.js"
+    },
+    "./surface/surface-mission-steering": {
+      "types": "./dist/surface/surface-mission-steering.d.ts",
+      "default": "./dist/surface/surface-mission-steering.js"
+    },
+    "./surface/surface-mutation-guard": {
+      "types": "./dist/surface/surface-mutation-guard.d.ts",
+      "default": "./dist/surface/surface-mutation-guard.js"
+    },
+    "./surface/surface-provider-manifest-catalog": {
+      "types": "./dist/surface/surface-provider-manifest-catalog.d.ts",
+      "default": "./dist/surface/surface-provider-manifest-catalog.js"
+    },
+    "./surface/surface-provider-manifest": {
+      "types": "./dist/surface/surface-provider-manifest.d.ts",
+      "default": "./dist/surface/surface-provider-manifest.js"
+    },
+    "./surface/surface-provider-policy": {
+      "types": "./dist/surface/surface-provider-policy.d.ts",
+      "default": "./dist/surface/surface-provider-policy.js"
+    },
+    "./surface/surface-query-helpers": {
+      "types": "./dist/surface/surface-query-helpers.d.ts",
+      "default": "./dist/surface/surface-query-helpers.js"
+    },
+    "./surface/surface-query-overlay-catalog": {
+      "types": "./dist/surface/surface-query-overlay-catalog.d.ts",
+      "default": "./dist/surface/surface-query-overlay-catalog.js"
+    },
+    "./surface/surface-query": {
+      "types": "./dist/surface/surface-query.d.ts",
+      "default": "./dist/surface/surface-query.js"
+    },
+    "./surface/surface-request-input": {
+      "types": "./dist/surface/surface-request-input.d.ts",
+      "default": "./dist/surface/surface-request-input.js"
+    },
+    "./surface/surface-response-blocks": {
+      "types": "./dist/surface/surface-response-blocks.d.ts",
+      "default": "./dist/surface/surface-response-blocks.js"
+    },
+    "./surface/surface-role-catalog": {
+      "types": "./dist/surface/surface-role-catalog.d.ts",
+      "default": "./dist/surface/surface-role-catalog.js"
+    },
+    "./surface/surface-runtime-conversation-data": {
+      "types": "./dist/surface/surface-runtime-conversation-data.d.ts",
+      "default": "./dist/surface/surface-runtime-conversation-data.js"
+    },
+    "./surface/surface-runtime-external-response": {
+      "types": "./dist/surface/surface-runtime-external-response.d.ts",
+      "default": "./dist/surface/surface-runtime-external-response.js"
+    },
+    "./surface/surface-runtime-helpers": {
+      "types": "./dist/surface/surface-runtime-helpers.d.ts",
+      "default": "./dist/surface/surface-runtime-helpers.js"
+    },
+    "./surface/surface-runtime-orchestrator": {
+      "types": "./dist/surface/surface-runtime-orchestrator.d.ts",
+      "default": "./dist/surface/surface-runtime-orchestrator.js"
+    },
+    "./surface/surface-runtime-result": {
+      "types": "./dist/surface/surface-runtime-result.d.ts",
+      "default": "./dist/surface/surface-runtime-result.js"
+    },
+    "./surface/surface-runtime-router": {
+      "types": "./dist/surface/surface-runtime-router.d.ts",
+      "default": "./dist/surface/surface-runtime-router.js"
+    },
+    "./surface/surface-runtime": {
+      "types": "./dist/surface/surface-runtime.d.ts",
+      "default": "./dist/surface/surface-runtime.js"
+    },
+    "./surface/surface-steering-authority": {
+      "types": "./dist/surface/surface-steering-authority.d.ts",
+      "default": "./dist/surface/surface-steering-authority.js"
+    },
+    "./surface/surface-ux-contract": {
+      "types": "./dist/surface/surface-ux-contract.d.ts",
+      "default": "./dist/surface/surface-ux-contract.js"
+    },
+    "./surface/surface-ux": {
+      "types": "./dist/surface/surface-ux.d.ts",
+      "default": "./dist/surface/surface-ux.js"
+    },
+    "./task/task-distill-candidate": {
+      "types": "./dist/task/task-distill-candidate.d.ts",
+      "default": "./dist/task/task-distill-candidate.js"
+    },
+    "./task/task-executor": {
+      "types": "./dist/task/task-executor.d.ts",
+      "default": "./dist/task/task-executor.js"
+    },
+    "./task/task-knowledge-provisioning": {
+      "types": "./dist/task/task-knowledge-provisioning.d.ts",
+      "default": "./dist/task/task-knowledge-provisioning.js"
+    },
+    "./task/task-plan-coordinator-port": {
+      "types": "./dist/task/task-plan-coordinator-port.d.ts",
+      "default": "./dist/task/task-plan-coordinator-port.js"
+    },
+    "./task/task-result-contract": {
+      "types": "./dist/task/task-result-contract.d.ts",
+      "default": "./dist/task/task-result-contract.js"
+    },
+    "./task/task-routing-judgment": {
+      "types": "./dist/task/task-routing-judgment.d.ts",
+      "default": "./dist/task/task-routing-judgment.js"
+    },
+    "./task/task-scoped-grants": {
+      "types": "./dist/task/task-scoped-grants.d.ts",
+      "default": "./dist/task/task-scoped-grants.js"
+    },
+    "./task/task-session": {
+      "types": "./dist/task/task-session.d.ts",
+      "default": "./dist/task/task-session.js"
+    },
+    "./organization/team-composition-obligations": {
+      "types": "./dist/organization/team-composition-obligations.d.ts",
+      "default": "./dist/organization/team-composition-obligations.js"
+    },
     "./organization/team-decision-support-metrics": {
       "types": "./dist/organization/team-decision-support-metrics.d.ts",
       "default": "./dist/organization/team-decision-support-metrics.js"
+    },
+    "./organization/team-role-assignment-selection": {
+      "types": "./dist/organization/team-role-assignment-selection.d.ts",
+      "default": "./dist/organization/team-role-assignment-selection.js"
+    },
+    "./organization/team-role-selection": {
+      "types": "./dist/organization/team-role-selection.d.ts",
+      "default": "./dist/organization/team-role-selection.js"
+    },
+    "./organization/team-roster-proposal": {
+      "types": "./dist/organization/team-roster-proposal.d.ts",
+      "default": "./dist/organization/team-roster-proposal.js"
     },
     "./organization/tenant-activation": {
       "types": "./dist/organization/tenant-activation.d.ts",
@@ -4263,405 +5895,13 @@
       "types": "./dist/organization/tenant-rate-limiter.d.ts",
       "default": "./dist/organization/tenant-rate-limiter.js"
     },
-    "./organization/tenant-registry": {
-      "types": "./dist/organization/tenant-registry.d.ts",
-      "default": "./dist/organization/tenant-registry.js"
-    },
     "./organization/tenant-registry-exceptions": {
       "types": "./dist/organization/tenant-registry-exceptions.d.ts",
       "default": "./dist/organization/tenant-registry-exceptions.js"
     },
-    "./pipeline/adf-engine": {
-      "types": "./dist/pipeline/adf-engine.d.ts",
-      "default": "./dist/pipeline/adf-engine.js"
-    },
-    "./pipeline/adf-guardrails": {
-      "types": "./dist/pipeline/adf-guardrails.d.ts",
-      "default": "./dist/pipeline/adf-guardrails.js"
-    },
-    "./pipeline/adf-lifecycle": {
-      "types": "./dist/pipeline/adf-lifecycle.d.ts",
-      "default": "./dist/pipeline/adf-lifecycle.js"
-    },
-    "./pipeline/op-input-contracts": {
-      "types": "./dist/pipeline/op-input-contracts.d.ts",
-      "default": "./dist/pipeline/op-input-contracts.js"
-    },
-    "./pipeline/op-preflight": {
-      "types": "./dist/pipeline/op-preflight.d.ts",
-      "default": "./dist/pipeline/op-preflight.js"
-    },
-    "./pipeline/op-preflight-defaults": {
-      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
-      "default": "./dist/pipeline/op-preflight-defaults.js"
-    },
-    "./pipeline/op-suggestions": {
-      "types": "./dist/pipeline/op-suggestions.d.ts",
-      "default": "./dist/pipeline/op-suggestions.js"
-    },
-    "./pipeline/op-vocabulary": {
-      "types": "./dist/pipeline/op-vocabulary.d.ts",
-      "default": "./dist/pipeline/op-vocabulary.js"
-    },
-    "./pipeline/patch-decision": {
-      "types": "./dist/pipeline/patch-decision.d.ts",
-      "default": "./dist/pipeline/patch-decision.js"
-    },
-    "./pipeline/pipeline-contract": {
-      "types": "./dist/pipeline/pipeline-contract.d.ts",
-      "default": "./dist/pipeline/pipeline-contract.js"
-    },
-    "./pipeline/pipeline-dry-run": {
-      "types": "./dist/pipeline/pipeline-dry-run.d.ts",
-      "default": "./dist/pipeline/pipeline-dry-run.js"
-    },
-    "./pipeline/pipeline-input-contract": {
-      "types": "./dist/pipeline/pipeline-input-contract.d.ts",
-      "default": "./dist/pipeline/pipeline-input-contract.js"
-    },
-    "./pipeline/pipeline-run-journal": {
-      "types": "./dist/pipeline/pipeline-run-journal.d.ts",
-      "default": "./dist/pipeline/pipeline-run-journal.js"
-    },
-    "./plugin/plugin-host": {
-      "types": "./dist/plugin/plugin-host.d.ts",
-      "default": "./dist/plugin/plugin-host.js"
-    },
-    "./plugin/plugin-lifecycle": {
-      "types": "./dist/plugin/plugin-lifecycle.d.ts",
-      "default": "./dist/plugin/plugin-lifecycle.js"
-    },
-    "./plugin/plugin-managed-install": {
-      "types": "./dist/plugin/plugin-managed-install.d.ts",
-      "default": "./dist/plugin/plugin-managed-install.js"
-    },
-    "./plugin/plugin-pack": {
-      "types": "./dist/plugin/plugin-pack.d.ts",
-      "default": "./dist/plugin/plugin-pack.js"
-    },
-    "./plugin/plugin-view-actions": {
-      "types": "./dist/plugin/plugin-view-actions.d.ts",
-      "default": "./dist/plugin/plugin-view-actions.js"
-    },
-    "./plugin/plugin-view-contract": {
-      "types": "./dist/plugin/plugin-view-contract.d.ts",
-      "default": "./dist/plugin/plugin-view-contract.js"
-    },
-    "./plugin/plugin-view-frame": {
-      "types": "./dist/plugin/plugin-view-frame.d.ts",
-      "default": "./dist/plugin/plugin-view-frame.js"
-    },
-    "./plugin/skill-index": {
-      "types": "./dist/plugin/skill-index.d.ts",
-      "default": "./dist/plugin/skill-index.js"
-    },
-    "./plugin/skill-install-package-map": {
-      "types": "./dist/plugin/skill-install-package-map.d.ts",
-      "default": "./dist/plugin/skill-install-package-map.js"
-    },
-    "./plugin/skill-plugin-loader": {
-      "types": "./dist/plugin/skill-plugin-loader.d.ts",
-      "default": "./dist/plugin/skill-plugin-loader.js"
-    },
-    "./plugin/skill-resource-loader": {
-      "types": "./dist/plugin/skill-resource-loader.d.ts",
-      "default": "./dist/plugin/skill-resource-loader.js"
-    },
-    "./plugin/skill-wrapper": {
-      "types": "./dist/plugin/skill-wrapper.d.ts",
-      "default": "./dist/plugin/skill-wrapper.js"
-    },
-    "./project/project-management": {
-      "types": "./dist/project/project-management.d.ts",
-      "default": "./dist/project/project-management.js"
-    },
-    "./project/project-registry": {
-      "types": "./dist/project/project-registry.d.ts",
-      "default": "./dist/project/project-registry.js"
-    },
-    "./project/project-state-sync": {
-      "types": "./dist/project/project-state-sync.d.ts",
-      "default": "./dist/project/project-state-sync.js"
-    },
-    "./project/project-track-registry": {
-      "types": "./dist/project/project-track-registry.d.ts",
-      "default": "./dist/project/project-track-registry.js"
-    },
-    "./project/project-trust": {
-      "types": "./dist/project/project-trust.d.ts",
-      "default": "./dist/project/project-trust.js"
-    },
-    "./provider/claude-code-hook": {
-      "types": "./dist/provider/claude-code-hook.d.ts",
-      "default": "./dist/provider/claude-code-hook.js"
-    },
-    "./provider/claude-task-session-executor": {
-      "types": "./dist/provider/claude-task-session-executor.d.ts",
-      "default": "./dist/provider/claude-task-session-executor.js"
-    },
-    "./provider/provider-bridge": {
-      "types": "./dist/provider/provider-bridge.d.ts",
-      "default": "./dist/provider/provider-bridge.js"
-    },
-    "./provider/provider-capability-overview": {
-      "types": "./dist/provider/provider-capability-overview.d.ts",
-      "default": "./dist/provider/provider-capability-overview.js"
-    },
-    "./provider/provider-capability-registry": {
-      "types": "./dist/provider/provider-capability-registry.d.ts",
-      "default": "./dist/provider/provider-capability-registry.js"
-    },
-    "./provider/provider-capability-scanner": {
-      "types": "./dist/provider/provider-capability-scanner.d.ts",
-      "default": "./dist/provider/provider-capability-scanner.js"
-    },
-    "./provider/provider-cli-capability-report-policy": {
-      "types": "./dist/provider/provider-cli-capability-report-policy.d.ts",
-      "default": "./dist/provider/provider-cli-capability-report-policy.js"
-    },
-    "./provider/provider-discovery": {
-      "types": "./dist/provider/provider-discovery.d.ts",
-      "default": "./dist/provider/provider-discovery.js"
-    },
-    "./provider/provider-health-view": {
-      "types": "./dist/provider/provider-health-view.d.ts",
-      "default": "./dist/provider/provider-health-view.js"
-    },
-    "./provider/provider-managed-env": {
-      "types": "./dist/provider/provider-managed-env.d.ts",
-      "default": "./dist/provider/provider-managed-env.js"
-    },
-    "./provider/provider-pins-store": {
-      "types": "./dist/provider/provider-pins-store.d.ts",
-      "default": "./dist/provider/provider-pins-store.js"
-    },
-    "./reasoning/model-performance-index": {
-      "types": "./dist/reasoning/model-performance-index.d.ts",
-      "default": "./dist/reasoning/model-performance-index.js"
-    },
-    "./reasoning/model-registry-contract": {
-      "types": "./dist/reasoning/model-registry-contract.d.ts",
-      "default": "./dist/reasoning/model-registry-contract.js"
-    },
-    "./reasoning/model-registry-directory": {
-      "types": "./dist/reasoning/model-registry-directory.d.ts",
-      "default": "./dist/reasoning/model-registry-directory.js"
-    },
-    "./reasoning/model-role-fitness": {
-      "types": "./dist/reasoning/model-role-fitness.d.ts",
-      "default": "./dist/reasoning/model-role-fitness.js"
-    },
-    "./reasoning/model-role-fitness-runner": {
-      "types": "./dist/reasoning/model-role-fitness-runner.d.ts",
-      "default": "./dist/reasoning/model-role-fitness-runner.js"
-    },
-    "./reasoning/prompt-cache-discipline": {
-      "types": "./dist/reasoning/prompt-cache-discipline.d.ts",
-      "default": "./dist/reasoning/prompt-cache-discipline.js"
-    },
-    "./reasoning/reasoning-auth-preflight": {
-      "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
-      "default": "./dist/reasoning/reasoning-auth-preflight.js"
-    },
-    "./reasoning/reasoning-backend": {
-      "types": "./dist/reasoning/reasoning-backend.d.ts",
-      "default": "./dist/reasoning/reasoning-backend.js"
-    },
-    "./reasoning/reasoning-backend-contracts": {
-      "types": "./dist/reasoning/reasoning-backend-contracts.d.ts",
-      "default": "./dist/reasoning/reasoning-backend-contracts.js"
-    },
-    "./reasoning/reasoning-backend-execution-adapter": {
-      "types": "./dist/reasoning/reasoning-backend-execution-adapter.d.ts",
-      "default": "./dist/reasoning/reasoning-backend-execution-adapter.js"
-    },
-    "./reasoning/reasoning-backend-policy": {
-      "types": "./dist/reasoning/reasoning-backend-policy.d.ts",
-      "default": "./dist/reasoning/reasoning-backend-policy.js"
-    },
-    "./reasoning/reasoning-bootstrap": {
-      "types": "./dist/reasoning/reasoning-bootstrap.d.ts",
-      "default": "./dist/reasoning/reasoning-bootstrap.js"
-    },
-    "./reasoning/reasoning-degradation": {
-      "types": "./dist/reasoning/reasoning-degradation.d.ts",
-      "default": "./dist/reasoning/reasoning-degradation.js"
-    },
-    "./reasoning/reasoning-egress-scope": {
-      "types": "./dist/reasoning/reasoning-egress-scope.d.ts",
-      "default": "./dist/reasoning/reasoning-egress-scope.js"
-    },
-    "./reasoning/reasoning-endpoint-discovery": {
-      "types": "./dist/reasoning/reasoning-endpoint-discovery.d.ts",
-      "default": "./dist/reasoning/reasoning-endpoint-discovery.js"
-    },
-    "./reasoning/reasoning-failover": {
-      "types": "./dist/reasoning/reasoning-failover.d.ts",
-      "default": "./dist/reasoning/reasoning-failover.js"
-    },
-    "./reasoning/reasoning-model-routing": {
-      "types": "./dist/reasoning/reasoning-model-routing.d.ts",
-      "default": "./dist/reasoning/reasoning-model-routing.js"
-    },
-    "./reasoning/reasoning-participant": {
-      "types": "./dist/reasoning/reasoning-participant.d.ts",
-      "default": "./dist/reasoning/reasoning-participant.js"
-    },
-    "./reasoning/reasoning-provider-registry": {
-      "types": "./dist/reasoning/reasoning-provider-registry.d.ts",
-      "default": "./dist/reasoning/reasoning-provider-registry.js"
-    },
-    "./reasoning/reasoning-route-doctor": {
-      "types": "./dist/reasoning/reasoning-route-doctor.d.ts",
-      "default": "./dist/reasoning/reasoning-route-doctor.js"
-    },
-    "./reasoning/reasoning-route-resolver": {
-      "types": "./dist/reasoning/reasoning-route-resolver.d.ts",
-      "default": "./dist/reasoning/reasoning-route-resolver.js"
-    },
-    "./reasoning/reasoning-runtime-instructions": {
-      "types": "./dist/reasoning/reasoning-runtime-instructions.d.ts",
-      "default": "./dist/reasoning/reasoning-runtime-instructions.js"
-    },
-    "./scenario/scenario-definition": {
-      "types": "./dist/scenario/scenario-definition.d.ts",
-      "default": "./dist/scenario/scenario-definition.js"
-    },
-    "./scenario/scenario-executor": {
-      "types": "./dist/scenario/scenario-executor.d.ts",
-      "default": "./dist/scenario/scenario-executor.js"
-    },
-    "./scenario/scenario-final-checks": {
-      "types": "./dist/scenario/scenario-final-checks.d.ts",
-      "default": "./dist/scenario/scenario-final-checks.js"
-    },
-    "./scenario/scenario-interceptor": {
-      "types": "./dist/scenario/scenario-interceptor.d.ts",
-      "default": "./dist/scenario/scenario-interceptor.js"
-    },
-    "./scenario/scenario-model-fixtures": {
-      "types": "./dist/scenario/scenario-model-fixtures.d.ts",
-      "default": "./dist/scenario/scenario-model-fixtures.js"
-    },
-    "./scenario/scenario-report": {
-      "types": "./dist/scenario/scenario-report.d.ts",
-      "default": "./dist/scenario/scenario-report.js"
-    },
-    "./scenario/scenario-run-context": {
-      "types": "./dist/scenario/scenario-run-context.d.ts",
-      "default": "./dist/scenario/scenario-run-context.js"
-    },
-    "./scenario/scenario-side-effect-log": {
-      "types": "./dist/scenario/scenario-side-effect-log.d.ts",
-      "default": "./dist/scenario/scenario-side-effect-log.js"
-    },
-    "./scenario/scenario-trajectory": {
-      "types": "./dist/scenario/scenario-trajectory.d.ts",
-      "default": "./dist/scenario/scenario-trajectory.js"
-    },
-    "./secret/secret-bridge": {
-      "types": "./dist/secret/secret-bridge.d.ts",
-      "default": "./dist/secret/secret-bridge.js"
-    },
-    "./secret/secret-encryption": {
-      "types": "./dist/secret/secret-encryption.d.ts",
-      "default": "./dist/secret/secret-encryption.js"
-    },
-    "./secret/secret-guard": {
-      "types": "./dist/secret/secret-guard.d.ts",
-      "default": "./dist/secret/secret-guard.js"
-    },
-    "./secret/secret-identity": {
-      "types": "./dist/secret/secret-identity.d.ts",
-      "default": "./dist/secret/secret-identity.js"
-    },
-    "./secret/secret-introduction": {
-      "types": "./dist/secret/secret-introduction.d.ts",
-      "default": "./dist/secret/secret-introduction.js"
-    },
-    "./secret/vault-mount": {
-      "types": "./dist/secret/vault-mount.d.ts",
-      "default": "./dist/secret/vault-mount.js"
-    },
-    "./service/service-binding": {
-      "types": "./dist/service/service-binding.d.ts",
-      "default": "./dist/service/service-binding.js"
-    },
-    "./service/service-binding-registry": {
-      "types": "./dist/service/service-binding-registry.d.ts",
-      "default": "./dist/service/service-binding-registry.js"
-    },
-    "./service/service-connection-readiness": {
-      "types": "./dist/service/service-connection-readiness.d.ts",
-      "default": "./dist/service/service-connection-readiness.js"
-    },
-    "./service/service-distill-candidate": {
-      "types": "./dist/service/service-distill-candidate.d.ts",
-      "default": "./dist/service/service-distill-candidate.js"
-    },
-    "./service/service-endpoint-registry": {
-      "types": "./dist/service/service-endpoint-registry.d.ts",
-      "default": "./dist/service/service-endpoint-registry.js"
-    },
-    "./service/service-engine": {
-      "types": "./dist/service/service-engine.d.ts",
-      "default": "./dist/service/service-engine.js"
-    },
-    "./service/service-engine-helpers": {
-      "types": "./dist/service/service-engine-helpers.d.ts",
-      "default": "./dist/service/service-engine-helpers.js"
-    },
-    "./service/service-harness": {
-      "types": "./dist/service/service-harness.d.ts",
-      "default": "./dist/service/service-harness.js"
-    },
-    "./service/service-onboarding-catalog": {
-      "types": "./dist/service/service-onboarding-catalog.d.ts",
-      "default": "./dist/service/service-onboarding-catalog.js"
-    },
-    "./service/service-pid-registry": {
-      "types": "./dist/service/service-pid-registry.d.ts",
-      "default": "./dist/service/service-pid-registry.js"
-    },
-    "./service/service-preset-registry": {
-      "types": "./dist/service/service-preset-registry.d.ts",
-      "default": "./dist/service/service-preset-registry.js"
-    },
-    "./service/service-procedure-promotion": {
-      "types": "./dist/service/service-procedure-promotion.d.ts",
-      "default": "./dist/service/service-procedure-promotion.js"
-    },
-    "./service/service-recording": {
-      "types": "./dist/service/service-recording.d.ts",
-      "default": "./dist/service/service-recording.js"
-    },
-    "./service/service-recording-compiler": {
-      "types": "./dist/service/service-recording-compiler.d.ts",
-      "default": "./dist/service/service-recording-compiler.js"
-    },
-    "./service/service-recording-session": {
-      "types": "./dist/service/service-recording-session.d.ts",
-      "default": "./dist/service/service-recording-session.js"
-    },
-    "./service/service-runtime-registry": {
-      "types": "./dist/service/service-runtime-registry.d.ts",
-      "default": "./dist/service/service-runtime-registry.js"
-    },
-    "./service/service-validator": {
-      "types": "./dist/service/service-validator.d.ts",
-      "default": "./dist/service/service-validator.js"
-    },
-    "./shell/pty-engine": {
-      "types": "./dist/shell/pty-engine.d.ts",
-      "default": "./dist/shell/pty-engine.js"
-    },
-    "./shell/shell-streaming-stt-bridge": {
-      "types": "./dist/shell/shell-streaming-stt-bridge.d.ts",
-      "default": "./dist/shell/shell-streaming-stt-bridge.js"
-    },
-    "./shell/shell-streaming-tts-bridge": {
-      "types": "./dist/shell/shell-streaming-tts-bridge.d.ts",
-      "default": "./dist/shell/shell-streaming-tts-bridge.js"
+    "./organization/tenant-registry": {
+      "types": "./dist/organization/tenant-registry.d.ts",
+      "default": "./dist/organization/tenant-registry.js"
     },
     "./shell/terminal-bridge": {
       "types": "./dist/shell/terminal-bridge.d.ts",
@@ -4671,149 +5911,69 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./surface/a2ui-catalog": {
-      "types": "./dist/surface/a2ui-catalog.d.ts",
-      "default": "./dist/surface/a2ui-catalog.js"
-    },
-    "./surface/channel-adapter": {
-      "types": "./dist/surface/channel-adapter.d.ts",
-      "default": "./dist/surface/channel-adapter.js"
-    },
-    "./surface/channel-directory": {
-      "types": "./dist/surface/channel-directory.d.ts",
-      "default": "./dist/surface/channel-directory.js"
-    },
-    "./surface/channel-registry": {
-      "types": "./dist/surface/channel-registry.d.ts",
-      "default": "./dist/surface/channel-registry.js"
-    },
-    "./surface/channel-surface": {
-      "types": "./dist/surface/channel-surface.d.ts",
-      "default": "./dist/surface/channel-surface.js"
-    },
-    "./surface/channel-surface-types": {
-      "types": "./dist/surface/channel-surface-types.d.ts",
-      "default": "./dist/surface/channel-surface-types.js"
-    },
-    "./surface/operator-home-summary": {
-      "types": "./dist/surface/operator-home-summary.d.ts",
-      "default": "./dist/surface/operator-home-summary.js"
-    },
-    "./surface/operator-identity": {
-      "types": "./dist/surface/operator-identity.d.ts",
-      "default": "./dist/surface/operator-identity.js"
-    },
-    "./surface/operator-notifications": {
-      "types": "./dist/surface/operator-notifications.d.ts",
-      "default": "./dist/surface/operator-notifications.js"
-    },
-    "./surface/surface-access-policy": {
-      "types": "./dist/surface/surface-access-policy.d.ts",
-      "default": "./dist/surface/surface-access-policy.js"
-    },
-    "./surface/surface-agent-catalog": {
-      "types": "./dist/surface/surface-agent-catalog.d.ts",
-      "default": "./dist/surface/surface-agent-catalog.js"
-    },
-    "./surface/surface-approval-ui": {
-      "types": "./dist/surface/surface-approval-ui.d.ts",
-      "default": "./dist/surface/surface-approval-ui.js"
-    },
-    "./surface/surface-artifact-store": {
-      "types": "./dist/surface/surface-artifact-store.d.ts",
-      "default": "./dist/surface/surface-artifact-store.js"
-    },
-    "./surface/surface-authn": {
-      "types": "./dist/surface/surface-authn.d.ts",
-      "default": "./dist/surface/surface-authn.js"
-    },
-    "./surface/surface-authorization": {
-      "types": "./dist/surface/surface-authorization.d.ts",
-      "default": "./dist/surface/surface-authorization.js"
-    },
-    "./surface/surface-coordination-store": {
-      "types": "./dist/surface/surface-coordination-store.d.ts",
-      "default": "./dist/surface/surface-coordination-store.js"
-    },
-    "./surface/surface-delivery": {
-      "types": "./dist/surface/surface-delivery.d.ts",
-      "default": "./dist/surface/surface-delivery.js"
-    },
-    "./surface/surface-mission-proposals": {
-      "types": "./dist/surface/surface-mission-proposals.d.ts",
-      "default": "./dist/surface/surface-mission-proposals.js"
-    },
-    "./surface/surface-mutation-guard": {
-      "types": "./dist/surface/surface-mutation-guard.d.ts",
-      "default": "./dist/surface/surface-mutation-guard.js"
-    },
-    "./surface/surface-provider-manifest-catalog": {
-      "types": "./dist/surface/surface-provider-manifest-catalog.d.ts",
-      "default": "./dist/surface/surface-provider-manifest-catalog.js"
-    },
-    "./surface/surface-request-input": {
-      "types": "./dist/surface/surface-request-input.d.ts",
-      "default": "./dist/surface/surface-request-input.js"
-    },
-    "./surface/surface-role-catalog": {
-      "types": "./dist/surface/surface-role-catalog.d.ts",
-      "default": "./dist/surface/surface-role-catalog.js"
-    },
-    "./surface/surface-runtime": {
-      "types": "./dist/surface/surface-runtime.d.ts",
-      "default": "./dist/surface/surface-runtime.js"
-    },
-    "./surface/surface-runtime-orchestrator": {
-      "types": "./dist/surface/surface-runtime-orchestrator.d.ts",
-      "default": "./dist/surface/surface-runtime-orchestrator.js"
-    },
-    "./surface/surface-runtime-router": {
-      "types": "./dist/surface/surface-runtime-router.d.ts",
-      "default": "./dist/surface/surface-runtime-router.js"
-    },
-    "./surface/surface-ux": {
-      "types": "./dist/surface/surface-ux.d.ts",
-      "default": "./dist/surface/surface-ux.js"
-    },
-    "./surface/surface-ux-contract": {
-      "types": "./dist/surface/surface-ux-contract.d.ts",
-      "default": "./dist/surface/surface-ux-contract.js"
-    },
-    "./surface/ui-element-detector": {
-      "types": "./dist/surface/ui-element-detector.d.ts",
-      "default": "./dist/surface/ui-element-detector.js"
-    },
-    "./task/task-plan-coordinator-port": {
-      "types": "./dist/task/task-plan-coordinator-port.d.ts",
-      "default": "./dist/task/task-plan-coordinator-port.js"
-    },
-    "./task/task-session": {
-      "types": "./dist/task/task-session.d.ts",
-      "default": "./dist/task/task-session.js"
-    },
-    "./tool/runtime-health-history": {
-      "types": "./dist/tool/runtime-health-history.d.ts",
-      "default": "./dist/tool/runtime-health-history.js"
-    },
-    "./tool/runtime-supervisor": {
-      "types": "./dist/tool/runtime-supervisor.d.ts",
-      "default": "./dist/tool/runtime-supervisor.js"
+    "./tool/tool-actuator-routing": {
+      "types": "./dist/tool/tool-actuator-routing.d.ts",
+      "default": "./dist/tool/tool-actuator-routing.js"
     },
     "./tool/tool-binary-resolvers": {
       "types": "./dist/tool/tool-binary-resolvers.d.ts",
       "default": "./dist/tool/tool-binary-resolvers.js"
     },
+    "./tool/tool-call-repeat-governor": {
+      "types": "./dist/tool/tool-call-repeat-governor.d.ts",
+      "default": "./dist/tool/tool-call-repeat-governor.js"
+    },
     "./tool/tool-call-scheduler": {
       "types": "./dist/tool/tool-call-scheduler.d.ts",
       "default": "./dist/tool/tool-call-scheduler.js"
+    },
+    "./tool/tool-loop-guardrail": {
+      "types": "./dist/tool/tool-loop-guardrail.d.ts",
+      "default": "./dist/tool/tool-loop-guardrail.js"
+    },
+    "./tool/tool-repeat-advisor": {
+      "types": "./dist/tool/tool-repeat-advisor.d.ts",
+      "default": "./dist/tool/tool-repeat-advisor.js"
+    },
+    "./tool/tool-runtime-policy": {
+      "types": "./dist/tool/tool-runtime-policy.d.ts",
+      "default": "./dist/tool/tool-runtime-policy.js"
     },
     "./tool/tool-runtime-registry": {
       "types": "./dist/tool/tool-runtime-registry.d.ts",
       "default": "./dist/tool/tool-runtime-registry.js"
     },
-    "./video/narrated-video-brief-compiler": {
-      "types": "./dist/video/narrated-video-brief-compiler.d.ts",
-      "default": "./dist/video/narrated-video-brief-compiler.js"
+    "./analysis/trace-procedure-candidate": {
+      "types": "./dist/analysis/trace-procedure-candidate.d.ts",
+      "default": "./dist/analysis/trace-procedure-candidate.js"
+    },
+    "./analysis/trace-schema": {
+      "types": "./dist/analysis/trace-schema.d.ts",
+      "default": "./dist/analysis/trace-schema.js"
+    },
+    "./voice/tts-loopback-verifier": {
+      "types": "./dist/voice/tts-loopback-verifier.d.ts",
+      "default": "./dist/voice/tts-loopback-verifier.js"
+    },
+    "./surface/ui-element-detector": {
+      "types": "./dist/surface/ui-element-detector.d.ts",
+      "default": "./dist/surface/ui-element-detector.js"
+    },
+    "./voice/vad-bridge-protocol": {
+      "types": "./dist/voice/vad-bridge-protocol.d.ts",
+      "default": "./dist/voice/vad-bridge-protocol.js"
+    },
+    "./voice/vad-registry": {
+      "types": "./dist/voice/vad-registry.d.ts",
+      "default": "./dist/voice/vad-registry.js"
+    },
+    "./voice/vad-turn-recorder": {
+      "types": "./dist/voice/vad-turn-recorder.d.ts",
+      "default": "./dist/voice/vad-turn-recorder.js"
+    },
+    "./secret/vault-mount": {
+      "types": "./dist/secret/vault-mount.d.ts",
+      "default": "./dist/secret/vault-mount.js"
     },
     "./video/video-composition-compiler": {
       "types": "./dist/video/video-composition-compiler.d.ts",
@@ -4827,13 +5987,29 @@
       "types": "./dist/video/video-composition-lint.d.ts",
       "default": "./dist/video/video-composition-lint.js"
     },
+    "./video/video-composition-rendering": {
+      "types": "./dist/video/video-composition-rendering.d.ts",
+      "default": "./dist/video/video-composition-rendering.js"
+    },
     "./video/video-composition-template-registry": {
       "types": "./dist/video/video-composition-template-registry.d.ts",
       "default": "./dist/video/video-composition-template-registry.js"
     },
+    "./video/video-content-brief-compiler": {
+      "types": "./dist/video/video-content-brief-compiler.d.ts",
+      "default": "./dist/video/video-content-brief-compiler.js"
+    },
     "./video/video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
       "default": "./dist/video/video-content-brief-contract.js"
+    },
+    "./video/video-design-system": {
+      "types": "./dist/video/video-design-system.d.ts",
+      "default": "./dist/video/video-design-system.js"
+    },
+    "./video/video-device-lease": {
+      "types": "./dist/video/video-device-lease.d.ts",
+      "default": "./dist/video/video-device-lease.js"
     },
     "./video/video-frame-archive": {
       "types": "./dist/video/video-frame-archive.d.ts",
@@ -4851,13 +6027,17 @@
       "types": "./dist/video/video-render-backend.d.ts",
       "default": "./dist/video/video-render-backend.js"
     },
+    "./video/video-render-runtime-policy": {
+      "types": "./dist/video/video-render-runtime-policy.d.ts",
+      "default": "./dist/video/video-render-runtime-policy.js"
+    },
     "./video/video-render-runtime": {
       "types": "./dist/video/video-render-runtime.d.ts",
       "default": "./dist/video/video-render-runtime.js"
     },
-    "./video/video-render-runtime-policy": {
-      "types": "./dist/video/video-render-runtime-policy.d.ts",
-      "default": "./dist/video/video-render-runtime-policy.js"
+    "./video/video-route": {
+      "types": "./dist/video/video-route.d.ts",
+      "default": "./dist/video/video-route.js"
     },
     "./video/video-scene-composition": {
       "types": "./dist/video/video-scene-composition.d.ts",
@@ -4867,61 +6047,9 @@
       "types": "./dist/video/video-visual-direction.d.ts",
       "default": "./dist/video/video-visual-direction.js"
     },
-    "./virtual/computer-surface": {
-      "types": "./dist/virtual/computer-surface.d.ts",
-      "default": "./dist/virtual/computer-surface.js"
-    },
-    "./virtual/desktop-event-feed": {
-      "types": "./dist/virtual/desktop-event-feed.d.ts",
-      "default": "./dist/virtual/desktop-event-feed.js"
-    },
-    "./virtual/desktop-intent-reconstruction": {
-      "types": "./dist/virtual/desktop-intent-reconstruction.d.ts",
-      "default": "./dist/virtual/desktop-intent-reconstruction.js"
-    },
-    "./virtual/desktop-launch-adapter": {
-      "types": "./dist/virtual/desktop-launch-adapter.d.ts",
-      "default": "./dist/virtual/desktop-launch-adapter.js"
-    },
-    "./virtual/desktop-pipeline": {
-      "types": "./dist/virtual/desktop-pipeline.d.ts",
-      "default": "./dist/virtual/desktop-pipeline.js"
-    },
-    "./virtual/desktop-promotion-transaction": {
-      "types": "./dist/virtual/desktop-promotion-transaction.d.ts",
-      "default": "./dist/virtual/desktop-promotion-transaction.js"
-    },
-    "./virtual/desktop-recording": {
-      "types": "./dist/virtual/desktop-recording.d.ts",
-      "default": "./dist/virtual/desktop-recording.js"
-    },
-    "./virtual/desktop-recording-compiler": {
-      "types": "./dist/virtual/desktop-recording-compiler.d.ts",
-      "default": "./dist/virtual/desktop-recording-compiler.js"
-    },
-    "./virtual/os-automation": {
-      "types": "./dist/virtual/os-automation.d.ts",
-      "default": "./dist/virtual/os-automation.js"
-    },
-    "./virtual/os-automation-bridge": {
-      "types": "./dist/virtual/os-automation-bridge.d.ts",
-      "default": "./dist/virtual/os-automation-bridge.js"
-    },
-    "./virtual/screen-capture-bridge": {
-      "types": "./dist/virtual/screen-capture-bridge.d.ts",
-      "default": "./dist/virtual/screen-capture-bridge.js"
-    },
-    "./virtual/screen-display-inventory-bridge": {
-      "types": "./dist/virtual/screen-display-inventory-bridge.d.ts",
-      "default": "./dist/virtual/screen-display-inventory-bridge.js"
-    },
-    "./virtual/screen-frame-redaction": {
-      "types": "./dist/virtual/screen-frame-redaction.d.ts",
-      "default": "./dist/virtual/screen-frame-redaction.js"
-    },
-    "./virtual/screen-recording-bridge": {
-      "types": "./dist/virtual/screen-recording-bridge.d.ts",
-      "default": "./dist/virtual/screen-recording-bridge.js"
+    "./virtual/virtual-audio-device-bridge": {
+      "types": "./dist/virtual/virtual-audio-device-bridge.d.ts",
+      "default": "./dist/virtual/virtual-audio-device-bridge.js"
     },
     "./virtual/virtual-audio-input-recording-bridge": {
       "types": "./dist/virtual/virtual-audio-input-recording-bridge.d.ts",
@@ -4951,57 +6079,13 @@
       "types": "./dist/virtual/virtual-media-device-control-bridge.d.ts",
       "default": "./dist/virtual/virtual-media-device-control-bridge.js"
     },
-    "./voice/audio-bus": {
-      "types": "./dist/voice/audio-bus.d.ts",
-      "default": "./dist/voice/audio-bus.js"
+    "./knowledge/vocabulary-catalog": {
+      "types": "./dist/knowledge/vocabulary-catalog.d.ts",
+      "default": "./dist/knowledge/vocabulary-catalog.js"
     },
-    "./voice/audio-bus-bridge": {
-      "types": "./dist/voice/audio-bus-bridge.d.ts",
-      "default": "./dist/voice/audio-bus-bridge.js"
-    },
-    "./voice/audio-bus-resolver": {
-      "types": "./dist/voice/audio-bus-resolver.d.ts",
-      "default": "./dist/voice/audio-bus-resolver.js"
-    },
-    "./voice/audio-playback": {
-      "types": "./dist/voice/audio-playback.d.ts",
-      "default": "./dist/voice/audio-playback.js"
-    },
-    "./voice/realtime-voice-conversation": {
-      "types": "./dist/voice/realtime-voice-conversation.d.ts",
-      "default": "./dist/voice/realtime-voice-conversation.js"
-    },
-    "./voice/realtime-voice-loop": {
-      "types": "./dist/voice/realtime-voice-loop.d.ts",
-      "default": "./dist/voice/realtime-voice-loop.js"
-    },
-    "./voice/realtime-voice-preferences": {
-      "types": "./dist/voice/realtime-voice-preferences.d.ts",
-      "default": "./dist/voice/realtime-voice-preferences.js"
-    },
-    "./voice/speech-to-text-bridge": {
-      "types": "./dist/voice/speech-to-text-bridge.d.ts",
-      "default": "./dist/voice/speech-to-text-bridge.js"
-    },
-    "./voice/streaming-stt-bridge": {
-      "types": "./dist/voice/streaming-stt-bridge.d.ts",
-      "default": "./dist/voice/streaming-stt-bridge.js"
-    },
-    "./voice/streaming-tts-bridge": {
-      "types": "./dist/voice/streaming-tts-bridge.d.ts",
-      "default": "./dist/voice/streaming-tts-bridge.js"
-    },
-    "./voice/tts-loopback-verifier": {
-      "types": "./dist/voice/tts-loopback-verifier.d.ts",
-      "default": "./dist/voice/tts-loopback-verifier.js"
-    },
-    "./voice/vad-registry": {
-      "types": "./dist/voice/vad-registry.d.ts",
-      "default": "./dist/voice/vad-registry.js"
-    },
-    "./voice/vad-turn-recorder": {
-      "types": "./dist/voice/vad-turn-recorder.d.ts",
-      "default": "./dist/voice/vad-turn-recorder.js"
+    "./knowledge/vocabulary-keys.generated": {
+      "types": "./dist/knowledge/vocabulary-keys.generated.d.ts",
+      "default": "./dist/knowledge/vocabulary-keys.generated.js"
     },
     "./voice/voice-activity-detector": {
       "types": "./dist/voice/voice-activity-detector.d.ts",
@@ -5023,6 +6107,14 @@
       "types": "./dist/voice/voice-engine-registry.d.ts",
       "default": "./dist/voice/voice-engine-registry.js"
     },
+    "./voice/voice-eot-scorer": {
+      "types": "./dist/voice/voice-eot-scorer.d.ts",
+      "default": "./dist/voice/voice-eot-scorer.js"
+    },
+    "./voice/voice-first-phrase-cache": {
+      "types": "./dist/voice/voice-first-phrase-cache.d.ts",
+      "default": "./dist/voice/voice-first-phrase-cache.js"
+    },
     "./voice/voice-generation-runtime": {
       "types": "./dist/voice/voice-generation-runtime.d.ts",
       "default": "./dist/voice/voice-generation-runtime.js"
@@ -5030,6 +6122,10 @@
     "./voice/voice-path-policy": {
       "types": "./dist/voice/voice-path-policy.d.ts",
       "default": "./dist/voice/voice-path-policy.js"
+    },
+    "./voice/voice-phrase-chunker": {
+      "types": "./dist/voice/voice-phrase-chunker.d.ts",
+      "default": "./dist/voice/voice-phrase-chunker.js"
     },
     "./voice/voice-profile-promotion": {
       "types": "./dist/voice/voice-profile-promotion.d.ts",
@@ -5042,6 +6138,10 @@
     "./voice/voice-provider-adapters": {
       "types": "./dist/voice/voice-provider-adapters.d.ts",
       "default": "./dist/voice/voice-provider-adapters.js"
+    },
+    "./voice/voice-respond-gate": {
+      "types": "./dist/voice/voice-respond-gate.d.ts",
+      "default": "./dist/voice/voice-respond-gate.js"
     },
     "./voice/voice-runtime-policy": {
       "types": "./dist/voice/voice-runtime-policy.d.ts",
@@ -5063,6 +6163,10 @@
       "types": "./dist/voice/voice-selection-preferences.d.ts",
       "default": "./dist/voice/voice-selection-preferences.js"
     },
+    "./voice/voice-speculative-policy": {
+      "types": "./dist/voice/voice-speculative-policy.d.ts",
+      "default": "./dist/voice/voice-speculative-policy.js"
+    },
     "./voice/voice-stt": {
       "types": "./dist/voice/voice-stt.d.ts",
       "default": "./dist/voice/voice-stt.js"
@@ -5070,6 +6174,10 @@
     "./voice/voice-synth": {
       "types": "./dist/voice/voice-synth.d.ts",
       "default": "./dist/voice/voice-synth.js"
+    },
+    "./voice/voice-task-profile-catalog": {
+      "types": "./dist/voice/voice-task-profile-catalog.d.ts",
+      "default": "./dist/voice/voice-task-profile-catalog.js"
     },
     "./voice/voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
@@ -5083,213 +6191,621 @@
       "types": "./dist/voice/voice-tts-config.d.ts",
       "default": "./dist/voice/voice-tts-config.js"
     },
-    "./workforceforce/artifact-record": {
-      "types": "./dist/workforce/artifact-record.d.ts",
-      "default": "./dist/workforce/artifact-record.js"
+    "./voice/voice-turn-cancellation": {
+      "types": "./dist/voice/voice-turn-cancellation.d.ts",
+      "default": "./dist/voice/voice-turn-cancellation.js"
     },
-    "./workforceforce/artifact-review": {
-      "types": "./dist/workforce/artifact-review.d.ts",
-      "default": "./dist/workforce/artifact-review.js"
+    "./voice/voice-turn-taking-lexicon": {
+      "types": "./dist/voice/voice-turn-taking-lexicon.d.ts",
+      "default": "./dist/voice/voice-turn-taking-lexicon.js"
     },
-    "./workforceforce/artifact-store": {
-      "types": "./dist/workforce/artifact-store.d.ts",
-      "default": "./dist/workforce/artifact-store.js"
+    "./voice/voice-turn-taking": {
+      "types": "./dist/voice/voice-turn-taking.d.ts",
+      "default": "./dist/voice/voice-turn-taking.js"
     },
-    "./workforceforce/artifact-verification": {
-      "types": "./dist/workforce/artifact-verification.d.ts",
-      "default": "./dist/workforce/artifact-verification.js"
+    "./voice/voice-workbench": {
+      "types": "./dist/voice/voice-workbench.d.ts",
+      "default": "./dist/voice/voice-workbench.js"
     },
-    "./workforceforce/background-review-curator": {
-      "types": "./dist/workforce/background-review-curator.d.ts",
-      "default": "./dist/workforce/background-review-curator.js"
+    "./workforce/work-coordination-error": {
+      "types": "./dist/workforce/work-coordination-error.d.ts",
+      "default": "./dist/workforce/work-coordination-error.js"
     },
-    "./workforceforce/background-review-nudge": {
-      "types": "./dist/workforce/background-review-nudge.d.ts",
-      "default": "./dist/workforce/background-review-nudge.js"
-    },
-    "./workforceforce/background-review-patch": {
-      "types": "./dist/workforce/background-review-patch.d.ts",
-      "default": "./dist/workforce/background-review-patch.js"
-    },
-    "./workforceforce/work-coordination": {
-      "types": "./dist/workforce/work-coordination.d.ts",
-      "default": "./dist/workforce/work-coordination.js"
-    },
-    "./workforceforce/work-coordination-import-catalog": {
+    "./workforce/work-coordination-import-catalog": {
       "types": "./dist/workforce/work-coordination-import-catalog.d.ts",
       "default": "./dist/workforce/work-coordination-import-catalog.js"
     },
-    "./workforceforce/work-design": {
+    "./workforce/work-coordination-peer": {
+      "types": "./dist/workforce/work-coordination-peer.d.ts",
+      "default": "./dist/workforce/work-coordination-peer.js"
+    },
+    "./workforce/work-coordination-types": {
+      "types": "./dist/workforce/work-coordination-types.d.ts",
+      "default": "./dist/workforce/work-coordination-types.js"
+    },
+    "./workforce/work-coordination": {
+      "types": "./dist/workforce/work-coordination.d.ts",
+      "default": "./dist/workforce/work-coordination.js"
+    },
+    "./workforce/work-design": {
       "types": "./dist/workforce/work-design.d.ts",
       "default": "./dist/workforce/work-design.js"
     },
-    "./workforceforce/work-graph-projection": {
+    "./workforce/work-graph-projection": {
       "types": "./dist/workforce/work-graph-projection.d.ts",
       "default": "./dist/workforce/work-graph-projection.js"
     },
-    "./workforceforce/work-inventory": {
-      "types": "./dist/workforce/work-inventory.d.ts",
-      "default": "./dist/workforce/work-inventory.js"
+    "./workforce/work-graph": {
+      "types": "./dist/workforce/work-graph.d.ts",
+      "default": "./dist/workforce/work-graph.js"
     },
-    "./workforceforce/work-inventory-consent": {
+    "./workforce/work-inventory-consent": {
       "types": "./dist/workforce/work-inventory-consent.d.ts",
       "default": "./dist/workforce/work-inventory-consent.js"
     },
-    "./workforceforce/work-inventory-decompose": {
+    "./workforce/work-inventory-decompose": {
       "types": "./dist/workforce/work-inventory-decompose.d.ts",
       "default": "./dist/workforce/work-inventory-decompose.js"
     },
-    "./workforceforce/work-inventory-harvest": {
+    "./workforce/work-inventory-harvest": {
       "types": "./dist/workforce/work-inventory-harvest.d.ts",
       "default": "./dist/workforce/work-inventory-harvest.js"
     },
-    "./workforceforce/work-inventory-observation": {
+    "./workforce/work-inventory-observation": {
       "types": "./dist/workforce/work-inventory-observation.d.ts",
       "default": "./dist/workforce/work-inventory-observation.js"
     },
-    "./workforceforce/work-inventory-promotion": {
+    "./workforce/work-inventory-promotion": {
       "types": "./dist/workforce/work-inventory-promotion.d.ts",
       "default": "./dist/workforce/work-inventory-promotion.js"
     },
-    "./workforceforce/work-inventory-scoring": {
+    "./workforce/work-inventory-scoring": {
       "types": "./dist/workforce/work-inventory-scoring.d.ts",
       "default": "./dist/workforce/work-inventory-scoring.js"
     },
-    "./workforceforce/work-scope-decision": {
+    "./workforce/work-inventory": {
+      "types": "./dist/workforce/work-inventory.d.ts",
+      "default": "./dist/workforce/work-inventory.js"
+    },
+    "./workforce/work-scope-decision": {
       "types": "./dist/workforce/work-scope-decision.d.ts",
       "default": "./dist/workforce/work-scope-decision.js"
     },
-    "./workforceforce/work-visibility": {
+    "./workforce/work-visibility": {
       "types": "./dist/workforce/work-visibility.d.ts",
       "default": "./dist/workforce/work-visibility.js"
     },
-    "./workforceforce/worker-event-stream": {
+    "./workforce/worker-assignment-policy": {
+      "types": "./dist/workforce/worker-assignment-policy.d.ts",
+      "default": "./dist/workforce/worker-assignment-policy.js"
+    },
+    "./workforce/worker-context-compaction": {
+      "types": "./dist/workforce/worker-context-compaction.d.ts",
+      "default": "./dist/workforce/worker-context-compaction.js"
+    },
+    "./workforce/worker-event-stream": {
       "types": "./dist/workforce/worker-event-stream.d.ts",
       "default": "./dist/workforce/worker-event-stream.js"
     },
-    "./workforceforce/workspace-ledger": {
+    "./workforce/worker-goal-driver": {
+      "types": "./dist/workforce/worker-goal-driver.d.ts",
+      "default": "./dist/workforce/worker-goal-driver.js"
+    },
+    "./workforce/worker-goal": {
+      "types": "./dist/workforce/worker-goal.d.ts",
+      "default": "./dist/workforce/worker-goal.js"
+    },
+    "./workforce/worker-proxy": {
+      "types": "./dist/workforce/worker-proxy.d.ts",
+      "default": "./dist/workforce/worker-proxy.js"
+    },
+    "./workforce/worker-state-journal": {
+      "types": "./dist/workforce/worker-state-journal.d.ts",
+      "default": "./dist/workforce/worker-state-journal.js"
+    },
+    "./workforce/workspace-budget": {
+      "types": "./dist/workforce/workspace-budget.d.ts",
+      "default": "./dist/workforce/workspace-budget.js"
+    },
+    "./workforce/workspace-ledger": {
       "types": "./dist/workforce/workspace-ledger.d.ts",
       "default": "./dist/workforce/workspace-ledger.js"
     },
-    "./actuator": {
-      "types": "./dist/actuator/index.d.ts",
-      "default": "./dist/actuator/index.js"
+    "./workforce/workspace-process-identity": {
+      "types": "./dist/workforce/workspace-process-identity.d.ts",
+      "default": "./dist/workforce/workspace-process-identity.js"
     },
-    "./agent": {
-      "types": "./dist/agent/index.d.ts",
-      "default": "./dist/agent/index.js"
+    "./workforce/workspace-sweep": {
+      "types": "./dist/workforce/workspace-sweep.d.ts",
+      "default": "./dist/workforce/workspace-sweep.js"
     },
-    "./analysis": {
-      "types": "./dist/analysis/index.d.ts",
-      "default": "./dist/analysis/index.js"
+    "./pipeline/cron-utils": {
+      "types": "./dist/pipeline/cron-utils.d.ts",
+      "default": "./dist/pipeline/cron-utils.js"
     },
-    "./browser": {
-      "types": "./dist/browser/index.d.ts",
-      "default": "./dist/browser/index.js"
+    "./media/pptx-utils": {
+      "types": "./dist/media/pptx-utils.d.ts",
+      "default": "./dist/media/pptx-utils.js"
     },
-    "./contracts": {
+    "./pipeline/logic-utils": {
+      "types": "./dist/pipeline/logic-utils.d.ts",
+      "default": "./dist/pipeline/logic-utils.js"
+    },
+    "./foundation/lock-utils": {
+      "types": "./dist/foundation/lock-utils.d.ts",
+      "default": "./dist/foundation/lock-utils.js"
+    },
+    "./media/font-stack": {
+      "types": "./dist/media/font-stack.d.ts",
+      "default": "./dist/media/font-stack.js"
+    },
+    "./knowledge/knowledge-index": {
+      "types": "./dist/knowledge/knowledge-index.d.ts",
+      "default": "./dist/knowledge/knowledge-index.js"
+    },
+    "./actuator/actuator-manifest-index": {
+      "types": "./dist/actuator/actuator-manifest-index.d.ts",
+      "default": "./dist/actuator/actuator-manifest-index.js"
+    },
+    "./media/xlsx-number-format": {
+      "types": "./dist/media/xlsx-number-format.d.ts",
+      "default": "./dist/media/xlsx-number-format.js"
+    },
+    "./pipeline/retry-utils": {
+      "types": "./dist/pipeline/retry-utils.d.ts",
+      "default": "./dist/pipeline/retry-utils.js"
+    },
+    "./media/pdf-utils": {
+      "types": "./dist/media/pdf-utils.d.ts",
+      "default": "./dist/media/pdf-utils.js"
+    },
+    "./knowledge/knowledge-feedback-loop": {
+      "types": "./dist/knowledge/knowledge-feedback-loop.d.ts",
+      "default": "./dist/knowledge/knowledge-feedback-loop.js"
+    },
+    "./media/protocol-to-markdown": {
+      "types": "./dist/media/protocol-to-markdown.d.ts",
+      "default": "./dist/media/protocol-to-markdown.js"
+    },
+    "./actuator/actuator-capability": {
+      "types": "./dist/actuator/actuator-capability.d.ts",
+      "default": "./dist/actuator/actuator-capability.js"
+    },
+    "./knowledge/knowledge-curation-report": {
+      "types": "./dist/knowledge/knowledge-curation-report.d.ts",
+      "default": "./dist/knowledge/knowledge-curation-report.js"
+    },
+    "./knowledge/feedback-loop": {
+      "types": "./dist/knowledge/feedback-loop.d.ts",
+      "default": "./dist/knowledge/feedback-loop.js"
+    },
+    "./media/xlsx-utils": {
+      "types": "./dist/media/xlsx-utils.d.ts",
+      "default": "./dist/media/xlsx-utils.js"
+    },
+    "./actuator/actuator-example-catalog": {
+      "types": "./dist/actuator/actuator-example-catalog.d.ts",
+      "default": "./dist/actuator/actuator-example-catalog.js"
+    },
+    "./knowledge/knowledge-curation-tenant-ingest": {
+      "types": "./dist/knowledge/knowledge-curation-tenant-ingest.d.ts",
+      "default": "./dist/knowledge/knowledge-curation-tenant-ingest.js"
+    },
+    "./media/docx-utils": {
+      "types": "./dist/media/docx-utils.d.ts",
+      "default": "./dist/media/docx-utils.js"
+    },
+    "./pipeline/pipeline-engine": {
+      "types": "./dist/pipeline/pipeline-engine.d.ts",
+      "default": "./dist/pipeline/pipeline-engine.js"
+    },
+    "./analysis/trace": {
+      "types": "./dist/analysis/trace.d.ts",
+      "default": "./dist/analysis/trace.js"
+    },
+    "./pipeline/pipeline-preview": {
+      "types": "./dist/pipeline/pipeline-preview.d.ts",
+      "default": "./dist/pipeline/pipeline-preview.js"
+    },
+    "./intent/intent-compiler": {
+      "types": "./dist/intent/intent-compiler.d.ts",
+      "default": "./dist/intent/intent-compiler.js"
+    },
+    "./pipeline/pipeline-scheduler": {
+      "types": "./dist/pipeline/pipeline-scheduler.d.ts",
+      "default": "./dist/pipeline/pipeline-scheduler.js"
+    },
+    "./pfc/PhysicalLayer": {
+      "types": "./dist/pfc/PhysicalLayer.d.ts",
+      "default": "./dist/pfc/PhysicalLayer.js"
+    },
+    "./pfc/SovereignSentinel": {
+      "types": "./dist/pfc/SovereignSentinel.d.ts",
+      "default": "./dist/pfc/SovereignSentinel.js"
+    },
+    "./pfc/PfcController": {
+      "types": "./dist/pfc/PfcController.d.ts",
+      "default": "./dist/pfc/PfcController.js"
+    },
+    "./pfc/ServiceValidator": {
+      "types": "./dist/pfc/ServiceValidator.d.ts",
+      "default": "./dist/pfc/ServiceValidator.js"
+    },
+    "./contracts/ui-flow-adf": {
+      "types": "./dist/contracts/ui-flow-adf.d.ts",
+      "default": "./dist/contracts/ui-flow-adf.js"
+    },
+    "./contracts/system-status-brief": {
+      "types": "./dist/contracts/system-status-brief.d.ts",
+      "default": "./dist/contracts/system-status-brief.js"
+    },
+    "./contracts/operator-interaction-packet": {
+      "types": "./dist/contracts/operator-interaction-packet.d.ts",
+      "default": "./dist/contracts/operator-interaction-packet.js"
+    },
+    "./contracts/booking-preference-profile": {
+      "types": "./dist/contracts/booking-preference-profile.d.ts",
+      "default": "./dist/contracts/booking-preference-profile.js"
+    },
+    "./contracts/presentation-preference-profile": {
+      "types": "./dist/contracts/presentation-preference-profile.d.ts",
+      "default": "./dist/contracts/presentation-preference-profile.js"
+    },
+    "./contracts/xlsx-protocol": {
+      "types": "./dist/contracts/xlsx-protocol.d.ts",
+      "default": "./dist/contracts/xlsx-protocol.js"
+    },
+    "./contracts/travel-planning-brief": {
+      "types": "./dist/contracts/travel-planning-brief.d.ts",
+      "default": "./dist/contracts/travel-planning-brief.js"
+    },
+    "./contracts/meeting-operations-brief": {
+      "types": "./dist/contracts/meeting-operations-brief.d.ts",
+      "default": "./dist/contracts/meeting-operations-brief.js"
+    },
+    "./contracts/music-generation-adf": {
+      "types": "./dist/contracts/music-generation-adf.d.ts",
+      "default": "./dist/contracts/music-generation-adf.js"
+    },
+    "./contracts/delivery-pack": {
+      "types": "./dist/contracts/delivery-pack.d.ts",
+      "default": "./dist/contracts/delivery-pack.js"
+    },
+    "./contracts/excel-protocol": {
+      "types": "./dist/contracts/excel-protocol.d.ts",
+      "default": "./dist/contracts/excel-protocol.js"
+    },
+    "./contracts/proposal-brief": {
+      "types": "./dist/contracts/proposal-brief.d.ts",
+      "default": "./dist/contracts/proposal-brief.js"
+    },
+    "./contracts/architecture-adf": {
+      "types": "./dist/contracts/architecture-adf.d.ts",
+      "default": "./dist/contracts/architecture-adf.js"
+    },
+    "./contracts/skill-input": {
+      "types": "./dist/contracts/skill-input.d.ts",
+      "default": "./dist/contracts/skill-input.js"
+    },
+    "./contracts/mobile-app-profile-index": {
+      "types": "./dist/contracts/mobile-app-profile-index.d.ts",
+      "default": "./dist/contracts/mobile-app-profile-index.js"
+    },
+    "./contracts/narrated-video-upload-package": {
+      "types": "./dist/contracts/narrated-video-upload-package.d.ts",
+      "default": "./dist/contracts/narrated-video-upload-package.js"
+    },
+    "./contracts/proposal-storyline-adf": {
+      "types": "./dist/contracts/proposal-storyline-adf.d.ts",
+      "default": "./dist/contracts/proposal-storyline-adf.js"
+    },
+    "./contracts/document-protocol": {
+      "types": "./dist/contracts/document-protocol.d.ts",
+      "default": "./dist/contracts/document-protocol.js"
+    },
+    "./contracts/skill-output": {
+      "types": "./dist/contracts/skill-output.d.ts",
+      "default": "./dist/contracts/skill-output.js"
+    },
+    "./contracts/actuator-resolution-plan": {
+      "types": "./dist/contracts/actuator-resolution-plan.d.ts",
+      "default": "./dist/contracts/actuator-resolution-plan.js"
+    },
+    "./contracts/pptx-protocol": {
+      "types": "./dist/contracts/pptx-protocol.d.ts",
+      "default": "./dist/contracts/pptx-protocol.js"
+    },
+    "./contracts/slide-pattern-pack": {
+      "types": "./dist/contracts/slide-pattern-pack.d.ts",
+      "default": "./dist/contracts/slide-pattern-pack.js"
+    },
+    "./contracts/docx-protocol": {
+      "types": "./dist/contracts/docx-protocol.d.ts",
+      "default": "./dist/contracts/docx-protocol.js"
+    },
+    "./contracts/narrated-video-preference-profile": {
+      "types": "./dist/contracts/narrated-video-preference-profile.d.ts",
+      "default": "./dist/contracts/narrated-video-preference-profile.js"
+    },
+    "./contracts/mobile-app-profile": {
+      "types": "./dist/contracts/mobile-app-profile.d.ts",
+      "default": "./dist/contracts/mobile-app-profile.js"
+    },
+    "./contracts/bridge-request": {
+      "types": "./dist/contracts/bridge-request.d.ts",
+      "default": "./dist/contracts/bridge-request.js"
+    },
+    "./contracts/mission-contract": {
+      "types": "./dist/contracts/mission-contract.d.ts",
+      "default": "./dist/contracts/mission-contract.js"
+    },
+    "./contracts/meeting-operations-profile": {
+      "types": "./dist/contracts/meeting-operations-profile.d.ts",
+      "default": "./dist/contracts/meeting-operations-profile.js"
+    },
+    "./contracts/document-brief": {
+      "types": "./dist/contracts/document-brief.d.ts",
+      "default": "./dist/contracts/document-brief.js"
+    },
+    "./contracts/guided-coordination-brief": {
+      "types": "./dist/contracts/guided-coordination-brief.d.ts",
+      "default": "./dist/contracts/guided-coordination-brief.js"
+    },
+    "./contracts/actuator-pipeline-bundle": {
+      "types": "./dist/contracts/actuator-pipeline-bundle.d.ts",
+      "default": "./dist/contracts/actuator-pipeline-bundle.js"
+    },
+    "./contracts/system-status-report": {
+      "types": "./dist/contracts/system-status-report.d.ts",
+      "default": "./dist/contracts/system-status-report.js"
+    },
+    "./contracts/corporate-design-adf": {
+      "types": "./dist/contracts/corporate-design-adf.d.ts",
+      "default": "./dist/contracts/corporate-design-adf.js"
+    },
+    "./contracts/pdf-protocol": {
+      "types": "./dist/contracts/pdf-protocol.d.ts",
+      "default": "./dist/contracts/pdf-protocol.js"
+    },
+    "./contracts/actuator-execution-brief": {
+      "types": "./dist/contracts/actuator-execution-brief.d.ts",
+      "default": "./dist/contracts/actuator-execution-brief.js"
+    },
+    "./contracts/wisdom-action": {
+      "types": "./dist/contracts/wisdom-action.d.ts",
+      "default": "./dist/contracts/wisdom-action.js"
+    },
+    "./contracts/video-generation-adf": {
+      "types": "./dist/contracts/video-generation-adf.d.ts",
+      "default": "./dist/contracts/video-generation-adf.js"
+    },
+    "./contracts/generation-job": {
+      "types": "./dist/contracts/generation-job.d.ts",
+      "default": "./dist/contracts/generation-job.js"
+    },
+    "./contracts/narrated-video-publish-plan": {
+      "types": "./dist/contracts/narrated-video-publish-plan.d.ts",
+      "default": "./dist/contracts/narrated-video-publish-plan.js"
+    },
+    "./contracts/points-portal-clickout-usecase": {
+      "types": "./dist/contracts/points-portal-clickout-usecase.d.ts",
+      "default": "./dist/contracts/points-portal-clickout-usecase.js"
+    },
+    "./contracts/index": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
-    "./integrations": {
-      "types": "./dist/integrations/index.d.ts",
-      "default": "./dist/integrations/index.js"
+    "./contracts/web-app-profile": {
+      "types": "./dist/contracts/web-app-profile.d.ts",
+      "default": "./dist/contracts/web-app-profile.js"
     },
-    "./intent": {
-      "types": "./dist/intent/index.d.ts",
-      "default": "./dist/intent/index.js"
+    "./contracts/webview-session-handoff": {
+      "types": "./dist/contracts/webview-session-handoff.d.ts",
+      "default": "./dist/contracts/webview-session-handoff.js"
     },
-    "./knowledge": {
-      "types": "./dist/knowledge/index.d.ts",
-      "default": "./dist/knowledge/index.js"
+    "./contracts/diagram-adf": {
+      "types": "./dist/contracts/diagram-adf.d.ts",
+      "default": "./dist/contracts/diagram-adf.js"
     },
-    "./media": {
-      "types": "./dist/media/index.d.ts",
-      "default": "./dist/media/index.js"
+    "./contracts/generation-schedule": {
+      "types": "./dist/contracts/generation-schedule.d.ts",
+      "default": "./dist/contracts/generation-schedule.js"
     },
-    "./meeting": {
-      "types": "./dist/meeting/index.d.ts",
-      "default": "./dist/meeting/index.js"
+    "./contracts/image-generation-adf": {
+      "types": "./dist/contracts/image-generation-adf.d.ts",
+      "default": "./dist/contracts/image-generation-adf.js"
     },
-    "./mesh": {
-      "types": "./dist/mesh/index.d.ts",
-      "default": "./dist/mesh/index.js"
+    "./contracts/test-case-adf": {
+      "types": "./dist/contracts/test-case-adf.d.ts",
+      "default": "./dist/contracts/test-case-adf.js"
     },
-    "./mission": {
-      "types": "./dist/mission/index.d.ts",
-      "default": "./dist/mission/index.js"
+    "./media/native-xlsx-engine/content-types": {
+      "types": "./dist/media/native-xlsx-engine/content-types.d.ts",
+      "default": "./dist/media/native-xlsx-engine/content-types.js"
     },
-    "./organization": {
-      "types": "./dist/organization/index.d.ts",
-      "default": "./dist/organization/index.js"
+    "./media/native-xlsx-engine/shared-strings": {
+      "types": "./dist/media/native-xlsx-engine/shared-strings.d.ts",
+      "default": "./dist/media/native-xlsx-engine/shared-strings.js"
     },
-    "./pfc": {
-      "types": "./dist/pfc/index.d.ts",
-      "default": "./dist/pfc/index.js"
+    "./media/native-xlsx-engine/table": {
+      "types": "./dist/media/native-xlsx-engine/table.d.ts",
+      "default": "./dist/media/native-xlsx-engine/table.js"
     },
-    "./pipeline": {
-      "types": "./dist/pipeline/index.d.ts",
-      "default": "./dist/pipeline/index.js"
+    "./media/native-xlsx-engine/styles": {
+      "types": "./dist/media/native-xlsx-engine/styles.d.ts",
+      "default": "./dist/media/native-xlsx-engine/styles.js"
     },
-    "./plugin": {
-      "types": "./dist/plugin/index.d.ts",
-      "default": "./dist/plugin/index.js"
+    "./media/native-xlsx-engine/worksheet": {
+      "types": "./dist/media/native-xlsx-engine/worksheet.d.ts",
+      "default": "./dist/media/native-xlsx-engine/worksheet.js"
     },
-    "./project": {
-      "types": "./dist/project/index.d.ts",
-      "default": "./dist/project/index.js"
+    "./media/native-xlsx-engine/engine": {
+      "types": "./dist/media/native-xlsx-engine/engine.d.ts",
+      "default": "./dist/media/native-xlsx-engine/engine.js"
     },
-    "./provider": {
-      "types": "./dist/provider/index.d.ts",
-      "default": "./dist/provider/index.js"
+    "./media/native-xlsx-engine/rels": {
+      "types": "./dist/media/native-xlsx-engine/rels.d.ts",
+      "default": "./dist/media/native-xlsx-engine/rels.js"
     },
-    "./reasoning": {
-      "types": "./dist/reasoning/index.d.ts",
-      "default": "./dist/reasoning/index.js"
+    "./media/native-xlsx-engine/drawing": {
+      "types": "./dist/media/native-xlsx-engine/drawing.d.ts",
+      "default": "./dist/media/native-xlsx-engine/drawing.js"
     },
-    "./scenario": {
-      "types": "./dist/scenario/index.d.ts",
-      "default": "./dist/scenario/index.js"
+    "./media/native-xlsx-engine/workbook": {
+      "types": "./dist/media/native-xlsx-engine/workbook.d.ts",
+      "default": "./dist/media/native-xlsx-engine/workbook.js"
     },
-    "./secret": {
-      "types": "./dist/secret/index.d.ts",
-      "default": "./dist/secret/index.js"
+    "./media/native-xlsx-engine/examples/gen_wbs": {
+      "types": "./dist/media/native-xlsx-engine/examples/gen_wbs.d.ts",
+      "default": "./dist/media/native-xlsx-engine/examples/gen_wbs.js"
     },
-    "./service": {
-      "types": "./dist/service/index.d.ts",
-      "default": "./dist/service/index.js"
+    "./media/native-pptx-engine/content-types": {
+      "types": "./dist/media/native-pptx-engine/content-types.d.ts",
+      "default": "./dist/media/native-pptx-engine/content-types.js"
     },
-    "./shell": {
-      "types": "./dist/shell/index.d.ts",
-      "default": "./dist/shell/index.js"
+    "./media/native-pptx-engine/text-metrics": {
+      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
+      "default": "./dist/media/native-pptx-engine/text-metrics.js"
     },
-    "./surface": {
-      "types": "./dist/surface/index.d.ts",
-      "default": "./dist/surface/index.js"
+    "./media/native-pptx-engine/engine": {
+      "types": "./dist/media/native-pptx-engine/engine.d.ts",
+      "default": "./dist/media/native-pptx-engine/engine.js"
     },
-    "./task": {
-      "types": "./dist/task/index.d.ts",
-      "default": "./dist/task/index.js"
+    "./media/native-pptx-engine/presentation": {
+      "types": "./dist/media/native-pptx-engine/presentation.d.ts",
+      "default": "./dist/media/native-pptx-engine/presentation.js"
     },
-    "./tool": {
-      "types": "./dist/tool/index.d.ts",
-      "default": "./dist/tool/index.js"
+    "./media/native-pptx-engine/rels": {
+      "types": "./dist/media/native-pptx-engine/rels.d.ts",
+      "default": "./dist/media/native-pptx-engine/rels.js"
     },
-    "./video": {
-      "types": "./dist/video/index.d.ts",
-      "default": "./dist/video/index.js"
+    "./media/native-pptx-engine/layout-primitives": {
+      "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
+      "default": "./dist/media/native-pptx-engine/layout-primitives.js"
     },
-    "./virtual": {
-      "types": "./dist/virtual/index.d.ts",
-      "default": "./dist/virtual/index.js"
+    "./media/native-pptx-engine/design-cascade": {
+      "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
+      "default": "./dist/media/native-pptx-engine/design-cascade.js"
     },
-    "./voice": {
-      "types": "./dist/voice/index.d.ts",
-      "default": "./dist/voice/index.js"
+    "./media/native-pptx-engine/theme": {
+      "types": "./dist/media/native-pptx-engine/theme.d.ts",
+      "default": "./dist/media/native-pptx-engine/theme.js"
     },
-    "./workforce": {
-      "types": "./dist/workforce/index.d.ts",
-      "default": "./dist/workforce/index.js"
+    "./media/native-pptx-engine/builders": {
+      "types": "./dist/media/native-pptx-engine/builders.d.ts",
+      "default": "./dist/media/native-pptx-engine/builders.js"
+    },
+    "./media/native-pptx-engine/examples/gen_project_plan": {
+      "types": "./dist/media/native-pptx-engine/examples/gen_project_plan.d.ts",
+      "default": "./dist/media/native-pptx-engine/examples/gen_project_plan.js"
+    },
+    "./media/native-pdf-engine/engine": {
+      "types": "./dist/media/native-pdf-engine/engine.d.ts",
+      "default": "./dist/media/native-pdf-engine/engine.js"
+    },
+    "./media/native-pdf-engine/fontkit-shim": {
+      "types": "./dist/media/native-pdf-engine/fontkit-shim.d.ts",
+      "default": "./dist/media/native-pdf-engine/fontkit-shim.js"
+    },
+    "./media/native-pdf-engine/parser": {
+      "types": "./dist/media/native-pdf-engine/parser.d.ts",
+      "default": "./dist/media/native-pdf-engine/parser.js"
+    },
+    "./media/native-pdf-engine/primitives": {
+      "types": "./dist/media/native-pdf-engine/primitives.d.ts",
+      "default": "./dist/media/native-pdf-engine/primitives.js"
+    },
+    "./media/native-docx-engine/engine": {
+      "types": "./dist/media/native-docx-engine/engine.d.ts",
+      "default": "./dist/media/native-docx-engine/engine.js"
+    },
+    "./media/native-docx-engine/examples/roundtrip_docx": {
+      "types": "./dist/media/native-docx-engine/examples/roundtrip_docx.d.ts",
+      "default": "./dist/media/native-docx-engine/examples/roundtrip_docx.js"
+    },
+    "./actuator/deployment-adapters/mobile-beta": {
+      "types": "./dist/actuator/deployment-adapters/mobile-beta.d.ts",
+      "default": "./dist/actuator/deployment-adapters/mobile-beta.js"
+    },
+    "./integrations/github-issues": {
+      "types": "./dist/integrations/github-issues.d.ts",
+      "default": "./dist/integrations/github-issues.js"
+    },
+    "./integrations/jira-issues": {
+      "types": "./dist/integrations/jira-issues.d.ts",
+      "default": "./dist/integrations/jira-issues.js"
+    },
+    "./video/ingest/vtt-parser": {
+      "types": "./dist/video/ingest/vtt-parser.d.ts",
+      "default": "./dist/video/ingest/vtt-parser.js"
+    },
+    "./video/ingest/video-brief": {
+      "types": "./dist/video/ingest/video-brief.d.ts",
+      "default": "./dist/video/ingest/video-brief.js"
+    },
+    "./video/ingest/index": {
+      "types": "./dist/video/ingest/index.d.ts",
+      "default": "./dist/video/ingest/index.js"
+    },
+    "./video/ingest/video-media": {
+      "types": "./dist/video/ingest/video-media.d.ts",
+      "default": "./dist/video/ingest/video-media.js"
+    },
+    "./video/ingest/video-fetch": {
+      "types": "./dist/video/ingest/video-fetch.d.ts",
+      "default": "./dist/video/ingest/video-fetch.js"
+    },
+    "./video/ingest/video-ingest-types": {
+      "types": "./dist/video/ingest/video-ingest-types.d.ts",
+      "default": "./dist/video/ingest/video-ingest-types.js"
+    },
+    "./provider/bundles/claude-cli": {
+      "types": "./dist/provider/bundles/claude-cli.d.ts",
+      "default": "./dist/provider/bundles/claude-cli.js"
+    },
+    "./provider/bundles/agy-cli": {
+      "types": "./dist/provider/bundles/agy-cli.d.ts",
+      "default": "./dist/provider/bundles/agy-cli.js"
+    },
+    "./provider/bundles/opencode-cli": {
+      "types": "./dist/provider/bundles/opencode-cli.d.ts",
+      "default": "./dist/provider/bundles/opencode-cli.js"
+    },
+    "./provider/bundles/codex-cli": {
+      "types": "./dist/provider/bundles/codex-cli.d.ts",
+      "default": "./dist/provider/bundles/codex-cli.js"
+    },
+    "./provider/bundles/gemini-cli": {
+      "types": "./dist/provider/bundles/gemini-cli.d.ts",
+      "default": "./dist/provider/bundles/gemini-cli.js"
+    },
+    "./provider/bundles/claude-agent": {
+      "types": "./dist/provider/bundles/claude-agent.d.ts",
+      "default": "./dist/provider/bundles/claude-agent.js"
+    },
+    "./provider/bundles/copilot": {
+      "types": "./dist/provider/bundles/copilot.d.ts",
+      "default": "./dist/provider/bundles/copilot.js"
+    },
+    "./provider/bundles/devin-cli": {
+      "types": "./dist/provider/bundles/devin-cli.d.ts",
+      "default": "./dist/provider/bundles/devin-cli.js"
+    },
+    "./provider/bundles/index": {
+      "types": "./dist/provider/bundles/index.d.ts",
+      "default": "./dist/provider/bundles/index.js"
+    },
+    "./provider/bundles/cursor-cli": {
+      "types": "./dist/provider/bundles/cursor-cli.d.ts",
+      "default": "./dist/provider/bundles/cursor-cli.js"
+    },
+    "./provider/bundles/grok-cli": {
+      "types": "./dist/provider/bundles/grok-cli.d.ts",
+      "default": "./dist/provider/bundles/grok-cli.js"
+    },
+    "./workforce/workforce-load": {
+      "types": "./dist/workforce/workforce-load.d.ts",
+      "default": "./dist/workforce/workforce-load.js"
     }
   },
   "dependencies": {
