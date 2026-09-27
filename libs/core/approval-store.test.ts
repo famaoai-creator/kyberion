@@ -1,11 +1,109 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
+  VITEST_APPROVAL_STORE_ROOT,
   approvalActionCacheKey,
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   computeApprovalPayloadHash,
+  createApprovalRequest,
+  decideApprovalRequest,
+  expireApprovalRequest,
+  listApprovalRequests,
   validateHumanFinalDecision,
 } from './approval-store.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+
+describe('approval-store test isolation', () => {
+  const channel = `isolation-probe-${process.pid}`;
+
+  afterEach(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const root of Object.values(approvalStoreRoots())) {
+        const dir = pathResolver.rootResolve(`${root}/${channel}`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('keeps the live store layout outside vitest', () => {
+    expect(approvalStoreRoots({})).toEqual({
+      coordination: 'active/shared/coordination/channels',
+      observability: 'active/shared/observability/channels',
+    });
+  });
+
+  it('routes every approval path under the isolated root during vitest', () => {
+    const id = '123e4567-e89b-12d3-a456-426614174000';
+    expect(approvalStoreRoots({ VITEST: 'true' }).coordination).toBe(
+      `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels`
+    );
+    expect(approvalRequestLogicalPath('terminal', id)).toBe(
+      `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels/terminal/approvals/requests/${id}.json`
+    );
+    expect(approvalEventLogicalPath('terminal')).toBe(
+      `${VITEST_APPROVAL_STORE_ROOT}/observability/channels/terminal/approvals.jsonl`
+    );
+  });
+
+  it('never writes test approvals into the live approval store', () => {
+    const record = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'isolation-probe',
+      requestedBy: 'approval-store-test',
+      draft: { title: 'isolation probe', summary: 'written by approval-store.test.ts' },
+    });
+
+    expect(
+      safeExistsSync(pathResolver.rootResolve(approvalRequestLogicalPath(channel, record.id)))
+    ).toBe(true);
+    expect(safeExistsSync(pathResolver.rootResolve(approvalEventLogicalPath(channel)))).toBe(true);
+    expect(
+      safeExistsSync(
+        pathResolver.rootResolve(
+          `active/shared/coordination/channels/${channel}/approvals/requests/${record.id}.json`
+        )
+      )
+    ).toBe(false);
+    expect(
+      safeExistsSync(
+        pathResolver.rootResolve(`active/shared/observability/channels/${channel}/approvals.jsonl`)
+      )
+    ).toBe(false);
+    expect(listApprovalRequests({ storageChannels: [channel] }).map((r) => r.id)).toEqual([
+      record.id,
+    ]);
+  });
+
+  it('refuses to decide a request that was expired without an expiresAt', () => {
+    const record = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'stale-probe',
+      requestedBy: 'approval-store-test',
+      draft: { title: 'stale probe', summary: 'swept as stale_pending' },
+    });
+    expireApprovalRequest('infrastructure_sentinel', {
+      channel,
+      requestId: record.id,
+      reason: 'stale_pending',
+    });
+
+    expect(() =>
+      decideApprovalRequest('mission_controller', {
+        channel,
+        requestId: record.id,
+        decision: 'approved',
+        decidedBy: 'operator',
+        decidedByType: 'human',
+        authenticated: true,
+      })
+    ).toThrow('has expired');
+  });
+});
 
 describe('approval-store path normalization', () => {
   it('rejects invalid approval channels', () => {

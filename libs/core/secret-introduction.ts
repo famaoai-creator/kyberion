@@ -28,6 +28,13 @@ import { getSecret, storeConnectionDocument } from './secret-guard.js';
 
 const DEFAULT_CHANNEL = 'terminal';
 const DEFAULT_STORAGE_CHANNEL = 'terminal';
+/**
+ * Decider recorded for policy auto-approvals. The policy decides, not the
+ * requesting operator, so the record must never claim a human decision.
+ */
+export const SECRET_INTRODUCTION_AUTO_APPROVER = 'policy:secret-introduction-local-low-risk';
+/** The value is collected interactively right after approval; an older pending request is abandoned. */
+export const SECRET_INTRODUCTION_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface ProposeSecretIntroductionInput {
   serviceId: string;
@@ -141,6 +148,7 @@ export function proposeSecretIntroduction(
     correlationId,
     requestedBy,
     kind: 'secret_mutation',
+    expiresAt: new Date(Date.now() + SECRET_INTRODUCTION_PENDING_TTL_MS).toISOString(),
     draft: {
       title: `${mutation === 'rotate' ? 'Rotate' : 'Introduce'} secret: ${identity.envName}`,
       summary: `Governed introduction of ${identity.envName} for service ${identity.serviceId}.`,
@@ -190,12 +198,11 @@ export function proposeSecretIntroduction(
       storageChannel: record.storageChannel,
       requestId: record.id,
       decision: 'approved',
-      decidedBy: input.decidedBy || requestedBy,
+      decidedBy: SECRET_INTRODUCTION_AUTO_APPROVER,
       decidedByRole: 'sovereign',
-      decidedByType: 'human',
-      authenticated: true,
-      authMethod: 'surface_session',
-      note: 'Auto-approved local low-risk secret introduction',
+      decidedByType: 'service',
+      authenticated: false,
+      note: `Auto-approved local low-risk secret introduction (requested by ${input.decidedBy || requestedBy})`,
     });
     status = decided.status;
     autoApproved = true;

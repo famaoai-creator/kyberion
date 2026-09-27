@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
+import {
+  approvalEventLogicalPath,
+  createApprovalRequest,
+  loadApprovalRequest,
+} from './approval-store.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import type { SupportedLocale } from './locale-normalize.js';
@@ -26,16 +30,12 @@ import {
 } from './intent-resolution-contract.js';
 
 function emitSlackApprovalEvent(event: Record<string, unknown>): string {
-  return appendGovernedArtifactJsonl(
-    'slack_bridge',
-    'active/shared/observability/channels/slack/approvals.jsonl',
-    {
-      ts: nowIso(),
-      event_id: randomUUID(),
-      channel: 'slack',
-      ...event,
-    }
-  );
+  return appendGovernedArtifactJsonl('slack_bridge', approvalEventLogicalPath('slack'), {
+    ts: nowIso(),
+    event_id: randomUUID(),
+    channel: 'slack',
+    ...event,
+  });
 }
 
 export function createSlackApprovalRequest(params: {

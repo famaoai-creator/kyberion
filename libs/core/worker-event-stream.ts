@@ -80,7 +80,7 @@ export interface WorkerEventPayloadMap {
   approval_response: {
     request_id: string;
     correlation_id: string;
-    status: 'approved' | 'rejected' | 'cancelled';
+    status: 'approved' | 'rejected' | 'cancelled' | 'expired';
     channel: string;
     decided_by?: string;
     reason_category?: string;
