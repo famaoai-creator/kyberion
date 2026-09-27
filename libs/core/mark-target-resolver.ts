@@ -19,6 +19,15 @@ import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.j
  *
  * Non-public marks live in the mission directory; the session dir then holds
  * only a pointer (mission id + marks id), never labels or boxes.
+ *
+ * Coordinate spaces: marks are boxes in screenshot pixels. A resolved target is
+ * in click points, `mark center / scale`, relative to the marked display; the
+ * click path adds the display origin. Click points are the OS pointer space:
+ * macOS global logical points; Windows virtual-desktop physical pixels (the
+ * Windows pointer script is per-monitor DPI aware, see windows-os-automation).
+ * `scale` is therefore screenshot pixels per click point: 2 for a Retina
+ * capture on macOS, 1 for a full-resolution Windows capture at any display
+ * scaling, below 1 for a screenshot that was downscaled.
  */
 
 export const MARKS_TTL_MS = 60_000;
@@ -34,7 +43,7 @@ export type MarksTier = 'public' | 'confidential' | 'personal';
 /** Display the marked screenshot was taken on. */
 export interface MarksDisplay {
   index?: number;
-  /** Top-left of the display in global logical points, when known. */
+  /** Top-left of the display in click points (macOS logical points, Windows physical pixels). */
   origin?: { x: number; y: number };
 }
 
@@ -46,7 +55,7 @@ export interface MarksRecord {
   expires_at: number;
   image: SomImageSize;
   image_dhash: string;
-  /** Image pixels per logical point (e.g. 2 on a Retina capture). */
+  /** Image pixels per click point (macOS: 2 on a Retina capture; Windows: 1 at any display scaling). */
   scale: number;
   marks: SomMark[];
   tier?: MarksTier;
@@ -101,7 +110,7 @@ export interface ResolveMarkTargetOptions {
 export interface MarkTargetResolution {
   n: number;
   marks_id: string;
-  /** Mark center in logical points (image pixels / scale). */
+  /** Mark center in click points (image pixels / scale): macOS logical points, Windows physical pixels. */
   x: number;
   y: number;
   /** Browser snapshot ref when the mark came from the DOM. */

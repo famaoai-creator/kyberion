@@ -4081,6 +4081,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_WIN_POINTER",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Internal child-process channel: JSON pointer actions the Windows click path sets on its own powershell.exe child (never read from the operator environment); do not set it.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_WINDOWS_AI",
       "category": "runtime",
       "type": "string",
