@@ -86,7 +86,7 @@ const FILES: Record<string, string> = {
     `import { createRequire } from '${['node', 'module'].join(':')}';`,
     'const load = createRequire(import.meta.url);',
     'export function run(): void {',
-    "  (load('../libs/core/required-dep.js') as { go(): void }).go();",
+    `  (load('${CORE}/required-dep.js') as { go(): void }).go();`,
     '}',
   ].join('\n'),
   'libs/core/required-dep.ts': [
