@@ -10,7 +10,10 @@ import {
   OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
   OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
   OsAccessibilityDetector,
+  POWERSHELL_STDIN_BOOTSTRAP,
   UIA_TO_AX_ROLE,
+  encodePowerShellCommand,
+  powerShellStdinArgs,
   candidatesFromAccessibility,
   isEditableAccessibilityElement,
   normaliseUiaElement,
@@ -50,7 +53,12 @@ const SNAPSHOT = {
 interface Call {
   command: string;
   args: string[];
-  options: { timeoutMs: number; maxOutputMB: number; env?: Record<string, string> };
+  options: {
+    timeoutMs: number;
+    maxOutputMB: number;
+    env?: Record<string, string>;
+    input?: string;
+  };
 }
 
 function fakeRunner(
@@ -462,12 +470,18 @@ describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
     return index < 0 ? '' : Buffer.from(args[index + 1], 'base64').toString('utf16le');
   }
 
+  function commandLine(command: string, args: string[]): string {
+    return [command, ...args].map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg)).join(' ');
+  }
+
   function fakeWindowsRunner(
     options: { available?: boolean; snapshot?: unknown; enumerateStatus?: number } = {}
   ) {
     const calls: WindowsCall[] = [];
     const run: AccessibilityCommandRunner = async (command, args, runOptions) => {
-      const script = decode(args);
+      // The command line only carries the fixed stdin bootstrap; the script is the input.
+      expect(decode(args)).toBe(POWERSHELL_STDIN_BOOTSTRAP);
+      const script = runOptions.input ?? '';
       calls.push({ command, args, options: runOptions, script });
       if (script === OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT) {
         return {
@@ -484,6 +498,38 @@ describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
     };
     return { run, calls };
   }
+
+  it('keeps the command line small and feeds the scripts on stdin, whatever their size', async () => {
+    const { run, calls } = fakeWindowsRunner();
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    await detector.isAvailable(live);
+    await detector.detect({ ...live, application: 'x'.repeat(20_000) });
+    expect(calls.map((call) => call.script)).toEqual([
+      OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
+      OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT,
+    ]);
+    // The enumeration script alone would exceed the 32 767-char limit once encoded.
+    expect(
+      encodePowerShellCommand(OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT).length
+    ).toBeGreaterThan(8_000);
+    for (const call of calls) {
+      // cmd.exe-safe (8 191) with a wide margin; identical for both scripts.
+      expect(commandLine(call.command, call.args).length).toBeLessThan(1_000);
+      expect(call.args).toEqual(powerShellStdinArgs());
+    }
+    expect(powerShellStdinArgs().join(' ').length).toBeLessThan(8_000);
+  });
+
+  it('sends ASCII-only scripts (stdin is decoded with the console code page)', () => {
+    for (const script of [
+      OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
+      OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT,
+      POWERSHELL_STDIN_BOOTSTRAP,
+    ]) {
+      expect(/[^\x09\x0a\x0d\x20-\x7e]/.test(script)).toBe(false);
+    }
+    expect(POWERSHELL_STDIN_BOOTSTRAP).toContain('[Console]::In.ReadToEnd()');
+  });
 
   it('probes UI Automation once through an encoded powershell.exe and caches the result', async () => {
     let now = 0;

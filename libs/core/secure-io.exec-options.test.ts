@@ -209,3 +209,17 @@ describe('generic exec helpers reject shell-script invocations', () => {
     expect(safeExec('echo', ['-c'])).toBe('-c\n');
   });
 });
+
+describe('safeExecResultAsync — stdin input', () => {
+  it('writes input to the child stdin and closes it', async () => {
+    const result = await safeExecResultAsync('cat', [], { input: 'line one\nline two\n' });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('line one\nline two\n');
+  });
+
+  it('keeps stdin closed without input', async () => {
+    const result = await safeExecResultAsync('cat', []);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
+  });
+});
