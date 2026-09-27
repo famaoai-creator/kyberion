@@ -2,6 +2,7 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import { describe, expect, it } from 'vitest';
 
+import { GOVERNED_ARTIFACT_ROLES } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
@@ -41,5 +42,20 @@ describe('surface-coordination-role-map', () => {
       )
     );
     expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('only admits GovernedArtifactRole values, for the public map and a personal overlay (S4)', () => {
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/surface-coordination-role-map.schema.json'
+    );
+    const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string);
+    expect([...schema.properties.entries.items.properties.role.enum].sort()).toEqual(
+      [...GOVERNED_ARTIFACT_ROLES].sort()
+    );
+    const validate = compileSchemaFromPath(new Ajv({ allErrors: true }), schemaPath);
+    const overlay = (role: string) => ({ version: '1.0.0', entries: [{ surface: 'x', role }] });
+    expect(validate(overlay('sovereign_concierge'))).toBe(true);
+    expect(validate(overlay('ecosystem_architect'))).toBe(false);
   });
 });
