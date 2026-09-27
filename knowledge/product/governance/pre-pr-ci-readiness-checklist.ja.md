@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-23
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -97,7 +97,8 @@ pnpm check -- --scope pr
 `pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）はデフォルトで手順 3 を実行する。緊急回避のみ `--skip-readiness`。エージェントは通常パスで skip しない。
 
 `knowledge/` 配下を 1 ファイルでも変更したら、commit 前に `pnpm generate:knowledge-index` を実行して
-`knowledge/_index.md` と `knowledge/_integrity-manifest.json` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
+`knowledge/_index.md` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
+`knowledge/_integrity-manifest.json` は gitignore 済みのローカル生成物（`pnpm build` が再生成）なので commit しない。
 
 完了条件:
 

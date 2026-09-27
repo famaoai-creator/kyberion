@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readKnowledgeTextFile, validateKnowledgeFrontmatter } from './generate_knowledge_index.js';
+import {
+  readKnowledgeTextFile,
+  selectKnowledgeIndexOutputs,
+  validateKnowledgeFrontmatter,
+} from './generate_knowledge_index.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -11,18 +15,39 @@ import { safeReadFile } from '@agent/core/secure-io';
  * (`pnpm run check -- --scope full --only catalogs`).
  */
 describe('generate_knowledge_index', () => {
-  it('keeps the generator behind the shared JSON parser', () => {
+  it('keeps the generator on governed text reads', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/generate_knowledge_index.ts'), {
         encoding: 'utf8',
       })
     );
-    expect(source).toContain("parseSafeJsonInput(content, 'knowledge integrity manifest')");
-    expect(source).toContain('parseSafeJsonInput, readTextFile } from');
+    expect(source).toContain("import { readTextFile } from '@agent/core/foundation';");
     expect(source).not.toContain('safeReadFile(');
     expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+  });
+
+  it('keeps the untracked manifest out of freshness checks and the index out of builds', () => {
+    const manifest = pathResolver.knowledge('_integrity-manifest.json');
+    const index = pathResolver.knowledge('_index.md');
+    const files = [
+      { path: manifest, content: '{}\n' },
+      { path: index, content: '# Index\n' },
+    ];
+
+    expect(selectKnowledgeIndexOutputs(files, {}).map((file) => file.path)).toEqual([
+      manifest,
+      index,
+    ]);
+    expect(selectKnowledgeIndexOutputs(files, { check: true }).map((file) => file.path)).toEqual([
+      index,
+    ]);
+    expect(
+      selectKnowledgeIndexOutputs(files, { unknownFlags: ['--manifest-only'] }).map(
+        (file) => file.path
+      )
+    ).toEqual([manifest]);
   });
 
   it('requires frontmatter for non-excluded markdown knowledge', () => {
