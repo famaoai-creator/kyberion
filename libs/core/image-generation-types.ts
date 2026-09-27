@@ -52,6 +52,12 @@ export interface ImageGenerationRequest {
    * default false, so purpose-selected runs stay unattended.
    */
   allowHostHandoff?: boolean;
+  /**
+   * Hard allowlist of provider ids. When set, no other provider is eligible on
+   * any path (preference, operator rule, purpose, mode chain, fallback graph),
+   * so a caller can enforce its own egress / hand-off gate.
+   */
+  allowedProviders?: string[];
   outputDir?: string;
   targetPath?: string;
   awaitCompletion?: boolean;
