@@ -42,6 +42,7 @@ import {
   probeWindowsNativeImageGeneration,
 } from './windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
+import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from './host-image-handoff.js';
 import { isAppleSilicon } from './platform.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 import {
@@ -1015,9 +1016,11 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
     const startedAt = Date.now();
     const targetPath = getFallbackTargetPath(request);
 
-    if (safeExistsSync(targetPath)) {
+    // Only an image the host saved for this request (same prompt, changed
+    // since the request) is collected; a file that was merely there is not.
+    if (isHostImageHandoffOutput(targetPath, request.prompt)) {
       logger.info(
-        `[image_generation_bridge] ${this.config.displayName} image already exists at ${targetPath}. Skipping generation.`
+        `[image_generation_bridge] ${this.config.displayName} image collected from ${targetPath}.`
       );
       // The host agent has read the references and produced this frame: the
       // second receipt closes the hand-off in the audit chain.
@@ -1030,8 +1033,14 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
       };
     }
 
+    if (safeExistsSync(targetPath)) {
+      logger.info(
+        `[image_generation_bridge] ${targetPath} exists but was not produced for a hand-off request with this prompt; requesting a new image.`
+      );
+    }
     assertReferenceEgressAllowed(request, this);
     writeHostBridgeRequest(this.config, request, targetPath);
+    recordHostImageHandoffRequest({ providerId: this.id, targetPath, prompt: request.prompt });
 
     const errMessage = `${this.config.errorCode}: ${this.config.displayName} is required. Please use your 'generate_image' tool with prompt: "${request.prompt}" and save the image to "${targetPath}".${hostBridgeReferenceInstruction(request)} After saving, please rerun the task.`;
     logger.warn(`[image_generation_bridge] ${errMessage}`);
