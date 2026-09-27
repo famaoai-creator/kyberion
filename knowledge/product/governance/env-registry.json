@@ -808,6 +808,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CODEX_PROFILE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Named Codex account profile; resolves to an isolated CODEX_HOME below ~/.codex-profiles/<name>.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_COMFY_BASE_URL",
       "category": "provider",
       "type": "string",

@@ -128,6 +128,14 @@ describe('codex-cli-query', () => {
     expect(options.bin).toBe('fake/custom/codex');
   });
 
+  it('loads the isolated account profile from the governed environment', () => {
+    const options = buildCodexCliQueryOptionsFromEnv({
+      PATH: '/usr/bin',
+      KYBERION_CODEX_PROFILE: 'work',
+    } as NodeJS.ProcessEnv);
+    expect(options.codexProfile).toBe('work');
+  });
+
   it('resolves the first non-project-local Codex binary from PATH candidates', () => {
     mocks.safeExecResult.mockReturnValue({
       stdout:
