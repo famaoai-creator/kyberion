@@ -57,6 +57,7 @@
     "scripts/mission_controller.ts",
     "scripts/publish_pull_request.ts",
     "scripts/report_human_interventions.ts",
+    "scripts/approval_inbox.ts",
     "scripts/auto_checkpoint.ts",
     "scripts/daemon_watchdog.ts",
     "satellites/telegram-bridge/**",

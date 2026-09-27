@@ -106,6 +106,7 @@ export const OPERATOR_EVENT_COLLABORATION_KIND: Record<OperatorEvent, Collaborat
   mission_failed: 'failure',
   deliverable_ready: 'artifact',
   ops_alert: 'failure',
+  decision_digest: 'progress',
 };
 
 /**

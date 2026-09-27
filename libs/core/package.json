@@ -287,6 +287,22 @@
       "types": "./dist/approval-store-hygiene.d.ts",
       "default": "./dist/approval-store-hygiene.js"
     },
+    "./approval-veto-window": {
+      "types": "./dist/approval-veto-window.d.ts",
+      "default": "./dist/approval-veto-window.js"
+    },
+    "./approval-decision-card": {
+      "types": "./dist/approval-decision-card.d.ts",
+      "default": "./dist/approval-decision-card.js"
+    },
+    "./approval-digest": {
+      "types": "./dist/approval-digest.d.ts",
+      "default": "./dist/approval-digest.js"
+    },
+    "./approval-decision-routing": {
+      "types": "./dist/approval-decision-routing.d.ts",
+      "default": "./dist/approval-decision-routing.js"
+    },
     "./approval-audit": {
       "types": "./dist/approval-audit.d.ts",
       "default": "./dist/approval-audit.js"
