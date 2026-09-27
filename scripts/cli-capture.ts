@@ -1,16 +1,15 @@
 /**
- * `pnpm kyberion capture --screen|--window [--out <image>] [--json]`
+ * `pnpm kyberion capture [--screen | --window | --camera] [--out <image>] [--json]`
  *
  * The action-side counterpart of `pnpm kyberion see`: still-image capture
- * through the governed system-actuator (`system:screenshot`) — no capture
- * code of its own. Screen-frame redaction stays inside the actuator; this
- * verb only owns arg parsing, repo-boundary checks, and the summary output.
+ * through the governed system-actuator (`screenshot` / `capture_photo`) — no
+ * capture code of its own. Screen-frame redaction stays inside the actuator;
+ * this verb only owns arg parsing, repo-boundary checks, and the summary output.
  *
- * P1 covers screen + focused window. `--camera` is a governed not-yet
- * (P2: system:capture_photo) so callers get guidance instead of a stack trace.
- *
- * Outputs must land in the actuator's governed store
- * (`runtime/computer/screenshots/` or shared `tmp/`); anything else is refused.
+ * Invocation follows the pipeline-steps form
+ * (`{action:'pipeline', steps:[{type:'capture', op, params}]}`) — the only
+ * form the system-actuator executes. Stdout carries the summary (or --json);
+ * the image lands in --out inside the governed store.
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -20,12 +19,14 @@ import { isInsideRepository, parseCommonOption, sniffImageDimensions } from './l
 
 export const CAPTURE_USAGE = `Usage: pnpm kyberion capture [--screen | --window | --camera] [--out <image>] [--json]
 
-Captures a still image through the governed screen-capture bridge (with redaction).
+Captures a still image through the governed capture bridges (screen captures are redacted).
   --screen       Capture the current screen (default)
   --window       Capture the focused window (system:screenshot focused_window mode)
-  --camera       Camera still (not yet: P2 system:capture_photo)
-  --out <file>   Where to write (png / jpg / jpeg / webp) inside runtime/computer/screenshots/ or active/shared/tmp/
+  --camera       Capture a still photo from the camera (system:capture_photo)
+  --out <file>   Where to write (png / jpg / jpeg / webp) inside the governed store
+                 (runtime/computer/screenshots/ or /photos/) or active/shared/tmp/
                  Default: runtime/computer/screenshots/capture-<timestamp>.png
+                          (photos/ for --camera)
   --json         Print {out, bytes, width, height, mode, warnings} as JSON
   --verbose      Keep runtime logs (off by default)
 
@@ -52,6 +53,35 @@ export interface CaptureResult {
 /** Everything that touches the OS goes through here so the command stays hermetically testable. */
 export interface CaptureDeps {
   capture(input: Record<string, unknown>): Promise<Record<string, unknown>>;
+}
+
+export function buildScreenshotPipelineInput(
+  target: string,
+  captureMode: 'screen' | 'focused_window'
+): Record<string, unknown> {
+  return {
+    action: 'pipeline',
+    steps: [
+      {
+        type: 'capture',
+        op: 'screenshot',
+        params: { capture_mode: captureMode, path: target, export_as: 'screenshot_path' },
+      },
+    ],
+  };
+}
+
+export function buildPhotoPipelineInput(target: string): Record<string, unknown> {
+  return {
+    action: 'pipeline',
+    steps: [
+      {
+        type: 'capture',
+        op: 'capture_photo',
+        params: { path: target, camera_intent: 'reference', export_as: 'photo_path' },
+      },
+    ],
+  };
 }
 
 export const defaultCaptureDeps: CaptureDeps = {
@@ -87,9 +117,10 @@ function parseCaptureArgs(argv: string[]): CaptureArgs {
   return args;
 }
 
-function resolveCaptureOut(out: string | undefined): string {
+function resolveCaptureOut(out: string | undefined, mode: CaptureArgs['mode']): string {
+  const store = mode === 'camera' ? 'photos' : 'screenshots';
   const candidate =
-    out ?? path.join('active/shared/runtime/computer/screenshots', `capture-${Date.now()}.png`);
+    out ?? path.join('active/shared/runtime/computer', store, `capture-${Date.now()}.png`);
   const target = pathResolver.rootResolve(candidate);
   if (!isInsideRepository(target)) {
     throw new ScriptExitError(1, `[capture] --out ${candidate} must be inside the repository`);
@@ -122,28 +153,26 @@ export async function runCaptureCommand(
     print(CAPTURE_USAGE);
     return undefined;
   }
-  if (args.mode === 'camera') {
-    throw new ScriptExitError(
-      1,
-      '[capture] --camera is not available yet (P2: system:capture_photo). Use --screen or --window for now.'
-    );
-  }
-  const target = resolveCaptureOut(args.out);
-  const captureMode = args.mode === 'window' ? 'focused_window' : 'screen';
+  const target = resolveCaptureOut(args.out, args.mode);
+  const input =
+    args.mode === 'camera'
+      ? buildPhotoPipelineInput(target)
+      : buildScreenshotPipelineInput(target, args.mode === 'window' ? 'focused_window' : 'screen');
+  const opName = args.mode === 'camera' ? 'capture_photo' : 'screenshot';
   let raw: Record<string, unknown>;
   try {
-    raw = await deps.capture({
-      action: 'system:screenshot',
-      params: {
-        capture_mode: captureMode,
-        path: target,
-        export_as: 'screenshot_path',
-      },
-    });
+    raw = await deps.capture(input);
   } catch (error) {
-    throw new ScriptExitError(1, `[capture] system:screenshot failed: ${(error as Error).message}`);
+    throw new ScriptExitError(1, `[capture] system:${opName} failed: ${(error as Error).message}`);
   }
-  const saved = typeof raw.screenshot_path === 'string' ? raw.screenshot_path : target;
+  const context =
+    raw.context && typeof raw.context === 'object' ? (raw.context as Record<string, unknown>) : raw;
+  const saved =
+    typeof context.screenshot_path === 'string'
+      ? context.screenshot_path
+      : typeof context.photo_path === 'string'
+        ? context.photo_path
+        : target;
   const relative = path.relative(pathResolver.rootDir(), saved);
   let bytes = 0;
   let width: number | undefined;
@@ -159,7 +188,7 @@ export async function runCaptureCommand(
     // The actuator reported success; a missing file is still an error surface.
     throw new ScriptExitError(
       1,
-      `[capture] system:screenshot reported success but ${relative} is unreadable`
+      `[capture] system:${opName} reported success but ${relative} is unreadable`
     );
   }
   const result: CaptureResult = {

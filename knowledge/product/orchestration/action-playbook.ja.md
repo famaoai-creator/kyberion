@@ -49,7 +49,8 @@ phase_affinity: [alignment, execution]
 | モバイル端末            | `android-actuator` / `ios-actuator`                                 | `launch_app`、`open_deep_link`、タップ、`capture_screen`                                                             |
 | 渡すための文書          | `pnpm kyberion write <brief.json> --out <file>`                     | セマンティックブリーフから pptx / docx / xlsx / pdf（`media:generate_document`）。`read` の逆                        |
 
-- **画面キャプチャ**は `system:screenshot` / `system:record_screen`（画面の伏せ字処理を通る）。`media-generation` / `vision` のキャプチャ op はそこへ転送するだけ。ページのキャプチャは `browser:screenshot`。
+- **画面キャプチャ**は `system:screenshot` / `system:record_screen`（画面の伏せ字処理を通る）。`media-generation` / `vision` のキャプチャ op はそこへ転送するだけ。ページのキャプチャは `browser:screenshot`（ページ動画は `record_video` セッションフラグのまま。明示の `browser:record` op は意図的に未作: 録画は open→navigate→close のセッション生命定数が必要で、薄いキャプチャラッパの範囲を超えるため）。
+- **マイクとカメラ**は `system:record_audio` / `system:capture_photo` / `system:record_camera`（カメラ動画は写真つなぎのため低 fps が前提）。`pnpm kyberion capture [--screen|--window|--camera]` と `pnpm kyberion record screen|audio|camera` で届く。モバイルは静止画のみ（`capture_screen`）。モバイル動画のデバイスブリッジは未着手。
 - 詳細: [browser-automation-best-practices.md](./browser-automation-best-practices.md)、[computer-use-runtime-model.md](../architecture/computer-use-runtime-model.md)、[os-automation-bridge-model.md](../architecture/os-automation-bridge-model.md)。
 
 ## 3. 移動する — 手の一部

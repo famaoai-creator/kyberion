@@ -5,6 +5,9 @@ import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',
   'record_screen',
+  'record_audio',
+  'capture_photo',
+  'record_camera',
   'clipboard_read',
   'get_focused_input',
   'get_screen_size',
@@ -97,6 +100,40 @@ export interface SystemOpSpec {
 }
 
 const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
+  record_audio: {
+    type: 'object',
+    properties: {
+      duration: { type: 'number' },
+      duration_sec: { type: 'number' },
+      output: { type: 'string' },
+      targets: { type: 'array' },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  capture_photo: {
+    type: 'object',
+    properties: {
+      path: { type: 'string' },
+      camera_intent: { type: 'string' },
+      subject_hint: { type: 'string' },
+      device_preference: { type: 'string' },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  record_camera: {
+    type: 'object',
+    properties: {
+      output: { type: 'string' },
+      duration: { type: 'number' },
+      fps: { type: 'number' },
+      subject_hint: { type: 'string' },
+      device_preference: { type: 'string' },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
   screenshot: {
     type: 'object',
     properties: {
@@ -493,6 +530,9 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
 };
 
 const SYSTEM_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
+  record_audio: [{ output: 'active/shared/tmp/mic-recording.wav', duration: 5 }],
+  capture_photo: [{ export_as: 'photo_path' }],
+  record_camera: [{ output: 'active/shared/tmp/camera-recording.mp4', duration: 5 }],
   screenshot: [{ export_as: 'screenshot_path' }],
   window_list: [{ export_as: 'windows' }],
   chrome_tab_list: [{ export_as: 'tabs' }],

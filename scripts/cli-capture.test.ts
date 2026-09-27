@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeWriteFile, safeStat } from '@agent/core';
-import { CAPTURE_USAGE, renderCaptureResult, runCaptureCommand } from './cli-capture.js';
+import {
+  CAPTURE_USAGE,
+  buildPhotoPipelineInput,
+  buildScreenshotPipelineInput,
+  renderCaptureResult,
+  runCaptureCommand,
+} from './cli-capture.js';
 
 function pngHeader(width: number, height: number): Buffer {
   const buffer = Buffer.alloc(33);
@@ -14,6 +20,23 @@ function pngHeader(width: number, height: number): Buffer {
 }
 
 describe('pnpm kyberion capture', () => {
+  it('builds pipeline-steps inputs (the only form the system-actuator executes)', () => {
+    expect(buildScreenshotPipelineInput('/tmp/a.png', 'screen')).toEqual({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'capture',
+          op: 'screenshot',
+          params: { capture_mode: 'screen', path: '/tmp/a.png', export_as: 'screenshot_path' },
+        },
+      ],
+    });
+    expect(buildPhotoPipelineInput('/tmp/b.jpg')).toMatchObject({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'capture_photo' }],
+    });
+  });
+
   it('captures the screen through the injected runner and prints a repo-relative summary', async () => {
     const out = 'active/shared/tmp/capture-screen-test.png';
     const absolute = pathResolver.rootResolve(out);
@@ -22,39 +45,58 @@ describe('pnpm kyberion capture', () => {
     const result = await runCaptureCommand(['--screen', '--out', out], (t) => output.push(t), {
       async capture(input) {
         seen.push(input);
-        const params = input.params as Record<string, unknown>;
+        const step = (input.steps as Array<Record<string, unknown>>)[0]!;
+        const params = step.params as Record<string, unknown>;
         safeWriteFile(String(params.path), pngHeader(320, 200));
-        return { screenshot_path: String(params.path) };
+        return { status: 'succeeded', context: { screenshot_path: String(params.path) } };
       },
     });
     expect(seen[0]).toMatchObject({
-      action: 'system:screenshot',
-      params: { capture_mode: 'screen', export_as: 'screenshot_path' },
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'screenshot' }],
     });
     expect(result).toMatchObject({ out, mode: 'screen', width: 320, height: 200 });
     expect(safeStat(absolute).size).toBe(33);
     expect(output.join('\n')).toContain(`[capture] wrote ${out}`);
   });
 
-  it('maps --window to focused_window mode', async () => {
+  it('maps --window to focused_window mode and --camera to capture_photo', async () => {
     const seen: Record<string, unknown>[] = [];
+    const photoOut = 'active/shared/tmp/capture-camera-test.jpg';
     await runCaptureCommand(
       ['--window', '--out', 'active/shared/tmp/capture-window-test.png'],
       () => {},
       {
         async capture(input) {
           seen.push(input);
-          const params = input.params as Record<string, unknown>;
+          const step = (input.steps as Array<Record<string, unknown>>)[0]!;
+          const params = step.params as Record<string, unknown>;
           safeWriteFile(String(params.path), pngHeader(100, 50));
-          return { screenshot_path: String(params.path) };
+          return { status: 'succeeded', context: { screenshot_path: String(params.path) } };
         },
       }
     );
-    expect((seen[0]!.params as Record<string, unknown>).capture_mode).toBe('focused_window');
+    const windowStep = (seen[0]!.steps as Array<Record<string, unknown>>)[0]!;
+    expect(windowStep.op).toBe('screenshot');
+    expect((windowStep.params as Record<string, unknown>).capture_mode).toBe('focused_window');
+
+    const output: string[] = [];
+    const result = await runCaptureCommand(['--camera', '--out', photoOut], (t) => output.push(t), {
+      async capture(input) {
+        seen.push(input);
+        const step = (input.steps as Array<Record<string, unknown>>)[0]!;
+        const params = step.params as Record<string, unknown>;
+        safeWriteFile(String(params.path), pngHeader(640, 480));
+        return { status: 'succeeded', context: { photo_path: String(params.path) } };
+      },
+    });
+    const photoStep = (seen[1]!.steps as Array<Record<string, unknown>>)[0]!;
+    expect(photoStep.op).toBe('capture_photo');
+    expect(result).toMatchObject({ out: photoOut, mode: 'camera' });
+    expect(output.join('\n')).toContain(`[capture] wrote ${photoOut}`);
   });
 
-  it('rejects --camera with P2 guidance, bad outs, and prints usage', async () => {
-    await expect(runCaptureCommand(['--camera'], () => {})).rejects.toThrow(/P2.*capture_photo/);
+  it('rejects bad outs, unknown options, and prints usage', async () => {
     await expect(
       runCaptureCommand(['--screen', '--out', 'active/shared/tmp/x.txt'], () => {}, {
         async capture() {
@@ -84,9 +126,16 @@ describe('pnpm kyberion capture', () => {
       })
     ).rejects.toThrow(/system:screenshot failed: no display/);
     await expect(
+      runCaptureCommand(['--camera', '--out', 'active/shared/tmp/cap-cam-fail.jpg'], () => {}, {
+        async capture() {
+          throw new Error('no camera');
+        },
+      })
+    ).rejects.toThrow(/system:capture_photo failed: no camera/);
+    await expect(
       runCaptureCommand(['--screen', '--out', 'active/shared/tmp/cap-missing.png'], () => {}, {
-        async capture(input) {
-          return { screenshot_path: (input.params as Record<string, unknown>).path };
+        async capture() {
+          return { status: 'succeeded', context: {} };
         },
       })
     ).rejects.toThrow(/reported success but .* unreadable/);

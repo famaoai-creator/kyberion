@@ -261,7 +261,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('| Use case | Use this | Avoid / why |');
   lines.push('| :--- | :--- | :--- |');
   lines.push(
-    "| Screen capture and recording (general purpose) | `system-actuator` (`screenshot`, `record_screen`, `test_screen_stream`, `test_screen_mp4_roundtrip`) | `media-generation-actuator`'s capture names are compatibility forwarders for generation workflows. |"
+    "| Screen capture and recording (general purpose) | `system-actuator` (`screenshot`, `record_screen`, `record_audio`, `capture_photo`, `test_screen_stream`, `test_screen_mp4_roundtrip`) | `media-generation-actuator`'s capture names are compatibility forwarders for generation workflows. |"
   );
   lines.push(
     '| Document rendering from a template (pptx/docx/pdf, partial updates) | `media-actuator` | Deterministic rendering, not generative — use `media-generation-actuator` for content that has to be authored/synthesized. |'
