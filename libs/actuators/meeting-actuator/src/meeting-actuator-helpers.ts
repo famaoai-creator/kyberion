@@ -37,7 +37,7 @@ import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { resolveIdentityContext } from '@agent/core/authority';
@@ -45,7 +45,10 @@ import {
   loadVoiceConsentAtPath,
   validateVoiceConsentRecord,
 } from '@agent/core/voice/voice-consent';
-import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
@@ -404,10 +407,10 @@ function redactedTarget(input: MeetingAction): string {
   }
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: MEETING_MANIFEST_PATH,
-  defaults: DEFAULT_MEETING_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_MEETING_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): string {

@@ -6,7 +6,7 @@ import {
   type VideoSource,
   type VideoTier,
   type VideoTranscriptPreference,
-} from '@agent/core/video-ingest';
+} from '@agent/core/video/ingest';
 
 /**
  * vision:fetch_video / vision:build_video_brief — thin op facades over the

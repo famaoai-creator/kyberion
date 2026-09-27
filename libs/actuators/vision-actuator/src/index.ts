@@ -1,7 +1,7 @@
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -13,6 +13,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { ocrImage as coreOcrImage } from '@agent/core/ocr-bridge';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
 import { handleDescribeImage } from './describe-image.js';
@@ -59,10 +60,10 @@ const DEFAULT_VISION_RETRY = {
   jitter: true,
 };
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: VISION_MANIFEST_PATH,
-  defaults: DEFAULT_VISION_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_VISION_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function resolveVisionRepositoryPath(logicalPath: string): string {

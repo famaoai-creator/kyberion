@@ -4,7 +4,7 @@ import {
   inferImagePayloadTier,
   type PayloadTier,
 } from '@agent/core/media/image-description-bridge';
-import { tenantOfPath } from '@agent/core/video-ingest';
+import { tenantOfPath } from '@agent/core/video/ingest';
 
 /**
  * Tier and scope for perception ops that write derived artifacts (crops,

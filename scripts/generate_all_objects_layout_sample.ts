@@ -6,7 +6,7 @@ import {
   lineElement as line,
   sectionHeaderElements,
   footerElements,
-} from '@agent/core/layout-primitives';
+} from '@agent/core/media/native-pptx-engine/layout-primitives';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
 import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';

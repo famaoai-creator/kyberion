@@ -30,7 +30,7 @@ import {
   refreshServiceOAuthToken,
 } from '@agent/core/oauth-broker';
 import { validateServiceAuth } from '@agent/core/service/service-validator';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
 import { getServicePresetRecord } from '@agent/core/service/service-preset-registry';
 import {
@@ -61,6 +61,7 @@ import {
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { secureFetch } from '@agent/core/network';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
@@ -245,10 +246,10 @@ function emitRecoveryStimulus(serviceId: string) {
   appendJsonLine(STIMULI_PATH, stimulus);
 }
 
-const buildPipelineRetryPolicy = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildPipelineRetryPolicy } = defineActuatorPipelineBase({
   manifestPath: SERVICE_ACTUATOR_MANIFEST_PATH,
-  defaults: DEFAULT_PIPELINE_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_PIPELINE_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function resolveServiceBaseUrl(serviceId: string): string {

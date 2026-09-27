@@ -4,12 +4,13 @@ import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { encodeTerminalInput } from '@agent/core/shell/terminal-keys';
 import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import * as pathResolver from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
 import { resolveShellAdapter } from '@agent/core/platform-command-adapters';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 
 /**
@@ -97,10 +98,10 @@ export interface ComputerInteractionAction {
   };
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: TERMINAL_MANIFEST_PATH,
-  defaults: DEFAULT_TERMINAL_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_TERMINAL_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function resolveTerminalCwd(rootDir: string, cwd: string | undefined): string {

@@ -36,11 +36,12 @@ import {
   type CoordinatedAgentTaskEnvelope,
 } from '@agent/core/coordinated-agent-execution-port';
 import * as pathResolver from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { AgentProvider, AgentRecord } from '@agent/core/agent/agent-registry';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
 const DEFAULT_AGENT_RETRY = {
@@ -96,10 +97,10 @@ export interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: AGENT_MANIFEST_PATH,
-  defaults: DEFAULT_AGENT_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_AGENT_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {

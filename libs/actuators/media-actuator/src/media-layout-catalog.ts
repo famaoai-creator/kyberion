@@ -9,13 +9,14 @@ import {
 import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import {
   fitTextToBox,
   measureTextBlock,
   type LayoutFitResult,
 } from '@agent/core/media/native-pptx-engine/text-metrics';
 import { resolvePptxSurfaceDesign } from '@agent/core/media/native-pptx-engine/design-cascade';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
@@ -221,10 +222,10 @@ function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: MEDIA_MANIFEST_PATH,
-  defaults: DEFAULT_MEDIA_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_MEDIA_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function asMediaLayoutShape(value: unknown): MediaLayoutShape {
