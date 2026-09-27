@@ -2169,6 +2169,14 @@
       "noun": "co-session",
       "verb": "default",
       "audience": "operator"
+    },
+    {
+      "id": "script.agy.profile",
+      "module": "scripts/agy_profile_controller.ts",
+      "command": "agy profile",
+      "noun": "agy",
+      "verb": "profile",
+      "audience": "operator"
     }
   ]
 }
