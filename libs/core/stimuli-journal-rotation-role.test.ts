@@ -177,6 +177,27 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     authority.withExecutionContext('mission_controller', () => journal.appendStimulus(stimulus));
     expect(fs.readFileSync(journalPath(), 'utf8')).toBe(`${JSON.stringify(stimulus)}\n`);
   });
+  it('emits sensor stimuli through the journal store writer inside another assumption', async () => {
+    const { authority } = await loadModules();
+    const { KyberionSensor } = await import('./sensor-engine.js');
+    class ProbeSensor extends KyberionSensor {
+      async start(): Promise<void> {}
+      async stop(): Promise<void> {}
+      fire(): void {
+        this.emit({ intent: 'probe.sensor', payload: { ok: true }, priority: 3 });
+      }
+    }
+    fs.writeFileSync(journalPath(), '');
+    const sensor = new ProbeSensor({ id: 'probe', name: 'Probe', type: 'event-driven' });
+    authority.withExecutionContext('mission_controller', () => sensor.fire());
+    const lines = fs.readFileSync(journalPath(), 'utf8').split('\n').filter(Boolean);
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toMatchObject({
+      origin: { channel: 'sensor', source_id: 'probe' },
+      signal: { intent: 'probe.sensor', priority: 3, payload: { ok: true } },
+      control: { status: 'pending', feedback: 'auto', evidence: [] },
+    });
+  });
 });
 
 describe('SB-01 the stimuli journal is not an authorization input', () => {
