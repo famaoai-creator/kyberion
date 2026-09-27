@@ -25,7 +25,7 @@ import { withExecutionContext } from './authority.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
-import { resolveSurfaceApprovalReply } from './surface-approval-ui.js';
+import { parseDecisionToken, resolveSurfaceApprovalReply } from './surface-approval-ui.js';
 
 const CHAT = '424242';
 
@@ -200,6 +200,28 @@ describe('routeAutonomousDecision', () => {
       );
       expect(reply(`appr:${requestId}:explain`, '999').record).toBeUndefined();
       expect(loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId!)?.status).toBe('pending');
+    });
+  });
+
+  describe('parseDecisionToken', () => {
+    const id = '123e4567-e89b-12d3-a456-426614174000';
+
+    it('splits the verb from free-text instructions', () => {
+      expect(parseDecisionToken(`appr:${id}:REVISE  add tests\nfirst`)).toEqual({
+        requestId: id,
+        verb: 'revise',
+        trailing: 'add tests\nfirst',
+      });
+      expect(parseDecisionToken(`appr:${id}:approve`)).toEqual({ requestId: id, verb: 'approve' });
+      expect(parseDecisionToken(`appr:${id}:approvex`)).toBeNull();
+      expect(parseDecisionToken(`appr:${id}:why:quality`)).toBeNull();
+    });
+
+    it('stays linear on adversarial whitespace', () => {
+      const hostile = `appr:${id}:revise${' \t'.repeat(50_000)}x${' '.repeat(50_000)}!`;
+      const started = performance.now();
+      expect(parseDecisionToken(hostile)?.trailing?.endsWith('!')).toBe(true);
+      expect(performance.now() - started).toBeLessThan(500);
     });
   });
 });
