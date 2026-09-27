@@ -35,6 +35,7 @@ const FILES: Record<string, string> = {
       { id: 'union-surface', command: 'node', args: ['dist/apps/union.js'] },
       { id: 'dynamic-surface', command: 'node', args: ['dist/apps/dynamic.js'] },
       { id: 'require-surface', command: 'node', args: ['dist/apps/required.js'] },
+      { id: 'variants-surface', command: 'node', args: ['dist/apps/variants.js'] },
       { id: 'missing-surface', command: 'node', args: ['dist/apps/missing.js'] },
       { id: 'spawn-surface', command: 'node', args: ['dist/apps/spawn.js'] },
     ],
@@ -91,6 +92,30 @@ const FILES: Record<string, string> = {
   'libs/core/required-dep.ts': [
     "import { withExecutionContext } from './authority.js';",
     "export function go(): void { withExecutionContext('role_required', () => undefined); }",
+  ].join('\n'),
+  'apps/variants.ts': [
+    `import { promisify } from '${['node', 'util'].join(':')}';`,
+    `import { exec } from '${CHILD_PROCESS}';`,
+    `import { createRequire } from '${['node', 'module'].join(':')}';`,
+    `import { Worker } from '${['node', 'worker_threads'].join(':')}';`,
+    'const run = promisify(exec);',
+    "void run('node dist/scripts/promisified.js', { env: process.env });",
+    'const load = createRequire(import.meta.url);',
+    `const cp = load('${CHILD_PROCESS}') as { spawn(...args: unknown[]): void };`,
+    "cp.spawn('node', ['dist/scripts/required-child.js'], { env: process.env });",
+    "new Worker('dist/scripts/worker.js');",
+  ].join('\n'),
+  'scripts/promisified.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_promisified', () => undefined);",
+  ].join('\n'),
+  'scripts/required-child.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_required_child', () => undefined);",
+  ].join('\n'),
+  'scripts/worker.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_worker', () => undefined);",
   ].join('\n'),
   'apps/missing.ts': [`import { helper } from '${CORE}/not-there.js';`, 'helper();'].join('\n'),
   'apps/spawn.ts': [
@@ -166,6 +191,16 @@ describe('RN-02 role assumption reachability analysis', () => {
   it('follows createRequire-bound loads like require (S1)', () => {
     const surface = report.system_roles.require_surface;
     expect(Object.keys(surface.reachable_roles)).toEqual(['role_required']);
+    expect(surface.unresolved_sites).toEqual([]);
+  });
+
+  it('detects promisify(exec), require-bound child_process and worker threads (S9)', () => {
+    const surface = report.system_roles.variants_surface;
+    expect(Object.keys(surface.reachable_roles)).toEqual([
+      'role_promisified',
+      'role_required_child',
+      'role_worker',
+    ]);
     expect(surface.unresolved_sites).toEqual([]);
   });
 
