@@ -21,7 +21,7 @@ import { nowIso } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface-request-input';
-import { withExecutionContext } from '@agent/core/authority';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { resolveMemberByPrincipal } from '@agent/core/member-registry';
 import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
@@ -254,7 +254,7 @@ export function registerHearingMissionRoutes(app: express.Express): void {
         decidedBy,
       });
       const createResult = safeExecResult(process.execPath, [CONTROLLER_RELATIVE, ...createArgs], {
-        env: { ...process.env, MISSION_ROLE: 'mission_controller' },
+        env: buildExecutionEnv(process.env, 'mission_controller'),
         cwd: rootDir,
         timeoutMs: 60_000,
         maxOutputMB: 5,
@@ -279,7 +279,8 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       // write, not a plain surface-runtime one — the policy engine refuses
       // persona 'worker' / role `surface_runtime` here (same authority
       // boundary `mission_controller.js create` itself runs under, via
-      // `MISSION_ROLE=mission_controller` on the subprocess above). Elevate
+      // `buildExecutionEnv(process.env, 'mission_controller')` on the subprocess
+      // above — delegated under SYSTEM_ROLE, AUTHORITY_MODEL 3.B2 DR-01). Elevate
       // only for this write, the same pattern `mission-coordination-bus.ts` /
       // `mission-task-recovery.ts` use for direct mission-directory writes.
       withExecutionContext('mission_controller', () => {
