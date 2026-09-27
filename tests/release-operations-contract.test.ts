@@ -49,6 +49,7 @@ describe('Release operations contract', () => {
       'pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md'
     );
     expect(releaseOps).toContain('pnpm run release:source-archive');
+    expect(releaseOps).toContain('pnpm kyberion changelog assemble');
     expect(releaseOps).toContain('pnpm kyberion release install-smoke');
     expect(releaseOps).toContain('Automated release workflow (`.github/workflows/release.yml`)');
     expect(releaseOps).toContain('Migration runner (`scripts/run_migrations.ts`)');

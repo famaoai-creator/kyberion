@@ -379,6 +379,14 @@
       "rationale": "Checks Wisdom forwarder targets."
     },
     {
+      "id": "changelog-fragments",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/assemble_changelog.ts", "--check"],
+      "owner": "release",
+      "rationale": "Validates changelog.d/ fragment format (category front-matter, list-item body) so PRs record user-visible changes without editing CHANGELOG.md (GF-02)."
+    },
+    {
       "id": "env-registry",
       "scope": "pr",
       "executable": "node",
