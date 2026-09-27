@@ -351,6 +351,7 @@
 - [Active Inquiry Protocol: The Power of Questioning](./product/orchestration/active_inquiry_protocol.md) (public | Ecosystem Architect)
 - [Actuator Discovery Registry](./product/orchestration/actuator-discovery-registry.md) (public | Ecosystem Architect)
 - [Actuator Intent Normalization](./product/orchestration/actuator-intent-normalization.md) (public | Unknown)
+- [Antigravity CLI Multi-Account Profile Operations](./product/orchestration/antigravity-multi-account-operations.md) (public | Unknown)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
 - [Browser Automation Best Practices (Omni-Browser v2)](./product/orchestration/browser-automation-best-practices.md) (public | Ecosystem Architect)

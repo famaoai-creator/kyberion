@@ -174,6 +174,7 @@ describe('provider-permission-profiles', () => {
         CURSOR_API_KEY: 'fake-cursor-key',
         CUSTOM_SECRET_TOKEN: 'fake-custom-token',
         CODEX_HOME: '/home/test/.codex',
+        AGY_PROFILE: 'work',
         KYBERION_PERSONA: 'implementer',
         MISSION_ID: 'MSN-1',
         UNRELATED_VAR: 'should-not-leak',
@@ -211,13 +212,14 @@ describe('provider-permission-profiles', () => {
       expect(env.CODEX_HOME).toBe('/home/test/.codex');
     });
 
-    it('excludes all credential vars for agy (no declared credential var)', () => {
+    it('excludes all credential vars for agy and carries AGY_PROFILE', () => {
       const env = buildProviderChildEnv({ provider: 'agy', baseEnv: fakeBaseEnv() });
       expect(env.OPENAI_API_KEY).toBeUndefined();
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(env.GEMINI_API_KEY).toBeUndefined();
       expect(env.GH_TOKEN).toBeUndefined();
       expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.AGY_PROFILE).toBe('work');
     });
 
     it('excludes other providers credentials for grok, and carries XAI_API_KEY', () => {

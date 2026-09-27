@@ -355,7 +355,7 @@ const ALWAYS_ALLOWED_ENV_KEYS: readonly string[] = [
 const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>> = {
   claude: [],
   codex: ['CODEX_HOME'],
-  agy: [],
+  agy: ['AGY_PROFILE'],
   // OAuth session for Grok Build typically lives under ~/.grok; no extra config
   // home override is required for headless -p invocations.
   grok: [],
