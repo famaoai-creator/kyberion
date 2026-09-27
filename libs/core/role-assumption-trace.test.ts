@@ -113,8 +113,22 @@ describe('RN-01 role assumption trace', () => {
       '    at /repo/presence/displays/chronos-mirror-v2/.next/server/chunk.js:1:2',
     ].join('\n');
     expect(callerFramesFromStack(stack)).toEqual([
-      'libs/core/dist/mission-role.js:5:1',
+      'libs/core/dist/mission-role.js:5:1 (withMissionRole)',
       'presence/displays/chronos-mirror-v2/.next/server/chunk.js:1:2',
+    ]);
+  });
+
+  it('recognises the assumption path by function name inside a bundle', () => {
+    const chunk = '/srv/kyberion/presence/displays/concierge/.next/server/chunks/12.js';
+    const stack = [
+      'Error',
+      `    at captureStack (${chunk}:1:10)`,
+      `    at traceRoleAssumption (${chunk}:1:20)`,
+      `    at Object.withExecutionContext (${chunk}:1:30)`,
+      `    at async GET (${chunk}:9:40)`,
+    ].join('\n');
+    expect(callerFramesFromStack(stack)).toEqual([
+      'presence/displays/concierge/.next/server/chunks/12.js:9:40 (GET)',
     ]);
   });
 });
