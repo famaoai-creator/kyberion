@@ -48,6 +48,10 @@ import { reassignMissionToProject } from '@agent/core/project-management';
 import { recordMissionHandoff } from '@agent/core/work-coordination';
 import type { ArtifactReviewFinding } from '@agent/core/artifact-review';
 import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission-work-reconciliation';
+import {
+  runMissionTriage,
+  runScopeApproveRequestApproval,
+} from './refactor/mission-triage-commands.js';
 import type { HumanDecidedBy } from '@agent/core/mission-types';
 
 type Print = (value: unknown) => void;
@@ -895,8 +899,18 @@ Maintenance Commands:
                                  --generate [--output <PATH>] scaffolds a manifest from current git state
                                  Validate and adopt verified work completed outside dispatch-workitems
   review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
-  scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]
-                                 Approve a scope change and rebaseline the origin intent
+  scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>] [--success-condition <TEXT>]
+                                 Approve a scope change and rebaseline the origin intent.
+                                 Direct use requires SUDO; without it: --request-approval
+                                 files a human approval request (decide via
+                                 'pnpm kyberion approvals --approve <id>'), then apply with
+                                 --approval-request-id <id> — hash-bound to the exact
+                                 goal/reason/success-condition the human read
+  triage   <ID> [--json] [--request-approval] [--goal <TEXT>] [--reason <TEXT>]
+                                 Diagnose why a mission is not closed and print the
+                                 lowest-privilege path out. --request-approval files the
+                                 scope-approval request when classification is
+                                 intent_drift_blocked
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
   archive  [--execute] [--mission <ID>]
                                  Governed archive verb: policy-driven sweep like purge (dry-run by
@@ -1375,9 +1389,14 @@ async function approveScopeChange(
     reason?: string;
     goalSummary?: string;
     successCondition?: string;
+    approvalRequestId?: string;
   }
 ): Promise<void> {
-  assertCanGrantMissionAuthority();
+  // The approval-mediated path validates the human approval inside
+  // approveScopeChange; SUDO is only required for the direct path.
+  if (!options?.approvalRequestId?.trim()) {
+    assertCanGrantMissionAuthority();
+  }
   return missionSystem.approveScopeChange(missionId, options);
 }
 
@@ -1388,7 +1407,14 @@ async function approveScopeChange(
  * spawns cheap. Unknown actions fail safe toward installing: delegation
  * must never silently fall back to the stub.
  */
-const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set(['record-task', 'record-evidence']);
+const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
+  'record-task',
+  'record-evidence',
+  // Journal/state-only verbs: they never delegate to a reasoning backend, so
+  // skipping the ~3s backend bootstrap keeps the triage loop cheap.
+  'triage',
+  'scope-approve',
+]);
 
 /** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
 export function shouldSkipReasoningBootstrap(action: string | undefined): boolean {
@@ -1463,6 +1489,12 @@ async function mainImpl(
     grantMissionAccess,
     grantMissionSudo,
     approveScopeChange,
+    requestMissionScopeApproval: (
+      id: string,
+      options?: Parameters<typeof runScopeApproveRequestApproval>[1]
+    ) => runScopeApproveRequestApproval(id, options, printOutput),
+    triageMission: (id: string, options?: Parameters<typeof runMissionTriage>[1]) =>
+      runMissionTriage(id, options, printOutput),
     createCheckpoint,
     delegateMission,
     importMission,

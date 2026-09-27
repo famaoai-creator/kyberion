@@ -102,6 +102,12 @@ vi.mock('./surface-coordination-store.js', () => ({ enqueueSurfaceOutboxMessage:
 const imessage = vi.hoisted(() => vi.fn());
 vi.mock('./imessage-bridge.js', () => ({ sendIMessage: imessage }));
 
+const inbox = vi.hoisted(() => ({
+  addInboxEntry: vi.fn(),
+  listInboxEntries: vi.fn(() => [] as Array<{ entry_id: string }>),
+}));
+vi.mock('./deliverable-inbox.js', () => inbox);
+
 describe('operator notifications (E2E-04 Task 2)', () => {
   beforeEach(() => {
     process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS = '1';
@@ -119,6 +125,8 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     mod.resetOperatorNotificationRateLimiter();
     enqueue.mockReset();
     imessage.mockReset();
+    inbox.addInboxEntry.mockReset();
+    inbox.listInboxEntries.mockReset().mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -193,6 +201,36 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     expect(second).toBe(false);
     expect(other).toBe(true);
     expect(enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('delivers to the local inbox surface without any bridge', async () => {
+    writePrefs({ default_channel: { surface: 'inbox', target: 'operator' } });
+    const sent = await mod.notifyOperator('ops_alert', {
+      title: 'scheduler down',
+      body: 'chronos heartbeat missing',
+      correlation_id: 'OPS-123',
+    });
+    expect(sent).toBe(true);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(inbox.addInboxEntry).toHaveBeenCalledTimes(1);
+    expect(inbox.addInboxEntry.mock.calls[0][0]).toMatchObject({
+      entryId: 'INBOX-N-OPS123',
+      title: 'scheduler down',
+      kind: 'operator_notification',
+      status: 'unread',
+    });
+  });
+
+  it('inbox route dedupes an already-queued notification entry', async () => {
+    writePrefs({ default_channel: { surface: 'inbox', target: 'operator' } });
+    inbox.listInboxEntries.mockReturnValue([{ entry_id: 'INBOX-N-OPS123' }]);
+    const sent = await mod.notifyOperator('ops_alert', {
+      title: 'scheduler down',
+      body: 'chronos heartbeat missing',
+      correlation_id: 'OPS-123',
+    });
+    expect(sent).toBe(true);
+    expect(inbox.addInboxEntry).not.toHaveBeenCalled();
   });
 
   it('delivers imessage directly via sendIMessage', async () => {

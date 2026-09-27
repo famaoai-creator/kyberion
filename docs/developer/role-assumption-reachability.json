@@ -316,6 +316,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission-maintenance.ts#approveScopeChange (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission-orchestration-dispatch.ts#dispatchMissionNextTasksCore [delegated child role]",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -361,6 +366,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission-scope-approval.ts#createMissionScopeApprovalRequest (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission-task-recovery.ts#recoverMissionRequestedTasks",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -373,6 +383,11 @@
     {
       "site": "libs/core/mission-work-reconciliation.ts#createMissionWorkReconciliationApprovalRequest (via libs/core/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/operator-notifications.ts#loadNotificationPreferences",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -1605,6 +1620,11 @@
     },
     {
       "site": "scripts/kyberion_home.ts#handleIntentSubcommand",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/kyberion_home.ts#handleNotifySubcommand",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
