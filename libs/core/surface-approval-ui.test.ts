@@ -587,7 +587,7 @@ describe('surface-approval-ui decision cards', () => {
     const record = createCardRequest('thread');
     for (const text of [`appr:${record.id}:explain`, `appr:${record.id}:changes do it`]) {
       expect(reply(record.threadTs, text, 'thread-other').reply).toBe(
-        'この承認要求は別のスレッドにあります。'
+        t('bridge:approval_request_other_thread', undefined, 'en')
       );
     }
     expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
