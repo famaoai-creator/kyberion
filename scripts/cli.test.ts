@@ -193,6 +193,7 @@ describe('Kyberion CLI helpers', () => {
     expect(shouldBootstrapRuntime(['watch', 'demo.mp4'])).toBe(false);
     // speak uses the voice actuator's engine registry, not the python voice bridge.
     expect(shouldBootstrapRuntime(['speak', 'hello'])).toBe(false);
+    expect(shouldBootstrapRuntime(['draw', 'a lake', '--out', 'a.png'])).toBe(false);
     expect(shouldBootstrapRuntime(['task', 'plan', 'hello'])).toBe(true);
     expect(shouldBootstrapRuntime(['task', 'scenario', 'list'])).toBe(false);
   });
