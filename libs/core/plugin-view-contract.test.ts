@@ -42,6 +42,7 @@ import type { A2UIMessage } from './a2ui.js';
 import { findPluginManifestFor } from './plugin-grant-runtime.js';
 import { auditChain, type AuditEntry } from './audit-chain.js';
 import {
+  approvalRequestLogicalPath,
   decideApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
@@ -221,7 +222,7 @@ function newIds(prefix: string) {
 }
 
 function trackActionRequest(id: string): void {
-  tracked(pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`));
+  tracked(pathResolver.rootResolve(approvalRequestLogicalPath('chronos', id)));
   trackedActionIds.push(id);
   tracked(
     pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)

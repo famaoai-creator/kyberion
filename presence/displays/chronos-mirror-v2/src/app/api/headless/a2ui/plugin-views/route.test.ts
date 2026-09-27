@@ -4,7 +4,11 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { NextRequest } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import {
+  approvalRequestLogicalPath,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from '@agent/core/approval-store';
 import {
   safeExistsSync,
   safeMkdir,
@@ -310,9 +314,7 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
     expect(queued.status).toBe(202);
     expect(queued.body.data.outcome.status).toBe('approval_required');
     const requestId = queued.body.data.outcome.approvalRequestId as string;
-    cleanup.push(
-      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${requestId}.json`)
-    );
+    cleanup.push(pathResolver.rootResolve(approvalRequestLogicalPath('chronos', requestId)));
     trackedActionIds.push(requestId);
 
     const unknown = await act({ plugin_id: record.pluginId, view_id: 'status', action_id: 'nope' });
@@ -376,7 +378,7 @@ describe('POST /api/headless/a2ui/plugin-views', () => {
 describe('POST /api/headless/a2ui/plugin-views execute (FU-02)', () => {
   function trackActionRequest(id: string) {
     cleanup.push(
-      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`),
+      pathResolver.rootResolve(approvalRequestLogicalPath('chronos', id)),
       pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
     );
     trackedActionIds.push(id);
@@ -562,7 +564,7 @@ describe('plugin-views with the Chronos plugin host enabled (PH-01)', () => {
     expect(queued.status).toBe(202);
     const id = queued.body.data.outcome.approvalRequestId as string;
     cleanup.push(
-      pathResolver.shared(`coordination/channels/chronos/approvals/requests/${id}.json`),
+      pathResolver.rootResolve(approvalRequestLogicalPath('chronos', id)),
       pathResolver.shared(`coordination/channels/chronos/plugin-view-actions/${id}.claim.json`)
     );
     trackedActionIds.push(id);
