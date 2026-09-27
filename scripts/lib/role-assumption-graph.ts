@@ -38,6 +38,17 @@ import {
   type ModuleResolver,
   type Workspace,
 } from './role-assumption-workspace.js';
+import {
+  DELEGATED_ROLE_ENV_NAME,
+  DELEGATION_FUNCTION,
+  delegatedRoleWriteValue,
+  isUndefinedExpression,
+  singleReturnedEnvExpression,
+  SYSTEM_ROLE_LAUNCH_FUNCTION,
+  systemRoleOfEnvLiteral,
+  unwrapExpression,
+  type ForeignDelegation,
+} from './role-assumption-delegation.js';
 
 /** Specifiers that name Kyberion code (relative, `@/`, workspace scopes). */
 const INTERNAL_SPECIFIER = /^(?:\.{1,2}\/|\/|@\/|@agent\/|@actuator\/)/;
@@ -51,17 +62,6 @@ function isInternalCodeSpecifier(specifier: string): boolean {
 }
 
 const ASSUMPTION_FUNCTIONS = new Set(['withExecutionContext', 'withExecutionContextAsync']);
-/**
- * DR-01: `buildExecutionEnv(env, role)` delegates `role` to the child when the
- * env carries SYSTEM_ROLE; the child then runs as `role` under the parent's
- * SYSTEM_ROLE bounds, so the call is an assumption site of `role` for every
- * system role that reaches it (the child entry itself is walked as a spawn).
- */
-const DELEGATION_FUNCTION = 'buildExecutionEnv';
-/** Builds a child env under a NEW SYSTEM_ROLE and clears any delegation (DR-01). */
-const SYSTEM_ROLE_LAUNCH_FUNCTION = 'buildSystemRoleLaunchEnv';
-const DELEGATED_ROLE_ENV_NAME = 'KYBERION_DELEGATED_ROLE';
-const DELEGATED_ROLE_ENV_CONST = 'DELEGATED_ROLE_ENV';
 const AUTHORITY_FILE = 'libs/core/authority.ts';
 
 /**
@@ -154,20 +154,6 @@ function isDirectEntryGuard(statement: ts.Statement): boolean {
     return onlyGuards(statement.expression);
   }
   return false;
-}
-
-function unwrapExpression(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 function isFunctionLikeExpression(expression: ts.Expression | undefined): boolean {
@@ -366,29 +352,6 @@ export interface SpawnRecord {
   targets: string[];
 }
 
-/**
- * DR-01: `buildExecutionEnv({ ...env, SYSTEM_ROLE: <s> }, <role>)` delegates
- * <role> to a child that runs under system role <s>, whoever spawns it.
- */
-export interface ForeignDelegation {
-  unit: Unit;
-  site: string;
-  systemRoles: Set<string>;
-  /** The SYSTEM_ROLE value could not be resolved: the delegation may target any system role. */
-  anySystemRole: boolean;
-  roles: Set<string>;
-  /** Why the system role or the delegated role is not fully known ("any"). */
-  unresolved: string[];
-}
-
-function isUndefinedExpression(expression: ts.Expression): boolean {
-  const expr = unwrapExpression(expression);
-  return (
-    expr.kind === ts.SyntaxKind.UndefinedKeyword ||
-    (ts.isIdentifier(expr) && expr.text === 'undefined')
-  );
-}
-
 function emptyResolution(): RoleResolution {
   return { roles: new Set(), unresolved: [], forwards: [] };
 }
@@ -432,7 +395,7 @@ export class Analyzer {
   readonly unresolvedEdges = new Map<Unit, string[]>();
   readonly roleRecords: RoleRecord[] = [];
   readonly spawnRecords: SpawnRecord[] = [];
-  readonly foreignDelegations: ForeignDelegation[] = [];
+  readonly foreignDelegations: ForeignDelegation<Unit>[] = [];
   private readonly callRefs = new Map<ts.SignatureDeclaration, CallRef[]>();
   private readonly valueRefs = new Map<ts.SignatureDeclaration, Unit[]>();
   private readonly pendingForwards: Array<{
@@ -1300,7 +1263,9 @@ export class Analyzer {
     if (!roleArgument || isUndefinedExpression(roleArgument)) return;
     const site = `${this.position(call)} [delegated child role]`;
     // An env literal that sets SYSTEM_ROLE delegates under THAT system role.
-    const ownSystemRole = baseEnv ? this.systemRoleOfEnvLiteral(baseEnv) : undefined;
+    const ownSystemRole = baseEnv
+      ? systemRoleOfEnvLiteral(baseEnv, (node) => this.initializerOf(node))
+      : undefined;
     if (ownSystemRole) {
       const systemRoles = this.resolveRoleExpression(ownSystemRole);
       const roles = this.resolveRoleExpression(roleArgument);
@@ -1333,81 +1298,17 @@ export class Analyzer {
     });
   }
 
-  /** The `SYSTEM_ROLE` value of an object-literal env (possibly via a const). */
-  private systemRoleOfEnvLiteral(expression: ts.Expression, depth = 0): ts.Expression | undefined {
-    const expr = unwrapExpression(expression);
-    if (ts.isObjectLiteralExpression(expr)) {
-      for (const property of [...expr.properties].reverse()) {
-        if (
-          ts.isPropertyAssignment(property) &&
-          (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
-          property.name.text === 'SYSTEM_ROLE'
-        ) {
-          return property.initializer;
-        }
-      }
-      return undefined;
-    }
-    if (depth < 3) {
-      const initializer = this.initializerOf(expr);
-      if (initializer && initializer !== 'parameter') {
-        return this.systemRoleOfEnvLiteral(initializer, depth + 1);
-      }
-    }
-    return undefined;
-  }
-
   /**
    * DR-01: KYBERION_DELEGATED_ROLE is written only by libs/core/authority.ts.
    * Any other non-empty write could hand a child an arbitrary role, so it is
    * an "any role" site for every system role that reaches it.
    */
   private scanDelegatedRoleWrite(unit: Unit, node: ts.Node): void {
-    if (unit.file === AUTHORITY_FILE) return;
-    const namesDelegatedRole = (name: ts.Node | undefined): boolean => {
-      if (!name) return false;
-      if (ts.isComputedPropertyName(name)) return namesDelegatedRole(name.expression);
-      const expr = ts.isExpression(name) ? unwrapExpression(name) : name;
-      if (ts.isIdentifier(expr)) {
-        return expr.text === DELEGATED_ROLE_ENV_NAME || expr.text === DELEGATED_ROLE_ENV_CONST;
-      }
-      return ts.isStringLiteralLike(expr) && expr.text === DELEGATED_ROLE_ENV_NAME;
-    };
-    const isBlank = (value: ts.Expression): boolean => {
-      const expr = unwrapExpression(value);
-      return (ts.isStringLiteralLike(expr) && expr.text === '') || isUndefinedExpression(expr);
-    };
-    let written: ts.Expression | undefined;
-    if (ts.isPropertyAssignment(node) && namesDelegatedRole(node.name)) {
-      // `KYBERION_DELEGATED_ROLE: …` in an object literal (the identifier name
-      // itself only when it is not a computed key referring to the constant).
-      written = node.initializer;
-    } else if (
-      ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      ((ts.isPropertyAccessExpression(node.left) &&
-        node.left.name.text === DELEGATED_ROLE_ENV_NAME) ||
-        (ts.isElementAccessExpression(node.left) &&
-          namesDelegatedRole(node.left.argumentExpression)))
-    ) {
-      written = node.right;
-    } else if (ts.isCallExpression(node)) {
-      const callee = unwrapExpression(node.expression);
-      const name = ts.isIdentifier(callee)
-        ? callee.text
-        : ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : '';
-      if (name === 'setRegisteredEnv' && namesDelegatedRole(node.arguments[0])) {
-        written = node.arguments[1];
-      }
-    }
-    if (written && !isBlank(written)) {
-      this.addUnresolvedEdge(
-        unit,
-        `raw write of ${DELEGATED_ROLE_ENV_NAME} outside ${AUTHORITY_FILE} at ${this.position(node)}`
-      );
-    }
+    if (unit.file === AUTHORITY_FILE || !delegatedRoleWriteValue(node)) return;
+    this.addUnresolvedEdge(
+      unit,
+      `raw write of ${DELEGATED_ROLE_ENV_NAME} outside ${AUTHORITY_FILE} at ${this.position(node)}`
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1513,34 +1414,16 @@ export class Analyzer {
     return this.envInherits(initializer, depth + 1);
   }
 
-  /** The single `return <expr>` of a project function declaration, if that is all it returns. */
+  /** A project function declaration's directly returned env expression (DR-01). */
   private singleReturnExpression(callee: ts.Expression): ts.Expression | undefined {
     const symbol = this.resolveAlias(
       this.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(callee) ? callee.name : callee)
     );
     const declaration = symbol?.valueDeclaration;
-    if (
-      !declaration ||
-      !ts.isFunctionDeclaration(declaration) ||
-      !declaration.body ||
-      !isProjectSource(this.ws, declaration.getSourceFile().fileName)
-    ) {
-      return undefined;
-    }
-    const returns: ts.ReturnStatement[] = [];
-    const visit = (node: ts.Node): void => {
-      if (ts.isFunctionLike(node) && node !== declaration) return;
-      if (ts.isReturnStatement(node)) returns.push(node);
-      ts.forEachChild(node, visit);
-    };
-    visit(declaration.body);
-    // Only a directly returned call or object literal: a returned local variable
-    // may have been filled in place (a copy loop over process.env), which the
-    // initializer alone does not show, so it stays opaque.
-    const returned = returns.length === 1 ? returns[0].expression : undefined;
-    const inner = returned ? unwrapExpression(returned) : undefined;
-    return inner && (ts.isCallExpression(inner) || ts.isObjectLiteralExpression(inner))
-      ? returned
+    return declaration &&
+      ts.isFunctionDeclaration(declaration) &&
+      isProjectSource(this.ws, declaration.getSourceFile().fileName)
+      ? singleReturnedEnvExpression(declaration)
       : undefined;
   }
 
