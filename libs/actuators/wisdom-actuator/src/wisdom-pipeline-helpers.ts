@@ -11,9 +11,12 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { classifyError } from '@agent/core/error-classifier';
-import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -55,9 +58,6 @@ import {
   readWisdomJsonAtPath,
 } from './wisdom-persisted-json.js';
 
-const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/wisdom-actuator/manifest.json'
-);
 const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
 const DEFAULT_WISDOM_RETRY = {
   maxRetries: 2,
@@ -101,10 +101,10 @@ function assertWisdomReconcileSteps(steps: PipelineStep[]): void {
   }
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: WISDOM_MANIFEST_PATH,
-  defaults: DEFAULT_WISDOM_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+const { buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json'),
+  retryDefaults: DEFAULT_WISDOM_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 export async function runWithOperationRetry<T>(op: string, task: () => Promise<T>): Promise<T> {
