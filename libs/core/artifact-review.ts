@@ -190,7 +190,7 @@ export function assertValidArtifactReviewReceipt(receipt: ArtifactReviewReceipt)
   const validation = validateArtifactReviewReceipt(receipt);
   if (!validation.valid) {
     throw new Error(
-      `Artifact review receipt would be invalid: ${validation.errors.join('; ')}. ` +
+      `[ARTIFACT_REVIEW_INVALID] receipt would be invalid: ${validation.errors.join('; ')}. ` +
         `Each finding must be ${ARTIFACT_REVIEW_FINDING_SHAPE}.`
     );
   }

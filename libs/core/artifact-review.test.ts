@@ -80,7 +80,7 @@ describe('artifact review contract', () => {
       findings: [{ severity: 'major', summary: 'stale output collected' }] as never,
     });
     expect(() => assertValidArtifactReviewReceipt(invalid)).toThrow(
-      /findings\/0\/severity[\s\S]*"severity":"blocking"\|"suggestion"/
+      /ARTIFACT_REVIEW_INVALID[\s\S]*findings\/0\/severity[\s\S]*"severity":"blocking"\|"suggestion"/
     );
     expect(() =>
       assertValidArtifactReviewReceipt(
