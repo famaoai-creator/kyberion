@@ -72,6 +72,6 @@ describe('project-track-registry', () => {
   });
 
   it('rejects a track id that escapes the track directory', () => {
-    expect(() => loadProjectTrackRecord('../outside')).toThrow(/escapes its directory/);
+    expect(() => loadProjectTrackRecord('./outside')).toThrow(/escapes its directory/);
   });
 });

@@ -56,7 +56,7 @@ export function generateMasterRels(layoutCount: number): string {
   for (let i = 1; i <= layoutCount; i++) {
     xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout${i}.xml"/>`;
   }
-  xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../../src/theme/theme1.xml"/>`;
+  xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>`;
   xml += `\n</Relationships>`;
   return xml;
 }

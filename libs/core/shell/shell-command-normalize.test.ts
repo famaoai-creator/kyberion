@@ -130,8 +130,8 @@ describe('shell-command-normalize (QM-05)', () => {
 
     it('keeps path-qualified executables spelled as typed', () => {
       expect(allowableCommands('/tmp/evil/ls -la')?.[0]?.display).toBe('/tmp/evil/ls -la');
-      expect(allowableCommands('../gradlew assembleDebug')?.[0]?.display).toBe(
-        '../gradlew assembleDebug'
+      expect(allowableCommands('./gradlew assembleDebug')?.[0]?.display).toBe(
+        './gradlew assembleDebug'
       );
     });
 

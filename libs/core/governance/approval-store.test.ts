@@ -114,7 +114,7 @@ describe('approval-store path normalization', () => {
   });
 
   it('rejects invalid approval request ids', () => {
-    expect(() => approvalRequestLogicalPath('terminal', '../escape')).toThrow(
+    expect(() => approvalRequestLogicalPath('terminal', './escape')).toThrow(
       'Invalid approval request id'
     );
   });

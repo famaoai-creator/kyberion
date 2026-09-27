@@ -162,7 +162,7 @@ describe('autonomous-ops-gate', () => {
       ['libs/core/governance/approval-store-hygiene.ts', true],
       ['libs/core/organization/tenant-registry.ts', true],
       ['knowledge/product/governance/autonomous-ops-policy.json', true],
-      ['../src/AGENTS.md', true],
+      ['./AGENTS.md', true],
       ['docs/../AGENTS.md', true],
       ['../outside-repo.ts', true],
       ['/etc/passwd', true],

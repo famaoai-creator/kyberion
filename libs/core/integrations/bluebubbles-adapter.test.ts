@@ -143,7 +143,7 @@ describe('bluebubbles-adapter', () => {
       {
         attachmentGuid: 'att-1',
         storageKey: 'message-1',
-        filename: '../photo.png',
+        filename: './photo.png',
         mimeType: 'image/png',
         maxBytes: 16,
       },

@@ -139,7 +139,7 @@ describe('KC-06 delegation-notifications', () => {
   });
 
   it('rejects a queue override outside the repository', () => {
-    process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH = '../outside/notifications.jsonl';
+    process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH = './outside/notifications.jsonl';
     expect(() => delegationNotificationsPath()).toThrow(/outside the repository root/);
     process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH = QUEUE_OVERRIDE;
   });

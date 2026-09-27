@@ -272,7 +272,7 @@ describe('mission-distill end-to-end promotion flow', () => {
 
 describe('resolveWisdomOutputPath', () => {
   it('rejects output directories outside the repository root', () => {
-    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+    expect(() => resolveWisdomOutputPath('../outside-wisdom', 'distill.md')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
   });

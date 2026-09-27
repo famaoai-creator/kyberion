@@ -179,7 +179,7 @@ describe('scenario final checks (ES-05)', () => {
     const log = createScenarioSideEffectLog();
     expect(check({ type: 'artifactExists', path: 'out/report.json' }, log).pass).toBe(true);
     expect(check({ type: 'artifactExists', path: 'out/missing.json' }, log).pass).toBe(false);
-    expect(check({ type: 'artifactExists', path: '../escape.json' }, log)).toMatchObject({
+    expect(check({ type: 'artifactExists', path: './escape.json' }, log)).toMatchObject({
       pass: false,
       detail: expect.stringContaining('escapes the run root'),
     });

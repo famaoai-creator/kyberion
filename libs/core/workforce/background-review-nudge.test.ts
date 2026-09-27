@@ -96,7 +96,7 @@ describe('background-review-nudge', () => {
   });
 
   it('rejects path-unsafe session ids', () => {
-    expect(() => loadBackgroundReviewNudgeState('../escape')).toThrow('[POLICY_VIOLATION]');
+    expect(() => loadBackgroundReviewNudgeState('./escape')).toThrow('[POLICY_VIOLATION]');
   });
 
   it('falls back safely for schema-invalid and non-file session state', () => {

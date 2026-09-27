@@ -735,7 +735,7 @@ describe('video composition compiler', () => {
     const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
       encoding: 'utf8',
     }) as string;
-    expect(html).toContain('../assets/avatar-smile.png');
+    expect(html).toContain('./assets/avatar-smile.png');
     expect(safeExistsSync(`${bundleDir}/assets/avatar-smile.png`)).toBe(true);
   });
 

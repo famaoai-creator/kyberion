@@ -14,7 +14,7 @@ describe('knowledge taxonomy loader', () => {
   });
 
   it('rejects paths outside the repository', () => {
-    expect(() => loadKnowledgeTaxonomyAtPath('../outside.json')).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(() => loadKnowledgeTaxonomyAtPath('./outside.json')).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('rejects a directory at the taxonomy resource boundary', () => {

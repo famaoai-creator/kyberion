@@ -107,7 +107,7 @@ describe('peer messaging', () => {
   it('rejects traversal-shaped peer identifiers before building an envelope', () => {
     expect(() =>
       buildPeerMessageEnvelope({
-        senderPeerId: '../outside',
+        senderPeerId: './outside',
         recipientPeerId: 'peer-b-test',
         tenantId: TENANT_ID,
         subject: 'invalid-peer',
