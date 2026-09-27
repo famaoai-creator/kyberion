@@ -232,6 +232,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AGY_PROFILE",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Account profile name for Antigravity CLI (resolving to ~/.agy-profiles/<profile>).",
+      "documented": true
+    },
+    {
       "name": "KYBERION_AGY_SANDBOX",
       "category": "runtime",
       "type": "string",
