@@ -13,7 +13,11 @@ import { getRegisteredEnvText } from './env.js';
  *     concurrent requests served by one process.
  *
  * The scope is in-process only: it can never be inherited from a parent
- * process's environment. This foundation module imports nothing but node core
+ * process's environment. The one deliberate exception is a delegated child
+ * (DR-01): authority.ts registers a root scope provider that turns the
+ * `KYBERION_DELEGATED_ROLE` a parent set with `buildExecutionEnv(env, role)`
+ * into a process-wide root scope, used below every in-process assumption and
+ * re-checked by the same policy validator. This foundation module imports nothing but node core
  * and the env accessor, so secure-io, the identity bridge and authority can all
  * read it without an import cycle. The storage is pinned on `globalThis` so a
  * second module instance (a bundled copy next to the external dist copy, as in
@@ -42,9 +46,17 @@ export interface ExecutionScope {
 /** Returns false when the current process may not act as `role` (RA-02). */
 export type AssumedRoleValidator = (role: string) => boolean;
 
+/**
+ * DR-01: the process-wide root scope of a delegated child (authority.ts), used
+ * when no in-process assumption is active. Returns undefined when the process
+ * carries no delegated role.
+ */
+export type RootExecutionScopeProvider = () => ExecutionScope | undefined;
+
 interface ScopeRegistry {
   readonly storage: AsyncLocalStorage<ExecutionScope>;
   validator?: AssumedRoleValidator;
+  rootScope?: RootExecutionScopeProvider;
 }
 
 const REGISTRY_KEY = Symbol.for('kyberion.core.execution-scope.v1');
@@ -69,6 +81,14 @@ export function registerAssumedRoleValidator(validator: AssumedRoleValidator): v
   registry.validator = validator;
 }
 
+/**
+ * Install the DR-01 root scope provider (authority.ts). Like the validator,
+ * the latest registration wins.
+ */
+export function registerRootExecutionScopeProvider(provider: RootExecutionScopeProvider): void {
+  registry.rootScope = provider;
+}
+
 /** Run `fn` inside a frozen copy of `scope`. Only authority.ts should call this. */
 export function runInExecutionScope<T>(scope: ExecutionScope, fn: () => T): T {
   return registry.storage.run(Object.freeze({ ...scope }), fn);
@@ -83,25 +103,38 @@ function isAcceptedRole(role: string): boolean {
   return !systemRole || systemRole.toLowerCase() === role;
 }
 
+/** The delegated root scope (DR-01), policy-checked like any other scope. */
+function acceptedRootScope(): ExecutionScope | undefined {
+  const root = registry.rootScope?.();
+  const role = root?.assumedRole?.trim();
+  return root && role && isAcceptedRole(role) ? root : undefined;
+}
+
 /**
  * The innermost scope. Its `assumedRole` / `assumedPersona` are removed when
  * the role fails the read-time policy check, so callers can use the fields
- * directly.
+ * directly. Outside any in-process assumption (or when the innermost one is
+ * rejected) a delegated child's root scope (DR-01) supplies the role and
+ * persona; an in-process assumption always outranks it.
  */
 export function currentExecutionScope(): ExecutionScope | undefined {
   const scope = registry.storage.getStore();
-  const role = scope?.assumedRole?.trim();
-  if (!scope || !role) return scope;
-  if (isAcceptedRole(role)) return scope;
-  if (!warnedRejectedRoles.has(role)) {
+  if (!scope) return acceptedRootScope();
+  const role = scope.assumedRole?.trim();
+  if (role && isAcceptedRole(role)) return scope;
+  if (role && !warnedRejectedRoles.has(role)) {
     warnedRejectedRoles.add(role);
     console.warn(
       `[ROLE_ASSUMPTION_IGNORED] an execution scope carries role '${role}', which this process may not assume; it is ignored.`
     );
   }
+  const root = acceptedRootScope();
   return Object.freeze({
     tenantBound: scope.tenantBound,
     ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+    ...(root?.assumedRole
+      ? { assumedRole: root.assumedRole, assumedPersona: root.assumedPersona }
+      : {}),
   });
 }
 

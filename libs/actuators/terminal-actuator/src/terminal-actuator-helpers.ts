@@ -1,5 +1,6 @@
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { ptyEngine } from '@agent/core/pty-engine';
+import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { encodeTerminalInput } from '@agent/core/terminal-keys';
 import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -133,7 +134,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
       const shell = params.shell || resolveShellAdapter().shell;
       const args = params.args || [];
       const cwd = resolveTerminalCwd(rootDir, params.cwd);
-      const sessionId = ptyEngine.spawn(shell, args, cwd, params.env || {}, params.threadId);
+      // Caller-supplied env may not set execution authority (SYSTEM_ROLE, delegated role, …).
+      const env = stripAuthorityEnvOverrides(params.env) as Record<string, string>;
+      const sessionId = ptyEngine.spawn(shell, args, cwd, env, params.threadId);
       return { status: 'created', sessionId };
     }
 

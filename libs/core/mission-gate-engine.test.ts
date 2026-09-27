@@ -57,6 +57,42 @@ describe('mission-gate-engine', () => {
     expect(gate.evidence_path).toContain(`${missionPath}/gates`);
   });
 
+  it('never lets a command_succeeds env overlay set execution authority (DR-01)', async () => {
+    const probe = [
+      'const e = process.env;',
+      "const ok = e.FOO === 'bar' && e.SYSTEM_ROLE !== 'ecosystem_architect' &&",
+      "  e.MISSION_ROLE !== 'gate_injected' && e.KYBERION_PERSONA !== 'gate_injected' &&",
+      "  e.KYBERION_DELEGATED_ROLE !== 'ecosystem_architect@concierge' && e.KYBERION_SUDO !== 'gate_injected';",
+      'process.exit(ok ? 0 : 3);',
+    ].join('\n');
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'env-gate',
+        checks: [
+          {
+            kind: 'command_succeeds',
+            params: {
+              command: process.execPath,
+              args: ['-e', probe],
+              env: {
+                FOO: 'bar',
+                SYSTEM_ROLE: 'ecosystem_architect',
+                MISSION_ROLE: 'gate_injected',
+                KYBERION_PERSONA: 'gate_injected',
+                KYBERION_DELEGATED_ROLE: 'ecosystem_architect@concierge',
+                KYBERION_SUDO: 'gate_injected',
+              },
+            },
+          },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(gate.reasons).toEqual([]);
+    expect(gate.verdict).toBe('pass');
+  });
+
   it('fails when any check fails', async () => {
     const gate = await evaluateMissionGate({
       missionId,
