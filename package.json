@@ -190,6 +190,7 @@
     "chalk": "6.0.0",
     "chokidar": "^5.0.0",
     "claude-code": "^1.0.0",
+    "discord.js": "^14.27.0",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "8.2.2",
