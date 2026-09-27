@@ -2,13 +2,20 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
+import { getFoundationIo, registerFoundationIo } from './foundation/io.js';
 import {
   callerFramesFromStack,
   resetRoleAssumptionTraceState,
   resolveRoleAssumptionTracePath,
   ROLE_ASSUMPTION_TRACE_ENV,
 } from './role-assumption-trace.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+} from './secure-io.js';
 
 const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', ROLE_ASSUMPTION_TRACE_ENV];
 
@@ -21,7 +28,7 @@ function readTrace(file: string): Array<Record<string, unknown>> {
 
 describe('RN-01 role assumption trace', () => {
   const original: Record<string, string | undefined> = {};
-  const relativeTrace = `active/shared/tmp/role-assumption-trace-test-${process.pid}/trace.jsonl`;
+  const relativeTrace = `active/shared/tmp/role-assumption-trace/test-${process.pid}/trace.jsonl`;
   const traceFile = path.join(pathResolver.rootDir(), relativeTrace);
 
   beforeEach(() => {
@@ -88,18 +95,115 @@ describe('RN-01 role assumption trace', () => {
     ]);
   });
 
-  it('ignores a trace path outside the runtime directories', () => {
+  it('only accepts a .jsonl file in a dedicated trace directory (S5)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       expect(resolveRoleAssumptionTracePath('knowledge/public/trace.jsonl')).toBeNull();
       expect(resolveRoleAssumptionTracePath('../outside/trace.jsonl')).toBeNull();
+      // The shared tmp root itself is no longer enough: a dedicated directory is required.
+      expect(resolveRoleAssumptionTracePath('active/shared/tmp/trace.jsonl')).toBeNull();
+      expect(resolveRoleAssumptionTracePath('active/shared/runtime/x.jsonl')).toBeNull();
+      expect(
+        resolveRoleAssumptionTracePath('active/shared/runtime/role-assumption-trace/x.log')
+      ).toBeNull();
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_ASSUMPTION_TRACE]'));
-      expect(resolveRoleAssumptionTracePath('active/shared/runtime/x.jsonl')).toBe(
-        path.join(pathResolver.rootDir(), 'active/shared/runtime/x.jsonl')
+      expect(
+        resolveRoleAssumptionTracePath('active/shared/runtime/role-assumption-trace/x.jsonl')
+      ).toBe(
+        path.join(pathResolver.rootDir(), 'active/shared/runtime/role-assumption-trace/x.jsonl')
       );
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it('refuses a trace path that goes through a symbolic link (S5)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const dir = path.dirname(traceFile);
+    try {
+      safeMkdir(path.join(dir, 'real'), { recursive: true });
+      safeSymlinkSync(path.join(dir, 'real'), path.join(dir, 'link'));
+      const linked = path.relative(pathResolver.rootDir(), path.join(dir, 'link', 't.jsonl'));
+      expect(resolveRoleAssumptionTracePath(linked)).toBeNull();
+      safeSymlinkSync(path.join(dir, 'real', 'target.jsonl'), path.join(dir, 'leaf.jsonl'));
+      const leaf = path.relative(pathResolver.rootDir(), path.join(dir, 'leaf.jsonl'));
+      expect(resolveRoleAssumptionTracePath(leaf)).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('never changes a decision when the trace write fails (S6)', () => {
+    process.env[ROLE_ASSUMPTION_TRACE_ENV] = relativeTrace;
+    process.env.SYSTEM_ROLE = 'computer_surface';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const original = getFoundationIo();
+    registerFoundationIo({
+      ...original,
+      exists: () => {
+        throw new Error('io exploded');
+      },
+      appendFile: () => {
+        throw new Error('io exploded');
+      },
+    });
+    try {
+      expect(withExecutionContext('infrastructure_sentinel', () => 'ran')).toBe('ran');
+      expect(() => withExecutionContext('chronos_localadmin', () => undefined)).toThrow(
+        /ROLE_ASSUMPTION_DENIED/
+      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('disabled after a failure'));
+    } finally {
+      registerFoundationIo(original);
+      warn.mockRestore();
+    }
+    expect(safeExistsSync(traceFile)).toBe(false);
+  });
+
+  it('never changes a decision when path resolution fails (S6)', () => {
+    // Rejecting the path warns; a warn that throws must not escape either.
+    process.env[ROLE_ASSUMPTION_TRACE_ENV] = 'knowledge/public/trace.jsonl';
+    process.env.SYSTEM_ROLE = 'computer_surface';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+      throw new Error('console exploded');
+    });
+    try {
+      expect(withExecutionContext('infrastructure_sentinel', () => 'ran')).toBe('ran');
+      expect(() => withExecutionContext('chronos_localadmin', () => undefined)).toThrow(
+        /ROLE_ASSUMPTION_DENIED/
+      );
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('creates the trace file exclusively, then appends (S6)', () => {
+    process.env[ROLE_ASSUMPTION_TRACE_ENV] = relativeTrace;
+    const original = getFoundationIo();
+    const calls: string[] = [];
+    registerFoundationIo({
+      ...original,
+      createExclusiveFile: (file, content) => {
+        calls.push('create');
+        original.createExclusiveFile?.(file, content);
+      },
+      appendFile: (file, content) => {
+        calls.push('append');
+        original.appendFile(file, content);
+      },
+      writeFile: () => {
+        throw new Error('the trace must not use the replacing writer');
+      },
+    });
+    try {
+      withExecutionContext('mission_controller', () => undefined);
+      withExecutionContext('mission_controller', () => undefined);
+    } finally {
+      registerFoundationIo(original);
+    }
+    expect(calls).toEqual(['create', 'append', 'append']);
+    expect(readTrace(traceFile)).toHaveLength(2);
   });
 
   it('skips authority and node-internal frames and makes paths checkout-relative', () => {

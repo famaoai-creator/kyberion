@@ -1191,7 +1191,7 @@
     {
       "path": "product/governance/AUTHORITY_MODEL.md",
       "tier": "public",
-      "size": 22073,
+      "size": 22539,
       "type": "md"
     },
     {
@@ -1641,7 +1641,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 154195,
+      "size": 154284,
       "type": "json"
     },
     {

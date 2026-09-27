@@ -119,8 +119,9 @@ export function surfaceRuntimeLaunchEnv(): Record<string, string> {
 
 /**
  * RN-01: forward the opt-in role assumption trace to Chronos. The path is
- * resolved against the hermetic root (KYBERION_ROOT), so it must name a file
- * under that root's active/shared/tmp/; run with --keep-root to collect it.
+ * resolved against the hermetic root (KYBERION_ROOT), so it must name a .jsonl
+ * file under that root's active/shared/tmp/role-assumption-trace/; run with
+ * --keep-root to collect it.
  */
 export function roleAssumptionTraceEnv(): Record<string, string> {
   const trace = getRegisteredEnvText('KYBERION_ROLE_ASSUMPTION_TRACE');
