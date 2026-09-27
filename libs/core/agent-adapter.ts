@@ -1379,6 +1379,7 @@ function createCodexAdapterFromEnv(): AgentAdapter {
   return new CodexAppServerAdapter({
     model: getRegisteredEnvText('KYBERION_CODEX_MODEL'),
     modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
+    codexProfile: getRegisteredEnvText('KYBERION_CODEX_PROFILE'),
     approvalMode:
       (getRegisteredEnvText('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() === 'relaxed'
         ? 'relaxed'

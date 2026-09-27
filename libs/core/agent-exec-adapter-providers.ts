@@ -27,6 +27,7 @@ function createCodexAdapter(request: AgentExecAdapterRequest): AgentAdapter {
   return new CodexAppServerAdapter({
     model: request.modelId,
     modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
+    codexProfile: getRegisteredEnvText('KYBERION_CODEX_PROFILE'),
     cwd: request.cwd || PROJECT_ROOT,
     systemPrompt: request.systemPrompt,
     approvalMode:
