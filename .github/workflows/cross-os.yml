@@ -98,13 +98,16 @@ jobs:
           libs/core/environment-capability.test.ts
           libs/core/platform.test.ts
           libs/core/os-accessibility-detector.test.ts
+          libs/core/windows-os-automation.test.ts
 
-      # Live UI Automation smoke: launches Notepad on the runner's interactive
-      # desktop, focuses it and checks that os_accessibility finds its editor
-      # and controls in the foreground window (a few seconds end to end).
+      # Live UI Automation smoke: launches Notepad and a WPF window on the
+      # runner's interactive desktop, focuses them and checks that
+      # os_accessibility finds their controls in the foreground window, then
+      # clicks the WPF OK button through its Set-of-Marks mark with the
+      # DPI-aware Windows pointer path and checks the click registered.
       - name: UI Automation live smoke (Windows)
         if: runner.os == 'Windows'
-        timeout-minutes: 5
+        timeout-minutes: 8
         env:
           KYBERION_UIA_LIVE_SMOKE: '1'
           KYBERION_PERSONA: worker
