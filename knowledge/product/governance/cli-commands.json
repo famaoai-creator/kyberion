@@ -2058,6 +2058,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.changelog.assemble",
+      "module": "scripts/assemble_changelog.ts",
+      "command": "changelog assemble",
+      "noun": "changelog",
+      "verb": "assemble",
+      "audience": "operator"
+    },
+    {
       "id": "script.release.install-smoke",
       "module": "scripts/source_archive.ts",
       "args": ["--install-smoke"],
