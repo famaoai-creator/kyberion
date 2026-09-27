@@ -4,6 +4,25 @@
  * them, the resolved role of every withExecutionContext* call (including
  * roles forwarded through wrapper parameters) and the child processes that
  * may inherit SYSTEM_ROLE.
+ *
+ * Process and module patterns (S9):
+ *  - detected: child_process / node-pty spawn functions reached through an
+ *    import, a namespace, a require() of the child_process module,
+ *    `createRequire(...)('child_process')` or `await import(...)` binding,
+ *    and `promisify(<child_process fn>)` wrappers; the secure-io exec
+ *    helpers and managed-process spawners; `worker_threads` `new Worker(...)`
+ *    (an in-process thread with the same SYSTEM_ROLE: its module is loaded
+ *    like a dynamic import, a same-module `new URL(import.meta.url)` worker is
+ *    already reachable, anything else is an any-role site).
+ *  - not modelled: commands that start further commands (git hooks run by a
+ *    `git` child, npm lifecycle scripts, an external agent CLI that runs
+ *    Kyberion commands): a literal external command is not followed, so such
+ *    a child only matters when it inherits SYSTEM_ROLE and runs Kyberion
+ *    code; the secure-io exec helpers drop SYSTEM_ROLE unless the caller
+ *    passes it back in, and provider CLIs get buildProviderChildEnv (unless
+ *    KYBERION_PROVIDER_ENV_ALLOWLIST=0). Spawn functions reached through a
+ *    value the checker cannot bind (a callback parameter, a registry entry)
+ *    are not seen either.
  */
 import * as ts from 'typescript';
 import * as path from 'node:path';
@@ -592,6 +611,11 @@ export class Analyzer {
     return undefined;
   }
 
+  /**
+   * The module a binding comes from: an import declaration, or a variable
+   * initialised by `require('x')`, a createRequire-bound call or
+   * `await import('x')` (including destructuring of those).
+   */
   private importModuleSpecifierOf(symbol: ts.Symbol): string | undefined {
     const declaration = symbol.declarations?.[0];
     if (!declaration) return undefined;
@@ -602,9 +626,56 @@ export class Analyzer {
           ? current.moduleSpecifier.text
           : undefined;
       }
+      if (ts.isVariableDeclaration(current)) {
+        return current.initializer ? this.loadedModuleText(current.initializer) : undefined;
+      }
       current = current.parent;
     }
     return undefined;
+  }
+
+  /** `require('x')`, `<createRequire-bound>('x')`, `import('x')`, awaited or not. */
+  private loadedModuleText(expression: ts.Expression): string | undefined {
+    let inner = unwrapExpression(expression);
+    if (ts.isAwaitExpression(inner)) inner = unwrapExpression(inner.expression);
+    if (!ts.isCallExpression(inner)) return undefined;
+    const [argument] = inner.arguments;
+    if (!argument || !ts.isStringLiteralLike(argument)) return undefined;
+    const isLoad =
+      inner.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      this.isRequireCallee(inner.expression);
+    return isLoad ? argument.text : undefined;
+  }
+
+  /** A child_process / node-pty spawn function, directly or through its owner. */
+  private isProcessSpawnFunction(expression: ts.Expression): boolean {
+    const inner = unwrapExpression(expression);
+    const nameNode = ts.isPropertyAccessExpression(inner) ? inner.name : inner;
+    if (!ts.isIdentifier(nameNode) || !CHILD_PROCESS_FUNCTIONS.has(nameNode.text)) return false;
+    const ownerNode = ts.isPropertyAccessExpression(inner) ? inner.expression : nameNode;
+    const owner = this.checker.getSymbolAtLocation(ownerNode);
+    const specifier = owner ? this.importModuleSpecifierOf(owner) : undefined;
+    return !!specifier && PROCESS_SPAWN_MODULES.has(specifier);
+  }
+
+  /** An identifier bound to `promisify(<spawn function>)` (util.promisify too). */
+  private isPromisifiedSpawn(expression: ts.Expression): boolean {
+    const callee = unwrapExpression(expression);
+    if (!ts.isIdentifier(callee)) return false;
+    const symbol = this.resolveAlias(this.checker.getSymbolAtLocation(callee));
+    const declaration = symbol?.valueDeclaration;
+    if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) {
+      return false;
+    }
+    const init = unwrapExpression(declaration.initializer);
+    if (!ts.isCallExpression(init) || init.arguments.length !== 1) return false;
+    const factory = unwrapExpression(init.expression);
+    const name = ts.isPropertyAccessExpression(factory)
+      ? factory.name.text
+      : ts.isIdentifier(factory)
+        ? factory.text
+        : '';
+    return name === 'promisify' && this.isProcessSpawnFunction(init.arguments[0]);
   }
 
   private scanFile(sourceFile: ts.SourceFile): void {
@@ -641,6 +712,8 @@ export class Analyzer {
       this.scanIdentifier(unit, node);
     } else if (ts.isCallExpression(node)) {
       this.scanCall(unit, node);
+    } else if (ts.isNewExpression(node)) {
+      this.scanNewExpression(unit, node);
     }
     ts.forEachChild(node, (child) => this.scanNode(unit, child));
   }
@@ -716,15 +789,52 @@ export class Analyzer {
   ): { inheritsByDefault: boolean; optionsIndex?: number } | undefined {
     const helper = callee ? this.spawnHelperDeclarations.get(callee) : undefined;
     if (helper) return helper;
-    const expression = unwrapExpression(call.expression);
-    const nameNode = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
-    if (!ts.isIdentifier(nameNode) || !CHILD_PROCESS_FUNCTIONS.has(nameNode.text)) return undefined;
-    const ownerNode = ts.isPropertyAccessExpression(expression) ? expression.expression : nameNode;
-    const owner = this.checker.getSymbolAtLocation(ownerNode);
-    const specifier = owner ? this.importModuleSpecifierOf(owner) : undefined;
-    return specifier && PROCESS_SPAWN_MODULES.has(specifier)
+    return this.isProcessSpawnFunction(call.expression) || this.isPromisifiedSpawn(call.expression)
       ? { inheritsByDefault: true }
       : undefined;
+  }
+
+  /**
+   * `new Worker(...)` from worker_threads runs a module in-process with the
+   * same SYSTEM_ROLE: load it like a dynamic import.
+   */
+  private scanNewExpression(unit: Unit, node: ts.NewExpression): void {
+    const callee = unwrapExpression(node.expression);
+    const nameNode = ts.isPropertyAccessExpression(callee) ? callee.name : callee;
+    if (!ts.isIdentifier(nameNode) || nameNode.text !== 'Worker') return;
+    const ownerNode = ts.isPropertyAccessExpression(callee) ? callee.expression : nameNode;
+    const owner = this.checker.getSymbolAtLocation(ownerNode);
+    const specifier = owner ? this.importModuleSpecifierOf(owner) : undefined;
+    if (specifier !== 'worker_threads' && specifier !== 'node:worker_threads') return;
+    const [target] = node.arguments ?? [];
+    const inner = target ? unwrapExpression(target) : undefined;
+    // new Worker(new URL(import.meta.url)): the current module, already loaded.
+    if (
+      inner &&
+      ts.isNewExpression(inner) &&
+      inner.arguments?.length === 1 &&
+      unwrapExpression(inner.arguments[0]).getText() === 'import.meta.url'
+    ) {
+      return;
+    }
+    const files = inner
+      ? this.collectStrings(inner)
+          .map((value) => sourceForScriptReference(this.ws, value))
+          .filter((value): value is string => !!value)
+      : [];
+    let loaded = false;
+    for (const file of files) {
+      const source = this.program.getSourceFile(file);
+      if (!source) continue;
+      loaded = true;
+      for (const exported of this.exportedUnits(source)) this.addEdge(unit, exported);
+    }
+    if (!loaded) {
+      this.addUnresolvedEdge(
+        unit,
+        `worker thread module could not be resolved at ${this.position(node)}`
+      );
+    }
   }
 
   private position(node: ts.Node): string {
