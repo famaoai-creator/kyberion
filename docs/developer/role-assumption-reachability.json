@@ -371,6 +371,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/operator-notifications.ts#loadNotificationPreferences",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/orchestrator-session.ts#createOrchestratorSession",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1580,6 +1585,11 @@
     },
     {
       "site": "scripts/kyberion_home.ts#handleIntentSubcommand",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/kyberion_home.ts#handleNotifySubcommand",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
