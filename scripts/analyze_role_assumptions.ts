@@ -286,6 +286,15 @@ export function buildReachabilityReport(
         }
       }
     }
+    // DR-01: delegations issued for a child under THIS system role by an env
+    // literal that sets SYSTEM_ROLE, wherever the spawning code lives.
+    for (const delegation of analyzer.foreignDelegations) {
+      if (!delegation.anySystemRole && !delegation.systemRoles.has(systemRole)) continue;
+      for (const role of [...delegation.roles].sort()) {
+        reachable[role] ??= { example_path: [delegation.site] };
+      }
+      for (const reason of delegation.unresolved) addUnresolved(delegation.site, reason);
+    }
     // A child entry the program does not hold cannot be walked: any role.
     for (const rel of entryFiles) {
       if (!program.getSourceFile(ws.abs(rel))) {

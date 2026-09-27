@@ -127,7 +127,7 @@ describe('Config mission contract', () => {
     expect(src).toContain("case 'status'");
     expect(src).toContain("case 'apply'");
     expect(src).toContain("case 'request-approval'");
-    expect(src).toContain("SYSTEM_ROLE: 'system_configurator'");
+    expect(src).toContain("buildSystemRoleLaunchEnv(inputEnv, 'system_configurator'");
     expect(src).toContain('knowledge/product/config-missions');
     // a877d9c12 replaced the 'knowledge/confidential/...' literal with a
     // nodePath.join of the same segments; the tenant-scoped confidential root

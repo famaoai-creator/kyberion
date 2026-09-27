@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildExecutionEnv } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -31,7 +32,8 @@ export const dynamic = 'force-dynamic';
  * Mission state changes go exclusively through scripts/mission_controller.ts
  * (repo invariant), invoked the same way chronos-mirror-v2 does
  * (api/agent/route.ts): the built controller under dist/ with
- * MISSION_ROLE=mission_controller and cwd at the repo root.
+ * the mission_controller role (buildExecutionEnv: MISSION_ROLE, delegated under
+ * SYSTEM_ROLE — AUTHORITY_MODEL 3.B2 DR-01) and cwd at the repo root.
  */
 
 const ALLOWED_DECISIONS = ['start', 'cancel'] as const;
@@ -123,7 +125,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             ...decidedByArgs,
           ];
     const result = safeExecResult(process.execPath, args, {
-      env: { ...process.env, MISSION_ROLE: 'mission_controller' },
+      env: buildExecutionEnv(process.env, 'mission_controller'),
       cwd: rootDir,
       timeoutMs: CONTROLLER_TIMEOUT_MS,
       maxOutputMB: 5,
