@@ -8,7 +8,8 @@ import {
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-import { appendRetentionAudit, softDeleteToTrash } from './storage-janitor.js';
+import { appendRetentionAudit, softDeleteToTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
+import { validateWritePermission } from './tier-guard.js';
 
 /**
  * Autonomous-operation P1-2 / P1-4: keep the live approval store limited to
@@ -201,10 +202,25 @@ export function findFixtureApprovals(
   return selected;
 }
 
+/** How an operator shell gains the only persona allowed to write the trash. */
+export const APPROVAL_TRASH_PERSONA_ENV = 'KYBERION_PERSONA=sovereign';
+
+/**
+ * Whether the current identity may move `logicalPath` into the soft-delete
+ * trash. Checked once up front so a missing persona fails with one actionable
+ * message instead of one policy violation per record.
+ */
+export function checkApprovalTrashWritable(logicalPath: string): {
+  allowed: boolean;
+  reason?: string;
+} {
+  return validateWritePermission(pathResolver.resolve(`${TRASH_REPO_SUBPATH}/${logicalPath}`));
+}
+
 /**
  * Move fixture approval records to the soft-delete trash (30-day restore
  * window via `restoreFromTrash`). Runs under the caller's identity, like the
- * storage janitor: only an operator context may write `active/archive/.trash`.
+ * storage janitor: only the sovereign persona may write `active/archive/.trash`.
  */
 export function purgeFixtureApprovals(options: {
   dryRun: boolean;
@@ -218,7 +234,14 @@ export function purgeFixtureApprovals(options: {
     errors: [],
     dryRun: options.dryRun,
   };
-  if (options.dryRun) return result;
+  if (options.dryRun || candidates.length === 0) return result;
+  const access = checkApprovalTrashWritable(candidates[0].logicalPath);
+  if (!access.allowed) {
+    result.errors.push(
+      `trash not writable; rerun with ${APPROVAL_TRASH_PERSONA_ENV}: ${access.reason ?? 'denied'}`
+    );
+    return result;
+  }
   for (const candidate of candidates) {
     try {
       const absolute = pathResolver.resolve(candidate.logicalPath);
