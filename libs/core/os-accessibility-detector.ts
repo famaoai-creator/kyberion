@@ -1,6 +1,5 @@
 import { logger } from './core.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExecResultAsync, safeMkdir } from './secure-io.js';
+import { safeExecResultAsync } from './secure-io.js';
 import { safeMarkLabel, type SomBox, type SomCandidate } from './set-of-marks.js';
 import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-detector.js';
 import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
@@ -59,11 +58,6 @@ export const OS_ACCESSIBILITY_WINDOWS_PROBE_TIMEOUT_MS = 6_000;
  * which also has to cover powershell.exe start-up and the P/Invoke compile.
  */
 export const OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS = 5_000;
-/**
- * Governed cache of the compiled Windows C# walker (`<sha256 of source>.dll`),
- * so powershell.exe does not recompile it (~0.5-1 s) on every enumeration.
- */
-export const OS_ACCESSIBILITY_WALKER_CACHE_DIR = 'active/shared/runtime/uia-walker';
 /** Child-process environment variable carrying the Windows script options (JSON). */
 export const OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV = 'KYBERION_UIA_OPTIONS';
 /**
@@ -146,22 +140,6 @@ export interface OsAccessibilityDetectorDeps {
   run?: AccessibilityCommandRunner;
   platform?: NodeJS.Platform;
   now?: () => number;
-  /**
-   * Windows compiled-walker cache dir (absolute), or null to always compile in
-   * memory. Default: OS_ACCESSIBILITY_WALKER_CACHE_DIR on a real Windows host.
-   */
-  walkerCacheDir?: string | null;
-}
-
-/** The governed walker cache dir, created through secure-io; undefined when it cannot be. */
-export function ensureWalkerCacheDir(): string | undefined {
-  try {
-    const dir = pathResolver.rootResolve(OS_ACCESSIBILITY_WALKER_CACHE_DIR);
-    safeMkdir(dir, { recursive: true });
-    return dir;
-  } catch {
-    return undefined;
-  }
 }
 
 /** One accessibility element as the enumeration script reports it. */
@@ -296,7 +274,8 @@ $ok = $null -ne [System.Windows.Automation.AutomationElement]::RootElement
 // managed_control (managed UIA client, control view, one cached
 // FindAll(Children) per node), then com_control and com_raw (the COM UIA
 // client, which sees WinUI / XAML island content the managed client can miss,
-// over the control and raw views). The snapshot names the chosen strategy and
+// over the control and raw views; its C# is compiled in memory only when the
+// managed walk found no controls). The snapshot names the chosen strategy and
 // carries per-strategy diagnostics (per-depth scanned/emitted counts, skip
 // reasons, the first 20 raw elements' control type / class / framework / rect,
 // no names).
@@ -546,48 +525,12 @@ public static class KyberionUiaComWalker {
 }
 '@
 $comCompileError = $null
-$walkerSource = $csUsing + [Environment]::NewLine + $csNative + [Environment]::NewLine + $csCom
-# Compiled walker cache: <walkerCacheDir>/<sha256 of the C# source>.dll. A miss
-# compiles to a per-process temp name in the same dir and renames it into place
-# (a concurrent run that lost the race loads the winner's file); any failure
-# falls back to the in-memory compile below. Nothing is written outside the dir.
+# Compiled in memory only (never loaded from or written to disk): the small
+# P/Invoke type now, the COM walker only when the managed walk finds no controls.
 $compileClock = [System.Diagnostics.Stopwatch]::StartNew()
-$walkerCache = 'off'
-$walkerCacheError = $null
-$cacheDir = ''
-if ($opts.walkerCacheDir) { $cacheDir = [string]$opts.walkerCacheDir }
-if ($cacheDir -and [System.IO.Directory]::Exists($cacheDir)) {
-  try {
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    $hash = -join ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($walkerSource)) | ForEach-Object { $_.ToString('x2') })
-    $dll = [System.IO.Path]::Combine($cacheDir, $hash + '.dll')
-    if ([System.IO.File]::Exists($dll)) {
-      Add-Type -Path $dll
-      $walkerCache = 'hit'
-    } else {
-      $tmpDll = [System.IO.Path]::Combine($cacheDir, $hash + '.' + $PID + '.tmp.dll')
-      Add-Type -TypeDefinition $walkerSource -OutputAssembly $tmpDll -OutputType Library
-      try { [System.IO.File]::Move($tmpDll, $dll) } catch { }
-      if (-not ('KyberionUiaNative' -as [type])) {
-        if ([System.IO.File]::Exists($dll)) { Add-Type -Path $dll } else { Add-Type -Path $tmpDll }
-      }
-      if ([System.IO.File]::Exists($tmpDll)) { try { [System.IO.File]::Delete($tmpDll) } catch { } }
-      $walkerCache = 'stored'
-    }
-  } catch {
-    $walkerCacheError = $_.Exception.Message
-    $walkerCache = 'error'
-  }
-}
-if (-not ('KyberionUiaNative' -as [type])) {
-  try {
-    Add-Type -TypeDefinition $walkerSource
-  } catch {
-    $comCompileError = $_.Exception.Message
-    Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)
-  }
-}
+Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)
 $compileMs = $compileClock.ElapsedMilliseconds
+$comCompileMs = $null
 $dpi = 'unaware'
 try { if ([KyberionUiaNative]::SetThreadDpiAwarenessContext([IntPtr]::new(-4)) -ne [IntPtr]::Zero) { $dpi = 'per_monitor_v2' } } catch { }
 if ($dpi -eq 'unaware') { try { if ([KyberionUiaNative]::SetProcessDPIAware()) { $dpi = 'system' } } catch { } }
@@ -688,6 +631,11 @@ $chosenTruncated = $truncated
 $chosenActionable = $actionable
 # Strategies 2 and 3 (com_control, com_raw): the COM UIA client (UIA3) sees
 # XAML island / WinUI content the managed client (UIA2) can miss.
+if ($chosenActionable -eq 0) {
+  $comClock = [System.Diagnostics.Stopwatch]::StartNew()
+  try { Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csCom) } catch { $comCompileError = $_.Exception.Message }
+  $comCompileMs = $comClock.ElapsedMilliseconds
+}
 if ($chosenActionable -eq 0 -and $null -eq $comCompileError) {
   foreach ($rawView in @($false, $true)) {
     $remaining = [int][Math]::Max(0, $budget - $clock.ElapsedMilliseconds)
@@ -703,7 +651,9 @@ if ($chosenActionable -eq 0 -and $null -eq $comCompileError) {
   }
 }
 $parts.Add('"strategy":' + (JS $strategy))
-$walkerDiag = '{"cache":' + (JS $walkerCache) + ',"cached":' + (JB ($walkerCache -eq 'hit')) + ',"compile_ms":' + $compileMs + ',"cache_error":' + (JS $walkerCacheError) + '}'
+$comMsJson = 'null'
+if ($null -ne $comCompileMs) { $comMsJson = [string]$comCompileMs }
+$walkerDiag = '{"cache":"off","cached":false,"compile_ms":' + $compileMs + ',"com_compile_ms":' + $comMsJson + '}'
 $parts.Add('"diagnostics":{"com_compile_error":' + (JS $comCompileError) + ',"walker":' + $walkerDiag + ',"strategies":[' + ($diagnostics -join ',') + ']}')
 if ($chosenTruncated) { $parts.Add('"truncated":true') }
 Finish '' ('[' + ($chosen -join ',') + ']')`;
@@ -947,17 +897,6 @@ export class OsAccessibilityDetector implements UiElementDetector {
     return this.deps.run ?? defaultRunner;
   }
 
-  private cacheDir: string | null | undefined;
-
-  /** Windows walker cache dir: the injected one, else the governed dir on a real Windows host. */
-  private walkerCacheDir(): string | undefined {
-    if (this.deps.walkerCacheDir !== undefined) return this.deps.walkerCacheDir ?? undefined;
-    if (this.cacheDir === undefined) {
-      this.cacheDir = process.platform === 'win32' ? (ensureWalkerCacheDir() ?? null) : null;
-    }
-    return this.cacheDir ?? undefined;
-  }
-
   /** macOS: AXIsProcessTrusted. Windows: powershell.exe loads UI Automation. */
   private async permissionGranted(): Promise<boolean> {
     const now = (this.deps.now ?? Date.now)();
@@ -1014,7 +953,6 @@ export class OsAccessibilityDetector implements UiElementDetector {
             [OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV]: JSON.stringify({
               ...options,
               budgetMs: OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
-              ...(this.walkerCacheDir() ? { walkerCacheDir: this.walkerCacheDir() } : {}),
             }),
           },
         })
