@@ -251,6 +251,19 @@
       "rationale": "Checks capability seam adoption at the AST boundary."
     },
     {
+      "id": "role-assumption-reachability",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/analyze_role_assumptions.ts",
+        "--check"
+      ],
+      "owner": "security",
+      "rationale": "Keeps the call-level role assumption reachability report (docs/developer/role-assumption-reachability.json) current; role-assumption-policy.json must grant every reachable role (RN-02/RN-03)."
+    },
+    {
       "id": "reasoning-provider-registry",
       "scope": "pr",
       "executable": "node",
