@@ -134,15 +134,21 @@ function localizeRecorderWarning(warning: string): string {
 // operator's default notification channel (surface:target).
 function handleNotifySubcommand(setValue: string): void {
   const [surface, ...rest] = setValue.split(':');
-  const target = rest.join(':');
-  const allowed = ['slack', 'imessage', 'telegram', 'discord'];
+  // `inbox` is the local fallback surface (deliverable inbox, no bridge);
+  // `--set inbox` needs no remote target.
+  const target = rest.join(':') || (surface === 'inbox' ? 'operator' : '');
+  const allowed = ['slack', 'imessage', 'telegram', 'discord', 'inbox'];
   if (!allowed.includes(surface) || !target) {
     printOutput(ui('recorder:recorder_notify_usage', { channels: allowed.join('|') }));
     throw new ScriptExitError(1, '', true);
   }
   const prefs = loadNotificationPreferences();
   prefs.default_channel = { surface, target } as NotificationChannelTarget;
-  const filePath = saveNotificationPreferences(prefs);
+  // notification-preferences.json lives in the personal tier; the concierge
+  // role is the governed writer for it (same assumption Concierge routes use).
+  const filePath = withExecutionContext('sovereign_concierge', () =>
+    saveNotificationPreferences(prefs)
+  );
   printOutput(ui('recorder:recorder_notify_saved', { surface, target, path: filePath }));
 }
 
