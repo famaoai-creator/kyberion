@@ -35,9 +35,25 @@ export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
 
 // `revise` carries the operator's instructions after a space; `explain` asks
-// the agent why the card reached them and decides nothing.
-const DECISION_TOKEN =
-  /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected|revise|explain)(?:\s+([\s\S]+))?$/iu;
+// the agent why the card reached them and decides nothing. The head is matched
+// by a fixed-shape regex and the free text is sliced off afterwards, so chat
+// input can never drive regex backtracking.
+const DECISION_TOKEN_HEAD =
+  /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected|revise|explain)(?=$|\s)/iu;
+
+/** Split `appr:<id>:<verb>[ <free text>]` into its parts in linear time. */
+export function parseDecisionToken(
+  text: string
+): { requestId: string; verb: string; trailing?: string } | null {
+  const head = DECISION_TOKEN_HEAD.exec(text);
+  if (!head) return null;
+  const trailing = text.slice(head[0].length).trim();
+  return {
+    requestId: head[1],
+    verb: head[2].toLowerCase(),
+    ...(trailing ? { trailing } : {}),
+  };
+}
 
 export interface SurfaceApprovalAction {
   requestId: string;
@@ -451,14 +467,13 @@ export function resolveSurfaceApprovalReply(params: {
   decidedBy: string;
 }): SurfaceApprovalReply {
   const text = params.text.trim();
-  const token = text.match(DECISION_TOKEN);
+  const token = parseDecisionToken(text);
   let record: ApprovalRequestRecord | null = null;
   let decision: SurfaceApprovalDecision | undefined;
 
   if (token) {
-    const verb = token[2].toLowerCase();
-    const trailing = token[3]?.trim();
-    record = loadReplyTarget(params.surface, token[1]);
+    const { verb, trailing } = token;
+    record = loadReplyTarget(params.surface, token.requestId);
     if (verb === 'explain') {
       if (!record || !replyTargetsRecord(record, params.surface, params.channel, params.threadTs)) {
         return { handled: true, reply: t('decision:explain_not_found') };
