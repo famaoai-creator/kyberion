@@ -43,13 +43,17 @@ describe('resolve_generated', () => {
 
   it('writes and stages every step, keeping validation-only steps in check mode', async () => {
     const calls: string[][] = [];
-    const steps = [step('a', calls), { ...step('b', calls), tracked: [], checkOnly: true }];
+    const steps = [
+      { ...step('a', calls), passes: 2 },
+      { ...step('b', calls), tracked: [], checkOnly: true },
+    ];
 
     await expect(resolveGeneratedArtifacts({ check: false, stage: true }, steps)).resolves.toEqual({
       failed: [],
       staged: ['a.out'],
     });
     expect(calls).toEqual([
+      ['a', '--quiet'],
       ['a', '--quiet'],
       ['b', '--check', '--quiet'],
     ]);
