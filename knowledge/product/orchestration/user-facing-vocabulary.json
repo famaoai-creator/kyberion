@@ -21252,6 +21252,303 @@
         "ja": "ビューを開き直す",
         "qps-ploc": "⟦Řėőṗėñ ṽïėẇ ŀőř⟧"
       }
+    },
+    "decision": {
+      "level_decide": {
+        "en": "🔴 Your decision is needed",
+        "ja": "🔴 あなたの判断が必要です",
+        "qps-ploc": "⟦🔴 Ẏőůř ḓėƈïşïőñ ïş ñėėḓėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "level_veto": {
+        "en": "🟡 Proceeds unless you object",
+        "ja": "🟡 異議がなければ進めます",
+        "qps-ploc": "⟦🟡 Ṗřőƈėėḓş ůñŀėşş ẏőů őƀĵėƈŧ ŀőřėɱ ïṗş⟧"
+      },
+      "level_fyi": {
+        "en": "🔵 For your information — no action needed",
+        "ja": "🔵 報告のみ(対応は不要です)",
+        "qps-ploc": "⟦🔵 Ƒőř ẏőůř ïñƒőřɱȧŧïőñ — ñő ȧƈŧïőñ ñėėḓėḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "level_none": {
+        "en": "⚪ Done automatically",
+        "ja": "⚪ 自動で実行しました",
+        "qps-ploc": "⟦⚪ Ḓőñė ȧůŧőɱȧŧïƈȧŀŀẏ ŀőřėɱ ⟧"
+      },
+      "shadow_badge": {
+        "en": "(trial mode: nothing is executed)",
+        "ja": "(試行モード: 実行はしません)",
+        "qps-ploc": "⟦(ŧřïȧŀ ɱőḓė: ñőŧħïñɠ ïş ėẋėƈůŧėḓ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ask_label": {
+        "en": "Decision",
+        "ja": "決めてほしいこと",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ŀőř⟧"
+      },
+      "recommendation_label": {
+        "en": "Recommendation",
+        "ja": "推奨",
+        "qps-ploc": "⟦Řėƈőɱɱėñḓȧŧïőñ ŀőřė⟧"
+      },
+      "recommend_approve": {
+        "en": "approve",
+        "ja": "承認",
+        "qps-ploc": "⟦ȧṗṗřőṽė ŀőř⟧"
+      },
+      "recommend_reject": {
+        "en": "reject",
+        "ja": "却下",
+        "qps-ploc": "⟦řėĵėƈŧ ŀőř⟧"
+      },
+      "recommend_revise": {
+        "en": "revise",
+        "ja": "修正",
+        "qps-ploc": "⟦řėṽïşė ŀőř⟧"
+      },
+      "why_human_label": {
+        "en": "Why you",
+        "ja": "人の判断が必要な理由",
+        "qps-ploc": "⟦Ẇħẏ ẏőů ŀőř⟧"
+      },
+      "reversible_label": {
+        "en": "Can be undone",
+        "ja": "取り消し",
+        "qps-ploc": "⟦Ƈȧñ ƀė ůñḓőñė ŀőřė⟧"
+      },
+      "reversible_yes": {
+        "en": "yes",
+        "ja": "できます",
+        "qps-ploc": "⟦ẏėş ŀőř⟧"
+      },
+      "reversible_no": {
+        "en": "no — hard to undo",
+        "ja": "できません(取り消しにくい操作です)",
+        "qps-ploc": "⟦ñő — ħȧřḓ ŧő ůñḓő ŀőřėɱ⟧"
+      },
+      "if_no_response_label": {
+        "en": "If you do nothing",
+        "ja": "何もしない場合",
+        "qps-ploc": "⟦Ïƒ ẏőů ḓő ñőŧħïñɠ ŀőřėɱ⟧"
+      },
+      "if_no_response_decide": {
+        "en": "This stays paused until you decide. Other work continues meanwhile.",
+        "ja": "判断があるまで、この作業は止めたままにします。その間も他の作業は進めます。",
+        "qps-ploc": "⟦Ŧħïş şŧȧẏş ṗȧůşėḓ ůñŧïŀ ẏőů ḓėƈïḓė. Őŧħėř ẇőřķ ƈőñŧïñůėş ɱėȧñẇħïŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "if_no_response_decide_expires": {
+        "en": "The request is withdrawn at {deadline}.",
+        "ja": "{deadline} を過ぎると取り下げます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ïş ẇïŧħḓřȧẇñ ȧŧ {deadline}. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "if_no_response_veto_waiting": {
+        "en": "Once delivery is confirmed, it waits {minutes} active minutes and then proceeds.",
+        "ja": "通知の到達を確認してから、活動時間内で {minutes} 分待ち、異議がなければ進めます。",
+        "qps-ploc": "⟦Őñƈė ḓėŀïṽėřẏ ïş ƈőñƒïřɱėḓ, ïŧ ẇȧïŧş {minutes} ȧƈŧïṽė ɱïñůŧėş ȧñḓ ŧħėñ ṗřőƈėėḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "if_no_response_veto_counting": {
+        "en": "Proceeds automatically at {deadline} unless you object.",
+        "ja": "{deadline} までに異議がなければ、自動で進めます。",
+        "qps-ploc": "⟦Ṗřőƈėėḓş ȧůŧőɱȧŧïƈȧŀŀẏ ȧŧ {deadline} ůñŀėşş ẏőů őƀĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "if_no_response_veto_shadow": {
+        "en": "Trial mode: nothing runs at the deadline; your decision is recorded for comparison.",
+        "ja": "試行モードです。期限が来ても実行せず、あなたの判断を記録して比較に使います。",
+        "qps-ploc": "⟦Ŧřïȧŀ ɱőḓė: ñőŧħïñɠ řůñş ȧŧ ŧħė ḓėȧḓŀïñė; ẏőůř ḓėƈïşïőñ ïş řėƈőřḓėḓ ƒőř ƈőɱṗȧřïşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "if_no_response_undelivered": {
+        "en": "Delivery of this notice was not confirmed in time, so it now waits for your decision.",
+        "ja": "通知の到達を確認できなかったため、あなたの判断を待ちます。",
+        "qps-ploc": "⟦Ḓėŀïṽėřẏ őƒ ŧħïş ñőŧïƈė ẇȧş ñőŧ ƈőñƒïřɱėḓ ïñ ŧïɱė, şő ïŧ ñőẇ ẇȧïŧş ƒőř ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "if_no_response_done": {
+        "en": "Nothing. It already ran and is reported in the digest.",
+        "ja": "対応は不要です。実行済みで、ダイジェストで報告します。",
+        "qps-ploc": "⟦Ñőŧħïñɠ. Ïŧ ȧŀřėȧḓẏ řȧñ ȧñḓ ïş řėṗőřŧėḓ ïñ ŧħė ḓïɠėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "evidence_label": {
+        "en": "Evidence",
+        "ja": "証跡",
+        "qps-ploc": "⟦Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "action_approve": {
+        "en": "Approve",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "action_proceed_now": {
+        "en": "Proceed now",
+        "ja": "今すぐ進める",
+        "qps-ploc": "⟦Ṗřőƈėėḓ ñőẇ ŀőř⟧"
+      },
+      "action_revise": {
+        "en": "Request changes",
+        "ja": "修正を指示",
+        "qps-ploc": "⟦Řėɋůėşŧ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "action_reject": {
+        "en": "Reject",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧ ŀőř⟧"
+      },
+      "action_object": {
+        "en": "Object (stop)",
+        "ja": "止める(異議)",
+        "qps-ploc": "⟦Őƀĵėƈŧ (şŧőṗ) ŀőřė⟧"
+      },
+      "action_explain": {
+        "en": "Ask why",
+        "ja": "理由を聞く",
+        "qps-ploc": "⟦Ȧşķ ẇħẏ ŀőř⟧"
+      },
+      "reply_hint": {
+        "en": "Reply: appr:{requestId}:approve / reject / revise <instructions> / explain",
+        "ja": "返信: appr:{requestId}:approve / reject / revise <指示> / explain",
+        "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{requestId}:ȧṗṗřőṽė / řėĵėƈŧ / řėṽïşė <ïñşŧřůƈŧïőñş> / ėẋṗŀȧïñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "reason_axis_max": {
+        "en": "A risk axis is at its maximum: {axes}",
+        "ja": "影響範囲・取り消しにくさ・機密性・確信度のうち、最大の軸があります: {axes}",
+        "qps-ploc": "⟦Ȧ řïşķ ȧẋïş ïş ȧŧ ïŧş ɱȧẋïɱůɱ: {axes} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "reason_irreversible": {
+        "en": "Hard to undo",
+        "ja": "取り消しにくい操作です",
+        "qps-ploc": "⟦Ħȧřḓ ŧő ůñḓő ŀőř⟧"
+      },
+      "reason_never_auto": {
+        "en": "Always decided by a person: {classes}",
+        "ja": "常に人が決める種類の操作です: {classes}",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ḓėƈïḓėḓ ƀẏ ȧ ṗėřşőñ: {classes} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "reason_high_risk_path": {
+        "en": "Changes protected files: {paths}",
+        "ja": "重要なファイルを変更します: {paths}",
+        "qps-ploc": "⟦Ƈħȧñɠėş ṗřőŧėƈŧėḓ ƒïŀėş: {paths} ŀőřėɱ ïṗşů⟧"
+      },
+      "reason_requested": {
+        "en": "The agent asked for your judgment",
+        "ja": "エージェント自身が人の判断を求めました",
+        "qps-ploc": "⟦Ŧħė ȧɠėñŧ ȧşķėḓ ƒőř ẏőůř ĵůḓɠɱėñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "reason_budget": {
+        "en": "Expected cost exceeds the budget cap",
+        "ja": "費用が予算の上限を超える見込みです",
+        "qps-ploc": "⟦Ėẋṗėƈŧėḓ ƈőşŧ ėẋƈėėḓş ŧħė ƀůḓɠėŧ ƈȧṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "reason_score": {
+        "en": "Risk score {score}/{max}",
+        "ja": "リスク点数 {score}/{max}",
+        "qps-ploc": "⟦Řïşķ şƈőřė {score}/{max} ŀőřėɱ ï⟧"
+      },
+      "explain_heading": {
+        "en": "Why this reached you",
+        "ja": "この判断があなたに届いた理由",
+        "qps-ploc": "⟦Ẇħẏ ŧħïş řėȧƈħėḓ ẏőů ŀőřėɱ ⟧"
+      },
+      "explain_no_reasons": {
+        "en": "No policy escalation was recorded; this was raised directly.",
+        "ja": "ポリシーによる引き上げの記録はありません。直接の依頼として上がっています。",
+        "qps-ploc": "⟦Ñő ṗőŀïƈẏ ėşƈȧŀȧŧïőñ ẇȧş řėƈőřḓėḓ; ŧħïş ẇȧş řȧïşėḓ ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "revise_needs_text": {
+        "en": "Send your instructions as: appr:{requestId}:revise <what to change>",
+        "ja": "修正内容を appr:{requestId}:revise <変更してほしいこと> の形で送ってください。",
+        "qps-ploc": "⟦Şėñḓ ẏőůř ïñşŧřůƈŧïőñş ȧş: ȧṗṗř:{requestId}:řėṽïşė <ẇħȧŧ ŧő ƈħȧñɠė> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "revise_recorded": {
+        "en": "Change request recorded; the agent will redo it: {title}",
+        "ja": "修正指示を受け付けました。エージェントが作り直します: {title}",
+        "qps-ploc": "⟦Ƈħȧñɠė řėɋůėşŧ řėƈőřḓėḓ; ŧħė ȧɠėñŧ ẇïŀŀ řėḓő ïŧ: {title} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "digest_title": {
+        "en": "Decision digest ({time})",
+        "ja": "判断ダイジェスト({time})",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ḓïɠėşŧ ({time}) ŀőřėɱ ï⟧"
+      },
+      "digest_headline": {
+        "en": "Needs you: {decide} · Proceeds unless you object: {veto} · Done automatically: {done}",
+        "ja": "あなたの判断: {decide}件 ・ 異議がなければ進むもの: {veto}件 ・ 自動で済ませたこと: {done}件",
+        "qps-ploc": "⟦Ñėėḓş ẏőů: {decide} · Ṗřőƈėėḓş ůñŀėşş ẏőů őƀĵėƈŧ: {veto} · Ḓőñė ȧůŧőɱȧŧïƈȧŀŀẏ: {done} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "digest_all_clear": {
+        "en": "Nothing needs you right now.",
+        "ja": "いま、あなたの対応が必要なものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ẏőů řïɠħŧ ñőẇ. ŀőřėɱ ïṗş⟧"
+      },
+      "digest_section_decide": {
+        "en": "🔴 Needs your decision",
+        "ja": "🔴 あなたの判断が必要",
+        "qps-ploc": "⟦🔴 Ñėėḓş ẏőůř ḓėƈïşïőñ ŀőřėɱ ï⟧"
+      },
+      "digest_section_veto": {
+        "en": "🟡 Proceeds unless you object",
+        "ja": "🟡 異議がなければ進むもの",
+        "qps-ploc": "⟦🟡 Ṗřőƈėėḓş ůñŀėşş ẏőů őƀĵėƈŧ ŀőřėɱ ïṗş⟧"
+      },
+      "digest_section_stale": {
+        "en": "⏳ Waiting too long",
+        "ja": "⏳ 長く止まっている待ち",
+        "qps-ploc": "⟦⏳ Ẇȧïŧïñɠ ŧőő ŀőñɠ ŀőřėɱ⟧"
+      },
+      "digest_section_done": {
+        "en": "✅ Done automatically",
+        "ja": "✅ 自動で済ませたこと",
+        "qps-ploc": "⟦✅ Ḓőñė ȧůŧőɱȧŧïƈȧŀŀẏ ŀőřėɱ ⟧"
+      },
+      "digest_section_expired": {
+        "en": "⌛ Expired without a decision",
+        "ja": "⌛ 判断されないまま期限切れ",
+        "qps-ploc": "⟦⌛ Ėẋṗïřėḓ ẇïŧħőůŧ ȧ ḓėƈïşïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "digest_waiting_since": {
+        "en": "waiting {age}",
+        "ja": "{age}待ち",
+        "qps-ploc": "⟦ẇȧïŧïñɠ {age} ŀőřė⟧"
+      },
+      "digest_proceeds_at": {
+        "en": "proceeds at {deadline}",
+        "ja": "{deadline} に進行",
+        "qps-ploc": "⟦ṗřőƈėėḓş ȧŧ {deadline} ŀőřėɱ ï⟧"
+      },
+      "digest_awaiting_delivery": {
+        "en": "waiting for delivery confirmation",
+        "ja": "到達確認待ち",
+        "qps-ploc": "⟦ẇȧïŧïñɠ ƒőř ḓėŀïṽėřẏ ƈőñƒïřɱȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "digest_mission_waiting": {
+        "en": "Mission {missionId} is still {status}",
+        "ja": "ミッション {missionId} が {status} のまま",
+        "qps-ploc": "⟦Ɱïşşïőñ {missionId} ïş şŧïŀŀ {status} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "digest_more": {
+        "en": "…and {count} more",
+        "ja": "…ほか {count}件",
+        "qps-ploc": "⟦…ȧñḓ {count} ɱőřė ŀőřėɱ⟧"
+      },
+      "age_days": {
+        "en": "{n}d",
+        "ja": "{n}日",
+        "qps-ploc": "⟦{n}ḓ ŀőř⟧"
+      },
+      "age_hours": {
+        "en": "{n}h",
+        "ja": "{n}時間",
+        "qps-ploc": "⟦{n}ħ ŀőř⟧"
+      },
+      "age_minutes": {
+        "en": "{n}m",
+        "ja": "{n}分",
+        "qps-ploc": "⟦{n}ɱ ŀőř⟧"
+      },
+      "reply_object": {
+        "en": "object",
+        "ja": "異議",
+        "qps-ploc": "⟦őƀĵėƈŧ ŀőř⟧"
+      },
+      "explain_not_found": {
+        "en": "This request does not exist or belongs to another chat.",
+        "ja": "この承認要求は存在しないか、別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ḓőėş ñőŧ ėẋïşŧ őř ƀėŀőñɠş ŧő ȧñőŧħėř ƈħȧŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      }
     }
   }
 }
