@@ -20,34 +20,56 @@ last_updated: 2026-03-06
 ## 2. Ingestion Vectors (データ持ち込みの4つのルート)
 
 ### Vector 1: Manual Vaulting (主権者による物理的持ち込み)
+
 - **概要**: ユーザー（主権者）自身が、ファイルを `vault/` ディレクトリにコピーして配置する手法。
 - **ポリシー**: 全ての「未精査の生データ（Raw Data）」は `vault/` に格納されなければならない。AIエージェントは `vault/` の内容を**読み取り専用**として解釈する。
 
 ### Vector 2: Connector Skills (API経由のシステム間連携)
+
 - **概要**: 専用のコネクタスキル（例: `backlog-connector`, `github-connector`）が外部SaaS等からデータを取得する手法。
 - **ポリシー**: クレデンシャルは必ず `knowledge/personal/connections/` に保存され、`tier-guard` のアクセス制御に従う。
 
 ### Vector 3: Agentic Web Fetching (公開ウェブ情報の取得)
+
 - **概要**: `api-fetcher` や `web_fetch` ツールを用いて、認証不要の公開URLから情報を取得する手法。
 - **ポリシー**: 取得対象は公開情報（Public Data）に限定される。取得したデータは「外部の知恵（External Wisdom）」として構造化される。
 
 ### Vector 4: The Vault Mount (シンボリックリンクによる動的接続)
-- **概要**: 外部の巨大なデータセットやプロジェクトディレクトリを、専用ツール（`vault:mount`）を用いて `vault/mounts/` 配下に接続する手法。
+
+- **概要**: 外部の巨大なデータセットやシステム設定ディレクトリ（例: Chrome ユーザーデータ、大容量データセット）を、`vault/mounts/` 配下に接続する手法。
 - **ポリシー**: 主権者の明示的なツール実行（Sudo Gate）によってのみ成立する。AIエージェントはこれを `vault/` の一部として扱い、原則として**読み取り専用**で解析・蒸留を行う。
+- **CLI コマンド**:
+  ```bash
+  # 外部ホストディレクトリをマウント
+  pnpm kyberion vault mount <source-path> [mount-name]
+
+  # マウント一覧の確認
+  pnpm kyberion vault list
+
+  # マウントの解除
+  pnpm kyberion vault unmount <mount-name>
+  ```
+- **Tier Guard 連携**:
+  `libs/core/tier-guard.ts` の `validateReadPermission` は、`vault/mounts/` 経由のパス（またはマウント対象ターゲット）を公式な Ingestion Vector として認識し、プロジェクトルート外であっても `safeReadFile` 等による安全な読み取りを許可します（書き込みは厳格にブロックされます）。
+- **セキュリティ保護**:
+  `mount` 実行時に `assertSensitivePathAllowed`（SSH鍵、AWS認証情報、GPGキー等のセンシティブパス検証）が強制適用され、危険なホスト領域のマウントは未然に遮断されます。
 
 ## 3. Sovereign Workspace Model (書き込みの分離)
 
 外部から持ち込んだデータの改変や開発を安全に行うため、以下のワークフローを遵守しなければならない。
 
 ### A. Vault is for Reference (原典の保護)
+
 - `vault/` 配下は原則として読み取り専用（Read-only）である。AIはここを直接改変してはならない。
 - リポジトリの最新化（`git pull` 等）が必要な場合は、AIは主権者に提案し、明示的な承認（Sudo Gate）を得た上で実行する。これを「Vector 1-B: Original Refresh」と定義する。
 
 ### B. Active is for Construction (成果の構築)
+
 - コードの改変、新機能の実装、大規模なリファクタリングを行う場合は、必ず `vault/` から `active/projects/` へ対象ファイルをコピーまたはクローン（checkout）し、そこで作業を行うこと。
 - これにより、原典（Vault）を汚染することなく、安全にテストやビルドを実行できる環境（Active Workspace）を確保する。
 
 ### C. The Feedback Loop (成果の還元)
+
 - `active/projects/` で完成した変更は、PR（Pull Request）やパッチファイル（`.patch`）として出力される。
 - 主権者がその内容をレビューし、承認した場合にのみ、元のリポジトリ（`vault/` またはホスト環境）へ反映（マージ）される。
 

@@ -99,3 +99,47 @@ Phase 1 で特定した情報をもとに、決定論的な ADF を作成しま�
 
 - 一時的な検証は `active/shared/tmp/` 内で実施。
 - 恒常的な業務フローとして再利用する場合は `pipelines/` ディレクトリへ昇格（`pnpm pipeline:promote`）させます。
+
+---
+
+## 5. Browser Profile Management（プロファイル管理と連携）
+
+Chrome や Playwright の複数プロファイルを検出し、特定のプロファイルコンテキストでブラウザを起動・操作できます。
+
+### プロファイル一覧の確認
+
+```bash
+pnpm kyberion browser profiles [--provider chrome|playwright|all] [--json]
+```
+
+- **Chrome**: `Local State` から表示名、アカウント、ディレクトリ、および現在の起動状態（`ACTIVE` / `IDLE`）を検出。
+- **Playwright**: `active/shared/browser_profiles/` 配下の分離ストレージセッションを検出。
+
+### 特定プロファイルでの URL オープン
+
+```bash
+# プロファイル名（表示名）やメールアドレスで指定して開く
+pnpm kyberion browser open "https://example.com" --profile "Ichimura"
+
+# Playwright の独立プロファイルで開く
+pnpm kyberion browser open "https://example.com" --provider playwright --profile "agent-session"
+```
+
+### ADF パイプラインでのプロファイル指定
+
+ADF の `options` に `profile`, `profile_name`, または `profile_email` を指定することで、対象プロファイルの `user_data_dir` と `profile_directory` が自動解決されます：
+
+```json
+{
+  "action": "pipeline",
+  "session_id": "authenticated-job",
+  "options": {
+    "browser_channel": "chrome",
+    "profile": "Ichimura"
+  },
+  "steps": [
+    { "type": "apply", "op": "list_profiles", "params": { "export_as": "available_profiles" } },
+    { "type": "capture", "op": "goto", "params": { "url": "https://service.example.com" } }
+  ]
+}
+```

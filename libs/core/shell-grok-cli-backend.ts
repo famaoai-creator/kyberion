@@ -83,15 +83,16 @@ function normalizePermissionProfile(
   throw new Error(`[shell-grok-cli] unsupported permission profile: ${value}`);
 }
 
-const DEFAULT_MODEL = 'grok-4.6';
+const DEFAULT_MODEL = 'grok-4.7';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function resolveGrokModelForTier(
   tier: 'fast' | 'standard' | 'deep' | undefined,
   defaultModel: string
 ): string {
-  // Grok Build currently exposes a single primary model family; keep the
-  // tier hook for parity with other CLI backends and future multi-model IDs.
+  // Grok 4.7 Fast (`grok-4.7-build-fast`) is opt-in. It is the same model at
+  // 2x token rates, Grok Build/Cursor only, and outside the free tier and the
+  // public API. A fast task tier must not select that SKU.
   if (tier === 'fast' || tier === 'standard' || tier === 'deep') {
     return defaultModel || DEFAULT_MODEL;
   }
@@ -101,7 +102,7 @@ export function resolveGrokModelForTier(
 export interface ShellGrokCliBackendOptions {
   /** CLI binary. Defaults to `grok` (resolved via PATH). */
   bin?: string;
-  /** Model ID. Defaults to `grok-4.6`. */
+  /** Model ID. Defaults to `grok-4.7`. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;

@@ -19,7 +19,7 @@ describe('provider-config', () => {
     expect(config.default_models.claude).toBe('claude-opus-5-5');
     expect(config.default_models.agy).toBe('Gemini 3.8 Flash (Low)');
     expect(config.default_models.codex).toBe('gpt-6-sol');
-    expect(config.default_models.grok).toBe('grok-4.6');
+    expect(config.default_models.grok).toBe('grok-4.7');
     expect(config.runtime_defaults['anthropic-default']).toBe('claude-opus-5-5');
     expect(config.runtime_defaults['anthropic-fast']).toBe('claude-haiku-4-5-20251001');
     expect(config.default_models.copilot).toBe('auto');
