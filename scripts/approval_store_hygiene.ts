@@ -1,4 +1,6 @@
 import {
+  APPROVAL_TRASH_PERSONA_ENV,
+  checkApprovalTrashWritable,
   DEFAULT_STALE_PENDING_APPROVAL_MS,
   purgeFixtureApprovals,
   sweepExpirablePendingApprovals,
@@ -15,11 +17,27 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * on and move test-fixture records out of the live approval store.
  *
  * Dry-run by default; `--apply` performs both sweeps. Fixture records go to
- * `active/archive/.trash/` (30-day restore window), so run `--apply` from an
- * operator session — only that identity may write the trash.
+ * `active/archive/.trash/` (30-day restore window), which only the sovereign
+ * persona may write, so `--apply` needs `KYBERION_PERSONA=sovereign`.
  *
- *   node dist/scripts/approval_store_hygiene.js [--apply] [--stale-days N] [--json]
+ *   node dist/scripts/approval_store_hygiene.js [--stale-days N] [--json]
+ *   KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply
  */
+
+const APPROVAL_CHANNELS_LOGICAL_DIR = 'active/shared/coordination/channels';
+
+function assertApplyAllowed(): void {
+  const access = checkApprovalTrashWritable(APPROVAL_CHANNELS_LOGICAL_DIR);
+  if (access.allowed) return;
+  throw new ScriptExitError(
+    2,
+    [
+      '--apply moves fixture approvals to active/archive/.trash/, which only the sovereign persona may write.',
+      `Rerun as: ${APPROVAL_TRASH_PERSONA_ENV} node dist/scripts/approval_store_hygiene.js --apply`,
+      `(${access.reason ?? 'write denied'})`,
+    ].join('\n')
+  );
+}
 
 export interface ApprovalStoreHygieneReport {
   dryRun: boolean;
@@ -101,10 +119,10 @@ export const runApprovalStoreHygiene = defineScript({
   name: 'approval-store-hygiene',
   flags: ['json'],
   run(context) {
-    const report = runApprovalStoreHygieneSweeps({
-      dryRun: !context.argv.includes('--apply'),
-      staleAfterDays: readStaleDays(context.argv),
-    });
+    const dryRun = !context.argv.includes('--apply');
+    const staleAfterDays = readStaleDays(context.argv);
+    if (!dryRun) assertApplyAllowed();
+    const report = runApprovalStoreHygieneSweeps({ dryRun, staleAfterDays });
     context.print(
       context.json ? JSON.stringify(report, null, 2) : formatApprovalStoreHygieneReport(report)
     );

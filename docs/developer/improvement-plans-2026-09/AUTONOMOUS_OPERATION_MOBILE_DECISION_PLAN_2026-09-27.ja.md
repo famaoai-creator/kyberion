@@ -186,7 +186,7 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 ### P1-1〜P1-4 の実装(2026-09-27、ミッション `MSN-APPROVAL-STORE-HYGIENE-20260927`)
 
 - **P1-1(実装済み)** 承認ストアのパスを `approvalStoreRoots()` に集約した。vitest の実行中は `active/shared/runtime/vitest-approvals/` に書く。この場所は保存期間カタログで1日後に消える。本番の場所に書かないことを `approval-store.test.ts` の契約テストで確認している。
-- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。`--apply` はオペレーターのセッションで実行する(ごみ箱に書けるのはオペレーターだけ)。
+- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。ごみ箱に書けるのは sovereign ペルソナだけなので、`--apply` は `KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply` で実行する。ペルソナがないと、何も変更せずに実行すべきコマンドを表示して終了する。
 - **P1-3(実装済み)** 秘密情報のポリシー自動承認は `decidedBy: policy:secret-introduction-local-low-risk`、`decidedByType: service` で記録する(スキーマの非人間の値は `service` / `ai_agent`)。依頼した人は note に残す。
 - **P1-4(期限切れは実装済み、ダイジェストへの掲載は P1-8)** 秘密情報の申請は作成から24時間で期限切れにする。掃除の処理は、`expiresAt` を過ぎた申請と、期限なしで14日を超えて放置された申請を、承認ストアの正規の遷移で `expired` にする。イベントには `reason` を記録する。定期実行への組み込みは未実施。
 

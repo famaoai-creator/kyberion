@@ -6,8 +6,23 @@ const janitor = vi.hoisted(() => ({
     originalRepoRelative: absolutePath,
   })),
   appendRetentionAudit: vi.fn(),
+  TRASH_REPO_SUBPATH: 'active/archive/.trash',
 }));
 vi.mock('./storage-janitor.js', () => janitor);
+
+const trashAccess = vi.hoisted(() => ({
+  check: vi.fn((): { allowed: boolean; reason?: string } => ({ allowed: true })),
+}));
+vi.mock('./tier-guard.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tier-guard.js')>();
+  return {
+    ...actual,
+    validateWritePermission: (filePath: string) =>
+      filePath.includes('/active/archive/.trash/')
+        ? trashAccess.check()
+        : actual.validateWritePermission(filePath),
+  };
+});
 
 import {
   approvalEventLogicalPath,
@@ -136,6 +151,23 @@ describe('purgeFixtureApprovals', () => {
   afterEach(() => {
     janitor.softDeleteToTrash.mockClear();
     janitor.appendRetentionAudit.mockClear();
+    trashAccess.check.mockReset();
+    trashAccess.check.mockReturnValue({ allowed: true });
+  });
+
+  it('stops with one actionable error when the trash is not writable', () => {
+    trashAccess.check.mockReturnValue({ allowed: false, reason: '[POLICY_VIOLATION] denied' });
+    const records = [
+      record({ id: '11111111-1111-4111-8111-111111111111', storageChannel: 'qm07-test' }),
+      record({ id: '22222222-2222-4222-8222-222222222222', requestedBy: 'human:alice' }),
+    ];
+    const result = purgeFixtureApprovals({ dryRun: false, records });
+    expect(result.candidates).toHaveLength(2);
+    expect(result.applied).toEqual([]);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('KYBERION_PERSONA=sovereign');
+    expect(trashAccess.check).toHaveBeenCalledTimes(1);
+    expect(janitor.softDeleteToTrash).not.toHaveBeenCalled();
   });
 
   it('selects the same fixtures the census excludes and never touches real records', () => {
