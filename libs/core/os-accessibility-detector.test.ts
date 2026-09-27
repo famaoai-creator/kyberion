@@ -10,6 +10,7 @@ import {
   OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
   OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
   OsAccessibilityDetector,
+  UIA_TO_AX_ROLE,
   candidatesFromAccessibility,
   isEditableAccessibilityElement,
   normaliseUiaElement,
@@ -733,5 +734,106 @@ describe('Windows enumeration script', () => {
     expect(script).toContain('$clock.ElapsedMilliseconds -ge $budget');
     expect(script).toContain("'[^\\x20-\\x7E]|[\"\\\\]'");
     expect(script).toContain("'\\u{0:x4}'");
+  });
+
+  it('falls back from the managed control view to the COM client, control then raw view', () => {
+    const order = ['managed_control', 'com_control', 'com_raw'].map((name) =>
+      name === 'managed_control' ? script.indexOf("'managed_control'") : script.indexOf(`"${name}"`)
+    );
+    expect(order.every((index) => index > 0)).toBe(true);
+    expect(script).toContain('if ($chosenActionable -eq 0 -and $null -eq $comCompileError)');
+    expect(script).toContain('foreach ($rawView in @($false, $true))');
+    expect(script).toContain('automation.RawViewWalker : automation.ControlViewWalker');
+    // IUIAutomation, IUIAutomationTreeWalker, IUIAutomationElement, CUIAutomation8 / CUIAutomation.
+    for (const guid of [
+      '30cbe57d-d9d0-452a-ab13-7ac5ac4825ee',
+      '4042c624-389c-4afc-a630-9df854a541fc',
+      'd22108aa-8ac5-49a5-837b-37bbb3d7591e',
+      'e22ad333-b25f-460c-83d0-0581107395c9',
+      'ff48dba4-60ef-4201-aa87-54103eef594e',
+    ]) {
+      expect(script).toContain(guid);
+    }
+    // A failed COM compile keeps the managed walk (native type compiled alone).
+    expect(script).toContain('$comCompileError = $_.Exception.Message');
+  });
+
+  it('never prunes a skipped element and keeps the compiled C# on mscorlib only', () => {
+    // Managed walk: the enqueue sits outside the per-element try, after the skip checks.
+    const managed = script.slice(script.indexOf('$cache.Push()'), script.indexOf('$cache.Pop()'));
+    expect(managed.lastIndexOf('$queue.Enqueue(')).toBeGreaterThan(
+      managed.lastIndexOf('catch { $readErrors += 1 }')
+    );
+    // COM walk: every scanned child is queued whatever Record() decided.
+    expect(script).toMatch(
+      /Record\(walk, child, depth, actionableTypes\);\s*\/\/ Never prune[^\n]*\n\s*queue\.Add\(/
+    );
+    const csharp = script.slice(
+      script.indexOf("$csUsing = @'"),
+      script.indexOf('$comCompileError = $null')
+    );
+    expect(csharp).not.toMatch(/HashSet|System\.Linq|System\.Diagnostics|Queue</);
+  });
+
+  it('lists exactly the mapped UIA control types as actionable', () => {
+    const line = script.split('\n').find((entry) => entry.startsWith('$actionableTypes = '));
+    const listed = [...(line ?? '').matchAll(/'([A-Za-z]+)'/g)].map((match) => match[1]);
+    expect(listed.sort()).toEqual(Object.keys(UIA_TO_AX_ROLE).sort());
+  });
+
+  it('maps COM control type ids in UIA order', () => {
+    const start = script.indexOf('static readonly string[] Types = new string[] {');
+    const body = script.slice(start, script.indexOf('};', start));
+    const types = [...body.matchAll(/"([A-Za-z]+)"/g)].map((match) => match[1]);
+    // UIA_<Type>ControlTypeId = 50000 + index.
+    expect(types.indexOf('Button')).toBe(0);
+    expect(types.indexOf('Edit')).toBe(4);
+    expect(types.indexOf('MenuItem')).toBe(11);
+    expect(types.indexOf('TabItem')).toBe(19);
+    expect(types.indexOf('DataItem')).toBe(29);
+    expect(types.indexOf('Document')).toBe(30);
+    expect(types.indexOf('SplitButton')).toBe(31);
+    expect(types.indexOf('Window')).toBe(32);
+    expect(types.indexOf('Pane')).toBe(33);
+    expect(types.indexOf('AppBar')).toBe(40);
+    for (const type of Object.keys(UIA_TO_AX_ROLE)) expect(types).toContain(type);
+  });
+
+  it('reports the strategy and name-free diagnostics in the snapshot', async () => {
+    const diagnostics = {
+      com_compile_error: null,
+      strategies: [
+        {
+          name: 'managed_control',
+          scanned: 2,
+          emitted: 2,
+          actionable: 0,
+          per_depth: [{ depth: 1, scanned: 2, emitted: 2 }],
+          sample: [{ depth: 1, control_type: 'Pane', class_name: 'X', framework_id: 'Win32' }],
+        },
+        { name: 'com_control', scanned: 40, emitted: 30, actionable: 12 },
+      ],
+    };
+    const run: AccessibilityCommandRunner = async () => ({
+      stdout: JSON.stringify({
+        screen: { width: 1000, height: 600 },
+        application: 'notepad',
+        strategy: 'com_control',
+        diagnostics,
+        elements: [{ role: 'Button', title: 'Close', x: 1, y: 1, width: 10, height: 10 }],
+      }),
+      stderr: '',
+      status: 0,
+    });
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    const request = { image_path: 's.png', image_size: IMAGE, live_screen: true };
+    await expect(detector.readSnapshot(request)).resolves.toMatchObject({
+      strategy: 'com_control',
+      diagnostics,
+    });
+    await expect(detector.detect(request)).resolves.toHaveLength(1);
+    expect(parseAccessibilitySnapshot(JSON.stringify({ elements: [], diagnostics: [1] }))).toEqual({
+      elements: [],
+    });
   });
 });

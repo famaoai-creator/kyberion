@@ -168,9 +168,11 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
             window: snapshot.window,
             dpi_awareness: snapshot.dpi_awareness,
             truncated: snapshot.truncated,
+            strategy: snapshot.strategy,
             roles: Object.fromEntries(roles),
           })
         );
+        console.log('[uia-smoke] diagnostics', JSON.stringify(snapshot.diagnostics ?? null));
         if (snapshot.reason) {
           outcome = `reason ${snapshot.reason} (foreground ${String(focus.foreground_name)})`;
           continue;
