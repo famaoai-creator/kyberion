@@ -145,6 +145,38 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     expect(Buffer.byteLength(after)).toBeLessThan(journal.STIMULI_MAX_BYTES);
     expect(after.startsWith('{')).toBe(true);
   });
+
+  it('appends a Slack surface stimulus unchanged from inside another assumption (SB-02)', async () => {
+    const { authority, journal } = await loadModules();
+    const { appendJsonLine } = await import('./foundation/json.js');
+    fs.writeFileSync(journalPath(), '');
+    const stimulus = {
+      id: 'slack-stimulus-1',
+      ts: '2026-09-27T00:00:00.000Z',
+      ttl: 3600,
+      origin: {
+        channel: 'slack' as const,
+        source_id: 'C123',
+        context: 'thread',
+        metadata: { user: 'U123' },
+      },
+      signal: { type: 'CHAT' as const, priority: 5, payload: 'hello' },
+      policy: {
+        flow: 'LOOPBACK' as const,
+        feedback: 'auto' as const,
+        retention: 'ephemeral' as const,
+      },
+      control: { status: 'pending' as const, evidence: [] },
+    };
+    // The raw append the bridge used to do fails under mission_controller.
+    expect(() =>
+      authority.withExecutionContext('mission_controller', () =>
+        appendJsonLine(journal.stimuliJournalPath(), stimulus)
+      )
+    ).toThrow();
+    authority.withExecutionContext('mission_controller', () => journal.appendStimulus(stimulus));
+    expect(fs.readFileSync(journalPath(), 'utf8')).toBe(`${JSON.stringify(stimulus)}\n`);
+  });
 });
 
 describe('SB-01 the stimuli journal is not an authorization input', () => {
