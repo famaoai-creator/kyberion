@@ -68,6 +68,9 @@ evidence/browser/*
 # Auto-generated knowledge indices and context
 knowledge/orchestration/knowledge_index.json
 knowledge/orchestration/active_context.json
+# Size inventory of knowledge/ (GF-01): rebuilt by `pnpm build`, never committed —
+# it changed on every knowledge edit and conflicted between parallel PRs.
+knowledge/_integrity-manifest.json
 tools/chronos-mirror/public/knowledge_index.json
 presence/displays/chronos-mirror/public/stimuli_feed.json
 
