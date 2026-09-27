@@ -1533,7 +1533,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 53496,
+      "size": 53686,
       "type": "json"
     },
     {
@@ -3735,7 +3735,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 20557,
+      "size": 20868,
       "type": "json"
     },
     {
@@ -4707,13 +4707,13 @@
     {
       "path": "product/orchestration/action-playbook.ja.md",
       "tier": "public",
-      "size": 8025,
+      "size": 9191,
       "type": "md"
     },
     {
       "path": "product/orchestration/action-playbook.md",
       "tier": "public",
-      "size": 7348,
+      "size": 8309,
       "type": "md"
     },
     {
@@ -5001,13 +5001,13 @@
     {
       "path": "product/orchestration/capability-verb-inventory.ja.md",
       "tier": "public",
-      "size": 9160,
+      "size": 10294,
       "type": "md"
     },
     {
       "path": "product/orchestration/capability-verb-inventory.md",
       "tier": "public",
-      "size": 8894,
+      "size": 9767,
       "type": "md"
     },
     {
@@ -6447,7 +6447,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 1008608,
+      "size": 1009293,
       "type": "json"
     },
     {

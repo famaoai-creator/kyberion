@@ -16,7 +16,7 @@ tags:
   ]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-25
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, mission_controller, implementer, operator]
 phase_affinity: [alignment, execution]
 ---
@@ -58,14 +58,15 @@ phase_affinity: [alignment, execution]
 
 ## 4. 会話する
 
-| 目的                             | 使うもの                                                                                                                                                                                             |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| どのテキスト窓口でも人に応答する | 会話の窓口 `runSurfaceMessageConversation`（`libs/core/surface-runtime-orchestrator.ts`）。`ask`、Slack / Telegram / Discord / iMessage のサテライト、voice-hub、concierge、Chronos が既に使っている |
-| ターミナルから Kyberion に聞く   | `pnpm kyberion ask "<text>"`                                                                                                                                                                         |
-| メッセージを送る                 | チャネル接頭辞付きの `presence:dispatch`（`slack:`、`telegram:` …）                                                                                                                                  |
-| 声に出す / 音声ファイルを作る    | `pnpm kyberion speak "<text>" [--out <file>]`（`listen` の逆）。パイプラインでは `voice:generate_voice` / `voice:speak_local`                                                                        |
-| リアルタイム音声対話             | `pnpm kyberion voice conversation-turn` — [voice-interface-protocol.md](./voice-interface-protocol.md) 参照                                                                                          |
-| エージェント同士                 | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md)                                                                               |
+| 目的                             | 使うもの                                                                                                                                                                                                                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| どのテキスト窓口でも人に応答する | 会話の窓口 `runSurfaceMessageConversation`（`libs/core/surface-runtime-orchestrator.ts`）。`ask`、Slack / Telegram / Discord / iMessage のサテライト、voice-hub、concierge、Chronos が既に使っている                                                                         |
+| ターミナルから Kyberion に聞く   | `pnpm kyberion ask "<text>"`                                                                                                                                                                                                                                                 |
+| メッセージを送る                 | チャネル接頭辞付きの `presence:dispatch`（`slack:`、`telegram:` …）                                                                                                                                                                                                          |
+| 声に出す / 音声ファイルを作る    | `pnpm kyberion speak "<text>" [--out <file>]`（`listen` の逆）。パイプラインでは `voice:generate_voice` / `voice:speak_local`                                                                                                                                                |
+| プロンプトから画像を作る         | `pnpm kyberion draw "<prompt>" --out <image>`（`see` の逆）。既定はローカルのプロバイダのみ。`--allow-cloud` / `--allow-handoff` で許可し、その場合 `--ref` には実行ごとの同意が要る。`--dry-run` で先にプロバイダを確認。パイプラインでは `media-generation:generate_image` |
+| リアルタイム音声対話             | `pnpm kyberion voice conversation-turn` — [voice-interface-protocol.md](./voice-interface-protocol.md) 参照                                                                                                                                                                  |
+| エージェント同士                 | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md)                                                                                                                                                       |
 
 新しい窓口を推論バックエンドに直結して追加しない。テナントスコープ・監査・承認が効くよう、会話の窓口の裏に登録する。
 
@@ -75,3 +76,4 @@ phase_affinity: [alignment, execution]
 2. **秘密情報は `fill_secret_ref` で入力する。** 平文で打ち込まない。
 3. **危険な操作は承認を待つ**（削除・送信・購入）。承認待ちを実行器の切り替えで回避しない。
 4. **音声会話は現状、会話の窓口を通らない唯一の経路**（`realtime-voice-conversation.ts` が推論バックエンドを直接呼ぶ）。音声セッションが何に届き得るかを監査するときは念頭に置く。
+5. **画像生成 API やホストの `generate_image` ツールを直接呼ばない。** 外部送信の制限・参照画像の同意・監査レシートが効くよう `pnpm kyberion draw` を通す。

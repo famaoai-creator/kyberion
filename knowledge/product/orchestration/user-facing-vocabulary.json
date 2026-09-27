@@ -6403,6 +6403,11 @@
         "ja": "  speak <text>         テキストをローカル音声合成で読み上げる、または音声ファイルに書き出す(--out, --voice, --lang, --rate, --json)",
         "qps-ploc": "⟦  şṗėȧķ <ŧėẋŧ>         Şṗėȧķ ŧėẋŧ ẇïŧħ ŧħė ŀőƈȧŀ ŧėẋŧ-ŧő-şṗėėƈħ ėñɠïñė, őř ẇřïŧė ȧůḓïő (--őůŧ, --ṽőïƈė, --ŀȧñɠ, --řȧŧė, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       },
+      "cli_help_draw": {
+        "en": "  draw <prompt>        Generate an image, local providers by default (--out, --ref, --allow-cloud, --allow-handoff, --dry-run)",
+        "ja": "  draw <prompt>        プロンプトから画像を生成する。既定はローカルのみ(--out, --ref, --allow-cloud, --allow-handoff, --dry-run)",
+        "qps-ploc": "⟦  ḓřȧẇ <ṗřőɱṗŧ>        Ɠėñėřȧŧė ȧñ ïɱȧɠė, ŀőƈȧŀ ṗřőṽïḓėřş ƀẏ ḓėƒȧůŀŧ (--őůŧ, --řėƒ, --ȧŀŀőẇ-ƈŀőůḓ, --ȧŀŀőẇ-ħȧñḓőƒƒ, --ḓřẏ-řůñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
       "cli_help_watch": {
         "en": "  watch <video>        Video metadata + transcript + OCR'd frame timeline (--every, --max-frames, --frames)",
         "ja": "  watch <video>        動画のメタデータ・文字起こし・フレーム OCR タイムラインを出力(--every, --max-frames, --frames)",
