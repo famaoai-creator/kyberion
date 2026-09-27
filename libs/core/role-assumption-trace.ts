@@ -7,8 +7,9 @@ import * as pathResolver from './path-resolver.js';
  * RN-01: opt-in observation of in-process role assumptions.
  *
  * With `KYBERION_ROLE_ASSUMPTION_TRACE=<path>` set, every
- * withExecutionContext / withExecutionContextAsync decision is appended as
- * one JSONL record `{system_role, assumed_role, allowed, caller, ts}`. The
+ * withExecutionContext / withExecutionContextAsync decision, and a delegated
+ * child role decision (DR-01, `source: 'delegation'`, once per process), is
+ * appended as one JSONL record `{system_role, assumed_role, allowed, caller, ts}`. The
  * traces are the observed-usage half of the evidence used to narrow
  * role-assumption-policy.json (AUTHORITY_MODEL.md section 3.B2); the other half
  * is scripts/analyze_role_assumptions.ts.
@@ -38,6 +39,12 @@ export interface RoleAssumptionTraceRecord {
   system_role: string | null;
   assumed_role: string;
   allowed: boolean;
+  /**
+   * `delegation` when the decision is a child's delegated role (DR-01,
+   * KYBERION_DELEGATED_ROLE) rather than an in-process assumption; absent
+   * for in-process assumptions.
+   */
+  source?: 'delegation';
   /** First stack frame outside the authority module, repo-relative (`file:line:col`). */
   caller: string | null;
   /** The caller and up to four further frames, to see through role-forwarding wrappers. */
@@ -107,6 +114,7 @@ const AUTHORITY_FUNCTIONS = new Set([
   'traceRoleAssumption',
   'captureStack',
   'assertRoleAssumptionAllowed',
+  'resolveDelegatedRootScope',
   'prepareExecutionContext',
   'withExecutionContext',
   'withExecutionContextAsync',
@@ -191,7 +199,8 @@ function ensureTraceFile(target: string): void {
 export function traceRoleAssumption(
   systemRole: string | undefined,
   assumedRole: string,
-  allowed: boolean
+  allowed: boolean,
+  source?: 'delegation'
 ): void {
   let entered = false;
   try {
@@ -206,6 +215,7 @@ export function traceRoleAssumption(
       system_role: systemRole?.trim() ? systemRole.trim().toLowerCase() : null,
       assumed_role: assumedRole,
       allowed,
+      ...(source ? { source } : {}),
       caller: frames[0] ?? null,
       stack: frames,
       ts: new Date().toISOString(),
