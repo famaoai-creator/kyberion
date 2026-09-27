@@ -178,6 +178,24 @@ export function validateArtifactReviewReceipt(value: unknown): {
   };
 }
 
+export const ARTIFACT_REVIEW_FINDING_SHAPE =
+  '{"severity":"blocking"|"suggestion","category":"<text>","description":"<text>","required_action"?:"<text>","location"?:"<text>"}';
+
+/**
+ * Fail before a receipt is written: an invalid receipt cannot be loaded, so the
+ * review task would silently never be satisfied — and a free-form severity
+ * (e.g. "major") would not count as blocking when the verdict is computed.
+ */
+export function assertValidArtifactReviewReceipt(receipt: ArtifactReviewReceipt): void {
+  const validation = validateArtifactReviewReceipt(receipt);
+  if (!validation.valid) {
+    throw new Error(
+      `Artifact review receipt would be invalid: ${validation.errors.join('; ')}. ` +
+        `Each finding must be ${ARTIFACT_REVIEW_FINDING_SHAPE}.`
+    );
+  }
+}
+
 export function loadArtifactReviewReceipt(path: string): ArtifactReviewReceipt {
   const safePath = assertRegularArtifactReviewFile(path, 'receipt');
   const value = artifactReviewReceiptCatalog(safePath).load();
