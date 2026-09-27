@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 /**
  * Git merge driver "kyberion-regenerate" (GF-03) for tracked generated files
- * (see .gitattributes). Installed repo-locally by `pnpm install`
- * (scripts/install_git_merge_driver.mjs) as:
+ * (see .gitattributes). Optional: the repository owner installs it once with
+ * `pnpm kyberion resolve install-driver` (scripts/install_git_merge_driver.mjs),
+ * which sets:
  *
  *   [merge "kyberion-regenerate"]
  *     driver = node scripts/git_merge_regenerate.mjs %O %A %B %P
+ *
+ * Without it git does its normal text merge (conflict markers), and
+ * `pnpm kyberion resolve generated` runs the same strategies after the fact
+ * from the index conflict stages: `node scripts/git_merge_regenerate.mjs
+ * --from-index <path>` (stage :1: base, :2: ours, :3: theirs).
  *
  * Bootstrap-class like kyberion_cli_entry.mjs: git runs it mid-merge, before
  * any build, so it uses node:fs / node:child_process directly and never
@@ -91,14 +97,72 @@ async function formatJson(value, path) {
   }
 }
 
-async function entryMerge(base, ours, theirs, path) {
+/** Merge three JSON texts; an absent side (`null`, e.g. no base) is an empty document. */
+async function entryMergeText(base, ours, theirs, path) {
   try {
-    const doc = (file) => JSON.parse(readFileSync(file, 'utf8'));
+    const doc = (text) => (text === null ? {} : JSON.parse(text));
     const merged = mergeNamedEntries(doc(base), doc(ours), doc(theirs));
     return merged ? { clean: true, content: await formatJson(merged, path) } : { clean: false };
   } catch {
     return { clean: false };
   }
+}
+
+async function entryMerge(base, ours, theirs, path) {
+  const read = (file) => readFileSync(file, 'utf8');
+  return entryMergeText(read(base), read(ours), read(theirs), path);
+}
+
+function gitText(args) {
+  try {
+    return execFileSync('git', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve an unmerged path in the work tree from its index stages, with the
+ * same strategy the driver would have used. Returns 0 when the work-tree file
+ * now holds valid content (the caller regenerates and stages it), 1 when a
+ * curated conflict needs a human (the file is left untouched).
+ */
+export async function resolveFromIndex(path) {
+  const [base, ours, theirs] = [1, 2, 3].map((stage) => gitText(['show', `:${stage}:${path}`]));
+  if (ours === null || theirs === null) {
+    console.error(`kyberion-regenerate: ${path} is not a two-sided conflict; resolve it manually.`);
+    return 1;
+  }
+  if (ENTRY_MERGED_PATHS.has(path)) {
+    const result = await entryMergeText(base, ours, theirs, path);
+    if (!result.clean) {
+      console.error(
+        `kyberion-regenerate: ${path} has a curated conflict (same entry changed on both sides); edit the conflict markers by hand, keeping both descriptions where they differ.`
+      );
+      return 1;
+    }
+    writeFileSync(path, result.content);
+    return 0;
+  }
+  // Derived files: clean text merge, else our side. Regeneration overwrites it.
+  const merged =
+    base === null
+      ? null
+      : gitText([
+          'merge-file',
+          '-p',
+          '--quiet',
+          '--object-id',
+          `:2:${path}`,
+          `:1:${path}`,
+          `:3:${path}`,
+        ]);
+  writeFileSync(path, merged ?? ours);
+  return 0;
 }
 
 export async function runMergeDriver([base, ours, theirs, path]) {
@@ -129,5 +193,7 @@ export async function runMergeDriver([base, ours, theirs, path]) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await runMergeDriver(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  process.exitCode =
+    args[0] === '--from-index' ? await resolveFromIndex(args[1]) : await runMergeDriver(args);
 }

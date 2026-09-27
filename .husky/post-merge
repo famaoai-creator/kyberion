@@ -1,6 +1,7 @@
 # GF-03: after a true merge (two parents) where BOTH sides changed a tracked
 # generated file (the ones marked merge=kyberion-regenerate in .gitattributes),
-# remind to regenerate — the merge driver only made the merge succeed.
+# remind to regenerate — a merge (with or without the optional driver) only
+# combines text; regeneration makes the result correct.
 # Fast-forward pulls and one-sided changes stay silent.
 git rev-parse -q --verify HEAD^2 >/dev/null 2>&1 || exit 0
 base=$(git merge-base HEAD^1 HEAD^2 2>/dev/null) || exit 0

@@ -3,9 +3,11 @@
  * GF-03: `pnpm kyberion resolve generated` — regenerate every tracked
  * generated artifact in dependency order and stage the results.
  *
- * Use it after a merge/rebase (the "kyberion-regenerate" merge driver keeps a
- * conflicted generated file on one side and asks for this), or whenever a
- * freshness gate reports drift. Order:
+ * Use it after a merge/rebase, or whenever a freshness gate reports drift. It
+ * works with or without the optional "kyberion-regenerate" merge driver: an
+ * unmerged generated file is first rebuilt from its index conflict stages with
+ * the driver's own strategy (`git_merge_regenerate.mjs --from-index`), so
+ * env-registry.json gets the entry-by-name merge either way. Order:
  *   1. env registry   → env-registry.json, docs/developer/env.example, CONFIGURATION.md
  *   2. knowledge index → knowledge/_index.md (+ the gitignored size manifest)
  *   3. role-assumption reachability report
@@ -96,12 +98,53 @@ export async function resolveGeneratedArtifacts(
   return { failed, staged };
 }
 
+function git(args: string[]): { status: number | null; stdout: string; stderr: string } {
+  return safeExecResult('git', args, { cwd: pathResolver.rootDir(), timeoutMs: 60_000 });
+}
+
+/** Generated paths git still lists as unmerged (a merge without the driver). */
+export function unmergedGeneratedPaths(
+  unmergedOutput: string,
+  steps: readonly GeneratedArtifactStep[] = GENERATED_ARTIFACT_STEPS
+): string[] {
+  const tracked = new Set(steps.flatMap((step) => step.tracked));
+  return unmergedOutput
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => tracked.has(line));
+}
+
+/**
+ * Replace conflict markers in unmerged generated files with the merge
+ * driver's strategy, computed from the index stages (:1: base, :2: ours,
+ * :3: theirs) — so the optional driver is never required. Returns the paths
+ * that still need a human (curated env-registry conflicts).
+ */
+function resolveUnmergedFromIndex(paths: readonly string[]): string[] {
+  const unresolved: string[] = [];
+  for (const filePath of paths) {
+    const result = safeExecResult(
+      process.execPath,
+      [pathResolver.rootResolve('scripts/git_merge_regenerate.mjs'), '--from-index', filePath],
+      { cwd: pathResolver.rootDir(), timeoutMs: 60_000 }
+    );
+    if (result.status !== 0) unresolved.push(filePath);
+  }
+  return unresolved;
+}
+
+export const DRIVER_HINT =
+  'hint: optional merge driver not installed — the repository owner can run `pnpm kyberion resolve install-driver` once so merges keep generated files free of conflict markers.';
+
+function driverInstalled(): boolean | undefined {
+  const inside = git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.status !== 0) return undefined;
+  return git(['config', '--get', 'merge.kyberion-regenerate.driver']).stdout.trim() !== '';
+}
+
 function stagePaths(paths: readonly string[]): void {
   if (paths.length === 0) return;
-  const result = safeExecResult('git', ['add', '--', ...paths], {
-    cwd: pathResolver.rootDir(),
-    timeoutMs: 60_000,
-  });
+  const result = git(['add', '--', ...paths]);
   if (result.status !== 0) {
     throw new ScriptExitError(1, `git add failed: ${result.stderr || result.stdout}`);
   }
@@ -112,11 +155,26 @@ export const main = defineScript({
   flags: ['check', 'json', 'quiet'],
   async run(context) {
     const stage = !context.argv.includes('--no-stage');
+    const installed = driverInstalled();
+    if (installed === false && !context.json) context.print(DRIVER_HINT);
+    const unmerged = unmergedGeneratedPaths(git(['diff', '--name-only', '--diff-filter=U']).stdout);
+    const needsHuman = context.check ? unmerged : resolveUnmergedFromIndex(unmerged);
+    if (needsHuman.length > 0) {
+      throw new ScriptExitError(
+        1,
+        context.check
+          ? `generated files are still unmerged: ${needsHuman.join(', ')} (run pnpm kyberion resolve generated)`
+          : `unmerged generated files need a manual resolution first: ${needsHuman.join(', ')} ` +
+              '(env-registry.json: keep both sides of each conflicting entry, then rerun)'
+      );
+    }
     const { failed, staged } = await resolveGeneratedArtifacts({ check: context.check, stage });
     if (failed.length === 0) stagePaths(staged);
     const summary = {
       ok: failed.length === 0,
       mode: context.check ? 'check' : 'write',
+      driver_installed: installed ?? null,
+      resolved_from_index: context.check ? [] : unmerged,
       steps: GENERATED_ARTIFACT_STEPS.map((step) => step.id),
       failed,
       staged: failed.length === 0 ? staged : [],

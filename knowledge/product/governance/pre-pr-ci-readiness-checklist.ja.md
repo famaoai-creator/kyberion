@@ -103,7 +103,10 @@ pnpm check -- --scope pr
 `main` を取り込んだ（merge / rebase）あとは `pnpm kyberion resolve generated` を実行する。
 env registry → knowledge index → role-assumption reachability を順に再生成して stage し、changelog fragment を検証する。
 生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
-GitHub の web 画面は repo-local merge driver を使わないので、衝突表示が出たらローカルで `main` を merge してから実行する
+conflict marker が残っていても、このコマンドが index の conflict stage から組み直して再生成する（merge driver は不要）。
+`env-registry.json` で同じ entry が両側で別々に変更された場合だけ手で直してから再実行する。
+merge driver（`pnpm kyberion resolve install-driver`）は repository owner が一度だけ入れる任意設定で、`pnpm install` は git config を書かない。
+GitHub の web 画面は merge driver を使わないので、衝突表示が出たらローカルで `main` を merge してから実行する
 （詳細は [kyberion-development-practices §6.1](./kyberion-development-practices.md#61-generated-files-and-merges)）。
 
 完了条件:

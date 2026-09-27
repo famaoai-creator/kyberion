@@ -50,6 +50,7 @@ describe('git_merge_regenerate (kyberion-regenerate merge driver)', () => {
   });
 
   it('never touches git config in CI', () => {
-    expect(installGitMergeDriver({ CI: 'true' })).toBe('skipped:ci');
+    expect(installGitMergeDriver({ CI: 'true' })).toEqual({ status: 'skipped:ci', changed: [] });
+    expect(installGitMergeDriver({ CI: 'true' }, { uninstall: true }).status).toBe('skipped:ci');
   });
 });
