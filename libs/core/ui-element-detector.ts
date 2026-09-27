@@ -53,11 +53,15 @@ export interface UiElementDetectionRequest {
    * Enables os_accessibility; never set it for an arbitrary or stored image.
    */
   live_screen?: boolean;
-  /** Top-left of the screenshot in global logical screen points. Default {x: 0, y: 0} (main display). */
+  /**
+   * Top-left of the screenshot in global logical screen points (Windows: physical
+   * pixels). Default {x: 0, y: 0} (main / primary display).
+   */
   screen_origin?: { x: number; y: number };
   /**
-   * Screenshot pixels per logical screen point. Default: image width / main display width
-   * in points, which only fits the main display: required when screen_origin is not 0,0.
+   * Screenshot pixels per logical screen point (Windows: per physical pixel). Default:
+   * image width / main display width, which only fits the main display: required when
+   * screen_origin is not 0,0.
    */
   screen_scale?: number;
   /** Application whose front window os_accessibility reads. Default: the frontmost application. */
