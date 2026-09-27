@@ -129,6 +129,10 @@ Other traps seen on this path:
 - A failed `finish` returns the mission from `distilling` to `active` (the distillation
   output is kept); fix the gate cause, then `verify` → `distill` → `finish` again.
 - `checkpoint` only appends to the ledger; it never closes a task.
+- `review-task --findings` must use the receipt schema — each finding is exactly
+  `{"severity": "blocking" | "suggestion", "category": "...", "description": "..."}`. Other
+  shapes are accepted on the command line but make the receipt invalid, and the review task
+  then never closes (no error is printed).
 - In zsh, a multi-word command stored in a variable (`MC="node … mission_controller.ts"`;
   `$MC verify …`) is not word-split and silently does nothing — use an array or the full
   command.
