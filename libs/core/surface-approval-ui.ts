@@ -31,7 +31,7 @@ export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
 
 const DECISION_TOKEN = /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)$/iu;
-const CARD_TOKEN = /^appr:([0-9a-f-]{36}):(changes|explain)(?:\s+([\s\S]+))?$/iu;
+const CARD_TOKEN = /^appr:([0-9a-f-]{36}):(changes|explain)(?=\s|$)/iu;
 
 export interface SurfaceApprovalAction {
   requestId: string;
@@ -499,10 +499,16 @@ function resolveDecisionCardToken(params: {
     loadApprovalRequest(params.surface, params.requestId) ||
     loadApprovalRequest('background-review', params.requestId);
   if (!record) {
-    return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_not_found', undefined, params.locale),
+    };
   }
   if (record.channel !== params.channel || record.threadTs !== params.threadTs) {
-    return { handled: true, reply: 'この承認要求は別のスレッドにあります。' };
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_other_thread', undefined, params.locale),
+    };
   }
   if (params.kind === 'explain') {
     return {
@@ -512,7 +518,10 @@ function resolveDecisionCardToken(params: {
     };
   }
   if (record.status !== 'pending' || !record.decisionCard) {
-    return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+    return {
+      handled: true,
+      reply: t('bridge:approval_request_not_found', undefined, params.locale),
+    };
   }
   if (isApprovalRequestExpired(record)) {
     const expired = expireApprovalRequest(approvalRole(params.surface, record.storageChannel), {
@@ -520,7 +529,11 @@ function resolveDecisionCardToken(params: {
       storageChannel: record.storageChannel,
       requestId: record.id,
     });
-    return { handled: true, record: expired, reply: 'この承認要求は期限切れです。' };
+    return {
+      handled: true,
+      record: expired,
+      reply: t('bridge:approval_request_expired', undefined, params.locale),
+    };
   }
   const instruction = params.instruction?.trim();
   if (!instruction) {
@@ -616,6 +629,7 @@ export function resolveSurfaceApprovalReply(params: {
   const text = params.text.trim();
   const cardToken = text.match(CARD_TOKEN);
   if (cardToken) {
+    const instruction = text.slice(cardToken[0].length).trim();
     return resolveDecisionCardToken({
       surface: params.surface,
       channel: params.channel,
@@ -623,7 +637,7 @@ export function resolveSurfaceApprovalReply(params: {
       decidedBy: params.decidedBy,
       requestId: cardToken[1].toLowerCase(),
       kind: cardToken[2].toLowerCase() as 'changes' | 'explain',
-      instruction: cardToken[3],
+      instruction: instruction || undefined,
       locale: params.locale ?? 'ja',
     });
   }
