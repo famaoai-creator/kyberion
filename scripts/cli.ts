@@ -1434,6 +1434,25 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
+  if (command === 'capture') {
+    // Still-image capture (thin over system:screenshot). Registered as
+    // operator-cli.capture; stdout carries the summary (or --json).
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runCaptureCommand } = await import('./cli-capture.js');
+    await runCaptureCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
+    return;
+  }
+
+  if (command === 'record' && firstArg === 'screen') {
+    // Screen video (thin over system:record_screen). Registered as the
+    // two-word operator-cli command "record screen" so the bare `record`
+    // (operator-home desktop demonstration recorder) keeps working.
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runRecordCommand } = await import('./cli-record.js');
+    await runRecordCommand(restArgs, printText);
+    return;
+  }
+
   if (command === 'run') {
     runActuator(actuators, firstArg, restArgs, missionId);
     return;
