@@ -1694,6 +1694,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/report_human_interventions.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/report_i18n_translation_coverage.ts#writeHistory",
       "roles": ["ecosystem_architect"],
       "unresolved": []
