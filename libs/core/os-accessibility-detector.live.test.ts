@@ -4,18 +4,22 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import {
   OS_ACCESSIBILITY_LIVE_SMOKE_ENV,
   OsAccessibilityDetector,
+  type AccessibilityElement,
+  type AccessibilitySnapshot,
   powerShellStdinArgs,
   windowsPowerShellEnv,
 } from './os-accessibility-detector.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
-import type { SomBox } from './set-of-marks.js';
+import type { SomBox, SomCandidate } from './set-of-marks.js';
 
 /**
- * Live smoke of the Windows UI Automation path: launches Notepad, brings it to
- * the foreground, captures the primary screen and checks that os_accessibility
- * finds Notepad's editor and several of its buttons / menu items inside the
- * Notepad window. Runs only on Windows with KYBERION_UIA_LIVE_SMOKE=1 (the
+ * Live smoke of the Windows UI Automation path. Two targets, each brought to the
+ * foreground and captured from the primary screen: classic Notepad (a Win32 Edit,
+ * which the runner's UIA may only report as a Pane: at least one unlabelled
+ * editable element inside the window) and a WPF window with native UIA
+ * providers (a labelled Button, a CheckBox and an unlabelled editable TextBox).
+ * Runs only on Windows with KYBERION_UIA_LIVE_SMOKE=1 (the
  * windows-latest job of cross-os.yml); GitHub's Windows runners have an
  * interactive desktop session.
  */
@@ -27,6 +31,7 @@ using System;
 using System.Runtime.InteropServices;
 public static class KyberionUiaSmoke {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
@@ -52,6 +57,46 @@ $pids = @($started.Id)
 $hwnd = 0
 if ($null -ne $target) { $pids += $target.Id; $hwnd = $target.MainWindowHandle.ToInt64() }
 [Console]::Out.WriteLine((@{ pids = $pids; hwnd = $hwnd } | ConvertTo-Json -Compress))`;
+
+// Opens a WPF window titled UIA_SMOKE_TITLE (Button "OK", CheckBox, TextBox) in
+// a separate STA powershell.exe that stays open until killed; WPF has native UIA
+// providers, so this exercises real control types independent of Win32 proxies.
+const WPF_LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+${WIN32_TYPE}
+$wpf = @'
+Add-Type -AssemblyName PresentationFramework
+$window = New-Object System.Windows.Window
+$window.Title = $env:UIA_SMOKE_TITLE
+$window.Width = 420
+$window.Height = 260
+$window.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen
+$panel = New-Object System.Windows.Controls.StackPanel
+$button = New-Object System.Windows.Controls.Button
+$button.Content = 'OK'
+$button.Margin = New-Object System.Windows.Thickness(8)
+$check = New-Object System.Windows.Controls.CheckBox
+$check.Content = 'Remember me'
+$check.Margin = New-Object System.Windows.Thickness(8)
+$text = New-Object System.Windows.Controls.TextBox
+$text.Text = 'typed value'
+$text.Margin = New-Object System.Windows.Thickness(8)
+[void]$panel.Children.Add($button)
+[void]$panel.Children.Add($check)
+[void]$panel.Children.Add($text)
+$window.Content = $panel
+[void]$window.ShowDialog()
+'@
+$encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($wpf))
+$process = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-STA', '-EncodedCommand', $encoded) -PassThru
+$hwnd = [IntPtr]::Zero
+for ($i = 0; $i -lt 100 -and $hwnd -eq [IntPtr]::Zero; $i++) {
+  Start-Sleep -Milliseconds 200
+  $hwnd = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
+}
+[uint32]$ownerPid = 0
+if ($hwnd -ne [IntPtr]::Zero) { [void][KyberionUiaSmoke]::GetWindowThreadProcessId($hwnd, [ref]$ownerPid) }
+[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64() } | ConvertTo-Json -Compress))`;
 
 // Brings the window (handle in UIA_SMOKE_HWND) to the foreground; the ALT tap
 // lifts the foreground lock when a plain SetForegroundWindow is refused.
@@ -127,94 +172,170 @@ function inside(box: SomBox, frame: SomBox, tolerance = 2): boolean {
   );
 }
 
+interface LiveTarget {
+  label: string;
+  hwnd: number;
+  application: string;
+  shotPath: string;
+}
+
+interface LiveResult {
+  snapshot: AccessibilitySnapshot;
+  within: SomCandidate[];
+  windowElements: AccessibilityElement[];
+}
+
+/**
+ * Focuses the target window, captures the primary screen and runs the detector;
+ * retries up to three times when the window is not frontmost or yields no
+ * candidates, printing diagnostics every round.
+ */
+async function detectLive(target: LiveTarget): Promise<LiveResult> {
+  const detector = new OsAccessibilityDetector();
+  let outcome = 'not run';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const focus = runPowerShell(FOCUS_SCRIPT, { UIA_SMOKE_HWND: String(target.hwnd) });
+    console.log(`[uia-smoke:${target.label}] focus attempt ${attempt}`, JSON.stringify(focus));
+    const shot = runPowerShell(SCREENSHOT_SCRIPT, { UIA_SMOKE_SHOT_PATH: target.shotPath });
+    console.log(`[uia-smoke:${target.label}] screenshot`, JSON.stringify(shot));
+    const request = {
+      image_path: target.shotPath,
+      image_size: { width: Number(shot.width), height: Number(shot.height) },
+      live_screen: true,
+      application: target.application,
+    };
+    expect(await detector.isAvailable(request)).toBe(true);
+    const started = Date.now();
+    const snapshot = await detector.readSnapshot(request);
+    const roles = new Map<string, number>();
+    for (const element of snapshot.elements) {
+      roles.set(element.role, (roles.get(element.role) ?? 0) + 1);
+    }
+    console.log(
+      `[uia-smoke:${target.label}] snapshot`,
+      JSON.stringify({
+        ms: Date.now() - started,
+        application: snapshot.application,
+        reason: snapshot.reason,
+        screen: snapshot.screen,
+        window: snapshot.window,
+        dpi_awareness: snapshot.dpi_awareness,
+        truncated: snapshot.truncated,
+        strategy: snapshot.strategy,
+        roles: Object.fromEntries(roles),
+      })
+    );
+    console.log(
+      `[uia-smoke:${target.label}] diagnostics`,
+      JSON.stringify(snapshot.diagnostics ?? null)
+    );
+    if (snapshot.reason) {
+      outcome = `reason ${snapshot.reason} (foreground ${String(focus.foreground_name)})`;
+      continue;
+    }
+    expect(snapshot.application?.toLowerCase()).toBe(target.application);
+    expect(snapshot.screen?.width).toBeGreaterThan(0);
+    const frame = snapshot.window;
+    expect(frame).toBeDefined();
+    const scale = request.image_size.width / (snapshot.screen?.width ?? 1);
+    const windowBox: SomBox = {
+      x: frame!.x * scale,
+      y: frame!.y * scale,
+      width: frame!.width * scale,
+      height: frame!.height * scale,
+    };
+    const candidates = await detector.detect(request);
+    const within = candidates.filter((candidate) => inside(candidate.box, windowBox));
+    const windowElements = snapshot.elements.filter((element) =>
+      inside({ x: element.x, y: element.y, width: element.width, height: element.height }, frame!)
+    );
+    console.log(
+      `[uia-smoke:${target.label}] candidates`,
+      JSON.stringify({
+        total: candidates.length,
+        within: within.length,
+        sample: within.slice(0, 12),
+      })
+    );
+    if (within.length === 0) {
+      outcome = `no candidates inside the ${target.label} window`;
+      continue;
+    }
+    return { snapshot, within, windowElements };
+  }
+  throw new Error(`[uia-smoke:${target.label}] ${outcome}`);
+}
+
+function killAll(pids: number[]): void {
+  for (const pid of new Set(pids.filter((pid) => Number.isInteger(pid) && pid > 0))) {
+    safeExecResult('taskkill', ['/PID', String(pid), '/F', '/T'], { timeoutMs: 10_000 });
+  }
+}
+
+function pidsOf(launch: Record<string, unknown>): number[] {
+  return (Array.isArray(launch.pids) ? launch.pids : [launch.pids]).map(Number);
+}
+
 describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)', () => {
-  it('finds the Notepad editor and its controls in the foreground window', async () => {
-    const shotDir = pathResolver.sharedTmp('uia-live-smoke');
+  const shotDir = pathResolver.sharedTmp('uia-live-smoke');
+
+  it('finds the Notepad editor as an unlabelled editable element', async () => {
     safeMkdir(shotDir, { recursive: true });
-    const shotPath = path.join(shotDir, `screen-${process.pid}.png`);
     let pids: number[] = [];
     try {
       const launch = runPowerShell(LAUNCH_SCRIPT);
-      console.log('[uia-smoke] launch', JSON.stringify(launch));
-      pids = (Array.isArray(launch.pids) ? launch.pids : [launch.pids]).map(Number);
+      console.log('[uia-smoke:notepad] launch', JSON.stringify(launch));
+      pids = pidsOf(launch);
       expect(Number(launch.hwnd), 'Notepad main window did not appear').toBeGreaterThan(0);
-
-      const detector = new OsAccessibilityDetector();
-      let outcome: string | undefined;
-      for (let attempt = 1; attempt <= 3; attempt += 1) {
-        const focus = runPowerShell(FOCUS_SCRIPT, { UIA_SMOKE_HWND: String(launch.hwnd) });
-        console.log(`[uia-smoke] focus attempt ${attempt}`, JSON.stringify(focus));
-        const shot = runPowerShell(SCREENSHOT_SCRIPT, { UIA_SMOKE_SHOT_PATH: shotPath });
-        console.log('[uia-smoke] screenshot', JSON.stringify(shot));
-        const request = {
-          image_path: shotPath,
-          image_size: { width: Number(shot.width), height: Number(shot.height) },
-          live_screen: true,
-          application: 'notepad',
-        };
-        expect(await detector.isAvailable(request)).toBe(true);
-        const started = Date.now();
-        const snapshot = await detector.readSnapshot(request);
-        const roles = new Map<string, number>();
-        for (const element of snapshot.elements) {
-          roles.set(element.role, (roles.get(element.role) ?? 0) + 1);
-        }
-        console.log(
-          '[uia-smoke] snapshot',
-          JSON.stringify({
-            ms: Date.now() - started,
-            application: snapshot.application,
-            reason: snapshot.reason,
-            screen: snapshot.screen,
-            window: snapshot.window,
-            dpi_awareness: snapshot.dpi_awareness,
-            truncated: snapshot.truncated,
-            strategy: snapshot.strategy,
-            roles: Object.fromEntries(roles),
-          })
-        );
-        console.log('[uia-smoke] diagnostics', JSON.stringify(snapshot.diagnostics ?? null));
-        if (snapshot.reason) {
-          outcome = `reason ${snapshot.reason} (foreground ${String(focus.foreground_name)})`;
-          continue;
-        }
-        expect(snapshot.application?.toLowerCase()).toBe('notepad');
-        expect(snapshot.screen?.width).toBeGreaterThan(0);
-        const frame = snapshot.window;
-        expect(frame).toBeDefined();
-        const scale = request.image_size.width / (snapshot.screen?.width ?? 1);
-        const windowBox: SomBox = {
-          x: frame!.x * scale,
-          y: frame!.y * scale,
-          width: frame!.width * scale,
-          height: frame!.height * scale,
-        };
-        const candidates = await detector.detect(request);
-        const within = candidates.filter((candidate) => inside(candidate.box, windowBox));
-        console.log(
-          '[uia-smoke] candidates',
-          JSON.stringify({
-            total: candidates.length,
-            within: within.length,
-            sample: within.slice(0, 12),
-          })
-        );
-        if (within.length === 0) {
-          outcome = 'no candidates inside the Notepad window';
-          continue;
-        }
-        expect(within.filter((candidate) => candidate.editable).length).toBeGreaterThanOrEqual(1);
-        expect(within.filter((candidate) => !candidate.editable).length).toBeGreaterThanOrEqual(3);
-        // Editable elements never carry a label.
-        expect(within.filter((candidate) => candidate.editable && candidate.label)).toEqual([]);
-        outcome = 'ok';
-        break;
-      }
-      expect(outcome).toBe('ok');
+      const { within } = await detectLive({
+        label: 'notepad',
+        hwnd: Number(launch.hwnd),
+        application: 'notepad',
+        shotPath: path.join(shotDir, `notepad-${process.pid}.png`),
+      });
+      // Classic Notepad on the runner exposes its editor (a Win32 Edit, possibly only
+      // as a Pane) but no menu or title-bar buttons, so only the editor is required.
+      const editable = within.filter((candidate) => candidate.editable);
+      expect(editable.length).toBeGreaterThanOrEqual(1);
+      expect(editable.filter((candidate) => candidate.label)).toEqual([]);
     } finally {
-      for (const pid of new Set(pids.filter((pid) => Number.isInteger(pid) && pid > 0))) {
-        safeExecResult('taskkill', ['/PID', String(pid), '/F'], { timeoutMs: 10_000 });
-      }
+      killAll(pids);
+      if (safeExistsSync(shotDir)) safeRmSync(shotDir);
+    }
+  }, 180_000);
+
+  it('finds the button, checkbox and text box of a WPF window', async () => {
+    safeMkdir(shotDir, { recursive: true });
+    const title = `Kyberion UIA smoke ${process.pid}`;
+    let pids: number[] = [];
+    try {
+      const launch = runPowerShell(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title });
+      console.log('[uia-smoke:wpf] launch', JSON.stringify(launch));
+      pids = pidsOf(launch);
+      expect(Number(launch.hwnd), 'WPF window did not appear').toBeGreaterThan(0);
+      const { within, windowElements } = await detectLive({
+        label: 'wpf',
+        hwnd: Number(launch.hwnd),
+        application: 'powershell',
+        shotPath: path.join(shotDir, `wpf-${process.pid}.png`),
+      });
+      expect(windowElements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'AXButton', title: 'OK' }),
+          expect.objectContaining({ role: 'AXCheckBox', title: 'Remember me' }),
+          expect.objectContaining({ role: 'AXTextField' }),
+        ])
+      );
+      const labels = within.map((candidate) => candidate.label);
+      expect(labels).toContain('OK');
+      expect(labels).toContain('Remember me');
+      const editable = within.filter((candidate) => candidate.editable);
+      expect(editable.length).toBeGreaterThanOrEqual(1);
+      expect(editable.filter((candidate) => candidate.label)).toEqual([]);
+      // The typed text never becomes a label.
+      expect(labels.filter((label) => label?.includes('typed value'))).toEqual([]);
+    } finally {
+      killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
   }, 180_000);
