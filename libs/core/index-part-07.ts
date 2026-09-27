@@ -131,6 +131,13 @@ export type { GeminiCliVoiceBridgeOptions } from './gemini-cli-voice-bridge.js';
 
 export type { CodexCliQueryOptions, RunCodexCliQueryParams } from './codex-cli-query.js';
 
+export {
+  assertValidCodexProfileName,
+  codexProfileRoot,
+  resolveCodexHome,
+  resolveCodexProfileName,
+} from './codex-profile.js';
+
 export { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
 
 export type { ClaudeAgentReasoningBackendOptions } from './claude-agent-reasoning-backend.js';
