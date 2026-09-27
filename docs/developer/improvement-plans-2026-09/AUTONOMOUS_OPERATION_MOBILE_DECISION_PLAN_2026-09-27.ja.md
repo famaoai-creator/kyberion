@@ -134,7 +134,7 @@ status: active
 
 ## P0 の結果(2026-09-27)
 
-ミッション `MSN-AUTONOMOUS-MOBILE-DECISION-20260927` で、人の介入を集計する `pnpm report:human-interventions` を実装した。
+ミッション `MSN-AUTONOMOUS-MOBILE-DECISION-20260927` で、人の介入を集計する `scripts/report_human_interventions.ts` を実装した(実行: `node dist/scripts/report_human_interventions.js [--since YYYY-MM-DD] [--json]`)。
 情報源は承認ストア、git 履歴(PR マージと、`main` 取り込み時のコンフリクトの再現)、ミッション状態の3つである。
 
 2026-08-28 以降の30日間の集計:
