@@ -1,4 +1,3 @@
-import { appendJsonLine } from './foundation/json.js';
 /**
  * libs/core/sensor-engine.ts
  * Kyberion Autonomous Nerve System (KANS) - Sensor Engine v1.0
@@ -9,7 +8,7 @@ import { appendJsonLine } from './foundation/json.js';
  */
 
 import { createLogger } from './logger.js';
-import { stimuliJournalPath } from './stimuli-journal.js';
+import { appendStimulus } from './stimuli-journal.js';
 
 const logger = createLogger('sensor-engine');
 
@@ -28,6 +27,16 @@ export interface SensorEvent {
   payload: any;
   priority?: number;
   ttl?: number;
+}
+
+/** The GUSP stimulus a sensor appends to the stimuli journal. */
+export interface SensorStimulus {
+  id: string;
+  ts: string;
+  ttl: number;
+  origin: { channel: 'sensor'; source_id: string };
+  signal: { intent: string; priority: number; payload: unknown };
+  control: { status: 'pending'; feedback: 'auto'; evidence: unknown[] };
 }
 
 /**
@@ -49,7 +58,7 @@ export abstract class KyberionSensor {
    */
   protected emit(event: SensorEvent) {
     const timestamp = new Date();
-    const stimulus = {
+    const stimulus: SensorStimulus = {
       id: `sns-${this.config.id}-${timestamp.getTime()}`,
       ts: timestamp.toISOString(),
       ttl: event.ttl || 3600,
@@ -70,7 +79,8 @@ export abstract class KyberionSensor {
     };
 
     try {
-      appendJsonLine(stimuliJournalPath(), stimulus);
+      // Written as the journal's store-writer role, whatever assumption is current.
+      appendStimulus(stimulus);
       logger.info(`📡 [SENSOR:${this.config.id}] Emitted: ${event.intent}`);
     } catch (err) {
       logger.error(`❌ [SENSOR:${this.config.id}] Failed to emit stimulus: ${err}`);

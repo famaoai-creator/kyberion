@@ -12,6 +12,7 @@ import {
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
 import type { SlackSurfaceArtifact } from './channel-surface-types.js';
+import type { SensorStimulus } from './sensor-engine.js';
 
 const logger = createLogger('stimuli-journal');
 
@@ -215,10 +216,10 @@ function rotateStimuliJournal(maxBytes: number): boolean {
 }
 
 /**
- * A record of the mixed journal: a nerve message, or a channel surface (GUSP)
- * stimulus such as the one the Slack bridge ingests. Records are written as-is.
+ * A record of the mixed journal: a nerve message, or a GUSP stimulus from a
+ * channel surface (the Slack bridge) or a sensor. Records are written as-is.
  */
-export type StimuliJournalRecord = NerveMessage | SlackSurfaceArtifact['stimulus'];
+export type StimuliJournalRecord = NerveMessage | SlackSurfaceArtifact['stimulus'] | SensorStimulus;
 
 export function appendStimulus(stimulus: StimuliJournalRecord): void {
   withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => {
