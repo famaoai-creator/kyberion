@@ -3,7 +3,9 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { setProcessExitCode } from './lib/harness.js';
 import {
+  DRIVER_HINT,
   GENERATED_ARTIFACT_STEPS,
+  unmergedGeneratedPaths,
   resolveGeneratedArtifacts,
   type GeneratedArtifactStep,
 } from './resolve_generated.js';
@@ -57,6 +59,17 @@ describe('resolve_generated', () => {
       ['a', '--quiet'],
       ['b', '--check', '--quiet'],
     ]);
+  });
+
+  it('picks only generated paths out of the unmerged list and keeps the hint one line', () => {
+    expect(
+      unmergedGeneratedPaths(
+        'libs/core/foo.ts\nknowledge/_index.md\nknowledge/product/governance/env-registry.json\n'
+      )
+    ).toEqual(['knowledge/_index.md', 'knowledge/product/governance/env-registry.json']);
+    expect(unmergedGeneratedPaths('')).toEqual([]);
+    expect(DRIVER_HINT).not.toContain('\n');
+    expect(DRIVER_HINT).toContain('pnpm kyberion resolve install-driver');
   });
 
   it('reports drift per step without staging in check mode', async () => {
