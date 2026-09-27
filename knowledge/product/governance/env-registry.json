@@ -2991,7 +2991,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Opt-in JSONL trace of in-process role assumption decisions (system role, assumed role, allowed, calling module) used to narrow role-assumption-policy.json; must be under active/shared/tmp/ or active/shared/runtime/, otherwise ignored. Unset disables tracing.",
+      "description": "Opt-in JSONL trace of in-process role assumption decisions (system role, assumed role, allowed, calling module) used to narrow role-assumption-policy.json; must be a .jsonl file under active/shared/tmp/role-assumption-trace/ or active/shared/runtime/role-assumption-trace/ reached without symbolic links, otherwise ignored. Unset disables tracing.",
       "documented": true,
       "subsystem": "governance"
     },
