@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { StubAudioBus } from './audio-bus.js';
+import { StubAudioBus } from './voice/audio-bus.js';
 import {
   InRoomMeetingJoinDriver,
   installInRoomMeetingJoinDriver,
@@ -11,8 +11,8 @@ import {
   resetMeetingJoinDriverRegistry,
   StubMeetingJoinDriver,
   validateMeetingTarget,
-} from './meeting-join-driver.js';
-import type { AudioChunk } from './meeting-session-types.js';
+} from './meeting/meeting-join-driver.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 function fixtureMicCommand(bytes: number): string[] {
   return [

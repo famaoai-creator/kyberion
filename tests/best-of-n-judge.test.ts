@@ -28,22 +28,22 @@ function makeTaskResultText(summary: string): string {
   ].join('\n');
 }
 
-vi.mock('../libs/core/a2a-bridge.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../libs/core/a2a-bridge.js')>();
+vi.mock('../libs/core/mesh/a2a-bridge.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../libs/core/mesh/a2a-bridge.js')>();
   return {
     ...actual,
     a2aBridge: { ...actual.a2aBridge, route: mocks.route },
   };
 });
-vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
+vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
 }));
-vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
+vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
 }));
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
-vi.mock('../libs/core/mission-task-events.js', () => ({
+vi.mock('../libs/core/mission/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   // Must stay inside the repository: the secure-io resource-path scope rejects
   // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
@@ -91,7 +91,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     process.env.KYBERION_DRAFT_REFINE = '0';
     delete process.env.KYBERION_BEST_OF_N;
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     setWorkCoordinationNamespace('best-of-n-judge');
     clearWorkCoordinationStore();
 
@@ -113,7 +113,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
     const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     const missionPath = missionDir(MISSION, 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
     clearWorkCoordinationStore();
@@ -147,7 +147,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     });
 
     const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission-orchestration-worker.js');
+      await import('../libs/core/mission/mission-orchestration-worker.js');
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
 
@@ -179,7 +179,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     mocks.route.mockResolvedValue({ payload: { text: makeTaskResultText('Single shot result.') } });
 
     const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission-orchestration-worker.js');
+      await import('../libs/core/mission/mission-orchestration-worker.js');
     await dispatchMissionNextTasks(MISSION);
     expect(mocks.route).toHaveBeenCalledTimes(1);
   });
@@ -190,7 +190,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     mocks.route.mockResolvedValue({ payload: { text: makeTaskResultText('Single shot result.') } });
 
     const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission-orchestration-worker.js');
+      await import('../libs/core/mission/mission-orchestration-worker.js');
     await dispatchMissionNextTasks(MISSION);
     expect(mocks.route).toHaveBeenCalledTimes(1);
   });

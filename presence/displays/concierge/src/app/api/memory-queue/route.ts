@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   listMemoryPromotionCandidates,
   type MemoryCandidate,
-} from '@agent/core/memory-promotion-queue';
+} from '@agent/core/knowledge/memory-promotion-queue';
 import { withExecutionContext } from '@agent/core/authority';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 

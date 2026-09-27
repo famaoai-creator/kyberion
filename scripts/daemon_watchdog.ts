@@ -15,7 +15,7 @@ import {
 import {
   evaluateAutonomousOpsAction,
   type AutonomousOpsGateResult,
-} from '@agent/core/autonomous-ops-gate';
+} from '@agent/core/governance/autonomous-ops-gate';
 import { withExecutionContextAsync } from '@agent/core/authority';
 
 /**

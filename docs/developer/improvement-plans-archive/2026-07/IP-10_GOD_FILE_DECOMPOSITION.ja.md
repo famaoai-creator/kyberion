@@ -20,7 +20,7 @@ status: archived
 | `satellites/voice-hub/server.ts`                                             | 4,560(163KB) | workspace 外の単一ファイルサーバ。浮遊 Promise あり(IP-08) |
 | `libs/actuators/wisdom-actuator/src/decision-ops.ts`                         | 2,831        |                                                            |
 | `libs/actuators/media-actuator/src/index.ts`                                 | 2,627        | any 最多クラスタ(IP-11 と相互作用)                         |
-| `libs/core/surface-runtime-orchestrator.ts`                                  | 1,844        | リクエスト経路の中枢。特性化テスト(IP-07 Task 4/5)が前提   |
+| `libs/core/surface/surface-runtime-orchestrator.ts`                          | 1,844        | リクエスト経路の中枢。特性化テスト(IP-07 Task 4/5)が前提   |
 | `libs/core/index.ts`                                                         | 1,617        | 純バレル(554 export)— 分割対象ではなく現状維持でよい       |
 
 ## ゴール(受入条件)

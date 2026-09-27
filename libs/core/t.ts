@@ -1,8 +1,8 @@
 import { logger } from './core.js';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from './locale.js';
 import { renderMessage, type MessageParams } from './message-format.js';
-import { loadVocabularyCatalog, resolveVocabularyEntry } from './vocabulary-catalog.js';
-import type { VocabularyKey } from './vocabulary-keys.generated.js';
+import { loadVocabularyCatalog, resolveVocabularyEntry } from './knowledge/vocabulary-catalog.js';
+import type { VocabularyKey } from './knowledge/vocabulary-keys.generated.js';
 
 export type { VocabularyKey };
 
@@ -10,7 +10,7 @@ export type { VocabularyKey };
  * I18N-02: the single type-safe rendering entry point for the namespaced
  * user-facing vocabulary catalog.
  *
- * `key` is a generated union (`libs/core/vocabulary-keys.generated.ts`), so
+ * `key` is a generated union (`libs/core/knowledge/vocabulary-keys.generated.ts`), so
  * referencing a key that does not exist in the catalog is a compile-time
  * error, not a runtime "renders the key itself" surprise. The generated
  * union includes both the canonical `namespace:key` qualified form and (for

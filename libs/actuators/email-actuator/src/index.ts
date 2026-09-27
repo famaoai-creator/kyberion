@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
-import { sendEmail, createDraft } from '@agent/core/email-bridge';
+import { sendEmail, createDraft } from '@agent/core/integrations/email-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -23,7 +23,10 @@ import {
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { defineCatalogBackedActuator, runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import {
+  defineCatalogBackedActuator,
+  runActuatorPipeline,
+} from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
 
 interface EmailParams {

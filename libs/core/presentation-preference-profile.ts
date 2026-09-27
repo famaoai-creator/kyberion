@@ -1,14 +1,9 @@
 import { logger } from './core.js';
-import type { PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
+import type { PresentationPreferenceProfile } from './contracts/presentation-preference-profile.js';
 import type { PresentationSlidePatternSelectionPolicy } from './presentation-slide-pattern.js';
 
 export type PresentationDeckPurpose =
-  | 'proposal'
-  | 'internal_share'
-  | 'briefing'
-  | 'marketing'
-  | 'training'
-  | 'comparison';
+  'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison';
 
 export interface PresentationBriefQuestionSet {
   label: string;

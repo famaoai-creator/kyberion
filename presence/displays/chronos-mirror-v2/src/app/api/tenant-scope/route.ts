@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listProjectRecords } from '@agent/core/project-registry';
-import { listTenantProfileSlugs, readTenantProfile } from '@agent/core/tenant-registry';
+import { listProjectRecords } from '@agent/core/project/project-registry';
+import {
+  listTenantProfileSlugs,
+  readTenantProfile,
+} from '@agent/core/organization/tenant-registry';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

@@ -20,15 +20,15 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   installPluginManaged,
   refreshManagedPluginActivation,
   type ManagedPluginRecord,
-} from '@agent/core/plugin-managed-install';
-import { isPluginActive, resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
-import { createPluginHost, type PluginHost } from '@agent/core/plugin-host';
-import { PluginViewError } from '@agent/core/plugin-view-contract';
+} from '@agent/core/plugin/plugin-managed-install';
+import { isPluginActive, resetPluginLifecycleForTests } from '@agent/core/plugin/plugin-lifecycle';
+import { createPluginHost, type PluginHost } from '@agent/core/plugin/plugin-host';
+import { PluginViewError } from '@agent/core/plugin/plugin-view-contract';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { AddressInfo } from 'node:net';
 import { createLocalPadContext } from '../lib/local-artifact-pad.js';

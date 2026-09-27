@@ -8,17 +8,17 @@ import {
   recordActionItem,
   summarizeActionItemLifecycle,
 } from '@agent/core/action-item-store';
-import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
+import type { MeetingFacilitatorPolicy } from '@agent/core/meeting/meeting-facilitator-policy';
 import {
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-} from '@agent/core/reasoning-backend';
+} from '@agent/core/reasoning/reasoning-backend';
 import {
   createWorkItem,
   clearWorkCoordinationStore,
   setWorkCoordinationNamespace,
-} from '@agent/core/work-coordination';
+} from '@agent/core/workforce/work-coordination';
 import {
   applyRestrictedActionGate,
   auditSpeakerFairnessOp,

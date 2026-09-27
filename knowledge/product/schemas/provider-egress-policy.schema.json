@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "provider-egress-policy.schema.json",
   "title": "Provider Egress Policy",
-  "description": "XP-03: tier x provider egress gate for the delegation face (a task contract / context pack handed to an external LLM CLI), as opposed to egress-policy.json (SA-04, network/domain face). Declares, per provider, whether inference stays on this machine (local-only) or is sent to a vendor API (external-api) and, when it is sent, whether the vendor uses that material to train models. Confidential and personal material may be sent only to a provider whose applicable plan is not used for training, or under an explicit audited exception. Consumed by libs/core/provider-egress-gate.ts's checkProviderEgress.",
+  "description": "XP-03: tier x provider egress gate for the delegation face (a task contract / context pack handed to an external LLM CLI), as opposed to egress-policy.json (SA-04, network/domain face). Declares, per provider, whether inference stays on this machine (local-only) or is sent to a vendor API (external-api) and, when it is sent, whether the vendor uses that material to train models. Confidential and personal material may be sent only to a provider whose applicable plan is not used for training, or under an explicit audited exception. Consumed by libs/core/provider/provider-egress-gate.ts's checkProviderEgress.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

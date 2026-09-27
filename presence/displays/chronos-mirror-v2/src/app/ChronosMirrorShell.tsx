@@ -36,7 +36,7 @@ import { ChronosHome } from '../components/ChronosHome';
 import { humanizeMissionId } from '../components/ChronosOffice';
 import { ChronosKbI18n } from '../components/chronos-kb-i18n';
 import { ChronosFieldScope, ChronosInline, ChronosToolbar } from '../components/chronos-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { uxText as uxTextStatic, type SupportedLocale } from '../lib/ux-vocabulary';
 import type { ChronosThemeMode } from '../lib/chronos-theme';
 

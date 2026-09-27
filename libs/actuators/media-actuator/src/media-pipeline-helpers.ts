@@ -1,19 +1,19 @@
 import { safeWriteFile } from '@agent/core/secure-io';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import type {
   AdfEngineContext,
   AdfStepHandlers,
   AdfStepHooks,
   AdfStepOutcome,
-} from '@agent/core/adf-engine';
+} from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
+import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { resolveRef } from '@agent/core/pipeline-engine';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import * as path from 'node:path';
 

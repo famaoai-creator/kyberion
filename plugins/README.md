@@ -23,15 +23,15 @@ Create `.kyberion-plugins.json` in your working directory:
 }
 ```
 
-Plugins are loaded automatically by `runSkillAsync()` (`libs/core/skill-wrapper.ts`)
-through the KD-06 provenance-trust gate in `libs/core/skill-plugin-loader.ts` —
+Plugins are loaded automatically by `runSkillAsync()` (`libs/core/plugin/skill-wrapper.ts`)
+through the KD-06 provenance-trust gate in `libs/core/plugin/skill-plugin-loader.ts` —
 **before any configured path is imported**, it must resolve (symlinks
 followed) to one of:
 
 - **official** — inside this repo's own `plugins/` tree (the in-tree plugins
   listed below), or
 - a **managed-copy install** (`installPluginManaged`,
-  `libs/core/plugin-managed-install.ts`) whose activation status is
+  `libs/core/plugin/plugin-managed-install.ts`) whose activation status is
   `activatable` — official-by-provenance, or third-party with a human
   `approved` decision already applied.
 
@@ -208,7 +208,7 @@ closed.
 ## Lifecycle and the apply ladder (EP-04)
 
 Long-running hosts manage one live activation per plugin
-(`libs/core/plugin-lifecycle.ts`). Every registration is recorded in an
+(`libs/core/plugin/plugin-lifecycle.ts`). Every registration is recorded in an
 ownership ledger; a plugin can only dispose contributions it owns.
 
 ```bash
@@ -271,7 +271,7 @@ A plugin may contribute declarative views — A2UI documents, never code:
 }
 ```
 
-Rules (`libs/core/plugin-view-contract.ts`,
+Rules (`libs/core/plugin/plugin-view-contract.ts`,
 `knowledge/product/schemas/plugin-view-declaration.schema.json`):
 
 - The document lives under `views/` inside the plugin (no `..`, no symlinks)

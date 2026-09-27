@@ -18,7 +18,7 @@ OPERATOR_UX_GUIDE は「何が起きているかを見せる」ことを核の�
 - **ミッションの生きた状態が見えない**: `mission_controller.ts status <ID>`(`:994-1055`)は点のスナップショットのみ。実行中ミッションを tail する手段が無い。
 - **テキストブリッジにタイピング表示が無い**: `satellites/` 全体に `sendTyping / sendChatAction / typing` のヒットゼロ。長い応答の間、Slack/Telegram/Discord/iMessage のユーザーは無反応に見える。
 - **chronos チャットはスピナーのみ**: `SovereignChat.tsx:82-132` は非ストリーミング POST 一発で、進捗テキストもキャンセルボタンも無い(SSE ルート `/api/intelligence/stream` は既存)。
-- **進捗通知がオプトイン**: `libs/core/surface-interaction-model.ts:250-287` は呼び出し側が `startedText` 等を渡した時だけ通知し、既定タイトルは英語ハードコード(`Working`/`Completed`/`Failed`、`:254,265,276`)。
+- **進捗通知がオプトイン**: `libs/core/surface/surface-interaction-model.ts:250-287` は呼び出し側が `startedText` 等を渡した時だけ通知し、既定タイトルは英語ハードコード(`Working`/`Completed`/`Failed`、`:254,265,276`)。
 - **voice-hub の同期ターン**: 20 秒タイムアウトまで無音(`server.ts:4288-4304`)。非同期委譲時の即時アック(`:4264-4287`)は良い実装なので、これを基準にする。
 
 ## ゴール(受入条件)

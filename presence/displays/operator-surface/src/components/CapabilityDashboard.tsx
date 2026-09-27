@@ -1,5 +1,5 @@
 import { Grid, Section, StatusPill, Table } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { operatorTranslator, type OperatorLocale } from '@/lib/i18n';
 import { formatTimestamp } from '@/lib/view';
 

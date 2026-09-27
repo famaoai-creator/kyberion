@@ -1,0 +1,442 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { PROCEDURE_RESOLUTION_THRESHOLDS, type ProcedureEntry } from './procedure-types.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  invalidateProcedureCache,
+  loadProcedures,
+  readProcedureCatalog,
+  resolveAllowlistedRecordingRef,
+  resolveProcedure,
+} from './procedure-registry.js';
+import * as secureIo from '../secure-io.js';
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: <T>(filePath: string) => {
+    if (filePath.includes('procedures.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(path.resolve('knowledge/product/schemas/procedures.schema.json'), 'utf8')
+      ) as T;
+    }
+    const value = JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    const hasDangerousKey = (candidate: unknown): boolean => {
+      if (Array.isArray(candidate)) return candidate.some(hasDangerousKey);
+      if (!candidate || typeof candidate !== 'object') return false;
+      return Object.entries(candidate).some(
+        ([key, nested]) =>
+          key === '__proto__' ||
+          key === 'constructor' ||
+          key === 'prototype' ||
+          hasDangerousKey(nested)
+      );
+    };
+    if (hasDangerousKey(value)) throw new Error('JSON input contains a dangerous JSON key');
+    return value;
+  },
+}));
+
+import {
+  resetReasoningBackend,
+  registerReasoningBackend,
+  stubReasoningBackend,
+  type ReasoningBackend,
+} from '../reasoning/reasoning-backend.js';
+
+const BROWSER_ENTRY: ProcedureEntry = {
+  procedure_id: 'attendance.approve.kingoftime',
+  substrate: 'browser',
+  adapter: { recorder: 'chrome-extension', executor: 'extension_session' },
+  target: { name: 'King of Time', origins: ['https://s2.kingtime.jp'] },
+  intent_phrases: ['勤怠の承認', '勤怠承認'],
+  execution_substrate: 'extension',
+  pipeline_ref: 'pipelines/browser/attendance-approve.json',
+  risk_class: 'high',
+  version: '1.0.0',
+  status: 'active',
+};
+
+const SERVICE_ENTRY: ProcedureEntry = {
+  procedure_id: 'deal.intake',
+  substrate: 'service',
+  adapter: { recorder: 'service-capture', executor: 'service:preset' },
+  target: { name: 'Deal Intake', services: ['jira', 'slack'] },
+  intent_phrases: ['起票して通知', '案件を登録'],
+  pipeline_ref: 'pipelines/service/deal-intake.json',
+  risk_class: 'medium',
+  version: '1.0.0',
+  status: 'active',
+};
+
+const DEPRECATED_ENTRY: ProcedureEntry = {
+  ...BROWSER_ENTRY,
+  procedure_id: 'attendance.approve.old',
+  status: 'deprecated',
+};
+
+function stubCatalog(entries: ProcedureEntry[] = [BROWSER_ENTRY, SERVICE_ENTRY, DEPRECATED_ENTRY]) {
+  vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(
+    JSON.stringify({ schema_version: 'procedures.v1', procedures: entries })
+  );
+}
+
+describe('procedure-registry', () => {
+  afterEach(() => {
+    invalidateProcedureCache();
+    vi.restoreAllMocks();
+    resetReasoningBackend();
+  });
+
+  // -------------------------------------------------------------------------
+  // loadProcedures
+  // -------------------------------------------------------------------------
+  describe('loadProcedures', () => {
+    it('returns empty array when file is missing', () => {
+      vi.spyOn(secureIo, 'safeReadFile').mockImplementation(() => {
+        throw new Error('ENOENT');
+      });
+      expect(loadProcedures(true)).toEqual([]);
+    });
+
+    it('returns all entries including deprecated', () => {
+      stubCatalog();
+      const entries = loadProcedures(true);
+      expect(entries).toHaveLength(3);
+    });
+
+    it('caches on second call without forceRefresh', () => {
+      // The personal catalog is optional machine state; hide it so the read
+      // count is deterministic regardless of the host.
+      vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
+      const spy = vi
+        .spyOn(secureIo, 'safeReadFile')
+        .mockReturnValue(JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));
+      loadProcedures(true); // force refresh — reads file
+      loadProcedures(); // uses cache
+      loadProcedures(); // uses cache again
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops duplicate procedure_ids, keeping the first (S-H1/AR-M2)', () => {
+      const dup: ProcedureEntry = { ...SERVICE_ENTRY, procedure_id: BROWSER_ENTRY.procedure_id };
+      stubCatalog([BROWSER_ENTRY, dup]);
+      const entries = loadProcedures(true);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].substrate).toBe('browser'); // first one wins
+    });
+
+    it('drops structurally-invalid entries', () => {
+      stubCatalog([
+        BROWSER_ENTRY,
+        { procedure_id: '', intent_phrases: [] } as unknown as ProcedureEntry,
+      ]);
+      expect(loadProcedures(true)).toHaveLength(1);
+    });
+
+    it('merges the optional personal browser catalog before the public catalog', () => {
+      const personalEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'personal.attendance.approve',
+        adapter: {
+          ...BROWSER_ENTRY.adapter,
+          recording_ref: 'knowledge/personal/browser-recordings/rec.json',
+        },
+        intent_phrases: ['自分の勤怠を承認'],
+      };
+      vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
+        filePath.includes('knowledge/personal/browser-procedures.json')
+      );
+      vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath) => {
+        if (filePath.includes('knowledge/personal/browser-procedures.json')) {
+          return JSON.stringify({ schema_version: 'procedures.v1', procedures: [personalEntry] });
+        }
+        return JSON.stringify({ schema_version: 'procedures.v1', procedures: [BROWSER_ENTRY] });
+      });
+      // The catalog contents are supplied by the secure-read mock in this
+      // unit test, so let the path seam accept the virtual fixture paths.
+      vi.spyOn(secureIo, 'assertSafeRepositoryPath').mockImplementation((filePath) => filePath);
+      vi.spyOn(secureIo, 'safeLstat').mockReturnValue({
+        isFile: () => true,
+      } as unknown as fs.Stats);
+
+      const entries = loadProcedures(true);
+      expect(entries.map((entry) => entry.procedure_id)).toEqual([
+        'personal.attendance.approve',
+        BROWSER_ENTRY.procedure_id,
+      ]);
+    });
+  });
+
+  it('rejects a catalog reached through a symbolic link before reading it', () => {
+    const target = pathResolver.sharedTmp(`procedure-catalog-target-${process.pid}.json`);
+    const link = pathResolver.knowledge(`personal/procedure-catalog-link-${process.pid}.json`);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));
+    fs.rmSync(link, { force: true });
+    fs.symlinkSync(target, link);
+    try {
+      expect(() => readProcedureCatalog(link)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(link, { force: true });
+      fs.rmSync(target, { force: true });
+    }
+  });
+
+  it('rejects a catalog directory before reading it', () => {
+    const directory = pathResolver.sharedTmp(`procedure-catalog-directory-${process.pid}`);
+    fs.mkdirSync(directory, { recursive: true });
+    try {
+      expect(() => readProcedureCatalog(directory)).toThrow(
+        '[PROCEDURE_REGISTRY] catalog must be a regular file'
+      );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects dangerous JSON keys before schema validation', () => {
+    const catalog = pathResolver.sharedTmp(`procedure-catalog-dangerous-${process.pid}.json`);
+    secureIo.safeWriteFile(catalog, '{"__proto__":{"polluted":true}}');
+    try {
+      expect(() => readProcedureCatalog(catalog)).toThrow(/dangerous JSON key/);
+    } finally {
+      secureIo.safeRmSync(catalog, { force: true });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // resolveAllowlistedRecordingRef — recording_ref trust boundary (S-H1)
+  // -------------------------------------------------------------------------
+  describe('resolveAllowlistedRecordingRef', () => {
+    it('accepts a path inside the recordings store', () => {
+      expect(
+        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/foo.json')
+      ).not.toBeNull();
+    });
+
+    it('rejects undefined / empty', () => {
+      expect(resolveAllowlistedRecordingRef(undefined)).toBeNull();
+      expect(resolveAllowlistedRecordingRef('')).toBeNull();
+    });
+
+    it('rejects traversal escapes out of the store', () => {
+      expect(
+        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/../../../../etc/passwd')
+      ).toBeNull();
+    });
+
+    it('rejects paths outside the store (e.g. knowledge/)', () => {
+      expect(
+        resolveAllowlistedRecordingRef('knowledge/product/orchestration/procedures.json')
+      ).toBeNull();
+    });
+
+    it('accepts a path inside the personal browser recordings store', () => {
+      expect(
+        resolveAllowlistedRecordingRef('knowledge/personal/browser-recordings/foo.json')
+      ).not.toBeNull();
+    });
+
+    it('rejects traversal out of the personal recordings store', () => {
+      expect(
+        resolveAllowlistedRecordingRef(
+          'knowledge/personal/browser-recordings/../../product/procedures.json'
+        )
+      ).toBeNull();
+    });
+
+    it('rejects a recording reached through a symbolic link', () => {
+      const store = pathResolver.knowledge('personal/browser-recordings');
+      const target = pathResolver.sharedTmp(`procedure-registry-target-${process.pid}.json`);
+      const link = path.join(store, `procedure-registry-link-${process.pid}.json`);
+      fs.mkdirSync(store, { recursive: true });
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, '{}');
+      fs.rmSync(link, { force: true });
+      fs.symlinkSync(target, link);
+      try {
+        expect(resolveAllowlistedRecordingRef(pathResolver.toRepoRelative(link))).toBeNull();
+      } finally {
+        fs.rmSync(link, { force: true });
+        fs.rmSync(target, { force: true });
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resolveProcedure — unmatched cases
+  // -------------------------------------------------------------------------
+  describe('resolveProcedure — unmatched', () => {
+    it('returns unmatched + Pattern A for completely unknown intent', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('完全に関係ないこと');
+      expect(result.outcome).toBe('unmatched');
+      expect(result.recommendedPattern).toBe('A');
+      expect(result.candidates).toHaveLength(0);
+    });
+
+    it('returns unmatched when catalog is empty', async () => {
+      stubCatalog([]);
+      const result = await resolveProcedure('勤怠の承認');
+      expect(result.outcome).toBe('unmatched');
+    });
+
+    it('ignores deprecated entries', async () => {
+      stubCatalog([DEPRECATED_ENTRY]);
+      const result = await resolveProcedure('勤怠の承認');
+      expect(result.outcome).toBe('unmatched');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resolveProcedure — matched (Pattern B)
+  // -------------------------------------------------------------------------
+  describe('resolveProcedure — matched', () => {
+    it('matches exact phrase → Pattern B', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('勤怠の承認');
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe('attendance.approve.kingoftime');
+      expect(result.best?.confidence).toBeGreaterThanOrEqual(
+        PROCEDURE_RESOLUTION_THRESHOLDS.autoExecute
+      );
+      expect(result.recommendedPattern).toBe('B');
+    });
+
+    it('matches phrase embedded in longer intent', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('ブラウザで勤怠管理サービスの勤怠の承認をしておいて');
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe('attendance.approve.kingoftime');
+    });
+
+    it('origin affinity boosts matching procedure', async () => {
+      stubCatalog();
+      const withOrigin = await resolveProcedure('勤怠の承認', { origin: 'https://s2.kingtime.jp' });
+      const withoutOrigin = await resolveProcedure('勤怠の承認');
+      expect(withOrigin.best?.confidence).toBeGreaterThanOrEqual(
+        withoutOrigin.best?.confidence ?? 0
+      );
+    });
+
+    it('substrate filter eliminates wrong-substrate entries', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('勤怠の承認', { substrate: 'service' });
+      // BROWSER_ENTRY has substrate=browser; filtered out → unmatched
+      expect(result.outcome).toBe('unmatched');
+    });
+
+    it('matches service entry by phrase', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('起票して通知してください');
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe('deal.intake');
+    });
+
+    it('prefers an exact phrase over a shorter containing phrase', async () => {
+      const shortPhraseEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'attendance.short',
+        intent_phrases: ['勤怠'],
+      };
+      stubCatalog([BROWSER_ENTRY, shortPhraseEntry]);
+      const result = await resolveProcedure('勤怠の承認');
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe(BROWSER_ENTRY.procedure_id);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resolveProcedure — stub backend skips Stage 2
+  // -------------------------------------------------------------------------
+  describe('resolveProcedure — stub backend (offline)', () => {
+    it('never calls delegateTask in stub mode even when Stage 1 is ambiguous', async () => {
+      // Two entries with identical phrase → both score 0.9 → Stage 1 ambiguous
+      const altEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'attendance.approve.freee',
+        target: { name: 'Freee HR', origins: ['https://p.freee.co.jp'] },
+        intent_phrases: ['勤怠の承認'],
+      };
+      stubCatalog([BROWSER_ENTRY, altEntry]);
+      const delegateSpy = vi.spyOn(stubReasoningBackend, 'delegateTask');
+      const result = await resolveProcedure('勤怠の承認');
+      expect(delegateSpy).not.toHaveBeenCalled();
+      expect(result.outcome).toBe('ambiguous');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resolveProcedure — non-stub backend re-ranks ambiguous
+  // -------------------------------------------------------------------------
+  describe('resolveProcedure — LLM re-ranking', () => {
+    /** Two entries with the same phrase force Stage 1 into ambiguous territory. */
+    function twoIdenticalPhraseEntries() {
+      const altEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'attendance.approve.freee',
+        target: { name: 'Freee HR', origins: ['https://p.freee.co.jp'] },
+        intent_phrases: ['勤怠の承認'],
+      };
+      stubCatalog([BROWSER_ENTRY, altEntry]);
+    }
+
+    it('calls delegateTask when Stage 1 is ambiguous and backend is real', async () => {
+      const delegateFn = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          candidates: [
+            {
+              procedure_id: 'attendance.approve.kingoftime',
+              confidence: 0.9,
+              reason: 'best match',
+            },
+          ],
+        })
+      );
+      const fakeBackend: ReasoningBackend = {
+        ...stubReasoningBackend,
+        name: 'fake',
+        delegateTask: delegateFn,
+      };
+      registerReasoningBackend(fakeBackend);
+      twoIdenticalPhraseEntries();
+
+      const result = await resolveProcedure('勤怠の承認');
+      expect(delegateFn).toHaveBeenCalled();
+      expect(result.outcome).toBe('matched');
+      expect(result.best?.procedure_id).toBe('attendance.approve.kingoftime');
+    });
+
+    it('falls back to Stage 1 when structured delegation returns invalid JSON', async () => {
+      const delegateFn = vi.fn().mockResolvedValue('not-json');
+      const fakeBackend: ReasoningBackend = {
+        ...stubReasoningBackend,
+        name: 'fake',
+        delegateTask: delegateFn,
+      };
+      registerReasoningBackend(fakeBackend);
+      twoIdenticalPhraseEntries();
+
+      const result = await resolveProcedure('勤怠の承認');
+      expect(delegateFn).toHaveBeenCalled();
+      expect(result.outcome).toBe('ambiguous');
+      expect(result.candidates).toHaveLength(2);
+    });
+
+    it('returns unmatched when structured LLM output has no candidates', async () => {
+      const delegateFn = vi.fn().mockResolvedValue(JSON.stringify({ candidates: [] }));
+      const fakeBackend: ReasoningBackend = {
+        ...stubReasoningBackend,
+        name: 'fake',
+        delegateTask: delegateFn,
+      };
+      registerReasoningBackend(fakeBackend);
+      twoIdenticalPhraseEntries();
+
+      const result = await resolveProcedure('勤怠の承認');
+      expect(delegateFn).toHaveBeenCalled();
+      expect(result.outcome).toBe('unmatched');
+    });
+  });
+});

@@ -1,7 +1,8 @@
 ---
 title: Kyberion Intent Domain Evaluation
 category: Architecture
-tags: [intent, evaluation, abstraction, mission, actuators, knowledge, environment, team-composition]
+tags:
+  [intent, evaluation, abstraction, mission, actuators, knowledge, environment, team-composition]
 importance: 10
 author: Codex
 audit_date: 2026-04-29
@@ -16,13 +17,13 @@ Kyberion 全体を「何に対して、何を実施するのか」というイ�
 
 評価対象の主軸は次の 5 領域である。
 
-| 領域 | 問い |
-|---|---|
-| 目的遂行インテント | ユーザーの成果目的を、成果物・判断・変更・運用へ落とせるか |
-| 環境整備インテント | Kyberion 自体、actuator、LLM、外部連携、権限を準備・検証・活用できるか |
-| ナレッジ活用・整理インテント | 3-tier knowledge を検索・注入・整理・昇格・廃棄できるか |
-| 状態確認インテント | Kyberion 自身、mission、runtime、環境、証跡の状態を説明できるか |
-| ミッションプロセスインテント | mission 作成、分類、計画、team 編成、委譲、実行、検証、学習を扱えるか |
+| 領域                         | 問い                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| 目的遂行インテント           | ユーザーの成果目的を、成果物・判断・変更・運用へ落とせるか             |
+| 環境整備インテント           | Kyberion 自体、actuator、LLM、外部連携、権限を準備・検証・活用できるか |
+| ナレッジ活用・整理インテント | 3-tier knowledge を検索・注入・整理・昇格・廃棄できるか                |
+| 状態確認インテント           | Kyberion 自身、mission、runtime、環境、証跡の状態を説明できるか        |
+| ミッションプロセスインテント | mission 作成、分類、計画、team 編成、委譲、実行、検証、学習を扱えるか  |
 
 ## 2. 参照した主な定義
 
@@ -51,15 +52,15 @@ Kyberion の中核思想は一貫している。外部 UX は `Request -> Plan -
 
 評価結果は次の通り。
 
-| 評価軸 | 判定 | 根拠 |
-|---|---:|---|
-| 論理的整合性 | B+ | UX契約、mission、actuator、knowledge、evidence の方向性は整合している。ただし intent 領域と実行契約の対応が分散している。 |
-| 抽象化の適切性 | B | `Mission`、`Task Session`、`Actuator`、`Evidence`、`Memory` は良い抽象。上位の `IntentTarget` と `IntentAction` が未固定。 |
-| 拡張性 | B+ | actuator manifest、environment manifest、model registry、team role は拡張可能。ただし新規 intent を追加した時の coverage gate が弱い。 |
-| 環境準備から活用まで | B | `EnvironmentCapability` と manifest により準備・検証はある。intent catalog から readiness gate への結線はまだ薄い。 |
-| ナレッジ活用 | B | 3-tier、wisdom、distill、promotion はある。検索以外の整理・昇格・廃棄 intent が user-facing catalog に不足。 |
-| 状態確認 | B | baseline/vital/health/diagnostics はある。Kyberion 自身の状態確認 intent と runtime routing が限定的。 |
-| ミッションプロセス | A- | mission class、workflow、team composition、single-owner multi-worker は強い。チーム組成を intent として扱う表層が弱い。 |
+| 評価軸               | 判定 | 根拠                                                                                                                                   |
+| -------------------- | ---: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 論理的整合性         |   B+ | UX契約、mission、actuator、knowledge、evidence の方向性は整合している。ただし intent 領域と実行契約の対応が分散している。              |
+| 抽象化の適切性       |    B | `Mission`、`Task Session`、`Actuator`、`Evidence`、`Memory` は良い抽象。上位の `IntentTarget` と `IntentAction` が未固定。             |
+| 拡張性               |   B+ | actuator manifest、environment manifest、model registry、team role は拡張可能。ただし新規 intent を追加した時の coverage gate が弱い。 |
+| 環境準備から活用まで |    B | `EnvironmentCapability` と manifest により準備・検証はある。intent catalog から readiness gate への結線はまだ薄い。                    |
+| ナレッジ活用         |    B | 3-tier、wisdom、distill、promotion はある。検索以外の整理・昇格・廃棄 intent が user-facing catalog に不足。                           |
+| 状態確認             |    B | baseline/vital/health/diagnostics はある。Kyberion 自身の状態確認 intent と runtime routing が限定的。                                 |
+| ミッションプロセス   |   A- | mission class、workflow、team composition、single-owner multi-worker は強い。チーム組成を intent として扱う表層が弱い。                |
 
 ## 4. 推奨する正本抽象
 
@@ -69,13 +70,13 @@ Kyberion の中核思想は一貫している。外部 UX は `Request -> Plan -
 Intent = Target + Action + Object + ExecutionShape + GovernanceEnvelope
 ```
 
-| 軸 | 意味 | 例 |
-|---|---|---|
-| `IntentTarget` | 何に対して実施するか | `outcome`, `environment`, `actuator`, `llm`, `knowledge`, `system_state`, `mission_process`, `agent_team`, `external_service` |
-| `IntentAction` | 何を実施するか | `create`, `change`, `inspect`, `diagnose`, `prepare`, `verify`, `activate`, `query`, `distill`, `organize`, `compose`, `delegate`, `execute`, `review`, `promote` |
-| `IntentObject` | 対象物の具体型 | `project`, `artifact`, `reasoning_backend`, `environment_manifest`, `knowledge_corpus`, `mission`, `team_blueprint`, `actuator_contract` |
-| `ExecutionShape` | どの実行形に落とすか | `direct_reply`, `task_session`, `mission`, `project_bootstrap`, `pipeline`, `actuator_action` |
-| `GovernanceEnvelope` | どの統治条件で実行するか | `tier`, `risk_profile`, `approval_required`, `evidence_required`, `readiness_required`, `review_gate` |
+| 軸                   | 意味                     | 例                                                                                                                                                                |
+| -------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IntentTarget`       | 何に対して実施するか     | `outcome`, `environment`, `actuator`, `llm`, `knowledge`, `system_state`, `mission_process`, `agent_team`, `external_service`                                     |
+| `IntentAction`       | 何を実施するか           | `create`, `change`, `inspect`, `diagnose`, `prepare`, `verify`, `activate`, `query`, `distill`, `organize`, `compose`, `delegate`, `execute`, `review`, `promote` |
+| `IntentObject`       | 対象物の具体型           | `project`, `artifact`, `reasoning_backend`, `environment_manifest`, `knowledge_corpus`, `mission`, `team_blueprint`, `actuator_contract`                          |
+| `ExecutionShape`     | どの実行形に落とすか     | `direct_reply`, `task_session`, `mission`, `project_bootstrap`, `pipeline`, `actuator_action`                                                                     |
+| `GovernanceEnvelope` | どの統治条件で実行するか | `tier`, `risk_profile`, `approval_required`, `evidence_required`, `readiness_required`, `review_gate`                                                             |
 
 この抽象を導入すると、ユーザーの自然言語と backend 実行の間が次のように安定する。
 
@@ -216,14 +217,14 @@ Request
 
 ただし、現状は各段の接続が完全に強制されていない。
 
-| 接続 | 現状 | 改善必要性 |
-|---|---|---|
-| `standard intent -> mission class` | 一部 rules あり | 高 |
-| `standard intent -> workflow template` | mission class 経由で推定 | 中 |
-| `standard intent -> actuator / pipeline` | catalog と pipeline に分散 | 高 |
-| `standard intent -> environment readiness` | ほぼ暗黙 | 高 |
-| `standard intent -> team template` | mission classification 経由 | 中 |
-| `standard intent -> evidence / memory` | intent coverage と outcome pattern に分散 | 中 |
+| 接続                                       | 現状                                      | 改善必要性 |
+| ------------------------------------------ | ----------------------------------------- | ---------- |
+| `standard intent -> mission class`         | 一部 rules あり                           | 高         |
+| `standard intent -> workflow template`     | mission class 経由で推定                  | 中         |
+| `standard intent -> actuator / pipeline`   | catalog と pipeline に分散                | 高         |
+| `standard intent -> environment readiness` | ほぼ暗黙                                  | 高         |
+| `standard intent -> team template`         | mission classification 経由               | 中         |
+| `standard intent -> evidence / memory`     | intent coverage と outcome pattern に分散 | 中         |
 
 結論として、コンセプトは矛盾していないが、実装者が迷わないための join table が不足している。
 
@@ -240,7 +241,7 @@ Request
 - 新規: `knowledge/product/governance/intent-domain-ontology.json`
 - 新規: `knowledge/product/schemas/intent-domain-ontology.schema.json`
 - 更新: `knowledge/product/governance/standard-intents.json`
-- 更新: `libs/core/intent-resolution.ts`
+- 更新: `libs/core/intent/intent-resolution.ts`
 
 最小フィールド:
 
@@ -464,15 +465,15 @@ request -> intent_resolution -> readiness -> plan -> execution -> verification -
 
 ## 8. 優先実装順
 
-| 優先 | 改善 | 理由 |
-|---:|---|---|
-| 1 | `intent-domain-ontology.json` | すべての領域を束ねる正本がないと drift が続く |
-| 2 | `check_intent_domain_coverage.ts` | 新規 intent 追加時の破綻を CI で止める |
-| 3 | `standard-intents.json` の category 再分類 | user-facing routing と operator routing の見通しを改善する |
-| 4 | 環境整備・状態確認 intent pack | 準備から活用までの lifecycle を自然言語で扱えるようにする |
-| 5 | ナレッジ lifecycle intent pack | Kyberion の学習ループを検索中心から整理・昇格中心へ拡張する |
-| 6 | ミッションプロセス intent pack | team composition と delegation を command ではなく intent として扱う |
-| 7 | reasoning capability binding | LLM 選択を環境変数依存から intent 要求に引き上げる |
+| 優先 | 改善                                       | 理由                                                                 |
+| ---: | ------------------------------------------ | -------------------------------------------------------------------- |
+|    1 | `intent-domain-ontology.json`              | すべての領域を束ねる正本がないと drift が続く                        |
+|    2 | `check_intent_domain_coverage.ts`          | 新規 intent 追加時の破綻を CI で止める                               |
+|    3 | `standard-intents.json` の category 再分類 | user-facing routing と operator routing の見通しを改善する           |
+|    4 | 環境整備・状態確認 intent pack             | 準備から活用までの lifecycle を自然言語で扱えるようにする            |
+|    5 | ナレッジ lifecycle intent pack             | Kyberion の学習ループを検索中心から整理・昇格中心へ拡張する          |
+|    6 | ミッションプロセス intent pack             | team composition と delegation を command ではなく intent として扱う |
+|    7 | reasoning capability binding               | LLM 選択を環境変数依存から intent 要求に引き上げる                   |
 
 ## 9. 結論
 

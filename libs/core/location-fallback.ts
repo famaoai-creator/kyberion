@@ -1,5 +1,5 @@
 import { secureFetch } from './network.js';
-import { getSurfaceQueryProviderConfig } from './surface-query.js';
+import { getSurfaceQueryProviderConfig } from './surface/surface-query.js';
 import { currentScope } from './scope-context.js';
 
 type LocationSummaryData = {

@@ -1,4 +1,4 @@
-import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
+import type { OrganizationWorkLoopSummary } from '@agent/core/workforce/work-design';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 
 export interface MissionSummary {

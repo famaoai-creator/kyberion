@@ -6,7 +6,7 @@ import {
 } from '@agent/core/ingest-asset-ledger';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
-import { signA2AContent, verifyA2AContent } from '@agent/core/a2a-envelope-signature';
+import { signA2AContent, verifyA2AContent } from '@agent/core/mesh/a2a-envelope-signature';
 import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
 import { createAjv } from '@agent/core/foundation';
 

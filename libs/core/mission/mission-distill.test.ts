@@ -1,0 +1,298 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+
+let missionPath = '';
+
+vi.mock('./mission-llm.js', () => ({
+  inspectLlmResolution: vi.fn(),
+  resolveLlmConfig: vi.fn(),
+  runAdaptiveStructuredLlmProfile: vi.fn(async () => {
+    throw new Error('LLM unavailable in test');
+  }),
+}));
+
+vi.mock('../knowledge/knowledge-index.js', () => ({
+  buildScopedIndex: vi.fn(async () => ({ hints: [] })),
+  queryKnowledgeHybrid: vi.fn(async () => []),
+}));
+
+// SO-01: mission-distill.ts now imports these directly from their libs/core
+// sibling modules (not the @agent/core barrel) — the mocks must target the
+// same specifiers or vitest won't intercept the real calls.
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
+  return {
+    ...actual,
+    findMissionPath: vi.fn(() => missionPath),
+  };
+});
+vi.mock('../ledger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ledger.js')>();
+  return {
+    ...actual,
+    ledger: {
+      ...actual.ledger,
+      record: vi.fn(),
+    },
+  };
+});
+
+import * as pathResolver from '../path-resolver.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+  listMemoryPromotionCandidates,
+  memoryPromotionQueuePath,
+  updateMemoryPromotionCandidateStatus,
+} from '../knowledge/memory-promotion-queue.js';
+import { loadDistillCandidateRecord } from '../knowledge/distill-candidate-registry.js';
+import { loadState } from './mission-state.js';
+import {
+  gatherDistillContext,
+  distillMission,
+  isRegularMissionDistillPromptPath,
+  resolveWisdomOutputPath,
+} from './mission-distill.js';
+import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
+import { safeExec } from '../secure-io.js';
+
+// Namespace the promotion queue so parallel test files never clobber the
+// real shared queue (root cause of combined-run flakes).
+process.env.KYBERION_MEMORY_QUEUE_PATH =
+  'active/shared/tmp/test-memory-queue-mission-distill.jsonl';
+
+describe('mission-distill prompt resource loader', () => {
+  it('accepts only existing regular prompt files', () => {
+    const fixtureRoot = pathResolver.shared('tmp/mission-distill-prompt-loader-test');
+    const filePath = `${fixtureRoot}/prompt.md`;
+    const directoryPath = `${fixtureRoot}/prompt-directory.md`;
+    try {
+      safeWriteFile(filePath, 'distill prompt', { mkdir: true });
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(isRegularMissionDistillPromptPath(filePath)).toBe(true);
+      expect(isRegularMissionDistillPromptPath(directoryPath)).toBe(false);
+      expect(isRegularMissionDistillPromptPath(`${fixtureRoot}/missing.md`)).toBe(false);
+    } finally {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('mission-distill end-to-end promotion flow', () => {
+  const missionId = 'MSN-DISTILL-E2E-001';
+  missionPath = pathResolver.shared('tmp/mission-distill-e2e');
+  const queuePath = memoryPromotionQueuePath();
+  const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
+  const scratchHintsDir = pathResolver.shared('tmp/tests/mission-distill-hints');
+  const scratchHintsPath = `${scratchHintsDir}/HINTS.md`;
+  const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
+  const wisdomFileName = 'distillation.md';
+  const wisdomFilePath = `${missionPath}/evidence/${wisdomFileName}`;
+  const promotedRecordBase = `mem-${missionId}-${dateSlug}`;
+  const promotedKnowledgeDir = pathResolver.rootResolve(
+    'knowledge/public/common/patterns/generated'
+  );
+  let originalQueueRaw: string | null = null;
+  let originalHintsRaw: string | null = null;
+
+  function writeMissionState(): void {
+    withExecutionContext('ecosystem_architect', () => {
+      if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+      safeWriteFile(
+        `${missionPath}/mission-state.json`,
+        JSON.stringify(
+          {
+            mission_id: missionId,
+            tier: 'public',
+            status: 'distilling',
+            execution_mode: 'local',
+            priority: 1,
+            assigned_persona: 'worker',
+            confidence_score: 1,
+            git: {
+              branch: 'test',
+              start_commit: 'abc123',
+              latest_commit: safeExec('git', ['rev-parse', 'HEAD'], {
+                cwd: pathResolver.rootDir(),
+              }).trim(),
+              checkpoints: [],
+            },
+            history: [
+              {
+                ts: '2026-07-04T00:00:00.000Z',
+                event: 'VERIFY',
+                note: 'Mission ready for distillation.',
+              },
+            ],
+          },
+          null,
+          2
+        )
+      );
+    });
+  }
+
+  beforeAll(() => {
+    if (safeExistsSync(queuePath)) {
+      originalQueueRaw = safeReadFile(queuePath, { encoding: 'utf8' }) as string;
+    }
+    if (safeExistsSync(hintsPath)) {
+      originalHintsRaw = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    }
+    // Isolate hint rotation to a scratch copy: rewriting the real HINTS.md
+    // mid-suite makes the parallel catalog-integrity test observe a dirty
+    // knowledge tree (flaky failure) and litters hints/archive.
+    withExecutionContext('ecosystem_architect', () => {
+      safeMkdir(scratchHintsDir, { recursive: true });
+      safeWriteFile(scratchHintsPath, originalHintsRaw ?? '');
+    });
+    process.env.KYBERION_HINTS_PATH = scratchHintsPath;
+    process.env.KYBERION_HINTS_ARCHIVE_DIR = `${scratchHintsDir}/archive`;
+  });
+
+  beforeEach(() => {
+    withExecutionContext('ecosystem_architect', () => {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeRmSync(queuePath, { force: true });
+      safeRmSync(wisdomFilePath, { force: true });
+      safeRmSync(`${promotedKnowledgeDir}/${promotedRecordBase}.json`, { force: true });
+      safeRmSync(`${promotedKnowledgeDir}/${promotedRecordBase}.md`, { force: true });
+    });
+    writeMissionState();
+  });
+
+  afterAll(() => {
+    withExecutionContext('ecosystem_architect', () => {
+      if (originalQueueRaw !== null) {
+        safeWriteFile(queuePath, originalQueueRaw);
+      } else {
+        safeRmSync(queuePath, { force: true });
+      }
+      delete process.env.KYBERION_HINTS_PATH;
+      delete process.env.KYBERION_HINTS_ARCHIVE_DIR;
+      safeRmSync(scratchHintsDir, { recursive: true, force: true });
+      if (originalHintsRaw !== null && !safeExistsSync(hintsPath)) {
+        safeWriteFile(hintsPath, originalHintsRaw);
+      }
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeRmSync(wisdomFilePath, { force: true });
+      safeRmSync(`${promotedKnowledgeDir}/${promotedRecordBase}.json`, { force: true });
+      safeRmSync(`${promotedKnowledgeDir}/${promotedRecordBase}.md`, { force: true });
+    });
+  });
+
+  it('keeps raw distillation mission-local and queues a classified promotion candidate', async () => {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    try {
+      await distillMission(missionId, pathResolver.rootDir());
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+
+    const queued = listMemoryPromotionCandidates().find(
+      (row) => row.candidate_id === `mem-${missionId}-${dateSlug}`
+    );
+    expect(queued).toBeTruthy();
+    expect(queued?.status).toBe('queued');
+
+    if (!queued) throw new Error('queued candidate missing');
+    updateMemoryPromotionCandidateStatus({
+      candidateId: queued.candidate_id,
+      status: 'approved',
+      ratificationNote: 'Approved for promotion in E2E test.',
+      knowledgeDomain: 'organization',
+      curation: {
+        title: 'Reusable mission lesson',
+        summary: 'A durable lesson extracted from this mission evidence.',
+        content: 'Describe the reusable lesson without retaining mission-specific detail.',
+        evidence_refs: queued.evidence_refs,
+      },
+    });
+
+    const promotePreviousRole = process.env.MISSION_ROLE;
+    const promotePreviousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    let result;
+    try {
+      result = await promoteMemoryCandidateToKnowledge({
+        candidateId: queued.candidate_id,
+        executionRole: 'chronos_gateway',
+      });
+    } finally {
+      if (promotePreviousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = promotePreviousRole;
+      if (promotePreviousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = promotePreviousPersona;
+    }
+
+    expect(result.promotedRef).toContain('knowledge/public/common/patterns/generated/');
+    const distill = loadDistillCandidateRecord(queued.candidate_id);
+    expect(distill?.status).toBe('promoted');
+    expect(loadState(missionId)?.status).toBe('completed');
+    expect(loadState(missionId)?.distillation).toMatchObject({
+      mode: 'structural',
+      llm_used: false,
+    });
+
+    const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
+    expect(hints).not.toContain('Distilled wisdom from mission'); // risk_rule records do not pollute operational hints
+    expect(hints).not.toContain(`source_ref: ${queued.candidate_id}`);
+    expect(queued?.evidence_refs).toContain(
+      path
+        .relative(pathResolver.rootDir(), path.join(missionPath, 'evidence', wisdomFileName))
+        .replace(/\\/g, '/')
+    );
+  });
+
+  it('rejects a directory replacing the evidence ledger before distillation reads it', () => {
+    safeMkdir(`${missionPath}/evidence/ledger.jsonl`, { recursive: true });
+
+    expect(() => gatherDistillContext(missionId, loadState(missionId)!, missionPath)).toThrow(
+      '[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file'
+    );
+  });
+});
+
+describe('resolveWisdomOutputPath', () => {
+  it('rejects output directories outside the repository root', () => {
+    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a symbolic-link output directory', () => {
+    const suffix = `${process.pid}-${Date.now()}`;
+    const target = pathResolver.shared(`tmp/mission-distill-output-target-${suffix}`);
+    const link = pathResolver.shared(`tmp/mission-distill-output-link-${suffix}`);
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, link);
+    try {
+      expect(() =>
+        resolveWisdomOutputPath(
+          `active/shared/tmp/mission-distill-output-link-${suffix}`,
+          'distill.md'
+        )
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(link, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
+  });
+});

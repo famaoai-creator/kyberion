@@ -2,7 +2,7 @@
 
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool-runtime-registry';
+import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';

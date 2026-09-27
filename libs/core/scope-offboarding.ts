@@ -43,7 +43,7 @@ import {
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
-import { listArtifactOwnershipRecordsByQuery } from './artifact-registry.js';
+import { listArtifactOwnershipRecordsByQuery } from './workforce/artifact-registry.js';
 import {
   appendRetentionAudit,
   repoRelativePosix,
@@ -52,10 +52,10 @@ import {
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
-import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
+import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
 import { assertPhysicalScopeSegment } from './physical-namespace.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
-import type { MissionState } from './mission-types.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
+import type { MissionState } from './mission/mission-types.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue

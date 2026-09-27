@@ -18,7 +18,7 @@ import type {
   KbNavRailProps,
   KbPageHeaderProps,
   KbTabsProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   isPlainActivation,
   navBrandLogo,

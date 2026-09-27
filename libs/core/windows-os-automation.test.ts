@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { candidatesFromAccessibility } from './os-accessibility-detector.js';
+import { candidatesFromAccessibility } from './virtual/os-accessibility-detector.js';
 import { clearMarks, resolveMarkTarget, saveMarks } from './mark-target-resolver.js';
 import { fuseSetOfMarks } from './set-of-marks.js';
 import { POWERSHELL_STDIN_BOOTSTRAP, powerShellStdinArgs } from './windows-powershell.js';

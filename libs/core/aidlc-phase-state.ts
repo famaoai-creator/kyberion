@@ -23,7 +23,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import { getDefaultWorkerEventStream } from './workforce/worker-event-stream.js';
 
 export type AiDlcPhase = 'alignment' | 'execution' | 'test' | 'self_review' | 'complete';
 

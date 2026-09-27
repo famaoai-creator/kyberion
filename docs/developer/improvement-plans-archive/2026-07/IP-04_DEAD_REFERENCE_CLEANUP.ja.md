@@ -35,7 +35,7 @@ package.json・パイプライン定義・スキーマの間で参照切れが�
 
 ### E. スキーマの二重定義
 
-ランタイム検証は `knowledge/product/schemas/pipeline-adf.schema.json`(`libs/core/pipeline-contract.ts:95`)を使うが、リポジトリ直下 `schemas/` に別系統のパイプラインスキーマ(`file-pipeline.schema.json` ほか6本が参照ゼロ、2本がテスト参照のみ)が残っており、ドリフトし得る。
+ランタイム検証は `knowledge/product/schemas/pipeline-adf.schema.json`(`libs/core/pipeline/pipeline-contract.ts:95`)を使うが、リポジトリ直下 `schemas/` に別系統のパイプラインスキーマ(`file-pipeline.schema.json` ほか6本が参照ゼロ、2本がテスト参照のみ)が残っており、ドリフトし得る。
 
 ### F. ガバナンスチェックの走査漏れ
 

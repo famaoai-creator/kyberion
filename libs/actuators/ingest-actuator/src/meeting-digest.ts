@@ -31,12 +31,18 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant, type TenantRegistryPathOptions } from '@agent/core/tenant-registry';
+import {
+  resolveTenant,
+  type TenantRegistryPathOptions,
+} from '@agent/core/organization/tenant-registry';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { delegateTaskWithUntrustedData, getReasoningBackend } from '@agent/core/reasoning-backend';
-import type { ReasoningBackend } from '@agent/core/reasoning-backend';
-import { withReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
-import { executeServicePreset } from '@agent/core/service-engine';
+import {
+  delegateTaskWithUntrustedData,
+  getReasoningBackend,
+} from '@agent/core/reasoning/reasoning-backend';
+import type { ReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { withReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { commitIngest, type IngestCommitResult } from './commit.js';
 import { parseDocument } from './parse-document.js';
@@ -352,7 +358,7 @@ async function resolveBackend(input: MeetingDigestInput): Promise<ReasoningBacke
   let backend = getReasoningBackend();
   if (backend.name === 'stub') {
     // chronos does not bootstrap reasoning backends itself; install lazily.
-    const { installReasoningBackends } = await import('@agent/core/reasoning-bootstrap');
+    const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
     installReasoningBackends();
     backend = getReasoningBackend();
   }

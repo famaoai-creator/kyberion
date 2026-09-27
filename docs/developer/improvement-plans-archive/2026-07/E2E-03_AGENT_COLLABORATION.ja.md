@@ -52,7 +52,7 @@ planner が DAG を作る(依存つき)
 | 自己完結ハンドオフパケット                                                           | HO-01(2026-07-05 commit `bb7f632d`)                     |
 | planner とは別コンテキストの planning reviewer                                       | `:1946-1947`                                            |
 | PR 発行スクリプト                                                                    | `scripts/publish_pull_request.ts`                       |
-| work item / board / attempt 台帳                                                     | `libs/core/work-coordination.ts:667-932`                |
+| work item / board / attempt 台帳                                                     | `libs/core/workforce/work-coordination.ts:667-932`      |
 | goal の state 永続化(元発話・success_condition)                                      | IL-01(`state.intent` / `outcome_contract`)              |
 
 **切れている継ぎ目(ギャップ)**:
@@ -84,7 +84,7 @@ planner が DAG を作る(依存つき)
    - 該当結果が見つからない依存は `- [task_id]: completed (result summary unavailable — read the deliverable path from TASK_BOARD)` と明示(無言で欠落させない)。
 2. task_result の書き戻し: dispatch 完了処理(`:400` 周辺で artifacts を集めている箇所)で、`task.last_result = { summary, artifacts, verification_done, gaps }` を NEXT_TASKS.json のタスクに永続化する(次回の Upstream 注入の正本)。
 3. unit test: `mission-orchestration-worker.test.ts` の既存 fixture 流儀で「task-2(depends_on: task-1)の route ペイロードに task-1 の summary と artifact パスが含まれる」ことを固定。
-4. **検証**: `pnpm exec vitest run libs/core/mission-orchestration-worker.test.ts`。
+4. **検証**: `pnpm exec vitest run libs/core/mission/mission-orchestration-worker.test.ts`。
 
 ### Task 2: チームスナップショット注入 — `gpt-5.4-mini`
 
@@ -154,7 +154,7 @@ Task 1(上流注入)→ Task 2(snapshot)→ Task 3(review 契約)→ Task 4(往�
 
 Goal Satisfaction Loop が「成果」を閉じるのに対し、**「働き方」を閉じる後方エッジ**を追加:
 
-- `libs/core/mission-retrospective.ts` — finish 時に自動実行(fire-and-forget)+ `mission_controller retrospective <ID>` で手動再実行可。
+- `libs/core/mission/mission-retrospective.ts` — finish 時に自動実行(fire-and-forget)+ `mission_controller retrospective <ID>` で手動再実行可。
   - **計測は決定論**: NEXT_TASKS のロール分布、チケット化失敗(未配員ロール等)、空応答ブロック、rework 回数、best-of 判定回数、goal-loop 周回数、finish gate 失敗、clarification 数を mission の実記録から収集。
   - **提案は LLM**(stats に接地、stats に無い提案は禁止): team_composition / workflow_rule / process_step / tooling の4種を構造化 JSON で生成。
   - **反映はガバナンス付き**: 提案は自動適用せず `active/shared/coordination/process-improvements/queue.jsonl` に `proposed` で積み、notifyOperator で操作者へ。承認されたものだけが team-blueprint / workflow catalog へ反映される(memory-promotion の ratification パターンと同型)。
@@ -163,6 +163,6 @@ Goal Satisfaction Loop が「成果」を閉じるのに対し、**「働き方�
 
 ## 追記(2026-07-08 その2)— 自律改善3点の実装
 
-1. **agent×role 性能フィードバック**: retrospective が work item 成果(done/review/blocked)を `agent-role-outcomes.jsonl` に蓄積し `agent-performance.json` へ集計(`libs/core/agent-performance-index.ts`)。チーム編成の候補スコアリング(`team-role-assignment-selection.ts`)が **±8 の bounded 補正**として参照(最低5サンプル、operator の preferred_agents=+20 が常に優先)。
+1. **agent×role 性能フィードバック**: retrospective が work item 成果(done/review/blocked)を `agent-role-outcomes.jsonl` に蓄積し `agent-performance.json` へ集計(`libs/core/agent/agent-performance-index.ts`)。チーム編成の候補スコアリング(`team-role-assignment-selection.ts`)が **±8 の bounded 補正**として参照(最低5サンプル、operator の preferred_agents=+20 が常に優先)。
 2. **dispatch 自動ラウンド**: `dispatchMissionWorkItems` に `rounds`(CLI `--dispatch-rounds N` / env `KYBERION_DISPATCH_MAX_ROUNDS`)。各ラウンド後に ready/backlog/blocked を再選択し、残ゼロ or 無進捗で停止。blocked の手動再投入が不要に。
 3. **提案の承認→反映一気通貫**: `mission_controller improvements`(一覧)/ `--approve` / `--reject` / `--apply <id>`。apply は承認済み提案をワークオーダー md 化+inbox/notify(構造的自動パッチは意図的に除外 — 変更はレビューを通す)。実データで PIP-DBCAA4A2(T-TEST-1 失敗由来の preflight 検証提案)を approve→apply まで実演済み。

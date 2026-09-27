@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
-import { approvalRequestLogicalPath, loadApprovalRequest } from '@agent/core/approval-store';
-import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import {
+  approvalRequestLogicalPath,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
+import { createSurfaceApprovalRequest } from '@agent/core/surface/channel-surface';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
-} from '@agent/core/channel-surface-types';
+} from '@agent/core/surface/channel-surface-types';
 import { withExecutionContext } from '@agent/core/authority';
 import * as pathResolver from '@agent/core/path-resolver';
 import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
@@ -22,8 +25,8 @@ const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
 }));
 
-vi.mock('@agent/core/channel-surface', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
+vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {

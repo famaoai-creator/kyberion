@@ -1,4 +1,4 @@
-import type { PdfDesignProtocol } from '@agent/core/media-contracts';
+import type { PdfDesignProtocol } from '@agent/core/media/media-contracts';
 import type { OcrResult } from '@agent/core/ocr-types';
 import { clamp } from '@agent/core/foundation';
 

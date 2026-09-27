@@ -7,7 +7,7 @@ import type {
   OrganizationOperationType,
   OrganizationPurposeRecord,
   OrganizationServiceState,
-} from '@agent/core/organization-operating-model';
+} from '@agent/core/organization/organization-operating-model';
 
 /** Argument parsing and help text for `pnpm organization` (scripts/organization_operating_model.ts). */
 export type ParsedArgs = {

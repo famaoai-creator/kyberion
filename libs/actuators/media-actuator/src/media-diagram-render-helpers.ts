@@ -2,22 +2,22 @@ import { resolveLatinFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
-} from '@agent/core/media-drawio-edge-policy';
+} from '@agent/core/media/media-drawio-edge-policy';
 import {
   resolveDrawioBoundaryIconCandidates,
   resolveDrawioBoundaryPaletteOverride,
-} from '@agent/core/media-drawio-boundary-policy';
+} from '@agent/core/media/media-drawio-boundary-policy';
 import {
   resolveMediaDrawioBoundaryPalette,
   resolveMediaDrawioNodeSize,
-} from '@agent/core/media-drawio-policy';
-import { resolveMediaAwsIconCandidates } from '@agent/core/media-aws-icon-rules';
-import { resolveMediaDrawioTierRank } from '@agent/core/media-drawio-tier-order';
+} from '@agent/core/media/media-drawio-policy';
+import { resolveMediaAwsIconCandidates } from '@agent/core/media/media-aws-icon-rules';
+import { resolveMediaDrawioTierRank } from '@agent/core/media/media-drawio-tier-order';
 import {
   resolveMediaDrawioGroupRank,
   resolveMediaDrawioTypeRank,
-} from '@agent/core/media-drawio-sort-policy';
-import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/core/media-drawio-security-group-order';
+} from '@agent/core/media/media-drawio-sort-policy';
+import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/core/media/media-drawio-security-group-order';
 import { escapeXml } from '@agent/core/text-escaping';
 import { nowIso } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';

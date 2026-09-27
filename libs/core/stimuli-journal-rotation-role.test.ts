@@ -205,7 +205,7 @@ describe('SB-01 the stimuli journal is not an authorization input', () => {
     const authorizationModules = [
       'libs/core/tier-guard.ts',
       'libs/core/secure-io.ts',
-      'libs/core/policy-engine.ts',
+      'libs/core/governance/policy-engine.ts',
       'libs/core/authority.ts',
       'libs/core/operation-policy-gate.ts',
     ];

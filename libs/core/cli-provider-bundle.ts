@@ -9,8 +9,8 @@
 
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
-import type { ReasoningProviderRuntimeBundle } from './reasoning-provider-registry.js';
+import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
+import type { ReasoningProviderRuntimeBundle } from './reasoning/reasoning-provider-registry.js';
 
 export interface CliProviderBuildOptions {
   mode: ReasoningBackendMode;

@@ -25,13 +25,13 @@ import {
   safeReadFile,
   safeUnlinkSync,
 } from '@agent/core/secure-io';
-import type { ImageGenerationPlan } from '@agent/core/image-generation-bridge';
+import type { ImageGenerationPlan } from '@agent/core/media/image-generation-bridge';
 import type {
   ImageEgressConsent,
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageReference,
-} from '@agent/core/image-generation-types';
+} from '@agent/core/media/image-generation-types';
 import type { SeamProviderCandidate } from '@agent/core/seam-provider-selection';
 import { ScriptExitError } from './lib/harness.js';
 import {
@@ -99,8 +99,8 @@ export interface DrawDeps {
 
 export const defaultDrawDeps: DrawDeps = {
   async providers() {
-    const bridge = await import('@agent/core/image-generation-bridge');
-    const { imageProviderDataEgress } = await import('@agent/core/image-reference-consent');
+    const bridge = await import('@agent/core/media/image-generation-bridge');
+    const { imageProviderDataEgress } = await import('@agent/core/media/image-reference-consent');
     // A lookup registers the built-in providers before they are listed.
     bridge.getImageGenerationProvider('');
     return bridge.listImageGenerationProviders().map((provider) => ({
@@ -111,19 +111,20 @@ export const defaultDrawDeps: DrawDeps = {
     }));
   },
   async plan(request) {
-    const { planImageGeneration } = await import('@agent/core/image-generation-bridge');
+    const { planImageGeneration } = await import('@agent/core/media/image-generation-bridge');
     return planImageGeneration(request);
   },
   async candidates(request) {
-    const { listImageGenerationCandidates } = await import('@agent/core/image-generation-bridge');
+    const { listImageGenerationCandidates } =
+      await import('@agent/core/media/image-generation-bridge');
     return listImageGenerationCandidates(request);
   },
   async generate(request) {
-    const { generateImage } = await import('@agent/core/image-generation-bridge');
+    const { generateImage } = await import('@agent/core/media/image-generation-bridge');
     return generateImage(request);
   },
   async consent(input) {
-    const { createImageEgressConsent } = await import('@agent/core/image-reference-consent');
+    const { createImageEgressConsent } = await import('@agent/core/media/image-reference-consent');
     return createImageEgressConsent(input);
   },
   runMedia: (tool, args) => defaultPerceptionDeps.runMedia(tool, args),

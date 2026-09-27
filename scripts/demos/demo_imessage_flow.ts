@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import { nowIso } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 

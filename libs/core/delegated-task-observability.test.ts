@@ -29,7 +29,7 @@ import {
 import {
   delegationNotificationsPath,
   listDelegationNotifications,
-} from './delegation-notifications.js';
+} from './mission/delegation-notifications.js';
 
 const STORE_OVERRIDE = `active/shared/tmp/kc06-tests/delegations-${process.pid}`;
 const TRACE_OVERRIDE = `active/shared/tmp/kc06-tests/delegations-trace-${process.pid}.jsonl`;

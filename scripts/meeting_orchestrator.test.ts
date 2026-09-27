@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadMeetingAttendeesAtPath } from '@agent/core/meeting-attendees';
+import { loadMeetingAttendeesAtPath } from '@agent/core/meeting/meeting-attendees';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { parseMeetingAttendeesJson, resolveMeetingResourcePath } from './meeting_orchestrator.js';

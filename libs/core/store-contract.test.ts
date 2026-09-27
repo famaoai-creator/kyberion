@@ -5,12 +5,12 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
-} from './approval-store.js';
+} from './governance/approval-store.js';
 import {
   clearSurfaceOutboxMessage,
   enqueueSurfaceOutboxMessage,
   listSurfaceOutboxMessages,
-} from './surface-coordination-store.js';
+} from './surface/surface-coordination-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeUnlinkSync } from './secure-io.js';
 import { withExecutionContext } from './authority.js';

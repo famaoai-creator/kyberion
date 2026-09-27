@@ -30,8 +30,8 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/surface-runtime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/surface-runtime')>();
+vi.mock('@agent/core/surface/surface-runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface/surface-runtime')>();
   return {
     ...actual,
     loadSurfaceManifest: mocks.loadSurfaceManifest,
@@ -41,7 +41,7 @@ vi.mock('@agent/core/surface-runtime', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/service-validator', () => ({
+vi.mock('@agent/core/service/service-validator', () => ({
   inspectServiceAuth: mocks.inspectServiceAuth,
 }));
 

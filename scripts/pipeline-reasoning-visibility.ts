@@ -1,6 +1,6 @@
 import { findMissionPath } from '@agent/core/path-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import type { ReasoningPromptVisibilityContext } from '@agent/core/reasoning-backend-contracts';
+import type { ReasoningPromptVisibilityContext } from '@agent/core/reasoning/reasoning-backend-contracts';
 
 /** DH-06: bind pipeline model visibility to the mission-local durable ledger. */
 export function buildPipelinePromptVisibilityContext(

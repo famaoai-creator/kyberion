@@ -4,9 +4,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { NextRequest } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
+import { pluginViewFrameResponseHeaders } from '@agent/core/plugin/plugin-view-frame';
 
 const state = vi.hoisted(() => ({
   managedRoot: '',
@@ -28,9 +28,9 @@ vi.mock('../../../../../../lib/viewer-context', async () => {
   };
 });
 
-vi.mock('@agent/core/plugin-managed-install', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/plugin-managed-install')>(
-    '@agent/core/plugin-managed-install'
+vi.mock('@agent/core/plugin/plugin-managed-install', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/plugin/plugin-managed-install')>(
+    '@agent/core/plugin/plugin-managed-install'
   );
   return {
     ...actual,
@@ -45,7 +45,7 @@ import {
   installPluginManaged,
   refreshManagedPluginActivation,
   type ManagedPluginRecord,
-} from '@agent/core/plugin-managed-install';
+} from '@agent/core/plugin/plugin-managed-install';
 import { GET } from './route';
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');

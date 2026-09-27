@@ -1,4 +1,4 @@
-import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator-op-discovery';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator/actuator-op-discovery';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

@@ -1,13 +1,16 @@
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 
-import { discoverProviders } from './provider-discovery.js';
+import { discoverProviders } from './provider/provider-discovery.js';
 import {
   discoverReasoningEndpoints,
   type ReasoningEndpointInfo,
-} from './reasoning-endpoint-discovery.js';
-import { loadModelRegistry } from './reasoning-model-routing.js';
-import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
+} from './reasoning/reasoning-endpoint-discovery.js';
+import { loadModelRegistry } from './reasoning/reasoning-model-routing.js';
+import {
+  loadReasoningRoutePolicy,
+  type ReasoningRoutePolicy,
+} from './reasoning/reasoning-route-resolver.js';
 import {
   getLlmSelectionPreferencesPath,
   loadLlmSelectionPreferences as loadPersistedLlmSelectionPreferences,

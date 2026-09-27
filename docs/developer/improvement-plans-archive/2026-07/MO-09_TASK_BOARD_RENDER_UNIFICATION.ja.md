@@ -17,7 +17,7 @@ status: archived
 
 - `scripts/refactor/mission-creation.ts:246-256` — `lines.splice(1, 0, '', headerLine)` による行番号指定の挿入(classification/workflow ヘッダー行)
 - `scripts/refactor/mission-process-planning.ts:127,142` の `renderPhaseChecklist()` — フェーズチェックリスト部分の書き換え
-- `libs/core/mission-orchestration-worker.ts:3736,4007,4074`(特に `syncPlanningArtifacts()`, :3757-3760)— **リテラル文字列の完全一致置換**(`.replace('## Status: Planned', '## Status: Planning Ready')`)+ 正規表現による Gate Status セクションの差し替え
+- `libs/core/mission/mission-orchestration-worker.ts:3736,4007,4074`(特に `syncPlanningArtifacts()`, :3757-3760)— **リテラル文字列の完全一致置換**(`.replace('## Status: Planned', '## Status: Planning Ready')`)+ 正規表現による Gate Status セクションの差し替え
 
 この設計には具体的な脆さがある:
 

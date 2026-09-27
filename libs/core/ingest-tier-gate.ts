@@ -25,7 +25,7 @@ import {
   enqueueMemoryPromotionCandidate,
   loadMemoryPromotionCandidate,
   type MemoryCandidate,
-} from './memory-promotion-queue.js';
+} from './knowledge/memory-promotion-queue.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
 /** Landing roots a steward can approve (anything else is unreachable). */

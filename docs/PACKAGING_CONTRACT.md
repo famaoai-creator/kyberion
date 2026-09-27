@@ -69,7 +69,8 @@ Tests are allowed to import local source modules directly when the test is expli
 Allowed in tests:
 
 ```ts
-const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
+const { ensureMissionTeamRuntime } =
+  await import('../libs/core/mission/mission-team-orchestrator.js');
 ```
 
 This is a white-box exception, not a general convenience rule.

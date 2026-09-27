@@ -217,16 +217,16 @@ vi.mock('@agent/core/path-resolver', async () => {
     },
   };
 });
-vi.mock('@agent/core/voice-engine-registry', () => ({
+vi.mock('@agent/core/voice/voice-engine-registry', () => ({
   getVoiceEngineRecord: mocks.getVoiceEngineRecord,
   getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform: mocks.getVoiceEngineRecord,
 }));
-vi.mock('@agent/core/voice-tts-config', () => ({
+vi.mock('@agent/core/voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
 vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
-vi.mock('@agent/core/tool-runtime-registry', () => ({
+vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
 }));
 vi.mock('@agent/core/core', () => ({ logger: mocks.logger }));

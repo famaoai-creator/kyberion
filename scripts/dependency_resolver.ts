@@ -26,14 +26,14 @@ import {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
   type ActuatorDependencyBundleEntry,
-} from '@agent/core/actuator-dependency-bundles';
+} from '@agent/core/actuator/actuator-dependency-bundles';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
 import { isLinux, isMacOS, isWindows } from '@agent/core/platform';
-import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';

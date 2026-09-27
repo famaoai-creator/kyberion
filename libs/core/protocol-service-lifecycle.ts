@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
-import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
+import {
+  appendGovernedArtifactJsonl,
+  type GovernedArtifactRole,
+} from './workforce/artifact-store.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { readJsonLines } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';

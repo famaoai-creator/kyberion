@@ -10,7 +10,7 @@ import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
-import { getServiceAuthorities } from './service-authority-map.js';
+import { getServiceAuthorities } from './service/service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
 import {
@@ -22,7 +22,7 @@ import {
   scopedAssumedRole,
   type ExecutionScope,
 } from './foundation/execution-scope.js';
-import { traceRoleAssumption } from './role-assumption-trace.js';
+import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -772,7 +772,7 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
 }
 
 // ---------------------------------------------------------------------------
-// NI-04 task-scoped grants — read-side (see libs/core/task-scoped-grants.ts)
+// NI-04 task-scoped grants — read-side (see libs/core/task/task-scoped-grants.ts)
 //
 // This module CANNOT import task-scoped-grants.ts: that module writes through
 // secure-io, and secure-io's policy chain imports authority.ts (the exact TDZ

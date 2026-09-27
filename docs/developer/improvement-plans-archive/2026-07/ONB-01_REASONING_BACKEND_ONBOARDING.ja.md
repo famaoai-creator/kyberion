@@ -14,7 +14,7 @@ status: archived
 ## 背景と課題
 
 - **オンボードが reasoning backend に一切触れない**: `scripts/onboarding_wizard.ts` は identity/services/tenants/tutorial を捕捉するが、バックエンドの検出・案内・設定がゼロ。無条件に "Welcome aboard"(`:646`)。
-- **無言でスタブに落ちる**: `getReasoningBackend()` は `registered ?? stubReasoningBackend`(`libs/core/reasoning-backend.ts:358-360`)。スタブは placeholder を返し `logger.warn` を出すだけ(`:373-541`)。API キーも CLI も無い新規ユーザーはここに着地。
+- **無言でスタブに落ちる**: `getReasoningBackend()` は `registered ?? stubReasoningBackend`(`libs/core/reasoning/reasoning-backend.ts:358-360`)。スタブは placeholder を返し `logger.warn` を出すだけ(`:373-541`)。API キーも CLI も無い新規ユーザーはここに着地。
 - **doctor は検出するが `should` 誤分類**: `probeReasoningBackend` は `available:false` + 良い actionable reason を返す(`environment-capability-probes.ts:79-83`)が、`reasoning-backend.any-real` の `required_for` が `MUST_REQUIRED_FOR`(`environment-doctor.ts:23-30`)に含まれず `classifyDoctorSeverity` が `'should'` に落とす(`:42`)。唯一の必須能力が「streaming TTS」と同じ severity。ユーザーは "should" を「後回し可」と読む。
 - **修正コマンドが行き止まり**: doctor は失敗時に `pnpm env:bootstrap --manifest reasoning-backend --apply` を勧める(`run_doctor.ts:96,104`)が、`reasoning-backend.any-real` は `install.operator_confirmed: true` で `command` 無し(ベンダー資格情報)。`--apply` は operator-confirmed をスキップ(`bootstrap_environment.ts:145`)、`--force` でも実行対象が無い。**推奨された remediation では直せない**。
 - CLAUDE.md/AGENTS.md の推奨は `claude-cli`(ローカル claude CLI、API キー不要)→ `anthropic`(`ANTHROPIC_API_KEY`)→ `stub`。この優先順位が新規ユーザーに提示されない。

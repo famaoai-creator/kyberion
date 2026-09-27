@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import { isSurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import {
   listSurfaceDeadLetters,
   replaySurfaceDeadLetter,
-} from '@agent/core/surface-coordination-store';
+} from '@agent/core/surface/surface-coordination-store';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

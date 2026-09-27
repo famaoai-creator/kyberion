@@ -35,7 +35,7 @@
 import {
   PLUGIN_VIEW_ACTION_REQUEST_CAPABILITY,
   PLUGIN_VIEW_FRAME_PROTOCOL,
-} from '@agent/core/plugin-view-frame';
+} from '@agent/core/plugin/plugin-view-frame';
 
 export const PLUGIN_VIEW_FRAME_MAX_MESSAGE_BYTES = 16 * 1024;
 export const PLUGIN_VIEW_FRAME_MAX_REQUESTS_PER_MINUTE = 10;

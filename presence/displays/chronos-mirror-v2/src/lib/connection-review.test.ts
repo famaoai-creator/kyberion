@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { saveServiceBindingRecord } from '@agent/core/service-binding-registry';
+import { saveServiceBindingRecord } from '@agent/core/service/service-binding-registry';
 import { listConnectionReviewItems, recordConnectionReview } from './connection-review';
 
 describe('connection review', () => {

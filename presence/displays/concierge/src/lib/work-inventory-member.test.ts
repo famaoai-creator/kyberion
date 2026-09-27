@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   guardConciergeRequest: vi.fn<() => GuardResponse | null>(() => null),
 }));
 
-vi.mock('@agent/core/surface-mutation-guard', () => ({
+vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: mocks.authorizeSurfaceMutation,
 }));
 

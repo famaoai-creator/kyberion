@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { buildAgentCollaborationProjection } from '@agent/core/agent/agent-collaboration-projection';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';

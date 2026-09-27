@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { normalizeLocale, resolveDefaultLocale, type SupportedLocale } from './locale.js';
-import { loadVocabularyCatalog, resolveVocabularyEntry } from './vocabulary-catalog.js';
+import { loadVocabularyCatalog, resolveVocabularyEntry } from './knowledge/vocabulary-catalog.js';
 
 /** @deprecated Use `SupportedLocale` from `./locale.js` instead. */
 export type UxVocabularyLocale = SupportedLocale;

@@ -1,11 +1,11 @@
 import * as path from 'node:path';
-import { loadProjectRecord } from '@agent/core/project-registry';
-import { loadProjectTrackRecord } from '@agent/core/project-track-registry';
-import { assertManagedProjectTrackScope } from '@agent/core/project-management';
+import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { loadProjectTrackRecord } from '@agent/core/project/project-track-registry';
+import { assertManagedProjectTrackScope } from '@agent/core/project/project-management';
 import {
   resolveMissionExecutionSurface,
   type MissionExecutionSurface,
-} from '@agent/core/mission-execution-surface';
+} from '@agent/core/mission/mission-execution-surface';
 import { validateWritePermission } from '@agent/core/tier-guard';
 import { pathResolver } from '@agent/core/path-resolver';
 import {

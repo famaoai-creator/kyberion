@@ -1,15 +1,15 @@
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
+import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual/virtual-device-inventory-bridge';
 import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
-} from '@agent/core/voice-engine-registry';
+} from '@agent/core/voice/voice-engine-registry';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
-import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -22,13 +22,13 @@ import {
   safeStat,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { VoiceGenerationRuntime } from '@agent/core/voice-generation-runtime';
+import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import type {
   SpeechToTextCapabilities,
   TranscriptSegment,
-} from '@agent/core/speech-to-text-bridge';
+} from '@agent/core/voice/speech-to-text-bridge';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 

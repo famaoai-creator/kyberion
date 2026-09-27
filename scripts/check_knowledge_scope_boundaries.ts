@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge/knowledge-scope-check-policy';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

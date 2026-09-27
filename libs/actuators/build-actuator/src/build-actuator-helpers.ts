@@ -13,9 +13,9 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { resolveXcodebuildBin } from '@agent/core/tool-binary-resolvers';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { resolveXcodebuildBin } from '@agent/core/tool/tool-binary-resolvers';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 
 /**
  * E2E-05 Task 2/3: build-actuator core.

@@ -9,16 +9,23 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
-import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
+import {
+  listMemoryPromotionCandidates,
+  type MemoryCandidate,
+} from './knowledge/memory-promotion-queue.js';
 import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { isRecord } from './foundation/text.js';
 import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
-import { readSupervisorEvents } from './agent-runtime-events.js';
+import type {
+  TaskModelEffort,
+  TaskModelHint,
+  TaskModelTier,
+} from './reasoning/reasoning-model-routing.js';
+import { readSupervisorEvents } from './agent/agent-runtime-events.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
 

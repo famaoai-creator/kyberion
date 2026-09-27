@@ -3,7 +3,7 @@ import * as core from './core.js';
 import { resolveLocale } from './locale.js';
 import { t } from './t.js';
 import type { VocabularyKey } from './t.js';
-import { _resetVocabularyCatalogCacheForTests } from './vocabulary-catalog.js';
+import { _resetVocabularyCatalogCacheForTests } from './knowledge/vocabulary-catalog.js';
 
 afterEach(() => {
   _resetVocabularyCatalogCacheForTests();

@@ -1,2 +1,2 @@
 /** Public package boundary for XLSX extraction utilities. */
-export * from './src/xlsx-utils.js';
+export * from './media/xlsx-utils.js';

@@ -15,8 +15,8 @@ status: archived
 
 ミッションの「型」は3系統あるのに、実行を駆動しているのは**ほぼ常に `'development'` に既定される自由文字列**で、分類は飾りになっている。
 
-- `mission_type` は自由文字列で、`createMission`/`startMission` の既定が `'development'`(`scripts/mission_controller.ts:339,408`)。orchestration worker も同様に既定(`libs/core/mission-orchestration-worker.ts:141-149`)。この文字列が**そのままチーム テンプレートのキー**になる(`mission-team-plan-composer.ts:148,154`)。
-- 一方、ポリシー駆動の分類器は 9 クラス + 配送形状 5 + リスク 4 + ステージ 9 の 4 軸を持つ(`libs/core/mission-classification.ts:6-38`、`resolveMissionClassification` `:219-260`)— **計算はされる**(`mission-team-plan-composer.ts:139`)が、クラス→テンプレートのマップで 9 クラスが約 5 テンプレートに潰れ(`mission-classification.ts:269-288`。decision_support / content_and_media / code_change → すべて `development`)、実行プロセスの差異が消える。
+- `mission_type` は自由文字列で、`createMission`/`startMission` の既定が `'development'`(`scripts/mission_controller.ts:339,408`)。orchestration worker も同様に既定(`libs/core/mission/mission-orchestration-worker.ts:141-149`)。この文字列が**そのままチーム テンプレートのキー**になる(`mission-team-plan-composer.ts:148,154`)。
+- 一方、ポリシー駆動の分類器は 9 クラス + 配送形状 5 + リスク 4 + ステージ 9 の 4 軸を持つ(`libs/core/mission/mission-classification.ts:6-38`、`resolveMissionClassification` `:219-260`)— **計算はされる**(`mission-team-plan-composer.ts:139`)が、クラス→テンプレートのマップで 9 クラスが約 5 テンプレートに潰れ(`mission-classification.ts:269-288`。decision_support / content_and_media / code_change → すべて `development`)、実行プロセスの差異が消える。
 - `mission-task-classification-roadmap-5.4-mini.md` 自身が「クラス別ワークフロー/ゲート整備」を未了課題として挙げている(Phase A-D)。AI-DLC playbook(`docs/developer/playbooks/AI_DLC_PLAYBOOK.md`)はゲート付き SDLC を人間向けに規定するが、自動 worker はそれを実装していない。
 
 ## ゴール(受入条件)
@@ -39,7 +39,7 @@ status: archived
 プロセステンプレートが「フェーズ名ラベル」止まりだった残余を解消し、**フェーズ → 具体タスク/ゲートへの決定的展開**まで実装した。当初案の `schemas/mission-process-template.schema.json` + `mission-process-templates/` ディレクトリは**正式に廃案**とし、mission-workflow-catalog の phases を `string | phaseSpec` の oneOf に拡張する方式で確定(既存テンプレートは無変更で後方互換)。
 
 - **スキーマ**: `mission-workflow-catalog.schema.json` v1.1.0 — phaseSpec = `{ id, title?, kind?, pipeline_ref?, brief_ref?, entry_gate?, exit_gate?, default_tasks[] }`。gate check 語彙は mission-gate-engine と同一 + `deliverable_quality`。
-- **展開エンジン**: `libs/core/mission-process-task-expansion.ts` — `expandProcessTemplateTasks()` が phase specs を依存連鎖つき `NEXT_TASKS.json`(`origin: process_template` マーカー付き)へ決定的展開。reviewer 不変条件(review_target / REVIEW-\*.md)を展開時に自己検査。
+- **展開エンジン**: `libs/core/mission/mission-process-task-expansion.ts` — `expandProcessTemplateTasks()` が phase specs を依存連鎖つき `NEXT_TASKS.json`(`origin: process_template` マーカー付き)へ決定的展開。reviewer 不変条件(review_target / REVIEW-\*.md)を展開時に自己検査。
 - **接続**: `createMission` で default_tasks があれば自動展開 + TASK_BOARD.md にフェーズ別チェックリスト描画。既存ミッションは `mission_controller plan-tasks <ID> [--force]`。ゲート定義は `missions/<id>/gates/definitions/` に永続化。
 - **ゲート実効化(MO-02 の先行分)**: `gate-pass`/`gate-fail` が保存済み定義を `evaluateMissionGate` で機械評価(pass で `current_phase` 前進、fail でフェーズタスクを rework 化)。workitem dispatch は entry_gate 未通過フェーズのタスクを `deferred`。`deliverable_quality` check(`evaluateDeliverableQuality` ルーブリック、MO-07 の接続点)を gate-engine に追加。
 - **プロセステンプレート(3系統 + 文書)**: `presentation-deck-production`(顧客層定義 → ストーリー設計 → コンテンツ執筆 → デザイン選定 → レビュー → 成果物作成。production は `pipelines/fragments/pptx-produce-from-brief.json` を参照)、`document-authoring`、`incident-analysis-postmortem`(triage → evidence_collection → timeline_reconstruction → root_cause_analysis → review → report_delivery)、既存 `code-change-aidlc` に各フェーズの pipeline_ref + default_tasks + ゲートを付与(フェーズ id 不変)。

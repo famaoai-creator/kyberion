@@ -1,19 +1,22 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
-import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
+import {
+  getReasoningBackend,
+  delegateTaskWithUntrustedData,
+} from './reasoning/reasoning-backend.js';
 import {
   getInjectionSignalPath,
   loadInjectionSignalAtPath,
   writeInjectionSignalAtPath,
 } from './injection-signal.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
-import type { MissionState } from './mission-types.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
+import type { MissionState } from './mission/mission-types.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 export { isInjectionSuspected } from './injection-signal.js';
 import {

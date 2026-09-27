@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type { KbToolbarProps } from '@agent/core/a2ui-catalog';
+import type { KbToolbarProps } from '@agent/core/surface/a2ui-catalog';
 import {
   toolbarDescriptionId,
   toolbarInitialFocus,

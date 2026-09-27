@@ -13,12 +13,12 @@ import {
   buildFailoverReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-} from '@agent/core/reasoning-backend';
-import { resetVoiceBridge } from '@agent/core/voice-bridge';
+} from '@agent/core/reasoning/reasoning-backend';
+import { resetVoiceBridge } from '@agent/core/voice/voice-bridge';
 import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
-} from '@agent/core/actuator-forwarding-port';
+} from '@agent/core/actuator/actuator-forwarding-port';
 import {
   stakeholderGridSort,
   emitDissentLog,

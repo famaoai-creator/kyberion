@@ -27,27 +27,27 @@
 
 **今も生きている（LIVE）コア資産:**
 
-| 資産                                                           | 役割                                                                                                                               | 注意点                                                       |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `libs/core/mission-working-memory.ts` (`MissionWorkingMemory`) | ミッション/タスク/エージェント scope の作業メモリ                                                                                  | **インメモリのみ**。ディスク永続（`MEMORY.md` 等）には未接続 |
-| `libs/core/memory-promotion-queue.ts` (`MemoryCandidate`)      | 昇格候補キュー（kind: sop/template/heuristic/risk_rule/clarification_prompt、status: queued→approved→rejected→promoted、tier付き） | distill 配管の中核。**再発明不要**                           |
-| `libs/core/memory-promotion-workflow.ts`                       | memory kind → distill target への対応付け、`distill-candidate-registry` 連携                                                       | Phase 4 はこれを土台にする                                   |
-| `libs/core/promoted-memory.ts`                                 | 昇格済みレコードの永続化（pattern/sop_candidate/knowledge_hint/report_template）                                                   | secure-io 経由で実装済み                                     |
-| `libs/core/contextual-intent-memory.ts`                        | personal の文脈メモリを `knowledge/personal/contextual-intent-memory.json` に永続化                                                | **personal 永続メモリの既存前例**                            |
-| `schemas/memory-candidate.schema.json`                         | 昇格候補スキーマ                                                                                                                   | 流用                                                         |
-| `scripts/mission_journal.ts`                                   | ミッション履歴の人間可読ビュー（読み取り専用）                                                                                     | 揮発面の journal 表示に拡張可                                |
-| `pipelines/fragments/memory-distillation.json`                 | 最近のミッション trace → `knowledge/product/governance/HINTS.md` へ distill                                                        | 出力先 HINTS.md は**未生成**。Phase 4 で接続                 |
+| 資産                                                                   | 役割                                                                                                                               | 注意点                                                       |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `libs/core/mission/mission-working-memory.ts` (`MissionWorkingMemory`) | ミッション/タスク/エージェント scope の作業メモリ                                                                                  | **インメモリのみ**。ディスク永続（`MEMORY.md` 等）には未接続 |
+| `libs/core/knowledge/memory-promotion-queue.ts` (`MemoryCandidate`)    | 昇格候補キュー（kind: sop/template/heuristic/risk_rule/clarification_prompt、status: queued→approved→rejected→promoted、tier付き） | distill 配管の中核。**再発明不要**                           |
+| `libs/core/knowledge/memory-promotion-workflow.ts`                     | memory kind → distill target への対応付け、`distill-candidate-registry` 連携                                                       | Phase 4 はこれを土台にする                                   |
+| `libs/core/promoted-memory.ts`                                         | 昇格済みレコードの永続化（pattern/sop_candidate/knowledge_hint/report_template）                                                   | secure-io 経由で実装済み                                     |
+| `libs/core/contextual-intent-memory.ts`                                | personal の文脈メモリを `knowledge/personal/contextual-intent-memory.json` に永続化                                                | **personal 永続メモリの既存前例**                            |
+| `schemas/memory-candidate.schema.json`                                 | 昇格候補スキーマ                                                                                                                   | 流用                                                         |
+| `scripts/mission_journal.ts`                                           | ミッション履歴の人間可読ビュー（読み取り専用）                                                                                     | 揮発面の journal 表示に拡張可                                |
+| `pipelines/fragments/memory-distillation.json`                         | 最近のミッション trace → `knowledge/product/governance/HINTS.md` へ distill                                                        | 出力先 HINTS.md は**未生成**。Phase 4 で接続                 |
 
 **「削除」ではなく `public/` → `product/` へ移設されていた（仕様・思想は健在）** — commit `cda1b0f5 "import claude update patch"` は `knowledge/public/` を `knowledge/product/` へ棚卸しする変更で、メモリ機構の仕様・思想ドキュメントは**今も `product/` 配下に生存**している:
 
-| 概念                                                                          | 現在地（生存）                                                                           | 種別                                                           |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Corporate Memory Loop（capture→assess→distill→promote→reuse、importance 9）   | `knowledge/product/architecture/corporate-memory-loop.md`                                | 思想（健在）                                                   |
-| Memory Snapshot Protocol（実行中snapshot固定／durable書込分離、importance 8） | `knowledge/product/orchestration/memory-snapshot-protocol.md`                            | 思想（健在）                                                   |
-| Enterprise Operating Kernel / Organization Work Loop                          | `knowledge/product/architecture/{enterprise-operating-kernel,organization-work-loop}.md` | 思想（健在）                                                   |
-| 日次ルーチン                                                                  | `knowledge/product/pipeline-templates/daily-routine.yml`                                 | **テンプレ止まり**（稼働配線なし）                             |
-| personal TODO                                                                 | `knowledge/product/orchestration/work-coordination-examples/personal-todo.json`          | **サンプル止まり**                                             |
-| mission-journal-policy                                                        | `knowledge/product/schemas/mission-journal-policy.schema.json`                           | スキーマ（健在、`libs/core/mission-journal-policy.ts` が利用） |
+| 概念                                                                          | 現在地（生存）                                                                           | 種別                                                                   |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Corporate Memory Loop（capture→assess→distill→promote→reuse、importance 9）   | `knowledge/product/architecture/corporate-memory-loop.md`                                | 思想（健在）                                                           |
+| Memory Snapshot Protocol（実行中snapshot固定／durable書込分離、importance 8） | `knowledge/product/orchestration/memory-snapshot-protocol.md`                            | 思想（健在）                                                           |
+| Enterprise Operating Kernel / Organization Work Loop                          | `knowledge/product/architecture/{enterprise-operating-kernel,organization-work-loop}.md` | 思想（健在）                                                           |
+| 日次ルーチン                                                                  | `knowledge/product/pipeline-templates/daily-routine.yml`                                 | **テンプレ止まり**（稼働配線なし）                                     |
+| personal TODO                                                                 | `knowledge/product/orchestration/work-coordination-examples/personal-todo.json`          | **サンプル止まり**                                                     |
+| mission-journal-policy                                                        | `knowledge/product/schemas/mission-journal-policy.schema.json`                           | スキーマ（健在、`libs/core/mission/mission-journal-policy.ts` が利用） |
 
 **本当に失われた（GONE）もの:**
 
@@ -246,7 +246,7 @@
   2. **`MissionWorkingMemory` を拡張**: 現状インメモリの entries を、本文 Markdown ＋ sidecar へ secure-io 経由で**原子的に**永続化（`updated_at` 自動更新）。既存の `mission|task|agent` scope と本計画の scope を整合。
   3. テンプレート `templates/` に `NOW.md` / `MEMORY.md` の雛形を追加（`## Action Items` / `## Decisions` / `## Open Questions` セクション固定）。
   4. ミッション作成（`mission-creation.ts`）時に `MEMORY.md`＋sidecar を初期化（`scope:mission, cadence:resident, lifetime:mission`）。
-- **変更ファイル**: actuator 実装＋テスト, `libs/core/mission-working-memory.ts`, `CAPABILITIES_GUIDE.md`, `templates/`, `scripts/refactor/mission-creation.ts`。
+- **変更ファイル**: actuator 実装＋テスト, `libs/core/mission/mission-working-memory.ts`, `CAPABILITIES_GUIDE.md`, `templates/`, `scripts/refactor/mission-creation.ts`。
 - **受入条件**: 各 scope で作業面を作成/追記/読み出しでき、再起動後も永続面から復元できる。sidecar の `scope/cadence/tier/lifetime` が schema 検証を通る。tier 違反書き込みが拒否される。
 
 ### Phase 2b — personal / 時限面（日次・今日のTODO・週次）★今回の追加要望
@@ -354,8 +354,8 @@ Phase 0 (監査・生存資産確認)
 
 **再利用する生存メモリ資産（§1.0 LIVE）**
 
-- `libs/core/mission-working-memory.ts`（`MissionWorkingMemory`、要・永続化拡張）
-- `libs/core/memory-promotion-queue.ts` / `memory-promotion-workflow.ts` / `promoted-memory.ts`
+- `libs/core/mission/mission-working-memory.ts`（`MissionWorkingMemory`、要・永続化拡張）
+- `libs/core/knowledge/memory-promotion-queue.ts` / `memory-promotion-workflow.ts` / `promoted-memory.ts`
 - `libs/core/contextual-intent-memory.ts`（personal 永続メモリ前例）
 - `schemas/memory-candidate.schema.json`
 - `scripts/mission_journal.ts`

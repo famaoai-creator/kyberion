@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listWorkItems, getWorkItem, updateWorkItem } from '@agent/core/work-coordination';
+import {
+  listWorkItems,
+  getWorkItem,
+  updateWorkItem,
+} from '@agent/core/workforce/work-coordination';
 import {
   buildWorkVisibilityProjection,
   type WorkVisibilityScope,
   type WorkVisibilityView,
-} from '@agent/core/work-visibility';
+} from '@agent/core/workforce/work-visibility';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

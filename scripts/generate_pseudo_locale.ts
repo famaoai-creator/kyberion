@@ -36,7 +36,7 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
+import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
 import { format as prettierFormat } from 'prettier';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 

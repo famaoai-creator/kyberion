@@ -17,7 +17,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver, assertSafeRepositoryPath } from '@agent/core/path-resolver';
-import { getSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
+import { getSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isLinux, isMacOS } from '@agent/core/platform';
 import type { SupportedLocale } from '@agent/core/locale-normalize';

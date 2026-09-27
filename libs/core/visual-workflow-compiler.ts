@@ -1,7 +1,7 @@
-import type { KyberionImageGenerationADF } from './src/types/image-generation-adf.js';
-import type { KyberionVideoGenerationADF } from './src/types/video-generation-adf.js';
+import type { KyberionImageGenerationADF } from './contracts/image-generation-adf.js';
+import type { KyberionVideoGenerationADF } from './contracts/video-generation-adf.js';
 import { slugify } from './foundation/text.js';
-import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
+import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
 
 function seedOrRandom(seed?: number): number {
   return Number.isInteger(seed) ? Number(seed) : Math.floor(Date.now() % 2147483647);

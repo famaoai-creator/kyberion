@@ -20,7 +20,7 @@
  * in a vendor SDK behind the same JSON contract).
  */
 
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import {
@@ -39,13 +39,16 @@ import {
 } from '@agent/core/execution-bounds';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { resolveIdentityContext } from '@agent/core/authority';
-import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from '@agent/core/voice-consent';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  loadVoiceConsentAtPath,
+  validateVoiceConsentRecord,
+} from '@agent/core/voice/voice-consent';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
@@ -67,10 +70,10 @@ import { hearingSessionOp, tutorSessionOp } from './meeting-guided-dialogue.js';
 import { normalizeTranscriptText } from './transcript-normalize.js';
 import { resolveNextMeetingTarget, type CalendarLikeEvent } from './meeting-target-resolve.js';
 import { extensionCaptionsToTranscript } from './extension-transcript.js';
-import { StubAudioBus } from '@agent/core/audio-bus';
-import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
-import { getMeetingJoinDriver } from '@agent/core/meeting-join-driver';
-import type { TranscriptChunk } from '@agent/core/meeting-session-types';
+import { StubAudioBus } from '@agent/core/voice/audio-bus';
+import { installChromeExtensionMeetingJoinDriver } from '@agent/core/browser/chrome-extension-meeting-driver';
+import { getMeetingJoinDriver } from '@agent/core/meeting/meeting-join-driver';
+import type { TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
 
 function resolveMeetingPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });

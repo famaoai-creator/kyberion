@@ -45,7 +45,7 @@ candidates into the loops that already exist.
 ## 2. The record type: 7 stages × 12 verbs × 5 methods
 
 One business or recurring task is one `WorkInventoryEntry` (`work-inventory.v1`,
-`libs/core/work-inventory.ts`). Every entry decomposes into `steps[]`, and every step is a point in a
+`libs/core/workforce/work-inventory.ts`). Every entry decomposes into `steps[]`, and every step is a point in a
 fixed vocabulary declared in `knowledge/product/governance/work-inventory-taxonomy.json`:
 
 - **stage** (7): `trigger | gather | understand | decide | act | verify | record`
@@ -59,13 +59,13 @@ Entries move through `status: draft → confirmed → candidate → promoted →
 
 Storage is tenant-scoped: `knowledge/confidential/<tenant>/work-inventory/entries/*.json` for tenant
 work, `knowledge/personal/work-inventory/entries/*.json` for personal-only use, with a sibling
-`calibration.json` in each root (`libs/core/work-inventory-scoring.ts`). Every write goes through
+`calibration.json` in each root (`libs/core/workforce/work-inventory-scoring.ts`). Every write goes through
 `@agent/core/secure-io`; entries are schema-validated on save and rejected on violation.
 
 ## 3. Rules decide, models propose
 
 An LLM may be used to turn a free-text description into a candidate step list
-(`libs/core/work-inventory-decompose.ts`), including a _proposed_ method per step. That proposal is
+(`libs/core/workforce/work-inventory-decompose.ts`), including a _proposed_ method per step. That proposal is
 never final. `classifyWorkStep` re-derives the method from the declarative rule table in the taxonomy
 catalog — verb × conditions (`effects`, `system` binding, sensitivity) → method — and the rule's
 decision always wins. When the model's proposal and the rule disagree, both are kept in the step's
@@ -83,11 +83,11 @@ can be inspected, versioned, and corrected — a baked-in LLM judgment cannot.
 
 Work inventory entries and their supporting evidence are built from three independent channels:
 
-| Channel                  | Entry point                                                                                                                                             | What it yields                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| ① Self-report            | 相棒「頼む」hearing, `scenario=work_inventory` (`/ask?mode=hearing&scenario=work_inventory`), or `pnpm inventory add`                                   | work title, trigger, frequency, effort estimate, step list    |
-| ② Kyberion usage         | `pnpm inventory harvest` — trace files, repeated adhoc-pipeline runs, unhandled-intent records, mission history (`libs/core/work-inventory-harvest.ts`) | real frequency, real effort, real failures                    |
-| ③ PC operation recording | consented `desktop-recording` / browser-extension recordings, summarized through `libs/core/work-inventory-observation.ts`                              | actual operation sequence (app, operation kind, host, counts) |
+| Channel                  | Entry point                                                                                                                                                       | What it yields                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| ① Self-report            | 相棒「頼む」hearing, `scenario=work_inventory` (`/ask?mode=hearing&scenario=work_inventory`), or `pnpm inventory add`                                             | work title, trigger, frequency, effort estimate, step list    |
+| ② Kyberion usage         | `pnpm inventory harvest` — trace files, repeated adhoc-pipeline runs, unhandled-intent records, mission history (`libs/core/workforce/work-inventory-harvest.ts`) | real frequency, real effort, real failures                    |
+| ③ PC operation recording | consented `desktop-recording` / browser-extension recordings, summarized through `libs/core/workforce/work-inventory-observation.ts`                              | actual operation sequence (app, operation kind, host, counts) |
 
 Channel ③ carries the sharpest privacy stakes, so it runs under an explicit invariant set:
 
@@ -103,12 +103,12 @@ Channel ③ carries the sharpest privacy stakes, so it runs under an explicit in
   a clipboard value, never a screen frame's pixels.
 - **Raw recordings never leave the member's personal tier.** What crosses from `knowledge/personal/` to
   `knowledge/confidential/<tenant>/` is only a summary the member has explicitly confirmed
-  (`status: pending_review → confirmed`, `libs/core/work-inventory-observation.ts`'s
+  (`status: pending_review → confirmed`, `libs/core/workforce/work-inventory-observation.ts`'s
   `confirmObservationSummary` / `attachObservationToEntry`), and that crossing is audited.
 
 ## 5. Scoring and calibration
 
-`libs/core/work-inventory-scoring.ts` ranks entries by
+`libs/core/workforce/work-inventory-scoring.ts` ranks entries by
 
 ```
 frequency × effort_minutes × automatable_share × observation_confidence − risk
@@ -124,7 +124,7 @@ else (WI-06 acceptance).
 A candidate never self-promotes. A human decision (`decided_by`) drives `pnpm inventory promote`,
 which either produces a mission (through the same alignment-gate hand-off hearing already uses for
 other scenarios) or a `pipeline:promote` input when the repetition is already confirmed
-(`libs/core/work-inventory-promotion.ts`). Once promoted work actually runs, its real outcomes
+(`libs/core/workforce/work-inventory-promotion.ts`). Once promoted work actually runs, its real outcomes
 (`outcomes[]` — runs, minutes saved, failures) are measured back from the promoted mission/pipeline's
 own execution evidence, and `pnpm inventory learn` folds the delta between prediction and outcome back
 into `calibration.json`. Work whose predicted and observed automatable share diverge sharply is also
@@ -179,7 +179,7 @@ tenant/personal scope.
   that value; a `cron:`-prefixed correlationId or an ambient cron trigger delivery scope (Chronos)
   -> scheduled; `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` set -> agent (`MISSION_ROLE` alone is not
   an agent signal); else interactive — see `deriveTraceOrigin` in
-  `libs/core/src/trace.ts`). `pnpm inventory harvest` now drops `test`/`ci`-tagged traces entirely
+  `libs/core/analysis/trace.ts`). `pnpm inventory harvest` now drops `test`/`ci`-tagged traces entirely
   before they ever become or inflate a signal, and when at least half of a signature's counted
   traces are `scheduled`-tagged its signal's
   `origin` is `scheduled` even for a non-pipeline (`actuator_op`) signature that the
@@ -200,7 +200,7 @@ tenant/personal scope.
   `pnpm inventory migrate [--dry-run]` to backfill `inferred: true` on every entry in scope whose
   binding matches the default candidate and carries no `pipeline_id`/`intent_id`/`inferred` key
   already; explicit bindings (including an explicit `inferred: false`) are left untouched, and a
-  second run is always a no-op (see `migrateInferredBindings` in `libs/core/work-inventory.ts`).
+  second run is always a no-op (see `migrateInferredBindings` in `libs/core/workforce/work-inventory.ts`).
   Only entries created before `INFERRED_BINDING_TAGGING_SINCE` (2026-09-22T10:18:05Z, when
   `fillBinding` began tagging defaults) are migrated; on newer entries `applyClassification`
   stamps every explicit binding `inferred: false`, so a person's deliberate default-equal binding

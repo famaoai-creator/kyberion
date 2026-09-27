@@ -6,7 +6,7 @@
 
 | Internal (implemented)                                                                           | External analogue                                                 | Projection                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`nhi_id`** — `kyberion://agent/<org>/<slug>` (NI-01, `libs/core/agent-identity.ts`)            | **SPIFFE ID** — `spiffe://<trust-domain>/<workload-path>`         | Same shape: URI scheme + trust domain + path. `kyberion://agent/acme/report-writer` → `spiffe://acme.kyberion/agent/report-writer`. Both are stable, non-secret, comparable identifiers; neither carries authorization on its own.   |
+| **`nhi_id`** — `kyberion://agent/<org>/<slug>` (NI-01, `libs/core/agent/agent-identity.ts`)      | **SPIFFE ID** — `spiffe://<trust-domain>/<workload-path>`         | Same shape: URI scheme + trust domain + path. `kyberion://agent/acme/report-writer` → `spiffe://acme.kyberion/agent/report-writer`. Both are stable, non-secret, comparable identifiers; neither carries authorization on its own.   |
 | **`DelegationChain`** — ordered `[{actor, team_role?, granted_scope}]` (NI-03)                   | **RFC 8693 Token Exchange** nested `act` claim                    | The chain is the flattened form of `act` nesting: element _n_ is the actor acting on behalf of element _n−1_. `user:famao → orchestrator → worker` ⇄ `{sub: worker, act: {sub: orchestrator, act: {sub: user}}}`.                    |
 | **Task-scoped grant** — `{grantee_nhi_id, audience: {mission_id, task_id?}, expires_at}` (NI-04) | **RFC 8707 Resource Indicators** (audience-restricted token)      | `audience` is the internal `resource`/`aud` binding: a grant presented outside its declared mission/task is refused exactly as an audience-mismatched access token is. `expires_at` is the mandatory bounded lifetime (24h ceiling). |
 | **`lifecycle_status`** — `provisioned → active → suspended → retired` (NI-01/NI-05)              | **Entra Agent ID** governance states / OWASP NHI #1 (offboarding) | Retirement is terminal and enforced at use time (NI-02 `KYBERION_NHI_ACTOR=enforce` refuses retired actors), which is what an external IdP's disable/delete would do. Orphan detection (NI-05) is the internal access-review sweep.  |
@@ -20,13 +20,13 @@
 
 ## Where each piece lives
 
-| Concern                           | Module                                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------------------- |
-| Identity records + journal        | `libs/core/agent-identity.ts` (`active/shared/coordination/identity/agent-identities.jsonl`) |
-| Actor verification (warn→enforce) | `libs/core/nhi-actor-verification.ts` (`KYBERION_NHI_ACTOR`)                                 |
-| Delegation chains + attenuation   | `libs/core/delegation-chain.ts`                                                              |
-| Task-scoped grants                | `libs/core/task-scoped-grants.ts` (`active/shared/coordination/identity/task-grants.jsonl`)  |
-| Offboarding, orphans, inventory   | `libs/core/nhi-lifecycle-governance.ts`                                                      |
+| Concern                           | Module                                                                                             |
+| --------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Identity records + journal        | `libs/core/agent/agent-identity.ts` (`active/shared/coordination/identity/agent-identities.jsonl`) |
+| Actor verification (warn→enforce) | `libs/core/nhi-actor-verification.ts` (`KYBERION_NHI_ACTOR`)                                       |
+| Delegation chains + attenuation   | `libs/core/mission/delegation-chain.ts`                                                            |
+| Task-scoped grants                | `libs/core/task/task-scoped-grants.ts` (`active/shared/coordination/identity/task-grants.jsonl`)   |
+| Offboarding, orphans, inventory   | `libs/core/nhi-lifecycle-governance.ts`                                                            |
 
 ## If interop is ever required
 

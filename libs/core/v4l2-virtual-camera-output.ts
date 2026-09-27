@@ -17,10 +17,10 @@ import type {
 import {
   createVirtualCameraInjectionBridge,
   type VirtualCameraInjectionBridge,
-} from './virtual-camera-injection-bridge.js';
+} from './virtual/virtual-camera-injection-bridge.js';
 import { safeExec } from './secure-io.js';
-import { VideoDeviceLeaseManager, type VideoDeviceLease } from './video-device-lease.js';
-import type { VideoRouteHealth, VideoRouteMetrics } from './video-route.js';
+import { VideoDeviceLeaseManager, type VideoDeviceLease } from './video/video-device-lease.js';
+import type { VideoRouteHealth, VideoRouteMetrics } from './video/video-route.js';
 
 export const V4L2_VIRTUAL_CAMERA_BRIDGE_ID = 'v4l2-virtual-cam' as const;
 

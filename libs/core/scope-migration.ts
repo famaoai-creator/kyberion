@@ -1,4 +1,4 @@
-import { resolveRuntimeScope } from './runtime-scope.js';
+import { resolveRuntimeScope } from './tool/runtime-scope.js';
 import { normalizeEventScope, parseEventScopeFromRecord, type EventScope } from './event-scope.js';
 
 export type ScopeMigrationDisposition =

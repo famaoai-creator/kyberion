@@ -6,7 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   evaluateBlueBubblesConfiguration,
   type BlueBubblesConfigurationReport,
-} from './bluebubbles-adapter.js';
+} from './integrations/bluebubbles-adapter.js';
 import { safeExistsSync, safeExec, safeMkdir, validateFileSize } from './secure-io.js';
 
 export interface IMessageSendRequest {

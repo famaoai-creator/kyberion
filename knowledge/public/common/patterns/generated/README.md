@@ -1,6 +1,6 @@
 # Generated Patterns
 
-This directory holds **distilled, promoted patterns** emitted by the memory promotion workflow (see `libs/core/promoted-memory.ts` and `libs/core/memory-promotion-workflow.ts`).
+This directory holds **distilled, promoted patterns** emitted by the memory promotion workflow (see `libs/core/promoted-memory.ts` and `libs/core/knowledge/memory-promotion-workflow.ts`).
 
 A record only lands here when its source candidate passes the value threshold in `isMeaningfulPromotionCandidate`:
 

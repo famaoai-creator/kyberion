@@ -4,7 +4,7 @@ import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/
 import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
-} from '@agent/core/actuator-forwarding-port';
+} from '@agent/core/actuator/actuator-forwarding-port';
 import { describeOps } from './op-catalog.js';
 import { dispatchWisdomOperation } from './decision-ops.js';
 
@@ -400,9 +400,12 @@ describe('wisdom public contract boundaries', () => {
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
       { encoding: 'utf8' }
     ) as string;
-    const executorSource = safeReadFile(pathResolver.rootResolve('libs/core/task-executor.ts'), {
-      encoding: 'utf8',
-    }) as string;
+    const executorSource = safeReadFile(
+      pathResolver.rootResolve('libs/core/task/task-executor.ts'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string;
 
     expect(wisdomSource).not.toContain('@anthropic-ai/claude-agent-sdk');
     expect(wisdomSource).not.toContain('executeTaskPlan');
@@ -634,7 +637,7 @@ describe('wisdom public contract boundaries', () => {
   });
 
   it('keeps task-plan DAG coordination in Orchestrator and core as a port facade', () => {
-    const coreExecutor = safeReadFile(pathResolver.rootResolve('libs/core/task-executor.ts'), {
+    const coreExecutor = safeReadFile(pathResolver.rootResolve('libs/core/task/task-executor.ts'), {
       encoding: 'utf8',
     }) as string;
     const coordinatorSource = safeReadFile(

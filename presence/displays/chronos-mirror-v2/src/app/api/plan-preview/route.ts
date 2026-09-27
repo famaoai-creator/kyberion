@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
-import { compileUserIntentFlow } from '@agent/core/intent-contract';
-import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
 import { buildPlanPreview } from '../../../lib/plan-preview';
 import { readChronosJsonObject } from '../../../lib/request-input';
 import {

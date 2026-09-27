@@ -26,7 +26,7 @@ status: active
 | ------------------ | --------------------------------------------------------------------------------------------- | ------ |
 | ミッション分類     | `resolveMissionClassification`(`mission_class` / `delivery_shape` / `risk_profile` / `stage`) | 動     |
 | **役割集合**       | `knowledge/product/orchestration/mission-team-templates.json`(12 テンプレート)                | **静** |
-| 役割 → アクター    | `libs/core/team-role-assignment-selection.ts` `selectAgentForTeamRole`                        | 動     |
+| 役割 → アクター    | `libs/core/organization/team-role-assignment-selection.ts` `selectAgentForTeamRole`           | 動     |
 | **充当タイミング** | `composeMissionTeamPlan` が mission 作成時に全役割を一括確定                                  | **静** |
 | 実体化(spawn)      | `mission-team-orchestrator.ts` `ensureMissionTeamRuntime`(`teamRoles` フィルタ可)             | 半動   |
 | タスク → 担当      | planner が `assigned_to.role` を出し、dispatch が必要ロールのみ prewarm                       | 動     |
@@ -58,7 +58,7 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ### 1.4 書かれているが接続されていない層
 
-- `libs/core/worker-assignment-policy.ts`(135 行、lease 数 / 並行タスク数 / scope 衝突を見るタスク→ワーカー割当)は `index-part-09.ts` から export されているだけで**本番の呼び出し元が 0**。
+- `libs/core/workforce/worker-assignment-policy.ts`(135 行、lease 数 / 並行タスク数 / scope 衝突を見るタスク→ワーカー割当)は `index-part-09.ts` から export されているだけで**本番の呼び出し元が 0**。
 - `WorkforceResourceRef.availability` は `{ status: 'available' }` のベタ書き、`cost_profile` は `{}`(`mission-team-binding.ts`)。**プールに容量・コスト信号が無い**。
 
 ## 2. 根本原因
@@ -205,8 +205,8 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ### テスト
 
-- `libs/core/team-composition-obligations.test.ts`(新規 9 件): 構造役割、facet の AND/OR、テンプレートが言及しない役割の導出、義務の理由、reviewer 規則が tester 規則より前に並ぶこと。
-- `libs/core/mission-team-composer.test.ts`: 充当方針、standby の決定論、需要役割のみの昇格、refresh での staffing 引き継ぎ。
+- `libs/core/organization/team-composition-obligations.test.ts`(新規 9 件): 構造役割、facet の AND/OR、テンプレートが言及しない役割の導出、義務の理由、reviewer 規則が tester 規則より前に並ぶこと。
+- `libs/core/mission/mission-team-composer.test.ts`: 充当方針、standby の決定論、需要役割のみの昇格、refresh での staffing 引き継ぎ。
 - `tests/mission-team-orchestrator.test.ts`: 役割スコープ ensure が充当要求であること、スコープ無し ensure が名簿を充当しないこと。
 - 回帰: 10 files / 67 tests(team 系)、25 files / 242 tests(mission 系)、tests/ の mission contract 6 files / 42 tests。
 
@@ -252,8 +252,8 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 ### Wave 2 のテスト
 
 - `libs/core/workforce-load.test.ts`(新規 6 件): 未知リソースは available、実測 availability、governed レート、モデル無しは空、ペナルティ上限、**同条件なら空いているアクターが選ばれる**。
-- `libs/core/mission-team-composer.test.ts`: 増員の成功 / 職務分離 / 4 種の拒否理由 / 上限ヘッドルーム / refresh での増員メンバー残存、gap 診断 3 件。
-- `libs/core/mission-lifecycle-service.test.ts`: `restaff` を governed verb ゲート表に追加。
+- `libs/core/mission/mission-team-composer.test.ts`: 増員の成功 / 職務分離 / 4 種の拒否理由 / 上限ヘッドルーム / refresh での増員メンバー残存、gap 診断 3 件。
+- `libs/core/mission/mission-lifecycle-service.test.ts`: `restaff` を governed verb ゲート表に追加。
 
 ### 2026-09-20: Wave 3(TC-10〜TC-14)
 

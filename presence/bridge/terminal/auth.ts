@@ -1,4 +1,4 @@
-import { extractSurfaceBearerToken } from '@agent/core/surface-mutation-guard';
+import { extractSurfaceBearerToken } from '@agent/core/surface/surface-mutation-guard';
 
 type HeaderValue = string | string[] | undefined;
 

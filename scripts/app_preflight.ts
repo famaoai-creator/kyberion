@@ -5,7 +5,7 @@
  * pass/fail/warn per item and a copy-pasteable fix for every failure.
  */
 import { safeExecResult } from '@agent/core/secure-io';
-import { secretGuard } from '@agent/core/secret-guard';
+import { secretGuard } from '@agent/core/secret/secret-guard';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { isMacOS } from '@agent/core/platform';

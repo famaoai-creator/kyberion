@@ -8,11 +8,11 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
-import { writeTenantProfile, type TenantProfile } from './tenant-registry.js';
-import { writeMemberProfile, type MemberProfile } from './member-registry.js';
-import type { SurfaceViewerScope } from './surface-mutation-guard.js';
+import { writeTenantProfile, type TenantProfile } from './organization/tenant-registry.js';
+import { writeMemberProfile, type MemberProfile } from './organization/member-registry.js';
+import type { SurfaceViewerScope } from './surface/surface-mutation-guard.js';
 
-vi.mock('./operator-identity.js', () => ({
+vi.mock('./surface/operator-identity.js', () => ({
   resolveOperatorDisplayName: vi.fn((fallback?: string) => `mocked-operator(${fallback ?? ''})`),
 }));
 

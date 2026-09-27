@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentExecutionPort } from './agent-execution-port.js';
+import type { AgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
 import {
   clearWorkCoordinationStore,
@@ -10,7 +10,7 @@ import {
   releaseWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 import {
   CoordinatedAgentExecutionPort,
   delegateCoordinatedCliSubagentTask,

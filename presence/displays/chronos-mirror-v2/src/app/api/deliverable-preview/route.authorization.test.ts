@@ -24,7 +24,7 @@ vi.mock('../../../lib/viewer-context', async () => {
   };
 });
 
-vi.mock('@agent/core/artifact-record', () => ({
+vi.mock('@agent/core/workforce/artifact-record', () => ({
   loadArtifactRecord: vi.fn(() => ({
     artifact_id: 'ART-CONFIDENTIAL',
     tenant_slug: 'tenant-a',

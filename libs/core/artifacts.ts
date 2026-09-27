@@ -6,5 +6,5 @@ export {
   readGovernedArtifactJson,
   resolveGovernedArtifactPath,
   writeGovernedArtifactJson,
-} from './artifact-store.js';
-export type { GovernedArtifactRole } from './artifact-store.js';
+} from './workforce/artifact-store.js';
+export type { GovernedArtifactRole } from './workforce/artifact-store.js';

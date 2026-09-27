@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BoundedAudioQueue } from './bounded-audio-queue.js';
-import type { AudioChunk } from './meeting-session-types.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 const format = {
   encoding: 'pcm_s16le' as const,

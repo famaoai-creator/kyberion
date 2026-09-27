@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeExecResult, safeReaddir, safeLstat } from '@agent/core/secure-io';
-import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
+import { decidePatchAction, type PatchDecision } from '@agent/core/pipeline/patch-decision';
 import {
   appendDependencyVulnerabilityLedgerRecord,
   readDependencyVulnerabilityLedgerRecords,

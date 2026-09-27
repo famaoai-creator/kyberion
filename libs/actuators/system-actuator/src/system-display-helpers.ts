@@ -2,7 +2,7 @@ import {
   createScreenDisplayInventoryBridge,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
-} from '@agent/core/screen-display-inventory-bridge';
+} from '@agent/core/virtual/screen-display-inventory-bridge';
 
 export interface ResolvedScreenDisplaySelection {
   inventory: ScreenDisplayInventory;

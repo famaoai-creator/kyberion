@@ -26,7 +26,7 @@ vi.mock('@agent/core/core', () => ({ logger: { error: vi.fn(), info: vi.fn(), wa
 vi.mock('@agent/core/semantic-decide', () => ({
   executeLlmDecideOp: mocks.executeLlmDecideOp,
 }));
-vi.mock('@agent/core/pty-engine', () => ({
+vi.mock('@agent/core/shell/pty-engine', () => ({
   ptyEngine: {
     spawn: vi.fn((shell: string, args: string[], cwd?: string) => {
       const id = `pty-${ptyState.sessions.size + 1}`;
@@ -57,7 +57,7 @@ vi.mock('@agent/core/pty-engine', () => ({
     popMessages: vi.fn(() => []),
   },
 }));
-vi.mock('@agent/core/terminal-keys', () => ({
+vi.mock('@agent/core/shell/terminal-keys', () => ({
   encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
 }));
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
@@ -69,7 +69,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
     return candidate;
   }),
 }));
-vi.mock('@agent/core/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
+vi.mock('@agent/core/virtual/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
 vi.mock('@agent/core/platform-command-adapters', () => ({
   resolveShellAdapter: vi.fn(() => ({ shell: '/bin/bash', args: ['-lc'] })),
 }));
@@ -95,8 +95,8 @@ vi.mock('@agent/core/recovery-policy', () => ({
     }),
 }));
 vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
-vi.mock('@agent/core/op-preflight', () => ({ runOpPreflight: mocks.runOpPreflight }));
-vi.mock('@agent/core/op-preflight-defaults', () => ({
+vi.mock('@agent/core/pipeline/op-preflight', () => ({ runOpPreflight: mocks.runOpPreflight }));
+vi.mock('@agent/core/pipeline/op-preflight-defaults', () => ({
   ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,
 }));
 
@@ -165,7 +165,7 @@ describe('terminal-actuator direct actions', () => {
 
   it('drops execution-authority keys from a caller-supplied spawn env (DR-01)', async () => {
     const { handleAction } = await import('./index');
-    const { ptyEngine } = await import('@agent/core/pty-engine');
+    const { ptyEngine } = await import('@agent/core/shell/pty-engine');
     await handleAction({
       action: 'spawn',
       params: {

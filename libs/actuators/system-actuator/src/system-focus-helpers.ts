@@ -7,8 +7,8 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog, isRecord, nowIso } from '@agent/core/foundation';
-import type { FocusedInputState } from '@agent/core/os-automation';
-import { activateApplication, detectFocusedInput } from '@agent/core/os-automation';
+import type { FocusedInputState } from '@agent/core/virtual/os-automation';
+import { activateApplication, detectFocusedInput } from '@agent/core/virtual/os-automation';
 
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');

@@ -1,6 +1,6 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import * as pathResolver from './path-resolver.js';
-import { listWorkItems } from './work-coordination.js';
+import { listWorkItems } from './workforce/work-coordination.js';
 import { resolveCostRateModelKey, resolveCostRates } from './metrics.js';
 
 /**

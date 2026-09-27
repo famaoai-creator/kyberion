@@ -13,7 +13,7 @@ import {
   readMemberProfile,
   writeMemberProfile,
   type MemberProfile,
-} from '@agent/core/member-registry';
+} from '@agent/core/organization/member-registry';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../lib/request-input';
 import {

@@ -5,7 +5,7 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
 
 export const actuator = defineCatalogBackedActuator({

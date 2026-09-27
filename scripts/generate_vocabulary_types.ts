@@ -12,7 +12,7 @@
  *      union. `locale-normalize.ts` stays import-free (this generator writes
  *      a literal array, not a runtime catalog read) so it stays safe to
  *      bundle into the chronos browser build.
- *   2. `libs/core/vocabulary-keys.generated.ts`'s `VocabularyKey` union type
+ *   2. `libs/core/knowledge/vocabulary-keys.generated.ts`'s `VocabularyKey` union type
  *      — every `namespace:key` qualified form, plus (for the one-release
  *      backward-compat window) every bare `key` form that is unambiguous
  *      across namespaces. Referencing an unknown key in `t()` is then a
@@ -35,7 +35,7 @@ import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
+import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
 import { buildUiMessageBundle, type SupportedLocale } from '@agent/core/locale-normalize';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -48,7 +48,9 @@ interface VocabularyCatalogFile {
 
 const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
 const LOCALE_NORMALIZE_PATH = pathResolver.rootResolve('libs/core/locale-normalize.ts');
-const VOCABULARY_KEYS_PATH = pathResolver.rootResolve('libs/core/vocabulary-keys.generated.ts');
+const VOCABULARY_KEYS_PATH = pathResolver.rootResolve(
+  'libs/core/knowledge/vocabulary-keys.generated.ts'
+);
 const SHARED_UI_VANILLA_PATH = pathResolver.rootResolve(
   'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js'
 );

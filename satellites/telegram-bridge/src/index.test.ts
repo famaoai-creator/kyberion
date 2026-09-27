@@ -1,25 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Readable } from 'node:stream';
-import { approvalRequestLogicalPath, loadApprovalRequest } from '@agent/core/approval-store';
+import {
+  approvalRequestLogicalPath,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
 import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
-import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
+import { createSurfaceApprovalRequest } from '@agent/core/surface/channel-surface';
 import { withExecutionContext } from '@agent/core/authority';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import * as pathResolver from '@agent/core/path-resolver';
 import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
-} from '@agent/core/channel-surface-types';
+} from '@agent/core/surface/channel-surface-types';
 
 const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
   replyText: 'ok',
 }));
 
-vi.mock('@agent/core/channel-surface', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
+vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {

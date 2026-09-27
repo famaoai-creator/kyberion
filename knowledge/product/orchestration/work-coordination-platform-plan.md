@@ -189,8 +189,8 @@ Schemas:
 
 Core implementation:
 
-- `libs/core/work-coordination.ts`
-- `libs/core/work-coordination.test.ts`
+- `libs/core/workforce/work-coordination.ts`
+- `libs/core/workforce/work-coordination.test.ts`
 
 CLI:
 
@@ -266,8 +266,8 @@ Add local append-only storage APIs.
 
 Files:
 
-- `libs/core/work-coordination.ts`
-- `libs/core/work-coordination.test.ts`
+- `libs/core/workforce/work-coordination.ts`
+- `libs/core/workforce/work-coordination.test.ts`
 - `libs/core/index.ts`
 
 Required APIs:
@@ -331,8 +331,8 @@ Map peer messages into coordination commands.
 
 Files:
 
-- `libs/core/work-coordination-peer.ts`
-- `libs/core/work-coordination-peer.test.ts`
+- `libs/core/workforce/work-coordination-peer.ts`
+- `libs/core/workforce/work-coordination-peer.test.ts`
 
 Required behavior:
 
@@ -356,8 +356,8 @@ Import GitHub Issues into `WorkItem`.
 
 Files:
 
-- `libs/core/work-integrations/github-issues.ts`
-- `libs/core/work-integrations/github-issues.test.ts`
+- `libs/core/integrations/github-issues.ts`
+- `libs/core/integrations/github-issues.test.ts`
 
 Initial scope:
 
@@ -380,8 +380,8 @@ Import Jira issues into `WorkItem`.
 
 Files:
 
-- `libs/core/work-integrations/jira-issues.ts`
-- `libs/core/work-integrations/jira-issues.test.ts`
+- `libs/core/integrations/jira-issues.ts`
+- `libs/core/integrations/jira-issues.test.ts`
 
 Acceptance:
 
@@ -464,7 +464,7 @@ Milestone 4:
 Run after each milestone:
 
 ```bash
-pnpm exec vitest run libs/core/work-coordination.test.ts
+pnpm exec vitest run libs/core/workforce/work-coordination.test.ts
 pnpm check -- --only catalogs
 pnpm build
 ```
@@ -472,7 +472,7 @@ pnpm build
 After peer command integration:
 
 ```bash
-pnpm exec vitest run libs/core/peer-messaging.test.ts libs/core/work-coordination-peer.test.ts
+pnpm exec vitest run libs/core/mesh/peer-messaging.test.ts libs/core/workforce/work-coordination-peer.test.ts
 ```
 
 ## Open Decisions

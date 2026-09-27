@@ -13,7 +13,7 @@ status: archived
 
 ### 同名・非互換の「A2A」が2つある
 
-- **`a2aBridge.route`**(`libs/core/a2a-bridge.ts`): ホスト内の同期 RPC。ミッション/surface の実運用経路。
+- **`a2aBridge.route`**(`libs/core/mesh/a2a-bridge.ts`): ホスト内の同期 RPC。ミッション/surface の実運用経路。
 - **`a2a-transport.ts`**(`libs/actuators/network-actuator/src/`): ファイルシステム inbox/outbox(`active/shared/runtime/a2a/{inbox,outbox}`、`:21-22`)+ RSA/AES ハイブリッド暗号。network パイプラインの `a2a_send`/`a2a_poll` op からのみ到達(`network-pipeline-helpers.ts:201-202,238`)。
 
 両者は envelope の形は似ているが**一切相互運用しない**。しかもファイル版は読み取り時に unlink(`a2a-transport.ts:73`)= at-most-once で、**parse 失敗はメッセージを黙って消失させる**(`:75-77`)。名前の同一性は誤配線(「A2A で送ったのに届かない」)の温床。gist トランスポートのスタブは AC-06 Task 2 で処置済みの前提。

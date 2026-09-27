@@ -7,7 +7,7 @@ import type {
   KbSaveBarProps,
   KbSettingRowProps,
   KbSettingsGroupProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import { ActionRefButton } from '../components/controls.js';
 import { StatusPill } from '../components/feedback.js';

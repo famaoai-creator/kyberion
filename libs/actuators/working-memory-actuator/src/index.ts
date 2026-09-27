@@ -27,14 +27,14 @@ import {
   type VolatileSidecar,
   type VolatileTier,
 } from '@agent/core/volatile-knowledge';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   type MemoryCandidateKind,
   type MemoryCandidateTier,
-} from '@agent/core/memory-promotion-queue';
+} from '@agent/core/knowledge/memory-promotion-queue';
 import {
   boundNotebook,
   bullets as notebookBullets,
@@ -42,7 +42,7 @@ import {
   DEFAULT_CONSOLIDATE_AFTER,
   foldCapture,
   normalize as normalizeBullet,
-} from '@agent/core/memory-notebook';
+} from '@agent/core/knowledge/memory-notebook';
 const pr = pathResolver;
 
 // ---------------------------------------------------------------------------
@@ -1033,5 +1033,5 @@ export async function handleAction(input: HandleActionInput): Promise<Record<str
   const exportAs = (params.export_as as string) ?? 'working_memory_result';
   return { ...(input.context ?? {}), [exportAs]: result };
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

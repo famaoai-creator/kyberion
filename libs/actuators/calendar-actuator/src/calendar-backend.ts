@@ -13,8 +13,8 @@ import {
   readGwsAuthStatus,
   updateCalendarEvent,
   type CalendarEventCreateResult,
-} from '@agent/core/calendar-workflow';
-import { planAvailableSlots, type AvailableSlot } from '@agent/core/calendar-slot-planner';
+} from '@agent/core/meeting/calendar-workflow';
+import { planAvailableSlots, type AvailableSlot } from '@agent/core/meeting/calendar-slot-planner';
 
 export type CalendarBackendKind = string;
 export type CalendarBackendPreference = string;

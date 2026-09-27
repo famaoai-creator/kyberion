@@ -1,17 +1,17 @@
 import { logger } from '@agent/core/core';
 import { recordInteraction } from '@agent/core/relationship-graph-store';
-import { resolveServiceBinding } from '@agent/core/service-binding';
+import { resolveServiceBinding } from '@agent/core/service/service-binding';
 import { validatePresenceTimeline } from '@agent/core/presence-surface';
 import * as pathResolver from '@agent/core/path-resolver';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
 import { secureFetch } from '@agent/core/network';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
-import { enqueueSurfaceOutboxMessage } from '@agent/core/surface-coordination-store';
-import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
+import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(

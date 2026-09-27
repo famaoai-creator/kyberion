@@ -8,7 +8,7 @@
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { auditChain, normalizePersistedAuditEntry } from '@agent/core/audit-chain';
+import { auditChain, normalizePersistedAuditEntry } from '@agent/core/governance/audit-chain';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -16,7 +16,7 @@ import {
   loadApprovalRequest,
   validateHumanFinalDecision,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -28,7 +28,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import type { AuditEntry } from '@agent/core/audit-chain';
+import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

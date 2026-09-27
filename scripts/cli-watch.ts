@@ -11,7 +11,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeCopyFileSync, safeMkdir, safeReaddir } from '@agent/core/secure-io';
-import type { TranscriptSegment } from '@agent/core/speech-to-text-bridge';
+import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
 import { transcribeMediaFile } from './cli-listen.js';
 import {

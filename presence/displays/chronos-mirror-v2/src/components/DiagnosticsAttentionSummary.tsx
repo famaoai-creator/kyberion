@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { KbTone } from '@agent/core/a2ui-catalog';
+import type { KbTone } from '@agent/core/surface/a2ui-catalog';
 import { Button, Callout, Metric, Section, Table } from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText } from '../lib/ux-vocabulary';

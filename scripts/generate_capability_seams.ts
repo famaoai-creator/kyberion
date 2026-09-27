@@ -12,8 +12,8 @@ interface SeamRoleEntry {
 
 const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   'a2a-route': {
-    declaration: 'libs/core/a2a-route-port.ts',
-    consumers: ['libs/core/a2a-bridge.ts'],
+    declaration: 'libs/core/mesh/a2a-route-port.ts',
+    consumers: ['libs/core/mesh/a2a-bridge.ts'],
   },
   'camera-output-bridge': {
     declaration: 'libs/core/camera-output-bridge.ts',
@@ -21,36 +21,39 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   },
   'cli-provider-bundle': {
     declaration: 'libs/core/cli-provider-bundle.ts',
-    consumers: ['libs/core/reasoning-cli-provider.ts', 'libs/core/reasoning-bootstrap.ts'],
+    consumers: [
+      'libs/core/reasoning/reasoning-cli-provider.ts',
+      'libs/core/reasoning/reasoning-bootstrap.ts',
+    ],
   },
   'actuator.capability-probe': {
-    declaration: 'libs/core/src/actuator-capability.ts',
-    consumers: ['libs/core/src/actuator-capability.ts'],
+    declaration: 'libs/core/actuator/actuator-capability.ts',
+    consumers: ['libs/core/actuator/actuator-capability.ts'],
   },
   'actuator-forwarding-port': {
-    declaration: 'libs/core/actuator-forwarding-port.ts',
+    declaration: 'libs/core/actuator/actuator-forwarding-port.ts',
     consumers: ['libs/actuators/wisdom-actuator/src/compatibility/cross-actuator-forwarders.ts'],
   },
   'agent-execution-port': {
-    declaration: 'libs/core/agent-execution-port.ts',
+    declaration: 'libs/core/agent/agent-execution-port.ts',
     consumers: ['libs/actuators/agent-actuator/src/agent-actuator-helpers.ts'],
   },
   'agent-runtime-ensurer': {
-    declaration: 'libs/core/agent-runtime-port.ts',
-    consumers: ['libs/core/agent-runtime-supervisor.ts'],
+    declaration: 'libs/core/agent/agent-runtime-port.ts',
+    consumers: ['libs/core/agent/agent-runtime-supervisor.ts'],
   },
   'agent-pane-runtime-bridge': {
-    declaration: 'libs/core/agent-pane-runtime-bridge.ts',
-    consumers: ['libs/core/agent-lifecycle.ts', 'libs/core/a2a-bridge.ts'],
+    declaration: 'libs/core/agent/agent-pane-runtime-bridge.ts',
+    consumers: ['libs/core/agent/agent-lifecycle.ts', 'libs/core/mesh/a2a-bridge.ts'],
   },
   'agent-exec-adapter-bridge': {
-    declaration: 'libs/core/agent-exec-adapter-bridge.ts',
-    consumers: ['libs/core/agent-lifecycle.ts'],
+    declaration: 'libs/core/agent/agent-exec-adapter-bridge.ts',
+    consumers: ['libs/core/agent/agent-lifecycle.ts'],
   },
   'audio-bus-bridge': {
-    declaration: 'libs/core/audio-bus-bridge.ts',
+    declaration: 'libs/core/voice/audio-bus-bridge.ts',
     consumers: [
-      'libs/core/audio-bus-resolver.ts',
+      'libs/core/voice/audio-bus-resolver.ts',
       'libs/actuators/voice-actuator/src/voice-action-helpers.ts',
     ],
   },
@@ -59,131 +62,137 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/ocr-bridge.ts'],
   },
   'image-generation-provider': {
-    declaration: 'libs/core/image-generation-bridge.ts',
-    consumers: ['libs/core/image-generation-bridge.ts'],
+    declaration: 'libs/core/media/image-generation-bridge.ts',
+    consumers: ['libs/core/media/image-generation-bridge.ts'],
   },
   'risky-approval-override': {
     declaration: 'libs/core/risky-op-approval-port.ts',
     consumers: ['libs/core/risky-op-approval-port.ts'],
   },
   'scenario-op-override': {
-    declaration: 'libs/core/actuator-op-registry.ts',
-    consumers: ['libs/core/actuator-op-registry.ts', 'scripts/pipeline-execution-part-control.ts'],
+    declaration: 'libs/core/actuator/actuator-op-registry.ts',
+    consumers: [
+      'libs/core/actuator/actuator-op-registry.ts',
+      'scripts/pipeline-execution-part-control.ts',
+    ],
   },
   'virtual-camera-capture': {
-    declaration: 'libs/core/virtual-camera-bridge.ts',
-    consumers: ['libs/core/virtual-camera-bridge.ts'],
+    declaration: 'libs/core/virtual/virtual-camera-bridge.ts',
+    consumers: ['libs/core/virtual/virtual-camera-bridge.ts'],
   },
   'calendar-provider': {
-    declaration: 'libs/core/calendar-provider-bridge.ts',
-    consumers: ['libs/core/calendar-workflow.ts'],
+    declaration: 'libs/core/meeting/calendar-provider-bridge.ts',
+    consumers: ['libs/core/meeting/calendar-workflow.ts'],
   },
   'browser-automation-runtime': {
-    declaration: 'libs/core/browser-automation-runtime-bridge.ts',
+    declaration: 'libs/core/browser/browser-automation-runtime-bridge.ts',
     consumers: ['libs/actuators/browser-actuator/src/browser-runtime-helpers.ts'],
   },
   'audit-forwarder': {
-    declaration: 'libs/core/audit-forwarder.ts',
-    consumers: ['libs/core/audit-chain.ts'],
+    declaration: 'libs/core/governance/audit-forwarder.ts',
+    consumers: ['libs/core/governance/audit-chain.ts'],
   },
   'deployment-adapter': {
-    declaration: 'libs/core/deployment-adapter.ts',
+    declaration: 'libs/core/actuator/deployment-adapter.ts',
     consumers: ['libs/actuators/deployment-actuator/src/deployment-actuator-helpers.ts'],
   },
   'embedding-backend': {
     declaration: 'libs/core/embedding-backend.ts',
-    consumers: ['libs/core/src/knowledge-index.ts'],
+    consumers: ['libs/core/knowledge/knowledge-index.ts'],
   },
   'knowledge-adapter': {
-    declaration: 'libs/core/knowledge-adapter.ts',
-    consumers: ['libs/core/knowledge-adapter.ts'],
+    declaration: 'libs/core/knowledge/knowledge-adapter.ts',
+    consumers: ['libs/core/knowledge/knowledge-adapter.ts'],
   },
   'identity-context-resolver': {
     declaration: 'libs/core/identity-context-bridge.ts',
     consumers: ['libs/core/authority.ts', 'libs/core/tier-guard.ts'],
   },
   'email-account-provider': {
-    declaration: 'libs/core/email-account-catalog.ts',
-    consumers: ['libs/core/adapter-default-selection.ts', 'scripts/email-workflow.ts'],
+    declaration: 'libs/core/integrations/email-account-catalog.ts',
+    consumers: ['libs/core/actuator/adapter-default-selection.ts', 'scripts/email-workflow.ts'],
   },
   'environment.capability-probe': {
     declaration: 'libs/core/environment-capability.ts',
     consumers: ['libs/core/environment-capability.ts'],
   },
   'intent-extractor': {
-    declaration: 'libs/core/intent-extractor.ts',
-    consumers: ['libs/core/mission-orchestration-worker.ts', 'libs/core/reasoning-bootstrap.ts'],
+    declaration: 'libs/core/intent/intent-extractor.ts',
+    consumers: [
+      'libs/core/mission/mission-orchestration-worker.ts',
+      'libs/core/reasoning/reasoning-bootstrap.ts',
+    ],
   },
   'judgment-backend': {
-    declaration: 'libs/core/judgment-backend.ts',
-    consumers: ['libs/core/organization-operating-model-persistence.ts'],
+    declaration: 'libs/core/reasoning/judgment-backend.ts',
+    consumers: ['libs/core/organization/organization-operating-model-persistence.ts'],
   },
   'meeting-join-driver': {
-    declaration: 'libs/core/meeting-join-driver.ts',
+    declaration: 'libs/core/meeting/meeting-join-driver.ts',
     consumers: ['libs/core/in-room-meeting-driver.ts'],
   },
   'mission-worker-core-dispatcher': {
-    declaration: 'libs/core/mission-orchestration-worker-dispatch-port.ts',
-    consumers: ['libs/core/mission-orchestration-worker-part-core.ts'],
+    declaration: 'libs/core/mission/mission-orchestration-worker-dispatch-port.ts',
+    consumers: ['libs/core/mission/mission-orchestration-worker-part-core.ts'],
   },
   'provider-health-resolver': {
-    declaration: 'libs/core/provider-health-view.ts',
-    consumers: ['libs/core/provider-health-registry.ts'],
+    declaration: 'libs/core/provider/provider-health-view.ts',
+    consumers: ['libs/core/provider/provider-health-registry.ts'],
   },
   'reasoning-backend': {
-    declaration: 'libs/core/reasoning-backend.ts',
-    consumers: ['libs/core/reasoning-bootstrap.ts'],
+    declaration: 'libs/core/reasoning/reasoning-backend.ts',
+    consumers: ['libs/core/reasoning/reasoning-bootstrap.ts'],
   },
   'risky-approval-handler': {
     declaration: 'libs/core/risky-op-approval-port.ts',
-    consumers: ['libs/core/risky-op-registry.ts', 'libs/core/acp-mediator.ts'],
+    consumers: ['libs/core/risky-op-registry.ts', 'libs/core/mesh/acp-mediator.ts'],
   },
   'secret-resolver': {
-    declaration: 'libs/core/secret-resolver.ts',
-    consumers: ['libs/core/service-secret-resolver.ts'],
+    declaration: 'libs/core/secret/secret-resolver.ts',
+    consumers: ['libs/core/service/service-secret-resolver.ts'],
   },
   'structured-runner': {
-    declaration: 'libs/core/mission-llm.ts',
-    consumers: ['libs/core/mission-llm.ts'],
+    declaration: 'libs/core/mission/mission-llm.ts',
+    consumers: ['libs/core/mission/mission-llm.ts'],
   },
   'super-nerve-executor': {
     declaration: 'libs/core/super-nerve-execution-port.ts',
     consumers: ['libs/actuators/orchestrator-actuator/src/super-nerve/index.ts'],
   },
   'surface-provider': {
-    declaration: 'libs/core/surface-interaction-model.ts',
-    consumers: ['libs/core/surface-interaction-model.ts'],
+    declaration: 'libs/core/surface/surface-interaction-model.ts',
+    consumers: ['libs/core/surface/surface-interaction-model.ts'],
   },
   'task-intent-builder': {
-    declaration: 'libs/core/task-session.ts',
-    consumers: ['libs/core/task-session.ts'],
+    declaration: 'libs/core/task/task-session.ts',
+    consumers: ['libs/core/task/task-session.ts'],
   },
   'speech-to-text-bridge': {
-    declaration: 'libs/core/speech-to-text-bridge.ts',
+    declaration: 'libs/core/voice/speech-to-text-bridge.ts',
     consumers: ['libs/actuators/voice-actuator/src/index.ts'],
   },
   'streaming-stt-bridge': {
-    declaration: 'libs/core/streaming-stt-bridge.ts',
+    declaration: 'libs/core/voice/streaming-stt-bridge.ts',
     consumers: ['libs/actuators/voice-actuator/src/index.ts'],
   },
   'streaming-tts-bridge': {
-    declaration: 'libs/core/streaming-tts-bridge.ts',
-    consumers: ['libs/core/streaming-tts-bridge.ts'],
+    declaration: 'libs/core/voice/streaming-tts-bridge.ts',
+    consumers: ['libs/core/voice/streaming-tts-bridge.ts'],
   },
   'task-plan-coordinator': {
-    declaration: 'libs/core/task-plan-coordinator-port.ts',
-    consumers: ['libs/core/task-executor.ts'],
+    declaration: 'libs/core/task/task-plan-coordinator-port.ts',
+    consumers: ['libs/core/task/task-executor.ts'],
   },
   'ui-element-detector': {
-    declaration: 'libs/core/ui-element-detector.ts',
+    declaration: 'libs/core/surface/ui-element-detector.ts',
     consumers: ['libs/actuators/vision-actuator/src/mark-elements.ts'],
   },
   'voice-bridge': {
-    declaration: 'libs/core/voice-bridge.ts',
+    declaration: 'libs/core/voice/voice-bridge.ts',
     consumers: ['libs/actuators/meeting-actuator/src/meeting-intelligence-ops.ts'],
   },
   'voice.vad-backend': {
-    declaration: 'libs/core/vad-registry.ts',
+    declaration: 'libs/core/voice/vad-registry.ts',
     consumers: ['libs/core/ten-vad-bridge.ts', 'libs/core/silero-vad-bridge.ts'],
   },
 };

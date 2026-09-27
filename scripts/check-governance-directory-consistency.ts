@@ -5,18 +5,18 @@ import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index
 import {
   loadServiceEndpointsDirectoryCatalog,
   type ServiceEndpointsCatalog,
-} from '@agent/core/service-endpoint-registry';
+} from '@agent/core/service/service-endpoint-registry';
 import {
   loadAgentProfileDirectory,
   loadAgentProfileSnapshot,
   loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
-} from '@agent/core/mission-team-index';
-import { loadSurfaceProviderManifestCatalogDirectory } from '@agent/core/surface-provider-manifest-catalog';
-import { loadVoiceEngineRegistryDirectory } from '@agent/core/voice-engine-registry';
-import { loadVoiceProfileRegistryDirectory } from '@agent/core/voice-profile-registry';
-import { loadSpecialistCatalog } from '@agent/core/work-design';
+} from '@agent/core/mission/mission-team-index';
+import { loadSurfaceProviderManifestCatalogDirectory } from '@agent/core/surface/surface-provider-manifest-catalog';
+import { loadVoiceEngineRegistryDirectory } from '@agent/core/voice/voice-engine-registry';
+import { loadVoiceProfileRegistryDirectory } from '@agent/core/voice/voice-profile-registry';
+import { loadSpecialistCatalog } from '@agent/core/workforce/work-design';
 import { defineCatalog } from '@agent/core/foundation';
 
 type VoiceProfileSnapshot = {

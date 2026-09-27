@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadMemoryPromotionCandidate } from '@agent/core/memory-promotion-queue';
+import { loadMemoryPromotionCandidate } from '@agent/core/knowledge/memory-promotion-queue';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

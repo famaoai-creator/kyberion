@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { buildMissionOrchestrationEvaluationReport } from '@agent/core/mission-orchestration-evaluator';
+import { buildMissionOrchestrationEvaluationReport } from '@agent/core/mission/mission-orchestration-evaluator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';

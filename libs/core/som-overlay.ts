@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Jimp } from 'jimp';
-import { dhashRegion } from './image-dhash.js';
-import { redactScreenCaptureFile } from './screen-frame-redaction.js';
+import { dhashRegion } from './media/image-dhash.js';
+import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
 

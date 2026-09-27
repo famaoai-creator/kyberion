@@ -10,9 +10,9 @@ import path from 'node:path';
 
 const delegationSlotCalls: Array<{ provider?: string }> = [];
 
-vi.mock('./delegation-concurrency.js', async () => {
-  const actual = await vi.importActual<typeof import('./delegation-concurrency.js')>(
-    './delegation-concurrency.js'
+vi.mock('./mission/delegation-concurrency.js', async () => {
+  const actual = await vi.importActual<typeof import('./mission/delegation-concurrency.js')>(
+    './mission/delegation-concurrency.js'
   );
   return {
     ...actual,
@@ -29,7 +29,7 @@ vi.mock('./delegation-concurrency.js', async () => {
 // consulted, not what a real CLI backend returns (that's
 // provider-backend-resolver.test.ts's job).
 const resolveProviderBackendCalls: string[] = [];
-vi.mock('./provider-backend-resolver.js', () => ({
+vi.mock('./provider/provider-backend-resolver.js', () => ({
   resolveProviderBackend: (provider: string) => {
     resolveProviderBackendCalls.push(provider);
     return {
@@ -51,8 +51,8 @@ import { PlanningReviewVerdictSchema } from './structured-output-contracts.js';
 import {
   _resetProviderEgressPolicyCacheForTests,
   type ProviderEgressPolicyFile,
-} from './provider-egress-gate.js';
-import { resetDelegationConcurrencyStateForTests } from './delegation-concurrency.js';
+} from './provider/provider-egress-gate.js';
+import { resetDelegationConcurrencyStateForTests } from './mission/delegation-concurrency.js';
 
 const POLICY_DIR = pathResolver.sharedTmp(`best-of-providers-test-policy-${process.pid}`);
 const POLICY_PATH = path.join(POLICY_DIR, 'provider-egress-policy.json');

@@ -89,13 +89,13 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
-import { checkProviderEgress } from './provider-egress-gate.js';
+import { checkProviderEgress } from './provider/provider-egress-gate.js';
 import {
   peekProviderCapabilityRegistry,
   type ProviderCapability,
-} from './provider-capability-registry.js';
-import { withDelegationSlot } from './delegation-concurrency.js';
-import { resolveProviderBackend } from './provider-backend-resolver.js';
+} from './provider/provider-capability-registry.js';
+import { withDelegationSlot } from './mission/delegation-concurrency.js';
+import { resolveProviderBackend } from './provider/provider-backend-resolver.js';
 import type { TierLevel } from './types.js';
 import {
   PlanningReviewVerdictSchema,

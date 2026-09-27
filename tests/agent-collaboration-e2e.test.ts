@@ -44,8 +44,8 @@ function makeTaskResultText(input: {
   ].join('\n');
 }
 
-vi.mock('../libs/core/a2a-bridge.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../libs/core/a2a-bridge.js')>();
+vi.mock('../libs/core/mesh/a2a-bridge.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../libs/core/mesh/a2a-bridge.js')>();
   return {
     ...actual,
     a2aBridge: {
@@ -55,11 +55,11 @@ vi.mock('../libs/core/a2a-bridge.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
+vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
 }));
 
-vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
+vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
 }));
@@ -70,7 +70,7 @@ vi.mock('../libs/core/ledger.js', () => ({
   },
 }));
 
-vi.mock('../libs/core/mission-task-events.js', () => ({
+vi.mock('../libs/core/mission/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   // Must stay inside the repository: the secure-io resource-path scope rejects
   // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
@@ -85,7 +85,7 @@ describe('agent collaboration e2e', { concurrent: false }, () => {
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     const { safeMkdir, safeWriteFile } = await import('../libs/core/secure-io.js');
     setWorkCoordinationNamespace('agent-collaboration-e2e');
     clearWorkCoordinationStore();
@@ -138,7 +138,7 @@ describe('agent collaboration e2e', { concurrent: false }, () => {
   afterEach(async () => {
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
-      await import('../libs/core/work-coordination.js');
+      await import('../libs/core/workforce/work-coordination.js');
     const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
     const missionPath = missionDir('MSN-E2E-03', 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
@@ -151,7 +151,7 @@ describe('agent collaboration e2e', { concurrent: false }, () => {
     { timeout: 60_000 },
     async () => {
       const { dispatchMissionNextTasks } =
-        await import('../libs/core/mission-orchestration-worker.js');
+        await import('../libs/core/mission/mission-orchestration-worker.js');
       const { missionDir } = await import('../libs/core/path-resolver.js');
       const { safeWriteFile, safeReadFile } = await import('../libs/core/secure-io.js');
 

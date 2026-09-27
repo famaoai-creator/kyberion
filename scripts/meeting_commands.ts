@@ -8,7 +8,7 @@
  * to a clear "unsupported" message instead of failing.
  */
 
-import type { MeetingSession } from '@agent/core/meeting-session-types';
+import type { MeetingSession } from '@agent/core/meeting/meeting-session-types';
 import * as readline from 'node:readline';
 
 export type MeetingCommand =

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { isLocalPadOriginAllowed } from '../lib/local-artifact-pad.js';

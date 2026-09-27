@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
   Button,

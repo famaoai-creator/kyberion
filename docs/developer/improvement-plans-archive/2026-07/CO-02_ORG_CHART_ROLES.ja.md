@@ -56,7 +56,7 @@ status: archived
 ## 実装メモ
 
 - 2026-07-05: `libs/core/org-chart.ts` を追加し、`knowledge/product/personalities/roles.json` と `team-role-index.json` を既定出発点として派生組織図を生成できるようにした。
-- 2026-07-05: `libs/core/mission-team-plan-composer.ts` に `organization_chart` の概要を載せ、mission plan が組織図の既定編成を参照できるようにした。
+- 2026-07-05: `libs/core/mission/mission-team-plan-composer.ts` に `organization_chart` の概要を載せ、mission plan が組織図の既定編成を参照できるようにした。
 - 2026-07-05: `pnpm org role create` を追加し、`authority-roles/*.json` / `team-roles/*.json` / `role-authority-map.json` / `security-policy.json` / `roles/{id}/PROCEDURE.md` / `mission.md` を一括生成・更新できるようにした。
 - 2026-07-05: `security-policy.json` と `role-authority-map.json` に finance_controller / strategic_sales / marketing_growth / talent_culture / line_manager の限定 authority_role を追加し、`validateWritePermission` が business role の act を認める最小経路を実装した。
 - 2026-07-05: `pnpm org role promote` を追加し、既存 role の advise→act 昇格を明示操作として扱えるようにした。昇格時は authority role / team role / security policy / role-write-access / role-authority-map / promotion notes を一括更新する。

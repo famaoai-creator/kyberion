@@ -3,7 +3,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 import {
   assertScopeContext,
   normalizeScopeContext,

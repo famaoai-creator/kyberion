@@ -19,7 +19,7 @@ import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readTextFile } from './foundation/text.js';
-import type { ReasoningBackend } from './reasoning-backend.js';
+import type { ReasoningBackend } from './reasoning/reasoning-backend.js';
 
 export interface PipelineReportContract {
   schema_ref: string;

@@ -62,7 +62,7 @@ status: archived
 
 ## 進捗(2026-07-06)
 
-- **完了済み(一部)**: browser recording の op→pipeline 変換を `libs/core/op-vocabulary.ts` に切り出し、`click_ref` / `fill_ref` / `select_ref` / `submit_form` の別名を共通 helper で解決するようにした。
+- **完了済み(一部)**: browser recording の op→pipeline 変換を `libs/core/pipeline/op-vocabulary.ts` に切り出し、`click_ref` / `fill_ref` / `select_ref` / `submit_form` の別名を共通 helper で解決するようにした。
 - **完了済み(一部)**: browser 実行側でも `normalizeBrowserPipelineOp()` を使い、`click_ref` / `fill_ref` / `press_ref` / `wait_ref` を canonical な `click` / `fill` / `press` / `wait` に寄せた。
 - **完了済み(一部)**: 旧名の browser alias に 1 回だけ deprecate 警告を出すようにし、phase-out の入口を作った。
 - **完了済み(一部)**: `system-actuator` では `notify` を正準の host 通知 op とし、`system_notify` を deprecated alias として warn するようにした。

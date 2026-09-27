@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { readTextFile } from '@agent/core/foundation';
-import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
@@ -23,8 +23,8 @@ import {
   createTaskSession,
   saveTaskSession,
   validateTaskSession,
-} from '@agent/core/task-session';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+} from '@agent/core/task/task-session';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   executeEmailDelivery,
   generateEmailReplyDraft,
@@ -33,14 +33,14 @@ import {
   readEmailDraftArtifact,
   readGwsAuthStatus,
   resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
+} from '@agent/core/integrations/email-workflow';
 import {
   createCalendarEvent,
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
   readM365AuthStatus,
-} from '@agent/core/calendar-workflow';
+} from '@agent/core/meeting/calendar-workflow';
 import { main as taskInitMain } from './task_init.js';
 import { main as taskListMain } from './task_list.js';
 import { main as taskRunMain } from './task_run.js';

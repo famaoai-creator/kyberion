@@ -1,9 +1,13 @@
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
-import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
-import { createVirtualCameraBridge } from './virtual-camera-bridge.js';
-import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
+import {
+  recordTaskSessionHistory,
+  updateTaskSession,
+  type TaskSession,
+} from './task/task-session.js';
+import { createVirtualCameraBridge } from './virtual/virtual-camera-bridge.js';
+import { createVirtualDeviceInventoryBridge } from './virtual/virtual-device-inventory-bridge.js';
 
 export interface ExecuteCapturePhotoTaskSessionParams {
   session: TaskSession;

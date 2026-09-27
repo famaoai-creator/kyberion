@@ -1,0 +1,630 @@
+import * as path from 'node:path';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
+import { loadProjectRecord } from './project-registry.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeStat,
+  safeWriteFile,
+} from '../secure-io.js';
+import {
+  saveProjectMissionLink,
+  saveProjectTrackState,
+} from './project-operational-state-links.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+
+export {
+  projectOperationalMissionLinkPath,
+  projectOperationalTrackStatePath,
+  saveProjectMissionLink,
+  saveProjectTrackState,
+} from './project-operational-state-links.js';
+
+export interface ProjectOperationalStateSource {
+  kind:
+    | 'mission'
+    | 'track'
+    | 'task_session'
+    | 'artifact'
+    | 'service_binding'
+    | 'surface_event'
+    | 'manual_note'
+    | 'other';
+  ref: string;
+  summary?: string;
+  captured_at?: string;
+}
+
+export interface ProjectOperationalState {
+  project_id: string;
+  name: string;
+  summary: string;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  tier: 'personal' | 'confidential' | 'public';
+  tenant_slug?: string;
+  project_path?: string;
+  current_phase?:
+    'initiate' | 'define' | 'design' | 'build' | 'validate' | 'transfer_run' | 'run' | 'unknown';
+  active_track_ids?: string[];
+  active_mission_ids?: string[];
+  active_task_session_ids?: string[];
+  source_refs?: string[];
+  sources?: ProjectOperationalStateSource[];
+  distill_targets?: string[];
+  knowledge_refs?: string[];
+  last_distilled_at?: string;
+  updated_at?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProjectOperationalStateQuery {
+  projectId?: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantSlug?: string;
+  rootDir?: string;
+}
+
+export interface ProjectOperationalStateMissionContext {
+  mission_id: string;
+  mission_type?: string;
+  tier: 'personal' | 'confidential' | 'public';
+  status: string;
+  tenant_slug?: string;
+  tenant_id?: string;
+  relationships?: {
+    project?: {
+      project_id?: string;
+      project_path?: string;
+      relationship_type?: string;
+      affected_artifacts?: string[];
+      gate_impact?: string;
+      traceability_refs?: string[];
+      note?: string;
+    };
+    track?: {
+      track_id?: string;
+      track_name?: string;
+      track_type?: string;
+      lifecycle_model?: string;
+      relationship_type?: string;
+      traceability_refs?: string[];
+      note?: string;
+    };
+  };
+  assigned_persona?: string;
+  context?: {
+    last_action?: string;
+    next_step?: string;
+    associated_projects?: string[];
+    routing_decision_summary?: string;
+    mission_finish_trace_persisted_path?: string;
+    distill_output_path?: string;
+  };
+  outcome_contract?: {
+    outcome_id?: string;
+    requested_result?: string;
+  };
+}
+
+const STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-operational-state.schema.json'
+);
+const STATE_ROOT = pathResolver.active('projects');
+const STATE_FILE_NAME = 'project-state.json';
+
+const projectOperationalStateCatalog = defineCatalog<ProjectOperationalState>({
+  id: 'project-operational-state',
+  path: STATE_ROOT,
+  schema: STATE_SCHEMA_PATH,
+});
+
+const projectOperationalStateFileCatalogs = new Map<
+  string,
+  GovernedCatalog<ProjectOperationalState>
+>();
+
+function projectOperationalStateFileCatalog(
+  filePath: string
+): GovernedCatalog<ProjectOperationalState> {
+  const cached = projectOperationalStateFileCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<ProjectOperationalState>({
+    id: 'project-operational-state',
+    path: filePath,
+    schema: STATE_SCHEMA_PATH,
+  });
+  projectOperationalStateFileCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function isInvalidProjectOperationalState(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith('Invalid catalog ');
+}
+
+function missionStatusToPhase(
+  status: string
+): NonNullable<ProjectOperationalState['current_phase']> {
+  switch (status) {
+    case 'planned':
+      return 'initiate';
+    case 'active':
+      return 'build';
+    case 'validating':
+    case 'distilling':
+      return 'validate';
+    case 'completed':
+    case 'archived':
+      return 'transfer_run';
+    case 'paused':
+      return 'run';
+    case 'failed':
+      return 'validate';
+    default:
+      return 'unknown';
+  }
+}
+
+export function projectOperationalStateDir(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string,
+  rootDir = pathResolver.rootDir()
+): string {
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug || 'shared', rootDir),
+      'state'
+    ),
+    { allowMissingLeaf: true }
+  );
+}
+
+export function projectOperationalStatePath(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string,
+  rootDir = pathResolver.rootDir()
+): string {
+  return assertSafeRepositoryPath(
+    path.join(projectOperationalStateDir(projectId, tier, tenantSlug, rootDir), STATE_FILE_NAME),
+    { allowMissingLeaf: true }
+  );
+}
+
+export function validateProjectOperationalState(value: unknown): value is ProjectOperationalState {
+  try {
+    projectOperationalStateCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeProjectOperationalState(
+  record: ProjectOperationalState
+): ProjectOperationalState {
+  return {
+    ...record,
+    tenant_slug: record.tenant_slug?.trim() || undefined,
+    active_track_ids: record.active_track_ids || [],
+    active_mission_ids: record.active_mission_ids || [],
+    active_task_session_ids: record.active_task_session_ids || [],
+    source_refs: record.source_refs || [],
+    sources: record.sources || [],
+    distill_targets: record.distill_targets || [],
+    knowledge_refs: record.knowledge_refs || [],
+    updated_at: record.updated_at || nowIso(),
+  };
+}
+
+function stateRecordMatchesQuery(
+  record: ProjectOperationalState,
+  query: ProjectOperationalStateQuery
+): boolean {
+  if (query.projectId && record.project_id !== query.projectId) return false;
+  if (query.tier && record.tier !== query.tier) return false;
+  if (query.tenantSlug && (record.tenant_slug || 'shared') !== query.tenantSlug) return false;
+  return true;
+}
+
+function recursiveProjectStateFiles(dir: string): string[] {
+  if (!safeExistsSync(dir)) return [];
+  const entries = safeReaddir(dir);
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry);
+    if (!safeExistsSync(fullPath)) continue;
+    const stat = safeStat(fullPath);
+    if (stat.isDirectory()) {
+      files.push(...recursiveProjectStateFiles(fullPath));
+      continue;
+    }
+    if (entry === STATE_FILE_NAME) files.push(fullPath);
+  }
+  return files;
+}
+
+function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): string[] {
+  if (query.projectId && query.tier) {
+    const pathHint = projectOperationalStatePath(
+      query.projectId,
+      query.tier,
+      query.tenantSlug,
+      query.rootDir
+    );
+    if (safeExistsSync(pathHint)) return [pathHint];
+  }
+  if (query.projectId && query.tenantSlug && !query.tier) {
+    const tiers: Array<ProjectOperationalState['tier']> = ['personal', 'confidential', 'public'];
+    const direct = tiers
+      .map((tier) =>
+        projectOperationalStatePath(query.projectId!, tier, query.tenantSlug, query.rootDir)
+      )
+      .filter((candidate) => safeExistsSync(candidate));
+    if (direct.length > 0) return direct;
+  }
+  return recursiveProjectStateFiles(
+    assertSafeRepositoryPath(
+      path.resolve(query.rootDir || pathResolver.rootDir(), 'active/projects'),
+      { allowMissingLeaf: true }
+    )
+  );
+}
+
+export function saveProjectOperationalState(
+  record: ProjectOperationalState,
+  options: { rootDir?: string } = {}
+): string {
+  const normalized = normalizeProjectOperationalState(record);
+  const filePath = projectOperationalStatePath(
+    normalized.project_id,
+    normalized.tier,
+    normalized.tenant_slug,
+    options.rootDir
+  );
+  let validated: ProjectOperationalState;
+  try {
+    validated = projectOperationalStateFileCatalog(filePath).validate(normalized, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid project operational state: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  const dir = path.dirname(filePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  return filePath;
+}
+
+export function loadProjectOperationalState(
+  projectId: string,
+  query: Omit<ProjectOperationalStateQuery, 'projectId'> = {}
+): ProjectOperationalState | null {
+  const files = projectStateFilesForQuery({ projectId, ...query });
+  for (const filePath of files) {
+    try {
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (
+        parsed.project_id === projectId &&
+        stateRecordMatchesQuery(parsed, { projectId, ...query })
+      ) {
+        return parsed;
+      }
+    } catch (error) {
+      if (!isInvalidProjectOperationalState(error)) throw error;
+    }
+  }
+  return null;
+}
+
+export function listProjectOperationalStates(
+  query: ProjectOperationalStateQuery = {}
+): ProjectOperationalState[] {
+  const files = projectStateFilesForQuery(query);
+  const states: ProjectOperationalState[] = [];
+  for (const filePath of files) {
+    try {
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (stateRecordMatchesQuery(parsed, query)) {
+        states.push(parsed);
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return states.sort((a, b) => {
+    const aKey = `${a.tier}:${a.tenant_slug || 'shared'}:${a.project_id}`;
+    const bKey = `${b.tier}:${b.tenant_slug || 'shared'}:${b.project_id}`;
+    return aKey.localeCompare(bKey);
+  });
+}
+
+export function listProjectOperationalStatePaths(
+  query: ProjectOperationalStateQuery = {}
+): string[] {
+  return projectStateFilesForQuery(query).sort();
+}
+
+function readProjectStateIfExists(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug?: string
+): ProjectOperationalState | null {
+  const statePath = projectOperationalStatePath(projectId, tier, tenantSlug);
+  if (!safeExistsSync(statePath)) return null;
+  try {
+    return projectOperationalStateFileCatalog(statePath).load();
+  } catch (_) {
+    return null;
+  }
+}
+
+function listProjectStateFiles(rootDir: string): string[] {
+  if (!safeExistsSync(rootDir)) return [];
+  const entries = safeReaddir(rootDir);
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(rootDir, entry);
+    if (!safeExistsSync(fullPath)) continue;
+    const stat = safeStat(fullPath);
+    if (stat.isDirectory()) {
+      files.push(...listProjectStateFiles(fullPath));
+      continue;
+    }
+    if (entry === STATE_FILE_NAME) files.push(fullPath);
+  }
+  return files;
+}
+
+function loadAllProjectStateRecords(projectId: string): Array<{
+  tier: ProjectOperationalState['tier'];
+  tenant_slug?: string;
+  record: ProjectOperationalState;
+}> {
+  const files = listProjectStateFiles(STATE_ROOT);
+  const records: Array<{
+    tier: ProjectOperationalState['tier'];
+    tenant_slug?: string;
+    record: ProjectOperationalState;
+  }> = [];
+  for (const filePath of files) {
+    try {
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (parsed.project_id !== projectId) continue;
+      records.push({ tier: parsed.tier, tenant_slug: parsed.tenant_slug, record: parsed });
+    } catch (_) {
+      continue;
+    }
+  }
+  return records;
+}
+
+function collectSourceRefs(input: ProjectOperationalStateMissionContext): string[] {
+  const refs = new Set<string>();
+  refs.add(`mission:${input.mission_id}`);
+  if (input.relationships?.project?.project_id)
+    refs.add(`project:${input.relationships.project.project_id}`);
+  if (input.relationships?.project?.project_path)
+    refs.add(`project_path:${input.relationships.project.project_path}`);
+  if (input.relationships?.track?.track_id) refs.add(`track:${input.relationships.track.track_id}`);
+  if (input.context?.mission_finish_trace_persisted_path)
+    refs.add(`trace:${input.context.mission_finish_trace_persisted_path}`);
+  if (input.context?.distill_output_path)
+    refs.add(`knowledge:${input.context.distill_output_path}`);
+  return [...refs];
+}
+
+function dedupeSources(
+  sources: ProjectOperationalState['sources'] = []
+): ProjectOperationalState['sources'] {
+  const seen = new Set<string>();
+  const next: NonNullable<ProjectOperationalState['sources']> = [];
+  for (const source of sources) {
+    if (!source?.ref || seen.has(source.ref)) continue;
+    seen.add(source.ref);
+    next.push(source);
+  }
+  return next;
+}
+
+export function syncProjectOperationalStateFromMission(
+  input: ProjectOperationalStateMissionContext
+): string | null {
+  const projectId = input.relationships?.project?.project_id?.trim();
+  if (!projectId) return null;
+  const requestedTenantSlug = (input.tenant_slug || input.tenant_id || '').trim();
+  // `shared` is the tenantless workspace partition, not a serialized tenant.
+  // Keep it as undefined for public/personal state so the path resolver still
+  // uses active/projects/{tier}/shared/ while the schema remains truthful.
+  const tenantSlug =
+    requestedTenantSlug === 'shared' ? undefined : requestedTenantSlug || undefined;
+  if (tenantSlug && !isValidTenantSlug(tenantSlug)) {
+    throw new Error(`Invalid tenant_slug '${tenantSlug}' for project operational state.`);
+  }
+  if (input.tier === 'confidential' && !tenantSlug) {
+    throw new Error(
+      `tenant_slug is required for confidential project operational state (${projectId}).`
+    );
+  }
+  const existingProject = loadProjectRecord(projectId);
+  const projectPath = input.relationships?.project?.project_path?.trim();
+  const relationships = input.relationships || {};
+
+  const projectState =
+    readProjectStateIfExists(projectId, input.tier, tenantSlug) ||
+    ({
+      project_id: projectId,
+      name: existingProject?.name || projectId,
+      summary:
+        existingProject?.summary ||
+        relationships.project?.note ||
+        input.outcome_contract?.requested_result ||
+        `Operational state for ${projectId}`,
+      status: 'active',
+      tier: input.tier,
+      tenant_slug: tenantSlug,
+      project_path: projectPath,
+      active_track_ids: [],
+      active_mission_ids: [],
+      active_task_session_ids: [],
+      source_refs: [],
+      sources: [],
+      distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
+      knowledge_refs: [],
+      updated_at: nowIso(),
+    } satisfies ProjectOperationalState);
+
+  const missionLinkPath = saveProjectMissionLink({
+    project_id: projectId,
+    tier: input.tier,
+    tenant_slug: tenantSlug,
+    mission_id: input.mission_id,
+    relationship_type: relationships.project?.relationship_type || 'independent',
+    summary:
+      relationships.project?.note ||
+      input.outcome_contract?.requested_result ||
+      input.mission_type ||
+      'mission',
+    status: input.status,
+    evidence_refs: input.context?.mission_finish_trace_persisted_path
+      ? [input.context.mission_finish_trace_persisted_path]
+      : [],
+  });
+
+  const trackId = relationships.track?.track_id?.trim();
+  if (trackId) {
+    saveProjectTrackState({
+      project_id: projectId,
+      tier: input.tier,
+      tenant_slug: tenantSlug,
+      track_id: trackId,
+      name: relationships.track?.track_name || trackId,
+      summary: relationships.track?.note || relationships.track?.track_name || trackId,
+      status:
+        input.status === 'archived'
+          ? 'archived'
+          : input.status === 'completed'
+            ? 'completed'
+            : input.status === 'paused'
+              ? 'paused'
+              : 'active',
+      lifecycle_model: relationships.track?.lifecycle_model,
+      required_artifacts: [],
+      active_mission_ids: input.status === 'archived' ? [] : [input.mission_id],
+    });
+  }
+
+  const allStates = loadAllProjectStateRecords(projectId).filter(
+    (entry) => entry.record.tenant_slug === tenantSlug && entry.tier === input.tier
+  );
+  const projectStateDirPath = projectOperationalStateDir(projectId, input.tier, tenantSlug);
+  const missionStates: Array<{ record: ProjectOperationalState }> = allStates;
+  const activeMissionIds = new Set<string>();
+  const activeTrackIds = new Set<string>();
+  const sourceRefs = new Set<string>(collectSourceRefs(input));
+  for (const entry of missionStates) {
+    const record = entry.record;
+    if (record.status !== 'archived') {
+      if (record.active_mission_ids?.length) {
+        for (const missionId of record.active_mission_ids) activeMissionIds.add(missionId);
+      }
+      if (record.active_track_ids?.length) {
+        for (const id of record.active_track_ids) activeTrackIds.add(id);
+      }
+    }
+    for (const ref of record.source_refs || []) sourceRefs.add(ref);
+    for (const knowledgeRef of record.knowledge_refs || []) {
+      if (knowledgeRef) sourceRefs.add(knowledgeRef);
+    }
+  }
+  if (input.status !== 'archived') activeMissionIds.add(input.mission_id);
+  if (trackId) activeTrackIds.add(trackId);
+
+  const knowledgeRefs = new Set<string>(projectState.knowledge_refs || []);
+  const distillTarget = `knowledge/product/evolution/projects/${projectId}/project-state.md`;
+  const distillTargets = new Set<string>(projectState.distill_targets || [distillTarget]);
+  if (input.context?.mission_finish_trace_persisted_path)
+    knowledgeRefs.add(input.context.mission_finish_trace_persisted_path);
+  if (input.context?.distill_output_path) knowledgeRefs.add(input.context.distill_output_path);
+
+  const nextStatus: ProjectOperationalState['status'] =
+    activeMissionIds.size > 0
+      ? 'active'
+      : existingProject?.status || projectState.status || 'paused';
+
+  const nextState: ProjectOperationalState = {
+    ...projectState,
+    project_path: projectPath || projectState.project_path,
+    name: existingProject?.name || projectState.name,
+    summary: existingProject?.summary || projectState.summary,
+    status: nextStatus,
+    tier: input.tier,
+    tenant_slug: tenantSlug,
+    current_phase: missionStatusToPhase(input.status),
+    active_track_ids: [...activeTrackIds].sort(),
+    active_mission_ids: [...activeMissionIds].sort(),
+    active_task_session_ids: projectState.active_task_session_ids || [],
+    source_refs: [...sourceRefs].sort(),
+    sources: dedupeSources([
+      ...(projectState.sources || []).filter(
+        (entry) =>
+          entry.ref !== `mission:${input.mission_id}` && entry.ref !== `track:${trackId || ''}`
+      ),
+      {
+        kind: 'mission' as const,
+        ref: `mission:${input.mission_id}`,
+        summary:
+          input.relationships?.project?.note ||
+          input.outcome_contract?.requested_result ||
+          input.mission_type ||
+          'mission',
+        captured_at: nowIso(),
+      },
+      ...(trackId
+        ? [
+            {
+              kind: 'track' as const,
+              ref: `track:${trackId}`,
+              summary:
+                input.relationships?.track?.note ||
+                input.relationships?.track?.track_name ||
+                trackId,
+              captured_at: nowIso(),
+            },
+          ]
+        : []),
+      ...(input.context?.distill_output_path
+        ? [
+            {
+              kind: 'artifact' as const,
+              ref: `knowledge:${input.context.distill_output_path}`,
+              summary: 'Distilled knowledge output',
+              captured_at: nowIso(),
+            },
+          ]
+        : []),
+    ]),
+    distill_targets: [...distillTargets].sort(),
+    knowledge_refs: [...knowledgeRefs].sort(),
+    last_distilled_at:
+      input.status === 'completed' || input.status === 'archived'
+        ? nowIso()
+        : projectState.last_distilled_at,
+    updated_at: nowIso(),
+    metadata: {
+      ...(projectState.metadata || {}),
+      mission_link_path: missionLinkPath,
+      project_state_dir: projectStateDirPath,
+      last_mission_id: input.mission_id,
+      last_mission_status: input.status,
+      last_mission_type: input.mission_type,
+      last_assigned_persona: input.assigned_persona,
+    },
+  };
+
+  return saveProjectOperationalState(nextState);
+}

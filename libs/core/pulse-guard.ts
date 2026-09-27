@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { secretGuard } from './secret-guard.js';
+import { secretGuard } from './secret/secret-guard.js';
 
 /**
  * Pulse Guard: Ensures Stimuli Integrity via HMAC.
@@ -20,5 +20,5 @@ export const pulseGuard = {
     } catch (_) {
       return false;
     }
-  }
+  },
 };

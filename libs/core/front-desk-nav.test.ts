@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadSurfaceManifestMock = vi.hoisted(() => vi.fn());
 
-vi.mock('./surface-runtime.js', () => ({
+vi.mock('./surface/surface-runtime.js', () => ({
   loadSurfaceManifest: loadSurfaceManifestMock,
 }));
 

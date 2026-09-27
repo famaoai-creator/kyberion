@@ -26,7 +26,7 @@ Its reusable guidance is now covered by the provider discovery and adapter layer
 - keep approval and audit rails inside Kyberion
 - only introduce a separate long-lived surface if the runtime proves it needs one
 
-The canonical references for that work are the provider capability discovery/report docs and the adapter code in `libs/core/agent-adapter.ts`.
+The canonical references for that work are the provider capability discovery/report docs and the adapter code in `libs/core/agent/agent-adapter.ts`.
 
 ## Cleanup rule
 

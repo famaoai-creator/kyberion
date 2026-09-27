@@ -13,7 +13,7 @@ import {
   readRequirementsDraftAtPath,
   saveRequirementsDraft,
 } from '@agent/core/requirements-draft-store';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { SoftwareQualityContract } from '@agent/core/software-quality';

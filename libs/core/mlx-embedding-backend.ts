@@ -19,7 +19,7 @@ import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
 import type { EmbeddingBackend } from './embedding-backend.js';
 
 const DEFAULT_MODEL = 'mlx-community/multilingual-e5-large-instruct';

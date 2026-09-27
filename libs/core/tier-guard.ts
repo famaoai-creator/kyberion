@@ -12,8 +12,8 @@ import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { assertSandboxWriteAllowed } from './sandbox-policy.js';
-import { isAllowedVaultMountPath } from './vault-mount.js';
+import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
+import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -534,7 +534,7 @@ function recordTenantScopeViolation(input: {
   targetTenant: string;
   reason: string;
 }): void {
-  import('./audit-chain.js')
+  import('./governance/audit-chain.js')
     .then(({ auditChain }) => {
       auditChain.record({
         agentId: 'tier-guard',
@@ -563,7 +563,7 @@ function recordBrokerAccess(input: {
   brokerTenants: string[];
   targetTenant: string;
 }): void {
-  import('./audit-chain.js')
+  import('./governance/audit-chain.js')
     .then(({ auditChain }) => {
       auditChain.record({
         agentId: 'tier-guard',
@@ -587,7 +587,7 @@ function recordGroupAccess(input: {
   groupId: string;
   tenantSlug: string;
 }): void {
-  import('./audit-chain.js')
+  import('./governance/audit-chain.js')
     .then(({ auditChain }) => {
       auditChain.record({
         agentId: 'tier-guard',

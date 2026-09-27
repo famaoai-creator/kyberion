@@ -16,7 +16,7 @@ import {
 } from './reasoning_backend_selection.js';
 
 // Backend ids below mirror the canonical catalog in
-// libs/core/reasoning-backend-policy.ts (allowed_modes) — keep them aligned
+// libs/core/reasoning/reasoning-backend-policy.ts (allowed_modes) — keep them aligned
 // with that policy, docs/INITIALIZATION.md, and AGENTS.md §2 (LC-04c).
 const REASONING_SETUP_GUIDANCE = [
   'Reasoning backend is required for real work. Configure one of:',

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, assertSafeRepositoryPath } from './secure-io.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
 
 export type LocalSttBackend = string;
 export type LocalSttSource = string;

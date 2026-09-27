@@ -9,10 +9,10 @@
 // ingest:sync_source (capture) lists source-side changes incrementally and
 // maintains the per-tenant watermark under active/shared/runtime/ingest-cursors/.
 
-import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { getOpInputContract } from '@agent/core/pipeline/op-input-contracts';
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 export const INGEST_ACTUATOR_CAPTURE_OPS = ['parse_document', 'sync_source'] as const;
 

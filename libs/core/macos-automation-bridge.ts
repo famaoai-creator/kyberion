@@ -1,6 +1,6 @@
 import { safeExecResult } from './secure-io.js';
 import { activateApplication } from './apple-event-bridge.js';
-import { listKnownAppCapabilities, type KnownAppCapability } from './os-app-adapters.js';
+import { listKnownAppCapabilities, type KnownAppCapability } from './virtual/os-app-adapters.js';
 
 export const MACOS_AUTOMATION_BRIDGE_ID = 'macos-automation-bridge';
 
