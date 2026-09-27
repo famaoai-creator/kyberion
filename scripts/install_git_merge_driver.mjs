@@ -5,7 +5,9 @@
  * (package.json `prepare`), so it is a bootstrap-class script: no build, no
  * @agent/core, and it must never fail an install.
  *
- * - No-op in CI (`CI` set) and outside a git work tree (source archives).
+ * - No-op in CI (`CI` set), outside a git work tree (source archives), and
+ *   when the package root is not the work-tree top (an archive extracted
+ *   inside another checkout).
  * - Idempotent: only writes when the configured driver differs.
  * - `git config --local` lands in the common config shared by every linked
  *   worktree. The driver command is a path relative to the worktree root
@@ -14,14 +16,16 @@
  *   conflict for those files.
  */
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DRIVER_NAME = 'kyberion-regenerate';
 const DRIVER_COMMAND = 'node scripts/git_merge_regenerate.mjs %O %A %B %P';
 const DRIVER_LABEL = 'Kyberion generated file (merge, else keep ours; then regenerate)';
 
 function git(args) {
-  return execFileSync('git', args, {
+  return execFileSync('git', ['-C', ROOT, ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
@@ -39,6 +43,9 @@ export function installGitMergeDriver(env = process.env) {
   if (env.CI) return 'skipped:ci';
   try {
     if (git(['rev-parse', '--is-inside-work-tree']) !== 'true') return 'skipped:no-git';
+    // An extracted source archive nested inside another checkout must not
+    // configure that outer repository: only act when this package is the top.
+    if (git(['rev-parse', '--show-prefix']) !== '') return 'skipped:nested';
   } catch {
     return 'skipped:no-git';
   }
