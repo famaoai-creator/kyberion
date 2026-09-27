@@ -6,6 +6,7 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
   annotateApprovalRejectionReason,
+  APPROVAL_CHANGE_INSTRUCTION_MAX,
   type ApprovalRecord,
   type ApprovalRequestDraft,
   type ApprovalRequestRecord,
@@ -20,6 +21,7 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
+import type { DecisionCard, DecisionCardTier } from './decision-card.js';
 import type { SupportedLocale } from './locale-normalize.js';
 import { t } from './t.js';
 
@@ -29,6 +31,7 @@ export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
 
 const DECISION_TOKEN = /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)$/iu;
+const CARD_TOKEN = /^appr:([0-9a-f-]{36}):(changes|explain)(?:\s+([\s\S]+))?$/iu;
 
 export interface SurfaceApprovalAction {
   requestId: string;
@@ -64,6 +67,7 @@ export function createSurfaceApprovalRequest(params: {
   draft: ApprovalRequestDraft;
   sourceText?: string;
   expiresAt?: string;
+  decisionCard?: DecisionCard;
 }): ApprovalRequestRecord {
   return createApprovalRequest(approvalRole(params.surface), {
     channel: params.channel,
@@ -75,16 +79,111 @@ export function createSurfaceApprovalRequest(params: {
     sourceText: params.sourceText,
     expiresAt: params.expiresAt,
     accountability: { finalDecision: 'human_only' },
+    ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
   });
+}
+
+const TIER_KEYS = {
+  auto: 'bridge:decision_card_tier_auto',
+  notify: 'bridge:decision_card_tier_notify',
+  approve: 'bridge:decision_card_tier_approve',
+} as const satisfies Record<DecisionCardTier, string>;
+
+function formatDeadline(deadline: string, locale: SupportedLocale, timeZone?: string): string {
+  const date = new Date(deadline);
+  if (Number.isNaN(date.getTime())) return deadline;
+  return date.toLocaleString(locale === 'ja' ? 'ja-JP' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    ...(timeZone ? { timeZone } : {}),
+  });
+}
+
+/** The decision card body, shared by every text-based surface. */
+export function formatDecisionCardLines(
+  card: DecisionCard,
+  options: { locale?: SupportedLocale; timeZone?: string } = {}
+): string[] {
+  const locale = options.locale ?? 'ja';
+  return [
+    `${t('bridge:decision_card_question_label', undefined, locale)}: ${card.question}`,
+    `${t('bridge:decision_card_recommendation_label', undefined, locale)}: ${card.recommendation}`,
+    `${t('bridge:decision_card_risk_label', undefined, locale)}: ${t(TIER_KEYS[card.riskTier], undefined, locale)} / ${t(
+      card.reversible
+        ? 'bridge:decision_card_reversible_yes'
+        : 'bridge:decision_card_reversible_no',
+      undefined,
+      locale
+    )}`,
+    ...(card.riskReasons.length > 0
+      ? [`${t('bridge:decision_card_reasons_label', undefined, locale)}: ${card.riskReasons[0]}`]
+      : []),
+    ...(card.deadline
+      ? [
+          `${t('bridge:decision_card_deadline_label', undefined, locale)}: ${formatDeadline(card.deadline, locale, options.timeZone)}`,
+        ]
+      : []),
+    ...(card.evidence.length > 0
+      ? [
+          `${t('bridge:decision_card_evidence_label', undefined, locale)}:`,
+          ...card.evidence.map((item) => `- ${item.label}: ${item.ref}`),
+        ]
+      : []),
+  ];
+}
+
+/** "Ask why": the stored rationale only — never a model call. */
+export function explainApprovalRequest(
+  record: ApprovalRequestRecord,
+  options: { locale?: SupportedLocale } = {}
+): string {
+  const locale = options.locale ?? 'ja';
+  const card = record.decisionCard;
+  const reasons = [
+    ...(card?.riskReasons ?? []),
+    ...(record.justification?.reason ? [record.justification.reason] : []),
+    ...(record.justification?.impactSummary ? [record.justification.impactSummary] : []),
+  ];
+  const lines = [t('bridge:decision_card_explain_heading', { title: record.title }, locale)];
+  if (reasons.length === 0 && !card) {
+    lines.push(t('bridge:decision_card_no_rationale', undefined, locale));
+    return lines.join('\n');
+  }
+  lines.push(...reasons.map((reason) => `- ${reason}`));
+  if (card) {
+    lines.push(
+      `${t('bridge:decision_card_recommendation_label', undefined, locale)}: ${card.recommendation}`,
+      t(
+        card.reversible
+          ? 'bridge:decision_card_reversible_yes'
+          : 'bridge:decision_card_reversible_no',
+        undefined,
+        locale
+      ),
+      ...card.evidence.map((item) => `- ${item.label}: ${item.ref}`)
+    );
+  }
+  return lines.join('\n');
 }
 
 export function buildSurfaceApprovalText(
   surface: SurfaceApproval,
   record: ApprovalRequestRecord,
   intentResolution?: IntentResolutionContract,
-  options: { locale?: SupportedLocale } = {}
+  options: { locale?: SupportedLocale; timeZone?: string } = {}
 ): string {
   const locale = options.locale ?? 'ja';
+  if (record.decisionCard) {
+    return [
+      t('bridge:decision_card_heading', undefined, locale),
+      record.title,
+      record.summary,
+      '',
+      ...formatDecisionCardLines(record.decisionCard, options),
+      '',
+      t('bridge:approval_reply_instruction', { requestId: record.id }, locale),
+    ].join('\n');
+  }
   return [
     t('bridge:approval_heading', { surface }, locale),
     `${t('bridge:approval_title_label', undefined, locale)}: ${record.title}`,
@@ -131,6 +230,29 @@ export function buildSurfaceApprovalActions(
       callbackData: `appr:${record.id}:reject`,
     },
   ];
+}
+
+export type DecisionCardActionKind = 'approve' | 'changes' | 'reject' | 'explain';
+
+export interface DecisionCardAction {
+  requestId: string;
+  kind: DecisionCardActionKind;
+  callbackData: string;
+}
+
+/**
+ * The four decision-card buttons. Requests without a card keep the
+ * original approve / reject pair.
+ */
+export function buildDecisionCardActions(record: ApprovalRequestRecord): DecisionCardAction[] {
+  const kinds: DecisionCardActionKind[] = record.decisionCard
+    ? ['approve', 'changes', 'reject', 'explain']
+    : ['approve', 'reject'];
+  return kinds.map((kind) => ({
+    requestId: record.id,
+    kind,
+    callbackData: `appr:${record.id}:${kind}`,
+  }));
 }
 
 const SURFACE_ASK_WHY_LABELS: Record<RejectionReasonCategory, string> = {
@@ -281,6 +403,8 @@ export function applySurfaceApprovalDecision(params: {
   note?: string;
   /** LC-10 closed vocabulary — the same set every surface uses. */
   reasonCategory?: RejectionReasonCategory;
+  /** A rejection that asks the requester to revise and re-submit. */
+  changeInstruction?: string;
 }): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.surface;
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -307,6 +431,34 @@ export function applySurfaceApprovalDecision(params: {
     effectBinding: record.accountability?.effectBinding,
     ...(params.note ? { note: params.note } : {}),
     ...(params.reasonCategory ? { reasonCategory: params.reasonCategory } : {}),
+    ...(params.changeInstruction !== undefined
+      ? { changeInstruction: params.changeInstruction }
+      : {}),
+  });
+}
+
+/** "Request changes": recorded as a rejection carrying the instruction. */
+export function applySurfaceApprovalChangeRequest(params: {
+  surface: SurfaceApproval;
+  requestId: string;
+  channel: string;
+  threadTs: string;
+  decidedBy: string;
+  instruction: string;
+  storageChannel?: string;
+  authMethod?: ApprovalRecord['authMethod'];
+}): ApprovalRequestRecord {
+  return applySurfaceApprovalDecision({
+    surface: params.surface,
+    requestId: params.requestId,
+    decision: 'rejected',
+    channel: params.channel,
+    threadTs: params.threadTs,
+    decidedBy: params.decidedBy,
+    storageChannel: params.storageChannel,
+    authMethod: params.authMethod,
+    note: 'changes_requested',
+    changeInstruction: params.instruction,
   });
 }
 
@@ -329,6 +481,85 @@ export interface SurfaceApprovalReply {
   handled: boolean;
   reply?: string;
   record?: ApprovalRequestRecord;
+  /** The reply asks for free text; surfaces that can should force a reply to it. */
+  forceReply?: boolean;
+}
+
+function resolveDecisionCardToken(params: {
+  surface: SurfaceApproval;
+  channel: string;
+  threadTs: string;
+  decidedBy: string;
+  requestId: string;
+  kind: 'changes' | 'explain';
+  instruction?: string;
+  locale: SupportedLocale;
+}): SurfaceApprovalReply {
+  const record =
+    loadApprovalRequest(params.surface, params.requestId) ||
+    loadApprovalRequest('background-review', params.requestId);
+  if (!record) {
+    return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+  }
+  if (record.channel !== params.channel || record.threadTs !== params.threadTs) {
+    return { handled: true, reply: 'この承認要求は別のスレッドにあります。' };
+  }
+  if (params.kind === 'explain') {
+    return {
+      handled: true,
+      record,
+      reply: explainApprovalRequest(record, { locale: params.locale }),
+    };
+  }
+  if (record.status !== 'pending' || !record.decisionCard) {
+    return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+  }
+  if (isApprovalRequestExpired(record)) {
+    const expired = expireApprovalRequest(approvalRole(params.surface, record.storageChannel), {
+      channel: record.channel,
+      storageChannel: record.storageChannel,
+      requestId: record.id,
+    });
+    return { handled: true, record: expired, reply: 'この承認要求は期限切れです。' };
+  }
+  const instruction = params.instruction?.trim();
+  if (!instruction) {
+    return {
+      handled: true,
+      record,
+      forceReply: true,
+      reply: t(
+        'bridge:decision_card_changes_prompt',
+        { title: record.title, token: `appr:${record.id}:changes` },
+        params.locale
+      ),
+    };
+  }
+  if (instruction.length > APPROVAL_CHANGE_INSTRUCTION_MAX) {
+    return {
+      handled: true,
+      record,
+      reply: t(
+        'bridge:decision_card_changes_too_long',
+        { max: APPROVAL_CHANGE_INSTRUCTION_MAX },
+        params.locale
+      ),
+    };
+  }
+  const updated = applySurfaceApprovalChangeRequest({
+    surface: params.surface,
+    requestId: record.id,
+    channel: params.channel,
+    threadTs: params.threadTs,
+    decidedBy: params.decidedBy,
+    instruction,
+    storageChannel: record.storageChannel,
+  });
+  return {
+    handled: true,
+    record: updated,
+    reply: t('bridge:decision_card_changes_recorded', { title: updated.title }, params.locale),
+  };
 }
 
 function resolveSurfaceApprovalRecord(params: {
@@ -380,8 +611,22 @@ export function resolveSurfaceApprovalReply(params: {
   threadTs: string;
   text: string;
   decidedBy: string;
+  locale?: SupportedLocale;
 }): SurfaceApprovalReply {
   const text = params.text.trim();
+  const cardToken = text.match(CARD_TOKEN);
+  if (cardToken) {
+    return resolveDecisionCardToken({
+      surface: params.surface,
+      channel: params.channel,
+      threadTs: params.threadTs,
+      decidedBy: params.decidedBy,
+      requestId: cardToken[1].toLowerCase(),
+      kind: cardToken[2].toLowerCase() as 'changes' | 'explain',
+      instruction: cardToken[3],
+      locale: params.locale ?? 'ja',
+    });
+  }
   const token = text.match(DECISION_TOKEN);
   let record: ApprovalRequestRecord | null = null;
   let decision: SurfaceApprovalDecision | undefined;
