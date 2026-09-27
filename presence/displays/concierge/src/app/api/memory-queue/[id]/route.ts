@@ -7,7 +7,7 @@ import {
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { withExecutionContext } from '@agent/core/authority';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import {
@@ -30,7 +30,8 @@ export const dynamic = 'force-dynamic';
  * default decision. Queue state changes go exclusively through
  * scripts/mission_controller.ts (`memory-approve` / `memory-reject`), invoked
  * the same way the hygiene decision route does: the built controller under
- * dist/ with MISSION_ROLE=mission_controller and cwd at the repo root.
+ * dist/ as mission_controller (buildExecutionEnv: MISSION_ROLE, delegated under
+ * SYSTEM_ROLE — AUTHORITY_MODEL 3.B2 DR-01) and cwd at the repo root.
  */
 
 const ALLOWED_DECISIONS = ['approve', 'reject'] as const;
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       process.execPath,
       [CONTROLLER_RELATIVE, subcommand, candidate.candidate_id, ...decidedByArgs],
       {
-        env: { ...process.env, MISSION_ROLE: 'mission_controller' },
+        env: buildExecutionEnv(process.env, 'mission_controller'),
         cwd: rootDir,
         timeoutMs: CONTROLLER_TIMEOUT_MS,
         maxOutputMB: 5,

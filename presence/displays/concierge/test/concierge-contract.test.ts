@@ -473,7 +473,7 @@ describe('concierge surface contract', () => {
     expect(decisionRoute).toContain('requireConciergeMutationAccess');
     expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
     expect(decisionRoute).toContain('safeExecResult');
-    expect(decisionRoute).toContain("MISSION_ROLE: 'mission_controller'");
+    expect(decisionRoute).toContain("buildExecutionEnv(process.env, 'mission_controller')");
     // Human-only gate: the route accepts nothing but an explicit start/cancel
     // decision from the request body, validates the mission is actually in
     // the hygiene report, and there is no scheduler or auto-invocation path.
@@ -607,7 +607,7 @@ describe('concierge surface contract', () => {
     expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
     expect(decisionRoute).toContain('memory-approve');
     expect(decisionRoute).toContain('memory-reject');
-    expect(decisionRoute).toContain("MISSION_ROLE: 'mission_controller'");
+    expect(decisionRoute).toContain("buildExecutionEnv(process.env, 'mission_controller')");
     expect(decisionRoute).toContain('safeExecResult');
     // The candidate must exist and still be pending before anything runs, and
     // exit code 0 alone is not success — the transition is verified on disk.

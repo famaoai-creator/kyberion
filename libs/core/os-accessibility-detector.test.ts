@@ -939,6 +939,30 @@ describe('Windows enumeration script', () => {
     );
   });
 
+  it('compiles the walker in memory only, the COM walker only when the managed walk finds no controls', () => {
+    // Nothing compiled is ever written to or loaded from disk.
+    expect(script).not.toMatch(
+      /-OutputAssembly|Add-Type\s+-Path|Add-Type\s+-LiteralPath|LoadFrom|LoadFile/
+    );
+    expect(script).not.toContain('walkerCacheDir');
+    const native = script.indexOf(
+      'Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)'
+    );
+    const managed = script.indexOf('$cache.Push()');
+    const com = script.indexOf(
+      'Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csCom)'
+    );
+    expect(native).toBeGreaterThan(0);
+    expect(native).toBeLessThan(managed);
+    expect(com).toBeGreaterThan(managed);
+    expect(script.slice(script.lastIndexOf('if ($chosenActionable -eq 0) {', com), com)).toContain(
+      '$comClock'
+    );
+    expect(script).toContain(
+      `'{"cache":"off","cached":false,"compile_ms":' + $compileMs + ',"com_compile_ms":' + $comMsJson + '}'`
+    );
+  });
+
   it('lists exactly the mapped UIA control types as actionable', () => {
     const line = script.split('\n').find((entry) => entry.startsWith('$actionableTypes = '));
     const listed = [...(line ?? '').matchAll(/'([A-Za-z]+)'/g)].map((match) => match[1]);

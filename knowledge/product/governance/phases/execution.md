@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-09-22
+last_updated: 2026-09-27
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -99,6 +99,13 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    ```
    node dist/scripts/mission_controller.js review-task <MISSION_ID> self_review-code-review <reviewer_agent_id> \
      --specialist-roles code-reviewer --findings '<JSON array>'
+   # --findings must match artifact-review-receipt.schema.json:
+   #   [{"severity":"blocking"|"suggestion","category":"…","description":"…",
+   #     "required_action"?:"…","location"?:"…"}]
+   # Only "blocking" makes the verdict changes_requested. Map reviewer scales
+   # (major/minor/nit) onto it: an unresolved must-fix is blocking; a finding
+   # already fixed is recorded as a suggestion ("[major, resolved] …").
+   # Anything else is rejected with [ARTIFACT_REVIEW_INVALID].
    # review-task records the receipt but does not close the task by itself:
    #   write evidence/REVIEW-execution-implement.md, then
    node dist/scripts/mission_controller.js record-evidence <MISSION_ID> self_review-code-review "<NOTE>" \
