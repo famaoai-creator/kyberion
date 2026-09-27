@@ -59,7 +59,7 @@ vi.mock('../secure-io.js', async () => {
   };
 });
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 let tmpRoot: string;
 let mod: typeof import('./mission-seal.js');
