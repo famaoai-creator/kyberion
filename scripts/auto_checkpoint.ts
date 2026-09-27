@@ -24,7 +24,7 @@ function buildCheckpointNote(state: any | null): string {
 
 async function runAutoCheckpoint(): Promise<number> {
   const gate = evaluateAutonomousOpsAction({ actionId: 'auto_checkpoint', executionMode: 'apply' });
-  if (gate.decision === 'approve') {
+  if (!gate.allowed) {
     logger.warn(`[auto-checkpoint] gated for approval: ${gate.reason}`);
     return 0;
   }

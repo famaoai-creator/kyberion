@@ -190,6 +190,21 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 - **P1-3(実装済み)** 秘密情報のポリシー自動承認は `decidedBy: policy:secret-introduction-local-low-risk`、`decidedByType: service` で記録する(スキーマの非人間の値は `service` / `ai_agent`)。依頼した人は note に残す。
 - **P1-4(期限切れは実装済み、ダイジェストへの掲載は P1-8)** 秘密情報の申請は作成から24時間で期限切れにする。掃除の処理は、`expiresAt` を過ぎた申請と、期限なしで14日を超えて放置された申請を、承認ストアの正規の遷移で `expired` にする。イベントには `reason` を記録する。定期実行への組み込みは未実施。
 
+### P1-5 の実装(2026-09-27、ミッション `MSN-AUTONOMY-GATE-MATRIX-20260927`)
+
+- **P1-5(実装済み)** `autonomous-ops-policy.json` を 1.1.0 にし、第2版の行動13件、`high_risk_paths`、`never_auto`、`active_hours`(09:00〜22:00、Asia/Tokyo)を追加した。行動ごとに `action_class`、`veto_window_minutes`、`max_attempts`、`required_evidence` を持てる。
+- ゲートは点数による段階に、次の規則で段階を上げる。上げた規則は結果の `escalations` に残る。
+  - 変更に `high_risk_paths` の該当があれば承認。リポジトリ外を指すパスも承認。
+  - `never_auto` の種類(行動の種類、または呼び出し側が検出した種類)なら承認。
+  - どれかの軸が3なら承認。取り消しやすさが2以上なら少なくとも通知。
+  - エージェントは `requestedDecision` で段階を上げられるが、下げられない。
+  - テナントの上書きは下限としてだけ効く(軸の点数は高い方、予算の上限は低い方)。
+- パスの照合は大文字と小文字を区別しない。ドライブ名付きのパスもリポジトリ外として扱う。テナントの上書きで、基本のポリシーにない行動は作れない。
+- 呼び出し側は `decision` ではなく `allowed` で実行を判断する(`auto_checkpoint`、`daemon_watchdog`)。
+- 第2版の行動はすべて試行モード(`shadow: true`)で登録した。ゲートは段階を計算するが、`allowed` は常に `false`。既存の6行動の判定は変わらない。
+- `tests/autonomous-ops-high-risk-coverage-contract.test.ts` は、名前が承認・権限・テナント・秘密情報などに当たる `libs/core` のモジュールが `high_risk_paths` に含まれることを確認する。新しいモジュールは一覧に加えるまでテストが失敗する。
+- 未実施: 決裁カード、拒否期間の実行、ダイジェスト(P1-6〜P1-8)、1日の予算、費用の見積もりがない場合の扱い。
+
 ## 安全策
 
 - 取り消せない操作は、段階に関係なく人の承認を必須にする。
