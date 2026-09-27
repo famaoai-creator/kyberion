@@ -206,6 +206,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         reason?: string;
         goalSummary?: string;
         successCondition?: string;
+        approvalRequestId?: string;
       }
     ) {
       return _approveScopeChange({
@@ -214,6 +215,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         reason: options?.reason || 'Approved scope adjustment.',
         goalSummary: options?.goalSummary || '',
         successCondition: options?.successCondition,
+        approvalRequestId: options?.approvalRequestId,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => syncProjectOperationalStateIfLinked(id));
     },

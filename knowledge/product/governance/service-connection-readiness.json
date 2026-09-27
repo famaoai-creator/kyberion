@@ -6,7 +6,8 @@
   },
   "required_services": {
     "comfyui": {
-      "required_keys_any": ["base_url", "output_dir"]
+      "required_keys_any": ["base_url", "output_dir"],
+      "required": false
     },
     "whisper": {
       "required_keys_any": [
@@ -15,10 +16,12 @@
         "whisper_cli_path",
         "whisper_python_bin",
         "apple_speech_available"
-      ]
+      ],
+      "required": false
     },
     "voice": {
-      "required_keys_any": ["voice_python_bin", "voice_name"]
+      "required_keys_any": ["voice_python_bin", "voice_name"],
+      "required": false
     },
     "meeting": {
       "required_keys_any": ["meeting_python_bin"],

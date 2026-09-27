@@ -18,12 +18,14 @@ export const dynamic = 'force-dynamic';
 
 // Mirrors the closed surface union of NotificationChannelTarget in
 // @agent/core/operator-notifications — the only surfaces the operator
-// notification path can deliver to.
+// notification path can deliver to. `inbox` is a local fallback and is not a
+// surface-provider channel, so it is handled explicitly below.
 const NOTIFIABLE_SURFACES: ReadonlyArray<NotificationChannelTarget['surface']> = [
   'slack',
   'imessage',
   'telegram',
   'discord',
+  'inbox',
 ];
 
 // Preferences live in knowledge/personal/ — reads and writes both go through
@@ -37,11 +39,16 @@ function withPreferences<T>(fn: (prefs: NotificationPreferences) => T): T {
 
 function listNotifiableChannels() {
   const directory = new Map(listChannelDirectoryEntries().map((entry) => [entry.channel, entry]));
-  return NOTIFIABLE_SURFACES.map((surface) => ({
-    surface,
-    display_name: directory.get(surface)?.displayName || surface,
-    status: directory.get(surface)?.status || 'unknown',
-  }));
+  return NOTIFIABLE_SURFACES.map((surface) => {
+    if (surface === 'inbox') {
+      return { surface, display_name: 'Local inbox', status: 'ready' };
+    }
+    return {
+      surface,
+      display_name: directory.get(surface)?.displayName || surface,
+      status: directory.get(surface)?.status || 'unknown',
+    };
+  });
 }
 
 export function GET(req: NextRequest) {
@@ -90,10 +97,15 @@ export async function POST(req: NextRequest) {
     }
 
     const knownChannels = new Set(listChannelDirectoryEntries().map((entry) => entry.channel));
-    const channel = isSurfaceAsyncChannel(surface) ? surface : undefined;
-    const notifiable =
-      channel !== undefined && (NOTIFIABLE_SURFACES as readonly string[]).includes(channel);
-    if (!channel || !notifiable || !knownChannels.has(channel)) {
+    const channel: NotificationChannelTarget['surface'] | undefined =
+      surface === 'inbox'
+        ? 'inbox'
+        : isSurfaceAsyncChannel(surface) &&
+            (NOTIFIABLE_SURFACES as readonly string[]).includes(surface)
+          ? (surface as NotificationChannelTarget['surface'])
+          : undefined;
+    const known = channel === 'inbox' || (channel !== undefined && knownChannels.has(channel));
+    if (!channel || !known) {
       return NextResponse.json(
         { ok: false, error: t('api.notification_surface') },
         { status: 400 }
