@@ -232,7 +232,7 @@ export async function requestDaemonRecovery(
         decision: evaluated?.decision ?? 'approve',
         trigger_status: receipt.status,
         // Anything short of `auto` needs a human before the daemon comes back.
-        requires_operator: evaluated?.decision !== 'auto',
+        requires_operator: evaluated?.decision !== 'auto' || !evaluated.allowed,
         ...(reason ? { reason } : {}),
       });
     }
