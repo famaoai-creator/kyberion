@@ -1,5 +1,6 @@
 import { withExecutionContext } from '@agent/core/authority';
 import { listApprovalRequests, type ApprovalRequestRecord } from '@agent/core/approval-store';
+import { isFixtureApproval } from '@agent/core/approval-store-hygiene';
 import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission-state';
 import { safeExecResult } from '@agent/core/secure-io';
 import * as path from 'node:path';
@@ -56,6 +57,8 @@ export interface HumanInterventionReport {
   items: HumanIntervention[];
 }
 
+export { isFixtureApproval };
+
 export const INTERVENTION_CATEGORIES: readonly InterventionCategory[] = [
   'planning',
   'pr_merge',
@@ -67,16 +70,8 @@ export const INTERVENTION_CATEGORIES: readonly InterventionCategory[] = [
   'other',
 ];
 
-const FIXTURE_TOKEN = /(?:^|[-_:/.\s])(?:tests?|fixtures?)(?:$|[-_:/.\s])/i;
-const FIXTURE_CHANNEL_PREFIX = /^qm\d+-/i;
-const FIXTURE_REQUESTER = /^human:alice$/i;
-// `U123` is the placeholder Slack user the surface suites decide with.
-const FIXTURE_DECIDER = /^U123$/;
-// Plugin-install suites name throwaway plugins `<label>-<pid>[-<uuid8>...]` and
-// file them as `plugin-installer`, so the requester alone cannot tell them apart.
-const FIXTURE_PLUGIN_TITLE = /fixture|-\d{3,6}-[0-9a-f]{8}|-\d{5,6}$/i;
-// Policy auto-approvals are stamped decidedByType=human by the approving
-// surface; the workflow note is the only durable marker that no human acted.
+// Older policy auto-approvals were stamped decidedByType=human; for those
+// records the workflow note is the only durable marker that no human acted.
 const AUTO_APPROVAL_NOTE = /^auto-approved/i;
 const CHAT_CHANNELS = new Set(['slack', 'telegram', 'discord', 'imessage']);
 const BOT_AUTHOR = /\[bot\]|github-actions|dependabot|renovate/i;
@@ -88,26 +83,6 @@ const MAX_CONFLICT_REPLAYS = 500;
 
 export const PR_ATTRIBUTION_NOTE =
   'PR merge attribution uses the merge commit author; an agent merging with the operator token counts as human, and squash merges are unattributed';
-
-export function isFixtureApproval(
-  record: Pick<ApprovalRequestRecord, 'storageChannel' | 'requestedBy'> & {
-    title?: string;
-    decidedBy?: string;
-  }
-): boolean {
-  const channel = record.storageChannel || '';
-  const requester = record.requestedBy || '';
-  const decider = record.decidedBy || '';
-  return (
-    FIXTURE_TOKEN.test(channel) ||
-    FIXTURE_CHANNEL_PREFIX.test(channel) ||
-    FIXTURE_TOKEN.test(requester) ||
-    FIXTURE_REQUESTER.test(requester) ||
-    FIXTURE_TOKEN.test(decider) ||
-    FIXTURE_DECIDER.test(decider) ||
-    (channel === 'plugin-install' && FIXTURE_PLUGIN_TITLE.test(record.title || ''))
-  );
-}
 
 export function isPolicyAutoApproval(record: Pick<ApprovalRequestRecord, 'workflow'>): boolean {
   const decided = (record.workflow?.approvals ?? []).filter(
