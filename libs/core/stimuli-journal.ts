@@ -11,6 +11,7 @@ import {
 } from './secure-io.js';
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
+import type { SlackSurfaceArtifact } from './channel-surface-types.js';
 
 const logger = createLogger('stimuli-journal');
 
@@ -213,7 +214,13 @@ function rotateStimuliJournal(maxBytes: number): boolean {
   return true;
 }
 
-export function appendStimulus(stimulus: NerveMessage): void {
+/**
+ * A record of the mixed journal: a nerve message, or a channel surface (GUSP)
+ * stimulus such as the one the Slack bridge ingests. Records are written as-is.
+ */
+export type StimuliJournalRecord = NerveMessage | SlackSurfaceArtifact['stimulus'];
+
+export function appendStimulus(stimulus: StimuliJournalRecord): void {
   withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => {
     appendJsonLine(safeStimuliPath(), stimulus);
     rotateStimuliJournal(STIMULI_MAX_BYTES);
