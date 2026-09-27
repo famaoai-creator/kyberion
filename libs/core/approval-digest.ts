@@ -138,7 +138,7 @@ export function buildDecisionDigest(input: {
       const item: DigestItem = {
         id: record.id,
         title: record.title,
-        detail: record.decisionCard?.ask ?? record.summary,
+        detail: record.decisionCard?.question ?? record.summary,
         level,
         ageMs: ageOf(record.requestedAt, now),
         ...(record.veto?.activeHours ? { timezone: record.veto.activeHours.timezone } : {}),

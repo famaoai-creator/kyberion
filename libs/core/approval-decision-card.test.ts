@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildDecisionCardContent,
-  describeGateEscalations,
+  decisionCardActionLabel,
   effectiveInterventionLevel,
   renderDecisionCardExplanation,
   renderDecisionCardText,
@@ -11,6 +10,7 @@ import {
 } from './approval-decision-card.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
+import { buildDecisionCard, describeGateEscalations } from './decision-card.js';
 
 const NOW = Date.parse('2026-09-28T03:00:00Z');
 
@@ -50,6 +50,14 @@ function record(overrides: Partial<ApprovalRequestRecord> = {}): ApprovalRequest
   } as ApprovalRequestRecord;
 }
 
+const VETO = {
+  windowMinutes: 120,
+  activeHours: { start: '09:00', end: '22:00', timezone: 'Asia/Tokyo' },
+  deliveryDeadlineAt: new Date(NOW + 30 * 60_000).toISOString(),
+  deliveredAt: new Date(NOW).toISOString(),
+  proceedsAt: '2026-09-28T05:00:00.000Z',
+};
+
 describe('intervention levels', () => {
   it('maps the gate decision to what the operator has to do', () => {
     expect(resolveInterventionLevel({ decision: 'auto' })).toBe('none');
@@ -68,15 +76,17 @@ describe('intervention levels', () => {
     expect(resolveInterventionTiming('none')).toBe('digest');
   });
 
-  it('reads legacy approvals and undelivered vetoes as decisions', () => {
+  it('reads cardless approvals, approve-tier cards and undelivered vetoes as decisions', () => {
     expect(effectiveInterventionLevel(record())).toBe('decide');
     expect(
       effectiveInterventionLevel(
+        record({ decisionCard: buildDecisionCard({ question: 'q', recommendation: 'r' }) })
+      )
+    ).toBe('decide');
+    expect(
+      effectiveInterventionLevel(
         record({
-          veto: {
-            windowMinutes: 60,
-            deliveryDeadlineAt: new Date(NOW - 1).toISOString(),
-          },
+          veto: { windowMinutes: 60, deliveryDeadlineAt: new Date(NOW - 1).toISOString() },
         }),
         NOW
       )
@@ -85,7 +95,7 @@ describe('intervention levels', () => {
 });
 
 describe('escalation reasons', () => {
-  it('turns gate codes into sentences', () => {
+  it('turns gate codes into sentences instead of the internal reason string', () => {
     const reasons = describeGateEscalations(
       gate({
         decision: 'approve',
@@ -99,6 +109,14 @@ describe('escalation reasons', () => {
       '重要なファイルを変更します: libs/core/secure-io.ts',
       '常に人が決める種類の操作です: dependency_major',
     ]);
+    const card = buildDecisionCard({
+      question: 'q',
+      recommendation: 'r',
+      gate: gate({ decision: 'approve', escalations: ['requested'] }),
+    });
+    expect(card.riskReasons).toEqual([
+      describeGateEscalations(gate({ escalations: ['requested'] }))[0],
+    ]);
   });
 
   it('falls back to the score when nothing escalated', () => {
@@ -111,58 +129,43 @@ describe('decision card view', () => {
   it('tells the operator a decision blocks only this work, and when it is withdrawn', () => {
     const view = viewDecisionCard(
       record({
-        expiresAt: '2026-09-30T03:00:00Z',
-        justification: { reason: 'legacy' },
-        decisionCard: {
-          level: 'decide',
-          ask: 'Merge?',
-          reasons: ['legacy'],
-          reversible: false,
+        decisionCard: buildDecisionCard({
+          question: 'Merge?',
+          recommendation: 'Approve.',
+          riskReasons: ['legacy'],
+          deadline: '2026-09-30T03:00:00Z',
           timezone: 'Asia/Tokyo',
-        },
+        }),
       }),
       { now: NOW, locale: 'ja' }
     );
     expect(view.level).toBe('decide');
     expect(view.reversible).toBe(false);
     expect(view.reasons).toEqual(['legacy']);
-    expect(view.ifNoResponse).toContain('止めたまま');
     expect(view.ifNoResponse).toBe(
       '判断があるまで、この作業は止めたままにします。その間も他の作業は進めます。9/30 12:00 を過ぎると取り下げます。'
     );
     expect(view.deadlineAt).toBe('2026-09-30T03:00:00Z');
-    expect(view.actions.map((action) => action.kind)).toEqual([
-      'approve',
-      'revise',
-      'reject',
-      'explain',
-    ]);
   });
 
   it('shows when a veto proceeds and labels the buttons for objecting', () => {
-    const content = buildDecisionCardContent({
-      gate: gate(),
-      ask: 'Merge PR 42 into main?',
-      recommendation: { choice: 'approve', rationale: 'CI green and cross-provider review passed' },
-      evidence: ['https://example.invalid/pr/42'],
-    });
-    const view = viewDecisionCard(
-      record({
-        decisionCard: content,
-        veto: {
-          windowMinutes: 120,
-          activeHours: { start: '09:00', end: '22:00', timezone: 'Asia/Tokyo' },
-          deliveryDeadlineAt: new Date(NOW + 30 * 60_000).toISOString(),
-          deliveredAt: new Date(NOW).toISOString(),
-          proceedsAt: '2026-09-28T05:00:00.000Z',
-        },
+    const vetoRecord = record({
+      decisionCard: buildDecisionCard({
+        question: 'Merge PR 42 into main?',
+        recommendation: 'Approve: CI green and cross-provider review passed',
+        gate: gate(),
+        level: 'veto',
+        evidence: [{ label: 'PR', ref: 'https://example.invalid/pr/42' }],
       }),
-      { now: NOW, locale: 'ja' }
-    );
+      veto: VETO,
+    });
+    const view = viewDecisionCard(vetoRecord, { now: NOW, locale: 'ja' });
     expect(view.level).toBe('veto');
     expect(view.reversible).toBe(true);
     expect(view.ifNoResponse).toBe('9/28 14:00 までに異議がなければ、自動で進めます。');
-    expect(view.actions.find((action) => action.kind === 'reject')?.label).toBe('止める(異議)');
+    expect(decisionCardActionLabel(vetoRecord, 'reject', 'ja')).toBe('止める(異議)');
+    expect(decisionCardActionLabel(vetoRecord, 'approve', 'ja')).toBe('今すぐ進める');
+    expect(decisionCardActionLabel(record(), 'reject', 'ja')).toBe('却下');
 
     const text = renderDecisionCardText(view, 'ja');
     const order = [
@@ -178,12 +181,18 @@ describe('decision card view', () => {
     const positions = order.map((marker) => text.indexOf(marker));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(text).toContain('- PR: https://example.invalid/pr/42');
   });
 
   it('marks shadow cards and omits the reply hint for report-only cards', () => {
     const fyi = viewDecisionCard(
       record({
-        decisionCard: { level: 'fyi', ask: 'Restarted a daemon', reasons: [], reversible: true },
+        decisionCard: buildDecisionCard({
+          question: 'Restarted a daemon',
+          recommendation: 'Nothing to do',
+          riskTier: 'notify',
+          level: 'fyi',
+        }),
       }),
       { now: NOW, locale: 'en' }
     );
@@ -192,7 +201,12 @@ describe('decision card view', () => {
 
     const shadow = viewDecisionCard(
       record({
-        decisionCard: { level: 'veto', ask: 'a', reasons: [], reversible: true, shadow: true },
+        decisionCard: buildDecisionCard({
+          question: 'a',
+          recommendation: 'b',
+          level: 'veto',
+          shadow: true,
+        }),
         veto: {
           windowMinutes: 60,
           deliveryDeadlineAt: new Date(NOW + 60_000).toISOString(),

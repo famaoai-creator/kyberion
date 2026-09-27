@@ -10,8 +10,8 @@ import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { isVitestProcess } from './foundation/env.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
+import { validateDecisionCard, type DecisionCard } from './decision-card.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
-import type { ApprovalDecisionCardContent } from './approval-decision-card.js';
 import type { ApprovalVetoWindow } from './approval-veto-window.js';
 import {
   eventScopeMatches,
@@ -214,14 +214,24 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   /** Canonical authority scope of the effect being approved. */
   scope?: EventScope;
   /**
-   * Autonomous-operation P1-6: the decision card every surface renders — what
-   * is asked, the recommendation, why a human is needed, and whether it can be
-   * undone. See `approval-decision-card.ts`.
+   * Autonomous-operation P1-6: what the operator sees on a phone — display
+   * only, never the decision. See `decision-card.ts` / `approval-decision-card.ts`.
    */
-  decisionCard?: ApprovalDecisionCardContent;
+  decisionCard?: DecisionCard;
+  /** Set when a rejection asks the requester to revise and re-submit. */
+  changeRequest?: ApprovalChangeRequest;
   /** Autonomous-operation P1-7: present when silence after delivery lets the request proceed. */
   veto?: ApprovalVetoWindow;
 }
+
+export interface ApprovalChangeRequest {
+  instruction: string;
+  requestedBy: string;
+  requestedAt: string;
+}
+
+/** Longest change instruction kept on a record. */
+export const APPROVAL_CHANGE_INSTRUCTION_MAX = 2000;
 
 export interface ApprovalDecisionPayload {
   requestId: string;
@@ -483,10 +493,11 @@ export function createApprovalRequest(
     source?: ApprovalRequestSource;
     steering?: ApprovalSteeringAction;
     scope?: EventScopeInput;
-    decisionCard?: ApprovalDecisionCardContent;
+    decisionCard?: DecisionCard;
     veto?: ApprovalVetoWindow;
   }
 ): ApprovalRequestRecord {
+  if (params.decisionCard) validateDecisionCard(params.decisionCard);
   if (params.veto && params.accountability?.finalDecision === 'human_only') {
     throw new Error(
       '[POLICY_VIOLATION] A veto-window request cannot also require a human-only final decision'
@@ -870,8 +881,21 @@ export function decideApprovalRequest(
      * real, authenticated human — never for rejections.
      */
     sessionCache?: ApprovalActionDescriptor;
+    /** Only with `rejected` — the requester should revise and re-submit. */
+    changeInstruction?: string;
   }
 ): ApprovalRequestRecord {
+  const changeInstruction = params.changeInstruction?.trim();
+  if (params.changeInstruction !== undefined) {
+    if (params.decision !== 'rejected') {
+      throw new Error('[POLICY_VIOLATION] A change instruction can only accompany a rejection');
+    }
+    if (!changeInstruction || changeInstruction.length > APPROVAL_CHANGE_INSTRUCTION_MAX) {
+      throw new Error(
+        `[POLICY_VIOLATION] A change instruction must be 1-${APPROVAL_CHANGE_INSTRUCTION_MAX} characters`
+      );
+    }
+  }
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
@@ -977,14 +1001,27 @@ export function decideApprovalRequest(
       }
     : undefined;
 
+  const { changeRequest: priorChangeRequest, ...recordWithoutChangeRequest } = record;
   const updated: ApprovalRequestRecord = {
-    ...record,
+    ...recordWithoutChangeRequest,
+    ...(priorChangeRequest && params.decision !== 'approved'
+      ? { changeRequest: priorChangeRequest }
+      : {}),
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(changeInstruction
+      ? {
+          changeRequest: {
+            instruction: changeInstruction,
+            requestedBy: params.decidedBy,
+            requestedAt: decidedAt,
+          },
+        }
+      : {}),
     workflow,
   };
 
@@ -1008,6 +1045,7 @@ export function decideApprovalRequest(
     // per-request workflow record.
     note: params.note,
     reason_category: params.reasonCategory,
+    ...(changeInstruction ? { change_instruction: changeInstruction } : {}),
   });
   projectApprovalWorkerEvent(
     'approval_response',

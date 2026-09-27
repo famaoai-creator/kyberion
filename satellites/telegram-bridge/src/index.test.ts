@@ -39,6 +39,7 @@ vi.mock('@agent/core/channel-surface', async (importOriginal) => {
 });
 
 import {
+  buildTelegramApprovalReplyMarkup,
   buildTelegramThreadContextFromEntries,
   handleTelegramCallbackQuery,
   handleTelegramUpdate,
@@ -46,6 +47,7 @@ import {
   parseTelegramThreadHistoryEntry,
   parseTelegramSendInput,
   readTelegramJsonObject,
+  resolveTelegramApprovalText,
   resolveTelegramBridgeInputPath,
   resolveTelegramThreadHistoryPath,
   type TelegramThreadHistoryEntry,
@@ -317,5 +319,125 @@ describe('telegram bridge thread context', () => {
 
     expect(receipt).toMatchObject({ ok: true, chatId: 'chat-approval' });
     expect(loadApprovalRequest('telegram', record.id)).toMatchObject({ status: 'approved' });
+  });
+});
+
+describe('telegram bridge decision cards', () => {
+  const card = {
+    question: 'Ship the billing change?',
+    recommendation: 'Approve after CI is green.',
+    riskTier: 'approve' as const,
+    riskReasons: ['touches billing'],
+    reversible: false,
+    evidence: [],
+  };
+
+  function createRequest(suffix: string, withCard = true) {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: 'chat-card',
+      threadTs: 'chat-card',
+      correlationId: `telegram-bridge-test-${RUN_ID}-${suffix}`,
+      requestedBy: 'telegram-surface-agent',
+      draft: { title: 'Billing change', summary: 'Adjust invoice rounding.' },
+      ...(withCard ? { decisionCard: card } : {}),
+    });
+    process.env.TEST_APPROVAL_ID = record.id;
+    return record;
+  }
+
+  it('lays out four card buttons two per row and keeps legacy requests at two', () => {
+    const record = createRequest('markup');
+    expect(
+      buildTelegramApprovalReplyMarkup(record).inline_keyboard.map((row) =>
+        row.map((button) => button.callback_data)
+      )
+    ).toEqual([
+      [`appr:${record.id}:approve`, `appr:${record.id}:changes`],
+      [`appr:${record.id}:reject`, `appr:${record.id}:explain`],
+    ]);
+    const legacy = createRequest('markup-legacy', false);
+    expect(buildTelegramApprovalReplyMarkup(legacy).inline_keyboard).toHaveLength(1);
+  });
+
+  it('turns a reply to the changes prompt into a change instruction', () => {
+    const id = '123e4567-e89b-12d3-a456-426614174000';
+    const text = `Reply with changes: X\nappr:${id}:changes`;
+    const botPrompt = { message_id: 1, text, from: { id: 1, is_bot: true } };
+    expect(
+      resolveTelegramApprovalText(
+        { message_id: 2, chat: { id: 'c' }, reply_to_message: botPrompt } as never,
+        'shorten it'
+      )
+    ).toBe(`appr:${id}:changes shorten it`);
+    const userMessage = { message_id: 1, text, from: { id: 99, is_bot: false } };
+    expect(
+      resolveTelegramApprovalText(
+        { message_id: 2, chat: { id: 'c' }, reply_to_message: userMessage } as never,
+        'ok go ahead'
+      )
+    ).toBe('ok go ahead');
+    expect(resolveTelegramApprovalText({ message_id: 3, chat: { id: 'c' } } as never, 'hi')).toBe(
+      'hi'
+    );
+  });
+
+  it('ignores card buttons from a sender outside the allowlist', async () => {
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['42'] });
+    const record = createRequest('unauthorized');
+    const receipt = await handleTelegramCallbackQuery(
+      {
+        id: 'callback-unauthorized',
+        from: { id: '7' },
+        message: { message_id: 10, chat: { id: 'chat-card' } },
+        data: `appr:${record.id}:changes stop`,
+      },
+      { dryRun: true }
+    );
+    expect(receipt).toMatchObject({ ignored: true, reason: 'unauthorized_sender' });
+    expect(loadApprovalRequest('telegram', record.id)).toMatchObject({ status: 'pending' });
+  });
+
+  it('answers the explain button without deciding the request', async () => {
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['42'] });
+    const record = createRequest('explain');
+    const receipt = await handleTelegramCallbackQuery(
+      {
+        id: 'callback-explain',
+        from: { id: '42' },
+        message: { message_id: 10, chat: { id: 'chat-card' } },
+        data: `appr:${record.id}:explain`,
+      },
+      { dryRun: true }
+    );
+    expect(receipt).toMatchObject({ ok: true, chatId: 'chat-card' });
+    expect(receipt.reply?.text).toContain('touches billing');
+    expect(loadApprovalRequest('telegram', record.id)).toMatchObject({ status: 'pending' });
+  });
+
+  it('records a reply to the changes prompt as a rejection with the instruction', async () => {
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['42'] });
+    const record = createRequest('changes');
+    await handleTelegramUpdate(
+      {
+        message: {
+          message_id: 11,
+          date: 1_700_000_011,
+          chat: { id: 'chat-card' },
+          from: { id: '42', username: 'operator' },
+          text: 'round half-even instead',
+          reply_to_message: {
+            message_id: 10,
+            text: `prompt\nappr:${record.id}:changes`,
+            from: { id: 1, is_bot: true },
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    expect(loadApprovalRequest('telegram', record.id)).toMatchObject({
+      status: 'rejected',
+      changeRequest: { instruction: 'round half-even instead' },
+    });
   });
 });

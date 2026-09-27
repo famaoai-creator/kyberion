@@ -25,7 +25,7 @@ import { withExecutionContext } from './authority.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
-import { parseDecisionToken, resolveSurfaceApprovalReply } from './surface-approval-ui.js';
+import { resolveSurfaceApprovalReply } from './surface-approval-ui.js';
 
 const CHAT = '424242';
 
@@ -53,15 +53,15 @@ function route(overrides: Partial<AutonomousOpsGateResult> = {}) {
     role: 'mission_controller',
     gate: gate(overrides),
     title: 'Merge PR 42',
-    ask: 'Merge PR 42 into main?',
+    question: 'Merge PR 42 into main?',
     requestedBy: 'agent:test',
-    recommendation: { choice: 'approve', rationale: 'CI green' },
+    recommendation: 'Approve: CI green',
     locale: 'ja',
   });
 }
 
 function routedReasonsLine(requestId: string): string {
-  return loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)!.decisionCard!.reasons[0];
+  return loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)!.decisionCard!.riskReasons[0];
 }
 
 describe('routeAutonomousDecision', () => {
@@ -144,7 +144,8 @@ describe('routeAutonomousDecision', () => {
       role: 'mission_controller',
       gate: gate({ decision: 'approve', allowed: false }),
       title: 'Naming question',
-      ask: 'Which name?',
+      question: 'Which name?',
+      recommendation: 'Either works',
       requestedBy: 'agent:test',
       blocking: false,
     });
@@ -174,12 +175,19 @@ describe('routeAutonomousDecision', () => {
       expect(loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId!)?.status).toBe('pending');
     });
 
-    it('asks for instructions, then records a change request as the decision note', () => {
+    it('asks for instructions, then records them as a change request', () => {
       const { requestId } = route({ decision: 'approve', allowed: false });
-      expect(reply(`appr:${requestId}:revise`).reply).toContain(`appr:${requestId}:revise`);
+      const prompt = reply(`appr:${requestId}:changes`);
+      expect(prompt.forceReply).toBe(true);
+      expect(prompt.reply).toContain(`appr:${requestId}:changes`);
+      // `revise` is an alias of `changes`.
       const answer = reply(`appr:${requestId}:revise テストを先に足してください`);
       expect(answer.reply).toContain('Merge PR 42');
-      expect(answer.record).toMatchObject({ status: 'rejected', decidedByType: 'human' });
+      expect(answer.record).toMatchObject({
+        status: 'rejected',
+        decidedByType: 'human',
+        changeRequest: { instruction: 'テストを先に足してください' },
+      });
     });
 
     it('approves a human-only decision from the delivering chat', () => {
@@ -203,25 +211,19 @@ describe('routeAutonomousDecision', () => {
     });
   });
 
-  describe('parseDecisionToken', () => {
-    const id = '123e4567-e89b-12d3-a456-426614174000';
-
-    it('splits the verb from free-text instructions', () => {
-      expect(parseDecisionToken(`appr:${id}:REVISE  add tests\nfirst`)).toEqual({
-        requestId: id,
-        verb: 'revise',
-        trailing: 'add tests\nfirst',
-      });
-      expect(parseDecisionToken(`appr:${id}:approve`)).toEqual({ requestId: id, verb: 'approve' });
-      expect(parseDecisionToken(`appr:${id}:approvex`)).toBeNull();
-      expect(parseDecisionToken(`appr:${id}:why:quality`)).toBeNull();
+  it('parses change instructions in linear time on adversarial whitespace', () => {
+    const { requestId } = route({ decision: 'approve', allowed: false });
+    const hostile = `appr:${requestId}:changes${' \t'.repeat(50_000)}x${' '.repeat(50_000)}!`;
+    const started = performance.now();
+    const answer = resolveSurfaceApprovalReply({
+      surface: 'telegram',
+      channel: CHAT,
+      threadTs: CHAT,
+      text: hostile,
+      decidedBy: 'operator-1',
     });
-
-    it('stays linear on adversarial whitespace', () => {
-      const hostile = `appr:${id}:revise${' \t'.repeat(50_000)}x${' '.repeat(50_000)}!`;
-      const started = performance.now();
-      expect(parseDecisionToken(hostile)?.trailing?.endsWith('!')).toBe(true);
-      expect(performance.now() - started).toBeLessThan(500);
-    });
+    expect(performance.now() - started).toBeLessThan(1000);
+    // Longer than the 2000-character instruction limit: refused, still pending.
+    expect(answer.record?.status).toBe('pending');
   });
 });
