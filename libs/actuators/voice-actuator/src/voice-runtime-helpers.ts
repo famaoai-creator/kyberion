@@ -1,4 +1,3 @@
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
 import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual/virtual-device-inventory-bridge';
 import {
@@ -25,6 +24,7 @@ import { retry } from '@agent/core/async-utils';
 import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import type {
   SpeechToTextCapabilities,
   TranscriptSegment,
@@ -40,10 +40,10 @@ const DEFAULT_VOICE_RETRY = {
   factor: 2,
   jitter: true,
 };
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: VOICE_MANIFEST_PATH,
-  defaults: DEFAULT_VOICE_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_VOICE_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'faster_whisper' | 'kokoro_tts' | 'pocket_tts';

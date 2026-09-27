@@ -1,7 +1,9 @@
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 import { retry } from '@agent/core/async-utils';
-import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -37,10 +39,10 @@ const DEFAULT_APPROVAL_RETRY = {
   jitter: true,
 };
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: APPROVAL_MANIFEST_PATH,
-  defaults: DEFAULT_APPROVAL_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_APPROVAL_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 export interface ApprovalAction {
