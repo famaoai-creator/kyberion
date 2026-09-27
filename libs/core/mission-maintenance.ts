@@ -38,6 +38,7 @@ import {
   reissueBlockedMissionTasks,
 } from './mission-task-recovery.js';
 import {
+  assertValidArtifactReviewReceipt,
   buildArtifactReviewReceipt,
   evaluateArtifactReviews,
   hashArtifactForReview,
@@ -889,6 +890,8 @@ export async function recordArtifactReview(args: {
     findings: args.findings || [],
     acceptanceCriteria,
   });
+
+  assertValidArtifactReviewReceipt(receipt);
 
   const receiptRelPath = `evidence/reviews/${args.reviewTaskId}-r1.json`;
   const receiptPath = safeMissionArtifactPath(missionPath, receiptRelPath);
