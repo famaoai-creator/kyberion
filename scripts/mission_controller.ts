@@ -888,6 +888,8 @@ Maintenance Commands:
                                  Record a real ArtifactReviewReceipt for a review-kind task (required before it
                                  can complete — bare record-evidence is not enough for review tasks). Independence
                                  from the implementer is computed from the execution ledger, not self-declared.
+                                 --findings: JSON array of {severity: blocking|suggestion, category, description,
+                                 required_action?, location?}; anything else is rejected before a receipt is written.
   reconcile-work <ID> --manifest <PATH> [--dry-run] [--approval-request-id <UUID>]
                                  --request-approval [--requested-by <ACTOR>] creates a hash-bound human approval request
                                  --generate [--output <PATH>] scaffolds a manifest from current git state
