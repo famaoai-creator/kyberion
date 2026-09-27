@@ -90,6 +90,7 @@
     "libs/core/secure-io.test.ts",
     "libs/core/secure-io.ts",
     "libs/core/security-boundary.contract.test.ts",
+    "libs/core/service-connection-readiness.test.ts",
     "libs/core/speech-to-text-bridge.test.ts",
     "libs/core/src/actuator-capability.test.ts",
     "libs/core/src/feedback-loop.test.ts",
