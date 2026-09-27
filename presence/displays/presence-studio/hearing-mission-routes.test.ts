@@ -310,6 +310,32 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(persisted.mission_id).toBeUndefined();
   });
 
+  it('runs the controller child as mission_controller, delegated under SYSTEM_ROLE (DR-01)', () => {
+    const savedSystemRole = process.env.SYSTEM_ROLE;
+    process.env.SYSTEM_ROLE = 'presence_studio';
+    try {
+      vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+      vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
+      vi.mocked(findMissionPath).mockReturnValue(null);
+      vi.mocked(loadState).mockReturnValue(null);
+      const sessionId = `sess-${randomUUID()}`;
+      saveHearingRecord(namespace, decidedRecord(sessionId));
+
+      handoff(fakeRequest({ params: { session: sessionId } }), fakeResponse());
+      const [, args, options] = vi.mocked(safeExecResult).mock.calls[0] ?? [];
+      expect(args?.[0]).toBe('dist/scripts/mission_controller.js');
+      // SYSTEM_ROLE is inherited (it outranks MISSION_ROLE), so the role is delegated.
+      expect(options?.env).toMatchObject({
+        SYSTEM_ROLE: 'presence_studio',
+        MISSION_ROLE: 'mission_controller',
+        KYBERION_DELEGATED_ROLE: 'mission_controller@presence_studio',
+      });
+    } finally {
+      if (savedSystemRole === undefined) delete process.env.SYSTEM_ROLE;
+      else process.env.SYSTEM_ROLE = savedSystemRole;
+    }
+  });
+
   it('creates the mission, writes the brief evidence, opens the alignment request, and is idempotent on a second call', () => {
     const sessionId = `sess-${randomUUID()}`;
     const record = decidedRecord(sessionId);

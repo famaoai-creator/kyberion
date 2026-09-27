@@ -1,3 +1,4 @@
+import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { hudExec, distScript } from './exec.js';
 import { auditAction, type ActionResult } from './dispatch.js';
 
@@ -12,7 +13,10 @@ export function runSurfaceAction(kind: SurfaceActionKind, surfaceId: string): Ac
     'node',
     [distScript('surface_runtime.js'), '--action', kind, '--surface', surfaceId],
     {
-      env: { KYBERION_PERSONA: 'worker', SYSTEM_ROLE: 'surface_runtime' },
+      env: buildSystemRoleLaunchEnv({}, 'surface_runtime', { persona: 'worker' }) as Record<
+        string,
+        string
+      >,
       timeoutMs: 120000,
     }
   );
