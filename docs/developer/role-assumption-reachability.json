@@ -63,6 +63,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/authn-providers.ts#<module>",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1336,6 +1341,11 @@
     {
       "site": "scripts/apply_dependency_patch.ts#main",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_store_hygiene.ts#runApprovalStoreHygieneSweeps",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {

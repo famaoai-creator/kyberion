@@ -283,6 +283,10 @@
       "types": "./dist/approval-store.d.ts",
       "default": "./dist/approval-store.js"
     },
+    "./approval-store-hygiene": {
+      "types": "./dist/approval-store-hygiene.d.ts",
+      "default": "./dist/approval-store-hygiene.js"
+    },
     "./approval-audit": {
       "types": "./dist/approval-audit.d.ts",
       "default": "./dist/approval-audit.js"

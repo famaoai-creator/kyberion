@@ -402,7 +402,11 @@ export async function runStepsInternal(
           );
         }
         const expired = suspended.timeout_at && Date.parse(suspended.timeout_at) <= Date.now();
-        if (expired || (existing && isApprovalRequestExpired(existing))) {
+        if (
+          expired ||
+          existing?.status === 'expired' ||
+          (existing && isApprovalRequestExpired(existing))
+        ) {
           if (suspended.on_timeout === 'deny') {
             return {
               ...ctx,
