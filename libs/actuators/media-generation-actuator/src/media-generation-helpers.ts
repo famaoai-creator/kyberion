@@ -1,10 +1,8 @@
 import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  createGovernedRetryOptionsBuilder,
-  loadRecoveryPolicy as loadCoreRecoveryPolicy,
-} from '@agent/core/recovery-policy';
+import { loadRecoveryPolicy as loadCoreRecoveryPolicy } from '@agent/core/recovery-policy';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { retry, sleep } from '@agent/core/async-utils';
 import {
   compileMusicGenerationADF,
@@ -146,10 +144,10 @@ function loadRecoveryPolicy(): Record<string, any> {
   return loadCoreRecoveryPolicy(MEDIA_GENERATION_MANIFEST_PATH);
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
-  defaults: DEFAULT_MEDIA_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_MEDIA_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function ensureGenerationJobDir(): void {
