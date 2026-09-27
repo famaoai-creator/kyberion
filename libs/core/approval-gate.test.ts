@@ -180,6 +180,22 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it('re-requests instead of blocking forever on a swept expired request', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([
+      { id: 'req-old', correlationId: 'corr-123', status: 'expired' } as any,
+    ]);
+    mockCreateRequest.mockReturnValue({ id: 'req-new', status: 'pending' } as any);
+
+    const result = enforceApprovalGate(baseParams);
+
+    expect(result.allowed).toBe(false);
+    expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+    expect(result.requestId).toBe('req-new');
+  });
+
   it('treats an approved request with a malformed expiresAt as expired (fail closed)', () => {
     mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
     mockResolveDecisionRightsMatrix.mockReturnValue(null);
