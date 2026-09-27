@@ -14,8 +14,10 @@ import { safeLstat, safeRmSync } from '@agent/core/secure-io';
 /**
  * Screen coordinates for system clicks addressed by a Set-of-Marks target.
  * An explicit coordinate always wins; `target_mark` (`mark:<n>` from vision
- * mark_elements) is resolved only when no coordinate is given, into logical
- * points (the marks' display scale is applied by the resolver).
+ * mark_elements) is resolved only when no coordinate is given, into click
+ * points (the marks' display scale is applied by the resolver): macOS logical
+ * points, Windows virtual-desktop physical pixels (the Windows click path is
+ * per-monitor DPI aware).
  *
  * A mark is clicked only after the current screen is compared with the marked
  * screenshot, always through a fresh capture of the marks' display by the

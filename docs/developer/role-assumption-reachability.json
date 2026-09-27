@@ -1920,6 +1920,9 @@
     "libs/core/virtual-camera-injection-bridge.ts#isAvailableCommand": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "libs/core/windows-os-automation.ts#runWindowsPointerActions": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
     "scripts/backup.ts#runRequired": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -2363,6 +2366,7 @@
         "libs/core/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual-camera-injection-bridge.ts#isAvailableCommand",
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -2558,7 +2562,8 @@
         "libs/core/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
-        "libs/core/speech-to-text-bridge.ts#ShellSpeechToTextBridge"
+        "libs/core/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions"
       ],
       "policy_roles_not_reachable": []
     },
@@ -3834,6 +3839,7 @@
         "libs/core/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual-camera-injection-bridge.ts#isAvailableCommand",
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -4067,6 +4073,7 @@
         "libs/core/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
