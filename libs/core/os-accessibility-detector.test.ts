@@ -7,7 +7,6 @@ import {
   OS_ACCESSIBILITY_MAX_SCAN,
   OS_ACCESSIBILITY_WINDOWS_ENUMERATE_SCRIPT,
   OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV,
-  OS_ACCESSIBILITY_WALKER_CACHE_DIR,
   OS_ACCESSIBILITY_WINDOWS_PROBE_SCRIPT,
   OS_ACCESSIBILITY_WINDOWS_WALK_BUDGET_MS,
   OsAccessibilityDetector,
@@ -791,7 +790,7 @@ describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
     try {
       const { run, calls } = fakeWindowsRunner();
       const application = "notepad'; Remove-Item C:\\ -Recurse; '";
-      await new OsAccessibilityDetector({ run, platform: 'win32', walkerCacheDir: null }).detect({
+      await new OsAccessibilityDetector({ run, platform: 'win32' }).detect({
         ...live,
         application,
       });
@@ -811,18 +810,6 @@ describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
     } finally {
       vi.unstubAllEnvs();
     }
-  });
-
-  it('passes the compiled-walker cache dir in the options, never in the script', async () => {
-    const { run, calls } = fakeWindowsRunner();
-    const cacheDir = 'C:\\kyberion\\active\\shared\\runtime\\uia-walker';
-    await new OsAccessibilityDetector({ run, platform: 'win32', walkerCacheDir: cacheDir }).detect(
-      live
-    );
-    const options = JSON.parse(calls[0].options.env?.[OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV] ?? '');
-    expect(options.walkerCacheDir).toBe(cacheDir);
-    expect(calls[0].script).not.toContain('uia-walker');
-    expect(OS_ACCESSIBILITY_WALKER_CACHE_DIR).toBe('active/shared/runtime/uia-walker');
   });
 
   it('turns a not_frontmost snapshot into no candidates', async () => {
@@ -952,33 +939,27 @@ describe('Windows enumeration script', () => {
     );
   });
 
-  it('loads the compiled walker from the cache dir by source hash and falls back to an in-memory compile', () => {
-    const cache = script.slice(
-      script.indexOf('$walkerSource = '),
-      script.indexOf('$compileMs = $compileClock.ElapsedMilliseconds')
+  it('compiles the walker in memory only, the COM walker only when the managed walk finds no controls', () => {
+    // Nothing compiled is ever written to or loaded from disk.
+    expect(script).not.toMatch(
+      /-OutputAssembly|Add-Type\s+-Path|Add-Type\s+-LiteralPath|LoadFrom|LoadFile/
     );
-    expect(cache).toContain('$opts.walkerCacheDir');
-    expect(cache).toContain('[System.Security.Cryptography.SHA256]::Create()');
-    expect(cache).toContain("[System.IO.Path]::Combine($cacheDir, $hash + '.dll')");
-    expect(cache).toContain('Add-Type -Path $dll');
-    expect(cache).toContain('-OutputAssembly $tmpDll');
-    expect(cache).toContain('[System.IO.File]::Move($tmpDll, $dll)');
-    // Every path the script writes is built from $cacheDir.
-    const written = [...cache.matchAll(/\$(\w+) = \[System\.IO\.Path\]::Combine\(([^,]+),/g)].map(
-      (match) => [match[1], match[2]]
+    expect(script).not.toContain('walkerCacheDir');
+    const native = script.indexOf(
+      'Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)'
     );
-    expect(written).toEqual([
-      ['dll', '$cacheDir'],
-      ['tmpDll', '$cacheDir'],
-    ]);
-    expect(cache).not.toMatch(/Out-File|Set-Content|WriteAll|CreateDirectory|\$env:TEMP/);
-    // The in-memory compile (with its COM-less fallback) runs whenever the cache did not load the types.
-    expect(cache).toMatch(
-      /if \(-not \('KyberionUiaNative' -as \[type\]\)\) \{\n  try \{\n    Add-Type -TypeDefinition \$walkerSource/
+    const managed = script.indexOf('$cache.Push()');
+    const com = script.indexOf(
+      'Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csCom)'
     );
-    expect(script).toContain(`',"walker":' + $walkerDiag`);
+    expect(native).toBeGreaterThan(0);
+    expect(native).toBeLessThan(managed);
+    expect(com).toBeGreaterThan(managed);
+    expect(script.slice(script.lastIndexOf('if ($chosenActionable -eq 0) {', com), com)).toContain(
+      '$comClock'
+    );
     expect(script).toContain(
-      `'{"cache":' + (JS $walkerCache) + ',"cached":' + (JB ($walkerCache -eq 'hit')) + ',"compile_ms":' + $compileMs`
+      `'{"cache":"off","cached":false,"compile_ms":' + $compileMs + ',"com_compile_ms":' + $comMsJson + '}'`
     );
   });
 
