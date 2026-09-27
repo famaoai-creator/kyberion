@@ -153,6 +153,10 @@ export interface AccessibilityElement {
   description?: string | null;
   /** Windows: UIA IsPassword (the element is a password field). */
   password?: boolean;
+  /** Windows: UIA ClassName (the Win32 window class for Win32 / WinForms controls). */
+  class_name?: string;
+  /** Windows: UIA FrameworkId ('Win32', 'WinForm', 'WPF', 'XAML', 'DirectUI', ...). */
+  framework_id?: string;
   /**
    * Global logical points (top-left of the main display is 0,0); on Windows
    * physical pixels (top-left of the primary monitor is 0,0).
@@ -463,20 +467,20 @@ public static class KyberionUiaComWalker {
       walk.ReadErrors++;
       return;
     }
+    string cls = null;
+    string fw = null;
+    try {
+      cls = e.GetCurrentPropertyValue(30012) as string;
+      fw = e.GetCurrentPropertyValue(30024) as string;
+    } catch (Exception) { }
     if (walk.Sample.Count < 20) {
-      string cls = null;
-      string fw = null;
-      try {
-        cls = e.GetCurrentPropertyValue(30012) as string;
-        fw = e.GetCurrentPropertyValue(30024) as string;
-      } catch (Exception) { }
       walk.Sample.Add(@"{""depth"":" + depth.ToString(CultureInfo.InvariantCulture) + @",""control_type"":" + KyberionUiaJson.Str(type) + @",""class_name"":" + KyberionUiaJson.Str(cls) + @",""framework_id"":" + KyberionUiaJson.Str(fw) + @",""offscreen"":" + (offscreen ? "true" : "false") + @",""rect"":" + Rect(rect) + "}");
     }
     if (offscreen) { walk.SkippedOffscreen++; return; }
     if (rect == null || rect.Length < 4 || !(rect[2] > 0) || !(rect[3] > 0)) { walk.SkippedEmpty++; return; }
     walk.EmittedByDepth[d]++;
     if (password || Array.IndexOf(actionable, type) >= 0) walk.Actionable++;
-    walk.Elements.Add(@"{""role"":" + KyberionUiaJson.Str(type) + @",""title"":" + KyberionUiaJson.Str(name) + @",""description"":" + KyberionUiaJson.Str(help) + (password ? @",""password"":true" : "") + @",""x"":" + KyberionUiaJson.Num(rect[0]) + @",""y"":" + KyberionUiaJson.Num(rect[1]) + @",""width"":" + KyberionUiaJson.Num(rect[2]) + @",""height"":" + KyberionUiaJson.Num(rect[3]) + "}");
+    walk.Elements.Add(@"{""role"":" + KyberionUiaJson.Str(type) + @",""title"":" + KyberionUiaJson.Str(name) + @",""description"":" + KyberionUiaJson.Str(help) + (password ? @",""password"":true" : "") + @",""class_name"":" + KyberionUiaJson.Str(cls) + @",""framework_id"":" + KyberionUiaJson.Str(fw) + @",""x"":" + KyberionUiaJson.Num(rect[0]) + @",""y"":" + KyberionUiaJson.Num(rect[1]) + @",""width"":" + KyberionUiaJson.Num(rect[2]) + @",""height"":" + KyberionUiaJson.Num(rect[3]) + "}");
   }
   public static KyberionUiaWalk Walk(IntPtr hwnd, bool raw, int maxDepth, int maxScan, int remainingMs, string[] actionableTypes) {
     int deadline = unchecked(Environment.TickCount + remainingMs);
@@ -612,7 +616,7 @@ try {
           if ($c.IsPassword -or ($actionableTypes -contains $type)) { $actionable += 1 }
           $pw = ''
           if ($c.IsPassword) { $pw = ',"password":true' }
-          $items.Add('{"role":' + (JS $type) + ',"title":' + (JS $c.Name) + ',"description":' + (JS $c.HelpText) + $pw + ',"x":' + (JN $r.X) + ',"y":' + (JN $r.Y) + ',"width":' + (JN $r.Width) + ',"height":' + (JN $r.Height) + '}')
+          $items.Add('{"role":' + (JS $type) + ',"title":' + (JS $c.Name) + ',"description":' + (JS $c.HelpText) + $pw + ',"class_name":' + (JS $c.ClassName) + ',"framework_id":' + (JS $c.FrameworkId) + ',"x":' + (JN $r.X) + ',"y":' + (JN $r.Y) + ',"width":' + (JN $r.Width) + ',"height":' + (JN $r.Height) + '}')
         }
       } catch { $readErrors += 1 }
       $queue.Enqueue([pscustomobject]@{ Element = $child; Depth = $depth })
@@ -728,6 +732,12 @@ export function parseAccessibilitySnapshot(stdout: string): AccessibilitySnapsho
       title: text(entry.title),
       description: text(entry.description),
       ...(entry.password === true ? { password: true } : {}),
+      ...(typeof entry.class_name === 'string' && entry.class_name
+        ? { class_name: entry.class_name }
+        : {}),
+      ...(typeof entry.framework_id === 'string' && entry.framework_id
+        ? { framework_id: entry.framework_id }
+        : {}),
       x: entry.x as number,
       y: entry.y as number,
       width: entry.width as number,
@@ -762,19 +772,68 @@ export function parseAccessibilitySnapshot(stdout: string): AccessibilitySnapsho
 }
 
 /**
+ * Win32 window classes (compared case-insensitively) for controls that UI
+ * Automation reports only as Pane / Custom when the Win32 client-side proxies
+ * are not active (seen on GitHub's Windows Server 2025 runners). Edit and rich
+ * edit controls are editable text; list and tree views are containers, not
+ * click targets, so they are left unmapped, as are status bars.
+ */
+export const WIN32_CLASS_TO_AX_ROLE: Readonly<Record<string, string>> = {
+  edit: 'AXTextArea',
+  richedit: 'AXTextArea',
+  richedit20a: 'AXTextArea',
+  richedit20w: 'AXTextArea',
+  richedit50w: 'AXTextArea',
+  richeditd2dpt: 'AXTextArea',
+  button: 'AXButton',
+  combobox: 'AXComboBox',
+  comboboxex32: 'AXComboBox',
+  msctls_trackbar32: 'AXSlider',
+  msctls_updown32: 'AXIncrementor',
+  syslink: 'AXLink',
+  systabcontrol32: 'AXTab',
+};
+const WIN32_FRAMEWORKS: ReadonlySet<string> = new Set(['win32', 'winform']);
+// Control types UIA falls back to when it cannot tell what a Win32 window is.
+const UIA_FALLBACK_TYPES: ReadonlySet<string> = new Set(['Pane', 'Custom']);
+
+/**
+ * AX role for a Win32 / WinForms window class, or undefined. WinForms classes
+ * look like `WindowsForms10.EDIT.app.0.141b42a_r6_ad1`: the token after
+ * `WindowsForms10.` is the underlying Win32 class.
+ */
+export function axRoleFromWin32Class(className: string | undefined): string | undefined {
+  if (!className) return undefined;
+  let key = className.toLowerCase();
+  const winForms = /^windowsforms10\.([^.]+)\./.exec(key);
+  if (winForms) key = winForms[1];
+  return Object.hasOwn(WIN32_CLASS_TO_AX_ROLE, key) ? WIN32_CLASS_TO_AX_ROLE[key] : undefined;
+}
+
+/**
  * A Windows UIA element in the AX vocabulary: the control type becomes its AX
  * role (UIA_TO_AX_ROLE, else `uia:<Type>`), and a password field of any control
  * type becomes an AXTextField with subrole AXSecureTextField, so it is editable
- * and never labelled.
+ * and never labelled. A Win32 / WinForms element that UIA could only report as
+ * Pane / Custom / an unknown type is mapped by its window class instead
+ * (WIN32_CLASS_TO_AX_ROLE).
  */
 export function normaliseUiaElement(element: AccessibilityElement): AccessibilityElement {
   if (element.password === true) {
     return { ...element, role: 'AXTextField', subrole: 'AXSecureTextField' };
   }
-  const role = Object.hasOwn(UIA_TO_AX_ROLE, element.role)
+  const mapped = Object.hasOwn(UIA_TO_AX_ROLE, element.role)
     ? UIA_TO_AX_ROLE[element.role]
-    : `uia:${element.role}`;
-  return { ...element, role, subrole: null };
+    : undefined;
+  if (!mapped || UIA_FALLBACK_TYPES.has(element.role)) {
+    const framework = element.framework_id?.toLowerCase();
+    const byClass =
+      framework && WIN32_FRAMEWORKS.has(framework)
+        ? axRoleFromWin32Class(element.class_name)
+        : undefined;
+    if (byClass) return { ...element, role: byClass, subrole: null };
+  }
+  return { ...element, role: mapped ?? `uia:${element.role}`, subrole: null };
 }
 
 export function isEditableAccessibilityElement(element: AccessibilityElement): boolean {

@@ -12,6 +12,7 @@ import {
   OsAccessibilityDetector,
   POWERSHELL_STDIN_BOOTSTRAP,
   UIA_TO_AX_ROLE,
+  axRoleFromWin32Class,
   encodePowerShellCommand,
   powerShellStdinArgs,
   candidatesFromAccessibility,
@@ -677,6 +678,113 @@ describe('OsAccessibilityDetector on Windows (UI Automation)', () => {
     ).toEqual([true, true, true]);
   });
 
+  it('maps Win32 / WinForms window classes when UIA only reports a pane', () => {
+    const win32 = (className: string, role = 'Pane', framework_id = 'Win32') =>
+      normaliseUiaElement(element(role, 0, 0, 1, 1, { class_name: className, framework_id }));
+    expect(
+      [
+        'Edit',
+        'RichEdit20A',
+        'RichEdit20W',
+        'RICHEDIT50W',
+        'RichEditD2DPT',
+        'Button',
+        'ComboBox',
+        'ComboBoxEx32',
+        'msctls_trackbar32',
+        'msctls_updown32',
+        'SysLink',
+        'SysTabControl32',
+      ].map((className) => win32(className).role)
+    ).toEqual([
+      'AXTextArea',
+      'AXTextArea',
+      'AXTextArea',
+      'AXTextArea',
+      'AXTextArea',
+      'AXButton',
+      'AXComboBox',
+      'AXComboBox',
+      'AXSlider',
+      'AXIncrementor',
+      'AXLink',
+      'AXTab',
+    ]);
+    // WinForms: the token after WindowsForms10. is the Win32 class.
+    expect(win32('WindowsForms10.EDIT.app.0.141b42a_r6_ad1', 'Pane', 'WinForm').role).toBe(
+      'AXTextArea'
+    );
+    expect(win32('WindowsForms10.BUTTON.app.0.2bf8098_r6_ad1', 'Custom', 'WinForm').role).toBe(
+      'AXButton'
+    );
+    expect(win32('WindowsForms10.Window.8.app.0.2bf8098', 'Pane', 'WinForm').role).toBe('uia:Pane');
+    // Unknown control type ids fall back to the class as well.
+    expect(win32('Edit', 'Id50099').role).toBe('AXTextArea');
+    // Containers, status bars and unknown classes stay non-interactive.
+    for (const className of [
+      'msctls_statusbar32',
+      'SysListView32',
+      'SysTreeView32',
+      'ListBox',
+      'Foo',
+    ]) {
+      expect(win32(className).role).toBe('uia:Pane');
+    }
+    // Only Win32 / WinForms: a XAML or WPF pane is never guessed from its class.
+    expect(win32('Edit', 'Pane', 'XAML').role).toBe('uia:Pane');
+    expect(win32('Button', 'Pane', 'WPF').role).toBe('uia:Pane');
+    // A real control type wins over the class.
+    expect(win32('Edit', 'Button').role).toBe('AXButton');
+    expect(axRoleFromWin32Class(undefined)).toBeUndefined();
+  });
+
+  it('marks the classic Notepad edit pane as editable and never labels it', async () => {
+    const { run } = fakeWindowsRunner({
+      snapshot: {
+        screen: { width: 1000, height: 600 },
+        application: 'notepad',
+        window: { x: 50, y: 50, width: 800, height: 500 },
+        elements: [
+          {
+            role: 'Pane',
+            title: 'Text Editor',
+            class_name: 'Edit',
+            framework_id: 'Win32',
+            x: 60,
+            y: 103,
+            width: 752,
+            height: 437,
+          },
+          {
+            role: 'Pane',
+            title: 'Ln 1, Col 1',
+            class_name: 'msctls_statusbar32',
+            framework_id: 'Win32',
+            x: 60,
+            y: 540,
+            width: 752,
+            height: 20,
+          },
+        ],
+      },
+    });
+    const detector = new OsAccessibilityDetector({ run, platform: 'win32' });
+    const snapshot = await detector.readSnapshot(live);
+    expect(snapshot.elements.map((entry) => entry.class_name)).toEqual([
+      'Edit',
+      'msctls_statusbar32',
+    ]);
+    expect(await detector.detect({ ...live, image_size: { width: 1000, height: 600 } })).toEqual([
+      {
+        box: { x: 60, y: 103, width: 752, height: 437 },
+        source: 'accessibility',
+        kind: 'control',
+        score: 1,
+        editable: true,
+      },
+    ]);
+  });
+
   it('passes options through the child environment, never through the script text', async () => {
     vi.stubEnv('SystemRoot', 'C:\\Windows');
     try {
@@ -819,6 +927,16 @@ describe('Windows enumeration script', () => {
       script.indexOf('$comCompileError = $null')
     );
     expect(csharp).not.toMatch(/HashSet|System\.Linq|System\.Diagnostics|Queue</);
+  });
+
+  it('emits the class name and framework of every element from every walker', () => {
+    expect(script).toContain(
+      `',"class_name":' + (JS $c.ClassName) + ',"framework_id":' + (JS $c.FrameworkId)`
+    );
+    const csharp = script.slice(script.indexOf('static void Record('));
+    expect(csharp).toContain(
+      '@",""class_name"":" + KyberionUiaJson.Str(cls) + @",""framework_id"":" + KyberionUiaJson.Str(fw) + @",""x"":"'
+    );
   });
 
   it('lists exactly the mapped UIA control types as actionable', () => {
