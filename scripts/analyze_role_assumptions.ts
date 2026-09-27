@@ -341,9 +341,30 @@ export function renderReachabilityReport(report: RoleAssumptionReachabilityRepor
 }
 
 /** Compare reports by content so formatter (prettier) layout never reads as staleness. */
+/** Fields that only illustrate a path and depend on graph traversal order. */
+const ORDER_SENSITIVE_FIELDS = new Set(['example_path']);
+
+function stripOrderSensitive(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripOrderSensitive);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !ORDER_SENSITIVE_FIELDS.has(key))
+      .map(([key, entry]) => [key, stripOrderSensitive(entry)])
+  );
+}
+
+/**
+ * The staleness comparison (`--check`): by content, not layout, and without
+ * the illustrative example paths, so an unrelated refactor that only changes
+ * which path the BFS finds first does not fail the gate. Roles, sites,
+ * unresolved sites and child-process entries are compared.
+ */
 export function normalizeReachabilityReport(content: string): string {
   try {
-    return JSON.stringify(parseSafeJsonInput(content, 'role assumption reachability report'));
+    return JSON.stringify(
+      stripOrderSensitive(parseSafeJsonInput(content, 'role assumption reachability report'))
+    );
   } catch {
     return content;
   }
