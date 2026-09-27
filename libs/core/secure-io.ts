@@ -929,17 +929,26 @@ export function safeExecResultAsync(
     cwd = process.cwd(),
     env = {},
     maxOutputMB = 10,
+    input,
   } = options;
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
   return new Promise((resolve) => {
+    // `input` (like safeExecResult's) is written to stdin and closed; without
+    // it stdin stays ignored.
+    const withInput = input !== undefined;
     const child = spawn(command, args, {
       cwd,
       env: buildSafeExecEnv(env),
       shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [withInput ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
+    if (withInput && child.stdin) {
+      // A child that exits before reading all of stdin must not crash the caller (EPIPE).
+      child.stdin.on('error', () => undefined);
+      child.stdin.end(input);
+    }
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     const maxBytes = maxOutputMB * 1024 * 1024;

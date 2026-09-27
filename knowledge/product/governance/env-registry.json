@@ -3849,6 +3849,22 @@
       "documented": true
     },
     {
+      "name": "KYBERION_UIA_LIVE_SMOKE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Set to 1 on a Windows host with an interactive desktop to run the os_accessibility UI Automation live smoke test, which launches, focuses and closes Notepad; used by the windows-latest CI job, leave unset elsewhere.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_UIA_OPTIONS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Internal child-process channel: JSON options the os_accessibility detector sets on its own powershell.exe child on Windows (never read from the operator environment); do not set it.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_VAD",
       "category": "runtime",
       "type": "string",
