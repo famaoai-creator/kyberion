@@ -1,0 +1,17 @@
+# GF-03: after a true merge (two parents) where BOTH sides changed a tracked
+# generated file (the ones marked merge=kyberion-regenerate in .gitattributes),
+# remind to regenerate — the merge driver only made the merge succeed.
+# Fast-forward pulls and one-sided changes stay silent.
+git rev-parse -q --verify HEAD^2 >/dev/null 2>&1 || exit 0
+base=$(git merge-base HEAD^1 HEAD^2 2>/dev/null) || exit 0
+generated=$(git ls-files | git check-attr --stdin merge | sed -n 's/: merge: kyberion-regenerate$//p')
+[ -n "$generated" ] || exit 0
+ours=$(git diff --name-only "$base" HEAD^1 -- $generated)
+theirs=$(git diff --name-only "$base" HEAD^2 -- $generated)
+both=""
+for f in $ours; do
+  if printf '%s\n' "$theirs" | grep -qxF "$f"; then both="$both $f"; fi
+done
+[ -n "$both" ] || exit 0
+echo "kyberion: this merge combined changes to generated files:$both"
+echo "kyberion: run 'pnpm kyberion resolve generated' and commit the result (freshness gates will fail otherwise)."
