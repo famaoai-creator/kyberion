@@ -1,11 +1,10 @@
 import type { GovernedArtifactRole } from './artifact-store.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
-  buildDecisionCardContent,
   renderDecisionCardText,
+  resolveInterventionLevel,
   resolveInterventionTiming,
   viewDecisionCard,
-  type ApprovalDecisionCardContent,
   type DecisionCardView,
   type InterventionLevel,
   type InterventionTiming,
@@ -22,6 +21,7 @@ import {
   markApprovalNotificationDelivered,
 } from './approval-veto-window.js';
 import { getAutonomousOpsPolicy, type AutonomousOpsGateResult } from './autonomous-ops-gate.js';
+import { buildDecisionCard, type DecisionCardEvidence } from './decision-card.js';
 import type { EventScopeInput } from './event-scope.js';
 import type { SupportedLocale } from './locale-normalize.js';
 import {
@@ -51,9 +51,10 @@ export interface RouteAutonomousDecisionInput {
   gate: AutonomousOpsGateResult;
   title: string;
   /** One sentence: what the operator is asked to decide. */
-  ask: string;
-  recommendation?: ApprovalDecisionCardContent['recommendation'];
-  evidence?: string[];
+  question: string;
+  /** What the agent recommends, and why. */
+  recommendation: string;
+  evidence?: DecisionCardEvidence[];
   requestedBy: string;
   source?: ApprovalRequestSource;
   /** False when the agent has other work and the answer can wait for the digest. */
@@ -88,14 +89,7 @@ function activeHoursFromPolicy() {
 
 export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): RoutedDecision {
   const now = input.now ?? Date.now();
-  const content = buildDecisionCardContent({
-    gate: input.gate,
-    ask: input.ask,
-    recommendation: input.recommendation,
-    evidence: input.evidence,
-    locale: input.locale,
-  });
-  const level = content.level;
+  const level = resolveInterventionLevel(input.gate);
   const timing = resolveInterventionTiming(level, { blocking: input.blocking });
   const shadow = input.gate.shadow;
 
@@ -106,7 +100,7 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
         actionId: input.gate.actionId,
         level,
         title: input.title,
-        summary: input.ask,
+        summary: input.question,
         ...(input.source?.missionId ? { missionId: input.source.missionId } : {}),
       });
     }
@@ -150,24 +144,29 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
     requestedBy: input.requestedBy,
     draft: {
       title: input.title,
-      summary: input.ask,
+      summary: input.question,
       severity: level === 'decide' ? 'high' : 'medium',
     },
     kind: 'channel-approval',
     ...(expiresAt ? { expiresAt } : {}),
     ...(input.source ? { source: input.source } : {}),
     ...(input.scope ? { scope: input.scope } : {}),
-    ...(input.evidence?.length
-      ? { justification: { reason: input.ask, evidence: input.evidence } }
-      : {}),
     // Veto requests are settled by the policy when silence elapses; a decide
     // request is a human's call and must stay one.
     ...(level === 'decide' ? { accountability: { finalDecision: 'human_only' as const } } : {}),
-    decisionCard: {
-      ...content,
+    decisionCard: buildDecisionCard({
+      question: input.question,
+      recommendation: input.recommendation,
+      gate: input.gate,
+      level,
+      evidence: input.evidence,
+      shadow,
+      actionId: input.gate.actionId,
+      ...(input.locale ? { locale: input.locale } : {}),
+      ...(expiresAt ? { deadline: expiresAt } : {}),
       ...(activeHours ? { timezone: activeHours.timezone } : {}),
       ...(deliveredVia ? { deliveredVia } : {}),
-    },
+    }),
     ...(veto ? { veto } : {}),
   });
 

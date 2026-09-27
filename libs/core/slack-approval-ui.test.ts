@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { APPROVAL_CHANGE_INSTRUCTION_MAX } from './approval-store.js';
 import {
   buildSlackApprovalBlocks,
+  buildSlackChangeRequestModal,
   parseSlackApprovalAction,
   parseSlackAskWhyAction,
+  parseSlackCardAction,
+  parseSlackChangeRequestSubmission,
+  SLACK_CHANGE_REQUEST_CALLBACK_ID,
 } from './slack-approval-ui.js';
 
 describe('Slack approval UI intent contract projection', () => {
@@ -93,6 +98,94 @@ describe('Slack approval UI intent contract projection', () => {
     ).toThrow(/dangerous JSON key/u);
     expect(() => parseSlackAskWhyAction('{"requestId":"approval-1","category":"unknown"}')).toThrow(
       /valid category/u
+    );
+  });
+});
+
+describe('Slack decision card', () => {
+  const record = {
+    id: 'approval-card-1',
+    title: 'Billing change',
+    summary: 'Adjust invoice rounding.',
+    severity: 'high',
+    status: 'pending',
+    channel: 'ops',
+    threadTs: 'thread-1',
+    decisionCard: {
+      question: 'Ship the billing change?',
+      recommendation: 'Approve after CI is green.',
+      riskTier: 'approve',
+      riskReasons: ['touches billing'],
+      reversible: false,
+      evidence: [],
+    },
+  };
+
+  function actionIds(blocks: { type?: string; elements?: { action_id?: string }[] }[]) {
+    return blocks
+      .filter((block) => block.type === 'actions')
+      .flatMap((block) => (block.elements ?? []).map((element) => element.action_id));
+  }
+
+  it('adds the card body and the changes / explain buttons only when a card exists', () => {
+    const blocks = buildSlackApprovalBlocks(record as never, undefined, 'en');
+    expect(JSON.stringify(blocks)).toContain('Ship the billing change?');
+    expect(actionIds(blocks)).toEqual([
+      'slack_approval_decide',
+      'slack_approval_decide',
+      'slack_approval_changes',
+      'slack_approval_explain',
+    ]);
+    const legacy = buildSlackApprovalBlocks(
+      { ...record, decisionCard: undefined } as never,
+      undefined,
+      'en'
+    );
+    expect(actionIds(legacy)).toEqual(['slack_approval_decide', 'slack_approval_decide']);
+  });
+
+  it('escapes agent-written card text so it cannot mention or link', () => {
+    const blocks = buildSlackApprovalBlocks(
+      {
+        ...record,
+        decisionCard: { ...record.decisionCard, riskReasons: ['<!channel> <https://evil|ok>'] },
+      } as never,
+      undefined,
+      'en'
+    );
+    const text = JSON.stringify(blocks);
+    expect(text).toContain('&lt;!channel&gt;');
+    expect(text).not.toContain('<!channel>');
+  });
+
+  it('parses card button values and rejects malformed ones', () => {
+    expect(parseSlackCardAction(JSON.stringify({ requestId: 'r-1' }))).toEqual({
+      requestId: 'r-1',
+    });
+    expect(() => parseSlackCardAction(JSON.stringify({}))).toThrow(/requestId/u);
+  });
+
+  it('round-trips the change request modal through its submission', () => {
+    const view = buildSlackChangeRequestModal(
+      { requestId: 'r-1', channel: 'ops', threadTs: 'thread-1' },
+      'en'
+    );
+    expect(view.callback_id).toBe(SLACK_CHANGE_REQUEST_CALLBACK_ID);
+    expect(view.blocks[0].element.max_length).toBe(APPROVAL_CHANGE_INSTRUCTION_MAX);
+    const blockId = view.blocks[0].block_id as string;
+    expect(
+      parseSlackChangeRequestSubmission({
+        private_metadata: view.private_metadata,
+        state: { values: { [blockId]: { value: { value: 'shorten it' } } } },
+      })
+    ).toEqual({
+      requestId: 'r-1',
+      channel: 'ops',
+      threadTs: 'thread-1',
+      instruction: 'shorten it',
+    });
+    expect(() => parseSlackChangeRequestSubmission({ private_metadata: '{}' })).toThrow(
+      /metadata/u
     );
   });
 });
