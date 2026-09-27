@@ -2,7 +2,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildExecutionEnv,
+  buildSystemRoleLaunchEnv,
+  DELEGATED_ROLE_ENV,
+  inferPersonaFromRole,
   isRoleAssumptionAllowed,
+  stripAuthorityEnvOverrides,
   resetRoleAssumptionPolicyCache,
   resolveAssumedRole,
   resolveExecutionPersona,
@@ -23,7 +27,13 @@ import {
 } from './secure-io.js';
 import { validateReadPermission } from './tier-guard.js';
 
-const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', 'MISSION_ID'] as const;
+const ENV_KEYS = [
+  'SYSTEM_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
+  'MISSION_ID',
+  'KYBERION_DELEGATED_ROLE',
+] as const;
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
@@ -464,6 +474,265 @@ describe('S1 scope integrity', () => {
       Object.isFrozen(currentExecutionScope())
     );
     expect(frozen).toBe(true);
+  });
+});
+
+describe('DR-01 delegated child role', () => {
+  const original: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      original[key] = process.env[key];
+      delete process.env[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  });
+
+  /** Adopt a child env built by buildExecutionEnv as this process's env. */
+  function becomeChild(env: NodeJS.ProcessEnv): void {
+    for (const key of ENV_KEYS) {
+      if (env[key] === undefined) delete process.env[key];
+      else process.env[key] = env[key];
+    }
+    resetRoleAssumptionPolicyCache();
+  }
+
+  it('delegates an explicit role under SYSTEM_ROLE, bound to that SYSTEM_ROLE', () => {
+    const env = buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge');
+    expect(env.MISSION_ROLE).toBe('sovereign_concierge');
+    expect(env[DELEGATED_ROLE_ENV]).toBe('sovereign_concierge@concierge');
+    expect(env.SYSTEM_ROLE).toBe('concierge');
+  });
+
+  it('does not delegate without SYSTEM_ROLE, and drops a stale delegation', () => {
+    const env = buildExecutionEnv({ [DELEGATED_ROLE_ENV]: 'x@y' }, 'mission_controller');
+    expect(env.MISSION_ROLE).toBe('mission_controller');
+    expect(env[DELEGATED_ROLE_ENV]).toBeUndefined();
+  });
+
+  it('replaces an inherited delegation with the explicit role (grandchildren)', () => {
+    const env = buildExecutionEnv(
+      { SYSTEM_ROLE: 'concierge', [DELEGATED_ROLE_ENV]: 'sovereign_concierge@concierge' },
+      'mission_controller'
+    );
+    expect(env[DELEGATED_ROLE_ENV]).toBe('mission_controller@concierge');
+  });
+
+  it('honours an allowed delegated role above SYSTEM_ROLE, persona included', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    expect(resolveRole()).toBe('sovereign_concierge');
+    expect(resolveAssumedRole()).toBe('sovereign_concierge');
+    expect(resolveExecutionPersona()).toBe('sovereign');
+    expect(resolveIdentityContext().role).toBe('sovereign_concierge');
+    // The child's own children inherit it (safe-exec env follows the scope).
+    expect(buildSafeExecEnv().MISSION_ROLE).toBe('sovereign_concierge');
+  });
+
+  it('ignores a denied delegation with a warning and falls back to SYSTEM_ROLE', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'slack_bridge' }, 'chronos_localadmin'));
+    // The parent-side env still claims the role; the child must not trust it.
+    expect(process.env.KYBERION_PERSONA).toBe('worker');
+    process.env.KYBERION_PERSONA = 'sovereign';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(resolveRole()).toBe('slack_bridge');
+      expect(resolveExecutionPersona()).not.toBe('sovereign');
+      expect(resolveIdentityContext().persona).not.toBe('sovereign');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_DELEGATION_DENIED]'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('chronos_localadmin'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps the RA-02 bounds of SYSTEM_ROLE inside a delegated child', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    // Bounds stay those of SYSTEM_ROLE, not of the delegated role.
+    expect(() => withExecutionContext('chronos_localadmin', () => undefined)).toThrow(
+      '[ROLE_ASSUMPTION_DENIED]'
+    );
+    expect(withExecutionContext('ingest_commit', () => resolveRole())).toBe('ingest_commit');
+  });
+
+  it('lets an in-process assumption outrank the delegation, then returns to it', async () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    expect(withExecutionContext('mission_controller', () => resolveRole())).toBe(
+      'mission_controller'
+    );
+    expect(
+      await withExecutionContextAsync('concierge_operator', async () => {
+        await Promise.resolve();
+        return resolveRole();
+      })
+    ).toBe('concierge_operator');
+    expect(resolveRole()).toBe('sovereign_concierge');
+  });
+
+  it('behaves like MISSION_ROLE today when there is no SYSTEM_ROLE', () => {
+    becomeChild(buildExecutionEnv({}, 'mission_controller'));
+    expect(process.env[DELEGATED_ROLE_ENV]).toBeUndefined();
+    expect(resolveAssumedRole()).toBeUndefined();
+    expect(resolveRole()).toBe('mission_controller');
+    // A delegation without SYSTEM_ROLE has no effect at all.
+    process.env[DELEGATED_ROLE_ENV] = 'sovereign_concierge@concierge';
+    expect(resolveRole()).toBe('mission_controller');
+  });
+
+  it('ignores a delegation issued under another SYSTEM_ROLE or malformed', () => {
+    process.env.SYSTEM_ROLE = 'concierge';
+    for (const value of [
+      'surface_runtime@chronos_mirror_v2',
+      'sovereign_concierge',
+      '@concierge',
+      'sovereign_concierge@',
+    ]) {
+      process.env[DELEGATED_ROLE_ENV] = value;
+      resetRoleAssumptionPolicyCache();
+      expect(resolveRole(), value).toBe('concierge');
+    }
+  });
+
+  it('never raises the persona on a denied delegation, even for a sovereign-default SYSTEM_ROLE', () => {
+    // nexus_daemon's default persona is sovereign; the denied child must not get it.
+    expect(inferPersonaFromRole('nexus_daemon')).toBe('sovereign');
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'nexus_daemon' }, 'chronos_localadmin'));
+    process.env.KYBERION_PERSONA = 'sovereign';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(resolveRole()).toBe('nexus_daemon');
+      expect(resolveExecutionPersona()).toBe('worker');
+      const identity = resolveIdentityContext();
+      expect(identity.persona).toBe('worker');
+      expect(identity.authorities).not.toContain('SECRET_READ');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('snapshots the delegation at the first read; later env writes change nothing', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    expect(resolveRole()).toBe('sovereign_concierge');
+    process.env[DELEGATED_ROLE_ENV] = 'ecosystem_architect@concierge';
+    expect(resolveRole()).toBe('sovereign_concierge');
+    delete process.env[DELEGATED_ROLE_ENV];
+    expect(resolveRole()).toBe('sovereign_concierge');
+    // Nor can a delegation be introduced after the first read.
+    resetRoleAssumptionPolicyCache();
+    delete process.env[DELEGATED_ROLE_ENV];
+    expect(resolveRole()).toBe('concierge');
+    process.env[DELEGATED_ROLE_ENV] = 'sovereign_concierge@concierge';
+    expect(resolveRole()).toBe('concierge');
+  });
+
+  it('re-reads the delegation after the policy cache is reset while a decision is cached', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    expect(resolveRole()).toBe('sovereign_concierge');
+    resetRoleAssumptionPolicyCache();
+    expect(resolveRole()).toBe('sovereign_concierge');
+    expect(resolveExecutionPersona()).toBe('sovereign');
+  });
+
+  it('falls back to the delegated root when an in-process scope carries a rejected role', () => {
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    type Registry = { storage: { run<T>(scope: unknown, fn: () => T): T } };
+    const storage = (globalThis as unknown as Record<symbol, Registry>)[
+      Symbol.for('kyberion.core.execution-scope.v1')
+    ].storage;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const role = storage.run({ tenantBound: false, assumedRole: 'chronos_localadmin' }, () =>
+        resolveRole()
+      );
+      expect(role).toBe('sovereign_concierge');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('delegates the current scope role to a child built without a role (F4)', () => {
+    process.env.SYSTEM_ROLE = 'concierge';
+    // In-process assumption S under SYSTEM_ROLE: the child continues as S.
+    const inAssumption = withExecutionContext('mission_controller', () => buildExecutionEnv());
+    expect(inAssumption[DELEGATED_ROLE_ENV]).toBe('mission_controller@concierge');
+    // No scope role: a value written into process.env after the first read
+    // (the snapshot) is not passed on.
+    expect(resolveRole()).toBe('concierge');
+    process.env[DELEGATED_ROLE_ENV] = 'ecosystem_architect@concierge';
+    expect(buildExecutionEnv()[DELEGATED_ROLE_ENV]).toBeUndefined();
+    // A delegated child without an assumption passes its own delegation on;
+    // inside an assumption it passes the assumption, not the stale root.
+    becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
+    expect(buildExecutionEnv()[DELEGATED_ROLE_ENV]).toBe('sovereign_concierge@concierge');
+    expect(
+      withExecutionContext('mission_controller', () => buildExecutionEnv())[DELEGATED_ROLE_ENV]
+    ).toBe('mission_controller@concierge');
+  });
+
+  it('launches a new SYSTEM_ROLE without the launcher identity (F1)', () => {
+    const launched = buildSystemRoleLaunchEnv(
+      {
+        SYSTEM_ROLE: 'surface_runtime',
+        MISSION_ROLE: 'surface_runtime',
+        KYBERION_PERSONA: 'sovereign',
+        [DELEGATED_ROLE_ENV]: 'surface_runtime@concierge',
+      },
+      'concierge',
+      { persona: 'worker' }
+    );
+    expect(launched).toMatchObject({
+      SYSTEM_ROLE: 'concierge',
+      MISSION_ROLE: '',
+      KYBERION_PERSONA: 'worker',
+      [DELEGATED_ROLE_ENV]: '',
+    });
+    becomeChild(launched);
+    expect(resolveRole()).toBe('concierge');
+    expect(buildSystemRoleLaunchEnv({}, 'x', { missionRole: 'mcp_server' }).MISSION_ROLE).toBe(
+      'mcp_server'
+    );
+  });
+
+  it('strips authority keys from caller-supplied env overlays', () => {
+    expect(
+      stripAuthorityEnvOverrides({
+        PATH: '/bin',
+        SYSTEM_ROLE: 'x',
+        MISSION_ROLE: 'x',
+        KYBERION_PERSONA: 'sovereign',
+        [DELEGATED_ROLE_ENV]: 'x@y',
+        KYBERION_SUDO: 'true',
+      })
+    ).toEqual({ PATH: '/bin' });
+    expect(stripAuthorityEnvOverrides(undefined)).toEqual({});
+  });
+
+  it('is only set by the server-side env builders, never taken from caller input', () => {
+    // A value smuggled into a base env (e.g. a request-shaped overlay) is
+    // replaced whenever a role is delegated, and cleared when none can be.
+    const smuggled = {
+      SYSTEM_ROLE: 'concierge',
+      [DELEGATED_ROLE_ENV]: 'ecosystem_architect@concierge',
+    };
+    expect(buildExecutionEnv(smuggled, 'sovereign_concierge')[DELEGATED_ROLE_ENV]).toBe(
+      'sovereign_concierge@concierge'
+    );
+    expect(
+      buildExecutionEnv({ [DELEGATED_ROLE_ENV]: 'ecosystem_architect@concierge' }, 'worker')[
+        DELEGATED_ROLE_ENV
+      ]
+    ).toBeUndefined();
+    // Safe-exec children never pick it up from the process env (like SYSTEM_ROLE).
+    process.env.SYSTEM_ROLE = 'concierge';
+    process.env[DELEGATED_ROLE_ENV] = 'sovereign_concierge@concierge';
+    const safe = buildSafeExecEnv();
+    expect(safe.SYSTEM_ROLE).toBeUndefined();
+    expect(safe[DELEGATED_ROLE_ENV]).toBeUndefined();
   });
 });
 

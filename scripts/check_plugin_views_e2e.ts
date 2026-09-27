@@ -41,6 +41,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { approvalRequestLogicalPath } from '@agent/core/approval-store';
+import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { getRegisteredEnvText, readJson, readJsonLines } from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -105,16 +106,16 @@ export interface PluginViewsE2eReport {
 /**
  * The environment a Chronos launched by `pnpm surfaces` receives on top of
  * its own: surface_runtime.ts injects `AUTHORIZED_SCOPE=<service id>` and
- * `SYSTEM_ROLE=<surface id with - -> _>`, and the `pnpm surfaces` script runs
- * surface_runtime itself with `KYBERION_PERSONA=worker`, which the surface
- * inherits. Kept in sync with those sources by check_plugin_views_e2e.test.ts.
+ * `SYSTEM_ROLE=<surface id with - -> _>` and binds `KYBERION_PERSONA=worker`
+ * (the `pnpm surfaces` launch contract) while clearing its own MISSION_ROLE
+ * and delegated role (buildSurfaceLaunchEnv). Kept in sync with that function
+ * by check_plugin_views_e2e.test.ts.
  */
 export function surfaceRuntimeLaunchEnv(): Record<string, string> {
-  return {
-    KYBERION_PERSONA: 'worker',
-    AUTHORIZED_SCOPE: 'chronos-mirror-v2',
-    SYSTEM_ROLE: 'chronos_mirror_v2',
-  };
+  // DR-01: the launcher's own MISSION_ROLE / delegated role never reach a surface.
+  return buildSystemRoleLaunchEnv({ AUTHORIZED_SCOPE: 'chronos-mirror-v2' }, 'chronos_mirror_v2', {
+    persona: 'worker',
+  }) as Record<string, string>;
 }
 
 /**

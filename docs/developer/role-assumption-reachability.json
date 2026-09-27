@@ -306,8 +306,48 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission-orchestration-dispatch.ts#dispatchMissionNextTasksCore [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleMissionCompletionRequested [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleMissionControlRequested [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleMissionDistillationRequested [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleMissionKickoffRequested [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested [delegated child role]",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission-orchestration-planning.ts#emitSlackMissionEvent (via libs/core/artifact-store.ts#withRole)",
       "roles": ["slack_bridge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission-orchestration-worker-part-context.ts#recordMissionContextTask [delegated child role]",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -801,6 +841,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface-mission-proposals.ts#issueMissionFromProposal [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface-mission-proposals.ts#saveChronosMissionProposalState (via libs/core/artifact-store.ts#withRole)",
       "roles": ["chronos_gateway"],
       "unresolved": []
@@ -905,6 +950,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/work-inventory-promotion.ts#executeMissionPromotion [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/shared-network/src/mcp-server-engine.ts#ensureMcpApproval (via libs/core/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -942,6 +992,11 @@
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts#POST (via libs/core/artifact-store.ts#withRole)",
       "roles": ["chronos_gateway"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts#POST [delegated child role]",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1014,7 +1069,22 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/config-missions/route.ts#POST [delegated child role]",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST [delegated child role]",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/ingest/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/ingest/route.ts#POST [delegated child role]",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1041,6 +1111,11 @@
     {
       "site": "presence/displays/concierge/src/app/api/memory-queue/[id]/route.ts#POST",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/memory-queue/[id]/route.ts#POST [delegated child role]",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1134,6 +1209,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/avatar-generation-jobs.ts#defaultRunner [delegated child role]",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/front-desk-member.ts#resolveConciergeMembership",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1201,6 +1281,11 @@
     {
       "site": "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
       "roles": ["ecosystem_architect", "mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes [delegated child role]",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1630,7 +1715,7 @@
     },
     {
       "site": "scripts/run_generation_schedule.ts#runGenerationScheduleAction",
-      "roles": ["surface_runtime"],
+      "roles": ["generation_scheduler", "surface_runtime"],
       "unresolved": []
     },
     {
@@ -2448,10 +2533,7 @@
             "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
             "scripts/run_mission_orchestration_event_worker.ts#main",
             "libs/core/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
-            "scripts/surface_runtime.ts#startSurfaceById [child process]",
-            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
-            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+            "libs/core/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested"
           ]
         }
       },
@@ -4820,10 +4902,7 @@
             "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
             "scripts/run_mission_orchestration_event_worker.ts#main",
             "libs/core/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
-            "scripts/surface_runtime.ts#startSurfaceById [child process]",
-            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
-            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+            "libs/core/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested"
           ]
         }
       },

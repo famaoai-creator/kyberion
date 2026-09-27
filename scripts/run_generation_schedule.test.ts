@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     MISSION_ROLE: role,
   })),
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
+  withExecutionContextAsync: vi.fn(async (_role: string, fn: () => unknown) => fn()),
   registerGenerationSchedule: vi.fn(),
   runGovernedGenerationScheduleAction: vi.fn(),
   recordProtocolServiceLifecycle: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock('@agent/core/governance', async () => {
     ...actual,
     buildExecutionEnv: mocks.buildExecutionEnv,
     withExecutionContext: mocks.withExecutionContext,
+    withExecutionContextAsync: mocks.withExecutionContextAsync,
   };
 });
 
@@ -146,8 +148,13 @@ describe('run_generation_schedule', () => {
     const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
     await runGenerationScheduleAction({ action: 'tick' });
 
-    // A child process spawned mid-tick must inherit the same authority.
-    expect(mocks.buildExecutionEnv).toHaveBeenCalledWith(process.env, 'generation_scheduler');
+    // A child process spawned mid-tick must inherit the same authority, and
+    // the CLI never rewrites its own process.env to get there (DR-01).
+    expect(mocks.withExecutionContextAsync).toHaveBeenCalledWith(
+      'generation_scheduler',
+      expect.any(Function)
+    );
+    expect(mocks.buildExecutionEnv).not.toHaveBeenCalled();
   });
 
   it('delegates list as well', async () => {

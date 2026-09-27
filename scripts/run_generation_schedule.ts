@@ -9,7 +9,7 @@ import {
 import { normalizeEventScope, type EventScopeInput } from '@agent/core/event-scope';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycleBestEffort } from '@agent/core/protocol-service-lifecycle';
-import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
@@ -47,7 +47,6 @@ export async function runGenerationScheduleAction(argv: {
   switch (argv.action) {
     case 'register': {
       if (!argv.input) throw new Error('register requires --input');
-      Object.assign(process.env, buildExecutionEnv(process.env, 'surface_runtime'));
       return withExecutionContext('surface_runtime', () => {
         const inputPath = String(argv.input);
         const logicalPath = assertSafeRepositoryPath(
@@ -62,17 +61,20 @@ export async function runGenerationScheduleAction(argv: {
     }
     case 'list':
     case 'tick': {
-      // The library re-enters its own execution context; seeding the env here
-      // keeps a child process spawned mid-tick on the same authority.
-      Object.assign(
-        process.env,
-        buildExecutionEnv(process.env, GENERATION_SCHEDULER_AUTHORITY.authority_role)
+      // The library re-enters its own execution context; running inside the
+      // same role here keeps a child process spawned mid-tick on the same
+      // authority (buildExecutionEnv() / buildSafeExecEnv() follow the scope,
+      // DR-01 delegates it under SYSTEM_ROLE). process.env is never rewritten.
+      const action = argv.action; // narrowed to 'list' | 'tick' outside the closure
+      const result = await withExecutionContextAsync(
+        GENERATION_SCHEDULER_AUTHORITY.authority_role,
+        () =>
+          runGovernedGenerationScheduleAction({
+            action,
+            ...(argv.schedule ? { schedule: argv.schedule } : {}),
+            ...(argv.scope ? { scope: argv.scope } : {}),
+          })
       );
-      const result = await runGovernedGenerationScheduleAction({
-        action: argv.action,
-        ...(argv.schedule ? { schedule: argv.schedule } : {}),
-        ...(argv.scope ? { scope: argv.scope } : {}),
-      });
       recordHealthy();
       return result;
     }
