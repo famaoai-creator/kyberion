@@ -9,6 +9,8 @@ export interface FoundationIo {
   loadJson<T>(filePath: string, options?: FoundationReadOptions): T;
   loadJsonIfPresent<T>(filePath: string, options?: FoundationReadOptions): T | null;
   appendFile(filePath: string, content: string): void;
+  /** Create a new file (and its directory); fails with EEXIST when it exists. */
+  createExclusiveFile?(filePath: string, content: string): void;
   exists(filePath: string): boolean;
   readFile(filePath: string, options?: FoundationReadOptions): string;
   stat(filePath: string): { mtimeMs: number; size: number };

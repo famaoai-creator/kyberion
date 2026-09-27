@@ -80,7 +80,9 @@ describe('slack bridge channel turn', () => {
     );
     expect(source).toContain('renderIntentAuthorityLabel(');
     expect(source).not.toContain('Authority: ${params.intentResolution.authority_level}');
-    expect(source).toContain('appendJsonLine(stimuliJournalPath(), artifact.stimulus);');
+    // SB-02: the journal append goes through the store writer, never a raw append.
+    expect(source).toContain('appendStimulus(artifact.stimulus);');
+    expect(source).not.toContain('stimuliJournalPath()');
     expect(source).not.toContain('const STIMULI_PATH =');
   });
 
