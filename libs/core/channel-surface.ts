@@ -45,15 +45,20 @@ export {
   parseSlackApprovalAction,
 } from './slack-approval-ui.js';
 export {
+  applySurfaceApprovalChangeRequest,
   applySurfaceApprovalDecision,
   applySurfaceApprovalRejectionReason,
+  buildDecisionCardActions,
   buildSurfaceApprovalAskWhyActions,
   buildSurfaceApprovalActions,
   buildSurfaceApprovalText,
   createSurfaceApprovalRequest,
+  explainApprovalRequest,
+  formatDecisionCardLines,
   normalizeSurfaceApprovalAskWhyCategory,
   resolveSurfaceApprovalAskWhy,
   resolveSurfaceApprovalReply,
+  type DecisionCardActionKind,
 } from './surface-approval-ui.js';
 export {
   buildSlackMissionProposalBlocks,

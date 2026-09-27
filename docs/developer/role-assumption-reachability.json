@@ -635,6 +635,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/artifact-store.ts#withRole)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []

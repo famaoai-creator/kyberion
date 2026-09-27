@@ -8363,6 +8363,131 @@
         "en": "Processing. Please wait…",
         "ja": "処理中です。少々お待ちください…",
         "qps-ploc": "⟦Ṗřőƈėşşïñɠ. Ṗŀėȧşė ẇȧïŧ… ŀőřėɱ ï⟧"
+      },
+      "decision_card_heading": {
+        "en": "Decision needed",
+        "ja": "決裁のお願い",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ñėėḓėḓ ŀőřė⟧"
+      },
+      "decision_card_question_label": {
+        "en": "Decide",
+        "ja": "判断すること",
+        "qps-ploc": "⟦Ḓėƈïḓė ŀőř⟧"
+      },
+      "decision_card_recommendation_label": {
+        "en": "Recommendation",
+        "ja": "推奨",
+        "qps-ploc": "⟦Řėƈőɱɱėñḓȧŧïőñ ŀőřė⟧"
+      },
+      "decision_card_risk_label": {
+        "en": "Risk",
+        "ja": "リスク",
+        "qps-ploc": "⟦Řïşķ ŀőř⟧"
+      },
+      "decision_card_tier_auto": {
+        "en": "low (runs automatically)",
+        "ja": "低(自動で実行)",
+        "qps-ploc": "⟦ŀőẇ (řůñş ȧůŧőɱȧŧïƈȧŀŀẏ) ŀőřėɱ ï⟧"
+      },
+      "decision_card_tier_notify": {
+        "en": "medium (runs unless you object in time)",
+        "ja": "中(期限までに止めなければ実行)",
+        "qps-ploc": "⟦ɱėḓïůɱ (řůñş ůñŀėşş ẏőů őƀĵėƈŧ ïñ ŧïɱė) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "decision_card_tier_approve": {
+        "en": "high (needs your approval)",
+        "ja": "高(承認が必要)",
+        "qps-ploc": "⟦ħïɠħ (ñėėḓş ẏőůř ȧṗṗřőṽȧŀ) ŀőřėɱ ïṗ⟧"
+      },
+      "decision_card_reasons_label": {
+        "en": "Why",
+        "ja": "理由",
+        "qps-ploc": "⟦Ẇħẏ ŀőř⟧"
+      },
+      "decision_card_reversible_yes": {
+        "en": "Can be undone",
+        "ja": "元に戻せる",
+        "qps-ploc": "⟦Ƈȧñ ƀė ůñḓőñė ŀőřė⟧"
+      },
+      "decision_card_reversible_no": {
+        "en": "Hard to undo",
+        "ja": "元に戻しにくい",
+        "qps-ploc": "⟦Ħȧřḓ ŧő ůñḓő ŀőř⟧"
+      },
+      "decision_card_deadline_label": {
+        "en": "Deadline",
+        "ja": "期限",
+        "qps-ploc": "⟦Ḓėȧḓŀïñė ŀőř⟧"
+      },
+      "decision_card_evidence_label": {
+        "en": "Evidence",
+        "ja": "証跡",
+        "qps-ploc": "⟦Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "decision_card_changes_button": {
+        "en": "Request changes",
+        "ja": "修正を指示",
+        "qps-ploc": "⟦Řėɋůėşŧ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "decision_card_explain_button": {
+        "en": "Ask why",
+        "ja": "理由を聞く",
+        "qps-ploc": "⟦Ȧşķ ẇħẏ ŀőř⟧"
+      },
+      "decision_card_changes_prompt": {
+        "en": "Reply to this message with the changes you want for: {title}\n{token}",
+        "ja": "修正してほしい内容を、このメッセージへの返信で送ってください: {title}\n{token}",
+        "qps-ploc": "⟦Řėṗŀẏ ŧő ŧħïş ɱėşşȧɠė ẇïŧħ ŧħė ƈħȧñɠėş ẏőů ẇȧñŧ ƒőř: {title}\n{token} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "decision_card_changes_recorded": {
+        "en": "Changes requested: {title}. The agent will send a revised card.",
+        "ja": "修正を指示しました: {title}。直した案が新しいカードで届きます。",
+        "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ: {title}. Ŧħė ȧɠėñŧ ẇïŀŀ şėñḓ ȧ řėṽïşėḓ ƈȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "decision_card_explain_heading": {
+        "en": "Why this needs your decision: {title}",
+        "ja": "判断をお願いする理由: {title}",
+        "qps-ploc": "⟦Ẇħẏ ŧħïş ñėėḓş ẏőůř ḓėƈïşïőñ: {title} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "decision_card_no_rationale": {
+        "en": "No rationale was recorded for this request.",
+        "ja": "この要求には根拠が記録されていません。",
+        "qps-ploc": "⟦Ñő řȧŧïőñȧŀė ẇȧş řėƈőřḓėḓ ƒőř ŧħïş řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "decision_card_changes_modal_title": {
+        "en": "Request changes",
+        "ja": "修正を指示",
+        "qps-ploc": "⟦Řėɋůėşŧ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "decision_card_changes_modal_label": {
+        "en": "What should change?",
+        "ja": "修正してほしい内容",
+        "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ ƈħȧñɠė? ŀőřėɱ ⟧"
+      },
+      "decision_card_changes_modal_submit": {
+        "en": "Send",
+        "ja": "送信",
+        "qps-ploc": "⟦Şėñḓ ŀőř⟧"
+      },
+      "decision_card_changes_too_long": {
+        "en": "Please keep the changes under {max} characters.",
+        "ja": "修正内容は{max}文字以内で送ってください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ķėėṗ ŧħė ƈħȧñɠėş ůñḓėř {max} ƈħȧřȧƈŧėřş. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "secret_card_question_set": {
+        "en": "Introduce secret {envName} for {serviceId}?",
+        "ja": "{serviceId} 用のシークレット {envName} を登録してよいですか?",
+        "qps-ploc": "⟦Ïñŧřőḓůƈė şėƈřėŧ {envName} ƒőř {serviceId}? ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "secret_card_question_rotate": {
+        "en": "Rotate secret {envName} for {serviceId}?",
+        "ja": "{serviceId} 用のシークレット {envName} をローテーションしてよいですか?",
+        "qps-ploc": "⟦Řőŧȧŧė şėƈřėŧ {envName} ƒőř {serviceId}? ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "secret_card_recommendation": {
+        "en": "Approve only if you started this request; the value is entered on your own device after approval.",
+        "ja": "自分で依頼した場合のみ承認してください。値は承認後に手元の端末で入力します。",
+        "qps-ploc": "⟦Ȧṗṗřőṽė őñŀẏ ïƒ ẏőů şŧȧřŧėḓ ŧħïş řėɋůėşŧ; ŧħė ṽȧŀůė ïş ėñŧėřėḓ őñ ẏőůř őẇñ ḓėṽïƈė ȧƒŧėř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       }
     },
     "concierge": {
@@ -12304,6 +12429,16 @@
         "en": "Pending. Waiting for the Sovereign to approve or request changes.",
         "ja": "未決定（pending）。Sovereign の承認/要修正待ち",
         "qps-ploc": "⟦Ṗėñḓïñɠ. Ẇȧïŧïñɠ ƒőř ŧħė Şőṽėřėïɠñ ŧő ȧṗṗřőṽė őř řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "card_question": {
+        "en": "Approve this mission plan so work can start?",
+        "ja": "このミッション計画を承認して作業を開始してよいですか?",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŧħïş ɱïşşïőñ ṗŀȧñ şő ẇőřķ ƈȧñ şŧȧřŧ? ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "card_recommendation": {
+        "en": "Approve if the victory conditions and scope match your intent; otherwise request changes.",
+        "ja": "達成条件と範囲が意図どおりなら承認し、違えば修正を指示してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ïƒ ŧħė ṽïƈŧőřẏ ƈőñḓïŧïőñş ȧñḓ şƈőṗė ɱȧŧƈħ ẏőůř ïñŧėñŧ; őŧħėřẇïşė řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       }
     },
     "local_pads": {

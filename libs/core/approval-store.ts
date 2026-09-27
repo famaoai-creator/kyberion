@@ -10,6 +10,7 @@ import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { isVitestProcess } from './foundation/env.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
+import { validateDecisionCard, type DecisionCard } from './decision-card.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import {
   eventScopeMatches,
@@ -211,7 +212,20 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   accountability?: ApprovalAccountability;
   /** Canonical authority scope of the effect being approved. */
   scope?: EventScope;
+  /** What the operator sees on a phone; display only, never the decision. */
+  decisionCard?: DecisionCard;
+  /** Set when a rejection asks the requester to revise and re-submit. */
+  changeRequest?: ApprovalChangeRequest;
 }
+
+export interface ApprovalChangeRequest {
+  instruction: string;
+  requestedBy: string;
+  requestedAt: string;
+}
+
+/** Longest change instruction kept on a record. */
+export const APPROVAL_CHANGE_INSTRUCTION_MAX = 2000;
 
 export interface ApprovalDecisionPayload {
   requestId: string;
@@ -473,8 +487,10 @@ export function createApprovalRequest(
     source?: ApprovalRequestSource;
     steering?: ApprovalSteeringAction;
     scope?: EventScopeInput;
+    decisionCard?: DecisionCard;
   }
 ): ApprovalRequestRecord {
+  if (params.decisionCard) validateDecisionCard(params.decisionCard);
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   ensureGovernedArtifactDir(role, approvalRequestsLogicalDir(storageChannel));
 
@@ -513,6 +529,7 @@ export function createApprovalRequest(
     accountability: params.accountability,
     steering: params.steering,
     ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
+    ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
@@ -851,8 +868,21 @@ export function decideApprovalRequest(
      * real, authenticated human — never for rejections.
      */
     sessionCache?: ApprovalActionDescriptor;
+    /** Only with `rejected` — the requester should revise and re-submit. */
+    changeInstruction?: string;
   }
 ): ApprovalRequestRecord {
+  const changeInstruction = params.changeInstruction?.trim();
+  if (params.changeInstruction !== undefined) {
+    if (params.decision !== 'rejected') {
+      throw new Error('[POLICY_VIOLATION] A change instruction can only accompany a rejection');
+    }
+    if (!changeInstruction || changeInstruction.length > APPROVAL_CHANGE_INSTRUCTION_MAX) {
+      throw new Error(
+        `[POLICY_VIOLATION] A change instruction must be 1-${APPROVAL_CHANGE_INSTRUCTION_MAX} characters`
+      );
+    }
+  }
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
@@ -958,14 +988,27 @@ export function decideApprovalRequest(
       }
     : undefined;
 
+  const { changeRequest: priorChangeRequest, ...recordWithoutChangeRequest } = record;
   const updated: ApprovalRequestRecord = {
-    ...record,
+    ...recordWithoutChangeRequest,
+    ...(priorChangeRequest && params.decision !== 'approved'
+      ? { changeRequest: priorChangeRequest }
+      : {}),
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(changeInstruction
+      ? {
+          changeRequest: {
+            instruction: changeInstruction,
+            requestedBy: params.decidedBy,
+            requestedAt: decidedAt,
+          },
+        }
+      : {}),
     workflow,
   };
 
@@ -989,6 +1032,7 @@ export function decideApprovalRequest(
     // per-request workflow record.
     note: params.note,
     reason_category: params.reasonCategory,
+    ...(changeInstruction ? { change_instruction: changeInstruction } : {}),
   });
   projectApprovalWorkerEvent(
     'approval_response',

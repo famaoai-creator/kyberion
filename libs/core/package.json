@@ -891,6 +891,10 @@
       "types": "./dist/slack-approval-ui.d.ts",
       "default": "./dist/slack-approval-ui.js"
     },
+    "./decision-card": {
+      "types": "./dist/decision-card.d.ts",
+      "default": "./dist/decision-card.js"
+    },
     "./surface-approval-ui": {
       "types": "./dist/surface-approval-ui.d.ts",
       "default": "./dist/surface-approval-ui.js"

@@ -144,6 +144,8 @@ const autonomousOpsPolicyCatalog = defineCatalog<AutonomousOpsPolicy>({
   schema: pathResolver.knowledge('product/schemas/autonomous-ops-policy.schema.json'),
 });
 
+export const AUTONOMOUS_OPS_SHADOW_REASON = 'shadow mode: recorded only, never executed';
+
 export function _resetAutonomousOpsPolicyCacheForTests(): void {
   autonomousOpsPolicyCatalog.reset();
 }
@@ -334,7 +336,7 @@ export function evaluateAutonomousOpsAction(
     }
   }
 
-  if (shadow) reasons.push('shadow mode: recorded only, never executed');
+  if (shadow) reasons.push(AUTONOMOUS_OPS_SHADOW_REASON);
 
   return {
     actionId: input.actionId,
