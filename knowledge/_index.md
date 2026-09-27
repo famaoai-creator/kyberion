@@ -382,6 +382,7 @@
 - [Memory Snapshot Protocol](./product/orchestration/memory-snapshot-protocol.md) (public | Ecosystem Architect)
 - [Mesh Hub Inspection](./product/orchestration/mesh-hub-inspection.md) (public | Unknown)
 - [Mission Portability Standard (MEP v0.1)](./product/orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
+- [Mission Triage Playbook — closing missions that cannot finish](./product/orchestration/mission-triage-playbook.md) (public | Unknown)
 - [Mission Types & Categories](./product/orchestration/mission-types.md) (public | Ecosystem Architect)
 - [Narrated Video Production Playbook](./product/orchestration/narrated-video-production-playbook.md) (public | ecosystem_architect)
 - [Native operation selection ladder](./product/orchestration/native-op-ladder.md) (public | Unknown)

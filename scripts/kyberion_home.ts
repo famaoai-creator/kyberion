@@ -271,6 +271,14 @@ function handleApprovalsSubcommand(argv: {
   for (const request of pending) {
     printOutput(`  ● [${request.id}] ${request.title}`);
     if (request.summary) printOutput(`      ${String(request.summary).slice(0, 120)}`);
+    // Deciding requires seeing the effect: render the request details (what
+    // changes, who asked, what approval enables) inline so `approvals` alone
+    // is enough to make an informed decision without opening the store file.
+    if (request.details) {
+      for (const line of String(request.details).split('\n')) {
+        printOutput(`      ${line}`);
+      }
+    }
     printOutput(
       `      requested by ${request.requestedBy} via ${request.channel} at ${request.requestedAt}`
     );

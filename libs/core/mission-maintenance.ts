@@ -56,6 +56,7 @@ import {
 } from './mission-state.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import {
+  MISSION_TASK_COMPLETED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
   writeMissionNextTasks,
@@ -64,6 +65,20 @@ import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
+import {
+  computeApprovalPayloadHash,
+  isApprovalRequestExpired,
+  loadApprovalRequest,
+  recordApprovalApplyResult,
+  validateHumanFinalDecision,
+  type ApprovalRequestRecord,
+} from './approval-store.js';
+import { hasAuthority, resolveIdentityContext } from './governance.js';
+import {
+  MISSION_SCOPE_APPROVAL_CHANNEL,
+  scopeApproveApprovalPayload,
+  scopeApproveEffectBinding,
+} from './mission-scope-payload.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 
 function safeMissionRoot(missionDir: string): string {
@@ -327,15 +342,109 @@ async function recordCheckpointForMission(
   }
 }
 
+export interface ScopeChangeApprovalResult {
+  approval: ApprovalRequestRecord;
+  /** The authenticated human who approved — recorded as approved_by. */
+  humanDecider: string;
+}
+
+/**
+ * Same contract as mission-work-reconciliation: requesting and applying an
+ * approval-mediated mutation requires the mission_controller role (the
+ * controller CLI self-identifies as it) or SUDO. What it does NOT require is
+ * SUDO itself — that is the point of the approval path.
+ */
+function assertScopeApprovalAuthority(): void {
+  const identity = resolveIdentityContext();
+  if (identity.role !== 'mission_controller' && !hasAuthority('SUDO')) {
+    throw new Error('Mission controller authority is required for scope approval mediation.');
+  }
+}
+
+/**
+ * Fail-closed validation that an approval record authorizes THIS scope
+ * change: approved status, unexpired, bound to this mission, this exact
+ * goal/reason/success-condition (payloadHash), and this effect. Mirrors
+ * `assertReconciliationApproval` in mission-work-reconciliation.ts. Kept
+ * here (inside the lifecycle SCC) rather than in mission-scope-approval.ts
+ * so the apply side does not import the request side — that edge would close
+ * a module cycle via approval-store.
+ */
+export function assertScopeChangeApproval(input: {
+  approvalRequestId: string;
+  missionId: string;
+  goalSummary: string;
+  reason: string;
+  successCondition: string;
+}): ScopeChangeApprovalResult {
+  const missionId = input.missionId.toUpperCase();
+  const approval = loadApprovalRequest(MISSION_SCOPE_APPROVAL_CHANNEL, input.approvalRequestId);
+  const humanApproval = approval?.workflow?.approvals?.find(
+    (entry) =>
+      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+  );
+  if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
+    throw new Error(
+      `[POLICY_VIOLATION] scope-approve requires an approved mission_gate request: ${input.approvalRequestId}`
+    );
+  }
+  if (isApprovalRequestExpired(approval)) {
+    throw new Error(`[POLICY_VIOLATION] scope approval has expired: ${approval.id}`);
+  }
+  if (approval.source?.missionId?.toUpperCase() !== missionId) {
+    throw new Error('[POLICY_VIOLATION] scope approval is bound to a different mission');
+  }
+  const effectBinding = scopeApproveEffectBinding(missionId);
+  if (approval.accountability?.effectBinding !== effectBinding) {
+    throw new Error('[POLICY_VIOLATION] scope approval is bound to a different effect');
+  }
+  const payloadHash = computeApprovalPayloadHash(
+    scopeApproveApprovalPayload(missionId, input.goalSummary, input.reason, input.successCondition)
+  );
+  if (approval.accountability?.payloadHash !== payloadHash) {
+    throw new Error(
+      '[POLICY_VIOLATION] scope approval is bound to a different goal/reason/success-condition'
+    );
+  }
+  if (!humanApproval) {
+    throw new Error('[POLICY_VIOLATION] scope-approve requires an authenticated human approval');
+  }
+  validateHumanFinalDecision({
+    accountability: approval.accountability,
+    decidedByType: humanApproval.decidedByType,
+    authenticated: humanApproval.authenticated,
+    authMethod: humanApproval.authMethod,
+    payloadHash: humanApproval.payloadHash,
+    effectBinding: humanApproval.effectBinding,
+  });
+  return {
+    approval,
+    humanDecider: humanApproval.approvedBy || approval.decidedBy || 'unknown-human',
+  };
+}
+
 export async function approveScopeChange(args: {
   missionId: string;
   approvedBy?: string;
   reason: string;
   goalSummary: string;
   successCondition?: string;
+  /**
+   * When set, an authenticated human approval from the `mission-scope`
+   * approval channel substitutes for SUDO: the request must be an approved,
+   * unexpired `mission_gate` record hash-bound to this mission and this exact
+   * goal/reason/success-condition (see mission-scope-approval.ts). The human
+   * decider on the record becomes `approvedBy` — env identity is ignored.
+   */
+  approvalRequestId?: string;
   syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
 }): Promise<void> {
-  assertCanGrantMissionAuthority();
+  const approvalRequestId = String(args.approvalRequestId || '').trim();
+  if (approvalRequestId) {
+    assertScopeApprovalAuthority();
+  } else {
+    assertCanGrantMissionAuthority();
+  }
   const missionId = args.missionId.toUpperCase();
   const missionPathCandidate = findMissionPath(missionId);
   if (!missionPathCandidate) {
@@ -349,7 +458,18 @@ export async function approveScopeChange(args: {
   }
   const successCondition = String(args.successCondition || goalSummary).trim();
   const approvedAt = nowIso();
-  const approvedBy = resolveApprovalActor(args.approvedBy);
+  const approvalResult = approvalRequestId
+    ? assertScopeChangeApproval({
+        approvalRequestId,
+        missionId,
+        goalSummary,
+        reason: args.reason,
+        successCondition,
+      })
+    : null;
+  const approvedBy = approvalResult
+    ? approvalResult.humanDecider
+    : resolveApprovalActor(args.approvedBy);
 
   await withLock(`mission-${missionId}`, async () => {
     const state = loadState(missionId);
@@ -406,6 +526,42 @@ export async function approveScopeChange(args: {
     // dropping the approved constraints/deliverables from that same event
     // would manufacture a minor field-churn delta immediately after a
     // legitimate rebaseline.
+
+    // The approved rebaseline IS the repair the intent-drift gate failure
+    // asked for: a blocked verify/finish upserts `repair-intent-drift` into
+    // NEXT_TASKS.json, and leaving it open re-blocks the finish exit gate
+    // and bounces the mission back to active. Close it with evidence.
+    const driftRepairTaskId = 'repair-intent-drift';
+    const tasks = readMissionNextTasks(missionPathCandidate);
+    const driftRepair = tasks.find(
+      (task) =>
+        String(task.task_id || '') === driftRepairTaskId &&
+        !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+    );
+    if (driftRepair) {
+      const reportPath = safeMissionArtifactPath(
+        missionPathCandidate,
+        `evidence/${driftRepairTaskId}.md`
+      );
+      safeWriteFile(
+        reportPath,
+        [
+          `# ${driftRepairTaskId}`,
+          '',
+          'The intent-drift gate failure was resolved by an approved scope rebaseline.',
+          '',
+          `- approved_by: ${approvedBy}`,
+          `- approved_at: ${approvedAt}`,
+          `- reason: ${args.reason}`,
+          `- new goal: ${goalSummary}`,
+          `- previous origin snapshot: ${change.change.previous_origin_snapshot_id}`,
+          `- new origin snapshot: ${change.change.new_origin_snapshot_id}`,
+          '',
+        ].join('\n')
+      );
+      driftRepair.status = 'completed';
+      writeMissionNextTasks(missionPathCandidate, tasks);
+    }
   });
 
   try {
@@ -414,6 +570,26 @@ export async function approveScopeChange(args: {
     logger.warn(
       `[mission-maintenance] scope approval ledger sync skipped for ${missionId}: ${err?.message || err}`
     );
+  }
+  if (approvalResult && approvalRequestId) {
+    try {
+      recordApprovalApplyResult('mission_controller', {
+        channel: MISSION_SCOPE_APPROVAL_CHANNEL,
+        requestId: approvalRequestId,
+        applyResult: {
+          appliedAt: nowIso(),
+          appliedBy:
+            getRegisteredEnvText('KYBERION_PERSONA') ||
+            getRegisteredEnvText('USER') ||
+            'mission_controller',
+          result: 'success',
+        },
+      });
+    } catch (err: any) {
+      logger.warn(
+        `[mission-maintenance] scope approval apply-result recording skipped for ${missionId}: ${err?.message || err}`
+      );
+    }
   }
   logger.success(
     `✅ Approved scope change for ${missionId} by ${approvedBy} and reset the origin baseline to "${goalSummary}".`
