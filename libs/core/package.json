@@ -6806,6 +6806,134 @@
     "./workforce/workforce-load": {
       "types": "./dist/workforce/workforce-load.d.ts",
       "default": "./dist/workforce/workforce-load.js"
+    },
+    "./actuator": {
+      "types": "./dist/actuator/index.d.ts",
+      "default": "./dist/actuator/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "default": "./dist/agent/index.js"
+    },
+    "./analysis": {
+      "types": "./dist/analysis/index.d.ts",
+      "default": "./dist/analysis/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./dist/browser/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./integrations": {
+      "types": "./dist/integrations/index.d.ts",
+      "default": "./dist/integrations/index.js"
+    },
+    "./intent": {
+      "types": "./dist/intent/index.d.ts",
+      "default": "./dist/intent/index.js"
+    },
+    "./knowledge": {
+      "types": "./dist/knowledge/index.d.ts",
+      "default": "./dist/knowledge/index.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "default": "./dist/media/index.js"
+    },
+    "./meeting": {
+      "types": "./dist/meeting/index.d.ts",
+      "default": "./dist/meeting/index.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh/index.d.ts",
+      "default": "./dist/mesh/index.js"
+    },
+    "./mission": {
+      "types": "./dist/mission/index.d.ts",
+      "default": "./dist/mission/index.js"
+    },
+    "./organization": {
+      "types": "./dist/organization/index.d.ts",
+      "default": "./dist/organization/index.js"
+    },
+    "./pfc": {
+      "types": "./dist/pfc/index.d.ts",
+      "default": "./dist/pfc/index.js"
+    },
+    "./pipeline": {
+      "types": "./dist/pipeline/index.d.ts",
+      "default": "./dist/pipeline/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "default": "./dist/plugin/index.js"
+    },
+    "./project": {
+      "types": "./dist/project/index.d.ts",
+      "default": "./dist/project/index.js"
+    },
+    "./provider": {
+      "types": "./dist/provider/index.d.ts",
+      "default": "./dist/provider/index.js"
+    },
+    "./reasoning": {
+      "types": "./dist/reasoning/index.d.ts",
+      "default": "./dist/reasoning/index.js"
+    },
+    "./scenario": {
+      "types": "./dist/scenario/index.d.ts",
+      "default": "./dist/scenario/index.js"
+    },
+    "./secret": {
+      "types": "./dist/secret/index.d.ts",
+      "default": "./dist/secret/index.js"
+    },
+    "./service": {
+      "types": "./dist/service/index.d.ts",
+      "default": "./dist/service/index.js"
+    },
+    "./shell": {
+      "types": "./dist/shell/index.d.ts",
+      "default": "./dist/shell/index.js"
+    },
+    "./surface": {
+      "types": "./dist/surface/index.d.ts",
+      "default": "./dist/surface/index.js"
+    },
+    "./task": {
+      "types": "./dist/task/index.d.ts",
+      "default": "./dist/task/index.js"
+    },
+    "./tool": {
+      "types": "./dist/tool/index.d.ts",
+      "default": "./dist/tool/index.js"
+    },
+    "./video": {
+      "types": "./dist/video/index.d.ts",
+      "default": "./dist/video/index.js"
+    },
+    "./virtual": {
+      "types": "./dist/virtual/index.d.ts",
+      "default": "./dist/virtual/index.js"
+    },
+    "./voice": {
+      "types": "./dist/voice/index.d.ts",
+      "default": "./dist/voice/index.js"
+    },
+    "./workforce": {
+      "types": "./dist/workforce/index.d.ts",
+      "default": "./dist/workforce/index.js"
+    },
+    "./video/ingest": {
+      "types": "./dist/video/ingest/index.d.ts",
+      "default": "./dist/video/ingest/index.js"
+    },
+    "./provider/bundles": {
+      "types": "./dist/provider/bundles/index.d.ts",
+      "default": "./dist/provider/bundles/index.js"
     }
   },
   "dependencies": {

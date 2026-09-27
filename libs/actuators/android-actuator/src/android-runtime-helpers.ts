@@ -15,11 +15,12 @@ import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validato
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import type { AdfEngineContext } from '../../../core/pipeline/adf-engine.js';
 import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
@@ -90,10 +91,10 @@ interface AndroidTapTarget extends AndroidUiNode {
   center: { x: number; y: number };
 }
 
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: ANDROID_MANIFEST_PATH,
-  defaults: DEFAULT_ANDROID_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_ANDROID_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 function resolveAndroidRepositoryPath(rootDir: string, value: unknown): string {

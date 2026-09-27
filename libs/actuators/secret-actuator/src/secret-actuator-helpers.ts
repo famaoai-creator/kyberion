@@ -8,7 +8,7 @@ import {
   readJson,
 } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
 import {
   fetchSecret,
@@ -19,6 +19,7 @@ import {
 import * as pathResolver from '@agent/core/path-resolver';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 
 /**
@@ -109,10 +110,10 @@ function registryRemove(service: string, account: string): void {
   saveRegistry(registry);
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: SECRET_MANIFEST_PATH,
-  defaults: DEFAULT_SECRET_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_SECRET_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 async function withGovernedMutation(

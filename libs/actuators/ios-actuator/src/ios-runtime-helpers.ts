@@ -14,7 +14,7 @@ import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validato
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import type { AdfEngineContext } from '../../../core/pipeline/adf-engine.js';
 import {
@@ -22,6 +22,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 
 const IOS_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/ios-actuator/manifest.json');
@@ -33,10 +34,10 @@ export const DEFAULT_IOS_RETRY = {
   jitter: true,
 };
 
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: IOS_MANIFEST_PATH,
-  defaults: DEFAULT_IOS_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_IOS_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 function resolveIosRepositoryPath(rootDir: string, value: unknown): string {

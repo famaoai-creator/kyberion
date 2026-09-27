@@ -1,4 +1,3 @@
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import * as pathResolver from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
 import { safeExec } from '@agent/core/secure-io';
@@ -15,6 +14,7 @@ import {
   type CalendarEventCreateResult,
 } from '@agent/core/meeting/calendar-workflow';
 import { planAvailableSlots, type AvailableSlot } from '@agent/core/meeting/calendar-slot-planner';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
 export type CalendarBackendKind = string;
 export type CalendarBackendPreference = string;
@@ -154,10 +154,10 @@ function resolveDateRange(
   return { start, end };
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: CALENDAR_MANIFEST_PATH,
-  defaults: DEFAULT_CALENDAR_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_CALENDAR_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 export function normalizeCalendarSummaryList(value: unknown): CalendarSummary[] {
