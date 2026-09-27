@@ -2,10 +2,11 @@
 # knowledge/product/governance/kyberion-development-practices.md "Generated files and merges".
 #
 # linguist-generated collapses these in GitHub diffs. merge=kyberion-regenerate
-# uses the repo-local driver that `pnpm install` registers
-# (scripts/install_git_merge_driver.mjs → scripts/git_merge_regenerate.mjs);
-# where the driver is not configured (GitHub web UI, CI) git falls back to its
-# normal text merge. After a merge, run `pnpm kyberion resolve generated`.
+# names an OPTIONAL driver (scripts/git_merge_regenerate.mjs) that the
+# repository owner may install once with `pnpm kyberion resolve install-driver`;
+# `pnpm install` never writes git config. Where it is not configured (most
+# checkouts, GitHub web UI, CI) git falls back to its normal text merge.
+# Either way, after a merge run `pnpm kyberion resolve generated`.
 docs/developer/CONFIGURATION.md linguist-generated=true merge=kyberion-regenerate
 docs/developer/env.example linguist-generated=true merge=kyberion-regenerate
 docs/developer/role-assumption-reachability.json linguist-generated=true merge=kyberion-regenerate

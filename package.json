@@ -143,7 +143,7 @@
     "ci": "pnpm run validate && pnpm exec vitest run",
     "generate:types": "node dist/scripts/generate_types.js",
     "project-os:init": "node dist/scripts/generate_project_os.js",
-    "prepare": "husky && node scripts/install_git_merge_driver.mjs",
+    "prepare": "husky",
     "mcp:server": "node dist/scripts/mcp_server.js",
     "knowledge:cowork-sync": "node dist/scripts/cowork_knowledge_bridge.js"
   },
