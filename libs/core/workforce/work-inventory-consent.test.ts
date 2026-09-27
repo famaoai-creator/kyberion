@@ -155,7 +155,7 @@ describe('work inventory consent', () => {
     expectCode(
       () =>
         grantWorkInventoryConsent(
-          grantInput({ member_id: './bob', granted_by: { kind: 'human', id: './bob' } }),
+          grantInput({ member_id: '../bob', granted_by: { kind: 'human', id: '../bob' } }),
           { now: NOW, rootDir }
         ),
       'invalid_input'

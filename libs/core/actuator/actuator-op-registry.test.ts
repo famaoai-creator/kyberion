@@ -165,13 +165,13 @@ describe('actuator-op-registry', () => {
     expect(resolveActuatorModulePath('service-actuator', 'src/index.ts')).toBe(
       'dist/libs/actuators/service-actuator/src/index.js'
     );
-    expect(() => resolveActuatorModulePath('service-actuator', './shared.js')).toThrow(
+    expect(() => resolveActuatorModulePath('service-actuator', '../shared.js')).toThrow(
       '[OP_RESOLUTION_MANIFEST]'
     );
     expect(() => resolveActuatorModulePath('service-actuator', '/tmp/escape.js')).toThrow(
       '[OP_RESOLUTION_MANIFEST]'
     );
-    expect(() => resolveActuatorModulePath('./outside', 'src/index.js')).toThrow(
+    expect(() => resolveActuatorModulePath('../outside', 'src/index.js')).toThrow(
       '[OP_RESOLUTION_MANIFEST]'
     );
     expect(() => resolveActuatorModulePath('nested/actuator', 'src/index.js')).toThrow(

@@ -109,7 +109,7 @@ describe('MissionEvidenceDoc', () => {
   it('rejects evidence traversal and symlinked evidence files', () => {
     const traversal = new MissionEvidenceDoc<SampleDoc>({
       mission_id: FIX_MISSION,
-      filename: './outside.json',
+      filename: '../outside.json',
     });
     expect(() => traversal.exists()).toThrow('[MISSION_EVIDENCE_DOC_SCOPE]');
 

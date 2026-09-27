@@ -274,7 +274,7 @@ describe('GeminiImageModelGenerationProvider', () => {
     const provider = new GeminiImageModelGenerationProvider();
     await provider.generate({ prompt: 'text only', targetPath: 'active/shared/tmp/x.png' });
     expect(mocks.executeServicePreset.mock.calls[0]![2].model).toBe('gemini-3-pro-image-preview');
-    vi.stubEnv('KYBERION_GEMINI_IMAGE_MODEL', '../evil');
+    vi.stubEnv('KYBERION_GEMINI_IMAGE_MODEL', '../../evil');
     const failed = await provider.generate({ prompt: 'x', targetPath: 'active/shared/tmp/x.png' });
     expect(failed.status).toBe('failed');
     vi.unstubAllEnvs();

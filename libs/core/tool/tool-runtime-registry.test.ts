@@ -573,7 +573,7 @@ describe('tool runtime registry', () => {
   });
 
   it('rejects a managed binary relative path that climbs out of the managed env', () => {
-    addManagedBinaryTool('./escape/panda');
+    addManagedBinaryTool('../escape/panda');
     expect(() => getToolRuntimeRegistry()).toThrow();
   });
 

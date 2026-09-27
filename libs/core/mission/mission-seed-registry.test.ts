@@ -105,7 +105,7 @@ describe('mission-seed-registry', () => {
   });
 
   it('rejects a seed id that could escape the registry namespace', () => {
-    expect(() => missionSeedRecordPath('./outside')).toThrow(
+    expect(() => missionSeedRecordPath('../outside')).toThrow(
       '[mission-seed-registry] invalid seed id'
     );
   });

@@ -15,7 +15,7 @@ describe('mission management config', () => {
     const validate = compileSchema(
       pathResolver.rootResolve('knowledge/product/schemas/mission-management.schema.json')
     );
-    expect(validate({ version: '1.1.0', directories: { archive: './outside' } })).toBe(false);
+    expect(validate({ version: '1.1.0', directories: { archive: '../outside' } })).toBe(false);
     expect(validate({ version: '1.1.0', directories: { archive: '/outside' } })).toBe(false);
     expect(
       validate({ version: '1.1.0', directories: { archive: 'active/archive/missions' } })

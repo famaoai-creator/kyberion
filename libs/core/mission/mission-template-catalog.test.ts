@@ -17,7 +17,7 @@ describe('mission template catalog', () => {
         templates: [
           {
             name: 'unsafe',
-            files: [{ path: './outside.txt', content_template: 'x' }],
+            files: [{ path: '../outside.txt', content_template: 'x' }],
             unexpected: true,
           },
         ],

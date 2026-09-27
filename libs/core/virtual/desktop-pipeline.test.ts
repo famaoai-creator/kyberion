@@ -24,7 +24,7 @@ describe('desktop pipeline trust boundary', () => {
   });
 
   it('keeps allowlist validation ahead of the trust boundary', () => {
-    const result = loadDesktopPipeline('./pipelines/desktop/example.json', {
+    const result = loadDesktopPipeline('../pipelines/desktop/example.json', {
       trustResolved: false,
     });
 

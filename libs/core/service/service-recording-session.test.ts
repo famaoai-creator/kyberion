@@ -11,7 +11,7 @@ describe('ServiceRecordingSession', () => {
       () =>
         new ServiceRecordingSession({
           target_name: 'Issue intake',
-          recording_id: './escape',
+          recording_id: '../escape',
         })
     ).toThrow('recording_id');
   });

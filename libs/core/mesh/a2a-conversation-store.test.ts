@@ -38,7 +38,7 @@ afterEach(() => {
 describe('a2a conversation store', () => {
   it('rejects unsafe conversation ids', async () => {
     await expect(
-      appendConversationTurn('./escape', {
+      appendConversationTurn('../escape', {
         sender: 'sender-x',
         receiver: 'agent-y',
         performative: 'request',

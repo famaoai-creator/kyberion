@@ -113,7 +113,7 @@ describe('intent-handoff', () => {
 
   it('rejects mission identifiers that could escape the handoff directory', () => {
     expect(() =>
-      writeIntentGoalHandoff('./escape', { source_text: 'should not be written' })
+      writeIntentGoalHandoff('../escape', { source_text: 'should not be written' })
     ).toThrow(/missionId must be a single safe path segment/u);
   });
 

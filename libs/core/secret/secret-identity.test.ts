@@ -35,7 +35,7 @@ describe('secret-identity', () => {
   });
 
   it('rejects invalid service ids', () => {
-    expect(() => resolveSecretIdentity('./evil', 'API_KEY')).toThrow(/SECRET_IDENTITY_INVALID/);
+    expect(() => resolveSecretIdentity('../evil', 'API_KEY')).toThrow(/SECRET_IDENTITY_INVALID/);
   });
 });
 
