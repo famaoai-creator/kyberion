@@ -9,6 +9,7 @@ import {
   safeLstat,
   safeStat,
   safeUnlinkSync,
+  safeRmdirSync,
   safeExistsSync,
   safeWriteFile,
   safeMkdir,
@@ -267,6 +268,37 @@ function collectFiles(dir: string): string[] {
   return results;
 }
 
+/** Directories under `dir` in post-order (deepest first); symlinks skipped. */
+function collectDirsPostOrder(dir: string): string[] {
+  if (!safeExistsSync(dir)) return [];
+  const results: string[] = [];
+  const walk = (current: string): void => {
+    let entries: string[];
+    try {
+      entries = safeReaddir(current);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const fullPath = nodePath.join(current, name);
+      try {
+        const stat = safeLstat(fullPath);
+        if (stat.isSymbolicLink()) {
+          continue;
+        }
+        if (stat.isDirectory()) {
+          walk(fullPath);
+          results.push(fullPath);
+        }
+      } catch {
+        // skip unreadable entries
+      }
+    }
+  };
+  walk(dir);
+  return results;
+}
+
 /** Repo-relative POSIX path under the (possibly test-overridden) root. */
 export function repoRelativePosix(absolutePath: string): string {
   return nodePath.relative(rootDir(), absolutePath).split(nodePath.sep).join('/');
@@ -491,6 +523,46 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
         expired.push(filePath);
         if (!opts.dryRun) {
           expireFilePerPolicy(filePath, entry, outcome);
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  // collectFiles only sees files, so job-scoped directories under tmp/ never
+  // expire: empty staging dirs and dirs emptied by the file sweep accumulate
+  // forever (observed: hundreds of month-old empty dirs with Expired: 0 in
+  // the janitor report). Prune a directory once it is empty and either (a)
+  // its own mtime is past TTL or (b) this run just removed its last files.
+  const emptiedBySweep = new Set<string>();
+  for (const filePath of [...outcome.deleted, ...outcome.softDeleted]) {
+    let parent = nodePath.dirname(filePath);
+    while (parent.startsWith(dir + nodePath.sep)) {
+      emptiedBySweep.add(parent);
+      parent = nodePath.dirname(parent);
+    }
+  }
+  for (const dirPath of collectDirsPostOrder(dir)) {
+    try {
+      const stat = safeLstat(dirPath);
+      if (now - stat.mtimeMs <= ttlMs && !emptiedBySweep.has(dirPath)) continue;
+      if (safeReaddir(dirPath).length > 0) continue;
+      expired.push(dirPath);
+      if (!opts.dryRun) {
+        safeRmdirSync(dirPath);
+        outcome.deleted.push(dirPath);
+        logger.info(`[JANITOR] deleted empty dir: ${dirPath}`);
+        if (entry?.audit) {
+          appendRetentionAudit({
+            event: 'RETENTION_DELETE',
+            path: repoRelativePosix(dirPath),
+            policy_path: entry?.path,
+            artifact_class: entry?.artifact_class,
+            ttl_days: entry?.ttl_days,
+            policy_ref: RETENTION_CATALOG_REPO_PATH,
+            reason: 'retention TTL elapsed (storage janitor, empty dir prune)',
+          });
         }
       }
     } catch {

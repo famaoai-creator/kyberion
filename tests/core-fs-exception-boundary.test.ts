@@ -84,6 +84,8 @@ const allowedCoreFsImports = [
   'libs/core/src/pipeline-engine.test.ts',
   'libs/core/src/pipeline-fragments-catalog.test.ts',
   'libs/core/src/pipeline-preview.test.ts',
+  // Catalog fixture injection falls back to the committed file for this readiness test.
+  'libs/core/service-connection-readiness.test.ts',
   // SB-01: hermetic KYBERION_ROOT with a stimuli journal fixture.
   'libs/core/stimuli-journal-rotation-role.test.ts',
   'libs/core/storage-janitor.test.ts',

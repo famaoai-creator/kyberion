@@ -10,7 +10,7 @@
       "additionalProperties": false,
       "required": ["surface", "target"],
       "properties": {
-        "surface": { "enum": ["slack", "imessage", "telegram", "discord"] },
+        "surface": { "enum": ["slack", "imessage", "telegram", "discord", "inbox"] },
         "target": { "type": "string", "minLength": 1 }
       }
     },
