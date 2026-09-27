@@ -66,6 +66,8 @@ export function formatApprovalStoreHygieneReport(report: ApprovalStoreHygieneRep
   lines.push('', `Fixture records to trash: ${fixturePurge.candidates.length}`);
   if (fixturePurge.candidates.length > 0) {
     lines.push(`  by channel: ${countBy(fixturePurge.candidates, (c) => c.storageChannel)}`);
+    lines.push(`  by rule: ${countBy(fixturePurge.candidates, (c) => c.rule)}`);
+    lines.push('  (--json lists every record with its title, requester and matched rule)');
   }
   if (!report.dryRun) lines.push(`  trashed: ${fixturePurge.applied.length}`);
   const errors = [...pendingExpiry.errors, ...fixturePurge.errors];

@@ -7,6 +7,8 @@ import {
   approvalStoreRoots,
   computeApprovalPayloadHash,
   createApprovalRequest,
+  decideApprovalRequest,
+  expireApprovalRequest,
   listApprovalRequests,
   validateHumanFinalDecision,
 } from './approval-store.js';
@@ -74,6 +76,32 @@ describe('approval-store test isolation', () => {
     expect(listApprovalRequests({ storageChannels: [channel] }).map((r) => r.id)).toEqual([
       record.id,
     ]);
+  });
+
+  it('refuses to decide a request that was expired without an expiresAt', () => {
+    const record = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'stale-probe',
+      requestedBy: 'approval-store-test',
+      draft: { title: 'stale probe', summary: 'swept as stale_pending' },
+    });
+    expireApprovalRequest('infrastructure_sentinel', {
+      channel,
+      requestId: record.id,
+      reason: 'stale_pending',
+    });
+
+    expect(() =>
+      decideApprovalRequest('mission_controller', {
+        channel,
+        requestId: record.id,
+        decision: 'approved',
+        decidedBy: 'operator',
+        decidedByType: 'human',
+        authenticated: true,
+      })
+    ).toThrow('has expired');
   });
 });
 

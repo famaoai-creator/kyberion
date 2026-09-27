@@ -60,6 +60,11 @@ describe('findExpirablePendingApprovals', () => {
         }),
         record({ id: 'unparseable', requestedAt: 'not-a-date' }),
         record({
+          id: 'pipeline-owned',
+          requestedAt: new Date(NOW - 90 * DAY_MS).toISOString(),
+          requestedByContext: { surface: 'pipeline', pipelineRunId: 'run-1' } as never,
+        }),
+        record({
           id: 'decided',
           status: 'approved',
           requestedAt: new Date(NOW - 90 * DAY_MS).toISOString(),
@@ -150,9 +155,9 @@ describe('purgeFixtureApprovals', () => {
     ).toBe(false);
 
     const dry = purgeFixtureApprovals({ dryRun: true, records });
-    expect(dry.candidates.map((c) => c.requestId)).toEqual([
-      '11111111-1111-4111-8111-111111111111',
-      '22222222-2222-4222-8222-222222222222',
+    expect(dry.candidates.map((c) => [c.requestId, c.rule])).toEqual([
+      ['11111111-1111-4111-8111-111111111111', 'channel_token'],
+      ['22222222-2222-4222-8222-222222222222', 'requester_alice'],
     ]);
     expect(janitor.softDeleteToTrash).not.toHaveBeenCalled();
   });
@@ -172,7 +177,10 @@ describe('purgeFixtureApprovals', () => {
       expect(result.applied).toEqual([created.id]);
       expect(janitor.softDeleteToTrash).toHaveBeenCalledTimes(1);
       expect(janitor.appendRetentionAudit).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'APPROVAL_FIXTURE_TRASHED' })
+        expect.objectContaining({
+          event: 'APPROVAL_FIXTURE_TRASHED',
+          fixture_rule: 'channel_token',
+        })
       );
     } finally {
       withExecutionContext('mission_controller', () => {

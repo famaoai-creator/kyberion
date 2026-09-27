@@ -388,7 +388,7 @@ export function enforceApprovalGate(
   }
   const matched =
     renewableExpiresAt === undefined
-      ? sameCorrelation[0]
+      ? sameCorrelation.find((r: ApprovalRequestRecord) => r.status !== 'expired')
       : sameCorrelation.find((r: ApprovalRequestRecord) => !isLapsedRequest(r, now));
 
   if (matched) {

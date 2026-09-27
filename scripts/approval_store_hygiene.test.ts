@@ -25,8 +25,24 @@ function report(dryRun: boolean): ApprovalStoreHygieneReport {
     },
     fixturePurge: {
       candidates: [
-        { storageChannel: 'plugin-install', requestId: 'b', logicalPath: 'x' },
-        { storageChannel: 'plugin-install', requestId: 'c', logicalPath: 'y' },
+        {
+          storageChannel: 'plugin-install',
+          requestId: 'b',
+          logicalPath: 'x',
+          title: 'probe-12345',
+          requestedBy: 'plugin-installer',
+          status: 'pending',
+          rule: 'plugin_title',
+        },
+        {
+          storageChannel: 'plugin-install',
+          requestId: 'c',
+          logicalPath: 'y',
+          title: 'fixture-plugin',
+          requestedBy: 'plugin-installer',
+          status: 'approved',
+          rule: 'plugin_title',
+        },
       ],
       applied: [],
       errors: dryRun ? [] : ['plugin-install/b: denied'],
@@ -43,6 +59,7 @@ describe('approval_store_hygiene', () => {
     expect(text).toContain('by reason: stale_pending=1');
     expect(text).toContain('Fixture records to trash: 2');
     expect(text).toContain('by channel: plugin-install=2');
+    expect(text).toContain('by rule: plugin_title=2');
     expect(text).not.toContain('expired:');
   });
 
