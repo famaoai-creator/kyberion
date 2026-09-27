@@ -117,6 +117,8 @@ Persona も同じスコープに従います（`resolveExecutionPersona()`）。
 
 解析は「到達可能」とみなす側に倒しています。参照された宣言は呼ばれるか渡されるかを問わず到達可能とし、参照されたクラスはすべてのメンバーを、入れ子の関数は外側の宣言を到達可能とみなします。import されたモジュールの初期化コードは常に実行されるとみなし（`isDirectEntry` で守られた CLI 本体だけは、そのファイルがエントリポイントのときに限ります）、エントリポイント・動的 import されたモジュール・名前空間として値で使われたモジュールの export はすべて到達可能とします。解決できないロール引数、計算された動的 import、起動先を解決できないのに SYSTEM_ROLE を引き継ぐ子プロセスは「任意のロール」とみなし、そのサーフェスでは何も外せません。データに依存する分岐は、`scripts/lib/role-assumption-reviews.ts` のレビュー表（`REVIEWED_DYNAMIC_IMPORTS`、`REVIEWED_CHILD_PROCESSES`、`REVIEWED_INFEASIBLE_ASSUMPTIONS`）に理由と到達不能を固定するテストを添えて載せます。レビュー表にない新しいサイトは任意のロールとして扱われます。共有コアロールをシステムロールごとに外すにはポリシーの形を変える必要があるため、レポートが到達不能と示していても現在は外していません。
 
+**既知の課題（後続対応）: 子プロセスは親サーフェスのロールで動く**: 子プロセスの env を `buildExecutionEnv(process.env, role)` や `{ ...process.env, MISSION_ROLE: '<role>' }` で作ると、親から `SYSTEM_ROLE` も引き継がれます。`resolveRole()` では `SYSTEM_ROLE` が `MISSION_ROLE` より優先されるため、子は指定したロールではなく親サーフェスのロールで動きます（例: Concierge の `/api/ingest`・`hygiene`・`memory-queue`、Presence Studio の hearing-mission、nexus-daemon が起動するアクチュエーター）。子の中の引き受けは親サーフェスの `may_assume` で制限されるため、到達可能性レポートは子プロセスもたどり、必要なロール（`concierge` / `nexus_daemon` の `ingest_commit`、`nexus_daemon` の `reconcile_config_fallbacks`）を許可しています。子の env から `SYSTEM_ROLE` を外すと RA-02 の上限がなくなるため、現在は外していません（方針 B）。子を意図したロールで動かす方法（例: 明示ロールのときは子の `SYSTEM_ROLE` をそのロールの上限つきの値に置き換える）は後続で検討します。
+
 ### C. Authority (特権)
 
 特定の物理操作に対して与えられる、時間制限付きの「鍵」です。
