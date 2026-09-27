@@ -181,6 +181,10 @@ class WindowsDriver implements OSDriver {
     return await commandExists(cmd);
   }
 
+  // gdigrab 'desktop' captures the virtual screen in physical pixels (it scales
+  // its DPI-virtualised bounds by DESKTOPHORZRES / HORZRES), which is the
+  // Windows click space (windows-os-automation): on a single monitor a mark on
+  // this capture maps to a click with scale 1 and origin 0,0.
   async captureScreen(outputPath: string): Promise<void> {
     if (!(await commandExists(resolveFfmpegBin()))) {
       throw new Error('ffmpeg not found; install FFmpeg to capture Windows screens');
