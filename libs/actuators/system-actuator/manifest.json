@@ -1,6 +1,6 @@
 {
   "actuator_id": "system-actuator",
-  "version": "1.8.0",
+  "version": "1.10.0",
   "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
   "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -36,6 +36,9 @@
       "platforms": ["darwin", "linux", "win32"]
     },
     { "op": "record_screen", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "record_audio", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "capture_photo", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "record_camera", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "macos_automation_probe", "platforms": ["darwin"] },
     { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },

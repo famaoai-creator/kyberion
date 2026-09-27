@@ -574,6 +574,7 @@
       "capture": [
         "audit_verify",
         "baseline_check",
+        "capture_photo",
         "chrome_tab_list",
         "cli_health_check",
         "clipboard_read",
@@ -604,6 +605,8 @@
         "reconcile_config_fallbacks",
         "reconcile_unclassified_errors",
         "reconcile_unhandled_intents",
+        "record_audio",
+        "record_camera",
         "record_screen",
         "sample_traces",
         "scan_directory",

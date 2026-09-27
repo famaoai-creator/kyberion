@@ -411,6 +411,38 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.capture",
+      "command": "capture",
+      "noun": "capture",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.record.screen",
+      "command": "record screen",
+      "noun": "record",
+      "verb": "screen",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.record.audio",
+      "command": "record audio",
+      "noun": "record",
+      "verb": "audio",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.record.camera",
+      "command": "record camera",
+      "noun": "record",
+      "verb": "camera",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.run",
       "command": "run",
       "noun": "run",
@@ -593,6 +625,10 @@
         "watch",
         "speak",
         "draw",
+        "capture",
+        "record screen",
+        "record audio",
+        "record camera",
         "run",
         "preview",
         "intent",

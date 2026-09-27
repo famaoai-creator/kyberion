@@ -94,6 +94,12 @@ CLI に移すだけになる。
 | URL / Web ページ | `network:fetch`（外部通信統制）で保存 → 保存ファイルを `read`                                                | `read` は意図的に URL を拒否（`document-reader.ts`）。fetch を畳み込むと外部通信の判断が感覚動詞の下に入る |
 | いまの画面       | `media-generation:capture_screen` / `capture_focused_window`、`system:list_displays`、`system:record_screen` | capture は画面フレームの遮蔽を適用し行為側に属する。`see` はファイルしか読まない                           |
 
+2026-09-27 解決（MSN-CAPTURE-RECORD-20260927）: capture は 2 動詞になった。
+`pnpm kyberion capture [--screen|--window|--camera]`（静止画。`system:screenshot` / `system:capture_photo` 経由）と
+`pnpm kyberion record screen|audio|camera`（時系列。`system:record_screen` / `system:record_audio` / `system:record_camera` 経由）。
+遮蔽ゲートはアクチュエータ側に残し、動詞は引数解釈とリポジトリ境界だけを持つ。`see` は設計通りファイルのみ。
+未対応: `read <url>`（外部通信ゲートが未解決）、明示の `browser:record`（セッション生命定数が必要なため意図的に延期）、モバイル動画（デバイスブリッジなし）。
+
 どちらも現状 2 段で、1 動詞（`read <url>`、`see --screen`）に畳むのは容易。論点は
 エンジンの有無ではなく、外部通信・遮蔽のゲートをどこで評価するか。
 

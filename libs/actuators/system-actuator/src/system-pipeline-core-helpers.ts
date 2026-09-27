@@ -19,12 +19,9 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { retry } from '@agent/core/async-utils';
 import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual-media-device-control-bridge';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
 import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual-audio-input-recording-bridge';
 import { createVirtualInputDeviceInventoryBridge } from '@agent/core/virtual-input-device-inventory-bridge';
-import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
-import { createVirtualCameraInjectionBridge } from '@agent/core/virtual-camera-injection-bridge';
 import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
 import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
 import {
@@ -41,7 +38,19 @@ import type {
   ScreenDisplayRecord,
 } from '@agent/core/screen-display-inventory-bridge';
 import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
-import { writeVideoFrameBusToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
+import { writeVideoFramesToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
+import type { VideoFrame } from '@agent/core/meeting-session-types';
+import {
+  runRecordAudioOp,
+  runCapturePhotoOp,
+  runRecordCameraOp,
+  runCameraCaptureProbe,
+  runCameraInjectionProbe,
+  runTestCameraStreamOp,
+  runTestCameraMp4RoundtripOp,
+  runTestCameraInjectionOp,
+  replayCollectedFrames,
+} from './system-pipeline-capture-media-helpers.js';
 import { withinLoopBounds, DEFAULT_MAX_LOOP_ITERATIONS } from '@agent/core/execution-bounds';
 import {
   reconcileConfigFallbacks,
@@ -284,6 +293,15 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         },
       };
     }
+    case 'record_audio': {
+      return runRecordAudioOp(params, ctx, resolve);
+    }
+    case 'capture_photo': {
+      return runCapturePhotoOp(params, ctx, resolve);
+    }
+    case 'record_camera': {
+      return runRecordCameraOp(params, ctx, resolve);
+    }
     case 'macos_automation_probe':
       return {
         ...ctx,
@@ -372,20 +390,35 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         resolve
       );
       const bridge = createScreenCaptureBridge();
-      const captureBus = new StubVideoFrameBus();
-      await writeRedactedScreenFrames(bridge, captureBus, {
+      const redact = redactFrameInScope(screenRedactionWorkDir());
+      const frames: VideoFrame[] = [];
+      for await (const frame of bridge.captureStream({
         max_frames: Math.max(1, Number(params.max_frames || 2)),
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         display_index: displaySelection.display_index,
         display_name: displaySelection.display_name,
-      } as any);
+      } as any)) {
+        const redacted = await redact(frame);
+        if (!redacted || redacted.payload.byteLength === 0) {
+          throw new Error('screen frame withheld: redaction_failed');
+        }
+        frames.push(redacted);
+      }
       const outputPath = pathResolver.shared(`runtime/computer/screen-roundtrip-${Date.now()}.mp4`);
-      await captureBus.close();
-      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
+      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
         fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
       });
       const importBus = new StubVideoFrameBus();
       await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+      // Count re-imported frames (bounded: never wait past the exported
+      // count or a diagnostic timeout — an open bus blocks on empty).
+      let importedFrameCount = 0;
+      const importDeadline = Date.now() + 15_000;
+      for await (const frame of importBus.frameStream()) {
+        void frame;
+        importedFrameCount += 1;
+        if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
+      }
       await importBus.close();
       return {
         ...ctx,
@@ -396,7 +429,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           display_selection_source: displaySelection.selection_source,
           output_path: exported.output_path,
           exported_frame_count: exported.frame_count,
-          imported_frame_count: exported.frame_count,
+          imported_frame_count: importedFrameCount,
         },
       };
     }
@@ -1037,14 +1070,10 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'audio_input_devices']: result };
     }
     case 'camera_capture': {
-      const bridge = createVirtualCameraBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'camera_capture']: probe };
+      return runCameraCaptureProbe(params, ctx);
     }
     case 'camera_injection': {
-      const bridge = createVirtualCameraInjectionBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'camera_injection']: probe };
+      return runCameraInjectionProbe(params, ctx);
     }
     case 'screen_capture': {
       const bridge = createScreenCaptureBridge();
@@ -1067,127 +1096,13 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'audio_input_test']: result };
     }
     case 'test_camera_stream': {
-      const bridge = createVirtualCameraBridge();
-      const bus = new StubVideoFrameBus();
-      await bridge.pipeTo(bus, {
-        max_frames: Math.max(1, Number(params.frame_count || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        camera_intent: 'record',
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
-      const frames: any[] = [];
-      for await (const frame of bus.frameStream()) {
-        frames.push(frame);
-        if (frames.length >= Math.max(1, Number(params.frame_count || 2))) {
-          break;
-        }
-      }
-      await bus.close();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [params.export_as || 'camera_stream_test']: {
-          bridge_id: bridge.bridge_id,
-          backend: probe.backend || 'stub',
-          selected_camera: probe.selected_camera,
-          frame_count: frames.length,
-          frames,
-        },
-      };
+      return runTestCameraStreamOp(params, ctx);
     }
     case 'test_camera_mp4_roundtrip': {
-      const bridge = createVirtualCameraBridge();
-      const captureBus = new StubVideoFrameBus();
-      await bridge.pipeTo(captureBus, {
-        max_frames: Math.max(1, Number(params.frame_count || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        camera_intent: 'record',
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
-      const outputPath = pathResolver.shared(`runtime/computer/camera-roundtrip-${Date.now()}.mp4`);
-      await captureBus.close();
-      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
-        fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
-      });
-      const importBus = new StubVideoFrameBus();
-      await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
-      await importBus.close();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [params.export_as || 'camera_mp4_roundtrip']: {
-          bridge_id: bridge.bridge_id,
-          selected_camera: probe.selected_camera,
-          exported_mp4_path: exported.output_path,
-          exported_frame_count: exported.frame_count,
-          imported_frame_count: exported.frame_count,
-        },
-      };
+      return runTestCameraMp4RoundtripOp(params, ctx);
     }
     case 'test_camera_injection': {
-      const inventoryBridge = createVirtualDeviceInventoryBridge();
-      const cameraBridge = createVirtualCameraBridge({
-        inventory_bridge: inventoryBridge,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        preferred_backend:
-          typeof params.preferred_camera_backend === 'string'
-            ? (params.preferred_camera_backend as any)
-            : undefined,
-      });
-      const injectionBridge = createVirtualCameraInjectionBridge({
-        inventory_bridge: inventoryBridge,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
-      });
-      const frameCount = Math.max(1, Number(params.frame_count || 3));
-      const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
-      const mp4Path =
-        typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
-          ? resolveSystemPath(params.input_mp4_path.trim(), false)
-          : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
-      let sourcePath = mp4Path;
-      if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
-        const captureBus = new StubVideoFrameBus();
-        await cameraBridge.pipeTo(captureBus, {
-          device_preference: params.camera_device_preference || params.device_preference,
-          max_frames: frameCount,
-          frame_interval_ms: frameIntervalMs,
-          camera_intent: 'record',
-          subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-        });
-        await captureBus.close();
-        const exportResult = await writeVideoFrameBusToMp4(captureBus, mp4Path, {
-          fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
-        });
-        sourcePath = exportResult.output_path;
-      }
-      const injectionResult = await injectionBridge.injectFromMp4(sourcePath, {
-        source_path: sourcePath,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
-        output_path: typeof params.output_path === 'string' ? params.output_path : undefined,
-        fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
-      return {
-        ...ctx,
-        [params.export_as || 'camera_injection_test']: injectionResult,
-      };
+      return runTestCameraInjectionOp(params, ctx);
     }
     case 'resolve_path': {
       // Pure (no-I/O) path resolution so pipelines/ADF never embed a machine-specific

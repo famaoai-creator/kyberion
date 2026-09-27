@@ -1434,6 +1434,19 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
+  const { dispatchCaptureCommand } = await import('./lib/capture-dispatch.js');
+  if (
+    await dispatchCaptureCommand({
+      command,
+      firstArg,
+      restArgs,
+      normalizedArgs,
+      print: (text: string) => printText(text),
+    })
+  ) {
+    return;
+  }
+
   if (command === 'run') {
     runActuator(actuators, firstArg, restArgs, missionId);
     return;
