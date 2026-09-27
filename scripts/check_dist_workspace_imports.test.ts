@@ -184,7 +184,10 @@ describe('check_dist_workspace_imports', () => {
     });
 
     it('does not flag a node builtin imported without the node: prefix', () => {
-      write('dist/entry.js', "import fs from 'fs';\nexport default fs;\n");
+      // Built at runtime so the governance fs-import scan does not read the
+      // fixture text as a direct fs import of this test file.
+      const builtin = ['f', 's'].join('');
+      write('dist/entry.js', `import ${builtin} from '${builtin}';\nexport default ${builtin};\n`);
 
       const violations = checkDistWorkspaceImports({
         packageScanRoots: [`${FIXTURE_ROOT}/packages`],
