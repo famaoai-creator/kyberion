@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/autonomous-ops-policy.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "decision_thresholds": {
     "auto_max_score": 3,
     "notify_max_score": 6
@@ -10,6 +10,73 @@
     "reversibility": 1,
     "sensitivity": 1,
     "confidence": 1
+  },
+  "high_risk_paths": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CODEX.md",
+    "GEMINI.md",
+    ".github/**",
+    "**/package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".npmrc",
+    ".gitignore",
+    ".gitattributes",
+    "**/tsconfig*.json",
+    "vitest.config.*",
+    "eslint.config.*",
+    "plugins/**",
+    ".kyberion-plugins.json",
+    "knowledge/product/governance/**",
+    "knowledge/product/schemas/**",
+    "knowledge/product/roles/**",
+    "knowledge/product/orchestration/team-roles/**",
+    "knowledge/confidential/**",
+    "knowledge/personal/**",
+    "knowledge/public/**",
+    "libs/core/secure-io.ts",
+    "libs/core/path-resolver.ts",
+    "libs/core/tier-guard.ts",
+    "libs/core/foundation/env.ts",
+    "libs/core/foundation/governed-catalog.ts",
+    "libs/core/autonomous-ops-gate.ts",
+    "libs/core/mission-git.ts",
+    "libs/core/**/*approval*.ts",
+    "libs/core/**/*auth*.ts",
+    "libs/core/**/*permission*.ts",
+    "libs/core/**/*tenant*.ts",
+    "libs/core/**/*secret*.ts",
+    "libs/core/**/*viewer*.ts",
+    "libs/core/**/*trust*.ts",
+    "libs/core/**/*vault*.ts",
+    "libs/core/**/*guard*.ts",
+    "libs/core/**/*sandbox*.ts",
+    "libs/core/**/*sensitive*.ts",
+    "libs/core/src/autonomous-ops-gate.test.ts",
+    "scripts/mission_controller.ts",
+    "scripts/publish_pull_request.ts",
+    "scripts/report_human_interventions.ts",
+    "scripts/auto_checkpoint.ts",
+    "scripts/daemon_watchdog.ts",
+    "satellites/telegram-bridge/**",
+    "satellites/slack-bridge/**",
+    "tests/fixtures/governance-import-baseline.json",
+    "tests/*boundary*.test.ts",
+    "tests/*contract*.test.ts"
+  ],
+  "never_auto": [
+    "secret_mutation",
+    "external_publish",
+    "cross_tenant",
+    "lower_tier_write",
+    "policy_change",
+    "dependency_major"
+  ],
+  "active_hours": {
+    "start": "09:00",
+    "end": "22:00",
+    "timezone": "Asia/Tokyo"
   },
   "actions": {
     "storage_janitor": {
@@ -77,6 +144,174 @@
         "confidence": 1
       },
       "budget_cap_tokens": 1000
+    },
+    "ci_autofix_attempt": {
+      "title": "CI auto-fix attempt",
+      "description": "Classify a failing PR check and push a fix on the PR branch. If the fix deletes, skips, or changes test assertions, rebaselines snapshots, or touches config or baselines, it moves to approve.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "ci_autofix",
+      "max_attempts": 3,
+      "shadow": true
+    },
+    "pr_merge_low": {
+      "title": "Merge low-risk PR",
+      "description": "Gate-classified as tests, docs, or internal refactor outside high_risk_paths, with no external effect (no publish, daemon, or data migration). CI green and an independent cross-provider review of the head commit.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 1,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "pr_merge",
+      "required_evidence": ["ci_green", "cross_provider_review"],
+      "shadow": true
+    },
+    "pr_merge_medium": {
+      "title": "Merge medium-risk PR",
+      "description": "Behavior changes outside high_risk_paths; same evidence as low, plus a decision card with a fail-closed veto window.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 1,
+        "sensitivity": 1,
+        "confidence": 1
+      },
+      "action_class": "pr_merge",
+      "veto_window_minutes": 120,
+      "required_evidence": ["ci_green", "cross_provider_review"],
+      "shadow": true
+    },
+    "pr_merge_high": {
+      "title": "Merge high-risk PR",
+      "description": "Touches high_risk_paths, any never_auto class, or the author's self-repair cap was reached.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 2,
+        "sensitivity": 3,
+        "confidence": 1
+      },
+      "action_class": "pr_merge",
+      "shadow": true
+    },
+    "auto_revert_on_main_failure": {
+      "title": "Auto-revert after main breaks",
+      "description": "After an autonomous merge, if the main CI failure reproduces on a rerun, open and merge one revert PR per incident and lower the project's autonomy level by one. A conflicting revert escalates to approve.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "auto_revert",
+      "max_attempts": 1,
+      "shadow": true
+    },
+    "main_sync_clean": {
+      "title": "Sync main into a branch (clean)",
+      "description": "git merge-tree reports no conflict and tests pass after the sync. The census found 20 of 22 syncs clean; a clean replay is not semantic correctness, so tests stay mandatory.",
+      "axis_scores": {
+        "scope": 0,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "main_sync",
+      "required_evidence": ["tests_green"],
+      "shadow": true
+    },
+    "conflict_mechanical": {
+      "title": "Resolve mechanical conflict",
+      "description": "Lockfiles, generated files, import ordering: regenerate and re-run tests. pnpm-lock.yaml changes that alter resolved versions are high risk.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 1,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "conflict_resolution",
+      "max_attempts": 2,
+      "required_evidence": ["tests_green"],
+      "shadow": true
+    },
+    "conflict_semantic": {
+      "title": "Resolve semantic conflict",
+      "description": "A resolver agent merges both PRs' intents; tests and an independent cross-provider review verify it.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 1,
+        "sensitivity": 1,
+        "confidence": 2
+      },
+      "action_class": "conflict_resolution",
+      "veto_window_minutes": 120,
+      "max_attempts": 2,
+      "required_evidence": ["tests_green", "cross_provider_review"],
+      "shadow": true
+    },
+    "mission_start_mandate": {
+      "title": "Start mission within a standing mandate",
+      "description": "A standing mandate lists permitted work types, paths, spend, and external effects, and has an expiry. Work outside any of those is not covered.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "action_class": "mission_start",
+      "shadow": true
+    },
+    "mission_start_medium": {
+      "title": "Start mission outside mandates",
+      "description": "New work within an existing goal; planner + devil's advocate + reviewer produce one decision card.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 1,
+        "sensitivity": 1,
+        "confidence": 2
+      },
+      "action_class": "mission_start",
+      "veto_window_minutes": 720,
+      "shadow": true
+    },
+    "mission_start_high": {
+      "title": "Start mission with a new goal or external effect",
+      "description": "New goal, external publication, customer-facing effect, or over budget.",
+      "axis_scores": {
+        "scope": 3,
+        "reversibility": 2,
+        "sensitivity": 2,
+        "confidence": 1
+      },
+      "action_class": "mission_start",
+      "shadow": true
+    },
+    "stale_wait_escalation": {
+      "title": "Escalate stale waits",
+      "description": "Missions planned or paused, and approvals pending, beyond a threshold are listed in the digest with a proposed action (resume, cancel, archive). The census found 23 silent mission waits, the oldest from 2026-07-26.",
+      "axis_scores": {
+        "scope": 0,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 0
+      },
+      "action_class": "stale_wait_escalation",
+      "shadow": true
+    },
+    "secret_mutation": {
+      "title": "Introduce or change a secret",
+      "description": "never_auto: always a human decision with a second factor, regardless of scores.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 3,
+        "sensitivity": 3,
+        "confidence": 1
+      },
+      "action_class": "secret_mutation",
+      "shadow": true
     }
   }
 }
