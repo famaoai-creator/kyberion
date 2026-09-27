@@ -39,6 +39,9 @@ const FILES: Record<string, string> = {
       { id: 'missing-surface', command: 'node', args: ['dist/apps/missing.js'] },
       { id: 'spawn-surface', command: 'node', args: ['dist/apps/spawn.js'] },
       { id: 'delegate-surface', command: 'node', args: ['dist/apps/delegate.js'] },
+      { id: 'launch-surface', command: 'node', args: ['dist/apps/launch.js'] },
+      { id: 'other-surface', command: 'node', args: ['dist/apps/other.js'] },
+      { id: 'rawwrite-surface', command: 'node', args: ['dist/apps/rawwrite.js'] },
     ],
   }),
   'libs/core/authority.ts': [
@@ -50,6 +53,9 @@ const FILES: Record<string, string> = {
     '}',
     'export function buildExecutionEnv(env: NodeJS.ProcessEnv = process.env, role?: string): NodeJS.ProcessEnv {',
     '  return role ? { ...env, MISSION_ROLE: role } : { ...env };',
+    '}',
+    'export function buildSystemRoleLaunchEnv(env: NodeJS.ProcessEnv, systemRole: string): NodeJS.ProcessEnv {',
+    '  return { ...env, SYSTEM_ROLE: systemRole };',
     '}',
   ].join('\n'),
   'libs/core/stores.ts': [
@@ -138,6 +144,34 @@ const FILES: Record<string, string> = {
     '  return buildExecutionEnv(process.env, role);',
     '}',
     "forward('role_forwarded');",
+  ].join('\n'),
+  'apps/launch.ts': [
+    `import { spawn } from '${CHILD_PROCESS}';`,
+    `import { buildExecutionEnv, buildSystemRoleLaunchEnv } from '${CORE}/authority.js';`,
+    'function launchEnv(): NodeJS.ProcessEnv {',
+    "  return buildSystemRoleLaunchEnv(process.env, 'other_surface');",
+    '}',
+    // A NEW SYSTEM_ROLE: the launched child is not walked under launch_surface.
+    "spawn(process.execPath, ['dist/scripts/launched-child.js'], { env: launchEnv() });",
+    // An explicit undefined env inherits process.env like no env at all.
+    "spawn(process.execPath, ['dist/scripts/undefined-env-child.js'], { env: undefined });",
+    // buildExecutionEnv(undefined, role) defaults to process.env.
+    "void buildExecutionEnv(undefined, 'role_default_env');",
+    // A delegation under another SYSTEM_ROLE belongs to that system role.
+    "void buildExecutionEnv({ ...process.env, SYSTEM_ROLE: 'other_surface' }, 'role_for_other');",
+  ].join('\n'),
+  'apps/other.ts': 'export {};',
+  'apps/rawwrite.ts': [
+    "process.env.KYBERION_DELEGATED_ROLE = 'role_raw@rawwrite_surface';",
+    "export const cleared = { KYBERION_DELEGATED_ROLE: '' };",
+  ].join('\n'),
+  'scripts/launched-child.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_in_launched_child', () => undefined);",
+  ].join('\n'),
+  'scripts/undefined-env-child.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_undefined_env_child', () => undefined);",
   ].join('\n'),
   'scripts/delegated-child.ts': [
     `import { withExecutionContext } from '${CORE}/authority.js';`,
@@ -255,6 +289,27 @@ describe('RN-02 role assumption reachability analysis', () => {
       roles: ['role_delegated'],
       unresolved: [],
     });
+  });
+
+  it('models launch envs, explicit undefined envs and foreign delegations (DR-01)', () => {
+    const launch = report.system_roles.launch_surface;
+    expect(Object.keys(launch.reachable_roles)).toEqual([
+      'role_default_env',
+      'role_undefined_env_child',
+    ]);
+    expect(launch.unresolved_sites).toEqual([]);
+    // Delegated under SYSTEM_ROLE=other_surface by launch.ts: other_surface's role.
+    expect(Object.keys(report.system_roles.other_surface.reachable_roles)).toEqual([
+      'role_for_other',
+    ]);
+  });
+
+  it('treats a raw non-empty write of KYBERION_DELEGATED_ROLE as an any-role site (DR-01)', () => {
+    const surface = report.system_roles.rawwrite_surface;
+    expect(surface.unresolved_sites).toEqual(['apps/rawwrite.ts#<module>']);
+    expect(report.unresolved_sites['apps/rawwrite.ts#<module>']).toEqual([
+      expect.stringMatching(/raw write of KYBERION_DELEGATED_ROLE/),
+    ]);
   });
 
   it('compares reports by content, not by layout', () => {
