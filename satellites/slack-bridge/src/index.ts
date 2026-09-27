@@ -1,13 +1,13 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
-import { appendJsonLine, getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
 import { logger } from '@agent/core/core';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
-import { stimuliJournalPath } from '@agent/core/stimuli-journal';
+import { appendStimulus } from '@agent/core/stimuli-journal';
 import {
   emitChannelSurfaceEvent,
   recordSlackDelivery,
@@ -658,7 +658,9 @@ async function start(_args: string[] = []) {
         `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
       );
       recordSlackSurfaceArtifact(artifact);
-      appendJsonLine(stimuliJournalPath(), artifact.stimulus);
+      // SB-02: written as the journal's store-writer role (infrastructure_sentinel),
+      // so the append keeps working inside any other in-process assumption.
+      appendStimulus(artifact.stimulus);
 
       const initialized = isEnvironmentInitialized();
 
