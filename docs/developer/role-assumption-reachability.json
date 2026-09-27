@@ -1715,11 +1715,6 @@
     },
     {
       "site": "scripts/run_generation_schedule.ts#runGenerationScheduleAction",
-      "roles": ["surface_runtime"],
-      "unresolved": []
-    },
-    {
-      "site": "scripts/run_generation_schedule.ts#runGenerationScheduleAction [delegated child role]",
       "roles": ["generation_scheduler", "surface_runtime"],
       "unresolved": []
     },
