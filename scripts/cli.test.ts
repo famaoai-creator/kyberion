@@ -36,7 +36,12 @@ describe('Kyberion CLI helpers', () => {
 
   it('uses the governed parser for packet and pipeline preview files', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' })
+      [
+        safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' }),
+        safeReadFile(pathResolver.rootResolve('scripts/cli-command-handlers.ts'), {
+          encoding: 'utf8',
+        }),
+      ].join('\n')
     );
     expect(source).toContain("parseSafeJsonInput(content, 'Packet file')");
     expect(source).toContain("parseSafeJsonInput(content, 'Pipeline preview file')");
