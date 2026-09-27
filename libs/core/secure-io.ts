@@ -664,6 +664,18 @@ export function safeUnlinkSync(filePath: string): void {
 }
 
 /**
+ * Remove an empty directory safely. fs.rmdirSync refuses non-empty
+ * directories — the exact invariant the janitor's empty-dir prune relies on.
+ */
+export function safeRmdirSync(dirPath: string): void {
+  assertSensitivePathAllowed(dirPath, 'write', isSensitivePathMediated());
+  const resolved = pathResolver.resolve(dirPath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  if (fs.existsSync(resolved)) fs.rmdirSync(resolved);
+}
+
+/**
  * Create a directory safely.
  */
 export function safeMkdir(
