@@ -48,13 +48,19 @@ import {
 import {
   buildSlackApprovalAskWhyBlocks,
   buildSlackApprovalBlocks,
+  buildSlackChangeRequestModal,
   createSlackApprovalRequest,
   parseSlackApprovalAction,
   parseSlackAskWhyAction,
+  parseSlackCardAction,
+  parseSlackChangeRequestSubmission,
+  SLACK_CHANGE_REQUEST_BLOCK_ID,
+  SLACK_CHANGE_REQUEST_CALLBACK_ID,
 } from '@agent/core/slack-approval-ui';
 import {
   applySurfaceApprovalDecision,
   resolveSurfaceApprovalAskWhy,
+  resolveSurfaceApprovalReply,
 } from '@agent/core/surface-approval-ui';
 import {
   buildSlackMissionProposalBlocks,
@@ -1143,6 +1149,119 @@ async function start(_args: string[] = []) {
       });
     } catch (err: unknown) {
       logger.error(`❌ [SlackBridge] Ask-why handling failed: ${errorDetail(err)}`);
+    }
+  });
+
+  app.action('slack_approval_explain', async ({ ack, action, body, client }) => {
+    await ack();
+    try {
+      const payload = parseSlackCardAction(readStringAt(action, ['value']));
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
+      const access = evaluateSurfaceActorAccess('slack', actorId);
+      if (!access.allowed) {
+        logger.warn(
+          `⚠️ [SlackBridge] Ignoring unauthorized explain action from ${actorId}: ${access.reason}`
+        );
+        return;
+      }
+      const channel = readStringAt(body, ['channel', 'id']);
+      const threadTs =
+        readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
+      if (!channel || !threadTs) throw new Error('Slack explain action is missing channel/thread');
+      const resolved = resolveSurfaceApprovalReply({
+        surface: 'slack',
+        channel,
+        threadTs,
+        text: `appr:${payload.requestId}:explain`,
+        decidedBy: actorId,
+        locale: resolveOperatorLocale(),
+      });
+      await client.chat.postEphemeral({
+        channel,
+        user: actorId,
+        thread_ts: threadTs,
+        text: resolved.reply || '',
+      });
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Explain handling failed: ${errorDetail(err)}`);
+    }
+  });
+
+  app.action('slack_approval_changes', async ({ ack, action, body, client }) => {
+    await ack();
+    try {
+      const payload = parseSlackCardAction(readStringAt(action, ['value']));
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
+      const access = evaluateSurfaceActorAccess('slack', actorId);
+      if (!access.allowed) {
+        logger.warn(
+          `⚠️ [SlackBridge] Ignoring unauthorized change request from ${actorId}: ${access.reason}`
+        );
+        return;
+      }
+      const channel = readStringAt(body, ['channel', 'id']);
+      const threadTs =
+        readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
+      if (!channel || !threadTs) throw new Error('Slack change request is missing channel/thread');
+      await client.views.open({
+        trigger_id: readStringAt(body, ['trigger_id']),
+        view: buildSlackChangeRequestModal(
+          { requestId: payload.requestId, channel, threadTs },
+          resolveOperatorLocale()
+        ),
+      });
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Opening change request modal failed: ${errorDetail(err)}`);
+    }
+  });
+
+  app.view(SLACK_CHANGE_REQUEST_CALLBACK_ID, async ({ ack, body, view, client }) => {
+    let submission: ReturnType<typeof parseSlackChangeRequestSubmission>;
+    try {
+      submission = parseSlackChangeRequestSubmission(view);
+    } catch (err: unknown) {
+      await ack();
+      logger.error(`❌ [SlackBridge] Invalid change request submission: ${errorDetail(err)}`);
+      return;
+    }
+    if (!submission.instruction.trim()) {
+      await ack({
+        response_action: 'errors',
+        errors: {
+          [SLACK_CHANGE_REQUEST_BLOCK_ID]: t(
+            'bridge:decision_card_changes_modal_label',
+            undefined,
+            resolveOperatorLocale()
+          ),
+        },
+      });
+      return;
+    }
+    await ack();
+    try {
+      const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
+      const access = evaluateSurfaceActorAccess('slack', actorId);
+      if (!access.allowed) {
+        logger.warn(
+          `⚠️ [SlackBridge] Ignoring unauthorized change request from ${actorId}: ${access.reason}`
+        );
+        return;
+      }
+      const resolved = resolveSurfaceApprovalReply({
+        surface: 'slack',
+        channel: submission.channel,
+        threadTs: submission.threadTs,
+        text: `appr:${submission.requestId}:changes ${submission.instruction}`,
+        decidedBy: actorId,
+        locale: resolveOperatorLocale(),
+      });
+      await client.chat.postMessage({
+        channel: submission.channel,
+        thread_ts: submission.threadTs,
+        text: resolved.reply || '',
+      });
+    } catch (err: unknown) {
+      logger.error(`❌ [SlackBridge] Change request submission failed: ${errorDetail(err)}`);
     }
   });
 

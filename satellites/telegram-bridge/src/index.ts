@@ -41,11 +41,12 @@ import {
   stashMissionProposalForConfirmation,
 } from '@agent/core/surface-mission-proposals';
 import {
-  buildSurfaceApprovalActions,
+  buildDecisionCardActions,
   buildSurfaceApprovalText,
   createSurfaceApprovalRequest,
   resolveSurfaceApprovalReply,
   runSurfaceMessageConversation,
+  type DecisionCardActionKind,
 } from '@agent/core/channel-surface';
 import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
@@ -77,6 +78,7 @@ export interface TelegramMessage {
   text?: string;
   caption?: string;
   message_thread_id?: number;
+  reply_to_message?: Pick<TelegramMessage, 'message_id' | 'text' | 'from'>;
 }
 
 export interface TelegramCallbackQuery {
@@ -340,6 +342,9 @@ function resolveToken(input?: string): string | undefined {
   return input || getRegisteredEnvText('TELEGRAM_BOT_TOKEN') || undefined;
 }
 
+/** Sends without a parse mode, so agent-written text cannot inject links or formatting. */
+export const TELEGRAM_PLAIN_TEXT = 'none';
+
 async function sendTelegramMessageSingle(
   input: {
     chatId: string | number;
@@ -367,13 +372,14 @@ async function sendTelegramMessageSingle(
   }
 
   const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  const parseMode = input.parseMode || options.parseMode || 'Markdown';
   let response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
       text: input.text,
-      parse_mode: input.parseMode || options.parseMode || 'Markdown',
+      ...(parseMode === TELEGRAM_PLAIN_TEXT ? {} : { parse_mode: parseMode }),
       ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
     }),
   });
@@ -476,23 +482,36 @@ async function answerTelegramCallbackQuery(
   });
 }
 
-function buildTelegramApprovalReplyMarkup(
+const DECISION_CARD_BUTTON_KEYS = {
+  approve: 'bridge:approval_approve_button',
+  changes: 'bridge:decision_card_changes_button',
+  reject: 'bridge:approval_reject_button',
+  explain: 'bridge:decision_card_explain_button',
+} as const satisfies Record<DecisionCardActionKind, string>;
+
+/** Two buttons per row so the four decision-card actions fit a phone screen. */
+export function buildTelegramApprovalReplyMarkup(
   record: Awaited<ReturnType<typeof createSurfaceApprovalRequest>>
 ) {
-  return {
-    inline_keyboard: [
-      buildSurfaceApprovalActions(record).map((action) => ({
-        text: t(
-          action.decision === 'approved'
-            ? 'bridge:approval_approve_button'
-            : 'bridge:approval_reject_button',
-          undefined,
-          resolveOperatorLocale()
-        ),
-        callback_data: action.callbackData,
-      })),
-    ],
-  };
+  const buttons = buildDecisionCardActions(record).map((action) => ({
+    text: t(DECISION_CARD_BUTTON_KEYS[action.kind], undefined, resolveOperatorLocale()),
+    callback_data: action.callbackData,
+  }));
+  const rows = [];
+  for (let index = 0; index < buttons.length; index += 2)
+    rows.push(buttons.slice(index, index + 2));
+  return { inline_keyboard: rows };
+}
+
+const TELEGRAM_FORCE_REPLY_MARKUP = { force_reply: true, selective: true } as const;
+const CHANGES_PROMPT_TOKEN = /appr:([0-9a-f-]{36}):changes\b/iu;
+
+/** A reply to the bot's "request changes" prompt carries the instruction for that request. */
+export function resolveTelegramApprovalText(message: TelegramMessage, text: string): string {
+  if (/^appr:/iu.test(text.trim())) return text;
+  if (message.reply_to_message?.from?.is_bot !== true) return text;
+  const token = message.reply_to_message.text?.match(CHANGES_PROMPT_TOKEN);
+  return token ? `appr:${token[1]}:changes ${text}` : text;
 }
 
 export async function handleTelegramCallbackQuery(
@@ -518,6 +537,7 @@ export async function handleTelegramCallbackQuery(
     threadTs,
     text: callbackQuery.data,
     decidedBy: senderId || chatId,
+    locale: resolveOperatorLocale(),
   });
   await answerTelegramCallbackQuery(callbackQuery.id, options).catch((error) => {
     logger.warn(`⚠️ [TelegramBridge] Callback acknowledgement failed: ${String(error)}`);
@@ -525,7 +545,15 @@ export async function handleTelegramCallbackQuery(
   if (!approvalReply.handled) {
     return { ok: true, ignored: true, reason: 'unsupported_callback' };
   }
-  const reply = await sendTelegramMessage({ chatId, text: approvalReply.reply || '' }, options);
+  const reply = await sendTelegramMessage(
+    {
+      chatId,
+      text: approvalReply.reply || '',
+      parseMode: TELEGRAM_PLAIN_TEXT,
+      ...(approvalReply.forceReply ? { replyMarkup: TELEGRAM_FORCE_REPLY_MARKUP } : {}),
+    },
+    options
+  );
   return { ok: true, chatId, threadTs, reply };
 }
 
@@ -619,11 +647,20 @@ export async function handleTelegramUpdate(
     surface: 'telegram',
     channel: chatId,
     threadTs,
-    text,
+    text: resolveTelegramApprovalText(message, text),
     decidedBy: senderId || chatId,
+    locale: resolveOperatorLocale(),
   });
   if (approvalReply.handled) {
-    const reply = await sendTelegramMessage({ chatId, text: approvalReply.reply || '' }, options);
+    const reply = await sendTelegramMessage(
+      {
+        chatId,
+        text: approvalReply.reply || '',
+        parseMode: TELEGRAM_PLAIN_TEXT,
+        ...(approvalReply.forceReply ? { replyMarkup: TELEGRAM_FORCE_REPLY_MARKUP } : {}),
+      },
+      options
+    );
     return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
   }
 
@@ -764,6 +801,7 @@ export async function handleTelegramUpdate(
                     locale: resolveOperatorLocale(),
                   }),
                   replyMarkup: buildTelegramApprovalReplyMarkup(record),
+                  ...(record.decisionCard ? { parseMode: TELEGRAM_PLAIN_TEXT } : {}),
                 },
                 options
               );
