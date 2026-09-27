@@ -18,38 +18,31 @@ const ASSUMPTION_FUNCTIONS = new Set(['withExecutionContext', 'withExecutionCont
 const AUTHORITY_FILE = 'libs/core/authority.ts';
 
 /**
- * Spawn helpers: where their options argument is and whether a call without
- * an explicit env inherits process.env (the secure-io helpers build an
- * allowlisted env that drops SYSTEM_ROLE unless the caller passes one back in).
+ * Spawn helpers, matched as the exported functions of their module whose name
+ * matches `name`: where their options argument is and whether a call without
+ * an explicit env inherits process.env (the secure-io exec helpers build an
+ * allowlisted env that drops SYSTEM_ROLE unless the caller passes one back in;
+ * the managed-process spawner hands its spawn options to child_process).
  */
-const CORE_SPAWN_HELPERS: Record<
-  string,
-  { file: string; inheritsByDefault: boolean; optionsIndex: number }
-> = {
-  safeExec: { file: 'libs/core/secure-io.ts', inheritsByDefault: false, optionsIndex: 2 },
-  safeExecResult: { file: 'libs/core/secure-io.ts', inheritsByDefault: false, optionsIndex: 2 },
-  safeExecResultAsync: {
+const CORE_SPAWN_HELPERS: ReadonlyArray<{
+  file: string;
+  name: RegExp;
+  inheritsByDefault: boolean;
+  optionsIndex: number;
+}> = [
+  {
     file: 'libs/core/secure-io.ts',
+    name: /^safe(?:Exec|Spawn)/,
     inheritsByDefault: false,
     optionsIndex: 2,
   },
-  safeExecShellScript: {
-    file: 'libs/core/secure-io.ts',
-    inheritsByDefault: false,
-    optionsIndex: 2,
-  },
-  safeExecShellScriptResult: {
-    file: 'libs/core/secure-io.ts',
-    inheritsByDefault: false,
-    optionsIndex: 2,
-  },
-  safeSpawn: { file: 'libs/core/secure-io.ts', inheritsByDefault: false, optionsIndex: 2 },
-  spawnManagedProcess: {
+  {
     file: 'libs/core/managed-process.ts',
+    name: /^spawn/,
     inheritsByDefault: true,
     optionsIndex: 0,
   },
-};
+];
 /** Modules whose spawn functions start a process that inherits process.env by default. */
 const PROCESS_SPAWN_MODULES = new Set(['child_process', 'node:child_process', 'node-pty']);
 const CHILD_PROCESS_FUNCTIONS = new Set([
@@ -407,8 +400,10 @@ export class Analyzer {
         if (rel === AUTHORITY_FILE && ASSUMPTION_FUNCTIONS.has(name)) {
           this.assumptionDeclarations.add(statement);
         }
-        const helper = CORE_SPAWN_HELPERS[name];
-        if (helper && helper.file === rel) {
+        const helper = CORE_SPAWN_HELPERS.find(
+          (candidate) => candidate.file === rel && candidate.name.test(name)
+        );
+        if (helper && hasExportModifier(statement)) {
           this.spawnHelperDeclarations.set(statement, helper);
         }
       }

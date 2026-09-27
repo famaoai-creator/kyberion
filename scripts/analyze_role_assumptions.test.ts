@@ -15,6 +15,7 @@ import {
 const FIXTURE_ROOT = pathResolver.sharedTmp(`analyze-role-assumptions-${process.pid}`);
 /** Fixture-relative import prefix, built so repo import scanners do not read it as ours. */
 const CORE = ['..', 'libs', 'core'].join('/');
+const CHILD_PROCESS = ['node', 'child_process'].join(':');
 
 const FILES: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'fixture', private: true, scripts: {} }),
@@ -79,7 +80,7 @@ const FILES: Record<string, string> = {
     '}',
   ].join('\n'),
   'apps/spawn.ts': [
-    "import { spawn } from 'node:child_process';",
+    `import { spawn } from '${CHILD_PROCESS}';`,
     "spawn(process.execPath, ['dist/scripts/child.js'], { env: { ...process.env } });",
     "spawn(process.execPath, ['dist/scripts/isolated.js'], { env: { PATH: '' } });",
     "spawn(process.execPath, ['dist/apps/unanalysed.js'], { env: process.env });",
