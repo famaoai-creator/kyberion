@@ -153,6 +153,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter (via libs/core/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh-hub-peer-messaging-adapter.ts#clearMeshHubPeerMessagingAdapterNamespace",
       "roles": [
         "chronos_gateway",
@@ -177,18 +189,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter (via libs/core/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/mesh-hub-peer-messaging-adapter.ts#recordEvent (via libs/core/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -201,7 +201,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh-message-broker.ts#clearMeshMessageBrokerNamespace",
+      "site": "libs/core/mesh-message-broker.ts#MeshMessageBroker (via libs/core/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -213,7 +213,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh-message-broker.ts#MeshMessageBroker (via libs/core/artifact-store.ts#withRole)",
+      "site": "libs/core/mesh-message-broker.ts#clearMeshMessageBrokerNamespace",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -381,11 +381,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/peer-messaging.ts#clearPeerRuntime",
-      "roles": ["infrastructure_sentinel"],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/peer-messaging.ts#PeerMessagingServer (via libs/core/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -395,6 +390,11 @@
         "sovereign_concierge",
         "surface_runtime"
       ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/peer-messaging.ts#clearPeerRuntime",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
@@ -1054,12 +1054,12 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts#buildPreview",
+      "site": "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts#GET",
+      "site": "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts#buildPreview",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1589,6 +1589,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/pipeline-execution-part-execution.ts#runStepsInternal (via libs/core/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/pipeline_promote.ts#appendCatalogRow",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -1596,11 +1601,6 @@
     {
       "site": "scripts/pipeline_promote.ts#main",
       "roles": ["ecosystem_architect"],
-      "unresolved": []
-    },
-    {
-      "site": "scripts/pipeline-execution-part-execution.ts#runStepsInternal (via libs/core/artifact-store.ts#withRole)",
-      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1829,10 +1829,10 @@
     "libs/core/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/virtual-camera-injection-bridge.ts#isAvailableCommand": [
+    "libs/core/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl": [
+    "libs/core/virtual-camera-injection-bridge.ts#isAvailableCommand": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "scripts/backup.ts#runRequired": [

@@ -48,7 +48,9 @@ import { REVIEWED_INFEASIBLE_ASSUMPTIONS } from './lib/role-assumption-reviews.j
 import {
   collectSources,
   collectSystemRoleEntries,
+  compareCodeUnits,
   createProgram,
+  createResolver,
   createWorkspace,
   type Workspace,
 } from './lib/role-assumption-workspace.js';
@@ -171,11 +173,12 @@ export function buildReachabilityReport(
   for (const files of entries.values()) for (const file of files) allRoots.add(file);
   // Child-process targets are added lazily; include every script so the program
   // already holds them (they are only walked when a spawn reaches them).
-  for (const dir of ['scripts', 'libs/actuators']) {
+  for (const dir of ['scripts', 'libs/core', 'libs/actuators']) {
     for (const file of collectSources(ws, ws.abs(dir))) allRoots.add(file);
   }
-  const program = createProgram(ws, [...allRoots].sort());
-  const analyzer = new Analyzer(ws, program, packageJson.scripts ?? {});
+  const resolveModule = createResolver(ws);
+  const program = createProgram(ws, [...allRoots].sort(), resolveModule);
+  const analyzer = new Analyzer(ws, program, packageJson.scripts ?? {}, resolveModule);
   const policy = readSafeJsonFile<PolicyFile>(
     path.join(root, POLICY_PATH),
     'role assumption policy'
@@ -241,7 +244,7 @@ export function buildReachabilityReport(
       reasons.add(reason);
       unresolvedSites.set(site, reasons);
     };
-    for (const unit of [...parents.keys()].sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const unit of [...parents.keys()].sort((a, b) => compareCodeUnits(a.id, b.id))) {
       for (const record of recordsByUnit.get(unit) ?? []) {
         for (const role of [...record.roles].sort()) {
           const infeasible = REVIEWED_INFEASIBLE_ASSUMPTIONS.find(
@@ -295,11 +298,11 @@ export function buildReachabilityReport(
     systemRoles[systemRole] = {
       entries: files.map((file) => ws.rel(file)).sort(),
       reviewed_infeasible: reviewedInfeasible.sort((a, b) =>
-        `${a.role}|${a.site}`.localeCompare(`${b.role}|${b.site}`)
+        compareCodeUnits(`${a.role}|${a.site}`, `${b.role}|${b.site}`)
       ),
-      child_process_entries: childEntries.sort((a, b) => a.site.localeCompare(b.site)),
+      child_process_entries: childEntries.sort((a, b) => compareCodeUnits(a.site, b.site)),
       reachable_roles: Object.fromEntries(
-        Object.entries(reachable).sort(([a], [b]) => a.localeCompare(b))
+        Object.entries(reachable).sort(([a], [b]) => compareCodeUnits(a, b))
       ),
       unresolved_sites: [...unresolved].sort(),
       // An unresolved site may assume any role: nothing is provably unreachable.
@@ -323,10 +326,10 @@ export function buildReachabilityReport(
     generated_by: 'scripts/analyze_role_assumptions.ts',
     description:
       'RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts`; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.',
-    assumption_sites: [...siteMap.values()].sort((a, b) => a.site.localeCompare(b.site)),
+    assumption_sites: [...siteMap.values()].sort((a, b) => compareCodeUnits(a.site, b.site)),
     unresolved_sites: Object.fromEntries(
       [...unresolvedSites.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => compareCodeUnits(a, b))
         .map(([site, reasons]) => [site, [...reasons].sort()])
     ),
     system_roles: systemRoles,

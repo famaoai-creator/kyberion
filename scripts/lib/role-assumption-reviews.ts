@@ -91,3 +91,20 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
       'runs `node dist/libs/actuators/<connector_skill>/src/index.js` with process.env for the connector skills of presence/bridge/channel-registry.json',
   },
 };
+
+/**
+ * Plain JavaScript modules the TypeScript program does not analyse, reviewed
+ * as browser-only runtime code (repo-relative, `*` matches one path segment;
+ * only .js / .mjs files of a match count).
+ * The analyzer re-verifies each loaded file: it may only import other
+ * reviewed modules by relative path and must not mention `require(`,
+ * `node:`, `@agent/` or `withExecutionContext`; otherwise the load stays an
+ * any-role site.
+ */
+export const REVIEWED_UNANALYSED_MODULES: Array<{ pattern: string; rationale: string }> = [
+  {
+    pattern: 'libs/shared-ui/vanilla/*',
+    rationale:
+      'framework-free browser renderers of the kyberion-base catalog (DOM only, typed by sibling .d.ts files); they never run Kyberion server code',
+  },
+];

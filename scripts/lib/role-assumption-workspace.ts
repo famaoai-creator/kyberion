@@ -151,13 +151,28 @@ function tryFile(ws: Workspace, base: string): string | null {
   return null;
 }
 
-function createResolver(ws: Workspace) {
+/** Resolve a module specifier from `containingFile` to a project source, or null. */
+export type ModuleResolver = (specifier: string, containingFile: string) => string | null;
+
+/** Deterministic, locale-independent ordering (UTF-16 code units). */
+export function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** Is `dir` (POSIX-normalised) the workspace root or below it? */
+function isWithinRoot(root: string, dir: string): boolean {
+  const posixRoot = toPosix(root);
+  const posixDir = toPosix(dir);
+  return posixDir === posixRoot || posixDir.startsWith(`${posixRoot}/`);
+}
+
+export function createResolver(ws: Workspace): ModuleResolver {
   const packages = loadWorkspacePackages(ws);
   const appRootCache = new Map<string, string | null>();
   const appRootFor = (file: string): string | null => {
     let dir = path.dirname(file);
     const visited: string[] = [];
-    while (dir.startsWith(ws.root) && dir !== ws.root) {
+    while (isWithinRoot(ws.root, dir) && toPosix(dir) !== toPosix(ws.root)) {
       if (appRootCache.has(dir)) {
         const hit = appRootCache.get(dir) ?? null;
         for (const seen of visited) appRootCache.set(seen, hit);
@@ -272,15 +287,18 @@ export function collectSystemRoleEntries(ws: Workspace): Map<string, string[]> {
     const files = rels.map((rel) => ws.abs(rel)).filter((file) => ws.isFile(file));
     if (files.length > 0) entries.set(systemRole, files);
   }
-  return new Map([...entries.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return new Map([...entries.entries()].sort(([a], [b]) => compareCodeUnits(a, b)));
 }
 
 // ---------------------------------------------------------------------------
 // Program
 // ---------------------------------------------------------------------------
 
-export function createProgram(ws: Workspace, rootNames: string[]): ts.Program {
-  const resolve = createResolver(ws);
+export function createProgram(
+  ws: Workspace,
+  rootNames: string[],
+  resolve: ModuleResolver = createResolver(ws)
+): ts.Program {
   const options: ts.CompilerOptions = {
     target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext,
