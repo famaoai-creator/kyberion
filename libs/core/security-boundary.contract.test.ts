@@ -13,6 +13,7 @@ const ALLOWLIST = [
   /\/scripts\/create_actuator\.ts$/,
   /\/scripts\/dependency_resolver\.ts$/,
   /\/scripts\/scenario_storage_governance\.ts$/,
+  /\/scripts\/agy_profile_controller\.ts$/,
 ];
 
 function collectProductionTsFiles(dir: string): string[] {
