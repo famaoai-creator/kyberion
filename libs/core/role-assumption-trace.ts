@@ -14,18 +14,25 @@ import * as pathResolver from './path-resolver.js';
  * is scripts/analyze_role_assumptions.ts.
  *
  * - Zero cost when unset: one registered-env lookup per assumption.
- * - The path must stay under `active/shared/tmp/` or `active/shared/runtime/`
- *   (both default_allow for every role), so the trace never needs a grant and
- *   never reaches a tier-governed store. Any other path is ignored with a
- *   single warning.
- * - Writes go through the secure-io foundation bridge (authority.ts cannot
- *   import secure-io directly without a bootstrap cycle). A failing write never
- *   affects the assumption; it is reported once and the trace is disabled for
- *   the rest of the process.
+ * - The target must be a `.jsonl` file inside a dedicated directory,
+ *   `active/shared/tmp/role-assumption-trace/` or
+ *   `active/shared/runtime/role-assumption-trace/` (both default_allow for
+ *   every role), so the trace never needs a grant and never reaches a
+ *   tier-governed store; no component of the path may be a symbolic link.
+ *   Any other target is ignored with a single warning.
+ * - The file is created with an exclusive create, then appended to. Writes go
+ *   through the secure-io foundation bridge (authority.ts cannot import
+ *   secure-io directly without a bootstrap cycle).
+ * - Nothing here can change the decision: every step (path resolution
+ *   included) runs inside one try; a failure is reported once and the trace
+ *   is disabled for the rest of the process.
  */
 export const ROLE_ASSUMPTION_TRACE_ENV = 'KYBERION_ROLE_ASSUMPTION_TRACE';
 
-const ALLOWED_TRACE_PREFIXES = ['active/shared/tmp/', 'active/shared/runtime/'];
+export const ROLE_ASSUMPTION_TRACE_DIRS = [
+  'active/shared/tmp/role-assumption-trace/',
+  'active/shared/runtime/role-assumption-trace/',
+];
 
 export interface RoleAssumptionTraceRecord {
   system_role: string | null;
@@ -41,17 +48,30 @@ export interface RoleAssumptionTraceRecord {
 let writing = false;
 let disabledReason: string | null = null;
 let warnedPath: string | null = null;
+const createdTargets = new Set<string>();
 
-/** Test seam: forget a disabled trace / warned path. */
+/** Test seam: forget a disabled trace / warned path / created files. */
 export function resetRoleAssumptionTraceState(): void {
   writing = false;
   disabledReason = null;
   warnedPath = null;
+  createdTargets.clear();
+}
+
+function rejectTracePath(value: string, reason: string): null {
+  if (warnedPath !== value) {
+    warnedPath = value;
+    console.warn(
+      `[ROLE_ASSUMPTION_TRACE] ignoring ${ROLE_ASSUMPTION_TRACE_ENV}=${value}: ${reason}`
+    );
+  }
+  return null;
 }
 
 /**
- * Resolve the configured trace path, or null when tracing is off or the path
- * is outside the allowed runtime directories.
+ * Resolve the configured trace path, or null when tracing is off or the target
+ * is not a `.jsonl` file in a dedicated trace directory reached without
+ * symbolic links.
  */
 export function resolveRoleAssumptionTracePath(raw: string | undefined): string | null {
   const value = raw?.trim();
@@ -59,14 +79,24 @@ export function resolveRoleAssumptionTracePath(raw: string | undefined): string 
   const root = pathResolver.rootDir();
   const resolved = path.resolve(root, value);
   const relative = path.relative(root, resolved).split(path.sep).join('/');
-  if (ALLOWED_TRACE_PREFIXES.some((prefix) => relative.startsWith(prefix))) return resolved;
-  if (warnedPath !== value) {
-    warnedPath = value;
-    console.warn(
-      `[ROLE_ASSUMPTION_TRACE] ignoring ${ROLE_ASSUMPTION_TRACE_ENV}=${value}: the trace must live under ${ALLOWED_TRACE_PREFIXES.join(' or ')}`
+  const inDedicatedDir = ROLE_ASSUMPTION_TRACE_DIRS.some(
+    (dir) => relative.startsWith(dir) && relative.length > dir.length
+  );
+  if (!inDedicatedDir || relative.includes('/../')) {
+    return rejectTracePath(
+      value,
+      `the trace must live under ${ROLE_ASSUMPTION_TRACE_DIRS.join(' or ')}`
     );
   }
-  return null;
+  if (!relative.endsWith('.jsonl')) {
+    return rejectTracePath(value, 'the trace file must end in .jsonl');
+  }
+  try {
+    // Throws on a symbolic link anywhere on the path, the leaf included.
+    return pathResolver.assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  } catch (err) {
+    return rejectTracePath(value, err instanceof Error ? err.message : String(err));
+  }
 }
 
 const AUTHORITY_FRAME =
@@ -138,19 +168,39 @@ function captureStack(): string | undefined {
   }
 }
 
+/** Create the trace file exclusively once per process; a concurrent creator is fine. */
+function ensureTraceFile(target: string): void {
+  if (createdTargets.has(target)) return;
+  const io = getFoundationIo();
+  if (!io.exists(target)) {
+    if (!io.createExclusiveFile) throw new Error('foundation io cannot create files exclusively');
+    try {
+      io.createExclusiveFile(target, '');
+    } catch (err) {
+      // Another process created it between the check and the create.
+      if (!(err instanceof Error && /EEXIST/.test(err.message)) || !io.exists(target)) throw err;
+    }
+  }
+  createdTargets.add(target);
+}
+
 /**
- * Record one assumption decision when tracing is enabled. Never throws.
+ * Record one assumption decision when tracing is enabled. Never throws and
+ * never changes the decision: the caller decides before and after it.
  */
 export function traceRoleAssumption(
   systemRole: string | undefined,
   assumedRole: string,
   allowed: boolean
 ): void {
-  if (disabledReason || writing) return;
-  const target = resolveRoleAssumptionTracePath(getRegisteredEnvText(ROLE_ASSUMPTION_TRACE_ENV));
-  if (!target) return;
-  writing = true;
+  let entered = false;
   try {
+    if (disabledReason || writing) return;
+    const raw = getRegisteredEnvText(ROLE_ASSUMPTION_TRACE_ENV);
+    if (!raw) return;
+    writing = entered = true;
+    const target = resolveRoleAssumptionTracePath(raw);
+    if (!target) return;
     const frames = callerFramesFromStack(captureStack());
     const record: RoleAssumptionTraceRecord = {
       system_role: systemRole?.trim() ? systemRole.trim().toLowerCase() : null,
@@ -160,16 +210,16 @@ export function traceRoleAssumption(
       stack: frames,
       ts: new Date().toISOString(),
     };
-    const line = `${JSON.stringify(record)}\n`;
-    const io = getFoundationIo();
-    // safeAppendFileSync does not create directories; the first record goes
-    // through the atomic writer, which does.
-    if (io.exists(target)) io.appendFile(target, line);
-    else io.writeFile(target, line);
+    ensureTraceFile(target);
+    getFoundationIo().appendFile(target, `${JSON.stringify(record)}\n`);
   } catch (err) {
-    disabledReason = err instanceof Error ? err.message : String(err);
-    console.warn(`[ROLE_ASSUMPTION_TRACE] disabled after a failed write: ${disabledReason}`);
+    try {
+      disabledReason = err instanceof Error ? err.message : String(err);
+      console.warn(`[ROLE_ASSUMPTION_TRACE] disabled after a failure: ${disabledReason}`);
+    } catch {
+      disabledReason = disabledReason ?? 'trace failure';
+    }
   } finally {
-    writing = false;
+    if (entered) writing = false;
   }
 }
