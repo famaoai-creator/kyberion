@@ -86,7 +86,7 @@ describe('email-workflow shared helpers', () => {
 
   it('rejects a request id that escapes the draft artifact directory', async () => {
     await expect(
-      generateEmailReplyDraft({ requestId: './outside', triageText: 'safe triage' })
+      generateEmailReplyDraft({ requestId: '../outside', triageText: 'safe triage' })
     ).rejects.toThrow(/invalid request id/);
   });
 });

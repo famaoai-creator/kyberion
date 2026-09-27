@@ -158,7 +158,7 @@ describe('voice-sample-collection', () => {
     expect(() =>
       collectVoiceSamples({
         action: 'collect_voice_samples',
-        request_id: './escape',
+        request_id: '../escape',
         samples: [{ sample_id: 's1', path: sample1, language: 'ja' }],
       })
     ).toThrow(/request_id must be a single safe path segment/u);

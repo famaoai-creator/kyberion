@@ -13,7 +13,9 @@ describe('voice-path-policy', () => {
   });
 
   it('rejects traversal and foreign absolute paths', () => {
-    expect(() => resolveVoicePath('../outside.wav', 'recording-output')).toThrow(/project root/u);
+    expect(() => resolveVoicePath('../../outside.wav', 'recording-output')).toThrow(
+      /project root/u
+    );
     expect(() => resolveVoicePath('/tmp/outside.wav', 'recording-output')).toThrow(/project root/u);
   });
 

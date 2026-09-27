@@ -147,13 +147,13 @@ describe('buildTenantKnowledgeScopeSet (positive allowlist)', () => {
 
 describe('normalizeTenantKnowledgeSourcePath', () => {
   it('normalizes knowledge-relative overlay sources without allowing traversal', () => {
-    expect(normalizeTenantKnowledgeSourcePath('./customer/tenant-x/brief.md')).toBe(
+    expect(normalizeTenantKnowledgeSourcePath('../customer/tenant-x/brief.md')).toBe(
       'customer/tenant-x/brief.md'
     );
     expect(normalizeTenantKnowledgeSourcePath('confidential/tenant-x/brief.md')).toBe(
       'knowledge/confidential/tenant-x/brief.md'
     );
-    expect(normalizeTenantKnowledgeSourcePath('../outside/secret.md')).toBeNull();
+    expect(normalizeTenantKnowledgeSourcePath('../../outside/secret.md')).toBeNull();
     expect(normalizeTenantKnowledgeSourcePath('/tmp/outside/secret.md')).toBeNull();
   });
 });

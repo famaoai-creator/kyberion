@@ -68,7 +68,7 @@ describe('computer-surface a2ui messages', () => {
   it('rejects traversal-shaped computer session ids before persistence', () => {
     expect(() =>
       buildComputerSurfaceMessages({
-        sessionId: './outside',
+        sessionId: '../outside',
         executor: 'terminal',
         status: 'running',
         latestAction: 'spawn',

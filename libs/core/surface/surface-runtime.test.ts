@@ -23,7 +23,7 @@ describe('surface runtime manifest loader', () => {
     safeWriteFile(
       manifestPath,
       JSON.stringify({
-        $schema: './schemas/runtime-surface-manifest.schema.json',
+        $schema: '../schemas/runtime-surface-manifest.schema.json',
         version: 1,
         surfaces: [
           {

@@ -101,7 +101,7 @@ describe('agy-cli-backend', () => {
   });
 
   it('rejects path traversal attempts in agyProfile', () => {
-    const backend = new AgyCliBackend({ agyProfile: './etc/passwd' });
+    const backend = new AgyCliBackend({ agyProfile: '../etc/passwd' });
     expect(backend.resolveProfileHome()).toBeUndefined();
   });
 

@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe('work coordination', () => {
   it('rejects a namespace that can escape the coordination root', () => {
-    expect(() => setWorkCoordinationNamespace('./outside')).toThrow(/invalid work coordination/);
+    expect(() => setWorkCoordinationNamespace('../outside')).toThrow(/invalid work coordination/);
   });
 
   it('rejects a symlinked coordination store leaf', () => {
