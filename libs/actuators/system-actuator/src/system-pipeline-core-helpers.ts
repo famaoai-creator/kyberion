@@ -18,12 +18,9 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { retry } from '@agent/core/async-utils';
 import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual-media-device-control-bridge';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual-audio-output-playback-bridge';
 import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual-audio-input-recording-bridge';
 import { createVirtualInputDeviceInventoryBridge } from '@agent/core/virtual-input-device-inventory-bridge';
-import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
-import { createVirtualCameraInjectionBridge } from '@agent/core/virtual-camera-injection-bridge';
 import { createScreenCaptureBridge } from '@agent/core/screen-capture-bridge';
 import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
 import {
@@ -42,15 +39,17 @@ import type {
 import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
 import { writeVideoFramesToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
 import type { VideoFrame } from '@agent/core/meeting-session-types';
-
-/** Replay finitely-collected frames as a stream: draining a closed
- * StubVideoFrameBus yields nothing, and draining an open one blocks once the
- * buffer empties — collected-then-replayed never loses the recording. */
-async function* replayCollectedFrames(frames: VideoFrame[]): AsyncIterable<VideoFrame> {
-  for (const frame of frames) {
-    yield frame;
-  }
-}
+import {
+  runRecordAudioOp,
+  runCapturePhotoOp,
+  runRecordCameraOp,
+  runCameraCaptureProbe,
+  runCameraInjectionProbe,
+  runTestCameraStreamOp,
+  runTestCameraMp4RoundtripOp,
+  runTestCameraInjectionOp,
+  replayCollectedFrames,
+} from './system-pipeline-capture-media-helpers.js';
 import { withinLoopBounds, DEFAULT_MAX_LOOP_ITERATIONS } from '@agent/core/execution-bounds';
 import {
   reconcileConfigFallbacks,
@@ -294,165 +293,13 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       };
     }
     case 'record_audio': {
-      const bridge = createVirtualAudioInputRecordingBridge();
-      const availability = await bridge.probe();
-      if (!availability.available) {
-        throw new Error(
-          `record_audio unavailable: ${availability.reason || 'audio input bridge unavailable'}`
-        );
-      }
-      const durationRaw = params.duration ?? params.duration_sec;
-      const durationValue = durationRaw === undefined ? 3 : Number(durationRaw);
-      if (!Number.isFinite(durationValue) || durationValue <= 0) {
-        throw new Error(
-          `record_audio duration must be 1-300 seconds, got "${String(durationRaw)}"`
-        );
-      }
-      const durationSec = durationValue;
-      if (durationSec > 300) {
-        throw new Error(`record_audio duration must be 1-300 seconds, got "${durationSec}"`);
-      }
-      const requestedTargets = Array.isArray(params.targets)
-        ? params.targets.map((entry: unknown) => String(entry).trim()).filter(Boolean)
-        : [];
-      const selectedInputs = requestedTargets.length > 0 ? requestedTargets : availability.inputs;
-      if (selectedInputs.length === 0) {
-        throw new Error('record_audio: no audio inputs available on this machine');
-      }
-      const requestedOutput =
-        typeof params.output === 'string' && params.output.trim() ? params.output.trim() : '';
-      const outputExt = requestedOutput
-        ? path.extname(pathResolver.rootResolve(String(resolve(requestedOutput)))).toLowerCase()
-        : '';
-      const fileMode = requestedOutput !== '' && AUDIO_RECORDING_EXTENSIONS.includes(outputExt);
-      if (fileMode && selectedInputs.length !== 1) {
-        throw new Error(
-          `record_audio: output file "${requestedOutput}" needs exactly one input ` +
-            `(${selectedInputs.length} selected). Pass targets with a single device or omit output.`
-        );
-      }
-      const baseDir = fileMode
-        ? ''
-        : resolveCanonicalAudioRecordingDir(
-            requestedOutput ? String(resolve(requestedOutput)) : '',
-            resolve
-          );
-      const recordings: Array<Record<string, unknown>> = [];
-      for (const inputName of selectedInputs) {
-        const recordingPath = fileMode
-          ? resolveCanonicalAudioRecordingPath(String(resolve(requestedOutput)))
-          : path.join(baseDir, `${slugifyAudioInputName(inputName)}.wav`);
-        if (!fileMode && !safeExistsSync(path.dirname(recordingPath))) {
-          safeMkdir(path.dirname(recordingPath), { recursive: true });
-        }
-        const result = await bridge.recordOnInputs([inputName], {
-          duration_sec: durationSec,
-          output_path: recordingPath,
-        });
-        for (const entry of result.recordings) recordings.push({ ...entry });
-      }
-      const failed = recordings.filter((entry) => entry.status !== 'recorded');
-      if (failed.length > 0) {
-        const detail = failed
-          .map((entry) => `${String(entry.device_name)}: ${String(entry.error || entry.status)}`)
-          .join('; ');
-        throw new Error(`record_audio: ${failed.length} input(s) failed: ${detail}`);
-      }
-      return {
-        ...ctx,
-        [params.export_as || 'audio_recording']: {
-          status: 'succeeded',
-          bridge_id: bridge.bridge_id,
-          duration_sec: durationSec,
-          recordings,
-        },
-      };
+      return runRecordAudioOp(params, ctx, resolve);
     }
     case 'capture_photo': {
-      const bridge = createVirtualCameraBridge();
-      const photoPath = resolveCanonicalPhotoCapturePath(params, resolve);
-      if (!safeExistsSync(path.dirname(photoPath))) {
-        safeMkdir(path.dirname(photoPath), { recursive: true });
-      }
-      const cameraIntent =
-        params.camera_intent === 'record' ||
-        params.camera_intent === 'share' ||
-        params.camera_intent === 'ocr_source'
-          ? params.camera_intent
-          : 'reference';
-      const result = await bridge.capturePhoto({
-        save_path: photoPath,
-        camera_intent: cameraIntent,
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-        device_preference:
-          typeof params.device_preference === 'string' ? params.device_preference : undefined,
-      });
-      return {
-        ...ctx,
-        [params.export_as || 'photo_path']: photoPath,
-        photo_path: photoPath,
-        photo_backend: result.backend,
-        photo_camera: result.selected_camera,
-        photo_intent: result.camera_intent,
-      };
+      return runCapturePhotoOp(params, ctx, resolve);
     }
     case 'record_camera': {
-      // Camera video is photo-per-frame (see captureStream), so this is
-      // low-fps by construction — timelapse grade, unlike screen recording.
-      const bridge = createVirtualCameraBridge();
-      const fpsRaw = params.fps ?? 2;
-      const fpsValue = Number(fpsRaw);
-      if (!Number.isFinite(fpsValue) || fpsValue <= 0 || fpsValue > 5) {
-        throw new Error(`record_camera fps must be 1-5, got "${String(fpsRaw)}"`);
-      }
-      const fps = fpsValue;
-      const durationRaw = params.duration;
-      const durationValue = durationRaw === undefined ? 5 : Number(durationRaw);
-      if (!Number.isFinite(durationValue) || durationValue <= 0) {
-        throw new Error(
-          `record_camera duration must be 1-60 seconds, got "${String(durationRaw)}"`
-        );
-      }
-      const durationSec = durationValue;
-      if (durationSec > 60) {
-        throw new Error(`record_camera duration must be 1-60 seconds, got "${durationSec}"`);
-      }
-      const frameCount = Math.min(300, Math.max(1, Math.ceil(durationSec * fps)));
-      const frameIntervalMs = Math.max(200, Math.round(1000 / fps));
-      const outputPath = resolveCanonicalCameraRecordingPath(params, resolve);
-      // Collect frames directly from the capture stream: draining a closed
-      // StubVideoFrameBus yields nothing, and draining an open one blocks
-      // once the buffer empties — both lose the recording.
-      const frames: VideoFrame[] = [];
-      for await (const frame of bridge.captureStream({
-        max_frames: frameCount,
-        frame_interval_ms: frameIntervalMs,
-        camera_intent: 'record',
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-        device_preference:
-          typeof params.device_preference === 'string' ? params.device_preference : undefined,
-      })) {
-        frames.push(frame);
-      }
-      if (frames.length === 0) {
-        throw new Error('record_camera: the camera produced no frames');
-      }
-      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
-        fps,
-      });
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [params.export_as || 'camera_recording']: {
-          status: 'succeeded',
-          bridge_id: bridge.bridge_id,
-          selected_camera: probe.selected_camera,
-          output_path: exported.output_path,
-          frame_count: exported.frame_count,
-          fps,
-          duration_sec: durationSec,
-        },
-      };
+      return runRecordCameraOp(params, ctx, resolve);
     }
     case 'macos_automation_probe':
       return {
@@ -1221,14 +1068,10 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'audio_input_devices']: result };
     }
     case 'camera_capture': {
-      const bridge = createVirtualCameraBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'camera_capture']: probe };
+      return runCameraCaptureProbe(params, ctx);
     }
     case 'camera_injection': {
-      const bridge = createVirtualCameraInjectionBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'camera_injection']: probe };
+      return runCameraInjectionProbe(params, ctx);
     }
     case 'screen_capture': {
       const bridge = createScreenCaptureBridge();
@@ -1251,136 +1094,13 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       return { ...ctx, [params.export_as || 'audio_input_test']: result };
     }
     case 'test_camera_stream': {
-      const bridge = createVirtualCameraBridge();
-      const bus = new StubVideoFrameBus();
-      await bridge.pipeTo(bus, {
-        max_frames: Math.max(1, Number(params.frame_count || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        camera_intent: 'record',
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
-      const frames: any[] = [];
-      for await (const frame of bus.frameStream()) {
-        frames.push(frame);
-        if (frames.length >= Math.max(1, Number(params.frame_count || 2))) {
-          break;
-        }
-      }
-      await bus.close();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [params.export_as || 'camera_stream_test']: {
-          bridge_id: bridge.bridge_id,
-          backend: probe.backend || 'stub',
-          selected_camera: probe.selected_camera,
-          frame_count: frames.length,
-          frames,
-        },
-      };
+      return runTestCameraStreamOp(params, ctx);
     }
     case 'test_camera_mp4_roundtrip': {
-      const bridge = createVirtualCameraBridge();
-      const frames: VideoFrame[] = [];
-      for await (const frame of bridge.captureStream({
-        max_frames: Math.max(1, Number(params.frame_count || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        camera_intent: 'record',
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      })) {
-        frames.push(frame);
-      }
-      const outputPath = pathResolver.shared(`runtime/computer/camera-roundtrip-${Date.now()}.mp4`);
-      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
-        fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
-      });
-      const importBus = new StubVideoFrameBus();
-      await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
-      let importedFrameCount = 0;
-      const importDeadline = Date.now() + 15_000;
-      for await (const frame of importBus.frameStream()) {
-        void frame;
-        importedFrameCount += 1;
-        if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
-      }
-      await importBus.close();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [params.export_as || 'camera_mp4_roundtrip']: {
-          bridge_id: bridge.bridge_id,
-          selected_camera: probe.selected_camera,
-          exported_mp4_path: exported.output_path,
-          exported_frame_count: exported.frame_count,
-          imported_frame_count: importedFrameCount,
-        },
-      };
+      return runTestCameraMp4RoundtripOp(params, ctx);
     }
     case 'test_camera_injection': {
-      const inventoryBridge = createVirtualDeviceInventoryBridge();
-      const cameraBridge = createVirtualCameraBridge({
-        inventory_bridge: inventoryBridge,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        preferred_backend:
-          typeof params.preferred_camera_backend === 'string'
-            ? (params.preferred_camera_backend as any)
-            : undefined,
-      });
-      const injectionBridge = createVirtualCameraInjectionBridge({
-        inventory_bridge: inventoryBridge,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
-      });
-      const frameCount = Math.max(1, Number(params.frame_count || 3));
-      const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
-      const mp4Path =
-        typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
-          ? resolveSystemPath(params.input_mp4_path.trim(), false)
-          : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
-      let sourcePath = mp4Path;
-      if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
-        const frames: VideoFrame[] = [];
-        for await (const frame of cameraBridge.captureStream({
-          device_preference: params.camera_device_preference || params.device_preference,
-          max_frames: frameCount,
-          frame_interval_ms: frameIntervalMs,
-          camera_intent: 'record',
-          subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-        })) {
-          frames.push(frame);
-        }
-        const exportResult = await writeVideoFramesToMp4(mp4Path, replayCollectedFrames(frames), {
-          fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
-        });
-        sourcePath = exportResult.output_path;
-      }
-      const injectionResult = await injectionBridge.injectFromMp4(sourcePath, {
-        source_path: sourcePath,
-        device_preference:
-          typeof params.camera_device_preference === 'string'
-            ? params.camera_device_preference
-            : typeof params.device_preference === 'string'
-              ? params.device_preference
-              : undefined,
-        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
-        output_path: typeof params.output_path === 'string' ? params.output_path : undefined,
-        fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
-        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
-      return {
-        ...ctx,
-        [params.export_as || 'camera_injection_test']: injectionResult,
-      };
+      return runTestCameraInjectionOp(params, ctx);
     }
     case 'resolve_path': {
       // Pure (no-I/O) path resolution so pipelines/ADF never embed a machine-specific
@@ -1721,99 +1441,6 @@ export function resolveCanonicalScreenCapturePath(
   ) {
     throw new Error(
       'screenshot output must remain within the governed screenshot or shared tmp store'
-    );
-  }
-  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
-}
-
-export const AUDIO_RECORDING_EXTENSIONS: readonly string[] = [
-  '.wav',
-  '.mp3',
-  '.m4a',
-  '.aac',
-  '.flac',
-  '.ogg',
-  '.opus',
-] as const;
-
-function slugifyAudioInputName(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'input';
-}
-
-function assertWithinAudioRecordingRoots(absolute: string, what: string): string {
-  const allowedRoots = [
-    path.resolve(pathResolver.shared('runtime/computer/audio-recordings')),
-    path.resolve(pathResolver.shared('tmp')),
-  ];
-  if (
-    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
-  ) {
-    throw new Error(`${what} must remain within the governed audio-recording or shared tmp store`);
-  }
-  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
-}
-
-export function resolveCanonicalAudioRecordingPath(requestedOutput: string): string {
-  const absolute = path.resolve(pathResolver.rootResolve(requestedOutput));
-  return assertWithinAudioRecordingRoots(absolute, 'record_audio output file');
-}
-
-export function resolveCanonicalAudioRecordingDir(
-  requestedOutput: string,
-  resolve: (value: unknown) => unknown
-): string {
-  const candidate = requestedOutput
-    ? pathResolver.rootResolve(String(resolve(requestedOutput)))
-    : pathResolver.shared(`runtime/computer/audio-recordings/audio-${Date.now()}`);
-  const absolute = path.resolve(candidate);
-  const resolved = assertWithinAudioRecordingRoots(absolute, 'record_audio output directory');
-  if (!safeExistsSync(resolved)) {
-    safeMkdir(resolved, { recursive: true });
-  }
-  return resolved;
-}
-
-export function resolveCanonicalPhotoCapturePath(
-  params: Record<string, unknown>,
-  resolve: (value: unknown) => unknown
-): string {
-  const requested =
-    typeof params.path === 'string' && params.path.trim()
-      ? pathResolver.rootResolve(String(resolve(params.path)))
-      : pathResolver.shared(`runtime/computer/photos/photo-${Date.now()}-${randomUUID()}.jpg`);
-  const absolute = path.resolve(requested);
-  const allowedRoots = [
-    path.resolve(pathResolver.shared('runtime/computer/photos')),
-    path.resolve(pathResolver.shared('tmp')),
-  ];
-  if (
-    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
-  ) {
-    throw new Error(
-      'capture_photo output must remain within the governed photo or shared tmp store'
-    );
-  }
-  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
-}
-
-export function resolveCanonicalCameraRecordingPath(
-  params: Record<string, unknown>,
-  resolve: (value: unknown) => unknown = (value) => value
-): string {
-  const requested = typeof params.output === 'string' ? params.output.trim() : '';
-  const candidate = requested
-    ? pathResolver.rootResolve(String(resolve(requested)))
-    : pathResolver.shared(`runtime/computer/camera-recordings/camera-${Date.now()}.mp4`);
-  const absolute = path.resolve(candidate);
-  const allowedRoots = [
-    path.resolve(pathResolver.shared('runtime/computer/camera-recordings')),
-    path.resolve(pathResolver.shared('tmp')),
-  ];
-  if (
-    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
-  ) {
-    throw new Error(
-      'record_camera output must remain within the governed camera-recording or shared tmp store'
     );
   }
   return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });

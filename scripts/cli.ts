@@ -1434,25 +1434,16 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
-  if (command === 'capture') {
-    // Still-image capture (thin over system:screenshot). Registered as
-    // operator-cli.capture; stdout carries the summary (or --json).
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runCaptureCommand } = await import('./cli-capture.js');
-    await runCaptureCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
+  const { dispatchCaptureCommand } = await import('./lib/capture-dispatch.js');
   if (
-    command === 'record' &&
-    (firstArg === 'screen' || firstArg === 'audio' || firstArg === 'camera')
+    await dispatchCaptureCommand({
+      command,
+      firstArg,
+      restArgs,
+      normalizedArgs,
+      print: (text: string) => printText(text),
+    })
   ) {
-    // Time-series recording (thin over system:record_screen / record_audio /
-    // record_camera). Registered as two-word operator-cli commands so the bare
-    // `record` (operator-home desktop demonstration recorder) keeps working.
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runRecordCommand } = await import('./cli-record.js');
-    await runRecordCommand([`--${firstArg}`, ...restArgs], printText);
     return;
   }
 
