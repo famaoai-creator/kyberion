@@ -20,6 +20,7 @@ import {
 } from './service-engine-helpers.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { stripAuthorityEnvOverrides } from './authority.js';
 
 const logger = createLogger('service-engine-execution');
 
@@ -29,6 +30,20 @@ function buildChildEnv(env?: Record<string, unknown>): Record<string, string> | 
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key, value]) => [key, String(value)] as const);
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+/**
+ * A preset's child-process env overlay (`alt.env`): like buildChildEnv, but a
+ * preset may not set execution authority (SYSTEM_ROLE, MISSION_ROLE,
+ * KYBERION_PERSONA, KYBERION_DELEGATED_ROLE, KYBERION_SUDO — DR-01).
+ */
+export function buildPresetProcessEnv(
+  env?: Record<string, unknown>
+): Record<string, string> | undefined {
+  const childEnv = buildChildEnv(env);
+  if (!childEnv) return undefined;
+  const stripped = stripAuthorityEnvOverrides(childEnv) as Record<string, string>;
+  return Object.keys(stripped).length > 0 ? stripped : undefined;
 }
 
 /** Parse untrusted CLI output without allowing unsafe JSON objects into mappings. */
@@ -52,7 +67,7 @@ export async function executeMcp(
   const transport = new StdioClientTransport({
     command,
     args,
-    env: buildChildEnv(options?.env),
+    env: buildPresetProcessEnv(options?.env),
     stderr: 'inherit',
   });
   const client = new Client(
@@ -154,7 +169,7 @@ export async function executeServicePresetAlternative(
           const resolved = resolveTemplateValue(a, runtimeVars);
           return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
         });
-        const execEnv = buildChildEnv(
+        const execEnv = buildPresetProcessEnv(
           stripUnresolvedTemplateValues(resolveTemplateValue(input.alt.env || {}, runtimeVars))
         );
         logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
@@ -201,7 +216,7 @@ export async function executeServicePresetAlternative(
     if (!isCliAllowedForOperation(input.serviceConfig, input.preset, input.alt)) {
       throw new Error('CLI execution disabled.');
     }
-    const mcpEnv = buildChildEnv(
+    const mcpEnv = buildPresetProcessEnv(
       stripUnresolvedTemplateValues(resolveTemplateValue(input.alt.env || {}, runtimeVars))
     );
 

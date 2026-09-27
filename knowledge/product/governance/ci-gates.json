@@ -300,6 +300,14 @@
       "rationale": "Checks runtime ESM integrity."
     },
     {
+      "id": "dist-workspace-imports",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["dist/scripts/check_dist_workspace_imports.js"],
+      "owner": "quality",
+      "rationale": "Catches dist/presence, dist/satellites, and dist/scripts entry points whose bare workspace-package imports resolve fine under tsconfig paths at typecheck time but are never linked into node_modules, so `node <entry>` fails with ERR_MODULE_NOT_FOUND at process startup (e.g. nexus-daemon and @actuator/service)."
+    },
+    {
       "id": "catalogs",
       "scope": "full",
       "executable": "node",
@@ -369,6 +377,14 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_wisdom_forwarders.ts"],
       "owner": "operations",
       "rationale": "Checks Wisdom forwarder targets."
+    },
+    {
+      "id": "changelog-fragments",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/assemble_changelog.ts", "--check"],
+      "owner": "release",
+      "rationale": "Validates changelog.d/ fragment format (category front-matter, list-item body) so PRs record user-visible changes without editing CHANGELOG.md (GF-02)."
     },
     {
       "id": "env-registry",

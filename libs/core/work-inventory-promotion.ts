@@ -27,7 +27,7 @@ import { slugify } from './foundation/text.js';
 import { pathResolver, findMissionPath } from './path-resolver.js';
 import { loadState } from './mission-state.js';
 import { listApprovalRequests } from './approval-store.js';
-import { withExecutionContext } from './authority.js';
+import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -636,7 +636,8 @@ function assertExistingMissionBelongsToPlan(
 /**
  * Runs the governed mission hand-off for a mission plan, mirroring
  * `hearing-mission-routes.ts`: `mission_controller.js create` (subprocess,
- * `MISSION_ROLE=mission_controller`), verify the mission landed `planned`,
+ * `buildExecutionEnv(process.env, 'mission_controller')`: MISSION_ROLE, and
+ * the delegated role under SYSTEM_ROLE — AUTHORITY_MODEL 3.B2 DR-01), verify the mission landed `planned`,
  * write `evidence/mission-brief.json` under the `mission_controller`
  * execution context (a governed mission write the caller's own role may not
  * hold), then `mission_alignment_request.js --mission <id> --json`.
@@ -670,7 +671,7 @@ export function executeMissionPromotion(
   const created = !missionDir;
   if (!missionDir) {
     const createResult = exec(process.execPath, [CONTROLLER_RELATIVE, ...plan.create_args], {
-      env: { ...process.env, MISSION_ROLE: 'mission_controller' },
+      env: buildExecutionEnv(process.env, 'mission_controller'),
       cwd: rootDir,
       timeoutMs: 60_000,
       maxOutputMB: 5,

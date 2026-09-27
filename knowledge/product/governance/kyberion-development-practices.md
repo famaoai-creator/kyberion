@@ -16,19 +16,22 @@ This repo guards its boundaries with contract tests. Adding code without the
 matching registration compiles fine locally and then fails CI (or worse,
 weakens a boundary silently). Ceremony checklist by change type:
 
-| You added…                                                                                       | You must also…                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a new `libs/core/*.ts` module used via `@agent/core`                                             | export it from `libs/core/index.ts` (typecheck does NOT catch a missing barrel export — `build:actuators` resolves dist and fails on CI only)                                                                                                                                                                                                                                                                                                                                                                                   |
-| a test file that imports `node:fs` directly                                                      | register it in `tests/fixtures/governance-import-baseline.json` AND `tests/core-fs-exception-boundary.test.ts` `allowedCoreFsImports`                                                                                                                                                                                                                                                                                                                                                                                           |
-| a `spawnManagedProcess` caller                                                                   | add it to `tests/process-boundary-governance.test.ts` `allowedManagedProcessConsumers`                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| a direct `child_process` import                                                                  | add it to both `tests/runtime-child-process-boundary.test.ts` and `tests/fixtures/governance-import-baseline.json` (prefer `spawnManagedProcess` instead); the runtime boundary and governance import baseline are separate contracts                                                                                                                                                                                                                                                                                           |
-| a white-box test import (`../libs/core/x.js` from `tests/`)                                      | add the specifier to `tests/package-boundary-contract.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| a workspace-source import from `scripts/`                                                        | justify it in `scripts/check_esm_integrity.ts` `ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES` (only bootstrap-class scripts qualify — see `scripts/clean.ts`)                                                                                                                                                                                                                                                                                                                                                                          |
-| a script that writes governed paths (`knowledge/**`)                                             | grant its script-name-derived authority role a **narrowly scoped** `allow_write` in `knowledge/product/governance/security-policy.json` (pattern: `generate_design_tokens`)                                                                                                                                                                                                                                                                                                                                                     |
-| **any of the above**                                                                             | finish the ceremony by RUNNING the matching contract suite (`pnpm vitest run tests/package-boundary-contract.test.ts` etc.) — editing the code without running the gate is how the same failure ships twice                                                                                                                                                                                                                                                                                                                     |
-| a new user-facing vocabulary key (`knowledge/product/orchestration/user-facing-vocabulary.json`) | add it to the right namespace under `domains` → `pnpm generate:vocabulary-types` → `pnpm check -- --only catalogs`. A locale left untranslated for that key falls back to `default_locale` (or the first available entry) and logs one `[t]`/`[UX_VOCAB]`-prefixed warning per call (`libs/core/t.ts`, `libs/core/ux-vocabulary.ts`) — never invent a second warning style. `pnpm report:i18n-coverage` shows per-locale/per-namespace coverage and missing keys but is an instrument, not the gate — it never fails the build. |
-| a knowledge document                                                                             | `pnpm generate:knowledge-index` (lint-staged does this when knowledge files are staged)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| a new file or intentional remaining debt in an i18n scan root                                    | run the canonical `pnpm exec tsx scripts/check_i18n_hardcoding.ts --update-baseline`, then rerun the normal i18n gate; commit the resulting `knowledge/product/governance/i18n-baseline.json` and regenerated knowledge index together. If the string should be localized, fix the code instead of enlarging the baseline.                                                                                                                                                                                                      |
+| You added…                                                                                       | You must also…                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a new `libs/core/*.ts` module used via `@agent/core`                                             | export it from `libs/core/index.ts` (typecheck does NOT catch a missing barrel export — `build:actuators` resolves dist and fails on CI only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| a test file that imports `node:fs` directly                                                      | register it in `tests/fixtures/governance-import-baseline.json` AND `tests/core-fs-exception-boundary.test.ts` `allowedCoreFsImports`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| a `spawnManagedProcess` caller                                                                   | add it to `tests/process-boundary-governance.test.ts` `allowedManagedProcessConsumers`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| a direct `child_process` import                                                                  | add it to both `tests/runtime-child-process-boundary.test.ts` and `tests/fixtures/governance-import-baseline.json` (prefer `spawnManagedProcess` instead); the runtime boundary and governance import baseline are separate contracts                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| a white-box test import (`../libs/core/x.js` from `tests/`)                                      | add the specifier to `tests/package-boundary-contract.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| a workspace-source import from `scripts/`                                                        | justify it in `scripts/check_esm_integrity.ts` `ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES` (only bootstrap-class scripts qualify — see `scripts/clean.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| a script that writes governed paths (`knowledge/**`)                                             | grant its script-name-derived authority role a **narrowly scoped** `allow_write` in `knowledge/product/governance/security-policy.json` (pattern: `generate_design_tokens`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **any of the above**                                                                             | finish the ceremony by RUNNING the matching contract suite (`pnpm vitest run tests/package-boundary-contract.test.ts` etc.) — editing the code without running the gate is how the same failure ships twice                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| a new user-facing vocabulary key (`knowledge/product/orchestration/user-facing-vocabulary.json`) | add it to the right namespace under `domains` → `pnpm generate:vocabulary-types` → `pnpm check -- --only catalogs`. A locale left untranslated for that key falls back to `default_locale` (or the first available entry) and logs one `[t]`/`[UX_VOCAB]`-prefixed warning per call (`libs/core/t.ts`, `libs/core/ux-vocabulary.ts`) — never invent a second warning style. `pnpm report:i18n-coverage` shows per-locale/per-namespace coverage and missing keys but is an instrument, not the gate — it never fails the build.                                                                                                                                         |
+| a new `pnpm kyberion <verb>`                                                                     | route it in `scripts/cli.ts` (plus `READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP` when it needs no reasoning runtime) AND register it in `knowledge/product/governance/cli-commands.json` (`commands[]` entry + the `operator-cli` entry's command list) — the `scripts/kyberion.ts` dispatcher rejects unregistered verbs with `Unknown kyberion command`, which only a live run shows; add the help line key (`cli_help_<verb>`) → `pnpm generate:pseudo-locale` + `pnpm generate:vocabulary-types`; bump the help length in `scripts/kyberion_home.trust-boundary.test.ts`; update the row in `knowledge/product/orchestration/capability-verb-inventory.md` (en/ja) |
+| a `pathResolver.sharedTmp(` call site                                                            | register the file and its call count in `knowledge/product/governance/shared-tmp-allowlist.json` (`legit-tmp` only for true consumables; scope-owned artifacts go through `writeScopedArtifact()`) — enforced by `tests/shared-tmp-ratchet.test.ts`, which `pnpm check -- --scope pr` does not run                                                                                                                                                                                                                                                                                                                                                                      |
+| a JSON read/write of a state file                                                                | use foundation `readJsonIfPresent` / `writeJson`, not `JSON.parse(safeReadFile(...))` — the `foundation-adoption` gate counts the hand-rolled pattern                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| a knowledge document                                                                             | `pnpm generate:knowledge-index` (lint-staged does this when knowledge files are staged)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| a new file or intentional remaining debt in an i18n scan root                                    | run the canonical `pnpm exec tsx scripts/check_i18n_hardcoding.ts --update-baseline`, then rerun the normal i18n gate; commit the resulting `knowledge/product/governance/i18n-baseline.json` and regenerated knowledge index together. If the string should be localized, fix the code instead of enlarging the baseline.                                                                                                                                                                                                                                                                                                                                              |
 
 ### 1.1 Adapter-first extension rule
 
@@ -102,6 +105,17 @@ leftovers. A test may not depend on:
 
 Smell test: _would this pass in a fresh clone on a different OS on the
 first run?_
+
+**Known non-hermetic suites (until fixed).** A parallel full run
+(`pnpm vitest run libs/core scripts tests`) can fail or dirty the tree for
+reasons unrelated to your change: `scripts/check_governance_rules.test.ts`
+writes `knowledge/product/governance/test-governance-deterministic.json` into
+the real governance directory (so `scripts/check_contract_schemas.test.ts`
+fails if it runs meanwhile), and `libs/core/memory-promotion-workflow.test.ts`
+can append a `MEM-…` note (evidence `MSN-TEST-AUTOPROMOTE`) to the real
+`knowledge/product/governance/HINTS.md`. Rerun a failing file
+in isolation before trusting it, and check `git status` after every full run —
+never commit that residue.
 
 **The tier guard is not a fixture either.** Tests that point `rootDir`
 under `active/shared/tmp/` are default-allowed, so code that reads or writes
@@ -205,6 +219,17 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   `prepareArtifactReviewTask` gating and artifact-review-receipt persistence
   in `mission-orchestration-worker.ts` (fixed 2026-07).
 
+- **Detect an external answer by content, not by existence or clocks.**
+  When a flow hands work to someone else and collects the result on a rerun
+  (host image hand-off, `libs/core/host-image-handoff.ts`), record the
+  target's content hash (or its absence) when the request is made, and
+  collect only when the content differs — for the same request (prompt).
+  File existence attributes stale files to the helper; comparing mtimes
+  against a request time loses to 1 s mtime granularity and to
+  timestamp-preserving copies. Keep collection idempotent and a same-request
+  re-request non-destructive, so multi-pass resumes (avatar sets) do not
+  re-request finished parts or orphan an answer written in between.
+
 ## 6. Process discipline for repo work
 
 - One logical change per commit; lint-staged regenerates the knowledge
@@ -215,8 +240,8 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
      you will stage;
   2. for any `knowledge/` edit, run `pnpm generate:knowledge-index` (it also
      picks up other agents' uncommitted knowledge edits — check the diff);
-  3. stage explicit paths plus `knowledge/_index.md` and
-     `knowledge/_integrity-manifest.json`, and confirm no newly added
+  3. stage explicit paths plus `knowledge/_index.md` (the size manifest
+     `knowledge/_integrity-manifest.json` is gitignored), and confirm no newly added
      `.js`/`.d.ts` shadows a `.ts` source (the `.husky/pre-commit` check);
   4. only then `git -c core.hooksPath=/dev/null commit`.
 - Set up every new worktree from scratch (install with
@@ -246,6 +271,58 @@ scanned file or stale generated index. When a gate reports baseline drift,
 use its canonical generator, inspect the complete generated diff, run the
 matching focused test, and rerun the PR-scope check before pushing. Do not
 infer remote CI success from local checks or from a pending status.
+
+### 6.1 Generated files and merges
+
+Parallel PRs used to conflict on generated files every day. The rules that
+keep them mergeable:
+
+- **Untracked when nothing needs the committed copy.**
+  `knowledge/_integrity-manifest.json` (a size inventory with no runtime or
+  tamper-check consumer) is gitignored and rebuilt by `pnpm build`
+  (`generate_knowledge_index --manifest-only`, which never rewrites the
+  tracked `_index.md`, so a build cannot hide a stale index from the gate).
+- **Fragments instead of a shared file.** PRs never edit `CHANGELOG.md`; they
+  add `changelog.d/<short-slug>.md` (`category:` front-matter + list items,
+  validated by the `changelog-fragments` PR gate). The release runs
+  `pnpm kyberion changelog assemble` to fold them into `[Unreleased]`.
+- **Regenerate, don't hand-merge, the files that stay tracked.**
+  `knowledge/_index.md`, `docs/developer/CONFIGURATION.md`,
+  `docs/developer/env.example` and
+  `docs/developer/role-assumption-reachability.json` (plus the curated
+  `env-registry.json`) carry `merge=kyberion-regenerate` in `.gitattributes`.
+- **After any merge or rebase that touched them, run
+  `pnpm kyberion resolve generated`.** It works without any merge driver:
+  unmerged generated files are first rebuilt from their index conflict stages
+  (`:1:` base, `:2:` ours, `:3:` theirs) — derived files by text merge else
+  our side, `env-registry.json` entry-by-entry by name — then it regenerates
+  env registry → knowledge index → role-assumption reachability, validates the
+  changelog fragments and stages the results (`--check` is read-only,
+  `--no-stage` skips `git add`). Only an `env-registry.json` entry changed
+  differently on both sides needs a human: edit its markers keeping both
+  descriptions' intent, then rerun. The `post-merge` hook reminds you when
+  both sides of a completed merge changed a generated file.
+- **Optional merge driver — a one-time repository-owner step, never
+  automatic.** Repo config belongs to the mission owner (AGENTS.md §1) and
+  the repo-local config is shared by every linked worktree and agent CLI, so
+  `pnpm install` does not touch it. The owner may run
+  `pnpm kyberion resolve install-driver` (`--uninstall` reverts; it prints the
+  exact `git config --local merge.kyberion-regenerate.*` keys it sets and is
+  a no-op in CI, outside a git checkout and in a nested checkout). With it,
+  `git merge` never stops on these files: derived files keep a clean text
+  merge or our side, `env-registry.json` is merged by name. Without it, git's
+  normal text merge leaves conflict markers and `resolve generated` repairs
+  them; `resolve generated` prints a one-line hint while it is missing.
+- **Limits.** GitHub's conflict detection and web editor ignore custom
+  drivers, so a PR can still show "conflicts" there: merge `main` locally,
+  run `resolve generated`, push. Rebases use the driver (when installed) but
+  run no `post-merge` hook. Only regeneration makes a merge correct, and the
+  freshness gates (`env-registry`, `role-assumption-reachability`,
+  `catalogs`) are what enforce it.
+- **Adding a tracked generated file**: give it a `.gitattributes`
+  `merge=kyberion-regenerate` line AND a step in
+  `scripts/resolve_generated.ts` — `scripts/resolve_generated.test.ts` fails
+  when the two lists differ.
 
 ## 7. Design principles adopted from qm (QM adoption plan §3)
 

@@ -4,6 +4,7 @@ export {
   inferPersonaFromRole,
   buildExecutionEnv,
   withExecutionContext,
+  withExecutionContextAsync,
 } from './authority.js';
 export {
   detectTier,
@@ -12,7 +13,12 @@ export {
   scanForConfidentialMarkers,
   validateSovereignBoundary,
 } from './tier-guard.js';
-export { createApprovalRequest, loadApprovalRequest, decideApprovalRequest, listApprovalRequests } from './approval-store.js';
+export {
+  createApprovalRequest,
+  loadApprovalRequest,
+  decideApprovalRequest,
+  listApprovalRequests,
+} from './approval-store.js';
 export type {
   ApprovalApplyResult,
   ApprovalDecisionPayload,

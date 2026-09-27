@@ -2058,6 +2058,30 @@
       "audience": "operator"
     },
     {
+      "id": "script.changelog.assemble",
+      "module": "scripts/assemble_changelog.ts",
+      "command": "changelog assemble",
+      "noun": "changelog",
+      "verb": "assemble",
+      "audience": "operator"
+    },
+    {
+      "id": "script.resolve.install-driver",
+      "module": "scripts/install_git_merge_driver.mjs",
+      "command": "resolve install-driver",
+      "noun": "resolve",
+      "verb": "install-driver",
+      "audience": "operator"
+    },
+    {
+      "id": "script.resolve.generated",
+      "module": "scripts/resolve_generated.ts",
+      "command": "resolve generated",
+      "noun": "resolve",
+      "verb": "generated",
+      "audience": "dev"
+    },
+    {
       "id": "script.release.install-smoke",
       "module": "scripts/source_archive.ts",
       "args": ["--install-smoke"],

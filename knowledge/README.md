@@ -2,7 +2,7 @@
 
 ## Retrieval and integrity files
 
-`knowledge/_index.md` and `knowledge/_integrity-manifest.json` are generated integrity and navigation artifacts. They are not the retrieval contract. Task delivery resolves the scoped corpus through [`product/governance/knowledge-slices.json`](product/governance/knowledge-slices.json), validated by [`product/schemas/knowledge-slices.schema.json`](product/schemas/knowledge-slices.schema.json) and consumed by `libs/core/knowledge-slices.ts`.
+`knowledge/_index.md` (tracked navigation index) and `knowledge/_integrity-manifest.json` (gitignored local size inventory, rebuilt by `pnpm build`) are generated artifacts. They are not the retrieval contract. Task delivery resolves the scoped corpus through [`product/governance/knowledge-slices.json`](product/governance/knowledge-slices.json), validated by [`product/schemas/knowledge-slices.schema.json`](product/schemas/knowledge-slices.schema.json) and consumed by `libs/core/knowledge-slices.ts`.
 
 The legacy content-first documents that intentionally do not carry task-card frontmatter are listed in [`product/governance/frontmatter-exclusions.json`](product/governance/frontmatter-exclusions.json). New scoped knowledge cards must carry frontmatter; the exclusion manifest is reviewed with the knowledge taxonomy rather than inferred from missing metadata.
 

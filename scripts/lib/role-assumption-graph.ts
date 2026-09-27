@@ -38,6 +38,17 @@ import {
   type ModuleResolver,
   type Workspace,
 } from './role-assumption-workspace.js';
+import {
+  DELEGATED_ROLE_ENV_NAME,
+  DELEGATION_FUNCTION,
+  delegatedRoleWriteValue,
+  isUndefinedExpression,
+  singleReturnedEnvExpression,
+  SYSTEM_ROLE_LAUNCH_FUNCTION,
+  systemRoleOfEnvLiteral,
+  unwrapExpression,
+  type ForeignDelegation,
+} from './role-assumption-delegation.js';
 
 /** Specifiers that name Kyberion code (relative, `@/`, workspace scopes). */
 const INTERNAL_SPECIFIER = /^(?:\.{1,2}\/|\/|@\/|@agent\/|@actuator\/)/;
@@ -143,20 +154,6 @@ function isDirectEntryGuard(statement: ts.Statement): boolean {
     return onlyGuards(statement.expression);
   }
   return false;
-}
-
-function unwrapExpression(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 function isFunctionLikeExpression(expression: ts.Expression | undefined): boolean {
@@ -398,6 +395,7 @@ export class Analyzer {
   readonly unresolvedEdges = new Map<Unit, string[]>();
   readonly roleRecords: RoleRecord[] = [];
   readonly spawnRecords: SpawnRecord[] = [];
+  readonly foreignDelegations: ForeignDelegation<Unit>[] = [];
   private readonly callRefs = new Map<ts.SignatureDeclaration, CallRef[]>();
   private readonly valueRefs = new Map<ts.SignatureDeclaration, Unit[]>();
   private readonly pendingForwards: Array<{
@@ -406,6 +404,7 @@ export class Analyzer {
     resolution: RoleResolution;
   }> = [];
   private readonly assumptionDeclarations = new Set<ts.Declaration>();
+  private readonly delegationDeclarations = new Set<ts.Declaration>();
   private readonly spawnHelperDeclarations = new Map<
     ts.Declaration,
     { inheritsByDefault: boolean; optionsIndex: number }
@@ -436,6 +435,9 @@ export class Analyzer {
         const name = statement.name.text;
         if (rel === AUTHORITY_FILE && ASSUMPTION_FUNCTIONS.has(name)) {
           this.assumptionDeclarations.add(statement);
+        }
+        if (rel === AUTHORITY_FILE && name === DELEGATION_FUNCTION) {
+          this.delegationDeclarations.add(statement);
         }
         const helper = CORE_SPAWN_HELPERS.find(
           (candidate) => candidate.file === rel && candidate.name.test(name)
@@ -708,6 +710,7 @@ export class Analyzer {
     ) {
       return;
     }
+    this.scanDelegatedRoleWrite(unit, node);
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
       this.scanIdentifier(unit, node);
     } else if (ts.isCallExpression(node)) {
@@ -767,6 +770,10 @@ export class Analyzer {
         ? this.resolveRoleExpression(roleArgument)
         : { ...emptyResolution(), unresolved: ['missing role argument'] };
       this.pendingForwards.push({ unit, site: this.position(call), resolution });
+      return;
+    }
+    if (callee && this.delegationDeclarations.has(callee)) {
+      this.recordDelegation(unit, call);
       return;
     }
     const spawnKind = this.spawnKind(call, callee);
@@ -1196,7 +1203,8 @@ export class Analyzer {
       if (resolution.roles.size > 0 || resolution.unresolved.length > 0) {
         this.roleRecords.push({
           unit,
-          site: unit.id === site ? site : `${unit.id} (via ${site})`,
+          site:
+            unit.id === site || site.startsWith(`${unit.id} [`) ? site : `${unit.id} (via ${site})`,
           roles: new Set(resolution.roles),
           unresolved: [...resolution.unresolved],
         });
@@ -1241,6 +1249,66 @@ export class Analyzer {
         }
       }
     }
+  }
+
+  /**
+   * DR-01: a `buildExecutionEnv(env, role)` whose env may carry SYSTEM_ROLE
+   * delegates `role` to the child: record it as an assumption of `role`
+   * (resolved like a withExecutionContext role argument, forwarded through
+   * wrapper parameters, "any role" when unresolvable). Without a role, or
+   * with an env that cannot carry SYSTEM_ROLE, nothing is delegated.
+   */
+  private recordDelegation(unit: Unit, call: ts.CallExpression): void {
+    const [baseEnv, roleArgument] = call.arguments;
+    if (!roleArgument || isUndefinedExpression(roleArgument)) return;
+    const site = `${this.position(call)} [delegated child role]`;
+    // An env literal that sets SYSTEM_ROLE delegates under THAT system role.
+    const ownSystemRole = baseEnv
+      ? systemRoleOfEnvLiteral(baseEnv, (node) => this.initializerOf(node))
+      : undefined;
+    if (ownSystemRole) {
+      const systemRoles = this.resolveRoleExpression(ownSystemRole);
+      const roles = this.resolveRoleExpression(roleArgument);
+      const anySystemRole = systemRoles.unresolved.length > 0 || systemRoles.forwards.length > 0;
+      // `SYSTEM_ROLE: ''` clears it: buildExecutionEnv then delegates nothing.
+      systemRoles.roles.delete('');
+      if (!anySystemRole && systemRoles.roles.size === 0) return;
+      this.foreignDelegations.push({
+        unit,
+        site,
+        systemRoles: systemRoles.roles,
+        anySystemRole,
+        roles: roles.roles,
+        unresolved: [
+          ...(anySystemRole ? [`SYSTEM_ROLE of the child env is not resolved at ${site}`] : []),
+          ...roles.unresolved,
+          ...(roles.forwards.length > 0
+            ? [`delegated role forwarded through a parameter at ${site}`]
+            : []),
+        ],
+      });
+      return;
+    }
+    // No base env (or an explicit undefined) means the default, process.env.
+    if (baseEnv && !isUndefinedExpression(baseEnv) && !this.envInherits(baseEnv)) return;
+    this.pendingForwards.push({
+      unit,
+      site,
+      resolution: this.resolveRoleExpression(roleArgument),
+    });
+  }
+
+  /**
+   * DR-01: KYBERION_DELEGATED_ROLE is written only by libs/core/authority.ts.
+   * Any other non-empty write could hand a child an arbitrary role, so it is
+   * an "any role" site for every system role that reaches it.
+   */
+  private scanDelegatedRoleWrite(unit: Unit, node: ts.Node): void {
+    if (unit.file === AUTHORITY_FILE || !delegatedRoleWriteValue(node)) return;
+    this.addUnresolvedEdge(
+      unit,
+      `raw write of ${DELEGATED_ROLE_ENV_NAME} outside ${AUTHORITY_FILE} at ${this.position(node)}`
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1330,7 +1398,10 @@ export class Analyzer {
         : ts.isIdentifier(callee)
           ? callee.text
           : '';
-      if (name === 'buildProviderChildEnv') return false;
+      if (name === 'buildProviderChildEnv' || name === SYSTEM_ROLE_LAUNCH_FUNCTION) return false;
+      // A project function that returns an env expression: follow its return.
+      const returned = this.singleReturnExpression(callee);
+      if (returned) return this.envInherits(returned, depth + 1);
       if (name === 'buildSafeExecEnv') {
         return expr.arguments.some((arg) => this.envInherits(arg, depth + 1));
       }
@@ -1341,6 +1412,19 @@ export class Analyzer {
     const initializer = this.initializerOf(expr);
     if (initializer === 'parameter' || initializer === undefined) return true;
     return this.envInherits(initializer, depth + 1);
+  }
+
+  /** A project function declaration's directly returned env expression (DR-01). */
+  private singleReturnExpression(callee: ts.Expression): ts.Expression | undefined {
+    const symbol = this.resolveAlias(
+      this.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(callee) ? callee.name : callee)
+    );
+    const declaration = symbol?.valueDeclaration;
+    return declaration &&
+      ts.isFunctionDeclaration(declaration) &&
+      isProjectSource(this.ws, declaration.getSourceFile().fileName)
+      ? singleReturnedEnvExpression(declaration)
+      : undefined;
   }
 
   private objectHasOwnProperty(node: ts.ObjectLiteralExpression, name: string): boolean {
@@ -1433,7 +1517,12 @@ export class Analyzer {
     ) {
       return;
     }
-    const env = this.spawnEnv(call, optionsIndex);
+    const spawnEnv = this.spawnEnv(call, optionsIndex);
+    // `env: undefined` is the same as no env: the spawn helper's default applies.
+    const env =
+      spawnEnv !== 'absent' && spawnEnv !== 'opaque' && isUndefinedExpression(spawnEnv)
+        ? 'absent'
+        : spawnEnv;
     const inheritsSystemRole =
       env === 'absent' ? inheritsByDefault : env === 'opaque' ? true : this.envInherits(env);
     const strings = call.arguments.flatMap((arg) => this.collectStrings(arg));
