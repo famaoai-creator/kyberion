@@ -404,8 +404,13 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
  * projected into worker delegations" invariant forbids. A delegation that
  * legitimately needs a role tag must have one assigned to it explicitly on
  * its own path, never inherited from its parent's env.
+ *
+ * `KYBERION_DELEGATED_ROLE` (DR-01, authority.ts) is the same kind of
+ * authority signal — a role the child should run as under SYSTEM_ROLE — so it
+ * is excluded from the KYBERION_* passthrough below, like SYSTEM_ROLE.
  */
 const KYBERION_PREFIX = 'KYBERION_';
+const EXCLUDED_AUTHORITY_ENV_KEYS: ReadonlySet<string> = new Set(['KYBERION_DELEGATED_ROLE']);
 const ADDITIONAL_KYBERION_STYLE_KEYS = ['MISSION_ID'] as const;
 
 /** Matches `*_API_KEY` / `*_TOKEN`-shaped credential env vars (case-insensitive). */
@@ -463,6 +468,8 @@ export function buildProviderChildEnv({
       }
       continue;
     }
+
+    if (EXCLUDED_AUTHORITY_ENV_KEYS.has(key)) continue;
 
     const isKyberionStyleKey =
       key.startsWith(KYBERION_PREFIX) ||

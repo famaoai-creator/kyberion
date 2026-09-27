@@ -62,6 +62,12 @@ importers:
 
   .:
     dependencies:
+      '@actuator/meeting-browser-driver':
+        specifier: workspace:*
+        version: link:libs/actuators/meeting-browser-driver
+      '@actuator/service':
+        specifier: workspace:*
+        version: link:libs/actuators/service-actuator
       '@actuator/system':
         specifier: workspace:*
         version: link:libs/actuators/system-actuator

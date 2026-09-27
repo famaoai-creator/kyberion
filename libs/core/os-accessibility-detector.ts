@@ -1,8 +1,8 @@
 import { logger } from './core.js';
-import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExecResultAsync } from './secure-io.js';
 import { safeMarkLabel, type SomBox, type SomCandidate } from './set-of-marks.js';
 import type { UiElementDetectionRequest, UiElementDetector } from './ui-element-detector.js';
+import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
 
 /**
  * `os_accessibility` UI element detector: exact element rectangles of a native
@@ -66,9 +66,6 @@ export const OS_ACCESSIBILITY_WINDOWS_OPTIONS_ENV = 'KYBERION_UIA_OPTIONS';
  */
 export const OS_ACCESSIBILITY_LIVE_SMOKE_ENV = 'KYBERION_UIA_LIVE_SMOKE';
 const POWERSHELL = 'powershell.exe';
-// powershell.exe fails to start without SystemRoot (error 8009001d), and the
-// secure-io child environment allowlist does not carry Windows system variables.
-const WINDOWS_SYSTEM_ENV = ['SystemRoot', 'windir', 'PSModulePath'] as const;
 
 /** Roles a user can click, type into or toggle. */
 export const INTERACTIVE_AX_ROLES: ReadonlySet<string> = new Set([
@@ -277,7 +274,8 @@ $ok = $null -ne [System.Windows.Automation.AutomationElement]::RootElement
 // managed_control (managed UIA client, control view, one cached
 // FindAll(Children) per node), then com_control and com_raw (the COM UIA
 // client, which sees WinUI / XAML island content the managed client can miss,
-// over the control and raw views). The snapshot names the chosen strategy and
+// over the control and raw views; its C# is compiled in memory only when the
+// managed walk found no controls). The snapshot names the chosen strategy and
 // carries per-strategy diagnostics (per-depth scanned/emitted counts, skip
 // reasons, the first 20 raw elements' control type / class / framework / rect,
 // no names).
@@ -527,12 +525,12 @@ public static class KyberionUiaComWalker {
 }
 '@
 $comCompileError = $null
-try {
-  Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative + [Environment]::NewLine + $csCom)
-} catch {
-  $comCompileError = $_.Exception.Message
-  Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)
-}
+# Compiled in memory only (never loaded from or written to disk): the small
+# P/Invoke type now, the COM walker only when the managed walk finds no controls.
+$compileClock = [System.Diagnostics.Stopwatch]::StartNew()
+Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csNative)
+$compileMs = $compileClock.ElapsedMilliseconds
+$comCompileMs = $null
 $dpi = 'unaware'
 try { if ([KyberionUiaNative]::SetThreadDpiAwarenessContext([IntPtr]::new(-4)) -ne [IntPtr]::Zero) { $dpi = 'per_monitor_v2' } } catch { }
 if ($dpi -eq 'unaware') { try { if ([KyberionUiaNative]::SetProcessDPIAware()) { $dpi = 'system' } } catch { } }
@@ -633,6 +631,11 @@ $chosenTruncated = $truncated
 $chosenActionable = $actionable
 # Strategies 2 and 3 (com_control, com_raw): the COM UIA client (UIA3) sees
 # XAML island / WinUI content the managed client (UIA2) can miss.
+if ($chosenActionable -eq 0) {
+  $comClock = [System.Diagnostics.Stopwatch]::StartNew()
+  try { Add-Type -TypeDefinition ($csUsing + [Environment]::NewLine + $csCom) } catch { $comCompileError = $_.Exception.Message }
+  $comCompileMs = $comClock.ElapsedMilliseconds
+}
 if ($chosenActionable -eq 0 -and $null -eq $comCompileError) {
   foreach ($rawView in @($false, $true)) {
     $remaining = [int][Math]::Max(0, $budget - $clock.ElapsedMilliseconds)
@@ -648,49 +651,19 @@ if ($chosenActionable -eq 0 -and $null -eq $comCompileError) {
   }
 }
 $parts.Add('"strategy":' + (JS $strategy))
-$parts.Add('"diagnostics":{"com_compile_error":' + (JS $comCompileError) + ',"strategies":[' + ($diagnostics -join ',') + ']}')
+$comMsJson = 'null'
+if ($null -ne $comCompileMs) { $comMsJson = [string]$comCompileMs }
+$walkerDiag = '{"cache":"off","cached":false,"compile_ms":' + $compileMs + ',"com_compile_ms":' + $comMsJson + '}'
+$parts.Add('"diagnostics":{"com_compile_error":' + (JS $comCompileError) + ',"walker":' + $walkerDiag + ',"strategies":[' + ($diagnostics -join ',') + ']}')
 if ($chosenTruncated) { $parts.Add('"truncated":true') }
 Finish '' ('[' + ($chosen -join ',') + ']')`;
 
-/** powershell.exe -EncodedCommand payload (base64 of the UTF-16LE script). */
-export function encodePowerShellCommand(script: string): string {
-  return Buffer.from(script, 'utf16le').toString('base64');
-}
-
-/**
- * Fixed bootstrap passed on the command line: it reads the real script from
- * stdin and runs it as one script block. The scripts themselves (the
- * enumeration script with its C# walker is ~18 KB, far past the 32 767-char
- * Windows command-line limit once encoded) always travel on stdin, so the
- * command line has the same small size whatever the script. Scripts must be
- * ASCII: stdin is decoded with the console code page.
- */
-export const POWERSHELL_STDIN_BOOTSTRAP =
-  "$ErrorActionPreference = 'Stop'; & ([scriptblock]::Create([Console]::In.ReadToEnd()))";
-
-/** powershell.exe arguments that run the script given on stdin (see POWERSHELL_STDIN_BOOTSTRAP). */
-export function powerShellStdinArgs(): string[] {
-  return [
-    '-NoLogo',
-    '-NoProfile',
-    '-NonInteractive',
-    '-EncodedCommand',
-    encodePowerShellCommand(POWERSHELL_STDIN_BOOTSTRAP),
-  ];
-}
-
-/**
- * Windows system variables powershell.exe needs to start, which the secure-io
- * child environment allowlist does not carry.
- */
-export function windowsPowerShellEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const name of WINDOWS_SYSTEM_ENV) {
-    const value = getRegisteredEnvText(name);
-    if (value) env[name] = value;
-  }
-  return env;
-}
+export {
+  encodePowerShellCommand,
+  POWERSHELL_STDIN_BOOTSTRAP,
+  powerShellStdinArgs,
+  windowsPowerShellEnv,
+} from './windows-powershell.js';
 
 const defaultRunner: AccessibilityCommandRunner = (command, args, options) =>
   safeExecResultAsync(command, args, options);

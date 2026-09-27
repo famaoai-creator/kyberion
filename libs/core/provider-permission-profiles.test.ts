@@ -292,10 +292,13 @@ describe('provider-permission-profiles', () => {
           ...fakeBaseEnv(),
           MISSION_ROLE: 'mission_controller',
           SYSTEM_ROLE: 'mission_controller',
+          KYBERION_DELEGATED_ROLE: 'mission_controller@concierge',
         } as NodeJS.ProcessEnv;
         const env = buildProviderChildEnv({ provider, baseEnv: base });
         expect(env.MISSION_ROLE, `provider=${provider}`).toBeUndefined();
         expect(env.SYSTEM_ROLE, `provider=${provider}`).toBeUndefined();
+        // DR-01: the delegated child role is an authority signal too.
+        expect(env.KYBERION_DELEGATED_ROLE, `provider=${provider}`).toBeUndefined();
         // MISSION_ID (a plain identifier, not an authority signal) is
         // unaffected — this test only pins the authority-signal exclusion.
         expect(env.MISSION_ID, `provider=${provider}`).toBe('MSN-1');
