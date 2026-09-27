@@ -708,6 +708,14 @@ export interface DefineActuatorPipelineBaseInput {
   retryFallbackCategories?: readonly string[];
   /** Env flag that unlocks unsafe shell execution. */
   unsafeShellEnv?: string;
+  /** Category errors retried on top of manifest/fallback categories. */
+  additionalShouldRetry?: (error: Error, category: string) => boolean;
+  /**
+   * Extra unsafe gates: assertion name → env flag (+ optional message label).
+   * Returned under `gates`, e.g.
+   * `unsafeGates: { assertUnsafeJsAllowed: { env: 'KYBERION_ALLOW_UNSAFE_JS', label: 'JS' } }`.
+   */
+  unsafeGates?: Record<string, string | { env: string; label?: string }>;
 }
 
 export interface ActuatorPipelineBase {
@@ -718,6 +726,8 @@ export interface ActuatorPipelineBase {
   buildStepRetryOptions: (stepParams: Record<string, unknown>) => RetryOptions;
   /** Fail closed unless the unsafe-shell env flag was set at module load. */
   assertUnsafeShellAllowed: () => void;
+  /** Assertions for extra unsafe gates declared via `unsafeGates`. */
+  gates: Record<string, () => void>;
 }
 
 export function defineActuatorPipelineBase(
@@ -727,10 +737,23 @@ export function defineActuatorPipelineBase(
     manifestPath: input.manifestPath,
     defaults: input.retryDefaults,
     fallbackCategories: input.retryFallbackCategories,
+    additionalShouldRetry: input.additionalShouldRetry,
   });
   const unsafeShellEnv = input.unsafeShellEnv ?? 'KYBERION_ALLOW_UNSAFE_SHELL';
   const unsafeShellAllowed =
     getRegisteredEnv<boolean>(unsafeShellEnv, { defaultValue: false }) === true;
+  const gates: Record<string, () => void> = {};
+  for (const [name, spec] of Object.entries(input.unsafeGates ?? {})) {
+    const env = typeof spec === 'string' ? spec : spec.env;
+    const label =
+      typeof spec === 'string' ? 'Unsafe capability' : (spec.label ?? 'Unsafe capability');
+    const allowed = getRegisteredEnv<boolean>(env, { defaultValue: false }) === true;
+    gates[name] = () => {
+      if (!allowed) {
+        throw new Error(`[SECURITY] ${label} execution disabled. Set ${env}=true to enable.`);
+      }
+    };
+  }
   return {
     manifestPath: input.manifestPath,
     buildRetryOptions,
@@ -753,5 +776,6 @@ export function defineActuatorPipelineBase(
         );
       }
     },
+    gates,
   };
 }

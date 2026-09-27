@@ -15,7 +15,7 @@ import {
 } from '@agent/core/secure-io';
 import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { retry } from '@agent/core/async-utils';
 import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual/virtual-media-device-control-bridge';
@@ -33,6 +33,7 @@ import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry
 import { listServiceRuntimeInventory } from '@agent/core/service/service-runtime-registry';
 import { probeSileroVad } from '@agent/core/silero-vad-bridge';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import type {
   ScreenDisplayInventory,
   ScreenDisplayRecord,
@@ -67,12 +68,7 @@ import {
   runTaskModelRoutingSummary,
 } from '@agent/core/report-ops';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
-import {
-  getRegisteredEnv,
-  getRegisteredEnvText,
-  parseSafeJsonObjectValue,
-  readJson,
-} from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -120,10 +116,6 @@ function readSystemJson(filePath: string, label: string): unknown {
   return readJson(filePath);
 }
 
-export const ALLOW_UNSAFE_SHELL =
-  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
-export const ALLOW_UNSAFE_JS =
-  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_JS', { defaultValue: false }) === true;
 export const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 export const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/system-actuator/manifest.json'
@@ -1160,26 +1152,15 @@ export interface PipelineStep {
   params: Record<string, unknown>;
 }
 
-export function assertUnsafeShellAllowed() {
-  if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error(
-      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
-    );
-  }
-}
-
-export function assertUnsafeJsAllowed() {
-  if (!ALLOW_UNSAFE_JS) {
-    throw new Error(
-      '[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.'
-    );
-  }
-}
-
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+export const {
+  buildRetryOptions,
+  assertUnsafeShellAllowed,
+  gates: { assertUnsafeJsAllowed },
+} = defineActuatorPipelineBase({
   manifestPath: SYSTEM_MANIFEST_PATH,
-  defaults: DEFAULT_SYSTEM_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_SYSTEM_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  unsafeGates: { assertUnsafeJsAllowed: { env: 'KYBERION_ALLOW_UNSAFE_JS', label: 'JS' } },
 });
 
 export async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {

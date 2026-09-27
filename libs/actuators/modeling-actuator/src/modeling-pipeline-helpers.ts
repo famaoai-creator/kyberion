@@ -7,7 +7,10 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
@@ -16,7 +19,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { runGovernedShellScript } from '@agent/core/command-runner';
 import {
   analyzeSourceTree,
@@ -59,9 +62,6 @@ import {
   extractTestPlan,
 } from './sdlc-ops.js';
 
-const MODEL_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/modeling-actuator/manifest.json'
-);
 const DEFAULT_MODEL_RETRY = {
   maxRetries: 2,
   initialDelayMs: 150,
@@ -70,10 +70,10 @@ const DEFAULT_MODEL_RETRY = {
   jitter: true,
 };
 
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: MODEL_MANIFEST_PATH,
-  defaults: DEFAULT_MODEL_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+const { buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/modeling-actuator/manifest.json'),
+  retryDefaults: DEFAULT_MODEL_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 const ajv = createAjv();
