@@ -62,7 +62,7 @@ vi.mock('../core.js', () => ({
   },
 }));
 
-vi.mock('../agent-registry', () => ({
+vi.mock('./agent-registry', () => ({
   agentRegistry: {
     get: mocks.get,
     getRuntimeIdentity: mocks.getRuntimeIdentity,
@@ -92,13 +92,13 @@ vi.mock('../agent/agent-runtime-supervisor-client.js', () => ({
   toSupervisorEnsurePayload: mocks.toSupervisorEnsurePayload,
 }));
 
-vi.mock('../agent-manifest', () => ({
+vi.mock('./agent-manifest', () => ({
   getAgentManifest: mocks.getAgentManifest,
   resolveAgentSelectionHints: mocks.resolveAgentSelectionHints,
   loadAgentManifests: vi.fn(),
 }));
 
-vi.mock('../audit-chain', () => ({
+vi.mock('./audit-chain', () => ({
   auditChain: {
     record: mocks.record,
   },

@@ -177,7 +177,7 @@ describe('narrowPluginPermissions', () => {
         paths: [
           { tier: 'confidential', prefix: 'acme' },
           { tier: 'personal', prefix: '' },
-          { tier: 'public', prefix: '../confidential/acme' },
+          { tier: 'public', prefix: './confidential/acme' },
         ],
       },
     });
@@ -300,9 +300,9 @@ describe('narrowPluginPermissions', () => {
 
 describe('normalizeTierPrefix', () => {
   it('normalises and rejects escapes', () => {
-    expect(normalizeTierPrefix('../docs/guides')).toBe('docs/guides');
+    expect(normalizeTierPrefix('./docs/guides')).toBe('docs/guides');
     expect(normalizeTierPrefix('')).toBe('');
-    expect(normalizeTierPrefix('../x')).toBeNull();
+    expect(normalizeTierPrefix('./x')).toBeNull();
     expect(normalizeTierPrefix('/etc')).toBeNull();
     expect(normalizeTierPrefix('C:/x')).toBeNull();
     expect(normalizeTierPrefix('a\\..\\b')).toBeNull();

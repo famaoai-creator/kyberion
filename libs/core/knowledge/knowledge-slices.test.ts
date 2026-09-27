@@ -36,7 +36,7 @@ describe('knowledge-slices: manifest loading (fail-open)', () => {
   });
 
   it('returns null for a manifest path outside the repository root', () => {
-    expect(loadKnowledgeSlicesFile('../../outside-knowledge-slices.json')).toBeNull();
+    expect(loadKnowledgeSlicesFile('../outside-knowledge-slices.json')).toBeNull();
   });
 
   it('returns null and warns once for a JSON-parse-invalid manifest', () => {

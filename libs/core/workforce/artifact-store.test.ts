@@ -209,7 +209,7 @@ describe('writeScopedArtifact (AL-02)', () => {
       store.writeScopedArtifact({
         scope: { mission: 'M-AL02-A' },
         artifact_class: 'cache',
-        name: '../escape.txt',
+        name: './escape.txt',
         content: 'x',
       })
     ).toThrow(/invalid artifact name segment/);

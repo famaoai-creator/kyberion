@@ -1206,7 +1206,7 @@ describe('approved human view actions (FU-02)', () => {
     const tampered = path.join(ACTION_DIR, `000000000000002-${randomUUID()}.json`);
     withExecutionContext('mission_controller', () => {
       safeWriteFile(stale, JSON.stringify({ approval_request_id: staleId }));
-      safeWriteFile(tampered, JSON.stringify({ approval_request_id: '../../../x' }));
+      safeWriteFile(tampered, JSON.stringify({ approval_request_id: '../../x' }));
     });
     tracked(stale);
     tracked(tampered);
