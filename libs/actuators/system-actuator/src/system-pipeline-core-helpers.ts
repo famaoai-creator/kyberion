@@ -40,7 +40,17 @@ import type {
   ScreenDisplayRecord,
 } from '@agent/core/screen-display-inventory-bridge';
 import { StubVideoFrameBus } from '@agent/core/video-frame-bus';
-import { writeVideoFrameBusToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
+import { writeVideoFramesToMp4, pipeMp4ToVideoFrameBus } from '@agent/core/video-frame-archive';
+import type { VideoFrame } from '@agent/core/meeting-session-types';
+
+/** Replay finitely-collected frames as a stream: draining a closed
+ * StubVideoFrameBus yields nothing, and draining an open one blocks once the
+ * buffer empties — collected-then-replayed never loses the recording. */
+async function* replayCollectedFrames(frames: VideoFrame[]): AsyncIterable<VideoFrame> {
+  for (const frame of frames) {
+    yield frame;
+  }
+}
 import { withinLoopBounds, DEFAULT_MAX_LOOP_ITERATIONS } from '@agent/core/execution-bounds';
 import {
   reconcileConfigFallbacks,
@@ -283,6 +293,151 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         },
       };
     }
+    case 'record_audio': {
+      const bridge = createVirtualAudioInputRecordingBridge();
+      const availability = await bridge.probe();
+      if (!availability.available) {
+        throw new Error(
+          `record_audio unavailable: ${availability.reason || 'audio input bridge unavailable'}`
+        );
+      }
+      const durationValue = Number(params.duration ?? params.duration_sec ?? 0);
+      const durationSec = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : 3;
+      if (durationSec > 300) {
+        throw new Error(`record_audio duration must be 1-300 seconds, got "${durationSec}"`);
+      }
+      const requestedTargets = Array.isArray(params.targets)
+        ? params.targets.map((entry: unknown) => String(entry).trim()).filter(Boolean)
+        : [];
+      const selectedInputs = requestedTargets.length > 0 ? requestedTargets : availability.inputs;
+      if (selectedInputs.length === 0) {
+        throw new Error('record_audio: no audio inputs available on this machine');
+      }
+      const requestedOutput =
+        typeof params.output === 'string' && params.output.trim() ? params.output.trim() : '';
+      const outputExt = requestedOutput
+        ? path.extname(pathResolver.rootResolve(String(resolve(requestedOutput)))).toLowerCase()
+        : '';
+      const fileMode = requestedOutput !== '' && AUDIO_RECORDING_EXTENSIONS.includes(outputExt);
+      if (fileMode && selectedInputs.length !== 1) {
+        throw new Error(
+          `record_audio: output file "${requestedOutput}" needs exactly one input ` +
+            `(${selectedInputs.length} selected). Pass targets with a single device or omit output.`
+        );
+      }
+      const baseDir = fileMode
+        ? ''
+        : resolveCanonicalAudioRecordingDir(
+            requestedOutput ? String(resolve(requestedOutput)) : '',
+            resolve
+          );
+      const recordings: Array<Record<string, unknown>> = [];
+      for (const inputName of selectedInputs) {
+        const recordingPath = fileMode
+          ? resolveCanonicalAudioRecordingPath(String(resolve(requestedOutput)))
+          : path.join(baseDir, `${slugifyAudioInputName(inputName)}.wav`);
+        if (!fileMode && !safeExistsSync(path.dirname(recordingPath))) {
+          safeMkdir(path.dirname(recordingPath), { recursive: true });
+        }
+        const result = await bridge.recordOnInputs([inputName], {
+          duration_sec: durationSec,
+          output_path: recordingPath,
+        });
+        for (const entry of result.recordings) recordings.push({ ...entry });
+      }
+      const failed = recordings.filter((entry) => entry.status !== 'recorded');
+      if (failed.length > 0) {
+        const detail = failed
+          .map((entry) => `${String(entry.device_name)}: ${String(entry.error || entry.status)}`)
+          .join('; ');
+        throw new Error(`record_audio: ${failed.length} input(s) failed: ${detail}`);
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'audio_recording']: {
+          status: 'succeeded',
+          bridge_id: bridge.bridge_id,
+          duration_sec: durationSec,
+          recordings,
+        },
+      };
+    }
+    case 'capture_photo': {
+      const bridge = createVirtualCameraBridge();
+      const photoPath = resolveCanonicalPhotoCapturePath(params, resolve);
+      if (!safeExistsSync(path.dirname(photoPath))) {
+        safeMkdir(path.dirname(photoPath), { recursive: true });
+      }
+      const cameraIntent =
+        params.camera_intent === 'record' ||
+        params.camera_intent === 'share' ||
+        params.camera_intent === 'ocr_source'
+          ? params.camera_intent
+          : 'reference';
+      const result = await bridge.capturePhoto({
+        save_path: photoPath,
+        camera_intent: cameraIntent,
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+        device_preference:
+          typeof params.device_preference === 'string' ? params.device_preference : undefined,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'photo_path']: photoPath,
+        photo_path: photoPath,
+        photo_backend: result.backend,
+        photo_camera: result.selected_camera,
+        photo_intent: result.camera_intent,
+      };
+    }
+    case 'record_camera': {
+      // Camera video is photo-per-frame (see captureStream), so this is
+      // low-fps by construction — timelapse grade, unlike screen recording.
+      const bridge = createVirtualCameraBridge();
+      const fpsValue = Number(params.fps ?? 2);
+      const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? Math.min(5, fpsValue) : 2;
+      const durationValue = Number(params.duration ?? 0);
+      const durationSec = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : 5;
+      if (durationSec > 60) {
+        throw new Error(`record_camera duration must be 1-60 seconds, got "${durationSec}"`);
+      }
+      const frameCount = Math.min(300, Math.max(1, Math.ceil(durationSec * fps)));
+      const frameIntervalMs = Math.max(200, Math.round(1000 / fps));
+      const outputPath = resolveCanonicalCameraRecordingPath(params);
+      // Collect frames directly from the capture stream: draining a closed
+      // StubVideoFrameBus yields nothing, and draining an open one blocks
+      // once the buffer empties — both lose the recording.
+      const frames: VideoFrame[] = [];
+      for await (const frame of bridge.captureStream({
+        max_frames: frameCount,
+        frame_interval_ms: frameIntervalMs,
+        camera_intent: 'record',
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+        device_preference:
+          typeof params.device_preference === 'string' ? params.device_preference : undefined,
+      })) {
+        frames.push(frame);
+      }
+      if (frames.length === 0) {
+        throw new Error('record_camera: the camera produced no frames');
+      }
+      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
+        fps,
+      });
+      const probe = await bridge.probe();
+      return {
+        ...ctx,
+        [params.export_as || 'camera_recording']: {
+          status: 'succeeded',
+          bridge_id: bridge.bridge_id,
+          selected_camera: probe.selected_camera,
+          output_path: exported.output_path,
+          frame_count: exported.frame_count,
+          fps,
+          duration_sec: durationSec,
+        },
+      };
+    }
     case 'macos_automation_probe':
       return {
         ...ctx,
@@ -371,16 +526,22 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         resolve
       );
       const bridge = createScreenCaptureBridge();
-      const captureBus = new StubVideoFrameBus();
-      await writeRedactedScreenFrames(bridge, captureBus, {
+      const redact = redactFrameInScope(screenRedactionWorkDir());
+      const frames: VideoFrame[] = [];
+      for await (const frame of bridge.captureStream({
         max_frames: Math.max(1, Number(params.max_frames || 2)),
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         display_index: displaySelection.display_index,
         display_name: displaySelection.display_name,
-      } as any);
+      } as any)) {
+        const redacted = await redact(frame);
+        if (!redacted || redacted.payload.byteLength === 0) {
+          throw new Error('screen frame withheld: redaction_failed');
+        }
+        frames.push(redacted);
+      }
       const outputPath = pathResolver.shared(`runtime/computer/screen-roundtrip-${Date.now()}.mp4`);
-      await captureBus.close();
-      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
+      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
         fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
       });
       const importBus = new StubVideoFrameBus();
@@ -1095,16 +1256,17 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     }
     case 'test_camera_mp4_roundtrip': {
       const bridge = createVirtualCameraBridge();
-      const captureBus = new StubVideoFrameBus();
-      await bridge.pipeTo(captureBus, {
+      const frames: VideoFrame[] = [];
+      for await (const frame of bridge.captureStream({
         max_frames: Math.max(1, Number(params.frame_count || 2)),
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         camera_intent: 'record',
         subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-      });
+      })) {
+        frames.push(frame);
+      }
       const outputPath = pathResolver.shared(`runtime/computer/camera-roundtrip-${Date.now()}.mp4`);
-      await captureBus.close();
-      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
+      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
         fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
       });
       const importBus = new StubVideoFrameBus();
@@ -1155,16 +1317,17 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
       let sourcePath = mp4Path;
       if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
-        const captureBus = new StubVideoFrameBus();
-        await cameraBridge.pipeTo(captureBus, {
+        const frames: VideoFrame[] = [];
+        for await (const frame of cameraBridge.captureStream({
           device_preference: params.camera_device_preference || params.device_preference,
           max_frames: frameCount,
           frame_interval_ms: frameIntervalMs,
           camera_intent: 'record',
           subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
-        });
-        await captureBus.close();
-        const exportResult = await writeVideoFrameBusToMp4(captureBus, mp4Path, {
+        })) {
+          frames.push(frame);
+        }
+        const exportResult = await writeVideoFramesToMp4(mp4Path, replayCollectedFrames(frames), {
           fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
         });
         sourcePath = exportResult.output_path;
@@ -1526,6 +1689,96 @@ export function resolveCanonicalScreenCapturePath(
   ) {
     throw new Error(
       'screenshot output must remain within the governed screenshot or shared tmp store'
+    );
+  }
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+}
+
+export const AUDIO_RECORDING_EXTENSIONS: readonly string[] = [
+  '.wav',
+  '.mp3',
+  '.m4a',
+  '.aac',
+  '.flac',
+  '.ogg',
+  '.opus',
+] as const;
+
+function slugifyAudioInputName(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'input';
+}
+
+function assertWithinAudioRecordingRoots(absolute: string, what: string): string {
+  const allowedRoots = [
+    path.resolve(pathResolver.shared('runtime/computer/audio-recordings')),
+    path.resolve(pathResolver.shared('tmp')),
+  ];
+  if (
+    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
+  ) {
+    throw new Error(`${what} must remain within the governed audio-recording or shared tmp store`);
+  }
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+}
+
+export function resolveCanonicalAudioRecordingPath(requestedOutput: string): string {
+  const absolute = path.resolve(pathResolver.rootResolve(requestedOutput));
+  return assertWithinAudioRecordingRoots(absolute, 'record_audio output file');
+}
+
+export function resolveCanonicalAudioRecordingDir(
+  requestedOutput: string,
+  resolve: (value: unknown) => unknown
+): string {
+  const candidate = requestedOutput
+    ? pathResolver.rootResolve(String(resolve(requestedOutput)))
+    : pathResolver.shared(`runtime/computer/audio-recordings/audio-${Date.now()}`);
+  const absolute = path.resolve(candidate);
+  const resolved = assertWithinAudioRecordingRoots(absolute, 'record_audio output directory');
+  if (!safeExistsSync(resolved)) {
+    safeMkdir(resolved, { recursive: true });
+  }
+  return resolved;
+}
+
+export function resolveCanonicalPhotoCapturePath(
+  params: Record<string, unknown>,
+  resolve: (value: unknown) => unknown
+): string {
+  const requested =
+    typeof params.path === 'string' && params.path.trim()
+      ? pathResolver.rootResolve(String(resolve(params.path)))
+      : pathResolver.shared(`runtime/computer/photos/photo-${Date.now()}-${randomUUID()}.jpg`);
+  const absolute = path.resolve(requested);
+  const allowedRoots = [
+    path.resolve(pathResolver.shared('runtime/computer/photos')),
+    path.resolve(pathResolver.shared('tmp')),
+  ];
+  if (
+    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
+  ) {
+    throw new Error(
+      'capture_photo output must remain within the governed photo or shared tmp store'
+    );
+  }
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+}
+
+export function resolveCanonicalCameraRecordingPath(params: Record<string, unknown>): string {
+  const requested = typeof params.output === 'string' ? params.output.trim() : '';
+  const candidate = requested
+    ? pathResolver.rootResolve(requested)
+    : pathResolver.shared(`runtime/computer/camera-recordings/camera-${Date.now()}.mp4`);
+  const absolute = path.resolve(candidate);
+  const allowedRoots = [
+    path.resolve(pathResolver.shared('runtime/computer/camera-recordings')),
+    path.resolve(pathResolver.shared('tmp')),
+  ];
+  if (
+    !allowedRoots.some((root) => absolute === root || absolute.startsWith(`${root}${path.sep}`))
+  ) {
+    throw new Error(
+      'record_camera output must remain within the governed camera-recording or shared tmp store'
     );
   }
   return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });

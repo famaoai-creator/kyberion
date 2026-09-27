@@ -61,7 +61,15 @@ They are **not duplicates**; their action sets do not overlap.
 
 - **Screen capture** is `system:screenshot` / `system:record_screen` — they apply
   screen-frame redaction. The `media-generation` / `vision` capture ops only forward
-  there. Page captures: `browser:screenshot`.
+  there. Page captures: `browser:screenshot` (page video stays on the
+  `record_video` session flag — no explicit `browser:record` op yet, by design:
+  a recording needs session open → navigate → close lifecycle, which is a
+  control-flow op of its own, not a thin capture wrapper).
+- **Microphone and camera** are `system:record_audio` / `system:capture_photo` /
+  `system:record_camera` (camera video is photo-per-frame, low fps by
+  construction). Reachable as `pnpm kyberion capture [--screen|--window|--camera]`
+  and `pnpm kyberion record screen|audio|camera`. Mobile stays still-image only
+  (`capture_screen`); mobile video has no device bridge yet.
 - Details: [browser-automation-best-practices.md](./browser-automation-best-practices.md),
   [computer-use-runtime-model.md](../architecture/computer-use-runtime-model.md),
   [os-automation-bridge-model.md](../architecture/os-automation-bridge-model.md).

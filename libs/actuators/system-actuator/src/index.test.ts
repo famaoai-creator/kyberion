@@ -508,6 +508,24 @@ const createVirtualCameraBridge = vi.fn(() => ({
       })()
     );
   }),
+  capturePhoto: vi.fn(async (input?: any) => ({
+    bridge_id: 'virtual-camera-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    save_path: input?.save_path || '/tmp/photo.jpg',
+    selected_camera: 'FaceTime HD Camera',
+    camera_intent: input?.camera_intent || 'reference',
+  })),
+  captureStream: vi.fn(async function* (input?: any) {
+    const frameCount = Math.max(1, Number(input?.max_frames || 2));
+    for (let index = 0; index < frameCount; index += 1) {
+      yield {
+        format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+        payload: new Uint8Array([index + 1, index + 2, index + 3]),
+        ts_ms: index * 250,
+      };
+    }
+  }),
 }));
 const createVirtualCameraInjectionBridge = vi.fn(() => ({
   bridge_id: 'virtual-camera-injection-bridge',
@@ -565,6 +583,16 @@ const createScreenCaptureBridge = vi.fn(() => ({
     capture_mode: input?.capture_mode || 'screen',
     subject_hint: input?.subject_hint,
   })),
+  captureStream: vi.fn(async function* (input?: any) {
+    const frameCount = Math.max(1, Number(input?.max_frames || 2));
+    for (let index = 0; index < frameCount; index += 1) {
+      yield {
+        format: { mime_type: 'image/png' as const, width: 1920, height: 1080 },
+        payload: new Uint8Array([index + 10, index + 11, index + 12]),
+        ts_ms: index * 250,
+      };
+    }
+  }),
   pipeTo: vi.fn(async (bus: any, input?: any) => {
     await bus.writeFrames(
       (async function* () {
@@ -706,6 +734,18 @@ const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
   return {
     output_path: outputPath,
     frame_count: frames.length,
+    fps: 30,
+    format: { mime_type: 'image/jpeg', width: 640, height: 480 },
+  };
+});
+const writeVideoFramesToMp4 = vi.fn(async (outputPath: string, frames: AsyncIterable<any>) => {
+  const collected: any[] = [];
+  for await (const frame of frames) {
+    collected.push(frame);
+  }
+  return {
+    output_path: outputPath,
+    frame_count: collected.length,
     fps: 30,
     format: { mime_type: 'image/jpeg', width: 640, height: 480 },
   };
@@ -1044,6 +1084,7 @@ vi.mock('@agent/core', async () => ({
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
   writeVideoFrameBusToMp4,
+  writeVideoFramesToMp4,
   pipeMp4ToVideoFrameBus,
   StubVideoFrameBus,
   createVirtualInputDeviceInventoryBridge,
@@ -1260,6 +1301,7 @@ vi.mock('@agent/core/video-frame-bus', async () => ({
 vi.mock('@agent/core/video-frame-archive', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/video-frame-archive')),
   writeVideoFrameBusToMp4,
+  writeVideoFramesToMp4,
   pipeMp4ToVideoFrameBus,
 }));
 vi.mock('@agent/core/ledger', async () => ({
@@ -2349,6 +2391,138 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       );
     });
 
+    it('record_audio: records one input to a governed file path', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'record_audio',
+            params: {
+              targets: ['Built-in Microphone'],
+              output: 'active/shared/tmp/canonical-mic.wav',
+              duration: 4,
+              export_as: 'mic',
+            },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('succeeded');
+      const audioFactory = vi
+        .mocked(createVirtualAudioInputRecordingBridge)
+        .mock.results.at(-1)?.value;
+      expect(audioFactory?.recordOnInputs).toHaveBeenCalledWith(
+        ['Built-in Microphone'],
+        expect.objectContaining({
+          duration_sec: 4,
+          output_path: expect.stringContaining('canonical-mic.wav'),
+        })
+      );
+      expect(result.context.mic).toEqual(
+        expect.objectContaining({ status: 'succeeded', duration_sec: 4 })
+      );
+      expect(result.context.mic.recordings).toHaveLength(1);
+    });
+
+    it('record_audio: refuses a file output when several inputs are selected', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'record_audio',
+            params: { output: 'active/shared/tmp/combined.wav', duration: 2 },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/needs exactly one input/);
+    });
+
+    it('capture_photo: saves a camera still to a governed path', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'capture_photo',
+            params: {
+              path: 'active/shared/tmp/canonical-photo.jpg',
+              export_as: 'photo',
+            },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('succeeded');
+      const cameraFactory = vi.mocked(createVirtualCameraBridge).mock.results.at(-1)?.value;
+      expect(cameraFactory?.capturePhoto).toHaveBeenCalledWith(
+        expect.objectContaining({
+          save_path: expect.stringContaining('canonical-photo.jpg'),
+          camera_intent: 'reference',
+        })
+      );
+      expect(result.context.photo).toContain('canonical-photo.jpg');
+      expect(result.context.photo_path).toContain('canonical-photo.jpg');
+    });
+
+    it('record_camera: records a bounded low-fps MP4 from photo-per-frame capture', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'record_camera',
+            params: {
+              output: 'active/shared/tmp/canonical-camera.mp4',
+              duration: 4,
+              export_as: 'cam',
+            },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('succeeded');
+      const cameraFactory = vi.mocked(createVirtualCameraBridge).mock.results.at(-1)?.value;
+      expect(cameraFactory?.captureStream).toHaveBeenCalledWith(
+        expect.objectContaining({ max_frames: 8, camera_intent: 'record' })
+      );
+      expect(writeVideoFramesToMp4).toHaveBeenCalledWith(
+        expect.stringContaining('canonical-camera.mp4'),
+        expect.anything(),
+        expect.objectContaining({ fps: 2 })
+      );
+      expect(result.context.cam).toEqual(
+        expect.objectContaining({
+          status: 'succeeded',
+          output_path: expect.stringContaining('canonical-camera.mp4'),
+          frame_count: 8,
+        })
+      );
+    });
+
+    it('record_camera: rejects durations beyond the photo-per-frame budget', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'record_camera', params: { duration: 61 } }],
+      });
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/1-60 seconds/);
+    });
+
     it('screen_stream: captures repeated screen frames via bridge', async () => {
       const { handleAction } = await import('./index');
 
@@ -2733,7 +2907,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect((result.context.camera_mp4_roundtrip as any).exported_frame_count).toBe(2);
       expect((result.context.camera_mp4_roundtrip as any).imported_frame_count).toBe(2);
       expect((result.context.camera_mp4_roundtrip as any).exported_mp4_path).toContain('.mp4');
-      expect(writeVideoFrameBusToMp4).toHaveBeenCalled();
+      expect(writeVideoFramesToMp4).toHaveBeenCalled();
       expect(pipeMp4ToVideoFrameBus).toHaveBeenCalled();
     });
 

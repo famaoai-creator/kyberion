@@ -6413,6 +6413,26 @@
         "ja": "  watch <video>        動画のメタデータ・文字起こし・フレーム OCR タイムラインを出力(--every, --max-frames, --frames)",
         "qps-ploc": "⟦  ẇȧŧƈħ <ṽïḓėő>        Ṽïḓėő ɱėŧȧḓȧŧȧ + ŧřȧñşƈřïṗŧ + ŐƇŘ'ḓ ƒřȧɱė ŧïɱėŀïñė (--ėṽėřẏ, --ɱȧẋ-ƒřȧɱėş, --ƒřȧɱėş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
       },
+      "cli_help_capture": {
+        "en": "  capture [--screen|--window|--camera]  Capture a still image (screen redacted) (--out, --json)",
+        "ja": "  capture [--screen|--window|--camera]  静止画を撮影する(画面は伏せ字処理)(--out, --json)",
+        "qps-ploc": "⟦  ƈȧṗŧůřė [--şƈřėėñ|--ẇïñḓőẇ|--ƈȧɱėřȧ]  Ƈȧṗŧůřė ȧ şŧïŀŀ ïɱȧɠė (şƈřėėñ řėḓȧƈŧėḓ) (--őůŧ, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "cli_help_record_screen": {
+        "en": "  record screen              Record the screen as video (--duration, --out, --json)",
+        "ja": "  record screen              画面を動画として録画する(--duration, --out, --json)",
+        "qps-ploc": "⟦  řėƈőřḓ şƈřėėñ              Řėƈőřḓ ŧħė şƈřėėñ ȧş ṽïḓėő (--ḓůřȧŧïőñ, --őůŧ, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "cli_help_record_audio": {
+        "en": "  record audio               Record microphone audio (--duration, --out, --device, --json)",
+        "ja": "  record audio               マイク音声を録音する(--duration, --out, --device, --json)",
+        "qps-ploc": "⟦  řėƈőřḓ ȧůḓïő               Řėƈőřḓ ɱïƈřőṗħőñė ȧůḓïő (--ḓůřȧŧïőñ, --őůŧ, --ḓėṽïƈė, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "cli_help_record_camera": {
+        "en": "  record camera              Record camera video, low fps (--duration, --out, --json)",
+        "ja": "  record camera              カメラ動画を録画する(低fps)(--duration, --out, --json)",
+        "qps-ploc": "⟦  řėƈőřḓ ƈȧɱėřȧ              Řėƈőřḓ ƈȧɱėřȧ ṽïḓėő, ŀőẇ ƒṗş (--ḓůřȧŧïőñ, --őůŧ, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
       "cli_help_info": {
         "en": "  info <name>          Show details for a specific actuator",
         "ja": "  info <name>          指定アクチュエータの詳細を表示",

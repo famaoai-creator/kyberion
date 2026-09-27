@@ -1443,13 +1443,16 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
-  if (command === 'record' && firstArg === 'screen') {
-    // Screen video (thin over system:record_screen). Registered as the
-    // two-word operator-cli command "record screen" so the bare `record`
-    // (operator-home desktop demonstration recorder) keeps working.
+  if (
+    command === 'record' &&
+    (firstArg === 'screen' || firstArg === 'audio' || firstArg === 'camera')
+  ) {
+    // Time-series recording (thin over system:record_screen / record_audio /
+    // record_camera). Registered as two-word operator-cli commands so the bare
+    // `record` (operator-home desktop demonstration recorder) keeps working.
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runRecordCommand } = await import('./cli-record.js');
-    await runRecordCommand(restArgs, printText);
+    await runRecordCommand([`--${firstArg}`, ...restArgs], printText);
     return;
   }
 

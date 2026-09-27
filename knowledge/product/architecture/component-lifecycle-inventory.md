@@ -42,7 +42,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema knowledge/product/schemas/process-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection. (4 ops, v1.2.0, schema knowledge/product/schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.3.0, schema knowledge/product/schemas/service-action.schema.json)
-- `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (26 ops, v1.8.0, schema knowledge/product/schemas/system-pipeline.schema.json)
+- `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (29 ops, v1.10.0, schema knowledge/product/schemas/system-pipeline.schema.json)
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema knowledge/product/schemas/terminal-action.schema.json)
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (7 ops, v1.5.0, schema knowledge/product/schemas/vision-action.schema.json)

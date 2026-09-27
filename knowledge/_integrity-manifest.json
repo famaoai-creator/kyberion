@@ -309,7 +309,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7868,
+      "size": 7869,
       "type": "md"
     },
     {
@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 22015,
+      "size": 22089,
       "type": "json"
     },
     {
@@ -1533,7 +1533,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 54106,
+      "size": 54538,
       "type": "json"
     },
     {
@@ -4707,13 +4707,13 @@
     {
       "path": "product/orchestration/action-playbook.ja.md",
       "tier": "public",
-      "size": 9191,
+      "size": 9854,
       "type": "md"
     },
     {
       "path": "product/orchestration/action-playbook.md",
       "tier": "public",
-      "size": 8309,
+      "size": 8927,
       "type": "md"
     },
     {
@@ -4737,7 +4737,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1474271,
+      "size": 1477429,
       "type": "json"
     },
     {
@@ -5001,13 +5001,13 @@
     {
       "path": "product/orchestration/capability-verb-inventory.ja.md",
       "tier": "public",
-      "size": 10462,
+      "size": 11199,
       "type": "md"
     },
     {
       "path": "product/orchestration/capability-verb-inventory.md",
       "tier": "public",
-      "size": 9902,
+      "size": 10527,
       "type": "md"
     },
     {
@@ -5133,13 +5133,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 20112,
+      "size": 20187,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 9431,
+      "size": 9432,
       "type": "json"
     },
     {
@@ -6447,7 +6447,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 1009293,
+      "size": 1011284,
       "type": "json"
     },
     {
@@ -11577,7 +11577,7 @@
     {
       "path": "product/schemas/system-pipeline.schema.json",
       "tier": "public",
-      "size": 11207,
+      "size": 11412,
       "type": "json"
     },
     {
