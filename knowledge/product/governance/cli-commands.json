@@ -2177,6 +2177,14 @@
       "noun": "agy",
       "verb": "profile",
       "audience": "operator"
+    },
+    {
+      "id": "script.codex.profile",
+      "module": "scripts/codex_profile_controller.ts",
+      "command": "codex profile",
+      "noun": "codex",
+      "verb": "profile",
+      "audience": "operator"
     }
   ]
 }

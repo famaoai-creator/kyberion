@@ -19,6 +19,7 @@ import { loadAgentInstructionResource } from './agent-instruction-loader.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import { safeChildEnv } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';
+import { resolveCodexHome } from './codex-profile.js';
 import type {
   AgentAdapter,
   AgentAskOptions,
@@ -226,6 +227,7 @@ export interface CodexAppServerAdapterOptions {
   sandboxMode?: 'workspace-write' | 'read-only' | 'danger-full-access';
   networkAccess?: boolean;
   writableRoots?: string[];
+  codexProfile?: string;
 }
 
 export interface CodexNativeSubagentInfo {
@@ -322,8 +324,12 @@ export class CodexAppServerAdapter implements AgentAdapter {
     logger.info('[UAA] Codex App Server booting (cwd: ' + cwd + ')');
     this.runtimeResourceId = 'codex-app-server:' + cwd;
     this.codexBinary = resolveCodexBinary(process.env);
+    const childEnv = safeChildEnv({
+      ...process.env,
+      CODEX_HOME: resolveCodexHome(this.options.codexProfile, process.env),
+    }) as NodeJS.ProcessEnv;
     const versionResult = safeExecResult(this.codexBinary, ['--version'], {
-      env: safeChildEnv() as NodeJS.ProcessEnv,
+      env: childEnv,
       cwd,
       timeoutMs: 5000,
     });
@@ -340,7 +346,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       spawnOptions: {
         cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: safeChildEnv() as NodeJS.ProcessEnv,
+        env: childEnv,
       },
       metadata: { cwd },
     });
