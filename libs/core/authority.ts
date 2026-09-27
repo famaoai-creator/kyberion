@@ -17,6 +17,7 @@ import {
   currentExecutionScope,
   executionPersonaText,
   registerAssumedRoleValidator,
+  registerRootExecutionScopeProvider,
   runInExecutionScope,
   scopedAssumedRole,
   type ExecutionScope,
@@ -229,8 +230,10 @@ function normalizeRoleName(role: string): string {
 
 /**
  * RA-01: the role assumed in-process by the innermost
- * `withExecutionContext` / `withExecutionContextAsync`, if any. In-process
- * only — it can never come from an inherited environment variable.
+ * `withExecutionContext` / `withExecutionContextAsync`, if any, else the
+ * delegated role of a child spawned with an explicit role under SYSTEM_ROLE
+ * (DR-01, {@link DELEGATED_ROLE_ENV}; validated against SYSTEM_ROLE by the
+ * role assumption policy). Nothing else is ever read from the environment.
  */
 export function resolveAssumedRole(): string | undefined {
   const assumed = scopedAssumedRole();
@@ -238,9 +241,12 @@ export function resolveAssumedRole(): string | undefined {
 }
 
 /**
- * Role resolution precedence (RA-01):
+ * Role resolution precedence (RA-01 / DR-01):
  *   1. the role assumed in-process by withExecutionContext* (scoped, per
  *      async context; never inherited from the environment);
+ *   1b. the delegated role of a child process (DR-01): set by the parent's
+ *      `buildExecutionEnv(env, role)` alongside the inherited SYSTEM_ROLE and
+ *      honoured only when SYSTEM_ROLE may assume it (else SYSTEM_ROLE);
  *   2. `SYSTEM_ROLE` (set by surface_runtime / runtime launchers);
  *   3. `MISSION_ROLE`;
  *   4. a heuristic derived from the process argv[1] basename.
@@ -356,6 +362,7 @@ function loadRoleAssumptionPolicy(): RoleAssumptionPolicy | null {
 /** Test seam: drop the cached role assumption policy. */
 export function resetRoleAssumptionPolicyCache(): void {
   cachedRoleAssumptionPolicy = null;
+  delegationMemo = null;
 }
 
 /**
@@ -386,6 +393,91 @@ function isScopedRoleAccepted(role: string): boolean {
 
 registerAssumedRoleValidator(isScopedRoleAccepted);
 
+// ---------------------------------------------------------------------------
+// DR-01 delegated child role
+//
+// A child spawned with an explicit role inherits the parent's SYSTEM_ROLE,
+// which outranks MISSION_ROLE, so on its own it would run as the parent
+// surface. The parent's buildExecutionEnv(env, role) therefore also sets
+// KYBERION_DELEGATED_ROLE=<role>@<system role>. The child resolves it lazily,
+// on the first read of its execution scope (not at import time), into a
+// process-wide root scope equivalent to an in-process assumption of <role>:
+// below any explicit withExecutionContext*, above SYSTEM_ROLE, bounded by the
+// same RA-02 check. The delegation is bound to the SYSTEM_ROLE it was issued
+// under, so a process relaunched with another SYSTEM_ROLE (a surface started
+// by a delegated surface_runtime) ignores a stale value.
+// ---------------------------------------------------------------------------
+
+/** Env var carrying a delegated child role (DR-01): `<role>@<issuing SYSTEM_ROLE>`. */
+export const DELEGATED_ROLE_ENV = 'KYBERION_DELEGATED_ROLE';
+
+let delegationMemo: {
+  key: string;
+  policy: typeof cachedRoleAssumptionPolicy;
+  scope: ExecutionScope | undefined;
+} | null = null;
+
+function parseDelegatedRole(raw: string): { role: string; issuer: string } | null {
+  const separator = raw.lastIndexOf('@');
+  if (separator <= 0 || separator === raw.length - 1) return null;
+  const role = normalizeRoleName(raw.slice(0, separator).trim());
+  const issuer = normalizeRoleName(raw.slice(separator + 1).trim());
+  return role && issuer ? { role, issuer } : null;
+}
+
+function rootPersonaFor(role: string): string | null {
+  const persona = inferPersonaFromRole(role);
+  return persona === 'unknown' ? null : persona;
+}
+
+/**
+ * DR-01: the root scope of a delegated child, or undefined when the process
+ * has no SYSTEM_ROLE or no delegation issued under it. A delegation the
+ * policy does not allow is replaced by SYSTEM_ROLE itself (fail closed, also
+ * for the persona) with a `[ROLE_DELEGATION_DENIED]` warning. Each decision is
+ * traced (RN-01) and warned about once per (SYSTEM_ROLE, delegation) pair.
+ */
+function resolveDelegatedRootScope(): ExecutionScope | undefined {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  const raw = getRegisteredEnvText(DELEGATED_ROLE_ENV)?.trim();
+  if (!systemRole || !raw) return undefined;
+  const key = `${systemRole}\n${raw}`;
+  loadRoleAssumptionPolicy();
+  if (delegationMemo?.key === key && delegationMemo.policy === cachedRoleAssumptionPolicy) {
+    return delegationMemo.scope;
+  }
+  const normalizedSystemRole = normalizeRoleName(systemRole);
+  const parsed = parseDelegatedRole(raw);
+  if (!parsed || parsed.issuer !== normalizedSystemRole) {
+    // Issued under another SYSTEM_ROLE (or malformed): not a delegation to this process.
+    delegationMemo = { key, policy: cachedRoleAssumptionPolicy, scope: undefined };
+    logger.debug(
+      `ignoring ${DELEGATED_ROLE_ENV}=${raw}: not issued under SYSTEM_ROLE=${normalizedSystemRole}`
+    );
+    return undefined;
+  }
+  const allowed = isRoleAssumptionAllowed(normalizedSystemRole, parsed.role);
+  const role = allowed ? parsed.role : normalizedSystemRole;
+  const scope: ExecutionScope = Object.freeze({
+    tenantBound: false,
+    assumedRole: role,
+    assumedPersona: rootPersonaFor(role),
+  });
+  // Memoize before tracing / warning: both may re-enter the scope readers.
+  delegationMemo = { key, policy: cachedRoleAssumptionPolicy, scope };
+  traceRoleAssumption(normalizedSystemRole, parsed.role, allowed, 'delegation');
+  if (!allowed) {
+    console.warn(
+      `[ROLE_DELEGATION_DENIED] a process running as SYSTEM_ROLE=${normalizedSystemRole} ` +
+        `may not run as delegated role '${parsed.role}'; it runs as ${normalizedSystemRole}. ` +
+        `Allowed roles are governed by knowledge/${ROLE_ASSUMPTION_POLICY_PATH}.`
+    );
+  }
+  return scope;
+}
+
+registerRootExecutionScopeProvider(resolveDelegatedRootScope);
+
 function assertRoleAssumptionAllowed(role: string): void {
   const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
   const allowed = !systemRole || isRoleAssumptionAllowed(systemRole, role);
@@ -412,9 +504,16 @@ export function inferPersonaFromRole(role?: string): Persona {
 
 /**
  * Environment for a child process. With an explicit `role` the child runs as
- * that role; without one, a child built from the live `process.env` inherits
- * the role/persona assumed by the current execution scope (RA-01) instead of
- * whatever a concurrent context last wrote into the process-global env.
+ * that role: MISSION_ROLE is set for children without SYSTEM_ROLE, and when
+ * the resulting env carries SYSTEM_ROLE (which outranks MISSION_ROLE) the role
+ * is also delegated through {@link DELEGATED_ROLE_ENV} (DR-01), bound to that
+ * SYSTEM_ROLE and bounded by its role assumption policy; a delegated child's
+ * persona is the role's default persona (like withExecutionContext(role)
+ * without a persona), so an explicit `persona` only reaches children without
+ * SYSTEM_ROLE. Without a role, a
+ * child built from the live `process.env` inherits the role/persona assumed by
+ * the current execution scope (RA-01) instead of whatever a concurrent context
+ * last wrote into the process-global env.
  */
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
@@ -431,7 +530,16 @@ export function buildExecutionEnv(
       return nextEnv;
     }
   }
-  if (role) nextEnv.MISSION_ROLE = role;
+  if (role) {
+    nextEnv.MISSION_ROLE = role;
+    const systemRole = nextEnv.SYSTEM_ROLE?.trim();
+    if (systemRole) {
+      nextEnv[DELEGATED_ROLE_ENV] =
+        `${normalizeRoleName(role.trim())}@${normalizeRoleName(systemRole)}`;
+    } else {
+      delete nextEnv[DELEGATED_ROLE_ENV];
+    }
+  }
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
     nextEnv.KYBERION_PERSONA = resolvedPersona;
