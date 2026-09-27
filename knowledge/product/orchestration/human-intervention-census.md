@@ -25,10 +25,19 @@ The approval store is not the only record, and today it is not the main one:
 
 ## Traps in the approval store (2026-09)
 
-- **Test pollution.** Suites write into the production store. Exclude by token-anchored `test`/`fixture` in channel, requester, or decider; `qm<N>-` channels; decider `U123` (placeholder Slack user); `human:alice`; plugin titles shaped `<label>-<pid>-<uuid8>` or `<label>-<5–6 digit pid>`. In the 2026-09-27 run, 3,351 records were fixtures, over 95% of the store.
-- **Auto-approvals stamped human.** Policy auto-approvals carry `decidedByType: human`; only the workflow note `Auto-approved …` shows no human acted. Count a record as agent only when every decided workflow entry is auto-approved.
+- **Test pollution.** Until 2026-09-27, test suites wrote into the production store. Since then, `approvalStoreRoots()` sends vitest runs to `active/shared/runtime/vitest-approvals/`. Any code that builds approval paths must call `approvalRequestLogicalPath` / `approvalEventLogicalPath` rather than hard-coding `coordination/channels/<ch>/approvals`. Old leftovers are matched by `isFixtureApproval` in `libs/core/approval-store-hygiene.ts`; the census and the cleanup share these rules. The rules match on:
+  - the token `test` or `fixture` (as a whole word) in the channel, requester, or decider;
+  - channels starting with `qm<N>-`;
+  - decider `U123` and requester `human:alice`;
+  - throwaway plugin titles;
+  - the exact reason values of `secret-introduction.test.ts`.
+
+  The records live on a plain `terminal` channel with requester `operator`, so only the reason value identifies them. When a new leak is found, add its signature to `isFixtureApproval`, not to the census alone.
+
+- **Cleaning up.** Run `node dist/scripts/approval_store_hygiene.js`. It is a dry run by default. `--apply` moves fixture records to `active/archive/.trash/`, where they can be restored for 30 days. It also expires stale pending requests. Run `--apply` from an operator session, because only the operator identity may write the trash.
+- **Auto-approvals stamped human.** Before 2026-09-27, policy auto-approvals of secrets carried `decidedByType: human`. For those records, only the workflow note `Auto-approved …` shows that no human acted. New ones use `decidedBy: policy:…` and `decidedByType: service`. Count a record as agent only when every decided workflow entry is auto-approved.
 - **Missing decider type is not agent.** Legacy decisions lack `decidedByType`; count them as unattributed, never as agent, or the census flatters autonomy.
-- **Pending requests never expire.** Orphaned `pending` requests accumulate and inflate "waiting on human".
+- **Pending requests used to never expire.** Secret requests now expire 24 hours after creation. The hygiene sweep also expires pending requests past `expiresAt`, and those with no expiry that are older than 14 days (`reason: stale_pending` on the event). Until the sweep runs on a schedule, orphaned requests still inflate "waiting on human" between runs.
 
 ## Using the numbers
 

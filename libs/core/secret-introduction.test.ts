@@ -58,6 +58,13 @@ describe('secret-introduction façade', () => {
     expect(record?.kind).toBe('secret_mutation');
     expect(JSON.stringify(record)).not.toMatch(/sk-|api[_-]?key[_-]?value/i);
     expect(record?.target?.secretKey).toBe('API_KEY');
+    expect(record?.decidedBy).toBe('policy:secret-introduction-local-low-risk');
+    expect(record?.decidedByType).toBe('service');
+    expect(record?.authenticated).toBe(false);
+    expect(record?.workflow?.approvals[0]).toMatchObject({
+      status: 'approved',
+      decidedByType: 'service',
+    });
   });
 
   it('applies dual-write only when approved and never echoes the value', async () => {
@@ -104,6 +111,11 @@ describe('secret-introduction façade', () => {
       requestedBy: 'operator',
     });
     expect(proposed.status).toBe('pending');
+    const { loadApprovalRequest } = await import('./approval-store.js');
+    const pending = loadApprovalRequest(proposed.storageChannel, proposed.approvalId);
+    const ttlMs = Date.parse(pending?.expiresAt ?? '') - Date.parse(pending?.requestedAt ?? '');
+    expect(ttlMs).toBeGreaterThan(23 * 60 * 60 * 1000);
+    expect(ttlMs).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 1000);
     await expect(
       applySecretIntroduction({
         approvalId: proposed.approvalId,

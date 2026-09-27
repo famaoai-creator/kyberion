@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { approvalRequestLogicalPath } from '@agent/core/approval-store';
 import { pathResolver } from '@agent/core/path-resolver';
 
 function makeTempRoot(): string {
@@ -49,19 +50,10 @@ function makeTempRoot(): string {
 }
 
 function seedSecurityPolicyApproval(root: string, id: string): void {
-  const requestDir = path.join(
-    root,
-    'active',
-    'shared',
-    'coordination',
-    'channels',
-    'terminal',
-    'approvals',
-    'requests'
-  );
-  fs.mkdirSync(requestDir, { recursive: true });
+  const requestPath = path.join(root, approvalRequestLogicalPath('terminal', id));
+  fs.mkdirSync(path.dirname(requestPath), { recursive: true });
   fs.writeFileSync(
-    path.join(requestDir, `${id}.json`),
+    requestPath,
     JSON.stringify({
       id,
       status: 'approved',

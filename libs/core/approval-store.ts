@@ -8,6 +8,7 @@ import {
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
+import { isVitestProcess } from './foundation/env.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import {
@@ -409,12 +410,43 @@ export function validateHumanFinalDecision(params: {
   }
 }
 
+/**
+ * Repo-relative root of the vitest-isolated approval store. Test runs write
+ * here instead of the live store so fixture approvals never mix with real
+ * operator decisions; the storage retention catalog expires it.
+ */
+export const VITEST_APPROVAL_STORE_ROOT = 'active/shared/runtime/vitest-approvals';
+
+/**
+ * Repo-relative roots of the approval store: request records live under
+ * `coordination`, the append-only event log under `observability`.
+ */
+export function approvalStoreRoots(env: Record<string, string | undefined> = process.env): {
+  coordination: string;
+  observability: string;
+} {
+  if (isVitestProcess(env)) {
+    return {
+      coordination: `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels`,
+      observability: `${VITEST_APPROVAL_STORE_ROOT}/observability/channels`,
+    };
+  }
+  return {
+    coordination: 'active/shared/coordination/channels',
+    observability: 'active/shared/observability/channels',
+  };
+}
+
+function approvalRequestsLogicalDir(storageChannel: string): string {
+  return `${approvalStoreRoots().coordination}/${normalizeApprovalChannel(storageChannel)}/approvals/requests`;
+}
+
 export function approvalRequestLogicalPath(storageChannel: string, id: string): string {
-  return `active/shared/coordination/channels/${normalizeApprovalChannel(storageChannel)}/approvals/requests/${normalizeApprovalRequestId(id)}.json`;
+  return `${approvalRequestsLogicalDir(storageChannel)}/${normalizeApprovalRequestId(id)}.json`;
 }
 
 export function approvalEventLogicalPath(storageChannel: string): string {
-  return `active/shared/observability/channels/${normalizeApprovalChannel(storageChannel)}/approvals.jsonl`;
+  return `${approvalStoreRoots().observability}/${normalizeApprovalChannel(storageChannel)}/approvals.jsonl`;
 }
 
 export function createApprovalRequest(
@@ -444,10 +476,7 @@ export function createApprovalRequest(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  ensureGovernedArtifactDir(
-    role,
-    `active/shared/coordination/channels/${storageChannel}/approvals/requests`
-  );
+  ensureGovernedArtifactDir(role, approvalRequestsLogicalDir(storageChannel));
 
   const record: ApprovalRequestRecord = {
     id: randomUUID(),
@@ -555,7 +584,13 @@ export function isApprovalRequestExpired(
 /** Persist the terminal expiry transition exactly once. */
 export function expireApprovalRequest(
   role: GovernedArtifactRole,
-  params: { channel: string; storageChannel?: string; requestId: string }
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    /** Why the request expired; recorded on the event (e.g. `stale_pending`). */
+    reason?: string;
+  }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -571,6 +606,7 @@ export function expireApprovalRequest(
     correlation_id: updated.correlationId,
     channel: updated.channel,
     thread_ts: updated.threadTs,
+    ...(params.reason ? { reason: params.reason } : {}),
   });
   return updated;
 }
@@ -731,7 +767,7 @@ export function listApprovalRequests(params?: {
   kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][];
   scope?: EventScopeInput;
 }): ApprovalRequestRecord[] {
-  const channelsRoot = pathResolver.shared('coordination/channels');
+  const channelsRoot = pathResolver.resolve(approvalStoreRoots().coordination);
   if (!safeExistsSync(channelsRoot)) return [];
 
   const statuses = params?.status
@@ -746,17 +782,15 @@ export function listApprovalRequests(params?: {
     ? params.storageChannels.map((channel) => normalizeApprovalChannel(channel, 'storage channel'))
     : safeReaddir(channelsRoot).filter((entry) =>
         safeExistsSync(
-          pathResolver.shared(
-            `coordination/channels/${normalizeApprovalChannel(entry, 'storage channel')}/approvals/requests`
+          pathResolver.resolve(
+            approvalRequestsLogicalDir(normalizeApprovalChannel(entry, 'storage channel'))
           )
         )
       );
 
   const records: ApprovalRequestRecord[] = [];
   for (const storageChannel of storageChannels) {
-    const requestsDir = pathResolver.shared(
-      `coordination/channels/${storageChannel}/approvals/requests`
-    );
+    const requestsDir = pathResolver.resolve(approvalRequestsLogicalDir(storageChannel));
     if (!safeExistsSync(requestsDir)) continue;
     for (const entry of safeReaddir(requestsDir).filter((item) => item.endsWith('.json'))) {
       const record = loadApprovalRequest(storageChannel, entry.replace(/\.json$/, ''));

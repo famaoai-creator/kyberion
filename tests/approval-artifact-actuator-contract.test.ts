@@ -4,6 +4,9 @@ import addFormats from 'ajv-formats';
 import * as path from 'node:path';
 import {
   appendGovernedArtifactJsonl,
+  approvalEventLogicalPath,
+  approvalRequestLogicalPath,
+  approvalStoreRoots,
   pathResolver,
   safeExistsSync,
   safeReadFile,
@@ -35,12 +38,20 @@ describe('Approval and artifact actuator contracts', () => {
   const contractObservability = pathResolver.rootResolve(
     `active/shared/observability/channels/${contractChannel}`
   );
+  const contractApprovalCoordination = pathResolver.rootResolve(
+    `${approvalStoreRoots().coordination}/${contractChannel}`
+  );
+  const contractApprovalObservability = pathResolver.rootResolve(
+    `${approvalStoreRoots().observability}/${contractChannel}`
+  );
   const createdSlackRequestPaths = new Set<string>();
 
   afterEach(() => {
     process.env.MISSION_ROLE = 'infrastructure_sentinel';
     if (safeExistsSync(contractCoordination)) safeRmSync(contractCoordination);
     if (safeExistsSync(contractObservability)) safeRmSync(contractObservability);
+    if (safeExistsSync(contractApprovalCoordination)) safeRmSync(contractApprovalCoordination);
+    if (safeExistsSync(contractApprovalObservability)) safeRmSync(contractApprovalObservability);
     for (const logicalPath of createdSlackRequestPaths) {
       if (safeExistsSync(logicalPath)) safeUnlinkSync(logicalPath);
     }
@@ -84,9 +95,7 @@ describe('Approval and artifact actuator contracts', () => {
       sourceText: 'deploy please',
     });
 
-    createdSlackRequestPaths.add(
-      `active/shared/coordination/channels/${contractChannel}/approvals/requests/${request.id}.json`
-    );
+    createdSlackRequestPaths.add(approvalRequestLogicalPath(contractChannel, request.id));
     expect(loadApprovalRequest(contractChannel, request.id)?.status).toBe('pending');
 
     const decided = decideApprovalRequest('infrastructure_sentinel', {
@@ -99,9 +108,7 @@ describe('Approval and artifact actuator contracts', () => {
 
     expect(decided.status).toBe('approved');
     const events = safeReadFile(
-      pathResolver.rootResolve(
-        `active/shared/observability/channels/${contractChannel}/approvals.jsonl`
-      ),
+      pathResolver.rootResolve(approvalEventLogicalPath(contractChannel)),
       { encoding: 'utf8' }
     ) as string;
     expect(events).toContain('approval_requested');
@@ -235,9 +242,7 @@ describe('Approval and artifact actuator contracts', () => {
       note: 'approved from terminal',
     });
 
-    createdSlackRequestPaths.add(
-      `active/shared/coordination/channels/${contractChannel}/approvals/requests/${request.id}.json`
-    );
+    createdSlackRequestPaths.add(approvalRequestLogicalPath(contractChannel, request.id));
     expect(loadApprovalRequest(contractChannel, request.id)?.status).toBe('approved');
   });
 });
