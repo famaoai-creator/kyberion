@@ -9,6 +9,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -123,7 +124,8 @@ export async function handleAction(input: ProcessAction) {
             cwd: params.cwd
               ? resolveProcessPath(String(params.cwd), false)
               : pathResolver.rootDir(),
-            env: { ...process.env, ...(params.env || {}) },
+            // Caller-supplied env may not set execution authority (DR-01).
+            env: { ...process.env, ...stripAuthorityEnvOverrides(params.env) },
             stdio: ['pipe', 'pipe', 'pipe'],
           },
         });
