@@ -41,7 +41,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { approvalRequestLogicalPath } from '@agent/core/approval-store';
-import { readJson, readJsonLines } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson, readJsonLines } from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
 import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
@@ -115,6 +115,17 @@ export function surfaceRuntimeLaunchEnv(): Record<string, string> {
     AUTHORIZED_SCOPE: 'chronos-mirror-v2',
     SYSTEM_ROLE: 'chronos_mirror_v2',
   };
+}
+
+/**
+ * RN-01: forward the opt-in role assumption trace to Chronos. The path is
+ * resolved against the hermetic root (KYBERION_ROOT), so it must name a .jsonl
+ * file under that root's active/shared/tmp/role-assumption-trace/; run with
+ * --keep-root to collect it.
+ */
+export function roleAssumptionTraceEnv(): Record<string, string> {
+  const trace = getRegisteredEnvText('KYBERION_ROLE_ASSUMPTION_TRACE');
+  return trace ? { KYBERION_ROLE_ASSUMPTION_TRACE: trace } : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +421,7 @@ function startChronos(
         KYBERION_CHRONOS_PLUGIN_HOST_TENANTS: TENANT_SLUG,
         KYBERION_PLUGIN_HOST_POLL_MS: '1000',
         ...(launchMode === 'surface-runtime' ? surfaceRuntimeLaunchEnv() : {}),
+        ...roleAssumptionTraceEnv(),
       }),
     },
   });

@@ -1166,6 +1166,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   // speak routes through the voice actuator's engine registry, not the
   // bootstrapped python voice bridge / reasoning backends.
   'speak',
+  // draw binds only the image-generation bridge it routes through.
+  'draw',
 ]);
 
 /**
@@ -1421,6 +1423,14 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
     const { runSpeakCommand } = await import('./cli-speak.js');
     await runSpeakCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
+    return;
+  }
+
+  if (command === 'draw') {
+    // Output is an image; stdout carries only the `[draw]` summary (or --json).
+    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+    const { runDrawCommand } = await import('./cli-draw.js');
+    await runDrawCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
     return;
   }
 

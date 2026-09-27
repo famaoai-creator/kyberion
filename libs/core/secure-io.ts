@@ -1381,6 +1381,7 @@ registerFoundationIo({
   loadJson: secureLoadJson,
   loadJsonIfPresent: secureLoadJsonIfPresent,
   appendFile: (filePath, content) => safeAppendFileSync(filePath, content),
+  createExclusiveFile: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),
   exists: safeExistsSync,
   readFile: (filePath, options) =>
     safeReadFile(filePath, { ...options, encoding: 'utf8' }) as string,

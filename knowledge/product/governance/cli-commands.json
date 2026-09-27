@@ -403,6 +403,14 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.draw",
+      "command": "draw",
+      "noun": "draw",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.run",
       "command": "run",
       "noun": "run",
@@ -584,6 +592,7 @@
         "listen",
         "watch",
         "speak",
+        "draw",
         "run",
         "preview",
         "intent",

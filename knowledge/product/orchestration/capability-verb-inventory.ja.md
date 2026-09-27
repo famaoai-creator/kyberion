@@ -16,7 +16,7 @@ tags:
   ]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-09-26
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, knowledge_steward, mission_controller, operator]
 phase_affinity: [alignment]
 ---
@@ -49,7 +49,7 @@ CLI に移すだけになる。
 | 文書 → テキスト     | `media:document_digest`                 | `pnpm kyberion read`   | 統合済み                          |
 | ブリーフ → 文書     | `media:generate_document`               | `pnpm kyberion write`  | 統合済み                          |
 | 画像 → テキスト     | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | 統合済み                          |
-| 指示 → 画像         | `media-generation:generate_image`       | —                      | **動詞がない**                    |
+| 指示 → 画像         | `media-generation:generate_image`       | `pnpm kyberion draw`   | 統合済み                          |
 | 音声 → テキスト     | `voice:transcribe`                      | `pnpm kyberion listen` | 統合済み                          |
 | テキスト → 音声     | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | 統合済み                          |
 | 動画 → タイムライン | フレーム＋書き起こしの合成              | `pnpm kyberion watch`  | 統合済み                          |
@@ -68,10 +68,20 @@ CLI に移すだけになる。
 [narrated-video-production-playbook](./narrated-video-production-playbook.md)
 にある。
 
-画像と動画の行は**同じ扱いにできない**。`generate_image` はプロバイダに出る
-（ローカルの文書描画と違い外部通信の判断が入る）し、動画はエンジンが 2 系統
-（ナレーション合成の `video-composition:*` とモデル生成の `generate_video`）あり、
-選択を隠す統合 op がない。
+`draw` は `see` の逆。統合層は画像生成ブリッジ（`libs/core/image-generation-bridge.ts`
+の `generateImage` / `planImageGeneration`）で、プロバイダの選択は既に 1 つのルーターに
+隠れていた。行が空だった理由は外部送信の判断だったので、動詞はそこだけを受け持つ。
+既定では、データを端末の外に出さず無人で完了するプロバイダだけが候補になる。
+`--allow-cloud` でクラウドのプロバイダを、`--allow-handoff` でホストエージェントへの
+委譲を最後の手段として加える（終了コード 100、同じコマンドの再実行で回収）。
+この制限はルーターがすべての選択経路で適用する明示的な許可リスト
+（`ImageGenerationRequest.allowedProviders`）で実装している。`mode: 'local_only'` だけでは
+足りない。ホストブリッジはローカルで動くが、依頼をホストエージェントのモデルに転送するため。
+参照画像（`--ref`）は PA-10 に従う。クラウドまたは委譲先のプロバイダには、そのプロバイダを
+名指しした実行ごとの同意が必要で、`--dry-run` で送信前にどこへ送られるかを確認できる。
+
+動画の行は、まだ**同じ扱いにできない**。エンジンが 2 系統（ナレーション合成の
+`video-composition:*` とモデル生成の `generate_video`）あり、選択を隠す統合 op がない。
 
 ## 3. ファイルでない入力
 

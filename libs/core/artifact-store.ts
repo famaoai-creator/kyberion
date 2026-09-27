@@ -26,6 +26,28 @@ export type GovernedArtifactRole =
   | 'infrastructure_sentinel'
   | 'sovereign_concierge';
 
+// Kept as an explicit literal union: the role assumption analysis
+// (scripts/analyze_role_assumptions.ts) resolves it without the TS lib. The
+// record below makes the runtime list exhaustive and exact at compile time.
+const GOVERNED_ARTIFACT_ROLE_SET: Record<GovernedArtifactRole, true> = {
+  slack_bridge: true,
+  chronos_gateway: true,
+  surface_runtime: true,
+  mission_controller: true,
+  infrastructure_sentinel: true,
+  sovereign_concierge: true,
+};
+
+/**
+ * The store-writer roles governed artifacts are written as. The surface
+ * coordination role map schema enumerates exactly these values
+ * (surface-coordination-role-map.test.ts keeps them equal), so data can never
+ * name a role this type does not cover.
+ */
+export const GOVERNED_ARTIFACT_ROLES = Object.keys(
+  GOVERNED_ARTIFACT_ROLE_SET
+) as readonly GovernedArtifactRole[];
+
 function withRole<T>(role: GovernedArtifactRole, fn: () => T): T {
   return withExecutionContext(role, fn);
 }
