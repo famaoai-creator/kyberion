@@ -1,4 +1,4 @@
-import { loadWorkforceCapacityPolicy, type WorkforceLoadSnapshot } from '../workforce-load.js';
+import { loadWorkforceCapacityPolicy, type WorkforceLoadSnapshot } from './workforce-load.js';
 
 /**
  * TC-09: the single place that decides what being busy costs a candidate.

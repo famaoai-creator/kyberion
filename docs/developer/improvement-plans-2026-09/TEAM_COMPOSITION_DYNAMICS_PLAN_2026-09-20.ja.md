@@ -251,7 +251,7 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ### Wave 2 のテスト
 
-- `libs/core/workforce-load.test.ts`(新規 6 件): 未知リソースは available、実測 availability、governed レート、モデル無しは空、ペナルティ上限、**同条件なら空いているアクターが選ばれる**。
+- `libs/core/workforce/workforce-load.test.ts`(新規 6 件): 未知リソースは available、実測 availability、governed レート、モデル無しは空、ペナルティ上限、**同条件なら空いているアクターが選ばれる**。
 - `libs/core/mission/mission-team-composer.test.ts`: 増員の成功 / 職務分離 / 4 種の拒否理由 / 上限ヘッドルーム / refresh での増員メンバー残存、gap 診断 3 件。
 - `libs/core/mission/mission-lifecycle-service.test.ts`: `restaff` を governed verb ゲート表に追加。
 

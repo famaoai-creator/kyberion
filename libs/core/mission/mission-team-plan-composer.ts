@@ -12,7 +12,7 @@ import {
   type TeamProviderPreference,
 } from '../organization/team-role-assignment-selection.js';
 import { resolveTaskModelHint } from '../reasoning/reasoning-model-routing.js';
-import { collectWorkforceLoad } from '../workforce-load.js';
+import { collectWorkforceLoad } from '../workforce/workforce-load.js';
 import {
   matchTeamCompositionObligations,
   resolveAlwaysStaffedRoles,
