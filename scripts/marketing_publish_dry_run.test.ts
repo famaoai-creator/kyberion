@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
+  approvalEventLogicalPath,
+  approvalStoreRoots,
   buildPublicationEffectPayload,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -297,10 +299,10 @@ describe('marketing publication dry-run', () => {
       payloadHash,
       effectBinding: approval.shared_approval.effect_binding,
     });
-    const coordinationRoot = pathResolver.shared(`coordination/channels/${storageChannel}`);
-    const observabilityPath = pathResolver.shared(
-      `observability/channels/${storageChannel}/approvals.jsonl`
+    const coordinationRoot = pathResolver.rootResolve(
+      `${approvalStoreRoots().coordination}/${storageChannel}`
     );
+    const observabilityPath = pathResolver.rootResolve(approvalEventLogicalPath(storageChannel));
     try {
       const result = runMarketingPublishDryRun({
         approvalPath: input.approvalPath,
