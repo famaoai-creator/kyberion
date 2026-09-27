@@ -2066,6 +2066,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.resolve.generated",
+      "module": "scripts/resolve_generated.ts",
+      "command": "resolve generated",
+      "noun": "resolve",
+      "verb": "generated",
+      "audience": "dev"
+    },
+    {
       "id": "script.release.install-smoke",
       "module": "scripts/source_archive.ts",
       "args": ["--install-smoke"],

@@ -272,6 +272,47 @@ use its canonical generator, inspect the complete generated diff, run the
 matching focused test, and rerun the PR-scope check before pushing. Do not
 infer remote CI success from local checks or from a pending status.
 
+### 6.1 Generated files and merges
+
+Parallel PRs used to conflict on generated files every day. The rules that
+keep them mergeable:
+
+- **Untracked when nothing needs the committed copy.**
+  `knowledge/_integrity-manifest.json` (a size inventory with no runtime or
+  tamper-check consumer) is gitignored and rebuilt by `pnpm build`
+  (`generate_knowledge_index --manifest-only`, which never rewrites the
+  tracked `_index.md`, so a build cannot hide a stale index from the gate).
+- **Fragments instead of a shared file.** PRs never edit `CHANGELOG.md`; they
+  add `changelog.d/<short-slug>.md` (`category:` front-matter + list items,
+  validated by the `changelog-fragments` PR gate). The release runs
+  `pnpm kyberion changelog assemble` to fold them into `[Unreleased]`.
+- **Regenerate, don't hand-merge, the files that stay tracked.**
+  `knowledge/_index.md`, `docs/developer/CONFIGURATION.md`,
+  `docs/developer/env.example` and
+  `docs/developer/role-assumption-reachability.json` carry
+  `merge=kyberion-regenerate` in `.gitattributes`. `pnpm install` registers
+  that driver in the repo-local git config (`scripts/install_git_merge_driver.mjs`;
+  no-op in CI and outside a git checkout; one config shared by all linked
+  worktrees). The driver keeps a clean text merge, or else our side — never
+  conflict markers. `env-registry.json` (curated descriptions) is merged
+  entry-by-entry by name instead, and only a real conflict — the same entry
+  changed on both sides — stops the merge.
+- **After any merge or rebase that touched them, run
+  `pnpm kyberion resolve generated`** (env registry → knowledge index →
+  role-assumption reachability, then fragment validation; stages the results;
+  `--check` is read-only, `--no-stage` skips `git add`). The `post-merge`
+  hook reminds you when both sides changed a generated file.
+- **Limits.** GitHub's conflict detection and web editor ignore custom
+  drivers, so a PR can still show "conflicts" there: merge `main` locally,
+  run `resolve generated`, push. Rebases use the driver but run no
+  `post-merge` hook. The driver makes merges succeed; only regeneration makes
+  them correct, and the freshness gates (`env-registry`,
+  `role-assumption-reachability`, `catalogs`) are what enforce it.
+- **Adding a tracked generated file**: give it a `.gitattributes`
+  `merge=kyberion-regenerate` line AND a step in
+  `scripts/resolve_generated.ts` — `scripts/resolve_generated.test.ts` fails
+  when the two lists differ.
+
 ## 7. Design principles adopted from qm (QM adoption plan §3)
 
 Patterns proven in yc-software/qm and adopted as repo-wide discipline

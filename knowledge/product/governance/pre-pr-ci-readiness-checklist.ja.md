@@ -100,6 +100,12 @@ pnpm check -- --scope pr
 `knowledge/_index.md` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
 `knowledge/_integrity-manifest.json` は gitignore 済みのローカル生成物（`pnpm build` が再生成）なので commit しない。
 
+`main` を取り込んだ（merge / rebase）あとは `pnpm kyberion resolve generated` を実行する。
+env registry → knowledge index → role-assumption reachability を順に再生成して stage し、changelog fragment を検証する。
+生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
+GitHub の web 画面は repo-local merge driver を使わないので、衝突表示が出たらローカルで `main` を merge してから実行する
+（詳細は [kyberion-development-practices §6.1](./kyberion-development-practices.md#61-generated-files-and-merges)）。
+
 完了条件:
 
 - [ ] `git status --short --branch` と差分一覧で、別作業・秘密情報・生成済み `dist/`・不要な runtime state が混ざっていない。
