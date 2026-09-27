@@ -26,6 +26,13 @@ const policy = readJson<Policy>(
   pathResolver.rootResolve('knowledge/product/governance/role-assumption-policy.json')
 );
 
+/**
+ * System roles whose grants RN-03 narrowed on the report's evidence. Their
+ * narrowing is only sound while the analysis can prove unreachability, so a
+ * new any-role site or an inheriting child process must force a re-review.
+ */
+const NARROWED_SYSTEM_ROLES = ['oauth_callback_surface', 'surface_runtime'];
+
 function allowedFor(systemRole: string): Set<string> {
   return new Set([
     systemRole,
@@ -64,6 +71,18 @@ describe('RN-03 role assumption policy covers the reachability report', () => {
     expect(launched.length).toBeGreaterThan(0);
     for (const systemRole of launched) {
       expect(Object.keys(report.system_roles)).toContain(systemRole);
+    }
+  });
+
+  it('keeps every narrowed system role fully resolved (S2)', () => {
+    for (const systemRole of NARROWED_SYSTEM_ROLES) {
+      const entry = report.system_roles[systemRole];
+      expect(entry, systemRole).toBeDefined();
+      expect(entry.unresolved_sites, `${systemRole}: any-role sites need a re-review`).toEqual([]);
+      expect(
+        entry.child_process_entries,
+        `${systemRole}: children inheriting SYSTEM_ROLE need a re-review`
+      ).toEqual([]);
     }
   });
 
