@@ -31,25 +31,30 @@ that parks one action picks up other work and resumes when the approval-store re
 
 ## 2. The decision card
 
-Stored on the approval record (`decisionCard`) and rendered identically on every surface, in a
-fixed order so the operator learns where to look:
+One stored type (`DecisionCard` in `libs/core/decision-card.ts`, validated on create: text
+limits, evidence only as `https://` URLs or repository-relative paths) on the approval record
+(`decisionCard`). `libs/core/approval-decision-card.ts` renders it identically on every surface,
+in a fixed order so the operator learns where to look:
 
 1. level badge (🔴 decide / 🟡 veto / 🔵 fyi / ⚪ none) and a trial-mode marker for shadow actions
 2. **what to decide** — one sentence
-3. **recommendation** — approve / reject / revise, with the reason
+3. **recommendation** — what the agent recommends, and why
 4. **why a human** — the gate escalations in plain words (high-risk paths, never-auto class, maxed axis, budget, agent request)
 5. **can it be undone**
 6. **if you do nothing** — "stays paused until you decide", "proceeds at 14:00 unless you object", or "trial mode: nothing runs"
 7. evidence links, then the reply vocabulary
 
-Replies (any chat surface; `appr:<id>:…` tokens, or a bare word when exactly one card is pending in the chat):
+Telegram and Slack show four buttons (approve / request changes / reject / ask why; on a veto
+card they read "proceed now" and "object"). Card text is sent without markup, so agent-written
+reasons cannot add links. Every chat surface also accepts text replies — `appr:<id>:…` tokens,
+or a bare word when exactly one card is pending in the chat:
 
-| Reply                             | Effect                                                         |
-| --------------------------------- | -------------------------------------------------------------- |
-| `approve` / `承認`                | approve (on a veto card: proceed now)                          |
-| `reject` / `却下` / `異議`        | reject (on a veto card: object and stop)                       |
-| `appr:<id>:revise <instructions>` | settles as rejected with note `revise: …`; the agent redoes it |
-| `appr:<id>:explain`               | answers why the card reached you; decides nothing              |
+| Reply                              | Effect                                                                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approve` / `承認`                 | approve (on a veto card: proceed now)                                                                                                                               |
+| `reject` / `却下` / `異議`         | reject (on a veto card: object and stop)                                                                                                                            |
+| `appr:<id>:changes <instructions>` | settles as rejected with `changeRequest` (1–2000 chars); the agent redoes it. `revise` is an alias. Without text, Telegram asks for a reply and Slack opens a modal |
+| `appr:<id>:explain`                | answers why the card reached you; decides nothing                                                                                                                   |
 
 Autonomy cards are top-level notifications, so a reply is accepted only from the surface and chat
 the card was delivered to (`decisionCard.deliveredVia`). The bridges still authorize the sender.
@@ -75,9 +80,9 @@ const routed = routeAutonomousDecision({
   role: 'mission_controller',
   gate,
   title: 'Merge PR 42',
-  ask: 'Merge PR 42 (refactor, CI green) into main?',
-  recommendation: { choice: 'approve', rationale: 'CI green, cross-provider review passed' },
-  evidence: [prUrl],
+  question: 'Merge PR 42 (refactor, CI green) into main?',
+  recommendation: 'Approve: CI green, cross-provider review passed',
+  evidence: [{ label: 'PR', ref: prUrl }],
   requestedBy: agentId,
   source: { missionId, taskId },
 });
@@ -88,7 +93,7 @@ else if (routed.parked) parkAndContinue(routed.requestId);
 - `blocking: false` for questions that can wait: the card goes to the digest instead of the phone.
 - Ask a stricter tier with the gate's `requestedDecision`; there is no way to ask for a looser one.
 - Before raising a `decide`, try another agent and `knowledge/` first (plan D, "相談の自己解決").
-- A `revise` decision is a new instruction, not a retry signal: read the note and change the approach.
+- A change request is a new instruction, not a retry signal: read `changeRequest.instruction` and change the approach.
 
 ## 5. Operations
 
