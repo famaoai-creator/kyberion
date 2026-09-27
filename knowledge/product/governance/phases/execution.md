@@ -137,6 +137,48 @@ Other traps seen on this path:
   `$MC verify …`) is not word-split and silently does nothing — use an array or the full
   command.
 
+### When `finish` blocks: `mission triage` + approval-mediated close
+
+A mission that cannot reach `finish` is diagnosed — not poked at by hand — with:
+
+```
+pnpm mission triage <MISSION_ID>            # read-only: classification + recommended commands
+pnpm mission triage <MISSION_ID> --json     # machine-readable report for agents
+```
+
+The intent-drift gate is the common blocker: the mission's origin intent no longer matches
+what was actually delivered, so `verify`/`finish` refuse to close it. `scope-approve`
+rewrites the origin baseline, and the **direct** path deliberately requires SUDO — the
+worker that drifted must not rebaseline its own contract. Instead of escalating env vars,
+drive the approval-mediated path:
+
+```
+pnpm mission triage <ID> --request-approval --goal "<as-delivered goal>" --reason "<why the delivered scope is correct>"
+#   → files a `mission_gate` approval request on the `mission-scope` channel whose
+#     details show the human exactly what changes: current origin goal → proposed
+#     goal / success condition, the reason, the drift verdict, and the effect.
+
+# human (no PERSONA/SUDO env needed):
+pnpm kyberion approvals                              # reads the full proposal inline
+pnpm kyberion approvals --approve <request-id>       # or --deny <id> --note "..."
+
+# worker (approval substitutes for SUDO; bound by hash to the exact goal/reason):
+pnpm mission scope-approve <ID> --approval-request-id <request-id> --goal "<same goal>" --reason "<same reason>"
+pnpm mission verify <ID> verified "<note>" && pnpm mission distill <ID> && pnpm mission finish <ID>
+```
+
+Changing the goal/reason between request and apply is rejected by the payload-hash
+binding — the approval is for exactly the text the human read. When the mission should
+die instead, triage recommends `cancel` → `archive --mission <ID> --execute` (no approval
+required; cancel is an unguarded operator action).
+
+**Ordering rule**: never delete the worktree before the mission reaches a terminal
+status. The mission ledger is a gitignored micro-repo under `active/missions/<tier>/` of
+whichever checkout ran `mission_controller` — deleting that checkout deletes the ledger
+and the evidence with it. Run mission commands from the main checkout.
+
+→ Full maintenance flow: [mission-triage-playbook](../../orchestration/mission-triage-playbook.md)
+
 ---
 
 _Status: Mandated by AGENTS.md_
