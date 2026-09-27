@@ -487,9 +487,15 @@
     },
     {
       "file": "scripts/cli-draw.ts",
-      "count": 2,
+      "count": 1,
       "classification": "legit-tmp",
-      "note": "`kyberion draw` host hand-off marker (target + prompt + requested_at) consumed by the rerun that collects the image, and the tmp-root check that limits which provider byproducts are removed"
+      "note": "`kyberion draw` tmp-root check that limits which provider byproducts are removed"
+    },
+    {
+      "file": "libs/core/host-image-handoff.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "per-target host image hand-off request marker (target + prompt + requested_at), consumed by the rerun that collects the host's image; an expired marker just means the image is requested again"
     },
     {
       "file": "scripts/lib/perception.ts",
