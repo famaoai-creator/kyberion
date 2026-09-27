@@ -1183,6 +1183,9 @@ export class AdaptivePolicyRouter {
     provider: ImageGenerationProvider,
     options: { ignoreConsent?: boolean } = {}
   ): string | null {
+    if (request.allowedProviders && !request.allowedProviders.includes(provider.id)) {
+      return 'not in the request allowlist (allowed_providers)';
+    }
     return (
       this.modeViolation(request, provider) ?? referenceImageViolation(request, provider, options)
     );

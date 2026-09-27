@@ -486,6 +486,12 @@
       "note": "legacy local-pad root scan and safety boundary; reads shared tmp handoffs until migration cutover"
     },
     {
+      "file": "scripts/cli-draw.ts",
+      "count": 2,
+      "classification": "legit-tmp",
+      "note": "`kyberion draw` host hand-off marker (target + prompt + requested_at) consumed by the rerun that collects the image, and the tmp-root check that limits which provider byproducts are removed"
+    },
+    {
       "file": "scripts/lib/perception.ts",
       "count": 1,
       "classification": "legit-tmp",

@@ -536,6 +536,39 @@ describe('media-generation-actuator', () => {
     expect(mocks.generateImage.mock.lastCall?.[0]).not.toHaveProperty('purpose');
   });
 
+  it('forwards reference_images to the image bridge instead of dropping them', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'local_diffusion',
+      promptId: 'bridge-ref-1',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      action: 'generate_image',
+      params: {
+        prompt: 'same character, smiling',
+        reference_images: [
+          'active/shared/tmp/ref/face.jpg',
+          { path: 'active/shared/tmp/ref/look.webp', role: 'style' },
+          { path: 'active/shared/tmp/ref/prev.png', role: 'consistency', mime_type: 'image/png' },
+        ],
+        await_completion: false,
+      },
+    });
+    expect(mocks.generateImage.mock.lastCall?.[0].referenceImages).toEqual([
+      { path: 'active/shared/tmp/ref/face.jpg', mimeType: 'image/jpeg', role: 'subject' },
+      { path: 'active/shared/tmp/ref/look.webp', mimeType: 'image/webp', role: 'style' },
+      { path: 'active/shared/tmp/ref/prev.png', mimeType: 'image/png', role: 'consistency' },
+    ]);
+
+    await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'plain', await_completion: false },
+    });
+    expect(mocks.generateImage.mock.lastCall?.[0]).not.toHaveProperty('referenceImages');
+  });
+
   it('reports the provider the image bridge actually used, not the requested default', async () => {
     mocks.generateImage.mockResolvedValue({
       status: 'submitted',
