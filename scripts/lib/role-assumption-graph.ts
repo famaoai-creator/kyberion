@@ -6,13 +6,30 @@
  * may inherit SYSTEM_ROLE.
  */
 import * as ts from 'typescript';
-import { REVIEWED_CHILD_PROCESSES, REVIEWED_DYNAMIC_IMPORTS } from './role-assumption-reviews.js';
+import * as path from 'node:path';
+import {
+  REVIEWED_CHILD_PROCESSES,
+  REVIEWED_DYNAMIC_IMPORTS,
+  REVIEWED_UNANALYSED_MODULES,
+} from './role-assumption-reviews.js';
 import {
   expandModuleGlobs,
   isProjectSource,
   sourceForScriptReference,
+  type ModuleResolver,
   type Workspace,
 } from './role-assumption-workspace.js';
+
+/** Specifiers that name Kyberion code (relative, `@/`, workspace scopes). */
+const INTERNAL_SPECIFIER = /^(?:\.{1,2}\/|\/|@\/|@agent\/|@actuator\/)/;
+/** Extensions of code the analysis must see; assets (.json, .css, ...) are not code. */
+const CODE_EXTENSION = /\.(?:[cm]?[jt]sx?)$/;
+
+function isInternalCodeSpecifier(specifier: string): boolean {
+  if (!INTERNAL_SPECIFIER.test(specifier)) return false;
+  const last = specifier.split('/').pop() ?? '';
+  return !last.includes('.') || CODE_EXTENSION.test(last);
+}
 
 const ASSUMPTION_FUNCTIONS = new Set(['withExecutionContext', 'withExecutionContextAsync']);
 const AUTHORITY_FILE = 'libs/core/authority.ts';
@@ -379,7 +396,8 @@ export class Analyzer {
   constructor(
     private readonly ws: Workspace,
     readonly program: ts.Program,
-    private readonly packageScripts: Record<string, string>
+    private readonly packageScripts: Record<string, string>,
+    private readonly resolveModule: ModuleResolver
   ) {
     this.checker = program.getTypeChecker();
     this.projectFiles = program
@@ -443,6 +461,107 @@ export class Analyzer {
     return declaration && ts.isSourceFile(declaration) ? declaration : undefined;
   }
 
+  /**
+   * The program source a literal specifier loads. An internal code specifier
+   * that resolves to nothing the program holds is recorded as an any-role
+   * edge on `unit` rather than silently dropped.
+   */
+  private loadSpecifier(
+    unit: Unit,
+    specifier: ts.StringLiteralLike,
+    viaChecker: boolean
+  ): ts.SourceFile | undefined {
+    const fromChecker = viaChecker ? this.moduleSourceFile(specifier) : undefined;
+    if (fromChecker) return fromChecker;
+    const text = specifier.text;
+    if (!isInternalCodeSpecifier(text)) return undefined;
+    const fromFile = specifier.getSourceFile().fileName;
+    const resolved = this.resolveModule(text, fromFile);
+    const target = resolved ? this.program.getSourceFile(resolved) : undefined;
+    if (!target && !this.isReviewedUnanalysedModule(text, fromFile)) {
+      this.addUnresolvedEdge(
+        unit,
+        `module specifier '${text}' does not resolve to an analysed source (${this.position(specifier)})`
+      );
+    }
+    return target;
+  }
+
+  private readonly reviewedUnanalysed = new Map<string, boolean>();
+
+  /** A relative load of a reviewed browser-only JS module that still passes its guard. */
+  private isReviewedUnanalysedModule(specifier: string, fromFile: string): boolean {
+    if (!specifier.startsWith('.')) return false;
+    const file = path.resolve(path.dirname(fromFile), specifier);
+    const cached = this.reviewedUnanalysed.get(file);
+    if (cached !== undefined) return cached;
+    const reviewed = new Set(
+      REVIEWED_UNANALYSED_MODULES.flatMap((entry) =>
+        expandModuleGlobs(this.ws, [entry.pattern]).filter((match) => /\.m?js$/.test(match))
+      )
+    );
+    let ok = reviewed.has(file);
+    if (ok) {
+      // Parse (comments and JSDoc type imports are not code) and check every load.
+      const source = ts.createSourceFile(
+        file,
+        this.ws.read(file),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.JS
+      );
+      const loadsReviewed = (spec: ts.Expression | undefined): boolean =>
+        !!spec &&
+        ts.isStringLiteralLike(spec) &&
+        spec.text.startsWith('./') &&
+        reviewed.has(path.resolve(path.dirname(file), spec.text));
+      const visit = (node: ts.Node): void => {
+        if (!ok) return;
+        if (
+          (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+          node.moduleSpecifier &&
+          !loadsReviewed(node.moduleSpecifier)
+        ) {
+          ok = false;
+        } else if (
+          ts.isCallExpression(node) &&
+          (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+            (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+          !loadsReviewed(node.arguments[0])
+        ) {
+          ok = false;
+        } else if (ts.isIdentifier(node) && ASSUMPTION_FUNCTIONS.has(node.text)) {
+          ok = false;
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    this.reviewedUnanalysed.set(file, ok);
+    return ok;
+  }
+
+  /** `require` itself, or an identifier bound to `createRequire(...)`. */
+  private isRequireCallee(expression: ts.Expression): boolean {
+    const callee = unwrapExpression(expression);
+    if (!ts.isIdentifier(callee)) return false;
+    if (callee.text === 'require') return true;
+    const symbol = this.resolveAlias(this.checker.getSymbolAtLocation(callee));
+    const declaration = symbol?.valueDeclaration;
+    if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) {
+      return false;
+    }
+    const init = unwrapExpression(declaration.initializer);
+    if (!ts.isCallExpression(init)) return false;
+    const factory = unwrapExpression(init.expression);
+    const name = ts.isPropertyAccessExpression(factory)
+      ? factory.name.text
+      : ts.isIdentifier(factory)
+        ? factory.text
+        : '';
+    return name === 'createRequire';
+  }
+
   /** Every declaration exported by `sourceFile` (following re-exports). */
   private exportedUnits(sourceFile: ts.SourceFile): Unit[] {
     const moduleSymbol = this.checker.getSymbolAtLocation(sourceFile);
@@ -498,8 +617,8 @@ export class Analyzer {
         (ts.isExportDeclaration(statement) && !statement.isTypeOnly && statement.moduleSpecifier)
       ) {
         const specifier = statement.moduleSpecifier;
-        if (!specifier) continue;
-        const target = this.moduleSourceFile(specifier);
+        if (!specifier || !ts.isStringLiteralLike(specifier)) continue;
+        const target = this.loadSpecifier(moduleUnit, specifier, true);
         if (target) this.addEdge(moduleUnit, this.units.moduleUnit(target));
       }
     }
@@ -530,7 +649,7 @@ export class Analyzer {
     if (call.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const [argument] = call.arguments;
       if (argument && ts.isStringLiteralLike(argument)) {
-        const target = this.moduleSourceFile(argument);
+        const target = this.loadSpecifier(unit, argument, true);
         if (target) for (const exported of this.exportedUnits(target)) this.addEdge(unit, exported);
         return;
       }
@@ -557,10 +676,11 @@ export class Analyzer {
       }
       return;
     }
-    if (ts.isIdentifier(call.expression) && call.expression.text === 'require') {
+    if (this.isRequireCallee(call.expression)) {
       const [argument] = call.arguments;
       if (argument && ts.isStringLiteralLike(argument)) {
-        const target = this.moduleSourceFile(argument);
+        // The checker does not bind require() in ESM sources: resolve it here.
+        const target = this.loadSpecifier(unit, argument, false);
         if (target) for (const exported of this.exportedUnits(target)) this.addEdge(unit, exported);
       } else {
         this.addUnresolvedEdge(unit, `require with a computed specifier at ${this.position(call)}`);
