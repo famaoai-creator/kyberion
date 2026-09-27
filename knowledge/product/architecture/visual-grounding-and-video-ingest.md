@@ -177,7 +177,12 @@ site's terms of service.
   ComboBox, CheckBox, RadioButton, Hyperlink → `AXLink`, MenuItem, TabItem →
   `AXTab`, ListItem / DataItem / TreeItem → `AXCell`, Slider, Spinner →
   `AXIncrementor`); a password field (`IsPassword`) is editable and never
-  labelled; offscreen elements are skipped. Availability is a cached,
+  labelled; a Win32 / WinForms element that UIA reports only as Pane / Custom
+  (Win32 client-side proxies inactive, as on GitHub's Windows Server 2025
+  runners) is mapped by its window class (Edit / RichEdit → editable
+  `AXTextArea`, Button, ComboBox(Ex32), trackbar → `AXSlider`, up-down →
+  `AXIncrementor`, SysLink, SysTabControl32, and `WindowsForms10.<CLASS>.*`
+  by the same table; list / tree views and status bars stay unmarked); offscreen elements are skipped. Availability is a cached,
   non-prompting probe that powershell.exe loads UI Automation (UIA needs no
   permission).
 - **Windows DPI**: `BoundingRectangle` is in physical pixels under per-monitor
@@ -189,8 +194,9 @@ site's terms of service.
   for a DPI-virtualised (logical-size) capture. Secondary monitors (non-zero
   origin, possibly negative) keep the rule above: pass an explicit `scale`,
   in screenshot pixels per physical pixel. The Windows path is exercised live
-  on the `windows-latest` CI job (`KYBERION_UIA_LIVE_SMOKE=1`: Notepad is
-  launched, focused, captured and enumerated).
+  on the `windows-latest` CI job (`KYBERION_UIA_LIVE_SMOKE=1`: classic
+  Notepad must yield an unlabelled editable editor, and a WPF window must yield
+  a labelled Button, a CheckBox and an unlabelled editable TextBox).
 - Marks are stored in the session's volatile dir for 60 s, together with the
   image dHash. `system-actuator` (`target_mark`, used only when no coordinate
   is given) and `browser-actuator` (`click_ref: "mark:<n>"`) resolve
