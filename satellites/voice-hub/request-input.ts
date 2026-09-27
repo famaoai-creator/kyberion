@@ -1,5 +1,6 @@
 import { parseEventScopeInput, type EventScopeInput } from '@agent/core/event-scope';
 import { isRecord } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 export type VoiceHubRequestBody = Record<string, unknown>;
 
@@ -45,4 +46,13 @@ export function parseVoiceTranscriptionResponse(
 ): VoiceTranscriptionResponse | undefined {
   if (!isRecord(value) || typeof value.text !== 'string') return undefined;
   return { text: value.text };
+}
+
+/** Resolve a repository-relative path that must already exist as a regular file. */
+export function resolveRegularRepositoryFile(filePath: string, label: string): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return safePath;
 }

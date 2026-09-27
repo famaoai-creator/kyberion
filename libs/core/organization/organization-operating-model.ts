@@ -675,9 +675,18 @@ interface OrganizationEntityQuery {
   rootDir?: string;
 }
 
+type RetirableOrganizationEntity = {
+  status?: string;
+  updated_at?: string;
+  tenant_slug?: string;
+  metadata?: Record<string, unknown>;
+  capability_ids?: string[];
+  service_ids?: string[];
+};
+
 interface OrganizationEntityKindHandler {
   load(recordId: string, query: OrganizationEntityQuery): unknown;
-  save(record: any, options: { rootDir?: string }): unknown;
+  save(record: RetirableOrganizationEntity, options: { rootDir?: string }): unknown;
   fileName: string;
   directory: OrganizationRecordKind;
   /** Throw to veto the lifecycle verb while blocking relations remain. */
@@ -695,7 +704,7 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
 > = {
   domain: {
     load: (recordId, query) => loadOrganizationDomain(recordId, query),
-    save: (record, options) => saveOrganizationDomain(record, options),
+    save: (record, options) => saveOrganizationDomain(record as OrganizationDomainRecord, options),
     fileName: 'domain.json',
     directory: 'domains',
     assertNoBlockingRelations(record, _catalog, recordId, verb) {
@@ -706,7 +715,8 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
   },
   capability: {
     load: (recordId, query) => loadOrganizationCapability(recordId, query),
-    save: (record, options) => saveOrganizationCapability(record, options),
+    save: (record, options) =>
+      saveOrganizationCapability(record as OrganizationCapabilityRecord, options),
     fileName: 'capability.json',
     directory: 'capabilities',
     assertNoBlockingRelations(record, _catalog, recordId, verb) {
@@ -717,7 +727,8 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
   },
   service: {
     load: (recordId, query) => loadOrganizationService(recordId, query),
-    save: (record, options) => saveOrganizationService(record, options),
+    save: (record, options) =>
+      saveOrganizationService(record as OrganizationServiceRecord, options),
     fileName: 'service.json',
     directory: 'services',
     assertNoBlockingRelations(_record, catalog, recordId, verb) {
@@ -728,14 +739,16 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
   },
   operation: {
     load: (recordId, query) => loadOrganizationOperation(recordId, query),
-    save: (record, options) => saveOrganizationOperation(record, options),
+    save: (record, options) =>
+      saveOrganizationOperation(record as OrganizationOperationRecord, options),
     fileName: 'operation.json',
     directory: 'operations',
   },
   cadence: {
     load: (recordId, query) =>
       listOrganizationCadences(query).find((entry) => entry.cadence_id === recordId) ?? null,
-    save: (record, options) => saveOrganizationCadence(record, options),
+    save: (record, options) =>
+      saveOrganizationCadence(record as OrganizationCadenceRecord, options),
     fileName: 'cadence.json',
     directory: 'cadences',
   },
@@ -757,7 +770,7 @@ export function retireOrganizationEntity(input: {
     rootDir: input.rootDir,
   };
   const handler = ORGANIZATION_ENTITY_KIND_HANDLERS[input.kind];
-  const record: any = handler.load(input.recordId, query);
+  const record = handler.load(input.recordId, query) as RetirableOrganizationEntity | undefined;
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
   const catalog = loadOrganizationCatalog(query);
   handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'retire');
@@ -802,7 +815,7 @@ export function removeOrganizationEntity(input: {
     rootDir: input.rootDir,
   };
   const handler = ORGANIZATION_ENTITY_KIND_HANDLERS[input.kind];
-  const record: any = handler.load(input.recordId, query);
+  const record = handler.load(input.recordId, query) as RetirableOrganizationEntity | undefined;
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
 
   const catalog = loadOrganizationCatalog(query);

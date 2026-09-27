@@ -4,7 +4,7 @@
     {
       "mode": "opencode-cli",
       "provider": "opencode",
-      "module": "./reasoning-cli-provider",
+      "module": "./reasoning/reasoning-cli-provider",
       "capabilities": {
         "reasoning": true,
         "structured_output": true,

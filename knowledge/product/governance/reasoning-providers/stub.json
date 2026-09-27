@@ -4,7 +4,7 @@
     {
       "mode": "stub",
       "provider": "stub",
-      "module": "./reasoning-backend",
+      "module": "./reasoning/reasoning-backend",
       "capabilities": {
         "reasoning": true,
         "structured_output": true,
