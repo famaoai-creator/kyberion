@@ -34,6 +34,7 @@
  * reachable role is missing from role-assumption-policy.json.
  */
 import * as path from 'node:path';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
@@ -383,11 +384,17 @@ export const main = defineGenerator({
   id: 'role-assumption-reachability',
   outputs: [REACHABILITY_REPORT_PATH],
   normalize: normalizeReachabilityReport,
-  render() {
+  async render() {
+    // Emit the committed (prettier) layout so a regeneration after a merge
+    // (`pnpm kyberion resolve generated`) does not rewrite every line.
+    const config = (await resolvePrettierConfig(REACHABILITY_REPORT_PATH)) ?? {};
     return [
       {
         path: REACHABILITY_REPORT_PATH,
-        content: renderReachabilityReport(buildReachabilityReport()),
+        content: await prettierFormat(renderReachabilityReport(buildReachabilityReport()), {
+          ...config,
+          parser: 'json',
+        }),
       },
     ];
   },

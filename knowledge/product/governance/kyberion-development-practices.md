@@ -240,8 +240,8 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
      you will stage;
   2. for any `knowledge/` edit, run `pnpm generate:knowledge-index` (it also
      picks up other agents' uncommitted knowledge edits — check the diff);
-  3. stage explicit paths plus `knowledge/_index.md` and
-     `knowledge/_integrity-manifest.json`, and confirm no newly added
+  3. stage explicit paths plus `knowledge/_index.md` (the size manifest
+     `knowledge/_integrity-manifest.json` is gitignored), and confirm no newly added
      `.js`/`.d.ts` shadows a `.ts` source (the `.husky/pre-commit` check);
   4. only then `git -c core.hooksPath=/dev/null commit`.
 - Set up every new worktree from scratch (install with
@@ -271,6 +271,58 @@ scanned file or stale generated index. When a gate reports baseline drift,
 use its canonical generator, inspect the complete generated diff, run the
 matching focused test, and rerun the PR-scope check before pushing. Do not
 infer remote CI success from local checks or from a pending status.
+
+### 6.1 Generated files and merges
+
+Parallel PRs used to conflict on generated files every day. The rules that
+keep them mergeable:
+
+- **Untracked when nothing needs the committed copy.**
+  `knowledge/_integrity-manifest.json` (a size inventory with no runtime or
+  tamper-check consumer) is gitignored and rebuilt by `pnpm build`
+  (`generate_knowledge_index --manifest-only`, which never rewrites the
+  tracked `_index.md`, so a build cannot hide a stale index from the gate).
+- **Fragments instead of a shared file.** PRs never edit `CHANGELOG.md`; they
+  add `changelog.d/<short-slug>.md` (`category:` front-matter + list items,
+  validated by the `changelog-fragments` PR gate). The release runs
+  `pnpm kyberion changelog assemble` to fold them into `[Unreleased]`.
+- **Regenerate, don't hand-merge, the files that stay tracked.**
+  `knowledge/_index.md`, `docs/developer/CONFIGURATION.md`,
+  `docs/developer/env.example` and
+  `docs/developer/role-assumption-reachability.json` (plus the curated
+  `env-registry.json`) carry `merge=kyberion-regenerate` in `.gitattributes`.
+- **After any merge or rebase that touched them, run
+  `pnpm kyberion resolve generated`.** It works without any merge driver:
+  unmerged generated files are first rebuilt from their index conflict stages
+  (`:1:` base, `:2:` ours, `:3:` theirs) — derived files by text merge else
+  our side, `env-registry.json` entry-by-entry by name — then it regenerates
+  env registry → knowledge index → role-assumption reachability, validates the
+  changelog fragments and stages the results (`--check` is read-only,
+  `--no-stage` skips `git add`). Only an `env-registry.json` entry changed
+  differently on both sides needs a human: edit its markers keeping both
+  descriptions' intent, then rerun. The `post-merge` hook reminds you when
+  both sides of a completed merge changed a generated file.
+- **Optional merge driver — a one-time repository-owner step, never
+  automatic.** Repo config belongs to the mission owner (AGENTS.md §1) and
+  the repo-local config is shared by every linked worktree and agent CLI, so
+  `pnpm install` does not touch it. The owner may run
+  `pnpm kyberion resolve install-driver` (`--uninstall` reverts; it prints the
+  exact `git config --local merge.kyberion-regenerate.*` keys it sets and is
+  a no-op in CI, outside a git checkout and in a nested checkout). With it,
+  `git merge` never stops on these files: derived files keep a clean text
+  merge or our side, `env-registry.json` is merged by name. Without it, git's
+  normal text merge leaves conflict markers and `resolve generated` repairs
+  them; `resolve generated` prints a one-line hint while it is missing.
+- **Limits.** GitHub's conflict detection and web editor ignore custom
+  drivers, so a PR can still show "conflicts" there: merge `main` locally,
+  run `resolve generated`, push. Rebases use the driver (when installed) but
+  run no `post-merge` hook. Only regeneration makes a merge correct, and the
+  freshness gates (`env-registry`, `role-assumption-reachability`,
+  `catalogs`) are what enforce it.
+- **Adding a tracked generated file**: give it a `.gitattributes`
+  `merge=kyberion-regenerate` line AND a step in
+  `scripts/resolve_generated.ts` — `scripts/resolve_generated.test.ts` fails
+  when the two lists differ.
 
 ## 7. Design principles adopted from qm (QM adoption plan §3)
 

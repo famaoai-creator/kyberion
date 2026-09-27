@@ -66,7 +66,7 @@ N/A.
 - [ ] Mission / workitem references are included when applicable
 - [ ] Evidence paths or trace IDs are included when applicable
 - [ ] Tests added (or existing tests updated)
-- [ ] CHANGELOG.md updated under `[Unreleased]` (for user-visible changes)
+- [ ] User-visible change → added a `changelog.d/<short-slug>.md` fragment (do not edit `CHANGELOG.md`; see `changelog.d/README.md`)
 - [ ] PR title and commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Read [`docs/developer/EXTENSION_POINTS.md`](../docs/developer/EXTENSION_POINTS.md) if touching public surfaces
 
@@ -74,7 +74,8 @@ N/A.
 
 <!-- Contract tests compare directories against committed snapshots; changing one side without the other breaks tests/ for everyone. -->
 
-- [ ] `pnpm generate:knowledge-index && pnpm check -- --only catalogs` is green (index/manifest regenerated)
+- [ ] `pnpm generate:knowledge-index && pnpm check -- --only catalogs` is green (`knowledge/_index.md` regenerated)
+- [ ] Merged/rebased `main` → `pnpm kyberion resolve generated` run (generated files are regenerated, never hand-merged)
 - [ ] Actuator manifests changed → `pnpm kyberion sync component-inventory` run (CAPABILITIES_GUIDE / global_actuator_index)
 - [ ] `agent-profiles/` changed → `agent-profile-index.json` regenerated to match
 - [ ] `surfaces/*.json` changed → `active-surfaces.json` snapshot matches (aggregate of per-surface files)

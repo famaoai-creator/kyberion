@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-23
+last_updated: 2026-09-27
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -97,7 +97,17 @@ pnpm check -- --scope pr
 `pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）はデフォルトで手順 3 を実行する。緊急回避のみ `--skip-readiness`。エージェントは通常パスで skip しない。
 
 `knowledge/` 配下を 1 ファイルでも変更したら、commit 前に `pnpm generate:knowledge-index` を実行して
-`knowledge/_index.md` と `knowledge/_integrity-manifest.json` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
+`knowledge/_index.md` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
+`knowledge/_integrity-manifest.json` は gitignore 済みのローカル生成物（`pnpm build` が再生成）なので commit しない。
+
+`main` を取り込んだ（merge / rebase）あとは `pnpm kyberion resolve generated` を実行する。
+env registry → knowledge index → role-assumption reachability を順に再生成して stage し、changelog fragment を検証する。
+生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
+conflict marker が残っていても、このコマンドが index の conflict stage から組み直して再生成する（merge driver は不要）。
+`env-registry.json` で同じ entry が両側で別々に変更された場合だけ手で直してから再実行する。
+merge driver（`pnpm kyberion resolve install-driver`）は repository owner が一度だけ入れる任意設定で、`pnpm install` は git config を書かない。
+GitHub の web 画面は merge driver を使わないので、衝突表示が出たらローカルで `main` を merge してから実行する
+（詳細は [kyberion-development-practices §6.1](./kyberion-development-practices.md#61-generated-files-and-merges)）。
 
 完了条件:
 
@@ -127,7 +137,7 @@ pnpm check -- --scope pr
 | surface、Intent、TUI、voice                           | `pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke` と変更に対応する focused test。viewer / tenant / tier は client input を認可根拠にしない。                                                                                                                                          |
 | dependency、lockfile、install script                  | `pnpm install --frozen-lockfile`、`pnpm check -- --scope pr --only pinned-deps`、`pnpm check -- --scope pr --only install-script-allowlist`、`pnpm check -- --scope pr --only lockfile-commit-gate`。                                                                                                    |
 | Node／OS／native capability                           | Cross-OS Smoke の対象 gate と、必要なら `pnpm run build`／該当 suite を実行する。macOS／Windows 固有の結果を Linux の結果で代用しない。                                                                                                                                                                  |
-| user-visible behavior                                 | `CHANGELOG.md` の `[Unreleased]` と public terminology を更新し、`pnpm check -- --scope pr --only ux-contract-docs` を確認する。                                                                                                                                                                         |
+| user-visible behavior                                 | `changelog.d/<short-slug>.md` fragment を追加し（`CHANGELOG.md` は直接編集しない。形式は `changelog.d/README.md`）、public terminology を更新して `pnpm check -- --scope pr --only changelog-fragments` と `--only ux-contract-docs` を確認する。                                                        |
 | 大規模変更、release、CI failure repair                | `pnpm run validate` または `pnpm check -- --scope full` を実行し、全 test suite と未実行項目を PR 本文へ記録する。                                                                                                                                                                                       |
 
 ## よく落ちる gate（実測パターン）

@@ -1129,7 +1129,7 @@ export function runCatalogIntegrityCheck(print: (value: unknown) => void = () =>
   const indexUpToDate = generateIndex(true);
   if (!indexUpToDate) {
     violations.push(
-      'knowledge: _index.md or _integrity-manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+      'knowledge: _index.md is out of date (or knowledge frontmatter is invalid). Run pnpm generate:knowledge-index to update.'
     );
   }
 
