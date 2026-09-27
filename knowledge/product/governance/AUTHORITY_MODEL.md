@@ -185,6 +185,22 @@ Authority は原則としてミッションに紐づけて発行されます。A
 - `mission_controller sudo <MISSION_ID> ON`
 - この操作は system-ledger に永久に記録され、監査の対象となります。
 
+SUDO が必要な操作のうち `scope-approve` (origin intent のリベースライン) は、
+**approval-mediated 経路**を持ちます: worker が `scope-approve --request-approval`
+で hash-bound の `mission_gate` 承認リクエストを `mission-scope` チャネルに起票し、
+人間が `pnpm kyberion approvals --approve <id>` で承認すると、worker は
+`--approval-request-id` による適用で SUDO なしに完了できます
+(`libs/core/mission-scope-approval.ts` — `reconcile-work` と同じ PI-05 型)。
+承認は goal/reason/success-condition の payloadHash に束縛され、`approved_by` には
+承認した人間 decider が記録されます。これにより「権限を持たない worker が詰まる」
+状態を解消しつつ、分掌 (drift した worker が自ら rebaseline しない) を維持します。
+手順の詳細は [mission-triage-playbook](../orchestration/mission-triage-playbook.md) を参照。
+
+なお `pnpm kyberion approvals --approve` の human 認証は surface が申告する形
+(`decidedByType: 'human'`, `authMethod: 'manual'`) であり、人間が操作するターミナル
+であることが信頼境界です — PI-05 系 (reconcile-work, plugin install) と同一の前提です。
+より強い認証 (passkey/TOTP) の証跡化は将来の改善余地です。
+
 ---
 
 ## 6. 起動時の環境変数

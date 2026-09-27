@@ -188,8 +188,29 @@ export interface MissionControllerRoutingContext {
       reason?: string;
       goalSummary?: string;
       successCondition?: string;
+      approvalRequestId?: string;
     }
   ) => Awaitable<void>;
+  requestMissionScopeApproval: (
+    id: string,
+    options?: {
+      goalSummary?: string;
+      reason?: string;
+      successCondition?: string;
+      requestedBy?: string;
+    }
+  ) => Awaitable<unknown>;
+  triageMission: (
+    id: string,
+    options?: {
+      json?: boolean;
+      requestApproval?: boolean;
+      goal?: string;
+      reason?: string;
+      successCondition?: string;
+      requestedBy?: string;
+    }
+  ) => Awaitable<unknown>;
   delegateMission: (id: string, agentId: string, a2aMessageId: string) => Awaitable<void>;
   importMission: (id: string, remoteUrl: string) => Awaitable<void>;
   verifyMission: (id: string, result: 'verified' | 'rejected', note: string) => Awaitable<void>;
@@ -811,11 +832,33 @@ export async function runMissionControllerAction(
       }
       break;
     case 'scope-approve':
+      if (context.argv.includes('--request-approval')) {
+        // Positional order matches the apply half below (arg2=reason,
+        // arg3=goal, arg4=success-condition) so both sides bind identically.
+        await context.requestMissionScopeApproval(arg1!, {
+          reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
+          goalSummary: getValue('--goal', context.argv) || arg3 || '',
+          successCondition: getValue('--success-condition', context.argv) || arg4,
+          requestedBy: getValue('--requested-by', context.argv),
+        });
+        break;
+      }
       await context.approveScopeChange(arg1!, {
         approvedBy: getValue('--approved-by', context.argv) || getValue('--by', context.argv),
         reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
         goalSummary: getValue('--goal', context.argv) || arg3 || '',
         successCondition: getValue('--success-condition', context.argv) || arg4,
+        approvalRequestId: getValue('--approval-request-id', context.argv),
+      });
+      break;
+    case 'triage':
+      await context.triageMission(arg1!, {
+        json: context.argv.includes('--json'),
+        requestApproval: context.argv.includes('--request-approval'),
+        goal: getValue('--goal', context.argv),
+        reason: getValue('--reason', context.argv),
+        successCondition: getValue('--success-condition', context.argv),
+        requestedBy: getValue('--requested-by', context.argv),
       });
       break;
     case 'delegate':
