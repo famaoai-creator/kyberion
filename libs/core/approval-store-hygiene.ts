@@ -20,6 +20,8 @@ import { appendRetentionAudit, softDeleteToTrash } from './storage-janitor.js';
  *    transition (event logged), so nothing waits on a human forever;
  *  - records left behind by test runs (before approvalStoreRoots isolated
  *    them) move to `active/archive/.trash/` — restorable, never hard-deleted.
+ *    Only the request records move; their lines in the append-only
+ *    `approvals.jsonl` event logs stay as history.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -43,28 +45,38 @@ const SECRET_INTRODUCTION_TEST_REASONS = new Set([
   'pending apply',
 ]);
 
-export function isFixtureApproval(
-  record: Pick<ApprovalRequestRecord, 'storageChannel' | 'requestedBy'> &
-    Partial<Pick<ApprovalRequestRecord, 'kind' | 'target' | 'justification'>> & {
-      title?: string;
-      decidedBy?: string;
-    }
-): boolean {
+type FixtureCandidate = Pick<ApprovalRequestRecord, 'storageChannel' | 'requestedBy'> &
+  Partial<Pick<ApprovalRequestRecord, 'kind' | 'target' | 'justification'>> & {
+    title?: string;
+    decidedBy?: string;
+  };
+
+/** Name of the first fixture rule the record matches, or null for a real record. */
+export function fixtureApprovalRule(record: FixtureCandidate): string | null {
   const channel = record.storageChannel || '';
   const requester = record.requestedBy || '';
   const decider = record.decidedBy || '';
-  return (
-    FIXTURE_TOKEN.test(channel) ||
-    FIXTURE_CHANNEL_PREFIX.test(channel) ||
-    FIXTURE_TOKEN.test(requester) ||
-    FIXTURE_REQUESTER.test(requester) ||
-    FIXTURE_TOKEN.test(decider) ||
-    FIXTURE_DECIDER.test(decider) ||
-    (channel === 'plugin-install' && FIXTURE_PLUGIN_TITLE.test(record.title || '')) ||
-    (record.kind === 'secret_mutation' &&
-      record.target?.serviceId === 'gemini' &&
-      SECRET_INTRODUCTION_TEST_REASONS.has(record.justification?.reason || ''))
-  );
+  if (FIXTURE_TOKEN.test(channel)) return 'channel_token';
+  if (FIXTURE_CHANNEL_PREFIX.test(channel)) return 'channel_qm_prefix';
+  if (FIXTURE_TOKEN.test(requester)) return 'requester_token';
+  if (FIXTURE_REQUESTER.test(requester)) return 'requester_alice';
+  if (FIXTURE_TOKEN.test(decider)) return 'decider_token';
+  if (FIXTURE_DECIDER.test(decider)) return 'decider_u123';
+  if (channel === 'plugin-install' && FIXTURE_PLUGIN_TITLE.test(record.title || '')) {
+    return 'plugin_title';
+  }
+  if (
+    record.kind === 'secret_mutation' &&
+    record.target?.serviceId === 'gemini' &&
+    SECRET_INTRODUCTION_TEST_REASONS.has(record.justification?.reason || '')
+  ) {
+    return 'secret_introduction_test';
+  }
+  return null;
+}
+
+export function isFixtureApproval(record: FixtureCandidate): boolean {
+  return fixtureApprovalRule(record) !== null;
 }
 
 export type PendingExpiryReason = 'expires_at_passed' | 'stale_pending';
@@ -81,7 +93,9 @@ export interface ExpirablePendingApproval {
  * Pure selection of pending requests that should expire. Fixture records are
  * left to the fixture purge so the expiry event log only carries real work.
  * An unparseable `requestedAt` on a request with no expiry counts as stale:
- * closing it fails safe, leaving it open does not.
+ * closing it fails safe, leaving it open does not. Requests owned by a
+ * suspended pipeline are never stale-expired: the pipeline's own
+ * `timeout_at` / `on_timeout` decides what a lapse means for them.
  */
 export function findExpirablePendingApprovals(
   records: readonly ApprovalRequestRecord[],
@@ -95,7 +109,10 @@ export function findExpirablePendingApprovals(
     let reason: PendingExpiryReason | null = null;
     if (isApprovalRequestExpired(record, now)) {
       reason = 'expires_at_passed';
-    } else if (typeof record.expiresAt !== 'string' || record.expiresAt.trim() === '') {
+    } else if (
+      !record.requestedByContext?.pipelineRunId &&
+      (typeof record.expiresAt !== 'string' || record.expiresAt.trim() === '')
+    ) {
       const requestedAt = Date.parse(record.requestedAt);
       if (!Number.isFinite(requestedAt) || now - requestedAt > staleAfterMs) {
         reason = 'stale_pending';
@@ -158,16 +175,30 @@ export interface FixtureApprovalRecord {
   storageChannel: string;
   requestId: string;
   logicalPath: string;
+  title: string;
+  requestedBy: string;
+  status: ApprovalRequestRecord['status'];
+  rule: string;
 }
 
 export function findFixtureApprovals(
   records: readonly ApprovalRequestRecord[]
 ): FixtureApprovalRecord[] {
-  return records.filter(isFixtureApproval).map((record) => ({
-    storageChannel: record.storageChannel,
-    requestId: record.id,
-    logicalPath: approvalRequestLogicalPath(record.storageChannel, record.id),
-  }));
+  const selected: FixtureApprovalRecord[] = [];
+  for (const record of records) {
+    const rule = fixtureApprovalRule(record);
+    if (!rule) continue;
+    selected.push({
+      storageChannel: record.storageChannel,
+      requestId: record.id,
+      logicalPath: approvalRequestLogicalPath(record.storageChannel, record.id),
+      title: record.title,
+      requestedBy: record.requestedBy,
+      status: record.status,
+      rule,
+    });
+  }
+  return selected;
 }
 
 /**
@@ -198,6 +229,7 @@ export function purgeFixtureApprovals(options: {
         event: 'APPROVAL_FIXTURE_TRASHED',
         path: candidate.logicalPath,
         trash_path: trashPath,
+        fixture_rule: candidate.rule,
         reason: 'test-fixture approval record in the live approval store',
       });
     } catch (err) {

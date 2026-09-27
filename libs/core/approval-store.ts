@@ -608,6 +608,16 @@ export function expireApprovalRequest(
     thread_ts: updated.threadTs,
     ...(params.reason ? { reason: params.reason } : {}),
   });
+  projectApprovalWorkerEvent(
+    'approval_response',
+    {
+      request_id: updated.id,
+      correlation_id: updated.correlationId,
+      status: 'expired',
+      channel: updated.channel,
+    },
+    approvalWorkerEventSource(updated)
+  );
   return updated;
 }
 
@@ -851,6 +861,9 @@ export function decideApprovalRequest(
     throw new Error(
       `[POLICY_VIOLATION] Approval request was cancelled and cannot be decided: ${record.id}`
     );
+  }
+  if (record.status === 'expired') {
+    throw new Error(`[POLICY_VIOLATION] Approval request has expired: ${record.id}`);
   }
 
   // MO-11 S-4: a settled decision is audit evidence and must not be silently
