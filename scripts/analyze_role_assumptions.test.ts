@@ -191,4 +191,23 @@ describe('RN-02 role assumption reachability analysis', () => {
       normalizeReachabilityReport('{"a":[\n1,\n2\n]}')
     );
   });
+
+  it('ignores example paths but not roles in the staleness comparison (S7)', () => {
+    const report = (path: string[], roles: string[]) =>
+      JSON.stringify({
+        system_roles: {
+          x: {
+            reachable_roles: Object.fromEntries(
+              roles.map((role) => [role, { example_path: path }])
+            ),
+          },
+        },
+      });
+    expect(normalizeReachabilityReport(report(['a#f', 'b#g'], ['r1']))).toBe(
+      normalizeReachabilityReport(report(['c#h'], ['r1']))
+    );
+    expect(normalizeReachabilityReport(report(['a#f'], ['r1']))).not.toBe(
+      normalizeReachabilityReport(report(['a#f'], ['r1', 'r2']))
+    );
+  });
 });
