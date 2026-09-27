@@ -359,6 +359,7 @@
 - [Capability Bundle Progressive Disclosure](./product/orchestration/capability-bundle-progressive-disclosure.md) (public | Ecosystem Architect)
 - [Capability Verb Inventory (which capabilities have one verb, which do not)](./product/orchestration/capability-verb-inventory.md) (public | Ecosystem Architect)
 - [Code Documentation And Video Production Playbook](./product/orchestration/code-documentation-production-playbook.md) (public | Unknown)
+- [Codex CLI Multi-Account Profile Operations](./product/orchestration/codex-multi-account-operations.md) (public | Unknown)
 - [Context Precedence Protocol](./product/orchestration/context-precedence-protocol.md) (public | Unknown)
 - [Counterfactual Simulation Protocol](./product/orchestration/counterfactual-simulation-protocol.md) (public | Ecosystem Architect)
 - [Cross-Role Directive Protocol (CRDP)](./product/orchestration/directives-protocol.md) (public | Ecosystem Architect)

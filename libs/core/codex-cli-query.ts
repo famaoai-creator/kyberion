@@ -21,6 +21,7 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { resolveCodexHome, resolveCodexProfileName } from './codex-profile.js';
 import {
   delegationChildHandleFromChildProcess,
   withWallClockBudget,
@@ -35,6 +36,7 @@ export interface CodexCliQueryOptions {
   extraArgs?: string[];
   cwd?: string;
   signal?: AbortSignal;
+  codexProfile?: string;
 }
 
 export interface RunCodexCliQueryParams<T> {
@@ -188,6 +190,10 @@ class CodexCliQuery {
       provider: 'codex',
       cwd: this.cwd,
       sessionId: newDelegationSessionId('codex'),
+      baseEnv: {
+        ...process.env,
+        CODEX_HOME: resolveCodexHome(this.options.codexProfile, process.env),
+      },
       ...(profile ? { profile } : {}),
     });
     const child = spawnWithDelegationEnv(spawnEnv, () =>
@@ -382,6 +388,7 @@ export function buildCodexCliQueryOptionsFromEnv(
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
+  const codexProfile = resolveCodexProfileName(env);
 
   logger.info(
     `[codex-cli] query helper ready (bin=${bin ?? '<deferred>'}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
@@ -395,6 +402,7 @@ export function buildCodexCliQueryOptionsFromEnv(
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
+    ...(codexProfile ? { codexProfile } : {}),
   };
 }
 

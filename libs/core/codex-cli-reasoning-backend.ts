@@ -302,6 +302,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
       cwd: this.options.cwd,
       timeoutMs: this.options.timeoutMs,
       sandboxMode: sandboxModeFromArgs(permissionArgs),
+      codexProfile: this.options.codexProfile,
       systemPrompt: 'Kyberion governed Codex app-server subagent session.',
       approvalMode: 'strict',
     });
