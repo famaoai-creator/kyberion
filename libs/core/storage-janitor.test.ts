@@ -12,6 +12,7 @@ vi.mock('./secure-io.js', async () => {
     safeStat: (p: string) => actual.statSync(p),
     safeLstat: (p: string) => actual.lstatSync(p),
     safeUnlinkSync: (p: string) => actual.unlinkSync(p),
+    safeRmdirSync: (p: string) => actual.rmdirSync(p),
     safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
@@ -295,6 +296,53 @@ describe('storage-janitor', () => {
       // With 1 hour TTL the file is fresh
       const result2 = scanTmp({ dryRun: true, ttlMs: 60 * 60 * 1000 });
       expect(result2.expired).not.toContain(file);
+    });
+
+    it('prunes an empty directory older than TTL', () => {
+      const emptyDir = path.join(tmpDir, 'abandoned-job');
+      fs.mkdirSync(emptyDir);
+      setMtime(emptyDir, DEFAULT_TMP_TTL_MS + 1000);
+
+      const dry = scanTmp({ dryRun: true });
+      expect(dry.expired).toContain(emptyDir);
+      expect(fs.existsSync(emptyDir)).toBe(true);
+
+      const result = scanTmp({ dryRun: false });
+      expect(result.deleted).toContain(emptyDir);
+      expect(fs.existsSync(emptyDir)).toBe(false);
+    });
+
+    it('keeps a fresh empty directory (possibly an in-flight staging dir)', () => {
+      const freshDir = path.join(tmpDir, 'in-flight-job');
+      fs.mkdirSync(freshDir);
+
+      const result = scanTmp({ dryRun: false });
+      expect(result.deleted).not.toContain(freshDir);
+      expect(fs.existsSync(freshDir)).toBe(true);
+    });
+
+    it('prunes a directory emptied by this run and its now-empty parents', () => {
+      const nested = path.join(tmpDir, 'job', 'stage', 'old.txt');
+      writeFile(nested);
+      setMtime(nested, DEFAULT_TMP_TTL_MS + 1000);
+
+      const result = scanTmp({ dryRun: false });
+      expect(result.deleted).toContain(nested);
+      expect(result.deleted).toContain(path.join(tmpDir, 'job', 'stage'));
+      expect(result.deleted).toContain(path.join(tmpDir, 'job'));
+      expect(fs.existsSync(path.join(tmpDir, 'job'))).toBe(false);
+      expect(fs.existsSync(tmpDir)).toBe(true); // tmp root itself is never pruned
+    });
+
+    it('keeps an expired directory that still contains fresh files', () => {
+      const dir = path.join(tmpDir, 'mixed-job');
+      writeFile(path.join(dir, 'fresh.txt'));
+      setMtime(dir, DEFAULT_TMP_TTL_MS + 1000);
+
+      const result = scanTmp({ dryRun: false });
+      expect(result.deleted).not.toContain(dir);
+      expect(fs.existsSync(dir)).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'fresh.txt'))).toBe(true);
     });
   });
 
