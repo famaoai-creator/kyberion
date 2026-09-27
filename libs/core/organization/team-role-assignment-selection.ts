@@ -11,7 +11,7 @@ import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 import { resolveModelProvider } from '../reasoning/reasoning-model-routing.js';
 import { loadProviderConfig } from '../provider/provider-config.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
-import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce-load.js';
+import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce/workforce-load.js';
 import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
 
 export interface AuthorityRoleRecord {

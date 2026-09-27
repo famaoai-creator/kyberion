@@ -26,7 +26,7 @@ import {
   buildCostProfileRecord,
   collectWorkforceLoad,
   type WorkforceLoadIndex,
-} from '../workforce-load.js';
+} from '../workforce/workforce-load.js';
 import {
   provisionMissionEntry,
   writeProvisionedJson,
