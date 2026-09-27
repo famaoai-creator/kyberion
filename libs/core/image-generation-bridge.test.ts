@@ -27,7 +27,11 @@ const mocks = vi.hoisted(() => {
   const probeServiceRuntime = vi.fn();
   const generateImageLocallyWithApplePlayground = vi.fn();
   const probeAppleImageGeneration = vi.fn();
+  const isHostOutput = vi.fn(() => false);
+  const recordHostRequest = vi.fn();
   return {
+    isHostOutput,
+    recordHostRequest,
     executeServicePreset,
     safeExecResult,
     safeExistsSync,
@@ -42,6 +46,11 @@ const mocks = vi.hoisted(() => {
 vi.mock('./apple-intelligence-bridge.js', () => ({
   generateImageLocallyWithApplePlayground: mocks.generateImageLocallyWithApplePlayground,
   probeAppleImageGeneration: mocks.probeAppleImageGeneration,
+}));
+
+vi.mock('./host-image-handoff.js', () => ({
+  isHostImageHandoffOutput: mocks.isHostOutput,
+  recordHostImageHandoffRequest: mocks.recordHostRequest,
 }));
 
 vi.mock('./service-engine.js', () => ({
@@ -850,9 +859,10 @@ describe('HostAgentImageGenerationProvider', () => {
     await expect(provider.isAvailable()).resolves.toBe(true);
   });
 
-  it('skips generation if file already exists at targetPath', async () => {
+  it('collects an existing target only when it answers a pending hand-off request', async () => {
     process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
     mocks.safeExistsSync.mockReturnValue(true);
+    mocks.isHostOutput.mockReturnValueOnce(true);
 
     const provider = new HostAgentImageGenerationProvider();
     const result = await provider.generate({
@@ -863,6 +873,24 @@ describe('HostAgentImageGenerationProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.provider).toBe('host_agent');
     expect(result.path).toBe('already-exists.png');
+    expect(mocks.isHostOutput).toHaveBeenCalledWith('already-exists.png', 'test prompt');
+    expect(mocks.recordHostRequest).not.toHaveBeenCalled();
+  });
+
+  it('requests a fresh image when the existing target was not produced for this request', async () => {
+    process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.isHostOutput.mockReturnValueOnce(false);
+
+    const provider = new HostAgentImageGenerationProvider();
+    await expect(
+      provider.generate({ prompt: 'test prompt', targetPath: 'stale.png' })
+    ).rejects.toThrow('HOST_AGENT_IMAGE_GENERATION_REQUIRED');
+    expect(mocks.recordHostRequest).toHaveBeenCalledWith({
+      providerId: 'host_agent',
+      targetPath: 'stale.png',
+      prompt: 'test prompt',
+    });
   });
 
   it('writes request metadata and throws exception if file does not exist', async () => {

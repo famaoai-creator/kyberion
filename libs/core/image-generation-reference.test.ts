@@ -11,11 +11,17 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   probeToolRuntime: vi.fn(),
   auditRecord: vi.fn(),
+  isHostOutput: vi.fn(() => false),
+  recordHostRequest: vi.fn(),
 }));
 
 vi.mock('./service-engine.js', () => ({ executeServicePreset: mocks.executeServicePreset }));
 vi.mock('./tool-runtime-registry.js', () => ({ probeToolRuntime: mocks.probeToolRuntime }));
 vi.mock('./service-runtime-registry.js', () => ({ probeServiceRuntime: vi.fn() }));
+vi.mock('./host-image-handoff.js', () => ({
+  isHostImageHandoffOutput: mocks.isHostOutput,
+  recordHostImageHandoffRequest: mocks.recordHostRequest,
+}));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: mocks.auditRecord } }));
 vi.mock('./provider-pins-store.js', () => ({
   loadSeamProviderPin: () => null,
@@ -410,6 +416,7 @@ describe('host bridge reference hand-off', () => {
 
   it('records a second receipt when the rerun picks up the host-produced frame (m1)', async () => {
     mocks.safeExistsSync.mockReturnValue(true);
+    mocks.isHostOutput.mockReturnValue(true);
     const provider = new HostAgentImageGenerationProvider();
     const consent = createImageEgressConsent({ providerId: 'host_agent', grantedBy: 'me' });
     const result = await provider.generate(
@@ -436,6 +443,7 @@ describe('host bridge reference hand-off', () => {
     mocks.auditRecord.mockClear();
     await provider.generate({ prompt: 'x', targetPath: 'active/shared/tmp/avatar-test/joy.png' });
     expect(mocks.auditRecord).not.toHaveBeenCalled();
+    mocks.isHostOutput.mockReturnValue(false);
   });
 
   it('refuses a reference hand-off without consent (host agent is cloud egress)', async () => {
