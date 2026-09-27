@@ -40,7 +40,7 @@ vi.mock('./mission-state-reader.js', () => ({
   },
 }));
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const REAL_ADF = path.join(REPO_ROOT, 'knowledge/product/governance/mission-lifecycle.json');
 
 let tmpRoot: string;
