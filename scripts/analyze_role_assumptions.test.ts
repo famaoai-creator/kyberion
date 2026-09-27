@@ -38,6 +38,7 @@ const FILES: Record<string, string> = {
       { id: 'variants-surface', command: 'node', args: ['dist/apps/variants.js'] },
       { id: 'missing-surface', command: 'node', args: ['dist/apps/missing.js'] },
       { id: 'spawn-surface', command: 'node', args: ['dist/apps/spawn.js'] },
+      { id: 'delegate-surface', command: 'node', args: ['dist/apps/delegate.js'] },
     ],
   }),
   'libs/core/authority.ts': [
@@ -46,6 +47,9 @@ const FILES: Record<string, string> = {
     '}',
     'export async function withExecutionContextAsync<T>(role: string, fn: () => Promise<T>): Promise<T> {',
     '  return fn();',
+    '}',
+    'export function buildExecutionEnv(env: NodeJS.ProcessEnv = process.env, role?: string): NodeJS.ProcessEnv {',
+    '  return role ? { ...env, MISSION_ROLE: role } : { ...env };',
     '}',
   ].join('\n'),
   'libs/core/stores.ts': [
@@ -125,6 +129,20 @@ const FILES: Record<string, string> = {
     "spawn(process.execPath, ['dist/apps/unanalysed.js'], { env: process.env });",
   ].join('\n'),
   'apps/unanalysed.ts': 'export {};',
+  'apps/delegate.ts': [
+    `import { spawn } from '${CHILD_PROCESS}';`,
+    `import { buildExecutionEnv } from '${CORE}/authority.js';`,
+    "spawn(process.execPath, ['dist/scripts/delegated-child.js'], { env: buildExecutionEnv(process.env, 'role_delegated') });",
+    "spawn(process.execPath, ['dist/scripts/delegated-child.js'], { env: buildExecutionEnv({ PATH: '' }, 'role_not_delegated') });",
+    'export function forward(role: string): NodeJS.ProcessEnv {',
+    '  return buildExecutionEnv(process.env, role);',
+    '}',
+    "forward('role_forwarded');",
+  ].join('\n'),
+  'scripts/delegated-child.ts': [
+    `import { withExecutionContext } from '${CORE}/authority.js';`,
+    "withExecutionContext('role_in_delegated_child', () => undefined);",
+  ].join('\n'),
   'scripts/child.ts': [
     `import { withExecutionContext } from '${CORE}/authority.js';`,
     "withExecutionContext('role_child', () => undefined);",
@@ -219,6 +237,24 @@ describe('RN-02 role assumption reachability analysis', () => {
     expect(Object.keys(surface.reachable_roles)).toEqual(['role_child']);
     // A child entry outside the analysed program is an any-role site.
     expect(surface.unresolved_sites).toEqual(['apps/unanalysed.ts']);
+  });
+
+  it('reaches the role a child is delegated through buildExecutionEnv under SYSTEM_ROLE (DR-01)', () => {
+    const surface = report.system_roles.delegate_surface;
+    // The delegated role itself, forwarded wrapper roles, and what the child
+    // entry assumes (still bounded by the parent SYSTEM_ROLE); an env that
+    // cannot carry SYSTEM_ROLE delegates nothing.
+    expect(Object.keys(surface.reachable_roles)).toEqual([
+      'role_delegated',
+      'role_forwarded',
+      'role_in_delegated_child',
+    ]);
+    expect(surface.unresolved_sites).toEqual([]);
+    expect(report.assumption_sites).toContainEqual({
+      site: 'apps/delegate.ts#<module> [delegated child role]',
+      roles: ['role_delegated'],
+      unresolved: [],
+    });
   });
 
   it('compares reports by content, not by layout', () => {
