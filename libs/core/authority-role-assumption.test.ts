@@ -384,6 +384,18 @@ describe('RA-02 role assumption policy', () => {
     expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(false);
   });
 
+  it('grants only the broad roles the reachability report evidences (RN-03)', () => {
+    // docs/developer/role-assumption-reachability.json: unreachable and never traced.
+    expect(isRoleAssumptionAllowed('oauth_callback_surface', 'sovereign_concierge')).toBe(true);
+    expect(isRoleAssumptionAllowed('oauth_callback_surface', 'mission_controller')).toBe(false);
+    expect(isRoleAssumptionAllowed('oauth_callback_surface', 'ecosystem_architect')).toBe(false);
+    expect(isRoleAssumptionAllowed('surface_runtime', 'mission_controller')).toBe(true);
+    expect(isRoleAssumptionAllowed('surface_runtime', 'ecosystem_architect')).toBe(false);
+    // Reachable through child processes that inherit SYSTEM_ROLE.
+    expect(isRoleAssumptionAllowed('concierge', 'ingest_commit')).toBe(true);
+    expect(isRoleAssumptionAllowed('nexus_daemon', 'reconcile_config_fallbacks')).toBe(true);
+  });
+
   it('leaves processes without SYSTEM_ROLE unrestricted', () => {
     expect(withExecutionContext('system_configurator', () => resolveRole())).toBe(
       'system_configurator'
