@@ -411,7 +411,7 @@
       }
     },
     "grok": {
-      "models": ["grok-4.6", "grok-4.5", "grok-4.5-build"],
+      "models": ["grok-4.7", "grok-4.7-build-fast", "grok-4.6", "grok-4.5", "grok-4.5-build"],
       "capabilities": [
         "reasoning",
         "planning",
@@ -426,6 +426,32 @@
         "can_subagent"
       ],
       "modelCapabilities": {
+        "grok-4.7": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "grok-4.7-build-fast": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
         "grok-4.6": [
           "reasoning",
           "planning",
