@@ -27,10 +27,10 @@ const mocks = vi.hoisted(() => {
   const probeServiceRuntime = vi.fn();
   const generateImageLocallyWithApplePlayground = vi.fn();
   const probeAppleImageGeneration = vi.fn();
-  const claimHostOutput = vi.fn(() => false);
+  const isHostOutput = vi.fn(() => false);
   const recordHostRequest = vi.fn();
   return {
-    claimHostOutput,
+    isHostOutput,
     recordHostRequest,
     executeServicePreset,
     safeExecResult,
@@ -49,7 +49,7 @@ vi.mock('./apple-intelligence-bridge.js', () => ({
 }));
 
 vi.mock('./host-image-handoff.js', () => ({
-  claimHostImageHandoffOutput: mocks.claimHostOutput,
+  isHostImageHandoffOutput: mocks.isHostOutput,
   recordHostImageHandoffRequest: mocks.recordHostRequest,
 }));
 
@@ -862,7 +862,7 @@ describe('HostAgentImageGenerationProvider', () => {
   it('collects an existing target only when it answers a pending hand-off request', async () => {
     process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
     mocks.safeExistsSync.mockReturnValue(true);
-    mocks.claimHostOutput.mockReturnValueOnce(true);
+    mocks.isHostOutput.mockReturnValueOnce(true);
 
     const provider = new HostAgentImageGenerationProvider();
     const result = await provider.generate({
@@ -873,14 +873,14 @@ describe('HostAgentImageGenerationProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.provider).toBe('host_agent');
     expect(result.path).toBe('already-exists.png');
-    expect(mocks.claimHostOutput).toHaveBeenCalledWith('already-exists.png', 'test prompt');
+    expect(mocks.isHostOutput).toHaveBeenCalledWith('already-exists.png', 'test prompt');
     expect(mocks.recordHostRequest).not.toHaveBeenCalled();
   });
 
   it('requests a fresh image when the existing target was not produced for this request', async () => {
     process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
     mocks.safeExistsSync.mockReturnValue(true);
-    mocks.claimHostOutput.mockReturnValueOnce(false);
+    mocks.isHostOutput.mockReturnValueOnce(false);
 
     const provider = new HostAgentImageGenerationProvider();
     await expect(

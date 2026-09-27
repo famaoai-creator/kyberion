@@ -68,7 +68,10 @@ function createFakeDrawDeps(
   const plans: ImageGenerationRequest[] = [];
   const media: { tool: MediaTool; args: string[] }[] = [];
   /** Pending host hand-offs by target, like libs/core/host-image-handoff.ts. */
-  const pendingHandoffs = new Map<string, string>();
+  /** Host hand-off requests by target (prompt + file before the request), like libs/core/host-image-handoff.ts. */
+  const handoffs = new Map<string, { prompt: string; prior: string | null }>();
+  const contents = (file: string) =>
+    safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : null;
   const pick = (request: ImageGenerationRequest) => {
     const order = [...(request.providerPreference ?? []), ...PROVIDERS.map((p) => p.id)];
     const id = order.find(
@@ -107,18 +110,21 @@ function createFakeDrawDeps(
       requests.push(request);
       if (options.generateError) throw new Error(options.generateError);
       const info = pick(request)!;
-      // Like the real host bridges: collect only the answer to a pending request.
+      // Like the real host bridges: collect only a file changed since the request.
       const target = request.targetPath!;
+      const pending = handoffs.get(target);
       if (
         info.interactiveHandoff &&
-        safeExistsSync(target) &&
-        pendingHandoffs.get(target) === request.prompt
+        contents(target) !== null &&
+        pending?.prompt === request.prompt &&
+        pending.prior !== contents(target)
       ) {
-        pendingHandoffs.delete(target);
         return { status: 'succeeded', provider: info.id, path: target, elapsedMs: 1 };
       }
       if (info.interactiveHandoff) {
-        pendingHandoffs.set(target, request.prompt);
+        if (pending?.prompt !== request.prompt) {
+          handoffs.set(target, { prompt: request.prompt, prior: contents(target) });
+        }
         throw new Error(
           `HOST_BRIDGE_IMAGE_GENERATION_REQUIRED: Codex host bridge is required. Please use your 'generate_image' tool.`
         );
@@ -255,7 +261,7 @@ describe('pnpm kyberion draw', () => {
     });
   });
 
-  it('passes the hand-off through: a pre-existing --out is re-requested, the answer is collected once', async () => {
+  it('passes the hand-off through: a pre-existing --out is re-requested, the answer is collected', async () => {
     const out = rel('fox.png');
     const target = path.join(workDir, 'fox.png');
     safeWriteFile(target, pngBytes(8, 8));
@@ -271,9 +277,13 @@ describe('pnpm kyberion draw', () => {
       provider: 'codex_host_bridge',
       width: 64,
     });
-    await expect(runDrawCommand(argv, () => {}, deps)).rejects.toMatchObject({
-      code: DRAW_HANDOFF_EXIT_CODE,
+    // Collection is idempotent; a different prompt needs a new host image.
+    await expect(runDrawCommand(argv, () => {}, deps)).resolves.toMatchObject({
+      status: 'succeeded',
     });
+    await expect(
+      runDrawCommand(['a', 'wolf', '--out', out, '--allow-handoff'], () => {}, deps)
+    ).rejects.toMatchObject({ code: DRAW_HANDOFF_EXIT_CODE });
   });
 
   it('turns a dispatch-time consent denial into the consent hint', async () => {
