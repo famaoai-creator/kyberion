@@ -178,7 +178,7 @@ describe('terminal-actuator direct actions', () => {
           KYBERION_SUDO: 'true',
         },
       },
-    } as any);
+    } as unknown as Parameters<typeof handleAction>[0]);
     const calls = vi.mocked(ptyEngine.spawn).mock.calls;
     expect(calls[calls.length - 1]?.[3]).toEqual({ FOO: 'bar' });
   });
