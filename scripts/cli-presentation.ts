@@ -73,6 +73,7 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText(t('cli_help_see', locale));
   printText(t('cli_help_listen', locale));
   printText(t('cli_help_speak', locale));
+  printText(t('cli_help_draw', locale));
   printText(t('cli_help_watch', locale));
   printText('');
   printText(t('cli_help_sec_pipelines', locale));

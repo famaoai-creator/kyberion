@@ -16,7 +16,18 @@
         "additionalProperties": false,
         "properties": {
           "surface": { "type": "string", "minLength": 1 },
-          "role": { "type": "string", "minLength": 1 },
+          "role": {
+            "description": "A GovernedArtifactRole (libs/core/artifact-store.ts GOVERNED_ARTIFACT_ROLES).",
+            "type": "string",
+            "enum": [
+              "slack_bridge",
+              "chronos_gateway",
+              "surface_runtime",
+              "mission_controller",
+              "infrastructure_sentinel",
+              "sovereign_concierge"
+            ]
+          },
           "summary": { "type": "string" }
         }
       }
