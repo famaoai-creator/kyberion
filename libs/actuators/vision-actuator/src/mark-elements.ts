@@ -42,7 +42,10 @@ export interface MarkElementsParams {
   dom_elements?: SomDomElement[];
   /** Screenshot pixels per CSS pixel for dom_elements. */
   dom_scale?: number;
-  /** Screenshot pixels per logical click point. Defaults to dom_scale, else 1. */
+  /**
+   * Screenshot pixels per click point (macOS logical point, Windows physical
+   * pixel). Defaults to dom_scale, else 1 (a full-resolution Windows capture).
+   */
   scale?: number;
   language?: string;
   ocr_mode?: OcrRoutingMode;
@@ -55,7 +58,7 @@ export interface MarkElementsParams {
   dom_snapshot_id?: string;
   /** Display the screenshot was captured on (system clicks). */
   display_index?: number;
-  /** Top-left of that display in global logical points, for multi-display clicks. */
+  /** Top-left of that display in click points (macOS logical, Windows physical), for multi-display clicks. */
   display_origin?: { x: number; y: number };
   /**
    * The screenshot is this machine's live screen, captured just now. Enables
