@@ -52,6 +52,7 @@ import { buildApiProviderBundle } from './reasoning-api-provider.js';
 import {
   buildFailoverReasoningBackend,
   buildRoleAwareReasoningBackend,
+  hasRegisteredReasoningBackend,
   registerReasoningBackend,
   resetReasoningBackend,
 } from './reasoning-backend.js';
@@ -453,6 +454,12 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
     options.refreshProviders === true ||
     kyberionEnv('KYBERION_PROVIDER_CAPABILITY_REFRESH') === '1';
   if (installed && !shouldReselect) return installedMode !== 'stub';
+  // A provider registered outside this bootstrap (test seam injection or a
+  // custom host bootstrap) already satisfies callers — do not collide with it.
+  if (!shouldReselect && hasRegisteredReasoningBackend()) {
+    installed = true;
+    return true;
+  }
   if (shouldReselect) {
     installed = false;
     installedMode = null;

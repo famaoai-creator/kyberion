@@ -1284,6 +1284,11 @@ export function getReasoningBackend(): ReasoningBackend {
   return reasoningBackendSeam.getOptional() ?? stubReasoningBackend;
 }
 
+/** True when any backend (real or test-injected) holds the 'active' provider slot. */
+export function hasRegisteredReasoningBackend(): boolean {
+  return reasoningBackendSeam.getOptional() !== undefined;
+}
+
 /** Clear the registered backend. Used by tests. */
 export function resetReasoningBackend(): void {
   registeredDisposer?.();

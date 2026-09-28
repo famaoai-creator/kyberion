@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
@@ -15,7 +15,23 @@ import {
   writeMissionTeamPlan,
 } from './mission-team-plan-composer.js';
 import { discoverProviders } from '../provider/provider-discovery.js';
+import {
+  clearWorkCoordinationStore,
+  setWorkCoordinationNamespace,
+} from '../workforce/work-coordination.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
+
+// selectAgentForTeamRole penalises candidates by the observed load index, which
+// reads the checkout's real work-item store. Isolate it so real active/ load
+// cannot flip the preferred-agent selection.
+beforeEach(() => {
+  setWorkCoordinationNamespace(`mission-team-composer-tests-${process.pid}`);
+  clearWorkCoordinationStore();
+});
+afterEach(() => {
+  clearWorkCoordinationStore();
+  setWorkCoordinationNamespace(null);
+});
 
 describe('mission-team-composer classification integration', () => {
   it('derives mission type from mission classification when missionType is omitted', () => {
