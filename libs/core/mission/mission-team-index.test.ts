@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
-import { loadAgentProfileDirectory } from './mission-team-index.js';
+import {
+  expandAgentProfileInstances,
+  loadAgentProfileDirectory,
+  loadAgentProfileIndex,
+} from './mission-team-index.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 
@@ -98,5 +102,57 @@ describe('mission-team-index governed loaders', () => {
     expect(loadAuthorityRoleIndex(authoritySnapshotRoot)).toMatchObject({
       reviewer: { description: 'Snapshot reviewer' },
     });
+  });
+});
+
+describe('agent instance pools (NHI scale-out)', () => {
+  it('expands instance_count into distinct NHI records sharing all fields', () => {
+    const expanded = expandAgentProfileInstances({
+      'planner-agent': {
+        authority_roles: ['mission_controller'],
+        team_roles: ['planner'],
+        capabilities: ['planning'],
+        instance_count: 3,
+      },
+    });
+
+    expect(Object.keys(expanded).sort()).toEqual([
+      'planner-agent',
+      'planner-agent-2',
+      'planner-agent-3',
+    ]);
+    for (const id of ['planner-agent', 'planner-agent-2', 'planner-agent-3']) {
+      expect(expanded[id]).toMatchObject({
+        team_roles: ['planner'],
+        capabilities: ['planning'],
+        instance_of: 'planner-agent',
+      });
+    }
+    expect(expanded['planner-agent'].instance_index).toBe(1);
+    expect(expanded['planner-agent-3'].instance_index).toBe(3);
+  });
+
+  it('leaves singleton profiles intact without clones', () => {
+    const expanded = expandAgentProfileInstances({
+      'nerve-agent': {
+        authority_roles: [],
+        team_roles: ['owner'],
+        capabilities: [],
+      },
+    });
+    expect(Object.keys(expanded)).toEqual(['nerve-agent']);
+    expect(expanded['nerve-agent'].instance_index).toBe(1);
+  });
+
+  it('caps instance_count at the governed maximum', () => {
+    const expanded = expandAgentProfileInstances({
+      worker: {
+        authority_roles: [],
+        team_roles: ['implementer'],
+        capabilities: [],
+        instance_count: 64,
+      },
+    });
+    expect(Object.keys(expanded)).toHaveLength(8);
   });
 });
