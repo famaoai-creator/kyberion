@@ -29,6 +29,7 @@ import type {
   MediaReportPdfProtocol,
 } from './media-report-pipeline-helpers.js';
 import type { MediaTrackerXlsxProtocol } from './media-spreadsheet-pipeline-helpers.js';
+import type { MediaBrief, MediaOutline } from './media-brief-types.js';
 
 const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
   'knowledge/public/design-patterns/media-templates/document-layouts.json'
@@ -100,43 +101,55 @@ export interface MediaDocumentPipelineDeps {
   loadDocumentCompositionCatalog: (rootDir: string) => MediaDocumentCompositionCatalog;
   buildPptxSlideFromPattern: (
     rootDir: string,
-    data: any,
+    data: Record<string, unknown>,
     idx: number,
-    theme: any,
-    pattern: any,
-    activeMaster: any,
-    canvas: any
+    theme: Record<string, unknown>,
+    pattern: Record<string, unknown>,
+    activeMaster: Record<string, unknown>,
+    canvas: Record<string, unknown>
   ) => any;
-  buildProposalNarrativeOutline: (rootDir: string, brief: any) => any;
+  buildProposalNarrativeOutline: (rootDir: string, brief: MediaBrief) => any;
   buildReportNarrativeOutline: (
     rootDir: string,
-    brief: any,
-    resolvePreset: any,
-    applyTemplate: any
+    brief: MediaBrief,
+    resolvePreset: DocumentCompositionPresetResolver,
+    applyTemplate: (
+      template: Record<string, unknown>,
+      tokens: Record<string, string>,
+      fallback?: string
+    ) => string
   ) => any;
-  buildSpreadsheetNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
-  buildDiagramNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
-  buildReportDocxProtocol: (rootDir: string, brief: any) => MediaReportDocxProtocol;
-  buildReportPdfProtocol: (rootDir: string, brief: any) => MediaReportPdfProtocol;
-  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => MediaTrackerXlsxProtocol;
-  buildDocumentPdfProtocol: (rawBrief: any) => MediaInvoicePdfProtocol;
+  buildSpreadsheetNarrativeOutline: (
+    rootDir: string,
+    brief: MediaBrief,
+    resolvePreset: DocumentCompositionPresetResolver
+  ) => any;
+  buildDiagramNarrativeOutline: (
+    rootDir: string,
+    brief: MediaBrief,
+    resolvePreset: DocumentCompositionPresetResolver
+  ) => any;
+  buildReportDocxProtocol: (rootDir: string, brief: MediaBrief) => MediaReportDocxProtocol;
+  buildReportPdfProtocol: (rootDir: string, brief: MediaBrief) => MediaReportPdfProtocol;
+  buildTrackerSpreadsheetProtocol: (rootDir: string, brief: MediaBrief) => MediaTrackerXlsxProtocol;
+  buildDocumentPdfProtocol: (rawBrief: MediaBrief) => MediaInvoicePdfProtocol;
   normalizeXlsxDesignProtocol: (protocol: any) => XlsxDesignProtocol;
   resolveDocumentLayoutTemplate: (
     rootDir: string,
-    brief: any
-  ) => { templateId: string; template: any };
+    brief: MediaBrief
+  ) => { templateId: string; template: Record<string, unknown> };
   resolveDocumentCompositionPreset: DocumentCompositionPresetResolver;
   applyCompositionTemplate: (
-    template: any,
+    template: Record<string, unknown>,
     tokens: Record<string, string>,
     fallback?: string
   ) => string;
-  buildMediaGenerationBoundary: (outline: any) => MediaGenerationBoundary;
-  normalizeBriefForCategory: (rootDir: string, input: any) => any;
-  resolveMediaBriefCategory: (input: any) => MediaBriefCategory;
+  buildMediaGenerationBoundary: (outline: MediaOutline) => MediaGenerationBoundary;
+  normalizeBriefForCategory: (rootDir: string, input: MediaBrief) => any;
+  resolveMediaBriefCategory: (input: MediaBrief) => MediaBriefCategory;
   generateDrawioDocument: (
-    graph: any,
-    options: { title: string; theme: any; iconMap: any; iconRoot?: string }
+    graph: Record<string, unknown>,
+    options: { title: string; theme: Record<string, unknown>; iconMap: any; iconRoot?: string }
   ) => string;
 }
 
@@ -151,7 +164,8 @@ export function assertMediaProtocolLayoutReady(
   const slides = Array.isArray(diagnostics.overflowSlides)
     ? diagnostics.overflowSlides
         .map(
-          (slide: any) => `slide ${slide.slideIndex}${slide.slideId ? ` (${slide.slideId})` : ''}`
+          (slide: Record<string, unknown>) =>
+            `slide ${slide.slideIndex}${slide.slideId ? ` (${slide.slideId})` : ''}`
         )
         .join(', ')
     : 'unknown slide';
@@ -189,19 +203,19 @@ export function summarizeMediaPptxLayout(protocol: {
 export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDeps) {
   function resolveDocumentCompositionPreset(
     rootDir: string,
-    brief: any
+    brief: MediaBrief
   ): ReturnType<DocumentCompositionPresetResolver> {
     return deps.resolveDocumentCompositionPreset(rootDir, brief);
   }
 
   function buildOutlineDrivenPptxProtocol(
     rootDir: string,
-    outline: any
-  ): { protocol: MediaPptxProtocol; theme: any; themeName: string } {
-    const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
+    outline: MediaOutline
+  ): { protocol: MediaPptxProtocol; theme: Record<string, unknown>; themeName: string } {
+    const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme as string | undefined);
     const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
-    const contentData = outline.toc.map((entry: any) => ({
+    const contentData = outline.toc.map((entry: Record<string, unknown>) => ({
       id: entry.section_id || entry.id,
       title: entry.title,
       body: Array.isArray(entry.body) ? entry.body : [entry.objective].filter(Boolean),
@@ -221,12 +235,14 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       branding: outline.branding || {},
     }));
     if (
-      !contentData.some((entry: any) =>
+      !contentData.some((entry: Record<string, unknown>) =>
         ['contents'].includes(String(entry.id || entry.section_id || '').toLowerCase())
       )
     ) {
       const contentsEntry = Array.isArray(outline.toc)
-        ? outline.toc.find((entry: any) => String(entry.section_id || '') === 'contents')
+        ? outline.toc.find(
+            (entry: Record<string, unknown>) => String(entry.section_id || '') === 'contents'
+          )
         : null;
       if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
         const contentsSlide = {
@@ -246,7 +262,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
           contentData.length > 0 && String(contentData[0]?.layout_key || '').includes('cover')
             ? 1
             : 0;
-        contentData.splice(insertAt, 0, contentsSlide);
+        contentData.splice(insertAt, 0, contentsSlide as never);
       }
     }
     const protocol: MediaPptxProtocol = {
@@ -256,9 +272,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         composition: outline,
         generationBoundary:
           outline.generation_boundary || deps.buildMediaGenerationBoundary(outline),
-        promptGuide: outline.prompt_guide || [],
-        sourceDesign: outline.source_design || null,
-        designRecommendations: outline.design_recommendations || [],
+        promptGuide: (outline.prompt_guide as unknown[]) || [],
+        sourceDesign: (outline.source_design as Record<string, unknown> | undefined) || null,
+        designRecommendations: (outline.design_recommendations as unknown[]) || [],
       },
       canvas,
       theme: {
@@ -278,7 +294,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         fonts: theme?.fonts || theme?.theme?.fonts || {},
         typography: theme?.typography || theme?.theme?.typography,
       }),
-      slides: contentData.map((data: any, idx: number) =>
+      slides: contentData.map((data: Record<string, unknown>, idx: number) =>
         deps.buildPptxSlideFromPattern(
           rootDir,
           data,
@@ -291,13 +307,18 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       ),
     };
     protocol.metadata.layoutDiagnostics = summarizeMediaPptxLayout(protocol);
-    return { protocol, theme, themeName: outline.recommended_theme };
+    return { protocol, theme, themeName: outline.recommended_theme as string };
   }
 
   function buildPresentationPptxProtocol(
     rootDir: string,
-    brief: any
-  ): { protocol: MediaPptxProtocol; outline: any; theme: any; themeName: string } {
+    brief: MediaBrief
+  ): {
+    protocol: MediaPptxProtocol;
+    outline: MediaOutline;
+    theme: Record<string, unknown>;
+    themeName: string;
+  } {
     const outline = deps.buildProposalNarrativeOutline(rootDir, brief);
     const compiled = buildOutlineDrivenPptxProtocol(rootDir, outline);
     return { ...compiled, outline };
@@ -306,7 +327,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildOutlineFromNormalizedBrief(
     rootDir: string,
     category: 'presentation' | 'document' | 'spreadsheet' | 'diagram',
-    brief: any
+    brief: MediaBrief
   ): any {
     const outlineBuilders: Record<
       MediaBriefCategory,
@@ -339,7 +360,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildCompiledBriefContext(input: {
     rootDir: string;
     ctx: any;
-    rawBrief: any;
+    rawBrief: MediaBrief;
     exportAs?: string;
     briefContextKey?: string;
   }): any {
@@ -395,7 +416,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
   async function renderDiagramDocumentBrief(
     rootDir: string,
-    brief: any,
+    brief: MediaBrief,
     outPath: string,
     params: any,
     ctx: any,
@@ -410,8 +431,8 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     safeMkdir(path.dirname(outPath), { recursive: true });
     const activeTheme =
       ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id, () => ({}));
-    const document = deps.generateDrawioDocument(brief.payload.graph, {
-      title: brief.payload.title || brief.title || 'Diagram',
+    const document = deps.generateDrawioDocument(brief.payload?.graph as Record<string, unknown>, {
+      title: String(brief.payload?.title || brief.title || 'Diagram'),
       theme: activeTheme,
       iconMap,
       iconRoot: params.icon_root
@@ -445,8 +466,8 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
   function resolveDocumentLayoutTemplate(
     rootDir: string,
-    brief: any
-  ): { templateId: string; template: any } {
+    brief: MediaBrief
+  ): { templateId: string; template: Record<string, unknown> } {
     const catalogPath = assertSafeRepositoryPath(
       path.resolve(
         rootDir,
@@ -495,7 +516,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
   }
 
-  function buildDocumentPdfProtocol(rawBrief: any): MediaInvoicePdfProtocol {
+  function buildDocumentPdfProtocol(rawBrief: MediaBrief): MediaInvoicePdfProtocol {
     const brief = normalizeInvoiceDocumentBrief(rawBrief);
     if (brief.document_type !== 'invoice') {
       throw new Error(
@@ -633,11 +654,11 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
   function compileBriefToDesignProtocol(
     rootDir: string,
-    rawBrief: any
+    rawBrief: MediaBrief
   ): {
     protocol: any;
-    outline: any;
-    theme: any;
+    outline: MediaOutline;
+    theme: Record<string, unknown>;
     themeName: string;
     protocolKind: ProtocolKind;
     exportKey: string;
@@ -645,7 +666,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     const category = deps.resolveMediaBriefCategory(rawBrief);
     const brief = deps.normalizeBriefForCategory(rootDir, rawBrief);
     const outline = buildOutlineFromNormalizedBrief(rootDir, category, brief);
-    const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
+    const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme as string | undefined);
 
     if (category === 'presentation') {
       const compiled = buildPresentationPptxProtocol(rootDir, brief);
