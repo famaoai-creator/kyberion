@@ -660,6 +660,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       threadTs: seed.source_task_session_id || seed.seed_id,
       sourceAgentId: 'chronos_localadmin',
       title: `Mission promoted: ${seed.title}`,
+      // i18n-exempt: voice notification is intentionally emitted in the seeded content language (ja)
       text: `${project.name} の mission seed 「${seed.title}」を durable mission ${missionId} として開始しました。${intelligenceData.buildLearnedNotificationText({ projectId: project.project_id, language: 'ja' })}`,
     });
     return NextResponse.json({

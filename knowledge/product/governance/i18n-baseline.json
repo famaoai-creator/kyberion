@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-28T11:55:05.947Z",
+  "generated_at": "2026-09-28T12:05:04.390Z",
   "scan_roots": [
     "libs/core",
     "libs/shared-ui",
@@ -83,8 +83,6 @@
     "libs/core/knowledge/procedure-dispatcher.ts": 1,
     "libs/core/lead-score.ts": 11,
     "libs/core/media/native-pdf-engine/primitives.ts": 1,
-    "libs/core/media/native-pptx-engine/examples/gen_project_plan.ts": 92,
-    "libs/core/media/native-xlsx-engine/examples/gen_wbs.ts": 36,
     "libs/core/mission/mission-gate-engine.ts": 3,
     "libs/core/mission/mission-hygiene.ts": 13,
     "libs/core/mission/mission-lifecycle.ts": 1,
@@ -147,7 +145,6 @@
     "libs/actuators/voice-actuator/src/index.ts": 10,
     "libs/actuators/voice-actuator/src/voice-action-helpers.ts": 4,
     "satellites/voice-hub/server.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts": 3,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts": 2,
     "presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts": 1,
     "presence/displays/chronos-mirror-v2/src/app/page.tsx": 13,

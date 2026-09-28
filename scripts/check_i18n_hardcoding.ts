@@ -92,7 +92,7 @@ export function isGeneratedFileText(text: string): boolean {
 }
 
 // Plan §2.7: sample code and dev-only tooling are explicitly out of scope.
-const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/src\/native-[^/]+-engine\/examples\//u];
+const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/media\/native-[^/]+-engine\/examples\//u];
 
 export function readI18nHardcodingTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
