@@ -110,10 +110,12 @@ function buildCanonicalProposalEvidence(brief: any): Array<{ title: string; poin
   const client = sanitizeProposalText(brief.client || brief.payload?.client, '対象組織');
   const objective = sanitizeProposalText(
     brief.objective || brief.payload?.objective,
+    // i18n-exempt: JA proposal generator copy (product language)
     `${client}向けの提案を整理する`
   );
   const coreMessage = sanitizeProposalText(
     brief.story?.core_message || brief.payload?.story?.core_message,
+    // i18n-exempt: JA proposal generator copy (product language)
     `${client}に対して、${objective} を governed に実現する提案です。`
   );
 
@@ -144,18 +146,22 @@ function buildCanonicalProposalEvidence(brief: any): Array<{ title: string; poin
   const defaults = [
     {
       title: 'Current pain points',
+      // i18n-exempt: JA proposal generator copy (product language)
       point: `${client}の現状課題を整理し、${objective} の必要性を明確にする。`,
     },
     {
       title: 'Target outcome',
+      // i18n-exempt: JA proposal generator copy (product language)
       point: `実現後の運用像と期待効果を可視化し、合意形成を進める。`,
     },
     {
       title: 'Governance design',
+      // i18n-exempt: JA proposal generator copy (product language)
       point: `リスク・統制・運用のガードレールを保ったまま実行できる構成にする。`,
     },
     {
       title: 'Delivery plan',
+      // i18n-exempt: JA proposal generator copy (product language)
       point: `Discovery / pilot / rollout の段階で確実に前進させる。`,
     },
   ];
@@ -446,10 +452,12 @@ function buildCanonicalProposalSlides(
   const client = sanitizeProposalText(brief.client || brief.payload?.client, '対象組織');
   const objective = sanitizeProposalText(
     brief.objective || brief.payload?.objective,
+    // i18n-exempt: JA proposal generator copy (product language)
     `${client}向けの提案を整理する`
   );
   const coreMessage = sanitizeProposalText(
     brief.story?.core_message || brief.payload?.story?.core_message,
+    // i18n-exempt: JA proposal generator copy (product language)
     `${client}に対して、${objective} を governed に実現する提案です。`
   );
   const closingCta = sanitizeProposalText(
@@ -473,10 +481,15 @@ function buildCanonicalProposalSlides(
       `Audience: ${audience.join(', ')}`,
       `Objective: ${objective}`,
     ],
+    // i18n-exempt: JA proposal generator copy (product language)
     'why-change': [evidence[0]?.point, `現状を変えない場合のコストとリスクを明確化する。`],
+    // i18n-exempt: JA proposal generator copy (product language)
     'target-outcome': [evidence[1]?.point, `期待効果と運用上の成功条件を定義する。`],
+    // i18n-exempt: JA proposal generator copy (product language)
     'solution-shape': [evidence[2]?.point, `推奨アプローチと差別化要素を端的に示す。`],
+    // i18n-exempt: JA proposal generator copy (product language)
     governance: [evidence[2]?.point, `監査・権限・運用ルールを組み込んで安全に実行する。`],
+    // i18n-exempt: JA proposal generator copy (product language)
     'delivery-plan': [evidence[3]?.point, `Discovery → pilot → rollout の段階で進める。`],
     decision: [closingCta, `Owner: ${audience[0] || 'Executive Sponsor'}`],
   };
@@ -882,11 +895,13 @@ function normalizeProposalBrief(deps: ProposalPptxDependencies, rootDir: string,
       branding: normalized.branding || normalized.payload?.branding || {},
       title: title || client || objective || canonicalSections?.[0]?.title || 'Proposal',
       client: client || '対象組織',
+      // i18n-exempt: JA proposal generator copy (product language)
       objective: objective || `${client || '対象組織'}向けの提案を整理する`,
       audience,
       story: {
         core_message:
           coreMessage ||
+          // i18n-exempt: JA proposal generator copy (product language)
           `${client || '対象組織'}に対して、${objective || '提案の内容'} を governed に実現する提案です。`,
         chapters: storyChapters,
         tone: sanitizeProposalText(

@@ -27,7 +27,9 @@ function isGenericPresentationOrReport(goalSummary: string, previewText: string)
     normalizedGoal === 'create a deck' ||
     normalizedGoal === 'generate a report' ||
     normalizedGoal === 'create a report' ||
+    // i18n-exempt: JA preview keyword matcher
     normalizedPreview === 'powerpoint 資料を生成しました。'.toLowerCase() ||
+    // i18n-exempt: JA preview keyword matcher
     normalizedPreview === 'レポート文書を生成しました。'.toLowerCase()
   );
 }

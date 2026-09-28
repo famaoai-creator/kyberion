@@ -14,10 +14,12 @@ export const simulateTelegram = defineScript({
     }
 
     logger.info('🚀 Starting Telegram Flow Simulation...');
+    // i18n-exempt: JA demo inbound text
     logger.info('📥 Inbound Message: "Telegram連携を試して"');
 
     const result = await runSurfaceMessageConversation({
       surface: 'telegram',
+      // i18n-exempt: JA demo inbound text
       text: 'Telegram連携を試して',
       locale: 'ja',
       channel: '123456789',

@@ -17,11 +17,15 @@ const VIDEO_PATH = `${OUT_DIR}/kyberion-product-intro.mp4`;
 const BUNDLE_DIR = `${OUT_DIR}/video-composition/kyberion-product-intro`;
 
 const VOICE_SCRIPT =
+  // i18n-exempt: JA demo video script content
   'Kyberionは曖昧な指示をそのまま実行しません。まず人間と意図を合意し、検証可能な活動定義に変換します。そのうえで安全なサンドボックスでタスクを実行し、実行ログと成果物の系統関係をエビデンスとして残します。さらに Quality Gate による多層検証で、成果物の信頼性と再現性を高めます。さあ、Kyberionを動かして、自律オペレーションを始めましょう。';
 
+// i18n-exempt: JA demo video script content
 const HOOK = 'Kyberionは曖昧な指示をそのまま実行しません。';
 const FEATURE =
+  // i18n-exempt: JA demo video script content
   '意図を合意し、検証可能な活動定義に変換してから、安全なサンドボックスで実行。Trace と Quality Gate で再現性を担保します。';
+// i18n-exempt: JA demo video script content
 const CTA = 'さあ、Kyberionを動かして自律オペレーションを始めましょう。';
 
 async function main() {
@@ -84,6 +88,7 @@ async function main() {
       narrated_video_brief: {
         kind: 'narrated-video-brief',
         version: '1.0.0',
+        // i18n-exempt: JA demo video script content
         title: 'Kyberion: 自律オペレーションへの招待',
         language: 'ja',
         script: { hook: HOOK, feature: FEATURE, cta: CTA },

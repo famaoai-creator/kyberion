@@ -27,6 +27,7 @@ async function main(print: (value: string) => void): Promise<void> {
     return;
   }
 
+  // i18n-exempt: JA test fixture
   const category = await classifyLocallyWithAppleFm('今週の進捗レポートを作って', [
     'document_production',
     'code_change',
@@ -36,6 +37,7 @@ async function main(print: (value: string) => void): Promise<void> {
   print(`[check:apple-fm] sample intent classification: ${category}`);
 
   const summary = await summarizeLocallyWithAppleFm(
+    // i18n-exempt: JA test fixture
     'ミッションでLP作成・デッキ作成・iOSアプリ検証を完了。レビュー1件が rework 指定。次はデザイン修正を行う。'
   );
   print(`[check:apple-fm] sample summary: ${summary}`);
@@ -54,6 +56,7 @@ async function main(print: (value: string) => void): Promise<void> {
     print(`[check:apple-fm] sample transcription: ${transcript}`);
   } else {
     print(
+      // i18n-exempt: JA test fixture
       '[check:apple-fm] transcription: set KYBERION_APPLE_FM_SAMPLE_AUDIO=<path> to demo (e.g. say -o /tmp/s.aiff "テスト")'
     );
   }

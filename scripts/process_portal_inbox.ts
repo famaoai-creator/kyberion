@@ -62,6 +62,7 @@ async function processInbox(print: Print = () => undefined): Promise<void> {
 
   print(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));
 
+  // i18n-exempt: JA demo/portal copy
   const thought = `Lord（上様）より「${request.intent}」との命を授かった。\n現在のロール（Architect）に基づき、単なるコマンド実行に留まらず、広範な影響調査を実施する。`;
 
   // 1. 中間報告
@@ -87,9 +88,11 @@ async function processInbox(print: Print = () => undefined): Promise<void> {
         'Recommended flow: use mission_controller to create a review mission, then execute a code/security review pipeline with evidence written under active/shared/tmp/ or the mission evidence directory.',
       ].join('\n');
     } else {
+      // i18n-exempt: JA demo/portal copy
       result = '意図を解釈しました。適切なスキルセットを起動します。';
     }
   } catch (_e) {
+    // i18n-exempt: JA demo/portal copy
     result = '実行中にエラーが発生しましたが、状況は把握しました。';
   }
 
@@ -99,6 +102,7 @@ async function processInbox(print: Print = () => undefined): Promise<void> {
     JSON.stringify(
       {
         status: 'complete',
+        // i18n-exempt: JA demo/portal copy
         thought: '任務完了。分析結果をポータルへ投影した。',
         result,
         timestamp: nowIso(),

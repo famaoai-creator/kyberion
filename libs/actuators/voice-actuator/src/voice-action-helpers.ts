@@ -217,6 +217,7 @@ export function buildAudioRouteViewModel(
   return {
     screen: 'audio-route-setup',
     status: available ? 'ready' : 'blocked',
+    // i18n-exempt: JA voice-surface copy (product language)
     status_text: available ? '経路を検証できます' : '経路を確認してください',
     steps: [
       {
@@ -226,7 +227,8 @@ export function buildAudioRouteViewModel(
             ? 'PulseAudio route status'
             : busId === 'stub'
               ? 'Stub audio route'
-              : '仮想オーディオドライバのインストール状態',
+              : // i18n-exempt: JA voice-surface copy (product language)
+                '仮想オーディオドライバのインストール状態',
         status: available ? 'pass' : 'action_required',
       },
       {
@@ -248,6 +250,7 @@ export function buildAudioRouteViewModel(
           : 'action_required',
       },
       { id: 'consent', label: '音声出力consent', status: 'operator_confirmation_required' },
+      // i18n-exempt: JA voice-surface copy (product language)
       { id: 'test', label: 'テスト文言を確認して開始', status: available ? 'ready' : 'blocked' },
     ],
     devices: devices.map((device) => ({

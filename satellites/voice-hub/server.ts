@@ -954,6 +954,7 @@ function normalizeTextForTts(text: string, language: SupportedLocale): string {
     .replace(/\s+/g, ' ')
     .replace(
       /REQ-[A-Z0-9-]+/g,
+      // i18n-exempt: bilingual inline label (JA branch intentional)
       profile.requestIdToken || (language === 'ja' ? 'リクエストID' : 'request id')
     )
     .replace(/https?:\/\/\S+/g, profile.urlToken || (language === 'ja' ? 'URL' : 'link'))

@@ -118,6 +118,7 @@ export async function runWithRepair(
             `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
           );
           logger.info(
+            // i18n-exempt: JA operator log (product language)
             `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
           );
         }
