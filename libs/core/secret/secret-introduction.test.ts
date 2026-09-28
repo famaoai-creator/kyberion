@@ -116,6 +116,13 @@ describe('secret-introduction façade', () => {
     const ttlMs = Date.parse(pending?.expiresAt ?? '') - Date.parse(pending?.requestedAt ?? '');
     expect(ttlMs).toBeGreaterThan(23 * 60 * 60 * 1000);
     expect(ttlMs).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 1000);
+    expect(pending?.decisionCard).toMatchObject({
+      riskTier: 'approve',
+      reversible: false,
+      deadline: pending?.expiresAt,
+    });
+    expect(pending?.decisionCard?.question).toContain('GEMINI_API_KEY');
+    expect(pending?.decisionCard?.riskReasons[0]).toBe('pending apply');
     await expect(
       applySecretIntroduction({
         approvalId: proposed.approvalId,

@@ -419,6 +419,13 @@ export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
 export * from './governance/autonomous-ops-gate.js';
 
 export * from './pipeline/patch-decision.js';
+export * from './governance/approval-veto-window.js';
+
+export * from './governance/approval-decision-card.js';
+
+export * from './governance/approval-digest.js';
+
+export * from './governance/approval-decision-routing.js';
 
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 

@@ -16,6 +16,7 @@ import { withLock } from '../foundation/lock-utils.js';
 import { resolveCustomerBinding } from '../customer-channel-binding.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { clamp } from '../foundation/text.js';
+import { recordApprovalDeliveryReceipt } from '../governance/approval-veto-window.js';
 
 export interface SurfaceOutboxRetryDecision {
   attempt_count: number;
@@ -116,6 +117,8 @@ export async function drainSurfaceOutbox(
       await deliver(message);
       recordSurfaceDeliverySuccess(surface, message.channel, message.scope);
       clearSurfaceOutboxMessage(surface, message.message_id, message.scope);
+      // A delivered decision card starts its veto clock (never before delivery).
+      recordApprovalDeliveryReceipt(message);
       delivered += 1;
     } catch (error) {
       settleSurfaceOutboxFailure(surface, message, error);
