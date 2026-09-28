@@ -40,7 +40,9 @@ export function normalizeSecretKey(secretKey: string): string {
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9_]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    // Anchored one-end trims avoid the ambiguous alternation polynomial regex.
+    .replace(/^_+/, '')
+    .replace(/_+$/, '');
   if (!SECRET_KEY_PATTERN.test(normalized)) {
     throw new Error(`[SECRET_IDENTITY_INVALID] secretKey is invalid: ${secretKey}`);
   }

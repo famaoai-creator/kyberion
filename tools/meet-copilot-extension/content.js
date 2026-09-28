@@ -18,8 +18,14 @@
 
   function detectPlatform() {
     const h = location.hostname;
-    if (h.includes('meet.google.com')) return 'meet';
-    if (h.includes('teams.microsoft.com') || h.includes('teams.live.com')) return 'teams';
+    if (h === 'meet.google.com' || h.endsWith('.meet.google.com')) return 'meet';
+    if (
+      h === 'teams.microsoft.com' ||
+      h.endsWith('.teams.microsoft.com') ||
+      h === 'teams.live.com' ||
+      h.endsWith('.teams.live.com')
+    )
+      return 'teams';
     if (h === 'zoom.us' || h.endsWith('.zoom.us')) return 'zoom';
     return 'meet';
   }

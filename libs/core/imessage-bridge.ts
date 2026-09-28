@@ -266,5 +266,5 @@ export function buildIMessageSendScript(request: {
   text: string;
   serviceName?: string;
 }): string {
-  return `tell application "Messages" to send "${request.text.replace(/"/g, '\\"')}" to buddy "${request.recipient}"`;
+  return `tell application "Messages" to send "${request.text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" to buddy "${request.recipient}"`;
 }

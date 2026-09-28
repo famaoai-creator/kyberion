@@ -282,6 +282,14 @@ finally {
 }
 
 // 2. Local File Secret Provider (Fallback for Headless Linux/Windows)
+const FORBIDDEN_SECRET_MAP_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function assertSafeSecretMapKey(key: string, label: 'service' | 'account'): void {
+  if (FORBIDDEN_SECRET_MAP_KEYS.has(key)) {
+    throw new Error(`[SECRET_BRIDGE_INVALID_KEY] ${label} may not be '${key}'`);
+  }
+}
+
 export class FileSecretProvider implements SecretProvider {
   readonly id = 'file_secrets';
 
@@ -332,6 +340,10 @@ export class FileSecretProvider implements SecretProvider {
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
+    // Prototype-pollution guard: secret names must never mutate the
+    // prototype chain of the in-memory secrets map.
+    assertSafeSecretMapKey(service, 'service');
+    assertSafeSecretMapKey(account, 'account');
     const secrets = this.readSecretsFile();
     if (!secrets[service]) secrets[service] = {};
     secrets[service][account] = value;
@@ -340,6 +352,8 @@ export class FileSecretProvider implements SecretProvider {
   }
 
   async delete(service: string, account: string): Promise<void> {
+    assertSafeSecretMapKey(service, 'service');
+    assertSafeSecretMapKey(account, 'account');
     const secrets = this.readSecretsFile();
     if (secrets[service]) {
       delete secrets[service][account];

@@ -63,7 +63,7 @@ function checkImageTierIsolation(): void {
     const negated = line.slice(1);
     if (
       protectedRoots.some(
-        (root) => negated.startsWith(root.replace('*', '')) || negated.includes(root)
+        (root) => negated.startsWith(root.replace(/\*/g, '')) || negated.includes(root)
       )
     ) {
       failures.push({

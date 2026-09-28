@@ -850,9 +850,12 @@ function extractTextFromSlideXml(xml: string): string[] {
   const results: string[] = [];
   const shapes = xml.match(/<p:sp[ >][\s\S]*?<\/p:sp>/g) || [];
   for (const shape of shapes) {
-    const txBody = shape.match(/<p:txBody>[\s\S]*?<\/p:txBody>/);
-    if (!txBody) continue;
-    const combined = paragraphTexts(txBody[0]).join('\n');
+    const txBodyStart = shape.indexOf('<p:txBody>');
+    const txBodyEnd = shape.indexOf('</p:txBody>');
+    if (txBodyStart < 0 || txBodyEnd < 0) continue;
+    const combined = paragraphTexts(
+      shape.slice(txBodyStart, txBodyEnd + '</p:txBody>'.length)
+    ).join('\n');
     if (combined.trim()) results.push(combined);
   }
   return results;

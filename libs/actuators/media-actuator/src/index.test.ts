@@ -45,7 +45,6 @@ import type { PptxDesignProtocol, PptxElement } from '@agent/core/media/media-co
 
 function decodeXmlEntities(value: string): string {
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')

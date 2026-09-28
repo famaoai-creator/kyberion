@@ -123,7 +123,8 @@ function sanitizeSeedFragment(value: string): string {
   return String(value)
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 
 function inferSpecialistForArtifact(artifactId: string): string {

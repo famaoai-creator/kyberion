@@ -200,8 +200,8 @@ function nativeScriptAvailable(
 function interpolateConnection(value: unknown, variables: Record<string, string>): unknown {
   if (typeof value === 'string') {
     return value.replace(
-      /\{\{\s*([^}]+)\s*\}\}/gu,
-      (match: string, key: string) => variables[key] ?? match
+      /\{\{([^}]*)\}\}/gu,
+      (match: string, key: string) => variables[key.trim()] ?? match
     );
   }
   if (Array.isArray(value)) return value.map((entry) => interpolateConnection(entry, variables));

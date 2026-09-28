@@ -46,7 +46,7 @@ export function resetBrowserAutomationRuntimeCalibrationActuatorForTest(): void 
 }
 
 function uniqueSessionId(providerId: string): string {
-  return `seam-calibration--${providerId}--${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `seam-calibration--${providerId}--${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`;
 }
 
 function isSuccessfulStatus(status: unknown): boolean {
