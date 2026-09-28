@@ -38,6 +38,7 @@ import {
   runInlineSystemShell,
   runInlineCoreWait,
   runInlineCoreJanitor,
+  runInlineCoreMissionHygiene,
   runInlineCoreTransform,
   CONTROL_ACTIONS,
 } from './pipeline-execution-part-bootstrap.js';
@@ -528,6 +529,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
     const { step, params, ctx } = dctx;
 
     return runInlineCoreJanitor(step, params, ctx);
+  },
+  'core:run_mission_hygiene': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return runInlineCoreMissionHygiene(step, params, ctx);
   },
   'core:parse_proposal_brief': async (dctx) => {
     const { step, params, ctx } = dctx;

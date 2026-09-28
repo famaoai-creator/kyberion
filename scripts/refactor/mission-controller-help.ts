@@ -43,6 +43,8 @@ Lifecycle Commands:
                                  --dispatch-final-status review|done
   hygiene [--notify]             List stuck planned missions with per-mission remediation
                                  --stale-days N (default 2) --abandoned-days N (default 14)
+  sweep-empty-dirs [--execute]   Preview ledger-free empty dirs under active/missions
+                                 (--execute removes; file-free subtrees only)
 
 Delegation Commands:
   delegate <ID> <agent_id> <a2a_message_id>

@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "mission-hygiene-weekly",
+  "name": "Mission Hygiene Weekly Report",
+  "version": "1.0.0",
+  "description": "Weekly dry-run mission hygiene audit via core:run_mission_hygiene — stuck/abandoned missions, purge preview, and empty mission-dir candidates. Applies no state changes; writes an operator report to runtime/reports.",
+  "schedule": {
+    "id": "mission-hygiene-weekly",
+    "cron": "0 9 * * 3",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🧹 [MISSION-HYGIENE] Weekly dry-run audit..." }
+    },
+    {
+      "id": "hygiene-scan",
+      "role": "source",
+      "op": "core:run_mission_hygiene",
+      "produces": { "channel": "mission_hygiene_report", "type": "Json" },
+      "params": { "export_as": "mission_hygiene_report" }
+    },
+    {
+      "id": "write_report",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "mission_hygiene_report",
+      "params": {
+        "path": "active/shared/runtime/reports/mission-hygiene-report.md",
+        "content": "# Mission Hygiene Report\n\n{{mission_hygiene_report.line}}\n\n## Findings\n\n```json\n{{mission_hygiene_report.report}}\n```\n\n## purge (dry-run preview — nothing applied)\n\n```json\n{{mission_hygiene_report.purge_preview}}\n```\n\n## Empty mission dirs (candidates — nothing applied)\n\n```json\n{{mission_hygiene_report.empty_mission_dirs}}\n```\n\n## Next actions\n- Inspect: `pnpm mission status <ID>` / `pnpm mission triage <ID>`\n- Close one: `pnpm mission cancel <ID>` → `pnpm mission archive --mission <ID> --execute`\n- Bulk: `pnpm mission purge --execute` (only after reviewing the dry-run list above)\n- Empty dirs: `pnpm mission sweep-empty-dirs --execute`\n"
+      }
+    }
+  ]
+}

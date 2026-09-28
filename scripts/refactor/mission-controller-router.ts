@@ -1128,6 +1128,25 @@ export async function runMissionControllerAction(
     case 'review-reenter':
       await context.reenterMissionFromReview(arg1!);
       break;
+    case 'sweep-empty-dirs': {
+      // Ledger-free directory debris under active/missions/: removes only
+      // dirs whose whole subtree holds no real file (dry-run by default).
+      const { sweepEmptyMissionDirs } = await import('@agent/core/storage-janitor');
+      const execute = context.argv.includes('--execute');
+      const result = sweepEmptyMissionDirs({ dryRun: !execute });
+      context.print?.(
+        execute
+          ? `sweep-empty-dirs: removed ${result.removed.length} dirs (${result.candidates.length} candidates, ${result.errors.length} errors)`
+          : `sweep-empty-dirs (dry-run): ${result.candidates.length} candidates — rerun with --execute to remove`
+      );
+      const shown = (execute ? result.removed : result.candidates).slice(0, 50);
+      for (const dir of shown) context.print?.(`  ${dir}`);
+      if ((execute ? result.removed : result.candidates).length > shown.length) {
+        context.print?.('  … (truncated; re-run for full list)');
+      }
+      for (const error of result.errors.slice(0, 20)) context.print?.(`  ERROR: ${error}`);
+      break;
+    }
     case 'purge':
       await context.purgeMissions(!context.argv.includes('--execute'));
       break;

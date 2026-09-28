@@ -124,6 +124,7 @@ import {
   scanDataVault,
   sweepDelegationChildren,
   sweepWorkspaces,
+  sweepEmptyMissionDirs,
   sweepTrash,
   restoreFromTrash,
   listReviewRequiredDirs,
@@ -1594,6 +1595,105 @@ describe('storage-janitor', () => {
       fs.rmSync(markerPath, { force: true });
       fs.mkdirSync(markerPath, { recursive: true });
       expect(readSchedulerOpsAlertDays()).toBeNull();
+    });
+  });
+
+  describe('sweepEmptyMissionDirs', () => {
+    const missionsDir = () => path.join(testRootDir(), 'active', 'missions');
+
+    it('removes a fully file-free mission dir and cascades its empty subdirs', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-EMPTY-001');
+      fs.mkdirSync(path.join(mission, 'coordination'), { recursive: true });
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).toContain('active/missions/public/MSN-EMPTY-001/coordination');
+      expect(result.removed).toContain('active/missions/public/MSN-EMPTY-001');
+      expect(fs.existsSync(mission)).toBe(false);
+      // tier root itself is protected even when it becomes empty
+      expect(fs.existsSync(path.join(missionsDir(), 'public'))).toBe(true);
+    });
+
+    it('keeps a mission dir that holds any file (ledger never deletable here)', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-LEDGER-001');
+      writeFile(path.join(mission, 'mission-state.json'), '{}');
+      fs.mkdirSync(path.join(mission, 'empty-subdir'), { recursive: true });
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).not.toContain('active/missions/public/MSN-LEDGER-001');
+      expect(fs.existsSync(path.join(mission, 'mission-state.json'))).toBe(true);
+      // empty subdirs inside a ledger-bearing mission are still debris
+      expect(fs.existsSync(path.join(mission, 'empty-subdir'))).toBe(false);
+    });
+
+    it('protects a scope container whose nested mission still has files', () => {
+      const nested = path.join(missionsDir(), 'public', 'default', 'MSN-NESTED-1');
+      writeFile(path.join(nested, 'NEXT_TASKS.json'), '[]');
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).not.toContain('active/missions/public/default');
+      expect(result.removed).not.toContain('active/missions/public/default/MSN-NESTED-1');
+      expect(fs.existsSync(nested)).toBe(true);
+    });
+
+    it('removes a fully-empty nested mission dir inside a scope container but keeps the container', () => {
+      const container = path.join(missionsDir(), 'public', 'default');
+      const nested = path.join(container, 'MSN-EMPTY-NESTED');
+      fs.mkdirSync(nested, { recursive: true });
+      writeFile(path.join(container, 'other', 'mission-state.json'), '{}');
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).toContain('active/missions/public/default/MSN-EMPTY-NESTED');
+      expect(fs.existsSync(nested)).toBe(false);
+      expect(fs.existsSync(container)).toBe(true);
+    });
+
+    it('dryRun lists candidates without removing anything', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-DRY-001');
+      fs.mkdirSync(mission, { recursive: true });
+
+      const result = sweepEmptyMissionDirs({ dryRun: true });
+      expect(result.candidates).toContain('active/missions/public/MSN-DRY-001');
+      expect(result.removed).toHaveLength(0);
+      expect(fs.existsSync(mission)).toBe(true);
+    });
+
+    it('removes a dir whose only file is OS debris (.DS_Store)', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-DS-001');
+      writeFile(path.join(mission, '.DS_Store'));
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).toContain('active/missions/public/MSN-DS-001');
+      expect(fs.existsSync(mission)).toBe(false);
+    });
+
+    it('never removes a tree containing a symlink', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-LINK-001');
+      fs.mkdirSync(mission, { recursive: true });
+      fs.symlinkSync('/nonexistent-target', path.join(mission, 'dangling-link'));
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.removed).not.toContain('active/missions/public/MSN-LINK-001');
+      expect(fs.existsSync(mission)).toBe(true);
+    });
+
+    it('never descends into .git / node_modules internals', () => {
+      const mission = path.join(missionsDir(), 'public', 'MSN-GIT-001');
+      fs.mkdirSync(path.join(mission, '.git', 'objects', 'pack'), { recursive: true });
+      writeFile(path.join(mission, '.git', 'HEAD'), 'ref: refs/heads/main');
+      writeFile(path.join(mission, 'mission-state.json'), '{}');
+
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.candidates).not.toContain(
+        'active/missions/public/MSN-GIT-001/.git/objects/pack'
+      );
+      expect(fs.existsSync(path.join(mission, '.git', 'objects', 'pack'))).toBe(true);
+    });
+
+    it('returns empty when active/missions does not exist', () => {
+      const result = sweepEmptyMissionDirs({ dryRun: false });
+      expect(result.candidates).toHaveLength(0);
+      expect(result.removed).toHaveLength(0);
+      expect(result.errors).toHaveLength(0);
     });
   });
 });
