@@ -17,7 +17,7 @@ on:
 
 jobs:
   build-and-smoke:
-    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}
+    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}${{ matrix.os != 'windows-latest' && format(' / shard {0}/{1}', matrix.shard, matrix.total) || '' }}
     runs-on: ${{ matrix.os }}
     # The Unix core suite takes ~21 minutes on macOS; build, follow-up smoke
     # checks, and post-job cache save push the full job past 30 minutes.
@@ -28,6 +28,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [24]
+        shard: [1, 2, 3]
+        total: [3]
+        exclude:
+          - os: windows-latest
+            shard: 2
+          - os: windows-latest
+            shard: 3
     steps:
       - uses: actions/checkout@v4
 
@@ -81,12 +88,12 @@ jobs:
       # assertions and host-only fixtures (sqlite3, ffmpeg, and macOS/Linux
       # media backends). Keep that coverage on the Unix runners and exercise
       # the Windows-native surface with its platform-focused suite below.
-      - name: Unit tests (core)
+      - name: Unit tests (core, shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
         if: runner.os != 'Windows'
-        run: pnpm test -- --suite core
+        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
 
       - name: Unit tests (Windows native)
         if: runner.os == 'Windows'
