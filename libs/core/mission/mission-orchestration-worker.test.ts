@@ -2071,9 +2071,30 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         route_reason: 'phase_kind=mechanical -> small/low',
       },
     });
-    mocks.route
-      .mockRejectedValueOnce(new AgentBusyError('busy', 10))
-      .mockResolvedValueOnce({
+    // Dispatch order inside a wave is completion-driven: under parallel test
+    // load either task may reach the route first, so the mock cannot assume a
+    // call sequence. Branch on the task id embedded in header.msg_id instead.
+    let busyAttempts = 0;
+    mocks.route.mockImplementation((request: { header?: { msg_id?: string } }) => {
+      const msgId = String(request?.header?.msg_id ?? '');
+      if (msgId.includes('task-busy')) {
+        busyAttempts += 1;
+        if (busyAttempts === 1) {
+          return Promise.reject(new AgentBusyError('busy', 10));
+        }
+        return Promise.resolve({
+          payload: {
+            text: makeTaskResultText({
+              summary: 'Completed the busy task after retry.',
+              artifacts: [{ path: 'deliverables/busy.md', kind: 'markdown' }],
+              verification_done: ['Confirmed the busy output.'],
+              gaps: [],
+              needs: [],
+            }),
+          },
+        });
+      }
+      return Promise.resolve({
         payload: {
           text: makeTaskResultText({
             summary: 'Completed the stable task.',
@@ -2083,18 +2104,8 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
             needs: [],
           }),
         },
-      })
-      .mockResolvedValueOnce({
-        payload: {
-          text: makeTaskResultText({
-            summary: 'Completed the busy task after retry.',
-            artifacts: [{ path: 'deliverables/busy.md', kind: 'markdown' }],
-            verification_done: ['Confirmed the busy output.'],
-            gaps: [],
-            needs: [],
-          }),
-        },
       });
+    });
 
     const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
 
