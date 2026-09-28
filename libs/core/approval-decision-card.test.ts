@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   decisionCardActionLabel,
   effectiveInterventionLevel,
+  neutralizeSurfaceMarkup,
   renderDecisionCardExplanation,
   renderDecisionCardText,
   resolveInterventionLevel,
@@ -224,5 +225,22 @@ describe('decision card view', () => {
     const explanation = renderDecisionCardExplanation(view, 'en');
     expect(explanation).toContain('Why this reached you');
     expect(explanation).toContain('No policy escalation was recorded');
+  });
+});
+
+describe('neutralizeSurfaceMarkup', () => {
+  const hostile = 'See [the plan](https://evil.invalid) <!channel> @everyone *now*';
+
+  it('keeps disguised links and mass mentions out of every surface', () => {
+    expect(neutralizeSurfaceMarkup(hostile, 'slack')).toBe(
+      'See [the plan](https://evil.invalid) &lt;!channel&gt; @everyone *now*'
+    );
+    expect(neutralizeSurfaceMarkup(hostile, 'telegram')).toBe(
+      'See \\[the plan](https://evil.invalid) <!channel> @everyone \\*now\\*'
+    );
+    const discord = neutralizeSurfaceMarkup(hostile, 'discord');
+    expect(discord).toContain('\\[the plan\\]\\(https://evil.invalid\\)');
+    expect(discord).toContain('@\u200beveryone');
+    expect(neutralizeSurfaceMarkup(hostile, 'imessage')).toBe(hostile);
   });
 });

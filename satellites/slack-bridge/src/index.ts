@@ -327,6 +327,29 @@ async function postSlackText(
   return response;
 }
 
+/**
+ * Text replies to approval and decision cards (`承認` / `異議` / `appr:<id>:reject` …).
+ * Autonomy cards arrive through the outbox as plain text without buttons, so
+ * this is the only way to object to one from Slack. Returns null for ordinary
+ * messages; the caller must have authorized the sender already.
+ */
+export function resolveSlackApprovalText(params: {
+  channel: string;
+  threadTs: string;
+  text: string;
+  actorId: string;
+}): string | null {
+  const resolved = resolveSurfaceApprovalReply({
+    surface: 'slack',
+    channel: params.channel,
+    threadTs: params.threadTs,
+    text: params.text,
+    decidedBy: params.actorId,
+    locale: resolveOperatorLocale(),
+  });
+  return resolved.handled ? resolved.reply || '' : null;
+}
+
 async function postApprovalRequest(
   client: SlackClient,
   params: {
@@ -655,6 +678,26 @@ async function start(_args: string[] = []) {
       logger.warn(
         `[SlackBridge] Ignored unauthorized message from sender: ${message.user || 'unknown'} (${access.reason})`
       );
+      return;
+    }
+
+    try {
+      const approvalReply = resolveSlackApprovalText({
+        channel: message.channel,
+        threadTs,
+        text: message.text,
+        actorId: message.user || 'unknown',
+      });
+      if (approvalReply !== null) {
+        await postSlackText(client, {
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: approvalReply,
+        });
+        return;
+      }
+    } catch (err) {
+      logger.error(`❌ [SlackBridge] Approval reply handling failed: ${errorDetail(err)}`);
       return;
     }
 
