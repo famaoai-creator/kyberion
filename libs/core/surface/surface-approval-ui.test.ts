@@ -12,6 +12,7 @@ import {
 import { withExecutionContext } from '../authority.js';
 import {
   applySurfaceApprovalDecision,
+  buildDecisionCardActions,
   buildSurfaceApprovalActions,
   buildSurfaceApprovalAskWhyActions,
   buildSurfaceApprovalText,
@@ -478,5 +479,122 @@ describe('surface-approval-ui', () => {
       record: { status: 'rejected' },
     });
     expect(reason.reply).toContain('quality');
+  });
+});
+
+describe('surface-approval-ui decision cards', () => {
+  const card = {
+    question: 'Ship the billing change?',
+    recommendation: 'Approve after CI is green.',
+    riskTier: 'approve' as const,
+    riskReasons: ['touches billing'],
+    reversible: false,
+    evidence: [{ label: 'PR', ref: 'https://example.com/pr/1' }],
+  };
+
+  function createCardRequest(suffix: string, withCard = true) {
+    return createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: `thread-card-${suffix}`,
+      correlationId: `surface-approval-test-${RUN_ID}-card-${suffix}`,
+      requestedBy: 'agent',
+      draft: { title: 'Billing change', summary: 'Adjust invoice rounding.' },
+      ...(withCard ? { decisionCard: card } : {}),
+    });
+  }
+
+  function reply(recordThread: string, text: string, threadTs = recordThread) {
+    return resolveSurfaceApprovalReply({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs,
+      text,
+      decidedBy: 'human-1',
+      locale: 'en',
+    });
+  }
+
+  it('offers four actions with a card and keeps the legacy two without one', () => {
+    expect(buildDecisionCardActions(createCardRequest('actions')).map((a) => a.kind)).toEqual([
+      'approve',
+      'changes',
+      'reject',
+      'explain',
+    ]);
+    const legacy = createCardRequest('legacy', false);
+    expect(buildDecisionCardActions(legacy).map((a) => a.callbackData)).toEqual([
+      `appr:${legacy.id}:approve`,
+      `appr:${legacy.id}:reject`,
+    ]);
+  });
+
+  it('renders the card body when the request carries one', () => {
+    const text = buildSurfaceApprovalText('telegram', createCardRequest('text'), undefined, {
+      locale: 'en',
+    });
+    // Level first, then the question, why a human is needed, undo, and what silence means.
+    expect(text.split('\n')[0]).toBe(t('decision:level_decide', undefined, 'en'));
+    expect(text).toContain('Ship the billing change?');
+    expect(text).toContain('touches billing');
+    expect(text).toContain(t('decision:reversible_no', undefined, 'en'));
+    expect(text).toContain(t('decision:if_no_response_decide', undefined, 'en'));
+  });
+
+  it('answers "ask why" from the stored rationale and leaves the request pending', () => {
+    const record = createCardRequest('explain');
+    const result = reply(record.threadTs, `appr:${record.id}:explain`);
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain('touches billing');
+    expect(result.reply).toContain('Approve after CI is green.');
+    expect(result.reply).toContain('https://example.com/pr/1');
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
+  });
+
+  it('says there is no rationale when a legacy request has none', () => {
+    const record = createCardRequest('no-rationale', false);
+    expect(reply(record.threadTs, `appr:${record.id}:explain`).reply).toContain(
+      t('decision:explain_no_reasons', undefined, 'en')
+    );
+  });
+
+  it('prompts for the instruction, then records changes as a rejection with it', () => {
+    const record = createCardRequest('changes');
+    const prompt = reply(record.threadTs, `appr:${record.id}:changes`);
+    expect(prompt).toMatchObject({ handled: true, forceReply: true });
+    expect(prompt.reply).toContain(`appr:${record.id}:changes`);
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
+
+    const recorded = reply(record.threadTs, `appr:${record.id}:changes round half-even instead`);
+    expect(recorded.reply).toBe(
+      t('bridge:decision_card_changes_recorded', { title: 'Billing change' }, 'en')
+    );
+    expect(loadApprovalRequest('telegram', record.id)).toMatchObject({
+      status: 'rejected',
+      changeRequest: { instruction: 'round half-even instead', requestedBy: 'human-1' },
+    });
+  });
+
+  it('refuses an over-long change instruction without deciding', () => {
+    const record = createCardRequest('too-long');
+    const result = reply(record.threadTs, `appr:${record.id}:changes ${'x'.repeat(2001)}`);
+    expect(result.reply).toBe(t('bridge:decision_card_changes_too_long', { max: 2000 }, 'en'));
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
+  });
+
+  it('only accepts change requests on requests that carry a card', () => {
+    const record = createCardRequest('changes-legacy', false);
+    reply(record.threadTs, `appr:${record.id}:changes do it`);
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
+  });
+
+  it('refuses card actions from another thread', () => {
+    const record = createCardRequest('thread');
+    for (const text of [`appr:${record.id}:explain`, `appr:${record.id}:changes do it`]) {
+      expect(reply(record.threadTs, text, 'thread-other').reply).toBe(
+        t('bridge:approval_request_other_thread', undefined, 'en')
+      );
+    }
+    expect(loadApprovalRequest('telegram', record.id)?.status).toBe('pending');
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  APPROVAL_CHANGE_INSTRUCTION_MAX,
   VITEST_APPROVAL_STORE_ROOT,
   approvalActionCacheKey,
   approvalEventLogicalPath,
@@ -102,6 +103,80 @@ describe('approval-store test isolation', () => {
         authenticated: true,
       })
     ).toThrow('has expired');
+  });
+});
+
+describe('approval-store decision card and change requests', () => {
+  const channel = `decision-card-probe-${process.pid}`;
+  const card = {
+    question: 'Ship it?',
+    recommendation: 'Approve.',
+    riskTier: 'approve' as const,
+    riskReasons: ['touches billing'],
+    reversible: false,
+    evidence: [{ label: 'PR', ref: 'https://example.com/pr/1' }],
+  };
+
+  afterEach(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const root of Object.values(approvalStoreRoots())) {
+        const dir = pathResolver.rootResolve(`${root}/${channel}`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  function create(decisionCard?: typeof card) {
+    return createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'decision-card-probe',
+      requestedBy: 'approval-store-test',
+      draft: { title: 'card probe', summary: 'written by approval-store.test.ts' },
+      ...(decisionCard ? { decisionCard } : {}),
+    });
+  }
+
+  it('stores a valid card and refuses a malformed one', () => {
+    expect(create(card).decisionCard).toEqual(card);
+    expect(() => create({ ...card, evidence: [{ label: 'x', ref: '../outside.json' }] })).toThrow(
+      /evidence/u
+    );
+  });
+
+  it('records a change instruction only on a rejection', () => {
+    const record = create(card);
+    expect(() =>
+      decideApprovalRequest('mission_controller', {
+        channel,
+        requestId: record.id,
+        decision: 'approved',
+        decidedBy: 'operator',
+        changeInstruction: 'shorten it',
+      })
+    ).toThrow();
+    expect(() =>
+      decideApprovalRequest('mission_controller', {
+        channel,
+        requestId: record.id,
+        decision: 'rejected',
+        decidedBy: 'operator',
+        changeInstruction: 'x'.repeat(APPROVAL_CHANGE_INSTRUCTION_MAX + 1),
+      })
+    ).toThrow();
+
+    const decided = decideApprovalRequest('mission_controller', {
+      channel,
+      requestId: record.id,
+      decision: 'rejected',
+      decidedBy: 'operator',
+      changeInstruction: '  shorten the summary  ',
+    });
+    expect(decided.status).toBe('rejected');
+    expect(decided.changeRequest).toMatchObject({
+      instruction: 'shorten the summary',
+      requestedBy: 'operator',
+    });
   });
 });
 

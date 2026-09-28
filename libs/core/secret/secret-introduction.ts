@@ -17,6 +17,8 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { ledger } from '../ledger.js';
+import { evaluateAutonomousOpsAction } from '../governance/autonomous-ops-gate.js';
+import { buildDecisionCard } from '../governance/decision-card.js';
 import {
   listServiceSecretIdentities,
   parseEnvSecretName,
@@ -25,6 +27,7 @@ import {
 } from './secret-identity.js';
 import { fetchSecretSync, storeSecret } from './secret-bridge.js';
 import { getSecret, storeConnectionDocument } from './secret-guard.js';
+import { t } from '../t.js';
 
 const DEFAULT_CHANNEL = 'terminal';
 const DEFAULT_STORAGE_CHANNEL = 'terminal';
@@ -141,6 +144,8 @@ export function proposeSecretIntroduction(
     fetchSecretSync(identity.keychainService, identity.keychainAccount)
   );
 
+  const expiresAt = new Date(Date.now() + SECRET_INTRODUCTION_PENDING_TTL_MS).toISOString();
+  const reason = input.reason.trim() || 'Operator-requested secret introduction';
   const record = createApprovalRequest('mission_controller', {
     channel,
     storageChannel,
@@ -148,7 +153,7 @@ export function proposeSecretIntroduction(
     correlationId,
     requestedBy,
     kind: 'secret_mutation',
-    expiresAt: new Date(Date.now() + SECRET_INTRODUCTION_PENDING_TTL_MS).toISOString(),
+    expiresAt,
     draft: {
       title: `${mutation === 'rotate' ? 'Rotate' : 'Introduce'} secret: ${identity.envName}`,
       summary: `Governed introduction of ${identity.envName} for service ${identity.serviceId}.`,
@@ -169,7 +174,7 @@ export function proposeSecretIntroduction(
       existingValuePresent: existingPresent,
     },
     justification: {
-      reason: input.reason.trim() || 'Operator-requested secret introduction',
+      reason,
       impactSummary: input.impactSummary || 'Enables service binding for the named credential.',
     },
     risk: {
@@ -188,6 +193,20 @@ export function proposeSecretIntroduction(
       missionId: getRegisteredEnvText('MISSION_ID') || undefined,
       agentId: requestedBy,
     },
+    decisionCard: buildDecisionCard({
+      question: t(
+        mutation === 'rotate'
+          ? 'bridge:secret_card_question_rotate'
+          : 'bridge:secret_card_question_set',
+        { envName: identity.envName, serviceId: identity.serviceId }
+      ),
+      recommendation: t('bridge:secret_card_recommendation'),
+      gate: evaluateAutonomousOpsAction({ actionId: 'secret_mutation' }),
+      riskTier: 'approve',
+      riskReasons: [reason],
+      reversible: false,
+      deadline: expiresAt,
+    }),
   });
 
   let status = record.status;

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChannelAdapter } from '@agent/core/surface/channel-adapter';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
@@ -40,8 +40,18 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
 });
 
 import {
+  approvalStoreRoots,
+  createApprovalRequest,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
+import { buildVetoWindow } from '@agent/core/governance/approval-veto-window';
+import { withExecutionContext } from '@agent/core/authority';
+import { buildDecisionCard } from '@agent/core/governance/decision-card';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import {
   collectSlackThreadContext,
   createSlackTypingHandle,
+  resolveSlackApprovalText,
   runSlackChannelTurn,
 } from './index.js';
 
@@ -250,5 +260,56 @@ describe('slack bridge channel turn', () => {
       'history unavailable'
     );
     expect(calls).toEqual(['thread-context']);
+  });
+});
+
+describe('slack approval text replies', () => {
+  afterEach(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const root of Object.values(approvalStoreRoots())) {
+        const dir = pathResolver.rootResolve(`${root}/autonomy`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('lets the operator object to an autonomy card that arrived as plain text', () => {
+    const record = createApprovalRequest('mission_controller', {
+      channel: 'C-ops',
+      storageChannel: 'autonomy',
+      threadTs: '',
+      correlationId: 'slack-veto-test',
+      requestedBy: 'agent:test',
+      draft: { title: 'Merge PR 42', summary: 'Merge PR 42 into main?' },
+      decisionCard: buildDecisionCard({
+        question: 'Merge PR 42 into main?',
+        recommendation: 'Approve',
+        riskTier: 'notify',
+        level: 'veto',
+        deliveredVia: { surface: 'slack', target: 'C-ops' },
+      }),
+      veto: buildVetoWindow({ windowMinutes: 120 }),
+    });
+
+    expect(
+      resolveSlackApprovalText({
+        channel: 'C-ops',
+        threadTs: '1700000000.000100',
+        text: 'hello there',
+        actorId: 'U-operator',
+      })
+    ).toBeNull();
+
+    const reply = resolveSlackApprovalText({
+      channel: 'C-ops',
+      threadTs: '1700000000.000100',
+      text: '異議',
+      actorId: 'U-operator',
+    });
+    expect(reply).toContain('Merge PR 42');
+    expect(loadApprovalRequest('autonomy', record.id)).toMatchObject({
+      status: 'rejected',
+      decidedByType: 'human',
+    });
   });
 });
