@@ -1199,7 +1199,7 @@ export function runRestoreDrill(options: BackupCliOptions): {
     safeMkdir(path.dirname(target));
     runRequired(
       'git',
-      ['clone', '--local', '--no-hardlinks', pathResolver.rootDir(), target],
+      ['clone', '--local', '--no-hardlinks', '--', pathResolver.rootDir(), target],
       'clean checkout preparation failed'
     );
     if (options.verifyBaseline) {

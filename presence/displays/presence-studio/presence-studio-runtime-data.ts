@@ -869,7 +869,9 @@ export function playTimeline(timeline: PresenceTimelineAdf): {
   if (timeline.title) {
     updatePresenceSurface(surfaceId, { title: timeline.title });
   }
-  const timers = timeline.events.map((event) =>
+  // Cap scheduled timers — an unbounded events array could exhaust the
+  // Node timer queue for this dev surface.
+  const timers = timeline.events.slice(0, 500).map((event) =>
     setTimeout(() => {
       applyTimelineEvent(surfaceId, timeline, event);
     }, event.at_ms)

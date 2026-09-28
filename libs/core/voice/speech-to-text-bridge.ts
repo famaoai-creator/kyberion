@@ -558,9 +558,12 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     // locale (identity/env/OS) instead of an empty string, matching the
     // stub bridge above and `python-voice-bridge.ts`'s TTS language (I18N-01).
     const resolvedLanguage = input.language ?? resolveLocale();
+    // Shell-quote substituted values: audioAbs comes from caller input and
+    // could otherwise inject shell syntax into the -c command string.
+    const shellQuote = (value: string): string => `'${value.replace(/'/g, "'\\''")}'`;
     const cmd = this.options.command
-      .replace(/\{\{audio\}\}/gu, audioAbs)
-      .replace(/\{\{language\}\}/gu, resolvedLanguage);
+      .replace(/\{\{audio\}\}/gu, shellQuote(audioAbs))
+      .replace(/\{\{language\}\}/gu, shellQuote(resolvedLanguage));
     const shell = this.options.shell ?? envText(process.env, 'SHELL') ?? '/bin/sh';
     const stdout = execFileSync(shell, ['-c', cmd], {
       encoding: 'utf8',

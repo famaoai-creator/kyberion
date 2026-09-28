@@ -770,14 +770,14 @@ export async function handleTaskSessionRoute(
 
       // 2. Strip HTML tags and extract readable text
       const plainTextRaw = String(rawHtml)
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
+        .replace(/<script[^<>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^<>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^<>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
         .replace(/\s{2,}/g, ' ')
         .trim();
       const plainTextPreview = truncateTextWithCount(plainTextRaw, 4000);

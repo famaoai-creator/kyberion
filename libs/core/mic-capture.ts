@@ -112,7 +112,7 @@ class WindowsMicCaptureAdapter implements MicCapturePlatformAdapter {
       '-f',
       'dshow',
       '-i',
-      `audio="${device.replace(/"/g, '\\"')}"`,
+      `audio="${device.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
       '-ac',
       '1',
       '-ar',

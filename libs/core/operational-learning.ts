@@ -26,7 +26,8 @@ function slug(value: string): string {
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'signal'
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || 'signal'
   );
 }
 

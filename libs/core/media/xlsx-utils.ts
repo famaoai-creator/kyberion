@@ -40,7 +40,7 @@ function getAttr(xml: string, attr: string): string | undefined {
 }
 
 function getTagContent(xml: string, tag: string): string | undefined {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const re = new RegExp(`<${tag}[^<>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
   const m = xml.match(re);
   return m ? m[1] : undefined;
 }
@@ -882,7 +882,7 @@ function extractDrawingText(txBodyXml: string): { plainText: string; runs: XlsxT
     // Direct <a:t> without runs
     const directT = getAllTags(txBodyXml, 'a:t');
     for (const t of directT) {
-      const content = t.replace(/<\/?a:t[^>]*>/g, '').trim();
+      const content = t.replace(/<\/?a:t[^<>]*>/g, '').trim();
       if (content) {
         plainText += content;
         runs.push({ text: content });
@@ -968,7 +968,7 @@ async function extractWorkbook(zip: JSZip): Promise<{
   const dnSource = dnTags.length > 0 ? dnTags : getAllTags(xml, 'x:definedName');
   for (const dn of dnSource) {
     const name = getAttr(dn, 'name') || '';
-    const value = dn.replace(/<[^>]+>/g, '').trim();
+    const value = dn.replace(/<[^<>]+>/g, '').trim();
     const localSheetId = getAttr(dn, 'localSheetId');
     result.definedNames.push({
       name,

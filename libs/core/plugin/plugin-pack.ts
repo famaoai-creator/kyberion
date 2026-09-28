@@ -308,7 +308,15 @@ function defaultFetcher(
   ref: string | undefined,
   destDir: string
 ): { commit?: string } {
-  const cloneArgs = ['clone', '--depth', '1', ...(ref ? ['--branch', ref] : []), url, destDir];
+  const cloneArgs = [
+    'clone',
+    '--depth',
+    '1',
+    ...(ref ? ['--branch', ref] : []),
+    '--',
+    url,
+    destDir,
+  ];
   const clone = safeExecResult('git', cloneArgs);
   if (clone.status !== 0) {
     throw new Error(`[plugin-pack] git clone failed: ${String(clone.stderr || '').slice(0, 500)}`);

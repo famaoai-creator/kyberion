@@ -5,8 +5,11 @@ import { isWindows } from '../platform.js';
 /**
  * Checks if a given CLI binary exists in the system PATH.
  */
+const SAFE_BINARY_NAME = /^[\w.+-]+$/u;
+
 export function checkBinary(bin: string): boolean {
   try {
+    if (!SAFE_BINARY_NAME.test(bin)) return false;
     const windowsHost = isWindows();
     const command = windowsHost ? `where ${bin}` : `command -v ${bin}`;
     execSync(command, { stdio: 'ignore' });

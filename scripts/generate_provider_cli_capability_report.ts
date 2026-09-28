@@ -74,7 +74,7 @@ function parseArg(args: string[], name: string, fallback?: string): string {
 }
 
 function formatTableRow(cols: string[]): string {
-  return `| ${cols.map((col) => col.replace(/\|/g, '\\|')).join(' | ')} |`;
+  return `| ${cols.map((col) => col.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')).join(' | ')} |`;
 }
 
 function buildReport(

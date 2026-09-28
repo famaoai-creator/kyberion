@@ -1224,11 +1224,16 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
  */
 export function sanitizePath(input: string): string {
   if (!input || typeof input !== 'string') return '';
-  return input
-    .replace(/\0/g, '')
-    .replace(/\.\.\//g, '')
-    .replace(/\.\.\\/g, '')
-    .replace(/^[/\\]+/, '');
+  // Collapse traversal segments until stable — a single pass can leave a new
+  // `../` behind (e.g. `....//`), which CodeQL's incomplete-sanitization rule
+  // and every consumer of this helper both treat as an unsafe outcome.
+  let s = input.replace(/\0/g, '');
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/\.\.[/\\]/g, '');
+  } while (s !== prev);
+  return s.replace(/^[/\\]+/, '');
 }
 
 /**

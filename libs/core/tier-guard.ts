@@ -333,7 +333,9 @@ export function isValidTenantGroupProfile(
     sharedPrefixes.every(
       (prefix) =>
         typeof prefix === 'string' &&
-        new RegExp(`^knowledge/confidential/shared/${groupId}/`).test(prefix)
+        new RegExp(`^knowledge/confidential/shared/${groupId.replace(/[^\w-]/gu, '')}/`).test(
+          prefix
+        )
     )
   );
 }

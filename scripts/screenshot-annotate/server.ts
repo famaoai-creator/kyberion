@@ -399,7 +399,10 @@ export function createScreenshotAnnotateRequestHandler(
     } catch (e: unknown) {
       if (!res.headersSent) {
         res.writeHead(500);
-        res.end(e instanceof Error ? e.message : String(e));
+        // Return a generic 500 — exception details stay in the server log
+        // (stack-trace-exposure / xss-through-exception hardening).
+        console.error(`[server:screenshot-annotate] request failed:`, e);
+        res.end('internal server error');
       }
     }
   };

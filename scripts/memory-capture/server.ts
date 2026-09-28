@@ -386,7 +386,7 @@ export async function main(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal error',
               });
             }
             print(`[memory-capture] ${e instanceof Error ? e.message : String(e)}`);
@@ -401,7 +401,10 @@ export async function main(
     } catch (e: unknown) {
       if (!res.headersSent) {
         res.writeHead(500);
-        res.end(e instanceof Error ? e.message : String(e));
+        // Return a generic 500 — exception details stay in the server log
+        // (stack-trace-exposure / xss-through-exception hardening).
+        console.error(`[server:memory-capture] request failed:`, e);
+        res.end('internal server error');
       }
     }
   });

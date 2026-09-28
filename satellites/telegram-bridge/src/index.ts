@@ -375,7 +375,9 @@ async function sendTelegramMessageSingle(
     };
   }
 
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   const parseMode = input.parseMode || options.parseMode || 'Markdown';
   let response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
     method: 'POST',
@@ -464,7 +466,9 @@ export async function sendTelegramTypingAction(
 ): Promise<void> {
   const token = resolveToken(options.token);
   if (options.dryRun || !token) return;
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   await fetch(`${apiBaseUrl}/bot${token}/sendChatAction`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -478,7 +482,9 @@ async function answerTelegramCallbackQuery(
 ): Promise<void> {
   const token = resolveToken(options.token);
   if (options.dryRun || !token) return;
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   await fetch(`${apiBaseUrl}/bot${token}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -978,7 +984,7 @@ async function main(args: string[] = []): Promise<void> {
       logger.error(`❌ [TelegramBridge] Request failed: ${errorDetail(error)}`);
       sendJson(res, 400, {
         ok: false,
-        error: errorDetail(error),
+        error: 'internal error',
       });
     }
   });

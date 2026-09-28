@@ -242,12 +242,12 @@ function firstCapture(xml: string, pattern: RegExp): string | undefined {
 
 function decodeXmlText(value: string): string {
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 function columnLettersToNumber(ref: string): number {

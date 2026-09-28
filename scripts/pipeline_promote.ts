@@ -134,6 +134,10 @@ function setParamPath(params: Record<string, unknown>, paramPath: string, value:
   }
   const leaf = segments[segments.length - 1];
   const leafKey: string | number = /^\d+$/.test(leaf) ? Number(leaf) : leaf;
+  // Prototype-pollution guard: never write into prototype-chain keys.
+  if (leafKey === '__proto__' || leafKey === 'constructor' || leafKey === 'prototype') {
+    return false;
+  }
   if (cursor == null || typeof cursor !== 'object' || !(leafKey in cursor)) return false;
   cursor[leafKey] = value;
   return true;

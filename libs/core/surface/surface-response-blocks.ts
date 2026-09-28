@@ -77,7 +77,10 @@ function stripReasoningTags(input: string): string {
     );
     if (openBoundary) {
       const afterOpen = line.slice(openBoundary[0].length);
-      const closeRegex = new RegExp(`</\\s*${openBoundary[1]}\\s*>`, 'i');
+      const closeRegex = new RegExp(
+        `</\\s*${openBoundary[1].replace(/[^a-zA-Z_]/g, '')}\\s*>`,
+        'i'
+      );
       const closeMatch = closeRegex.exec(afterOpen);
       if (closeMatch && closeMatch.index !== undefined) {
         line = afterOpen.slice(closeMatch.index + closeMatch[0].length);

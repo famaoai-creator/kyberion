@@ -74,6 +74,14 @@ export interface ResolutionResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const SAFE_BINARY_PATTERN = /^[\w.+-]+$/u;
+
+function assertSafeProbeBinary(binary: string): void {
+  if (!SAFE_BINARY_PATTERN.test(binary)) {
+    throw new Error(`[DEPENDENCY_RESOLVER] unsafe probe binary name: ${binary}`);
+  }
+}
+
 function tryExec(cmd: string): { ok: boolean; stdout: string } {
   try {
     const stdout = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -84,6 +92,7 @@ function tryExec(cmd: string): { ok: boolean; stdout: string } {
 }
 
 function checkBinary(binary: string): { ok: boolean; version?: string } {
+  assertSafeProbeBinary(binary);
   const result = tryExec(`${binary} --version`);
   if (result.ok) return { ok: true, version: result.stdout.split('\n')[0] };
   const which = tryExec(`which ${binary}`);

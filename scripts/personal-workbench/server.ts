@@ -390,7 +390,7 @@ export async function main(
           const tooLarge = error instanceof LocalPadRequestBodyTooLargeError;
           jsonResponse(res, tooLarge ? 413 : 400, {
             ok: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: 'internal error',
           });
         }
       })();

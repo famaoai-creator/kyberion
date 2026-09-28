@@ -159,7 +159,7 @@ function localizeContextualReason(
 ): string {
   if (locale !== 'ja') return reason;
   if (reason.startsWith('Missing inputs remain above the clarification threshold')) {
-    return `不足している入力は確認しきい値を超えています${reason.match(/\(([^)]+)\)/)?.[0] || ''}`;
+    return `不足している入力は確認しきい値を超えています${reason.slice(reason.indexOf('('), reason.lastIndexOf(')') + 1) || ''}`;
   }
   if (reason.startsWith('Missing critical inputs:')) {
     return `重要な不足入力があります: ${reason.replace(/^Missing critical inputs:\s*/u, '').replace(/\.$/u, '。')}`;
@@ -174,7 +174,7 @@ function localizeContextualReason(
     return '不足入力はポリシーの既定値で補完できます。';
   }
   if (reason.startsWith('The request can proceed with policy defaults because confidence is')) {
-    return `confidence ${reason.match(/([0-9.]+)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
+    return `confidence ${reason.match(/(\d+(?:\.\d+)*)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
   }
   return fallback;
 }

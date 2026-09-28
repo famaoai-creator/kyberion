@@ -206,10 +206,10 @@ export function buildShape(
     el.text.replace(/\s/g, '') !==
       el.pXmlLst
         .join('')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&amp;/g, '&')
+        .replace(/<[^<>]+>/g, '')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
         .replace(/\s/g, '');
 
   if (el.pXmlLst && el.pXmlLst.length > 0 && !isTextModified) {

@@ -62,7 +62,7 @@ export const { buildRetryOptions: buildVideoRetryOptions } = defineActuatorPipel
 
 export function deepResolve(val: any, ctx: any): any {
   if (typeof val === 'string') {
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
+    return val.replace(/{{([^{}]*)}}/g, (_, p) => {
       const key = String(p).split('|')[0].trim();
       const parts = key.split('.');
       let current = ctx;
