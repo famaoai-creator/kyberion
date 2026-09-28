@@ -153,7 +153,7 @@ function resolvePathToken(token: string): string | undefined {
  */
 export function resolveVars(
   input: string | undefined,
-  vars: Record<string, any>,
+  vars: Record<string, unknown>,
   maxDepth = 8
 ): string {
   if (!input) return '';
@@ -179,7 +179,7 @@ export function resolveVars(
   return out;
 }
 
-export function resolveTemplateValue(input: any, vars: Record<string, any>): any {
+export function resolveTemplateValue(input: unknown, vars: Record<string, unknown>): unknown {
   if (typeof input === 'string') {
     const trimmed = input.trim();
     const wholeVarMatch = trimmed.match(/^{{\s*([^}]+)\s*}}$/);
@@ -199,22 +199,28 @@ export function resolveTemplateValue(input: any, vars: Record<string, any>): any
   }
   if (input && typeof input === 'object') {
     return Object.fromEntries(
-      Object.entries(input).map(([key, value]) => [key, resolveTemplateValue(value, vars)])
+      Object.entries(input as Record<string, unknown>).map(([key, value]) => [
+        key,
+        resolveTemplateValue(value, vars),
+      ])
     );
   }
   return input;
 }
 
-export function normalizePresetResult(output: any, outputMapping?: Record<string, string>): any {
+export function normalizePresetResult(
+  output: unknown,
+  outputMapping?: Record<string, string>
+): unknown {
   if (!outputMapping || Object.keys(outputMapping).length === 0) return output;
   return transform(output, { type: 'json_map', mapping: outputMapping });
 }
 
-function resolveRecoveryPolicy(source: Record<string, any> | undefined): Record<string, any> {
+function resolveRecoveryPolicy(source: Record<string, unknown> | undefined): Record<string, any> {
   return isPlainObject(source?.recovery_policy) ? source.recovery_policy : {};
 }
 
-function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>): RetryPolicy {
+function resolveRetryPolicy(...sources: Array<Record<string, unknown> | undefined>): RetryPolicy {
   const merged: RetryPolicy = {};
   for (const source of sources) {
     const policy = resolveRecoveryPolicy(source);
@@ -228,8 +234,8 @@ function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>):
 }
 
 export function buildRetryOptions(
-  serviceConfig: Record<string, any>,
-  preset: Record<string, any>,
+  serviceConfig: Record<string, unknown>,
+  preset: Record<string, unknown>,
   operation: Record<string, any>
 ): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
   const retryableCategories = new Set<string>();
@@ -262,15 +268,15 @@ export function buildRetryOptions(
   return { ...resolvedRetry, shouldRetry };
 }
 
-export function resolveRequestEnvelope(params: any): {
-  templateVars: Record<string, any>;
-  query?: Record<string, any>;
-  body?: any;
+export function resolveRequestEnvelope(params: unknown): {
+  templateVars: Record<string, unknown>;
+  query?: Record<string, unknown>;
+  body?: unknown;
   hasBody: boolean;
 } {
-  const templateVars: Record<string, any> = isPlainObject(params) ? { ...params } : {};
-  let query: Record<string, any> | undefined;
-  let body: any;
+  const templateVars: Record<string, unknown> = isPlainObject(params) ? { ...params } : {};
+  let query: Record<string, unknown> | undefined;
+  let body: unknown;
   let hasBody = false;
 
   if (isPlainObject(templateVars.vars)) {
@@ -289,9 +295,9 @@ export function resolveRequestEnvelope(params: any): {
 
 export function buildApiKeyQueryAuth(
   authStrategy: string | undefined,
-  authParams: Record<string, any> | undefined,
+  authParams: Record<string, unknown> | undefined,
   binding: ReturnType<typeof resolveServiceBinding>,
-  templateVars: Record<string, any>
+  templateVars: Record<string, unknown>
 ): Record<string, string> {
   if (!authStrategy || authStrategy.toLowerCase() !== 'api_key_query') return {};
 
@@ -359,7 +365,7 @@ export function encodeFormBody(payload: Record<string, any>): string {
   return searchParams.toString();
 }
 
-export function stripUnresolvedTemplateValues(input: any): any {
+export function stripUnresolvedTemplateValues(input: any): unknown {
   if (typeof input === 'string') {
     return /^\{\{\s*[^}]+\s*\}\}$/.test(input.trim()) ? undefined : input;
   }
@@ -370,7 +376,7 @@ export function stripUnresolvedTemplateValues(input: any): any {
   }
   if (input && typeof input === 'object') {
     return Object.fromEntries(
-      Object.entries(input)
+      Object.entries(input as Record<string, unknown>)
         .map(([key, value]) => [key, stripUnresolvedTemplateValues(value)])
         .filter(([, value]) => value !== undefined)
     );
@@ -378,7 +384,7 @@ export function stripUnresolvedTemplateValues(input: any): any {
   return input;
 }
 
-export function prepareRequestBody(payload: any, headers: Record<string, any>): any {
+export function prepareRequestBody(payload: unknown, headers: Record<string, unknown>): unknown {
   const normalizedPayload = stripUnresolvedTemplateValues(payload);
   const contentType = String(
     headers['Content-Type'] || headers['content-type'] || ''
@@ -395,8 +401,8 @@ export function prepareRequestBody(payload: any, headers: Record<string, any>): 
 }
 
 export function isCliAllowedForOperation(
-  serviceConfig: Record<string, any>,
-  preset: Record<string, any>,
+  serviceConfig: Record<string, unknown>,
+  preset: Record<string, unknown>,
   operation: Record<string, any>
 ): boolean {
   if (['true', '1'].includes(getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') || '')) return true;

@@ -203,9 +203,9 @@ function stripAndroidOpPrefix(op: string): string {
 
 async function opCapture(
   op: string,
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: unknown) => unknown,
   options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
@@ -420,9 +420,9 @@ async function opCapture(
 
 async function opTransform(
   op: string,
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any
+  resolve: (val: unknown) => unknown
 ) {
   switch (op) {
     case 'set': {
@@ -468,9 +468,9 @@ async function opTransform(
 
 async function opApply(
   op: string,
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: unknown) => unknown,
   options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
@@ -810,7 +810,7 @@ function collectAdbHealth(ctx: Record<string, any>, options?: AndroidAction['opt
       devices,
       selected_serial: selectedSerial,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       available: false,
       error: error.message,
@@ -830,7 +830,7 @@ function ensureAdbAvailable(ctx: Record<string, any>, options?: AndroidAction['o
 function resolveSerial(
   ctx: Record<string, any>,
   options: AndroidAction['options'] | undefined,
-  params: any
+  params: Record<string, unknown>
 ): string {
   return String(
     resolvePrimitive(params?.serial) || options?.serial || ctx.android_serial || ''
@@ -878,7 +878,7 @@ function collectAndroidCliHealth(options?: AndroidAction['options']): {
       timeoutMs: options?.timeout_ms || 10000,
     }).trim();
     return { available: true, version };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { available: false, error: error.message };
   }
 }
@@ -917,9 +917,9 @@ function ensureParentDir(targetPath: string): void {
 }
 
 function resolveUiTreeSource(
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any
+  resolve: (val: unknown) => unknown
 ): string {
   if (params.from) {
     const value = ctx[String(params.from)];
@@ -962,9 +962,9 @@ function parseUiTreeNodes(xml: string): AndroidUiNode[] {
 }
 
 function resolveTapTarget(
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any
+  resolve: (val: unknown) => unknown
 ): AndroidTapTarget {
   let candidates: AndroidUiNode[] = [];
 
@@ -996,7 +996,7 @@ function resolveTapTarget(
   return { ...selected, center };
 }
 
-function selectorParamsFromInput(params: any): any {
+function selectorParamsFromInput(params: Record<string, unknown>): any {
   const appProfile = params.app_profile || params.profile;
   if (params.selector && typeof params.selector === 'object') {
     return { ...params, ...params.selector };
@@ -1017,9 +1017,9 @@ function selectorParamsFromInput(params: any): any {
 }
 
 function buildLoginFormPlan(
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any
+  resolve: (val: unknown) => unknown
 ): {
   email: string;
   password: string;
@@ -1121,9 +1121,9 @@ function loadAndroidUiDefaults(): AndroidUiDefaults {
 }
 
 function buildSessionHandoffArtifact(
-  params: any,
+  params: Record<string, unknown>,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: unknown) => unknown,
   platform: 'android' | 'ios'
 ) {
   const profile = resolveAppProfile(params, ctx);
@@ -1186,7 +1186,10 @@ function safeOrigin(targetUrl: string): string {
   }
 }
 
-function resolveAppProfile(params: any, ctx: Record<string, any>): MobileAppProfile | undefined {
+function resolveAppProfile(
+  params: Record<string, unknown>,
+  ctx: Record<string, any>
+): MobileAppProfile | undefined {
   if (params.app_profile && typeof params.app_profile === 'object') {
     assertValidMobileAppProfile(params.app_profile, 'params.app_profile');
     return params.app_profile as MobileAppProfile;
@@ -1212,8 +1215,8 @@ function resolveAppProfile(params: any, ctx: Record<string, any>): MobileAppProf
 
 function matchUiNodes(
   nodes: AndroidUiNode[],
-  params: any,
-  resolve: (val: any) => any
+  params: Record<string, unknown>,
+  resolve: (val: unknown) => unknown
 ): AndroidUiNode[] {
   const text = String(resolve(params.text || ''))
     .trim()
@@ -1246,7 +1249,10 @@ function matchUiNodes(
   });
 }
 
-function describeUiSelector(params: any, resolve: (val: any) => any): string {
+function describeUiSelector(
+  params: Record<string, unknown>,
+  resolve: (val: unknown) => unknown
+): string {
   const parts = [
     resolve(params.text) ? `text=${resolve(params.text)}` : '',
     resolve(params.resource_id) ? `resource_id=${resolve(params.resource_id)}` : '',

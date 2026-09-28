@@ -133,14 +133,28 @@ type VoiceAction =
       samples: Array<{ sample_id: string; path: string; language?: string }>;
       policy?: { strict_personal_voice?: boolean };
     }
-  | Record<string, any>;
+  | {
+      action: string;
+      params?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+
+/**
+ * Flatten `{ action, params }` into the single-action payload each helper
+ * expects, keeping the action field first so helpers see the same shape as
+ * direct calls.
+ */
+function voiceActionPayload(input: VoiceAction, action: string): Record<string, unknown> {
+  const params = (input as { params?: Record<string, unknown> }).params;
+  return params ? { action, ...params } : { ...(input as Record<string, unknown>), action };
+}
 
 async function executeSingleAction(input: VoiceAction) {
   if (input.action === 'health') {
-    return voiceHealth(input as any);
+    return voiceHealth(voiceActionPayload(input, 'health') as Parameters<typeof voiceHealth>[0]);
   }
   if (input.action === 'speak_local') {
-    return speakLocal((input as any).params || {});
+    return speakLocal((input as { params?: Record<string, unknown> }).params || {});
   }
   if (input.action === 'list_voices') {
     return listVoices();
@@ -155,41 +169,31 @@ async function executeSingleAction(input: VoiceAction) {
     return verifyTtsLoopback(extractActionParams(input));
   }
   if (input.action === 'transcribe') {
-    const payload = (input as any).params
-      ? { action: 'transcribe_voice_sample', ...((input as any).params || {}) }
-      : { ...input, action: 'transcribe_voice_sample' };
-    return transcribeVoiceSample(payload as any);
+    const payload = voiceActionPayload(input, 'transcribe_voice_sample');
+    return transcribeVoiceSample(payload as Parameters<typeof transcribeVoiceSample>[0]);
   }
   if (input.action === 'normalize_audio') {
-    const payload = (input as any).params
-      ? { action: 'normalize_audio', ...((input as any).params || {}) }
-      : { ...input, action: 'normalize_audio' };
-    return normalizeAudioSample(payload as any);
+    const payload = voiceActionPayload(input, 'normalize_audio');
+    return normalizeAudioSample(payload as Parameters<typeof normalizeAudioSample>[0]);
   }
   if (input.action === 'render_talking_avatar') {
-    const payload = (input as any).params
-      ? { action: 'render_talking_avatar', ...((input as any).params || {}) }
-      : { ...input, action: 'render_talking_avatar' };
-    return renderTalkingAvatar(payload as any);
+    const payload = voiceActionPayload(input, 'render_talking_avatar');
+    return renderTalkingAvatar(payload as Parameters<typeof renderTalkingAvatar>[0]);
   }
   if (input.action === 'output_to_virtual_camera') {
-    const payload = (input as any).params
-      ? { action: 'output_to_virtual_camera', ...((input as any).params || {}) }
-      : { ...input, action: 'output_to_virtual_camera' };
-    return outputToVirtualCamera(payload as any);
+    const payload = voiceActionPayload(input, 'output_to_virtual_camera');
+    return outputToVirtualCamera(payload as Parameters<typeof outputToVirtualCamera>[0]);
   }
   if (input.action === 'generate_voice') {
     return generateVoice(input);
   }
   if (input.action === 'record_voice_sample') {
-    const payload = (input as any).params
-      ? { action: 'record_voice_sample', ...((input as any).params || {}) }
-      : input;
-    if ((payload as any).dry_run) {
-      const requestId = String((payload as any).request_id || '');
-      const sampleId = String((payload as any).sample_id || 'sample');
+    const payload = voiceActionPayload(input, 'record_voice_sample');
+    if (payload.dry_run) {
+      const requestId = String(payload.request_id || '');
+      const sampleId = String(payload.sample_id || 'sample');
       const outputPath = String(
-        (payload as any).output_path ||
+        payload.output_path ||
           pathResolver.sharedTmp(`voice-sample-recording/${requestId}/${sampleId}.wav`)
       );
       return {
@@ -199,46 +203,47 @@ async function executeSingleAction(input: VoiceAction) {
         sample_id: sampleId,
         output_path: outputPath,
         prompt_path: `${outputPath}.prompt.txt`,
-        duration_sec: Number((payload as any).duration_sec || 0),
+        duration_sec: Number(payload.duration_sec || 0),
         backend: 'dry_run',
         dry_run: true,
       };
     }
-    return recordVoiceSample(payload as any);
+    return recordVoiceSample(payload as unknown as Parameters<typeof recordVoiceSample>[0]);
   }
   if (input.action === 'record_verify_repair_voice_sample') {
-    const payload = (input as any).params
-      ? { action: 'record_verify_repair_voice_sample', ...((input as any).params || {}) }
-      : input;
-    return recordVerifyRepairVoiceSample(payload as any);
+    const payload = voiceActionPayload(input, 'record_verify_repair_voice_sample');
+    return recordVerifyRepairVoiceSample(
+      payload as Parameters<typeof recordVerifyRepairVoiceSample>[0]
+    );
   }
   if (input.action === 'collect_voice_samples') {
-    const payload = (input as any).params
-      ? { action: 'collect_voice_samples', ...((input as any).params || {}) }
-      : input;
-    return collectVoiceSamples(payload as any);
+    const payload = voiceActionPayload(input, 'collect_voice_samples');
+    return collectVoiceSamples(payload as unknown as Parameters<typeof collectVoiceSamples>[0]);
   }
   if (input.action === 'collect_and_register_voice_profile') {
-    const payload = (input as any).params
-      ? { action: 'collect_and_register_voice_profile', ...((input as any).params || {}) }
-      : input;
-    return collectAndRegisterVoiceProfile(payload as any);
+    const payload = voiceActionPayload(input, 'collect_and_register_voice_profile');
+    return collectAndRegisterVoiceProfile(
+      payload as Parameters<typeof collectAndRegisterVoiceProfile>[0]
+    );
   }
   if (input.action === 'register_voice_profile') {
-    const payload = (input as any).params
-      ? { action: 'register_voice_profile', ...((input as any).params || {}) }
-      : input;
-    return registerVoiceProfile(payload as any);
+    const payload = voiceActionPayload(input, 'register_voice_profile');
+    return registerVoiceProfile(payload as Parameters<typeof registerVoiceProfile>[0]);
   }
   if (input.action === 'transcribe_voice_sample') {
-    const payload = (input as any).params
-      ? { action: 'transcribe_voice_sample', ...((input as any).params || {}) }
-      : input;
-    return transcribeVoiceSample(payload as any);
+    const payload = voiceActionPayload(input, 'transcribe_voice_sample');
+    return transcribeVoiceSample(payload as Parameters<typeof transcribeVoiceSample>[0]);
   }
-  if ((input as any).action === 'record_interaction') {
-    const p = (input as any).params ?? {};
-    if (!p.person_slug || !p.org || !p.summary) {
+  if ((input as { action?: string }).action === 'record_interaction') {
+    const p = (input as { params?: Record<string, unknown> }).params ?? {};
+    if (
+      !p.person_slug ||
+      !p.org ||
+      !p.summary ||
+      typeof p.person_slug !== 'string' ||
+      typeof p.org !== 'string' ||
+      typeof p.summary !== 'string'
+    ) {
       throw new Error('[VOICE] record_interaction requires person_slug, org, and summary');
     }
     const node = recordInteraction({
@@ -248,8 +253,14 @@ async function executeSingleAction(input: VoiceAction) {
       interaction: {
         at: nowIso(),
         summary: p.summary,
-        channel: p.channel ?? 'voice',
-        ...(p.tone_shifts ? { tone_shifts: p.tone_shifts } : {}),
+        channel: typeof p.channel === 'string' ? p.channel : 'voice',
+        ...(Array.isArray(p.tone_shifts)
+          ? {
+              tone_shifts: p.tone_shifts.filter(
+                (entry): entry is string => typeof entry === 'string'
+              ),
+            }
+          : {}),
       },
     });
     logger.info(
@@ -262,25 +273,25 @@ async function executeSingleAction(input: VoiceAction) {
       history_length: node.history.length,
     };
   }
-  throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
+  throw new Error(`Unsupported voice action: ${String((input as { action?: string })?.action)}`);
 }
 
 export async function handleSingleAction(input: VoiceAction) {
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
-    op: `voice:${String((input as any).action || '')}`,
+    op: `voice:${String((input as { action?: string }).action || '')}`,
     params: input as unknown as Record<string, unknown>,
     source: 'actuator',
   });
   if (preflight.decision !== 'allow') {
     throw new Error(
-      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation voice:${String((input as any).action || '')} was not admitted.`}`
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation voice:${String((input as { action?: string }).action || '')} was not admitted.`}`
     );
   }
   return executeSingleAction({
     ...(input as Record<string, unknown>),
     ...preflight.input,
-    action: (input as any).action,
+    action: (input as { action: string }).action,
   } as VoiceAction);
 }
 
