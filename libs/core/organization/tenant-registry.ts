@@ -5,7 +5,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { isValidTenantSlug } from '../entity-scope.js';
+import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -135,9 +135,16 @@ export function assertTenantOperational(profile: TenantProfile, operation = 'ope
 }
 
 function assertTenantSlug(slug: string): void {
-  if (!isValidTenantSlug(slug)) {
-    throw new Error(`[tenant-registry] invalid tenant slug '${slug}'`);
+  if (isValidTenantSlug(slug)) return;
+  if (isReservedScopeName(slug)) {
+    throw new Error(
+      `[tenant-registry] invalid tenant slug '${slug}': '${slug}' is a reserved tier/partition name, not a tenant. ` +
+        `Run 'KYBERION_PERSONA=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
+    );
   }
+  throw new Error(
+    `[tenant-registry] invalid tenant slug '${slug}': must match ^[a-z][a-z0-9-]{1,30}$ and must not be a reserved name (public, confidential, personal, shared).`
+  );
 }
 
 function assertTenantGroupId(groupId: string): void {

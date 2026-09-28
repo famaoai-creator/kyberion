@@ -684,6 +684,26 @@ describe('organization operating model', () => {
     });
   });
 
+  it('lists allowed enum values when a learning candidate violates source/target vocabularies', () => {
+    expect(() =>
+      buildOrganizationLearningCandidate(
+        {
+          learningId: 'learning-bad-enum',
+          organizationId,
+          sourceType: 'operation_run' as 'routine_exception',
+          sourceRef: 'op-1:run-1',
+          title: 'Bad enum candidate',
+          summary: 'Uses values outside the closed vocabularies.',
+          targetKind: 'service' as 'pattern',
+          tier: 'public',
+        },
+        '2026-08-03T00:00:00.000Z'
+      )
+    ).toThrow(
+      /source_type must be one of incident_review\|routine_exception\|project_closure\|governance_decision.*target_kind must be one of pattern\|sop_candidate\|knowledge_hint\|report_template/s
+    );
+  });
+
   it('scopes records to one organization when a subsidiary shares its parent tenant', () => {
     const rootDir = pathResolver.sharedTmp(`organization-parent-scope-test-${process.pid}`);
     // The parent id equals the tenant slug, so a substring match on the path
@@ -1272,7 +1292,7 @@ describe('organization operating model', () => {
           },
           now
         )
-      ).toThrow(/already attached/);
+      ).toThrow(/already attached.*attaches automatically/s);
       const detached = buildOrganizationProjectLink(
         {
           organizationId,
