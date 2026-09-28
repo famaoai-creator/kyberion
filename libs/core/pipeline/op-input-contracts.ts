@@ -42,7 +42,14 @@ export interface OpInputContract {
 
 type ContractCatalog = Record<OpInputDomain, Record<string, OpInputContract>>;
 
-const ajv = createAjv();
+// Lazily created so that importing this catalog (which every pipeline entry
+// point does) does not pull ajv into the startup path; ajv is only needed once
+// an op input is actually validated.
+let ajvInstance: ReturnType<typeof createAjv> | null = null;
+function ajv(): ReturnType<typeof createAjv> {
+  if (!ajvInstance) ajvInstance = createAjv();
+  return ajvInstance;
+}
 
 const INPUT_CONTRACTS: ContractCatalog = {
   browser: {
@@ -1283,7 +1290,7 @@ function getValidator(domain: OpInputDomain, op: string): ValidateFunction | nul
   const key = opKey(domain, op);
   const cached = validatorCache.get(key);
   if (cached) return cached;
-  const validate = ajv.compile(contract.schema);
+  const validate = ajv().compile(contract.schema);
   validatorCache.set(key, validate);
   return validate;
 }

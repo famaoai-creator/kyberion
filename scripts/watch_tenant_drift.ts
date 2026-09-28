@@ -27,7 +27,7 @@ import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import { nowIso } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation/time';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

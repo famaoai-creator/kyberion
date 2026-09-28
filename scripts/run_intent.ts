@@ -7,7 +7,7 @@ import {
   saveTaskSession,
   validateTaskSession,
 } from '@agent/core/task/task-session';
-import { getRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { executeApprovedClaudeTaskSession } from '@agent/core/provider/claude-task-session-executor';
 import { formatClarificationPacket } from '@agent/core/intent/intent-clarification-format';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';

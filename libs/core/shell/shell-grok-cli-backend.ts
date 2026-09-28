@@ -15,7 +15,8 @@
  * field (camelCase; falls back to parsing `text` when absent).
  */
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
 import {
   buildDelegationSpawnEnv,
@@ -649,12 +650,9 @@ export function probeShellGrokCliAvailability(
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
-    const result = spawnSync(bin, ['--version'], {
-      encoding: 'utf8',
+    const result = memoizedCliSpawnSync(bin, ['--version'], {
       env: buildProviderChildEnv({ provider: 'grok', baseEnv: { ...process.env, ...env } }),
-      shell: false,
       timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     if (result.error) {

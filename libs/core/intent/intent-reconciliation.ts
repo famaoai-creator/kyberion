@@ -1,8 +1,4 @@
-import {
-  getReasoningBackend,
-  getStubServedOps,
-  stubExplicitlyRequested,
-} from '../reasoning/reasoning-backend.js';
+import { getStubServedOps, stubExplicitlyRequested } from '../reasoning/stub-served-registry.js';
 import { logger } from '../core.js';
 import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-declaration.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -265,7 +261,9 @@ export async function reconcileCompletion(
   options?: IntentReconciliationOptions
 ): Promise<CompletionReconciliation> {
   const structural = reconcileCompletionStructurally(input);
-  if (structural.satisfied || getReasoningBackend().name === 'stub') {
+  if (structural.satisfied) return structural;
+  const { getReasoningBackend } = await import('../reasoning/reasoning-backend.js');
+  if (getReasoningBackend().name === 'stub') {
     return structural;
   }
 

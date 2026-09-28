@@ -17,7 +17,8 @@ import {
   promotePersonalMemoryCandidates,
 } from '@agent/core/knowledge/memory-promotion-workflow';
 import { logger } from '@agent/core/core';
-import { getRegisteredEnv, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { getOptionValue } from './mission-cli-args.js';
 import { ScriptExitError } from '../lib/harness.js';
 

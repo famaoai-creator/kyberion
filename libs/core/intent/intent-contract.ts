@@ -5,7 +5,6 @@ import { buildContextualIntentFrame } from '../contextual-intent-frame.js';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import {
   buildOrganizationWorkLoopSummary,
@@ -1106,6 +1105,7 @@ async function defaultAsk(
   prompt: string,
   options?: Pick<LlmCompileOptions, 'model_tier'>
 ): Promise<string> {
+  const { getReasoningBackend } = await import('../reasoning/reasoning-backend.js');
   return getReasoningBackend().prompt(
     prompt,
     options?.model_tier ? { model_tier: options.model_tier } : undefined

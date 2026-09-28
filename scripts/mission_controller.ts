@@ -17,41 +17,18 @@
 
 import * as path from 'node:path';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import { discoverProviders } from '@agent/core/provider/provider-discovery';
-// Registers the canonical A2A route as an import side effect. Without it
-// `getA2ARoute()` is undefined and every agent_runtime dispatch fails with
-// "has no A2A/runtime route" — the surface is selectable but unreachable.
-import '@agent/core/mesh/a2a-bridge';
-// Lets pane agents escalate prompts they stop on as approval requests.
-import '@agent/core/agent/agent-prompt-approval';
-import { discoverReasoningEndpoints } from '@agent/core/reasoning/reasoning-endpoint-discovery';
-import {
-  getInstalledReasoningMode,
-  installReasoningBackends,
-} from '@agent/core/reasoning/reasoning-bootstrap';
-import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
-import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
 import { logger } from '@agent/core/core';
 import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
-import { resolveMissionClassification } from '@agent/core/mission/mission-classification';
-import { resolveMissionWorkflowDesign } from '@agent/core/mission/mission-workflow-catalog';
 import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { TraceContext, persistTrace } from '@agent/core/trace';
 import { killSwitch } from '@agent/core/governance/kill-switch';
-import { renderStatus } from '@agent/core/ux-vocabulary';
 import { buildHandoffPacket } from '@agent/core/mesh/handoff-packet';
-import { recordMissionGateOverride } from '@agent/core/mission/mission-gate-engine';
-import { missionLifecycleService } from '@agent/core/mission/mission-lifecycle-service';
-import { releaseOrchestratorSessionForMissionBestEffort } from '@agent/core/mission/orchestrator-session';
-import { resumeAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
-import { reassignMissionToProject } from '@agent/core/project/project-management';
-import { recordMissionHandoff } from '@agent/core/workforce/work-coordination';
 import type { ArtifactReviewFinding } from '@agent/core/workforce/artifact-review';
-import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission/mission-work-reconciliation';
-import {
-  runMissionTriage,
-  runScopeApproveRequestApproval,
-} from './refactor/mission-triage-commands.js';
+import type * as MissionTriageCommands from './refactor/mission-triage-commands.js';
+import type * as MissionMemoryCommands from './refactor/mission-memory-commands.js';
+import type * as MissionOrganizationCommands from './refactor/mission-organization-commands.js';
+import type * as MissionProcessPlanning from './refactor/mission-process-planning.js';
 import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 
 type Print = (value: unknown) => void;
@@ -75,6 +52,8 @@ import {
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import { buildHelpText } from './refactor/mission-controller-help.js';
+export { buildHelpText } from './refactor/mission-controller-help.js';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -82,22 +61,6 @@ import {
   getOptionValue,
   parseCsvOption,
 } from './refactor/mission-cli-args.js';
-import { withOrganizationContext } from './refactor/organization-context.js';
-import {
-  listOrganizationCatalogs,
-  listOrganizationProfiles,
-  showOrganizationDiscovery,
-  showOrganizationProfile,
-} from './refactor/mission-organization-commands.js';
-import {
-  acceptRubricOverride,
-  approveMemoryCandidate,
-  listMemoryQueue,
-  promoteMemoryCandidate,
-  promotePendingMemoryCandidates,
-  rejectMemoryCandidate,
-  showMemoryReview,
-} from './refactor/mission-memory-commands.js';
 import {
   assertCanGrantMissionAuthority,
   writeFocusedMissionId as _writeFocusedMissionId,
@@ -105,20 +68,6 @@ import {
   saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import {
-  dispatchNextQueuedMission,
-  enqueueMission as _enqueueMission,
-} from './refactor/mission-queue.js';
-import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
-import { missionSystem } from './refactor/mission-system.js';
-import {
-  activateMissionOnGateProgress,
-  advanceCurrentPhase,
-  evaluateStoredMissionGate,
-  markPhaseTasksCompleted,
-  markPhaseTasksForRework,
-  planProcessTemplateTasks,
-} from './refactor/mission-process-planning.js';
 import {
   assertMissionIdArgument,
   runMissionControllerAction,
@@ -136,7 +85,6 @@ export {
   resolveMissionWorkItemDispatchOptionsFromArgv,
 };
 export type { ResolvedMissionCliInput } from './refactor/mission-controller-args.js';
-export { buildOrganizationDiscoveryReport } from './refactor/mission-organization-commands.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ROOT_DIR = pathResolver.rootDir();
@@ -150,10 +98,12 @@ function writeFocusedMissionId(missionId: string): void {
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
 async function syncProjectLedger(id: string): Promise<unknown> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.syncProjectLedger(id);
 }
 
 async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.syncProjectLedgerIfLinked(id);
 }
 
@@ -171,6 +121,7 @@ async function reassignMissionProject(
     dryRun?: boolean;
   }
 ): Promise<unknown> {
+  const { reassignMissionToProject } = await import('@agent/core/project/project-management');
   if (!options.projectId) throw new Error('reassign-project requires --project-id');
   const result = await reassignMissionToProject({
     mission_id: missionId,
@@ -190,14 +141,17 @@ async function reassignMissionProject(
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
 async function sealMission(id: string): Promise<unknown> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.sealMission(id);
 }
 
 async function distillMission(id: string): Promise<void> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.distillMission(id);
 }
 
 async function dispatchMissionTickets(id: string): Promise<void> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   const result = await missionSystem.dispatchMissionTickets(
     id,
     resolveMissionTicketDispatchOptionsFromArgv()
@@ -206,6 +160,7 @@ async function dispatchMissionTickets(id: string): Promise<void> {
 }
 
 async function dispatchMissionWorkItems(id: string): Promise<void> {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   try {
     const result = await missionLifecycleService.dispatch(
       id,
@@ -214,6 +169,7 @@ async function dispatchMissionWorkItems(id: string): Promise<void> {
     printOutput(JSON.stringify(result, null, 2));
   } finally {
     try {
+      const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
       await getReasoningBackend().resetSession?.();
     } catch (error) {
       logger.warn(
@@ -233,10 +189,12 @@ async function enqueueMission(
   priority: number = 5,
   deps: string[] = []
 ) {
+  const { enqueueMission: _enqueueMission } = await import('./refactor/mission-queue.js');
   await _enqueueMission(QUEUE_PATH, id, tier, priority, deps);
 }
 
 async function dispatchNextMission() {
+  const { dispatchNextQueuedMission } = await import('./refactor/mission-queue.js');
   await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
     startMission(missionId, tier)
   );
@@ -254,6 +212,8 @@ async function createMission(
   organizationId?: string,
   options?: { ephemeral?: boolean; intentGoal?: string }
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.create(
       id,
@@ -332,6 +292,8 @@ async function startMission(
     decidedBy?: HumanDecidedBy;
   }
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   await withOrganizationContext(organizationId, () =>
     missionLifecycleService.start(
       id,
@@ -356,14 +318,17 @@ async function startMission(
 // earlier in this file (lines 97-104), delegating to mission-project-ledger.ts
 
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.delegateMission(id, agentId, a2aMessageId);
 }
 
 async function importMission(id: string, remoteUrl: string) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.importMission(id, remoteUrl);
 }
 
 async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const output = await missionLifecycleService.verify(id, result, note);
   if (result === 'verified') {
     syncIntentContractMemorySnapshot(id, 'verify');
@@ -378,6 +343,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 //   - scripts/refactor/mission-seal.ts (sealMission)
 
 async function finishMission(id: string, seal: boolean = false) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const result = await missionLifecycleService.finish(id, seal);
   const finalState = loadState(id.toUpperCase());
   const archivedPath = path.join(pathResolver.active('archive/missions'), id.toUpperCase());
@@ -441,6 +407,8 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
 }
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { TraceContext, persistTrace } = await import('@agent/core/trace');
   const result = await missionLifecycleService.createCheckpoint(taskId, note, explicitMissionId);
   try {
     const tc = new TraceContext('mission:checkpoint', {
@@ -459,6 +427,8 @@ async function createCheckpoint(taskId: string, note: string, explicitMissionId?
 }
 
 async function resumeMission(id?: string) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { resumeAiDlcPhaseState } = await import('@agent/core/aidlc-phase-state');
   const result = await missionLifecycleService.resume(id);
   if (id) {
     try {
@@ -471,14 +441,17 @@ async function resumeMission(id?: string) {
 }
 
 async function pauseMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   return missionLifecycleService.pause(id, note, { decidedBy });
 }
 
 async function cancelMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.cancelMission(id, note, decidedBy);
 }
 
 async function repairLegacyMissionState(id: string, note?: string) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.repairLegacyMissionState(id, note);
 }
 
@@ -487,6 +460,7 @@ async function recordTask(
   description: string,
   details: Record<string, unknown> = {}
 ) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   return missionSystem.recordTask(missionId, description, details);
 }
 
@@ -499,6 +473,8 @@ async function recordEvidence(
   actorId?: string,
   actorType?: 'agent' | 'human' | 'service'
 ) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { TraceContext, persistTrace } = await import('@agent/core/trace');
   const result = await missionSystem.recordEvidence(
     missionId,
     taskId,
@@ -535,6 +511,7 @@ async function recordArtifactReview(
   reviewerTeamRole?: 'reviewer' | 'qa',
   specialistRoles?: string[]
 ) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   const result = await missionSystem.recordArtifactReview(
     missionId,
     reviewTaskId,
@@ -556,6 +533,8 @@ async function requestMissionWorkReconciliationApproval(
   manifestPath: string,
   requestedBy?: string
 ) {
+  const { createMissionWorkReconciliationApprovalRequest } =
+    await import('@agent/core/mission/mission-work-reconciliation');
   const result = createMissionWorkReconciliationApprovalRequest({
     missionId,
     manifestPath,
@@ -571,6 +550,7 @@ async function reconcileExistingWork(
   dryRun = false,
   approvalRequestId?: string
 ) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   const result = await missionSystem.reconcileExistingWork(
     missionId,
     manifestPath,
@@ -582,12 +562,14 @@ async function reconcileExistingWork(
 }
 
 async function reenterMissionFromReview(missionId: string) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   const result = await missionSystem.reenterMissionFromReview(missionId);
   printOutput(JSON.stringify(result, null, 2));
   return result;
 }
 
 async function purgeMissions(dryRun: boolean = false): Promise<void> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
@@ -597,6 +579,7 @@ async function purgeMissions(dryRun: boolean = false): Promise<void> {
 async function archiveMissions(
   options: { missionId?: string; execute?: boolean } = {}
 ): Promise<void> {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   // AL-03: the archive verb is governed by the mission-lifecycle-service
   // facade (gate + audit). `--mission <ID>` archives one completed/failed
   // mission immediately (explicit operator action, age-independent);
@@ -611,7 +594,9 @@ async function archiveMissions(
 /**
  * 6. Visibility Commands
  */
-function listMissions(filterStatus?: string) {
+async function listMissions(filterStatus?: string) {
+  const { renderStatus } = await import('@agent/core/ux-vocabulary');
+  const { listMissionSummaries } = await import('./refactor/mission-read-model.js');
   const missions = listMissionSummaries(filterStatus);
 
   if (missions.length === 0) {
@@ -649,7 +634,10 @@ function listMissions(filterStatus?: string) {
   logger.info(`${missions.length} mission(s) found.`);
 }
 
-function showMissionStatus(id: string, follow: boolean = false) {
+async function showMissionStatus(id: string, follow: boolean = false) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { renderStatus } = await import('@agent/core/ux-vocabulary');
+  const { buildMissionStatusView } = await import('./refactor/mission-read-model.js');
   if (!id) {
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
@@ -739,7 +727,13 @@ function showMissionStatus(id: string, follow: boolean = false) {
   }
 }
 
-function showReasoningBackendStatus() {
+async function showReasoningBackendStatus(): Promise<void> {
+  const [{ getInstalledReasoningMode }, { discoverProviders }, { discoverReasoningEndpoints }] =
+    await Promise.all([
+      import('@agent/core/reasoning/reasoning-bootstrap'),
+      import('@agent/core/provider/provider-discovery'),
+      import('@agent/core/reasoning/reasoning-endpoint-discovery'),
+    ]);
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
     activeMissionControllerArgs.includes('--refresh-providers') ||
@@ -775,246 +769,18 @@ function showReasoningBackendStatus() {
   printOutput('');
 }
 
-export function buildHelpText(): string {
-  return `
-Kyberion Sovereign Mission Controller (KSMC)
-
-Usage: node dist/scripts/mission_controller.js <command> [args]
-
-Lifecycle Commands:
-  create   <ID>                  Create a new mission (status: planned)
-  start    <ID>                  Activate a mission (planned/paused/failed → active)
-                                 --goal <TEXT> carries the user goal into the intent baseline
-                                 --success-condition <TEXT> records the acceptance condition
-                                 --intent-goal <PATH> accepts an existing governed handoff file
-                                 --decided-by user:<member-id> [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 records the human member who made this decision (optional)
-  checkpoint [task_id] [note]    Record a checkpoint on the focused mission
-  checkpoint <ID> <task_id> <note>
-                                 Record a checkpoint on an explicit mission
-  verify   <ID> <verified|rejected> <note>
-                                 Verify a mission (active → distilling or back to active)
-  distill  <ID>                  Extract knowledge via LLM (distilling → completed)
-  finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
-  resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
-  pause    <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 Pause an active mission without losing state
-  cancel   <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 Cancel a mission and mark it failed for follow-up
-  repair   <ID> [--note <TEXT>]  Repair legacy mission state via the governed controller
-  dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
-                                 --ticket-targets workitem,github,jira
-                                 --live-ticket-targets github,jira
-                                 --github-owner <OWNER> --github-repo <REPO>
-                                 --jira-domain <DOMAIN> --jira-project-key <KEY>
-  dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
-                                 --dispatch-mode auto|agent|subagent
-                                 --dispatch-execution-surface cli_subagent|agent_runtime|hybrid
-                                 --dispatch-review-execution-surface cli_subagent|agent_runtime|hybrid
-                                 --dispatch-statuses ready,backlog
-                                 --dispatch-rounds N (auto-retry blocked items, bounded)
-                                 --dispatch-sources local,github,jira
-                                 --dispatch-final-status review|done
-  hygiene [--notify]             List stuck planned missions with per-mission remediation
-                                 --stale-days N (default 2) --abandoned-days N (default 14)
-
-Delegation Commands:
-  delegate <ID> <agent_id> <a2a_message_id>
-                                 Delegate a mission to an external agent
-  import   <ID> <remote_url>     Import results from a delegated mission
-  seal     <ID>                  Encrypt a mission for archival (AES+RSA)
-
-Queue Commands:
-  enqueue  <ID> <tier> [priority] [deps]
-                                 Add a mission to the dispatch queue
-  dispatch                       Start the next queued mission
-  memory-queue [status]          List memory promotion candidates
-                                 Show readiness, blockers, and physical duplicate count
-  memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
-                                 Show summary, target, evidence, scope, audit, and next action
-  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 Curate mission knowledge and approve only when review preflight is clear
-  memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 Mark a memory candidate as rejected
-  memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
-                                 Promote an approved candidate to governed knowledge
-  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--dry-run]
-                                 Bulk promote approved memory candidates in queue order
-
-Visibility Commands:
-  list     [status]              List all missions (optionally filter by status)
-  status   <ID> [--refresh-providers]
-                                 Show detailed status of a specific mission and backend availability
-  outbox   [ID] [--ack]          Show mission results delivered to the terminal surface (--ack to clear)
-  sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
-  reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
-                                 Safely move a paused/planned mission to another project and reconcile both sides
-  team     <ID> [--refresh] [--summary] [--provider <ID>] [--model <ID>]
-                                 Show or regenerate mission team composition
-                                 --summary prints roster / staffed / standby / unfilled and the
-                                 obligations that shaped the roster instead of the raw plan JSON
-  staff    <ID> [--provider <ID>] [--model <ID>]
-                                 Spawn or verify runtime instances for assigned mission team roles
-  advise   <ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]
-                                 Consult the mission's own roster: each member answers from its role,
-                                 the panel cross-critiques the answers, and the outcome is recorded
-                                 in the mission execution ledger
-  propose-roster <ID> [--context <TEXT>] [--force]
-                                 Ask the reasoning backend to propose discretionary roles beyond the
-                                 derived roster. Off unless the governed policy enables it (--force
-                                 runs it anyway); every proposal must pass the same checks as restaff
-  restaff  <ID> <TEAM_ROLE> [--capabilities <CSV>] [--exclude <AGENT_CSV>] [--reason <TEXT>]
-                                 Add a role to a running mission's roster (bounded by max_members,
-                                 same capability / authority / separation-of-duties checks as
-                                 composition) and materialize its runtime
-  classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
-  workflow-select <ID> [intent] [task]
-                                 Resolve workflow template from mission classification
-  plan-tasks <ID> [--force] [--refresh-catalog]
-                                 Expand process template phases into NEXT_TASKS.json + gates (--refresh-catalog re-resolves from the current catalog)
-  review-worker-output <ID> [verified|rejected] [note]
-                                 Record worker-output review result via mission verification
-  handoff <ID> <persona> [note]  Transfer mission persona ownership with audit history
-
-Governance Commands:
-  accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]
-                                 Record a rubric override (counterfactual warn/poor accepted by operator).
-                                 Emits the rubric.override_accepted audit event per
-                                 counterfactual-degradation-policy.json. Required for warn-severity
-                                 acceptance; forbidden for poor unless tenant_risk_officer documents
-                                 the exception separately.
-
-Maintenance Commands:
-  record-task <ID> <description> Record a task intention (flight recorder)
-  record-evidence <ID> <task_id> <note>
-                                 Append an execution-ledger evidence entry and commit it
-  review-task <ID> <review_task_id> <reviewer_agent_id> [--findings <JSON>] [--reviewer-team-role reviewer|qa] [--specialist-roles <CSV>]
-                                 Record a real ArtifactReviewReceipt for a review-kind task (required before it
-                                 can complete — bare record-evidence is not enough for review tasks). Independence
-                                 from the implementer is computed from the execution ledger, not self-declared.
-                                 --findings: JSON array of {severity: blocking|suggestion, category, description,
-                                 required_action?, location?}; anything else is rejected before a receipt is written.
-  reconcile-work <ID> --manifest <PATH> [--dry-run] [--approval-request-id <UUID>]
-                                 --request-approval [--requested-by <ACTOR>] creates a hash-bound human approval request
-                                 --generate [--output <PATH>] scaffolds a manifest from current git state
-                                 Validate and adopt verified work completed outside dispatch-workitems
-  review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
-  scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>] [--success-condition <TEXT>]
-                                 Approve a scope change and rebaseline the origin intent.
-                                 Direct use requires SUDO; without it: --request-approval
-                                 files a human approval request (decide via
-                                 'pnpm kyberion approvals --approve <id>'), then apply with
-                                 --approval-request-id <id> — hash-bound to the exact
-                                 goal/reason/success-condition the human read
-  triage   <ID> [--json] [--request-approval] [--goal <TEXT>] [--reason <TEXT>]
-                                 Diagnose why a mission is not closed and print the
-                                 lowest-privilege path out. --request-approval files the
-                                 scope-approval request when classification is
-                                 intent_drift_blocked
-  purge    [--execute]            Preview stale missions to archive (--execute to apply)
-  archive  [--execute] [--mission <ID>]
-                                 Governed archive verb: policy-driven sweep like purge (dry-run by
-                                 default), or archive one completed/failed mission now via --mission
-    sync                           Sync mission registry
-  organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]
-                                 List available organization team template catalogs
-  organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]
-                                 List available organization profiles
-  organization-profile [--json] [--organization-id <ORG>] [--summary]
-                                 Show the resolved organization profile and defaults
-  organization-discovery [--json] [--summary]
-                                 Show the discovery overview and common paths
-                                 Guide: knowledge/product/orchestration/organization-discovery.md
-                                 Examples: knowledge/product/schemas/organization-discovery-report.example.json
-                                           knowledge/product/schemas/organization-profile-report.example.json
-                                           knowledge/product/schemas/organization-profiles-report.example.json
-                                           knowledge/product/schemas/organization-catalog-report.example.json
-
-  Typical Workflow:
-  start → checkpoint (repeat) → verify → distill → finish
-
-Mission Input Contract:
-  Positionals:
-    <ID>                         Only the mission ID should be positional for create/start
-  Preferred named options:
-    --tier <personal|confidential|public>
-    --tenant-id <TENANT>
-    --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
-    --organization-id <ORG>        # selects KYBERION_CUSTOMER for org-specific defaults
-    --org <ORG>                    # alias for --organization-id
-    --mission-type <TYPE>
-    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_CUSTOMER is set
-    --persona <NAME>
-    --dry-run
-    --relationships <JSON>
-    --relationships-file <PATH>
-    --mission-id <ID>            Explicit mission target for checkpoint
-
-Organization Selection:
-  --organization-id <ORG>        Select a specific organization profile and template catalog
-  --org <ORG>                    Alias for --organization-id
-  --summary                      Print only the resolved organization summary (organization-profile)
-  --active-only                  Filter organization-profiles to the selected organization only
-  --ready-only                   Filter organization-profiles to ready profiles only
-  --missing-only                 Filter organization-profiles to missing profiles only
-  --source <customer|public>     Filter organization-profiles by source
-  Guide: knowledge/product/orchestration/organization-selection-guide.md
-
-Organization Discovery:
-  organization-profiles --json --summary
-                                 Inventory organization readiness as JSON
-  organization-profile --json --summary
-                                 Inspect one resolved organization profile as JSON
-  organization-catalogs --json --selected-only --summary
-                                 Inspect the selected team template overlay as JSON
-  Reports: knowledge/product/orchestration/organization-discovery-reports.md
-  Examples: knowledge/product/schemas/organization-discovery-report.example.json
-            knowledge/product/schemas/organization-profile-report.example.json
-            knowledge/product/schemas/organization-profiles-report.example.json
-            knowledge/product/schemas/organization-catalog-report.example.json
-
-  Validation:
-    Linked project missions must point to a project_path whose 04_control ledger
-    is writable under the current authority. Unsafe targets like libs/core will fail fast.
-
-  Project Traceability Options:
-  --project-id <ID>              Link mission to a project identifier
-  --project-path <PATH>          Record the related project-os path
-  --project-relationship <TYPE>  belongs_to | supports | governs | independent
-  --affected-artifacts <CSV>     Comma-separated project artifacts impacted by the mission
-  --gate-impact <TYPE>           none | informational | review_required | blocking
-  --traceability-refs <CSV>      Comma-separated evidence or document refs
-  --project-note <TEXT>          Free-text note for the project relationship
-                                 Linked missions auto-sync to active/projects/<tier>/<tenant_or_shared>/<project_id>/state/
-                                 and later distill into knowledge/product/evolution/ or knowledge/product/incidents/
-
-Intent-to-Track Gate Options:
-  --intent-id <ID>               Resolve the intent to a governed project track before create/start
-  --intent-confidence <0..1>     Confidence score; below policy threshold requires confirmation
-  --confirm-intent-track <REASON> Explicitly confirm low-confidence track provisioning
-  --execution-shape <SHAPE>      Gate only mission/project_bootstrap shapes when specified
-
-Track Traceability Options:
-  --track-id <ID>                Link mission to a project track identifier
-  --track-name <NAME>            Human-readable track name
-  --track-type <TYPE>            delivery | release | change | incident | operations | governance
-  --lifecycle-model <MODEL>      Track lifecycle profile (for example default-sdlc)
-  --track-relationship <TYPE>    belongs_to | supports | governs | independent
-  --track-traceability-refs <CSV> Comma-separated track-level refs
-  --track-note <TEXT>            Free-text note for the track relationship
-`;
-}
-
 function showHelp() {
   printOutput(buildHelpText());
 }
 
-function showMissionTeam(
+async function showMissionTeam(
   id: string,
   refresh = false,
   organizationId?: string,
   providerPreference?: { provider: string; modelId?: string }
 ) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionSystem.showMissionTeam(id, refresh, providerPreference)
   );
@@ -1025,6 +791,8 @@ async function staffMissionTeam(
   organizationId?: string,
   providerPreference?: { provider: string; modelId?: string }
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.staff(id, { providerPreference })
   );
@@ -1035,6 +803,8 @@ async function adviseMission(
   input: { topic: string; question: string; context?: string; roles?: string[] },
   organizationId?: string
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () => missionLifecycleService.advise(id, input));
 }
 
@@ -1043,12 +813,16 @@ async function proposeMissionRoster(
   options: { missionContext?: string; force?: boolean },
   organizationId?: string
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.proposeRoster(id, options)
   );
 }
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.prewarm(id, teamRolesArg)
   );
@@ -1060,12 +834,16 @@ async function restaffMissionTeam(
   options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string },
   organizationId?: string
 ) {
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.restaff(id, teamRole, options)
   );
 }
 
 async function classifyMission(id: string, intentId?: string, taskType?: string): Promise<void> {
+  const { resolveMissionClassification } =
+    await import('@agent/core/mission/mission-classification');
   if (!id) {
     logger.error('Usage: mission_controller classify <MISSION_ID> [intent_id] [task_type]');
     return;
@@ -1091,6 +869,10 @@ async function selectMissionWorkflow(
   intentId?: string,
   taskType?: string
 ): Promise<void> {
+  const { resolveMissionClassification } =
+    await import('@agent/core/mission/mission-classification');
+  const { resolveMissionWorkflowDesign } =
+    await import('@agent/core/mission/mission-workflow-catalog');
   if (!id) {
     logger.error('Usage: mission_controller workflow-select <MISSION_ID> [intent_id] [task_type]');
     return;
@@ -1140,6 +922,9 @@ export async function handoffMission(
   nextPersona: string,
   note?: string
 ): Promise<void> {
+  const { releaseOrchestratorSessionForMissionBestEffort } =
+    await import('@agent/core/mission/orchestrator-session');
+  const { recordMissionHandoff } = await import('@agent/core/workforce/work-coordination');
   if (!id || !nextPersona) {
     logger.error('Usage: mission_controller handoff <MISSION_ID> <NEXT_PERSONA> [note]');
     return;
@@ -1213,6 +998,7 @@ export async function handoffMission(
 }
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   assertCanGrantMissionAuthority();
   return missionSystem.grantMissionAccess(missionId, serviceId, ttl);
 }
@@ -1234,6 +1020,13 @@ async function resolveGate(missionId: string, gateFile?: string): Promise<string
 }
 
 async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
+  const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
+  const {
+    activateMissionOnGateProgress,
+    advanceCurrentPhase,
+    evaluateStoredMissionGate,
+    markPhaseTasksCompleted,
+  } = await import('./refactor/mission-process-planning.js');
   if (!missionId) {
     logger.error(
       'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
@@ -1315,6 +1108,9 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
 }
 
 async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
+  const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
+  const { evaluateStoredMissionGate, markPhaseTasksForRework } =
+    await import('./refactor/mission-process-planning.js');
   if (!missionId) {
     logger.error(
       'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
@@ -1378,6 +1174,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
 }
 
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   assertCanGrantMissionAuthority();
   return missionSystem.grantMissionSudo(missionId, on, ttl);
 }
@@ -1392,6 +1189,7 @@ async function approveScopeChange(
     approvalRequestId?: string;
   }
 ): Promise<void> {
+  const { missionSystem } = await import('./refactor/mission-system.js');
   // The approval-mediated path validates the human approval inside
   // approveScopeChange; SUDO is only required for the direct path.
   if (!options?.approvalRequestId?.trim()) {
@@ -1408,17 +1206,36 @@ async function approveScopeChange(
  * must never silently fall back to the stub.
  */
 const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
+  'help',
   'record-task',
   'record-evidence',
   // Journal/state-only verbs: they never delegate to a reasoning backend, so
   // skipping the ~3s backend bootstrap keeps the triage loop cheap.
   'triage',
   'scope-approve',
+  // Read-only listing of mission summaries from disk.
+  'list',
 ]);
 
 /** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
 export function shouldSkipReasoningBootstrap(action: string | undefined): boolean {
   return !!action && REASONING_FREE_ACTIONS.has(action);
+}
+
+function triageCommands(): Promise<typeof MissionTriageCommands> {
+  return import('./refactor/mission-triage-commands.js');
+}
+
+function memoryCommands(): Promise<typeof MissionMemoryCommands> {
+  return import('./refactor/mission-memory-commands.js');
+}
+
+function organizationCommands(): Promise<typeof MissionOrganizationCommands> {
+  return import('./refactor/mission-organization-commands.js');
+}
+
+function processPlanning(): Promise<typeof MissionProcessPlanning> {
+  return import('./refactor/mission-process-planning.js');
 }
 
 /**
@@ -1450,7 +1267,14 @@ async function mainImpl(
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   // Journal-only actions never delegate; skip their probe cost.
   if (!shouldSkipReasoningBootstrap(requestedAction)) {
+    const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
     installReasoningBackends();
+    // Import side effects: the canonical A2A route (without it every
+    // agent_runtime dispatch fails with "has no A2A/runtime route") and pane
+    // prompt escalation into approval requests. Journal-only verbs never
+    // dispatch agents, so they skip this graph with the reasoning bootstrap.
+    await import('@agent/core/mesh/a2a-bridge');
+    await import('@agent/core/agent/agent-prompt-approval');
   }
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
@@ -1489,12 +1313,14 @@ async function mainImpl(
     grantMissionAccess,
     grantMissionSudo,
     approveScopeChange,
-    requestMissionScopeApproval: (
+    requestMissionScopeApproval: async (
       id: string,
-      options?: Parameters<typeof runScopeApproveRequestApproval>[1]
-    ) => runScopeApproveRequestApproval(id, options, printOutput),
-    triageMission: (id: string, options?: Parameters<typeof runMissionTriage>[1]) =>
-      runMissionTriage(id, options, printOutput),
+      options?: Parameters<typeof MissionTriageCommands.runScopeApproveRequestApproval>[1]
+    ) => (await triageCommands()).runScopeApproveRequestApproval(id, options, printOutput),
+    triageMission: async (
+      id: string,
+      options?: Parameters<typeof MissionTriageCommands.runMissionTriage>[1]
+    ) => (await triageCommands()).runMissionTriage(id, options, printOutput),
     createCheckpoint,
     delegateMission,
     importMission,
@@ -1505,13 +1331,25 @@ async function mainImpl(
     sealMission,
     enqueueMission,
     dispatchNextMission,
-    acceptRubricOverride,
-    listMemoryQueue,
-    showMemoryReview,
-    approveMemoryCandidate,
-    rejectMemoryCandidate,
-    promoteMemoryCandidate,
-    promotePendingMemoryCandidates,
+    acceptRubricOverride: async (
+      ...input: Parameters<typeof MissionMemoryCommands.acceptRubricOverride>
+    ) => (await memoryCommands()).acceptRubricOverride(...input),
+    listMemoryQueue: async (...input: Parameters<typeof MissionMemoryCommands.listMemoryQueue>) =>
+      (await memoryCommands()).listMemoryQueue(...input),
+    showMemoryReview: async (...input: Parameters<typeof MissionMemoryCommands.showMemoryReview>) =>
+      (await memoryCommands()).showMemoryReview(...input),
+    approveMemoryCandidate: async (
+      ...input: Parameters<typeof MissionMemoryCommands.approveMemoryCandidate>
+    ) => (await memoryCommands()).approveMemoryCandidate(...input),
+    rejectMemoryCandidate: async (
+      ...input: Parameters<typeof MissionMemoryCommands.rejectMemoryCandidate>
+    ) => (await memoryCommands()).rejectMemoryCandidate(...input),
+    promoteMemoryCandidate: async (
+      ...input: Parameters<typeof MissionMemoryCommands.promoteMemoryCandidate>
+    ) => (await memoryCommands()).promoteMemoryCandidate(...input),
+    promotePendingMemoryCandidates: async (
+      ...input: Parameters<typeof MissionMemoryCommands.promotePendingMemoryCandidates>
+    ) => (await memoryCommands()).promotePendingMemoryCandidates(...input),
     finishMission,
     resumeMission,
     pauseMission,
@@ -1526,14 +1364,29 @@ async function mainImpl(
     purgeMissions,
     archiveMissions,
     listMissions,
-    listOrganizationCatalogs: (organizationId, jsonOutput, output) =>
-      listOrganizationCatalogs(organizationId, jsonOutput, args, output),
-    listOrganizationProfiles: (organizationId, output) =>
-      listOrganizationProfiles(organizationId, args, ROOT_DIR, output),
-    showOrganizationProfile: (organizationId, summaryOnly, jsonOutput, output) =>
-      showOrganizationProfile(organizationId, summaryOnly, jsonOutput, output),
-    showOrganizationDiscovery: (jsonOutput, summaryOnly, output) =>
-      showOrganizationDiscovery(jsonOutput, summaryOnly, output),
+    listOrganizationCatalogs: async (organizationId, jsonOutput, output) =>
+      (await organizationCommands()).listOrganizationCatalogs(
+        organizationId,
+        jsonOutput,
+        args,
+        output
+      ),
+    listOrganizationProfiles: async (organizationId, output) =>
+      (await organizationCommands()).listOrganizationProfiles(
+        organizationId,
+        args,
+        ROOT_DIR,
+        output
+      ),
+    showOrganizationProfile: async (organizationId, summaryOnly, jsonOutput, output) =>
+      (await organizationCommands()).showOrganizationProfile(
+        organizationId,
+        summaryOnly,
+        jsonOutput,
+        output
+      ),
+    showOrganizationDiscovery: async (jsonOutput, summaryOnly, output) =>
+      (await organizationCommands()).showOrganizationDiscovery(jsonOutput, summaryOnly, output),
     showMissionStatus,
     showReasoningBackendStatus,
     syncProjectLedger,
@@ -1546,7 +1399,9 @@ async function mainImpl(
     adviseMission,
     classifyMission,
     selectMissionWorkflow,
-    planProcessTemplateTasks,
+    planProcessTemplateTasks: async (
+      ...input: Parameters<typeof MissionProcessPlanning.planProcessTemplateTasks>
+    ) => (await processPlanning()).planProcessTemplateTasks(...input),
     reviewWorkerOutput,
     handoffMission,
     gatePass,

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { loadProjectTrackRecord } from '@agent/core/project/project-track-registry';
-import { assertManagedProjectTrackScope } from '@agent/core/project/project-management';
+import { assertManagedProjectTrackScope } from '@agent/core/project/project-track-scope';
 import {
   resolveMissionExecutionSurface,
   type MissionExecutionSurface,

@@ -1298,58 +1298,21 @@ function stubText(message: string): string {
   return stubExplicitlyRequested() ? message : `${UNCONFIGURED_STUB_WARNING}\n${message}`;
 }
 
-/**
- * LC-07 (LOOP_CLOSURE_PLAN): stub-taint registry. Every stub op invocation is
- * recorded process-wide so completion gates (intent-reconciliation) can refuse
- * to mark work "done" when its judgments came from fabricated placeholders.
- * Explicit stub mode (KYBERION_REASONING_BACKEND=stub) opts out — that is the
- * deterministic-test configuration where stub output is the point.
- */
-export interface StubServedRecord {
-  op: string;
-  at: number;
-}
-
-const stubServedOps: StubServedRecord[] = [];
-const STUB_SERVED_CAP = 500;
-
-export function stubExplicitlyRequested(): boolean {
-  return getRegisteredEnvText('KYBERION_REASONING_BACKEND') === 'stub';
-}
-
-function recordStubServed(op: string, detail?: string): void {
-  if (stubServedOps.length < STUB_SERVED_CAP) {
-    stubServedOps.push({ op, at: Date.now() });
-  }
-  logger.warn(
-    `[reasoning-backend:stub] ${op} — no real backend registered${detail ? `; ${detail}` : ''}`
-  );
-}
-
-export function getStubServedOps(): readonly StubServedRecord[] {
-  return stubServedOps;
-}
-
-/** Clear the stub-taint registry. Used by tests and by resetReasoningBackend. */
-export function resetStubServedOps(): void {
-  stubServedOps.length = 0;
-}
-
-/** Copy of the stub-taint registry, for scoped callers that must reset the backend. */
-export function snapshotStubServedOps(): StubServedRecord[] {
-  return stubServedOps.map((record) => ({ ...record }));
-}
-
-/**
- * Put a snapshot back in front of the registry. Records made since the
- * snapshot are kept, so restoring can never drop taint.
- */
-export function restoreStubServedOps(snapshot: readonly StubServedRecord[]): void {
-  const since = stubServedOps.splice(0);
-  stubServedOps.push(
-    ...[...snapshot, ...since].slice(0, STUB_SERVED_CAP).map((record) => ({ ...record }))
-  );
-}
+// LC-07 stub-taint registry lives in a leaf so completion gates read it
+// without loading this module; re-exported here to keep the public surface.
+import {
+  recordStubServed,
+  resetStubServedOps,
+  stubExplicitlyRequested,
+} from './stub-served-registry.js';
+export {
+  getStubServedOps,
+  resetStubServedOps,
+  restoreStubServedOps,
+  snapshotStubServedOps,
+  stubExplicitlyRequested,
+  type StubServedRecord,
+} from './stub-served-registry.js';
 
 /** Deterministic, offline backend that emits structured placeholders. */
 export const stubReasoningBackend: ReasoningBackend = {

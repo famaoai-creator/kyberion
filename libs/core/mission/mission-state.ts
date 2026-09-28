@@ -26,7 +26,7 @@ import {
 import { withLock } from '../foundation/lock-utils.js';
 import { withFencedWriterLease, writerLeaseResourceId } from '../writer-lease.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
-import { hasAuthority } from '../governance.js';
+import { hasAuthority } from '../authority.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';

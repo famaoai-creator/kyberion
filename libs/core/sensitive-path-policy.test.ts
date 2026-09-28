@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
   findSensitivePathInText,
   findSensitivePathMatch,
@@ -36,6 +37,22 @@ describe('sensitive-path-policy', () => {
     );
     expect(findSensitivePathInText('cat ~/.ssh/id_ed25519')?.ruleId).toBe('credential.ssh');
     expect(findSensitivePathMatch(path.resolve('active/shared/tmp/example.txt'))).toBeNull();
+  });
+
+  it('rebuilds credential roots when HOME changes', () => {
+    const originalHome = os.homedir();
+    const originalHomeEnv = getRegisteredEnvText('HOME');
+    const probeHome = '/kyberion-sensitive-path-cache-probe';
+    try {
+      setRegisteredEnv('HOME', probeHome);
+      expect(findSensitivePathMatch(`${probeHome}/.ssh/id_ed25519`)?.ruleId).toBe('credential.ssh');
+      expect(findSensitivePathMatch(path.join(originalHome, '.ssh/id_ed25519'))).toBeNull();
+    } finally {
+      setRegisteredEnv('HOME', originalHomeEnv);
+    }
+    expect(findSensitivePathMatch(path.join(originalHome, '.ssh/id_ed25519'))?.ruleId).toBe(
+      'credential.ssh'
+    );
   });
 
   it('resolves the home root through the registered environment boundary', () => {

@@ -45,7 +45,11 @@ import {
 import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { HumanDecidedBy, MissionState } from './mission-types.js';
-import { isValidTenantSlug } from '../entity-scope.js';
+import {
+  normalizeMissionTenantSlug as normalizeTenantSlug,
+  parseMissionVisionRef,
+  type MissionVisionRefSummary,
+} from './mission-vision-ref.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 
@@ -95,61 +99,7 @@ function resolveMissionTemplateFilePath(missionDir: string, templatePath: string
   return assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
 }
 
-function normalizeTenantSlug(value: string | undefined | null): string | undefined {
-  if (!value) return undefined;
-  const trimmed = String(value).trim();
-  if (!trimmed) return undefined;
-  return isValidTenantSlug(trimmed) ? trimmed : undefined;
-}
-
-export interface MissionVisionRefSummary {
-  raw: string;
-  kind: 'company' | 'vision' | 'legacy';
-  tenant_slug: string | null;
-  path: string | null;
-  query: string | null;
-}
-
-export function parseMissionVisionRef(
-  inputVisionRef: string | undefined | null,
-  tenantSlug?: string | undefined
-): MissionVisionRefSummary | null {
-  const raw = String(inputVisionRef || '').trim();
-  if (!raw) return null;
-
-  if (raw.startsWith('company://')) {
-    const remainder = raw.slice('company://'.length);
-    const [pathPart, queryPart] = remainder.split('?', 2);
-    const [parsedTenantSlug, ...segments] = pathPart.split('/').filter(Boolean);
-    return {
-      raw,
-      kind: 'company',
-      tenant_slug: normalizeTenantSlug(parsedTenantSlug || tenantSlug || undefined) || null,
-      path: segments.length ? segments.join('/') : 'vision',
-      query: queryPart || null,
-    };
-  }
-
-  if (raw.startsWith('vision://')) {
-    const remainder = raw.slice('vision://'.length);
-    const [pathPart, queryPart] = remainder.split('?', 2);
-    return {
-      raw,
-      kind: 'vision',
-      tenant_slug: normalizeTenantSlug(tenantSlug || undefined) || null,
-      path: pathPart || null,
-      query: queryPart || null,
-    };
-  }
-
-  return {
-    raw,
-    kind: 'legacy',
-    tenant_slug: normalizeTenantSlug(tenantSlug || undefined) || null,
-    path: null,
-    query: null,
-  };
-}
+export { parseMissionVisionRef, type MissionVisionRefSummary };
 
 export function normalizeMissionVisionRef(
   inputVisionRef: string | undefined,

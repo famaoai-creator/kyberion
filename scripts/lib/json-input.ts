@@ -2,9 +2,10 @@ export {
   parseSafeJsonInput,
   parseSafeJsonObjectInput,
   parseSafeJsonObjectValue,
-} from '@agent/core/foundation';
+} from '@agent/core/foundation/safe-json';
 
-import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue } from '@agent/core/foundation/safe-json';
+import { readJson } from '@agent/core/foundation/json';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 function readFoundationJson<T>(filePath: string, label: string): T {

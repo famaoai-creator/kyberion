@@ -2,7 +2,7 @@ import { logger } from '@agent/core/core';
 import { safeExecShellScriptResult } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import type { StepHook } from '@agent/core/pipeline/pipeline-contract';
-import { isRecord } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/primitives';
 
 type HookDecision = 'continue' | 'skip' | 'abort';
 type DispatchFunc = (

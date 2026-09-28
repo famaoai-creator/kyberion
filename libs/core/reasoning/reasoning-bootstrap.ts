@@ -76,6 +76,7 @@ import { installSecretResolverIfAvailable } from '../secret/secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from '../python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from '../embedding-bootstrap.js';
 import { discoverProviders } from '../provider/provider-discovery.js';
+import { cliModeAbsentFromDiscovery, isCliDiscoveryMode } from './cli-mode-presence.js';
 import { discoverReasoningEndpoints } from './reasoning-endpoint-discovery.js';
 import {
   loadProviderCapabilityRegistry,
@@ -211,6 +212,16 @@ function buildReasoningRuntimeBundle(
   if (registeredBundle) return registeredBundle;
 
   const provider = providerForReasoningMode(mode);
+  if (
+    !options.force &&
+    isCliDiscoveryMode(mode) &&
+    cliModeAbsentFromDiscovery(mode, provider, discoverProviders(false))
+  ) {
+    logger.info(
+      `[reasoning-bootstrap] skip mode=${mode}: provider discovery reports the CLI is not installed`
+    );
+    return null;
+  }
   const openAiCompatibleBundle = buildOpenAiCompatibleProviderBundle({
     mode,
     provider,

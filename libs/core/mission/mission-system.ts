@@ -40,8 +40,6 @@ import {
   staffMissionTeam as _staffMissionTeam,
 } from './mission-runtime.js';
 import { distillMission as _distillMission } from './mission-distill.js';
-import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-ticket-dispatch.js';
-import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import type { MissionExecutionSurface } from './mission-execution-surface.js';
 import { reconcileMissionExistingWork as _reconcileMissionExistingWork } from './mission-work-reconciliation.js';
 import { sealMission as _sealMission } from './mission-seal.js';
@@ -357,7 +355,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       if (!state) {
         throw new Error(`Mission ${id.toUpperCase()} not found.`);
       }
-      return _dispatchMissionTickets(state, options);
+      // Dispatch pulls the delegation and provider stack; load it on the
+      // dispatch action only so status/journal commands stay light.
+      return import('./mission-ticket-dispatch.js').then(({ dispatchMissionTickets }) =>
+        dispatchMissionTickets(state, options)
+      );
     },
     dispatchMissionWorkItems(
       id: string,
@@ -377,7 +379,9 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       if (!state) {
         throw new Error(`Mission ${id.toUpperCase()} not found.`);
       }
-      return _dispatchMissionWorkItems(state, options);
+      return import('./mission-workitem-dispatch.js').then(({ dispatchMissionWorkItems }) =>
+        dispatchMissionWorkItems(state, options)
+      );
     },
     /**
      * Expand a mission handoff over the canonical WorkItem ledger. NEXT_TASKS

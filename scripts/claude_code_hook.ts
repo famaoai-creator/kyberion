@@ -28,9 +28,8 @@ import {
   summarizeTranscriptUsage,
 } from '@agent/core/provider/claude-code-hook';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
-import { parseSafeJsonInput } from '@agent/core/foundation';
-import { isRecord } from '@agent/core/foundation/text';
+import { isRecord, readTextFile } from '@agent/core/foundation/text';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
 async function readStdin(): Promise<string> {

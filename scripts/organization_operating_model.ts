@@ -47,7 +47,7 @@ import {
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   createOrganizationIncident,
   transitionOrganizationIncident,
