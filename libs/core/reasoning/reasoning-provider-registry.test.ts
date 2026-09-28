@@ -16,7 +16,7 @@ describe('reasoning provider registry', () => {
     expect(descriptors.length).toBeGreaterThanOrEqual(20);
     expect(getReasoningProviderDescriptor('anthropic')).toMatchObject({
       provider: 'anthropic',
-      module: './reasoning-api-provider',
+      module: './reasoning/reasoning-api-provider',
       capabilities: { structured_output: true, input_modalities: ['text', 'image'] },
     });
   });
@@ -38,7 +38,7 @@ describe('reasoning provider registry', () => {
       parseReasoningProviderDescriptor({
         mode: 'stub',
         provider: 'stub',
-        module: './reasoning-backend',
+        module: './reasoning/reasoning-backend',
         env_keys: [],
       })
     ).toBeNull();
@@ -46,7 +46,7 @@ describe('reasoning provider registry', () => {
       parseReasoningProviderDescriptor({
         mode: 'stub',
         provider: 'stub',
-        module: './reasoning-backend',
+        module: './reasoning/reasoning-backend',
         capabilities: {
           reasoning: true,
           structured_output: true,
@@ -72,7 +72,7 @@ describe('reasoning provider registry', () => {
       parseReasoningProviderDescriptor({
         mode: 'stub',
         provider: 'stub',
-        module: './reasoning-backend',
+        module: './reasoning/reasoning-backend',
         capabilities: {
           reasoning: true,
           structured_output: true,
@@ -90,7 +90,7 @@ describe('reasoning provider registry', () => {
     const base = {
       mode: 'stub' as const,
       provider: 'stub',
-      module: './reasoning-backend',
+      module: './reasoning/reasoning-backend',
       capabilities: {
         reasoning: true,
         structured_output: true,
