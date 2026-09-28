@@ -54,6 +54,9 @@ vi.mock('@agent/core/governance', () => ({
 
 // The shared JSON loader is backed by the foundation parser and secure-io
 // bridge, so both parser seams are stubbed for this isolated tmpdir fixture.
+vi.mock('@agent/core/foundation/json', () => ({
+  readJson: (filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')),
+}));
 vi.mock('@agent/core/foundation', () => ({
   parseSafeJsonInput: (text: string) => JSON.parse(text),
   readJson: (filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')),
