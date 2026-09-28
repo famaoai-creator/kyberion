@@ -2,6 +2,7 @@ import type { ApprovalRequestRecord } from './approval-store.js';
 import { evaluateVetoWindow, type VetoWindowState } from './approval-veto-window.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
+import type { NotificationChannelTarget } from './operator-notifications.js';
 import { resolveLocale } from './locale.js';
 import type { SupportedLocale } from './locale-normalize.js';
 import { t, type VocabularyKey } from './t.js';
@@ -318,4 +319,29 @@ export function renderDecisionCardExplanation(
     );
   }
   return lines.join('\n');
+}
+
+/**
+ * Outbox notifications are sent with each surface's default formatting (Slack
+ * mrkdwn, Telegram Markdown, Discord markdown), so agent-written text in a card
+ * could otherwise plant a disguised link or a mass mention on the decision
+ * screen. Neutralize the syntax that changes what the operator sees.
+ */
+export function neutralizeSurfaceMarkup(
+  text: string,
+  surface: NotificationChannelTarget['surface']
+): string {
+  switch (surface) {
+    case 'slack':
+      return text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+    case 'telegram':
+      // Legacy Markdown: only these four characters can be escaped.
+      return text.replace(/[_*`[]/gu, (char) => `\\${char}`);
+    case 'discord':
+      return text
+        .replace(/[\\*_~`|[\]()<>]/gu, (char) => `\\${char}`)
+        .replace(/@(everyone|here)/giu, '@\u200b$1');
+    default:
+      return text;
+  }
 }
