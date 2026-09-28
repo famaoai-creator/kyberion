@@ -9,7 +9,7 @@ import {
   revokeWorkInventoryConsent,
   type WorkInventoryConsentSource,
   type WorkInventoryObservationKind,
-} from '@agent/core/work-inventory-consent';
+} from '@agent/core/workforce/work-inventory-consent';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {

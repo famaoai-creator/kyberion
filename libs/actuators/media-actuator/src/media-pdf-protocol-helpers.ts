@@ -1,5 +1,5 @@
-import { resolveBorderKeySides } from '@agent/core/media-style-policy';
-import type { PdfDesignProtocol } from '@agent/core/media-contracts';
+import { resolveBorderKeySides } from '@agent/core/media/media-style-policy';
+import type { PdfDesignProtocol } from '@agent/core/media/media-contracts';
 import { nowIso } from '@agent/core/foundation';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 

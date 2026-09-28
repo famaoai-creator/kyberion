@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { Badge, Button, Callout, Section, Select, Table, TextField } from '@agent/shared-ui';
 import { ChronosFieldScope, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { useChronosLocale } from '../lib/hooks';

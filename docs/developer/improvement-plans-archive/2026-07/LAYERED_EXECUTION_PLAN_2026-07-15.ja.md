@@ -16,7 +16,7 @@ status: archived
 
 ### 1.1 PPTX デザイン乖離の根本原因
 
-両経路とも最終レンダラーは同一(`generateNativePptx()`, `libs/core/src/native-pptx-engine/engine.ts:17`)。乖離はすべて上流の「デフォルト補完層」の違い:
+両経路とも最終レンダラーは同一(`generateNativePptx()`, `libs/core/media/native-pptx-engine/engine.ts:17`)。乖離はすべて上流の「デフォルト補完層」の違い:
 
 | 経路                                                        | デフォルト補完                                                                                        | 結果                                                                                                                                              |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,7 +30,7 @@ status: archived
 
 - scripts/ 約185本の大半は正当(CI ゲート26本・codegen 10本・デーモン・対話 CLI・mission 制御機構)。
 - 真の問題は逆向き: **32本の pipeline が `system:exec dist/scripts/*.js` を呼ぶだけの薄いラッパー**(12本はスクリプトと1:1同名)。ロジックが TS に逃げる理由は一貫している — 動的コレクションのループ+累積状態、型付き `@agent/core` API 呼び出し、「見せかけ成功」への防御的検証(`scripts/campaign_suite.ts:46-58`)。
-- ADF 側の摩擦: 任意ロジックは `core:transform` の **JSON 文字列内 JS**のみ、条件 DSL は固定8演算子(`libs/core/src/logic-utils.ts:132-161`)、スキーマは `params` 任意キー許容で typo が実行時まで沈黙(`pipeline-adf.schema.json:60,70`)。
+- ADF 側の摩擦: 任意ロジックは `core:transform` の **JSON 文字列内 JS**のみ、条件 DSL は固定8演算子(`libs/core/pipeline/logic-utils.ts:132-161`)、スキーマは `params` 任意キー許容で typo が実行時まで沈黙(`pipeline-adf.schema.json:60,70`)。
 - AR-08 の裏付け: 77本中75本は事実上未実行、静的検証通過分の約半分が実行時失敗していた。
 
 ## 2. 目標アーキテクチャ: 各層に得意なものだけ
@@ -62,7 +62,7 @@ pipeline 内ループの判定: **データ駆動の反復**(既知リストに�
 
 ### LE-01: PPTX デザインデフォルトカスケード(P0 / S〜M)
 
-**内容**: `libs/core/src/native-pptx-engine/design-cascade.ts` を新設し、`PptxDesignProtocol.designDefaults`(opt-in)を追加。`generateNativePptx()` の semantic reconstruction 入口で、スタイルキーが省略された要素に一貫したデフォルトを補完する。
+**内容**: `libs/core/media/native-pptx-engine/design-cascade.ts` を新設し、`PptxDesignProtocol.designDefaults`(opt-in)を追加。`generateNativePptx()` の semantic reconstruction 入口で、スタイルキーが省略された要素に一貫したデフォルトを補完する。
 
 - text 要素: fontFamily(theme フォント → `resolveFontFamilyPair`)、fontSize 14、color(テーマ text)
 - テキストを持つ shape 要素: 同上、fontSize 12

@@ -1,5 +1,8 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { formatMeshHubInspectionReport, inspectMeshHub } from '@agent/core/mesh-hub-inspection';
+import {
+  formatMeshHubInspectionReport,
+  inspectMeshHub,
+} from '@agent/core/mesh/mesh-hub-inspection';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

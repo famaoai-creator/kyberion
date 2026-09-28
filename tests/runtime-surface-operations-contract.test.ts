@@ -62,7 +62,7 @@ describe('Runtime surface operations contract', () => {
     const lifecycleModel = read(
       'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
     );
-    expect(surfaceRuntime).toContain("from '@agent/core/surface-runtime'");
+    expect(surfaceRuntime).toContain("from '@agent/core/surface/surface-runtime'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');

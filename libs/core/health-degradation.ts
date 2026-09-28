@@ -19,11 +19,11 @@ import {
   evaluateRuntimeHealthTrends,
   loadRuntimeHealthSamples,
   type RuntimeHealthSample,
-} from './runtime-health-history.js';
+} from './tool/runtime-health-history.js';
 import { sendOpsAlert, type OpsAlertReceipt } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
-import { discoverProviders } from './provider-discovery.js';
-import { listDemotedProviders } from './provider-health-registry.js';
+import { discoverProviders } from './provider/provider-discovery.js';
+import { listDemotedProviders } from './provider/provider-health-registry.js';
 import type { FinanceControllerDecision } from './finance-controller.js';
 
 export interface HealthThresholds {

@@ -4,12 +4,12 @@
  * Cross-checks the tenant slug sets across the coexisting tenant reference
  * systems and exits non-zero on drift:
  *
- *   (a) tenant profiles — the SPINE (libs/core/tenant-registry.ts:
+ *   (a) tenant profiles — the SPINE (libs/core/organization/tenant-registry.ts:
  *       knowledge/personal/tenants/*.json). The customer/{slug}/tenants/*.json
  *       tree is a stance facet only and never changes registry authority,
  *   (b) knowledge/confidential/tenants/index.json (design override index),
  *   (c) customer/{customer}/tenants/{tenant}.json profile facets,
- *   (d) project registry — NOT APPLICABLE: libs/core/project-registry.ts
+ *   (d) project registry — NOT APPLICABLE: libs/core/project/project-registry.ts
  *       ProjectRecord carries no tenant slug field (verified 2026-07-28), so
  *       there is nothing to cross-check; reported as a note.
  *
@@ -30,10 +30,10 @@
  */
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
-import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
+import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
 import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '@agent/core/foundation/scope';
-import { listProjectRecords } from '@agent/core/project-registry';
+import { listProjectRecords } from '@agent/core/project/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -44,13 +44,13 @@ import {
 import {
   loadTenantRegistryExceptionsFile,
   type TenantRegistryException,
-} from '@agent/core/tenant-registry-exceptions';
+} from '@agent/core/organization/tenant-registry-exceptions';
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
 const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
 
-export type { TenantRegistryException } from '@agent/core/tenant-registry-exceptions';
+export type { TenantRegistryException } from '@agent/core/organization/tenant-registry-exceptions';
 
 export interface TenantSystemsSnapshot {
   /** (a) tenant profile slugs — the spine. */

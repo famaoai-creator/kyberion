@@ -41,7 +41,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 
 ## 実装済みの共有契約
 
-- `libs/core/work-visibility.ts` が全ビュー共通の context 解決と投影を担当する。
+- `libs/core/workforce/work-visibility.ts` が全ビュー共通の context 解決と投影を担当する。
 - Work Items API は `scope`、`view`、`tenant`、`organization_id`、`mission_id`、`project_id` を受け取る。
 - Agent Activity / Chronos Office は `operations/active` 投影を利用し、mission label の有無だけでは除外しない。
 - Work Items 画面は scope、view、explicit/migrated/missing context の状態を表示する。

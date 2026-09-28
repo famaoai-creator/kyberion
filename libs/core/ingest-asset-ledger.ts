@@ -26,7 +26,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
+import { resolveTenant, type TenantRegistryPathOptions } from './organization/tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 

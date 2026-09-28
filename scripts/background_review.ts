@@ -11,7 +11,7 @@ import {
   applyBackgroundReviewSkillPatch,
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
-} from '@agent/core/background-review';
+} from '@agent/core/workforce/background-review-patch';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {

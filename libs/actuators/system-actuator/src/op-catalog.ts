@@ -1,6 +1,6 @@
-import { getOpInputContract } from '@agent/core/op-input-contracts';
-import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import { getOpInputContract } from '@agent/core/pipeline/op-input-contracts';
+import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',

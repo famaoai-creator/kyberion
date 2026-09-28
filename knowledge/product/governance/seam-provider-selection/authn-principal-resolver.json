@@ -137,7 +137,7 @@
             "external_idp": "declared",
             "synthetic": "declared"
           },
-          "evidence": ["libs/core/agent-identity.ts"]
+          "evidence": ["libs/core/agent/agent-identity.ts"]
         },
         "oidc-jwt": {
           "traits": {

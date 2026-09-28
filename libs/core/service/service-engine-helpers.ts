@@ -1,0 +1,414 @@
+import { classifyError } from '../error-classifier.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { createLogger } from '../logger.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+const logger = createLogger('service-engine-helpers');
+import * as customerResolver from '../customer-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveRepositoryPathToken } from '../path-token-resolver.js';
+import { resolveServiceBinding } from './service-binding.js';
+import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from '../secure-io.js';
+import { secretGuard } from '../secret/secret-guard.js';
+import { transform } from '../transformer.js';
+
+export type RetryPolicy = {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  factor?: number;
+  jitter?: boolean;
+};
+
+export const DEFAULT_RETRY_POLICY: Required<RetryPolicy> = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+const SERVICE_CONNECTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-connection-document.schema.json'
+);
+
+function serviceConnectionCatalogAtPath(filePath: string) {
+  return defineCatalog<Record<string, unknown>>({
+    id: 'service-connection-document',
+    path: filePath,
+    schema: SERVICE_CONNECTION_SCHEMA_PATH,
+  });
+}
+
+export function loadServiceConnectionAtPath(filePath: string): Record<string, unknown> {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile())
+    throw new Error(`Service connection is not a regular file: ${safeFilePath}`);
+  return serviceConnectionCatalogAtPath(safeFilePath).load();
+}
+
+export function writeServiceConnectionAtPath(
+  filePath: string,
+  connection: Record<string, unknown>
+): string {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = serviceConnectionCatalogAtPath(safeFilePath).validate(connection, safeFilePath);
+  safeWriteFile(safeFilePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safeFilePath;
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export { isPlainObject };
+
+function assertServiceIdPathSegment(serviceId: string): string {
+  const normalized = String(serviceId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[SERVICE_ID_INVALID] service id must be a single path segment: ${serviceId}`);
+  }
+  return normalized;
+}
+
+export function loadConnectionWithFallback(serviceId: string): Record<string, any> {
+  const normalizedServiceId = assertServiceIdPathSegment(serviceId);
+  const connectionPath = customerResolver.resolveOverlay(`connections/${normalizedServiceId}.json`);
+  if (connectionPath) {
+    try {
+      const safeConnectionPath = assertSafeRepositoryPath(connectionPath, {
+        allowMissingLeaf: true,
+      });
+      const primary = loadServiceConnectionAtPath(safeConnectionPath);
+      if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+    } catch (err) {
+      logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
+    }
+  }
+  // Keep the legacy fallback observable to callers/tests, but let secure-io's
+  // deny layer reject personal credential paths before any filesystem access.
+  // The mediated secret-guard read below is the only permitted recovery path.
+  try {
+    const fallbackPath = assertSafeRepositoryPath(
+      pathResolver.resolve(`knowledge/personal/connections/${normalizedServiceId}.json`),
+      { allowMissingLeaf: true }
+    );
+    const fallback = loadServiceConnectionAtPath(fallbackPath);
+    if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
+      return fallback;
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith('[SENSITIVE_PATH_DENIED]'))) {
+      logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
+    }
+  }
+  const primary = secretGuard.loadConnectionDocument(serviceId);
+  if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+  return {};
+}
+
+function isUnresolvedTemplateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\{\{\s*[^}]+\s*\}\}$/.test(value.trim());
+}
+
+export function mergeParamsWithConnection(
+  connection: Record<string, any>,
+  params: Record<string, any>
+): Record<string, any> {
+  const merged: Record<string, any> = { ...connection };
+  for (const [key, value] of Object.entries(params || {})) {
+    if (isUnresolvedTemplateString(value) && merged[key] !== undefined) continue;
+    merged[key] = value;
+  }
+  return merged;
+}
+
+/**
+ * Resolve an inline path token of the form `@domain[:subPath]` to an absolute, machine-local
+ * path via {@link pathResolver}. Used so templates can reference repo locations portably
+ * (`{{@shared:tmp/run.json}}`, `{{@knowledge:product/x.md}}`, `{{@root}}`) without hard-coding a
+ * machine-specific prefix. Returns `undefined` for an unknown domain so the caller keeps the
+ * literal token (no silent wrong resolution).
+ *
+ * NOTE: the result is an ABSOLUTE, machine-local path — fine for runtime use (feeding an op or
+ * tool), but it must NOT be persisted. Use `system:resolve_path`'s `to_relative`/`normalize`
+ * (or `pathResolver.toRepoRelative`) before storing a path.
+ */
+function resolvePathToken(token: string): string | undefined {
+  return resolveRepositoryPathToken(token);
+}
+
+/**
+ * Substitute `{{var}}` placeholders from `vars`. Resolution is **recursive but bounded**:
+ * the string is re-scanned up to `maxDepth` passes so indirect references unwrap (e.g. a
+ * context var that itself holds `{{env.X}}`), stopping at a fixpoint (a pass that changes
+ * nothing). Infinite-loop safety:
+ *  - unknown keys are left as their literal `{{key}}` → they produce no progress, so they
+ *    can never drive an endless loop;
+ *  - cyclic / self references (`a→b→a`, `a→a`) are bounded by `maxDepth` and warn once.
+ *
+ * Inline path tokens (`{{@domain:subPath}}`) resolve to machine-local absolute paths via
+ * {@link resolvePathToken} so templates stay portable across machines.
+ */
+export function resolveVars(
+  input: string | undefined,
+  vars: Record<string, unknown>,
+  maxDepth = 8
+): string {
+  if (!input) return '';
+  let out = input;
+  for (let pass = 0; pass < maxDepth; pass++) {
+    const next = out.replace(/{{(.*?)}}/g, (match, key) => {
+      const trimmedKey = key.trim();
+      if (trimmedKey.startsWith('@')) {
+        const resolved = resolvePathToken(trimmedKey);
+        return resolved !== undefined ? resolved : match; // unknown domain → keep literal
+      }
+      const value = vars[trimmedKey];
+      return value !== undefined ? String(value) : match; // unknown → keep literal (no progress)
+    });
+    if (next === out) return out; // fixpoint: nothing left to resolve
+    out = next;
+  }
+  if (/{{.*?}}/.test(out)) {
+    logger.warn(
+      `[resolveVars] max expansion depth (${maxDepth}) reached without converging — possible variable cycle. Unresolved: "${out.slice(0, 120)}"`
+    );
+  }
+  return out;
+}
+
+export function resolveTemplateValue(input: unknown, vars: Record<string, unknown>): unknown {
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    const wholeVarMatch = trimmed.match(/^{{\s*([^}]+)\s*}}$/);
+    if (wholeVarMatch) {
+      const token = wholeVarMatch[1].trim();
+      if (token.startsWith('@')) {
+        const resolved = resolvePathToken(token);
+        return resolved !== undefined ? resolved : input;
+      }
+      const value = vars[token];
+      return value !== undefined ? value : input;
+    }
+    return resolveVars(input, vars);
+  }
+  if (Array.isArray(input)) {
+    return input.map((item) => resolveTemplateValue(item, vars));
+  }
+  if (input && typeof input === 'object') {
+    return Object.fromEntries(
+      Object.entries(input as Record<string, unknown>).map(([key, value]) => [
+        key,
+        resolveTemplateValue(value, vars),
+      ])
+    );
+  }
+  return input;
+}
+
+export function normalizePresetResult(
+  output: unknown,
+  outputMapping?: Record<string, string>
+): unknown {
+  if (!outputMapping || Object.keys(outputMapping).length === 0) return output;
+  return transform(output, { type: 'json_map', mapping: outputMapping });
+}
+
+function resolveRecoveryPolicy(source: Record<string, unknown> | undefined): Record<string, any> {
+  return isPlainObject(source?.recovery_policy) ? source.recovery_policy : {};
+}
+
+function resolveRetryPolicy(...sources: Array<Record<string, unknown> | undefined>): RetryPolicy {
+  const merged: RetryPolicy = {};
+  for (const source of sources) {
+    const policy = resolveRecoveryPolicy(source);
+    const retry =
+      policy.retry || policy.default_retry || source?.retry_policy || source?.retry || {};
+    if (isPlainObject(retry)) {
+      Object.assign(merged, retry);
+    }
+  }
+  return merged;
+}
+
+export function buildRetryOptions(
+  serviceConfig: Record<string, unknown>,
+  preset: Record<string, unknown>,
+  operation: Record<string, any>
+): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
+  const retryableCategories = new Set<string>();
+  for (const source of [serviceConfig, preset, operation]) {
+    const policy = resolveRecoveryPolicy(source);
+    const categories = Array.isArray(policy.retryable_categories)
+      ? policy.retryable_categories
+      : [];
+    for (const category of categories) retryableCategories.add(String(category));
+  }
+
+  const resolvedRetry = {
+    ...DEFAULT_RETRY_POLICY,
+    ...resolveRetryPolicy(serviceConfig, preset, operation),
+  };
+
+  const shouldRetry = (error: Error) => {
+    const classification = classifyError(error);
+    if (retryableCategories.size > 0) {
+      return retryableCategories.has(classification.category);
+    }
+    return (
+      classification.category === 'network' ||
+      classification.category === 'rate_limit' ||
+      classification.category === 'timeout' ||
+      classification.category === 'resource_unavailable'
+    );
+  };
+
+  return { ...resolvedRetry, shouldRetry };
+}
+
+export function resolveRequestEnvelope(params: unknown): {
+  templateVars: Record<string, unknown>;
+  query?: Record<string, unknown>;
+  body?: unknown;
+  hasBody: boolean;
+} {
+  const templateVars: Record<string, unknown> = isPlainObject(params) ? { ...params } : {};
+  let query: Record<string, unknown> | undefined;
+  let body: unknown;
+  let hasBody = false;
+
+  if (isPlainObject(templateVars.vars)) {
+    Object.assign(templateVars, templateVars.vars);
+  }
+  if (isPlainObject(templateVars.query)) {
+    query = { ...templateVars.query };
+  }
+  if (Object.prototype.hasOwnProperty.call(templateVars, 'body')) {
+    body = templateVars.body;
+    hasBody = true;
+  }
+
+  return { templateVars, query, body, hasBody };
+}
+
+export function buildApiKeyQueryAuth(
+  authStrategy: string | undefined,
+  authParams: Record<string, unknown> | undefined,
+  binding: ReturnType<typeof resolveServiceBinding>,
+  templateVars: Record<string, unknown>
+): Record<string, string> {
+  if (!authStrategy || authStrategy.toLowerCase() !== 'api_key_query') return {};
+
+  const key = String(authParams?.key || 'apiKey').trim();
+  if (!key) {
+    throw new Error(`api_key_query auth requires a query key for service "${binding.serviceId}"`);
+  }
+
+  const resolvedValue = resolveTemplateValue(authParams?.value ?? '{{accessToken}}', {
+    ...templateVars,
+    ...binding,
+  });
+  const value = typeof resolvedValue === 'string' ? resolvedValue : String(resolvedValue ?? '');
+  if (!value) {
+    throw new Error(
+      `api_key_query auth requires an access token for service "${binding.serviceId}"`
+    );
+  }
+
+  return { [key]: value };
+}
+
+export function buildAuthHeaders(
+  authStrategy: string | undefined,
+  binding: ReturnType<typeof resolveServiceBinding>
+): Record<string, string> {
+  if (!authStrategy || authStrategy.toLowerCase() === 'none') return {};
+
+  if (authStrategy.toLowerCase() === 'bearer') {
+    if (!binding.accessToken) {
+      throw new Error(`Bearer auth requires an access token for service "${binding.serviceId}"`);
+    }
+    return { Authorization: `Bearer ${binding.accessToken}` };
+  }
+
+  if (authStrategy.toLowerCase() === 'basic') {
+    if (binding.clientId && binding.clientSecret) {
+      const credentials = Buffer.from(
+        `${binding.clientId}:${binding.clientSecret}`,
+        'utf8'
+      ).toString('base64');
+      return { Authorization: `Basic ${credentials}` };
+    }
+    if (binding.accessToken) {
+      return { Authorization: `Basic ${binding.accessToken}` };
+    }
+    throw new Error(
+      `Basic auth requires client credentials or a pre-encoded token for service "${binding.serviceId}"`
+    );
+  }
+
+  return {};
+}
+
+export function encodeFormBody(payload: Record<string, any>): string {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) searchParams.append(key, String(item));
+      continue;
+    }
+    searchParams.append(key, String(value));
+  }
+  return searchParams.toString();
+}
+
+export function stripUnresolvedTemplateValues(input: any): unknown {
+  if (typeof input === 'string') {
+    return /^\{\{\s*[^}]+\s*\}\}$/.test(input.trim()) ? undefined : input;
+  }
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => stripUnresolvedTemplateValues(item))
+      .filter((item) => item !== undefined);
+  }
+  if (input && typeof input === 'object') {
+    return Object.fromEntries(
+      Object.entries(input as Record<string, unknown>)
+        .map(([key, value]) => [key, stripUnresolvedTemplateValues(value)])
+        .filter(([, value]) => value !== undefined)
+    );
+  }
+  return input;
+}
+
+export function prepareRequestBody(payload: unknown, headers: Record<string, unknown>): unknown {
+  const normalizedPayload = stripUnresolvedTemplateValues(payload);
+  const contentType = String(
+    headers['Content-Type'] || headers['content-type'] || ''
+  ).toLowerCase();
+  if (
+    contentType.includes('application/x-www-form-urlencoded') &&
+    normalizedPayload &&
+    typeof normalizedPayload === 'object' &&
+    !Array.isArray(normalizedPayload)
+  ) {
+    return encodeFormBody(normalizedPayload);
+  }
+  return normalizedPayload;
+}
+
+export function isCliAllowedForOperation(
+  serviceConfig: Record<string, unknown>,
+  preset: Record<string, unknown>,
+  operation: Record<string, any>
+): boolean {
+  if (['true', '1'].includes(getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') || '')) return true;
+  return (
+    Boolean(operation.allow_unsafe_cli) ||
+    Boolean(preset.allow_unsafe_cli) ||
+    Boolean(serviceConfig.allow_unsafe_cli)
+  );
+}

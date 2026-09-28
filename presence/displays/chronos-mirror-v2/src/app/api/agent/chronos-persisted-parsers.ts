@@ -1,5 +1,5 @@
 import { isRecord } from '@agent/core/foundation';
-import type { AgentRoutingDecision } from '@agent/core/intent-contract';
+import type { AgentRoutingDecision } from '@agent/core/intent/intent-contract';
 
 export type MissionProposal = {
   intent: 'create_mission';

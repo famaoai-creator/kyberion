@@ -9,64 +9,64 @@ export {
   decideApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 export { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 export {
   clearSurfaceOutboxMessage,
   enqueueSurfaceNotification,
   listSurfaceOutboxMessages,
-} from '@agent/core/surface-coordination-store';
-export { emitChannelSurfaceEvent } from '@agent/core/surface-artifact-store';
+} from '@agent/core/surface/surface-coordination-store';
+export { emitChannelSurfaceEvent } from '@agent/core/surface/surface-artifact-store';
 export {
   emitMissionOrchestrationObservation,
   enqueueMissionOrchestrationEvent,
   startMissionOrchestrationWorker,
-} from '@agent/core/mission-orchestration-events';
+} from '@agent/core/mission/mission-orchestration-events';
 export { ledger } from '@agent/core/ledger';
-export { listArtifactRecords } from '@agent/core/artifact-record';
+export { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 export {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   restartAgentRuntime,
   stopAgentRuntime,
-} from '@agent/core/agent-runtime-supervisor';
+} from '@agent/core/agent/agent-runtime-supervisor';
 export {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
   loadDistillCandidateRecord,
   saveDistillCandidateRecord,
   updateDistillCandidateRecord,
-} from '@agent/core/distill-candidate-registry';
+} from '@agent/core/knowledge/distill-candidate-registry';
 export {
   listMissionSeedRecords,
   loadMissionSeedRecord,
   saveMissionSeedRecord,
-} from '@agent/core/mission-seed-registry';
+} from '@agent/core/mission/mission-seed-registry';
 export {
   listMemoryPromotionCandidates,
   loadMemoryPromotionCandidate,
   updateMemoryPromotionCandidateStatus,
-} from '@agent/core/memory-promotion-queue';
+} from '@agent/core/knowledge/memory-promotion-queue';
 export {
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,
-} from '@agent/core/memory-promotion-workflow';
+} from '@agent/core/knowledge/memory-promotion-workflow';
 export {
   listProjectRecords,
   loadProjectRecord,
   saveProjectRecord,
-} from '@agent/core/project-registry';
+} from '@agent/core/project/project-registry';
 export {
   listProjectTrackRecords,
   loadProjectTrackRecord,
-} from '@agent/core/project-track-registry';
-export { listServiceBindingRecords } from '@agent/core/service-binding-registry';
+} from '@agent/core/project/project-track-registry';
+export { listServiceBindingRecords } from '@agent/core/service/service-binding-registry';
 export {
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
   probeSurfaceHealth,
-} from '@agent/core/surface-runtime';
+} from '@agent/core/surface/surface-runtime';
 export { pathResolver } from '@agent/core/path-resolver';
 export { readJson } from '@agent/core/foundation';
 export {
@@ -80,4 +80,4 @@ export {
   safeWriteFile,
 } from '@agent/core/secure-io';
 export { savePromotedMemoryRecord } from '@agent/core/promoted-memory';
-export { summarizeMissionSeedAssessment } from '@agent/core/mission-seed-assessment';
+export { summarizeMissionSeedAssessment } from '@agent/core/mission/mission-seed-assessment';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KbAvatarPickerProps, KbCameraCaptureProps } from '@agent/core/a2ui-catalog';
+import type { KbAvatarPickerProps, KbCameraCaptureProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import { safeHref } from '../safety.js';
 import {

@@ -108,7 +108,7 @@ AIによるレビュー、critic、judge、品質ゲートは利用できるが�
 - `knowledge/product/schemas/workforce-resource-ref.schema.json`（新規）
 - `knowledge/product/governance/organization-profile.json`
 - `knowledge/product/schemas/organization-profile.schema.json`
-- `libs/core/mission-team-binding.ts`
+- `libs/core/mission/mission-team-binding.ts`
 - `knowledge/product/schemas/mission-team-plan.schema.json`
 - `knowledge/product/schemas/task-contract.schema.json`
 
@@ -141,7 +141,7 @@ AIによるレビュー、critic、judge、品質ゲートは利用できるが�
 **対象**:
 
 - mission/task/work-item関連schema
-- `libs/core/work-coordination.ts`
+- `libs/core/workforce/work-coordination.ts`
 - mission team binding / orchestration worker
 - trace / audit correlation
 
@@ -233,7 +233,7 @@ LLM token費用だけでなく、次を共通 `resource_usage` として記録�
 **対象**:
 
 - `libs/core/ceo-surface-summary.ts`
-- `libs/core/operator-home-summary.ts`
+- `libs/core/surface/operator-home-summary.ts`
 - concierge / Chronos / `pnpm kyberion`
 - SU-01〜04、E2E-04
 

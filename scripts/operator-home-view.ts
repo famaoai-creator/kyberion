@@ -1,9 +1,9 @@
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { collectDoctorReport } from './run_doctor.js';
 import { loadCliManifest } from './check_cli_manifest.js';
-import { getGovernanceControlSummary } from '@agent/core/governance-status';
+import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
 import { formatNextAction } from '@agent/core/next-action';
-import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
+import { collectOperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 import type { VocabularyKey } from '@agent/core/t';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;

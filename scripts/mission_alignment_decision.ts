@@ -39,7 +39,7 @@ import {
   computeApprovalPayloadHash,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { loadMissionBriefAtPath } from './mission-alignment-gate/mission-brief.js';
 

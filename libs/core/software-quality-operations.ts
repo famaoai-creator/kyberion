@@ -1,7 +1,7 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 
-import { getReasoningBackend } from './reasoning-backend.js';
+import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';

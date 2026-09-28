@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/kyberion-scenario.schema.json",
   "title": "Kyberion scenario definition",
-  "description": "Scenario evaluation definition consumed by the scenario runner (kyberion-scenario.v1). Cross-field invariants the schema cannot express (lane vs. executionProfile, lane vs. judge/intent turns, deferred vs. lane, seed file path containment) are enforced in libs/core/scenario-definition.ts.",
+  "description": "Scenario evaluation definition consumed by the scenario runner (kyberion-scenario.v1). Cross-field invariants the schema cannot express (lane vs. executionProfile, lane vs. judge/intent turns, deferred vs. lane, seed file path containment) are enforced in libs/core/scenario/scenario-definition.ts.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -30,7 +30,7 @@
     "lane": {
       "enum": ["pr-deterministic", "live-only"],
       "default": "live-only",
-      "description": "Absent means live-only; libs/core/scenario-definition.ts applies the default."
+      "description": "Absent means live-only; libs/core/scenario/scenario-definition.ts applies the default."
     },
     "executionProfile": { "enum": ["simulated", "provider-qualified"] },
     "modelFixtures": { "enum": ["fixtures", "model-free"] },

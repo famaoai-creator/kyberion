@@ -1,7 +1,7 @@
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-} from '@agent/core/media-theme-role-policy';
+} from '@agent/core/media/media-theme-role-policy';
 import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
 import {

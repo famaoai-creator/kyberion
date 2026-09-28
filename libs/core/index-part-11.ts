@@ -21,7 +21,7 @@ export type {
   FoldCaptureResult,
   ConsolidationAction,
   ConsolidationPlan,
-} from './memory-notebook.js';
+} from './knowledge/memory-notebook.js';
 
 export {
   RECALL_MAX_CHARS,
@@ -46,7 +46,7 @@ export {
   parseConsolidationActions,
   applyConsolidationActions,
   planConsolidation,
-} from './memory-notebook.js';
+} from './knowledge/memory-notebook.js';
 
 export {
   exerciseJsonRecordStoreContract,
@@ -77,17 +77,17 @@ export * from './software-quality-report-reader.js';
 
 export * from './source-analysis.js';
 
-export * from './agentic-source-review.js';
+export * from './agent/agentic-source-review.js';
 
-export * from './agentic-source-review-verification.js';
+export * from './agent/agentic-source-review-verification.js';
 
 export * from './windows-local-assist-bridge.js';
 
 export * from './windows-native-image-recognition-bridge.js';
 
-export * from './image-description-types.js';
+export * from './media/image-description-types.js';
 
-export * from './image-description-bridge.js';
+export * from './media/image-description-bridge.js';
 
 export * from './local-assist-bridge.js';
 
@@ -105,14 +105,14 @@ export {
   buildSoftwareQualityReport,
 } from './software-quality.js';
 
-export * from './delegation-notifications.js';
+export * from './mission/delegation-notifications.js';
 
-export * from './work-graph.js';
+export * from './workforce/work-graph.js';
 
 export {
   ReasoningBackendExecutionAdapter,
   delegateWorkItemWithReasoningBackend,
-} from './reasoning-backend-execution-adapter.js';
+} from './reasoning/reasoning-backend-execution-adapter.js';
 
 // SO-01: governed in-process facade over the mission lifecycle verbs
 // (start/create/checkpoint/verify/finish/staff/prewarm/dispatch/pause/resume/status).
@@ -125,7 +125,7 @@ export {
   buildMissionLifecycleService,
   missionLifecycleService,
   MissionLifecycleGovernedError,
-} from './mission-lifecycle-service.js';
+} from './mission/mission-lifecycle-service.js';
 
 export type {
   MissionLifecycleService,
@@ -133,15 +133,15 @@ export type {
   MissionLifecycleCreateOptions,
   MissionLifecycleStartOptions,
   MissionLifecycleDispatchOptions,
-} from './mission-lifecycle-service.js';
+} from './mission/mission-lifecycle-service.js';
 
 // WI-02: work inventory taxonomy, classification, and tenant/personal-scoped
 // storage for the business-inventory discovery stage (work-inventory.v1).
-export * from './work-inventory.js';
-export * from './work-inventory-scoring.js';
-export * from './work-inventory-consent.js';
-export * from './work-inventory-observation.js';
-export * from './work-inventory-decompose.js';
-export * from './work-inventory-harvest.js';
-export * from './work-inventory-promotion.js';
+export * from './workforce/work-inventory.js';
+export * from './workforce/work-inventory-scoring.js';
+export * from './workforce/work-inventory-consent.js';
+export * from './workforce/work-inventory-observation.js';
+export * from './workforce/work-inventory-decompose.js';
+export * from './workforce/work-inventory-harvest.js';
+export * from './workforce/work-inventory-promotion.js';
 export * from './html-to-markdown.js';

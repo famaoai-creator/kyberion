@@ -18,7 +18,7 @@ installProcessGuards('terminal-bridge');
 import { ReflexTerminal } from '@agent/core/reflex-terminal';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import {
   assertSafeRepositoryPath,
   safeWriteFile,

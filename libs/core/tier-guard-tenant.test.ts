@@ -26,7 +26,7 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-vi.mock('./audit-chain.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
   },
@@ -140,7 +140,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.scope_violation/);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const { auditChain } = await import('./audit-chain.js');
+    const { auditChain } = await import('./governance/audit-chain.js');
     expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'tenant.scope_violation', result: 'denied' })
     );
@@ -167,7 +167,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.scope_missing/);
-    const { auditChain } = await import('./audit-chain.js');
+    const { auditChain } = await import('./governance/audit-chain.js');
     expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'tenant.scope_violation', result: 'denied' })
     );
@@ -424,7 +424,7 @@ describe('tier-guard brokered missions (C8)', () => {
       expect(result.reason).not.toMatch(/tenant\.scope_violation/);
     }
 
-    const { auditChain } = await import('./audit-chain.js');
+    const { auditChain } = await import('./governance/audit-chain.js');
     expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant.broker_access',

@@ -2,7 +2,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeWriteFile } from './secure-io.js';
-import { type PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
+import { type PresentationPreferenceProfile } from './contracts/presentation-preference-profile.js';
 
 export interface PresentationPreferenceRegistry {
   version: string;

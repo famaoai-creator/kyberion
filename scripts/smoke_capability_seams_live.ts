@@ -8,37 +8,40 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
 
-import '@agent/core/audio-bus-resolver';
-import { listAudioBusBridges, resolveAudioBus } from '@agent/core/audio-bus-bridge';
+import '@agent/core/voice/audio-bus-resolver';
+import { listAudioBusBridges, resolveAudioBus } from '@agent/core/voice/audio-bus-bridge';
 
-import '@agent/core/agent-lifecycle';
+import '@agent/core/agent/agent-lifecycle';
 import {
   createAgentExecAdapter,
   hasAgentExecAdapter,
   listAgentExecAdapterBridges,
-} from '@agent/core/agent-exec-adapter-bridge';
+} from '@agent/core/agent/agent-exec-adapter-bridge';
 
-import '@agent/core/agent-pane-runtime-herdr';
+import '@agent/core/agent/agent-pane-runtime-herdr';
 import {
   listAgentPaneRuntimeBridges,
   resolveAgentPaneRuntimeBridge,
   resolveAgentRuntimeLaunchMode,
-} from '@agent/core/agent-pane-runtime-bridge';
+} from '@agent/core/agent/agent-pane-runtime-bridge';
 
 import { listOcrProviders, ocrImage } from '@agent/core/ocr-bridge';
-import { generateImage, listImageGenerationProviders } from '@agent/core/image-generation-bridge';
+import {
+  generateImage,
+  listImageGenerationProviders,
+} from '@agent/core/media/image-generation-bridge';
 import {
   createVirtualCameraBridge,
   listVirtualCameraCaptureBackends,
-} from '@agent/core/virtual-camera-bridge';
+} from '@agent/core/virtual/virtual-camera-bridge';
 import {
   listCalendarProviders,
   resolveCalendarProvider,
-} from '@agent/core/calendar-provider-bridge';
+} from '@agent/core/meeting/calendar-provider-bridge';
 import {
   listBrowserAutomationRuntimeBridges,
   resolveBrowserAutomationRuntime,
-} from '@agent/core/browser-automation-runtime-bridge';
+} from '@agent/core/browser/browser-automation-runtime-bridge';
 
 type CheckResult = {
   seam: string;

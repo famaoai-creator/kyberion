@@ -18,28 +18,28 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
+vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   loadMissionTeamPlan: mocks.loadMissionTeamPlan,
   loadAgentProfileIndex: mocks.loadAgentProfileIndex,
 }));
 
 // TC-02: staffing standby roles is the binding layer's job; the orchestrator
 // only asks for it and then materializes what came back staffed.
-vi.mock('../libs/core/mission-team-binding.js', () => ({
+vi.mock('../libs/core/mission/mission-team-binding.js', () => ({
   staffMissionTeamRoles: mocks.staffMissionTeamRoles,
 }));
 
-vi.mock('../libs/core/agent-registry.js', () => ({
+vi.mock('../libs/core/agent/agent-registry.js', () => ({
   agentRegistry: {
     get: mocks.get,
   },
 }));
 
-vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
+vi.mock('../libs/core/agent/agent-runtime-supervisor.js', () => ({
   ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
-vi.mock('../libs/core/agent-runtime-supervisor-client.js', () => ({
+vi.mock('../libs/core/agent/agent-runtime-supervisor-client.js', () => ({
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
 }));
 
@@ -86,7 +86,8 @@ describe('mission-team-orchestrator', () => {
     mocks.get.mockReturnValue(undefined);
     mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
-    const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
+    const { ensureMissionTeamRuntime } =
+      await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
     expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledWith(
@@ -120,7 +121,8 @@ describe('mission-team-orchestrator', () => {
     mocks.loadAgentProfileIndex.mockReturnValue({});
     mocks.get.mockReturnValue({ status: 'ready' });
 
-    const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
+    const { ensureMissionTeamRuntime } =
+      await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
@@ -170,7 +172,8 @@ describe('mission-team-orchestrator', () => {
     mocks.get.mockReturnValue(undefined);
     mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
-    const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
+    const { ensureMissionTeamRuntime } =
+      await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
     expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
@@ -230,7 +233,8 @@ describe('mission-team-orchestrator', () => {
     mocks.get.mockReturnValue(undefined);
     mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
-    const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
+    const { ensureMissionTeamRuntime } =
+      await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime({
       missionId: 'MSN-TEAM',
       teamRoles: ['planner'],
@@ -279,7 +283,8 @@ describe('mission-team-orchestrator', () => {
     mocks.get.mockReturnValue(undefined);
     mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
-    const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
+    const { ensureMissionTeamRuntime } =
+      await import('@agent/core/mission/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
     // An unscoped ensure must not staff the whole roster.

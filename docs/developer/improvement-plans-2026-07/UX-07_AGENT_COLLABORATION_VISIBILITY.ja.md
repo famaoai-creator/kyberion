@@ -118,14 +118,14 @@ mission/task/orchestration/worker/a2a/trace writers
 
 ### Phase 1: 共通 writer/normalizer
 
-- `libs/core/agent-collaboration-events.ts` を追加し、既存 writer から additive に emit する。
+- `libs/core/agent/agent-collaboration-events.ts` を追加し、既存 writer から additive に emit する。
 - `WorkerEventStream` は共通 envelope の source/sequence を再利用し、mission/task/agent の ID を欠落させない。
 - `mission-task-events.ts`、`mission-orchestration-events.ts`、A2A handoff、runtime supervisor、approval/review/artifact receipt を adapter 接続する。
 - mission-local JSONL と shared redacted JSONL を分け、shared 側は `resolveSharedObservabilityDir` と secure-io を通す。
 
 ### Phase 2: 決定論的 projection/query
 
-- `libs/core/agent-collaboration-projection.ts` を追加し、cursor 付き replay、sequence gap、stale runtime、blocked reason、attention item を純関数中心に実装する。
+- `libs/core/agent/agent-collaboration-projection.ts` を追加し、cursor 付き replay、sequence gap、stale runtime、blocked reason、attention item を純関数中心に実装する。
 - `buildCollaborationOverview`、`buildCollaborationGraph`、`buildCollaborationTimeline`、`buildOperatorAttentionQueue` を公開する。
 - event source が異常でも UI 全体を落とさず、`partial` と欠落 source をレスポンスへ含める。
 - 長い payload は summary と evidence ref に圧縮し、raw log は TraceViewer など既存の権限付き導線からのみ開く。
@@ -154,14 +154,14 @@ mission/task/orchestration/worker/a2a/trace writers
 
 ## 変更対象候補
 
-| 目的  | 主な対象                                                                                                                                                     |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 契約  | `knowledge/product/schemas/agent-collaboration-event.schema.json`、event/state vocabulary、必要なら contract baseline                                        |
-| Core  | `libs/core/agent-collaboration-events.ts`、`libs/core/agent-collaboration-projection.ts`、既存 event writers、`libs/core/index.ts`/package exports           |
-| API   | `presence/displays/chronos-mirror-v2/src/app/api/collaboration/route.ts`、必要なら stream route                                                              |
-| UI    | `presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx`、`MissionIntelligence.tsx`、`FocusedOperatorView.tsx`、`AgentOpsBoards.tsx` |
-| Tests | core schema/normalizer/projection、mission/a2a/worker integration、Chronos API/UI、tier/tenant/no-write/SSRF 契約テスト                                      |
-| Docs  | 本計画、`STATUS.ja.md` の UX 行、operator UX guide/API docs、replay/incident runbook                                                                         |
+| 目的  | 主な対象                                                                                                                                                       |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 契約  | `knowledge/product/schemas/agent-collaboration-event.schema.json`、event/state vocabulary、必要なら contract baseline                                          |
+| Core  | `libs/core/agent/agent-collaboration-events.ts`、`libs/core/agent/agent-collaboration-projection.ts`、既存 event writers、`libs/core/index.ts`/package exports |
+| API   | `presence/displays/chronos-mirror-v2/src/app/api/collaboration/route.ts`、必要なら stream route                                                                |
+| UI    | `presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx`、`MissionIntelligence.tsx`、`FocusedOperatorView.tsx`、`AgentOpsBoards.tsx`   |
+| Tests | core schema/normalizer/projection、mission/a2a/worker integration、Chronos API/UI、tier/tenant/no-write/SSRF 契約テスト                                        |
+| Docs  | 本計画、`STATUS.ja.md` の UX 行、operator UX guide/API docs、replay/incident runbook                                                                           |
 
 ## 受入条件
 

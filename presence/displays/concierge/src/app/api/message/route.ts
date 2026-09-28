@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { SurfaceConversationResult } from '@agent/core/channel-surface';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
-import { isSimpleGreetingText } from '@agent/core/intent-contract';
-import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
+import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
+import { isSimpleGreetingText } from '@agent/core/intent/intent-contract';
+import { checkAndRepairSurfaceUxContract } from '@agent/core/surface/surface-ux-contract';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
 import { voiceHubUrl } from '../../../lib/voice-hub';
@@ -169,7 +169,7 @@ async function replyViaOrchestrator(
   scope: import('@agent/core/event-scope').EventScopeInput
 ): Promise<ConversationMessageResponse> {
   const [channelSurface, pathResolverModule] = await Promise.all([
-    import('@agent/core/channel-surface'),
+    import('@agent/core/surface/channel-surface'),
     import('@agent/core/path-resolver'),
   ]);
   const conversation = await channelSurface.runSurfaceMessageConversation({

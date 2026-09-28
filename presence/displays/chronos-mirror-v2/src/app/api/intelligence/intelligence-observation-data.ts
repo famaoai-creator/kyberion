@@ -8,9 +8,9 @@ import {
 } from '../../../lib/viewer-context';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { type CompanyAggregate } from '@agent/core/company';
-import { type ApprovalAuditDrilldownSummary } from '@agent/core/approval-audit';
+import { type ApprovalAuditDrilldownSummary } from '@agent/core/governance/approval-audit';
 import type { FinanceControllerDecision } from '@agent/core/finance-controller';
-import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
+import type { OrganizationWorkLoopSummary } from '@agent/core/workforce/work-design';
 import type { A2AHandoffSummary } from '../../../lib/agent-message-feed';
 import {
   type BrowserConversationSessionSummary,
@@ -23,7 +23,7 @@ import {
   parseTaskBoard,
   summarizeNextTasks,
 } from '../../../lib/mission-progress';
-import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission-next-task-reader';
+import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
 import type { ComputerSessionSummary } from '../../../lib/computer-sessions';
 import {
   createNextActionContract,
@@ -37,8 +37,12 @@ import {
   safeReadFile,
   safeReaddir,
 } from '../../../lib/intelligence-primitives';
-import { listWorkItems } from '@agent/core/work-coordination';
-import { listMissionsInSearchDirs, loadState, loadStateAtPath } from '@agent/core/mission-state';
+import { listWorkItems } from '@agent/core/workforce/work-coordination';
+import {
+  listMissionsInSearchDirs,
+  loadState,
+  loadStateAtPath,
+} from '@agent/core/mission/mission-state';
 
 export interface RuntimeTopologySurfaceInput {
   id: string;

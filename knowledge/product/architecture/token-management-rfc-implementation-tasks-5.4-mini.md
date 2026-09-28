@@ -48,12 +48,12 @@ Add a deterministic, policy-backed reasoning-level decision to the intent flow w
 
 ### Files in scope
 
-- Add `libs/core/reasoning-level-policy.ts`
-- Add `libs/core/reasoning-level-policy.test.ts`
+- Add `libs/core/reasoning/reasoning-level-policy.ts`
+- Add `libs/core/reasoning/reasoning-level-policy.test.ts`
 - Add `knowledge/product/governance/reasoning-level-policy.json`
 - Add `knowledge/product/schemas/reasoning-level-policy.schema.json`
-- Modify `libs/core/intent-contract.ts`
-- Modify `libs/core/intent-contract.test.ts`
+- Modify `libs/core/intent/intent-contract.ts`
+- Modify `libs/core/intent/intent-contract.test.ts`
 - Modify `libs/core/index.ts` only if the new types/functions are not already exported through an existing barrel pattern
 - Modify governance/schema catalog checks only when required by the repository's existing registration pattern
 
@@ -123,7 +123,7 @@ The thresholds and allowed shapes must live in the JSON policy, not as unexplain
 ### Verification
 
 ```bash
-pnpm exec vitest run libs/core/reasoning-level-policy.test.ts libs/core/intent-contract.test.ts
+pnpm exec vitest run libs/core/reasoning/reasoning-level-policy.test.ts libs/core/intent/intent-contract.test.ts
 pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
@@ -145,9 +145,9 @@ Emit traceable intent-compilation metadata without persisting a trace inside the
 
 ### Files in scope
 
-- Modify `libs/core/intent-contract.ts`
-- Modify `libs/core/intent-contract.test.ts`
-- Use the existing `TraceContext` type from `libs/core/src/trace.ts`; do not create another trace abstraction
+- Modify `libs/core/intent/intent-contract.ts`
+- Modify `libs/core/intent/intent-contract.test.ts`
+- Use the existing `TraceContext` type from `libs/core/analysis/trace.ts`; do not create another trace abstraction
 
 ### Required changes
 
@@ -191,7 +191,7 @@ Do not persist the trace in `compileUserIntentFlow()`. The caller owns trace per
 ### Verification
 
 ```bash
-pnpm exec vitest run libs/core/intent-contract.test.ts libs/core/src/trace.test.ts
+pnpm exec vitest run libs/core/intent/intent-contract.test.ts libs/core/analysis/trace.test.ts
 pnpm build
 ```
 
@@ -211,12 +211,12 @@ Map reasoning levels to approved model IDs for measurement, but do not dispatch 
 
 ### Files in scope
 
-- Add `libs/core/reasoning-model-routing.ts`
-- Add `libs/core/reasoning-model-routing.test.ts`
+- Add `libs/core/reasoning/reasoning-model-routing.ts`
+- Add `libs/core/reasoning/reasoning-model-routing.test.ts`
 - Modify `knowledge/product/governance/reasoning-level-policy.json`
 - Modify `knowledge/product/schemas/reasoning-level-policy.schema.json`
 - Read model eligibility from `knowledge/product/governance/model-registry.json`
-- Modify `libs/core/intent-contract.ts` only to attach shadow metadata and telemetry
+- Modify `libs/core/intent/intent-contract.ts` only to attach shadow metadata and telemetry
 
 ### Required behavior
 
@@ -238,7 +238,7 @@ Map reasoning levels to approved model IDs for measurement, but do not dispatch 
 ### Verification
 
 ```bash
-pnpm exec vitest run libs/core/reasoning-model-routing.test.ts libs/core/intent-contract.test.ts
+pnpm exec vitest run libs/core/reasoning/reasoning-model-routing.test.ts libs/core/intent/intent-contract.test.ts
 pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
@@ -260,11 +260,11 @@ Cache only validated, low-risk normalized `UserIntentFlow` results for the `REAC
 
 ### Files in scope
 
-- Add `libs/core/intent-flow-cache.ts`
-- Add `libs/core/intent-flow-cache.test.ts`
+- Add `libs/core/intent/intent-flow-cache.ts`
+- Add `libs/core/intent/intent-flow-cache.test.ts`
 - Add `knowledge/product/schemas/intent-flow-cache.schema.json`
-- Modify `libs/core/intent-contract.ts`
-- Modify `libs/core/intent-contract.test.ts`
+- Modify `libs/core/intent/intent-contract.ts`
+- Modify `libs/core/intent/intent-contract.test.ts`
 
 ### Storage and key
 
@@ -315,7 +315,7 @@ All read conditions must be true, plus:
 ### Verification
 
 ```bash
-pnpm exec vitest run libs/core/intent-flow-cache.test.ts libs/core/intent-contract.test.ts
+pnpm exec vitest run libs/core/intent/intent-flow-cache.test.ts libs/core/intent/intent-contract.test.ts
 pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
@@ -337,8 +337,8 @@ Create governed reflex candidates from repeated successful deterministic pattern
 
 ### Files in scope
 
-- Prefer extending `libs/core/memory-promotion-queue.ts`
-- Prefer extending `libs/core/memory-promotion-workflow.ts` only if the existing workflow cannot represent the candidate
+- Prefer extending `libs/core/knowledge/memory-promotion-queue.ts`
+- Prefer extending `libs/core/knowledge/memory-promotion-workflow.ts` only if the existing workflow cannot represent the candidate
 - Add focused tests beside the changed module
 - Do not create a parallel promotion queue
 
@@ -368,7 +368,7 @@ Create a candidate with `status=queued` and `ratification_required=true`. Map it
 ### Verification
 
 ```bash
-pnpm exec vitest run libs/core/memory-promotion-queue.test.ts libs/core/memory-promotion-workflow.test.ts libs/core/intent-contract-learning.test.ts
+pnpm exec vitest run libs/core/knowledge/memory-promotion-queue.test.ts libs/core/knowledge/memory-promotion-workflow.test.ts libs/core/intent/intent-contract-learning.test.ts
 pnpm build
 ```
 

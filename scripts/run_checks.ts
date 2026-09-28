@@ -146,11 +146,16 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
     return gate.scope === scope || (scope === 'full' && gate.scope === 'pr');
   });
   if (only) {
+    const ids = only
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
     const selected = scoped.filter(
-      (gate) => gate.id === only && (scope !== 'release' || gate.scope === 'release')
+      (gate) => ids.includes(gate.id) && (scope !== 'release' || gate.scope === 'release')
     );
-    if (selected.length === 0) {
-      throw new Error(`gate ${only} is not registered for scope ${scope}`);
+    const missing = ids.filter((id) => !selected.some((gate) => gate.id === id));
+    if (missing.length > 0) {
+      throw new Error(`gate(s) ${missing.join(',')} are not registered for scope ${scope}`);
     }
     return selected;
   }

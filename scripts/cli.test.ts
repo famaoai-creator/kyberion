@@ -36,7 +36,12 @@ describe('Kyberion CLI helpers', () => {
 
   it('uses the governed parser for packet and pipeline preview files', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' })
+      [
+        safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' }),
+        safeReadFile(pathResolver.rootResolve('scripts/cli-command-handlers.ts'), {
+          encoding: 'utf8',
+        }),
+      ].join('\n')
     );
     expect(source).toContain("parseSafeJsonInput(content, 'Packet file')");
     expect(source).toContain("parseSafeJsonInput(content, 'Pipeline preview file')");
@@ -194,6 +199,7 @@ describe('Kyberion CLI helpers', () => {
     // speak uses the voice actuator's engine registry, not the python voice bridge.
     expect(shouldBootstrapRuntime(['speak', 'hello'])).toBe(false);
     expect(shouldBootstrapRuntime(['draw', 'a lake', '--out', 'a.png'])).toBe(false);
+    expect(shouldBootstrapRuntime(['schedule', 'list'])).toBe(false);
     expect(shouldBootstrapRuntime(['task', 'plan', 'hello'])).toBe(true);
     expect(shouldBootstrapRuntime(['task', 'scenario', 'list'])).toBe(false);
   });

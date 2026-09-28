@@ -1,7 +1,7 @@
 import { logger } from './core.js';
 import { sendOpsAlert } from './ops-alert.js';
-import { validateAndRepairAdf } from './adf-repair-agent.js';
-import type { ReasoningCallOptions } from './reasoning-backend.js';
+import { validateAndRepairAdf } from './pipeline/adf-repair-agent.js';
+import type { ReasoningCallOptions } from './reasoning/reasoning-backend.js';
 
 /**
  * AR-01 compatibility boundary for callers that still use the old repair

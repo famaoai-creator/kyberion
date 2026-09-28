@@ -8,7 +8,7 @@ const rootDir = process.cwd();
 // XP-03: tier x egress gate on the delegation face. See
 // docs/developer/improvement-plans-2026-07/
 // CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03 and
-// libs/core/provider-egress-gate.ts.
+// libs/core/provider/provider-egress-gate.ts.
 describe('Provider egress policy contract (XP-03)', () => {
   it('validates the default provider-egress-policy.json against its schema', () => {
     const schema = JSON.parse(

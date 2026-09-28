@@ -1,14 +1,16 @@
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 import { retry } from '@agent/core/async-utils';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import { resolveVars } from '@agent/core/logic-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { nowIso } from '@agent/core/foundation';
 import {
   createApprovalRequest,
@@ -37,10 +39,10 @@ const DEFAULT_APPROVAL_RETRY = {
   jitter: true,
 };
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: APPROVAL_MANIFEST_PATH,
-  defaults: DEFAULT_APPROVAL_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_APPROVAL_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 export interface ApprovalAction {

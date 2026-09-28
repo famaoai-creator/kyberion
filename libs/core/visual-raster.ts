@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import {

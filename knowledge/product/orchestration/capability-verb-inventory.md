@@ -78,7 +78,7 @@ verification half of a reproduction run — extract → render via the
 `media-docx-roundtrip` template, then `pnpm kyberion diff <source> <output>`.
 
 `draw` is the inverse of `see`. The unifier is the image-generation bridge
-(`generateImage` / `planImageGeneration` in `libs/core/image-generation-bridge.ts`),
+(`generateImage` / `planImageGeneration` in `libs/core/media/image-generation-bridge.ts`),
 which already hides the provider behind one router. What kept the row empty was the
 egress decision, so the verb owns exactly that and nothing else: by default only
 providers that keep the data on this machine and finish unattended are eligible;

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 // imports its collaborators via relative module paths — mock the resolved
 // modules via package subpaths (relative imports into libs/core are forbidden
 // by the package-boundary contract).
-vi.mock('@agent/core/audit-chain', async (importOriginal) => {
+vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as any),

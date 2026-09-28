@@ -3,12 +3,12 @@ import { withExecutionContext } from '@agent/core/authority';
 import { isRecord } from '@agent/core/foundation';
 import { t } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
-import type { MissionProposal } from '@agent/core/channel-surface-types';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import type { MissionProposal } from '@agent/core/surface/channel-surface-types';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
-} from '@agent/core/intent-resolution-contract';
+} from '@agent/core/intent/intent-resolution-contract';
 import path from 'node:path';
 import { readChronosJsonObject, type JsonObjectRequest } from '../../../lib/request-input';
 

@@ -8,8 +8,8 @@ import {
   resolveFfmpegBin,
   resolveFfprobeBin,
   resolvePython3Bin,
-} from '@agent/core/tool-binary-resolvers';
-import { resolveVoicePath } from '@agent/core/voice-path-policy';
+} from '@agent/core/tool/tool-binary-resolvers';
+import { resolveVoicePath } from '@agent/core/voice/voice-path-policy';
 import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';
 import { installV4l2VirtualCameraOutputBridge } from '@agent/core/v4l2-virtual-camera-output';
 import { resolveCameraOutputBridge } from '@agent/core/camera-output-bridge';

@@ -51,7 +51,7 @@ last_updated: 2026-07-31
 ```text
 pnpm exec vitest run libs/actuators/browser-actuator/src/browser-phase3.test.ts \
   libs/actuators/browser-actuator/src/index.test.ts \
-  libs/core/op-input-contracts.test.ts \
+  libs/core/pipeline/op-input-contracts.test.ts \
   tests/computer-interaction-contract.test.ts
 pnpm run typecheck
 pnpm run validate

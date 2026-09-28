@@ -13,8 +13,8 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { saveProjectRecord, projectRecordPath } from '@agent/core/project-registry';
-import { saveServiceBindingRecord } from '@agent/core/service-binding-registry';
+import { saveProjectRecord, projectRecordPath } from '@agent/core/project/project-registry';
+import { saveServiceBindingRecord } from '@agent/core/service/service-binding-registry';
 import * as pptxUtils from '@agent/core/pptx-utils';
 import { withExecutionContext } from '@agent/core/authority';
 import { resetCurrentScope } from '@agent/core/scope-context';
@@ -41,11 +41,10 @@ vi.mock('./media-ocr.js', () => ({
 
 import { handleAction } from './index.js';
 import type { MediaAction } from './media-pipeline-helpers.js';
-import type { PptxDesignProtocol, PptxElement } from '@agent/core/media-contracts';
+import type { PptxDesignProtocol, PptxElement } from '@agent/core/media/media-contracts';
 
 function decodeXmlEntities(value: string): string {
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')

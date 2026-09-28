@@ -24,7 +24,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/speech-to-text-bridge.ts (installFluidAudioSpeechToTextBridgeIfAvailable: segment timestamps, local_only)",
+            "libs/core/voice/speech-to-text-bridge.ts (installFluidAudioSpeechToTextBridgeIfAvailable: segment timestamps, local_only)",
             "docs/VOICE_LOCAL_BACKENDS.md"
           ]
         },
@@ -40,7 +40,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/speech-to-text-bridge.ts (buildWhisperKitTranscribeArgs runs --without-timestamps)",
+            "libs/core/voice/speech-to-text-bridge.ts (buildWhisperKitTranscribeArgs runs --without-timestamps)",
             "knowledge/product/governance/local-stt-discovery-registry.json (priority 100)"
           ]
         },
@@ -102,7 +102,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/speech-to-text-bridge.ts (ShellSpeechToTextBridge: operator command from KYBERION_STT_COMMAND; may be a cloud CLI, capabilities from KYBERION_STT_CAPABILITIES)"
+            "libs/core/voice/speech-to-text-bridge.ts (ShellSpeechToTextBridge: operator command from KYBERION_STT_COMMAND; may be a cloud CLI, capabilities from KYBERION_STT_CAPABILITIES)"
           ]
         },
         "stub": {
@@ -117,7 +117,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/speech-to-text-bridge.ts (stubSpeechToTextBridge returns a pre-made sidecar transcript; synthetic, eligible only when synthetic output is allowed, always ranked last)"
+            "libs/core/voice/speech-to-text-bridge.ts (stubSpeechToTextBridge returns a pre-made sidecar transcript; synthetic, eligible only when synthetic output is allowed, always ranked last)"
           ]
         }
       },

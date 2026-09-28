@@ -1,6 +1,6 @@
 import { listInboxEntries } from '@agent/core/deliverable-inbox';
 import { Section, Table } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';

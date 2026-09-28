@@ -37,7 +37,10 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { loadVocabularyCatalog, type VocabularyCatalogFile } from '@agent/core/vocabulary-catalog';
+import {
+  loadVocabularyCatalog,
+  type VocabularyCatalogFile,
+} from '@agent/core/knowledge/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '@agent/core/secure-io';
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';

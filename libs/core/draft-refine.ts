@@ -2,7 +2,7 @@ import {
   evaluateDeliverableQuality,
   type DeliverableQualityReport,
 } from './deliverable-quality.js';
-import { getReasoningBackend } from './reasoning-backend.js';
+import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { logger } from './core.js';
 import { clamp } from './foundation/text.js';
 

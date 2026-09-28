@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOrganizationManagementView } from '@agent/core/organization-operating-model-management';
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { buildOrganizationManagementView } from '@agent/core/organization/organization-operating-model-management';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {

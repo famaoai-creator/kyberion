@@ -18,7 +18,9 @@ vi.mock('../src/lib/api-guard', () => ({ requireConciergeMutationAccess: () => n
 vi.mock('../src/lib/viewer-context', () => ({
   resolveConciergeViewer: () => ({ context: { tenantSlugs: 'all' } }),
 }));
-vi.mock('@agent/core/tenant-registry', () => ({ listTenantProfileSlugs: () => ['acme'] }));
+vi.mock('@agent/core/organization/tenant-registry', () => ({
+  listTenantProfileSlugs: () => ['acme'],
+}));
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {

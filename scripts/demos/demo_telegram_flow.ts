@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 
@@ -14,10 +14,12 @@ export const simulateTelegram = defineScript({
     }
 
     logger.info('🚀 Starting Telegram Flow Simulation...');
+    // i18n-exempt: JA demo inbound text
     logger.info('📥 Inbound Message: "Telegram連携を試して"');
 
     const result = await runSurfaceMessageConversation({
       surface: 'telegram',
+      // i18n-exempt: JA demo inbound text
       text: 'Telegram連携を試して',
       locale: 'ja',
       channel: '123456789',

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { registerOpPreflightListener } from '@agent/core/op-preflight';
+import { registerOpPreflightListener } from '@agent/core/pipeline/op-preflight';
 import { handleMediaAction, type MediaAction } from './media-pipeline-helpers.js';
 
 describe('media actuator direct preflight boundary', () => {

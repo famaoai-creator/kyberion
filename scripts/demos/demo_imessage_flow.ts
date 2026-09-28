@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import { nowIso } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 
@@ -7,10 +7,12 @@ export const simulateIMessage = defineScript({
   name: 'imessage-demo',
   async run({ print }) {
     logger.info('🚀 Starting iMessage Flow Simulation...');
+    // i18n-exempt: JA demo inbound text
     logger.info('📥 Inbound Message: "来週の月曜日の予定を教えて"');
 
     const result = await runSurfaceMessageConversation({
       surface: 'imessage',
+      // i18n-exempt: JA demo inbound text
       text: '来週の月曜日の予定を教えて',
       locale: 'ja',
       channel: 'chat123',

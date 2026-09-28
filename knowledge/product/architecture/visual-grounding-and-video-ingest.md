@@ -80,7 +80,7 @@ dispatches.
   run is reused rather than downloaded again (and never deleted by a failed
   re-download).
 - External binaries (`yt-dlp`, `ffmpeg`, `ffprobe`) resolve through
-  `libs/core/tool-binary-resolvers.ts` (`KYBERION_YTDLP_BIN`,
+  `libs/core/tool/tool-binary-resolvers.ts` (`KYBERION_YTDLP_BIN`,
   `KYBERION_FFMPEG_BIN`, `KYBERION_FFPROBE_BIN`, then the managed binary, then
   the registry, then PATH).
 

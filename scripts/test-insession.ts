@@ -1,5 +1,5 @@
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { logger } from '@agent/core/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -20,6 +20,7 @@ async function test(print: Print = () => undefined) {
   logger.info('--- Delegating Task via Native invoke_agent ---');
   try {
     const result = await backend.delegateTask(
+      // i18n-exempt: JA test fixture
       '「こんにちは」と返事をしてください。他の言葉は不要です。'
     );
     logger.info('\n--- Sub-agent Result ---');

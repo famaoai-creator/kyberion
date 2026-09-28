@@ -6,10 +6,10 @@ const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(() => ({ status: 1, stdout: '', stderr: 'mlx unavailable', error: null })),
 }));
 
-vi.mock('@agent/core/audit-chain', () => ({
+vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: (...args: unknown[]) => mocks.record(...args) },
 }));
-vi.mock('@agent/core/provider-pins-store', () => ({
+vi.mock('@agent/core/provider/provider-pins-store', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: (...args: unknown[]) => mocks.pinWrites(...args),
 }));
@@ -17,7 +17,7 @@ vi.mock('@agent/core/trace', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/trace')>('@agent/core/trace');
   return { ...actual, persistTrace: vi.fn(() => 'trace-not-persisted-in-tests') };
 });
-vi.mock('@agent/core/voice-path-policy', () => ({
+vi.mock('@agent/core/voice/voice-path-policy', () => ({
   resolveVoicePath: vi.fn((value: string) => value),
 }));
 vi.mock('@agent/core/secure-io', async () => {
@@ -41,7 +41,7 @@ vi.mock('./voice-media-output-helpers.js', async () => {
 });
 
 const { registerSpeechToTextBridge, resetSpeechToTextBridge } =
-  await import('@agent/core/speech-to-text-bridge');
+  await import('@agent/core/voice/speech-to-text-bridge');
 const { setSeamSelectionRule } = await import('@agent/core/seam-selection-rules');
 const { pathResolver } = await import('@agent/core/path-resolver');
 const secureIo = await import('@agent/core/secure-io');
@@ -50,7 +50,7 @@ const realSecureIo =
 const { safeRmSync } = secureIo;
 const rulesDir = pathResolver.sharedTmp('voice-actuator-transcribe-rules-test');
 const rulesFile = `${rulesDir}/rules.json`;
-type Bridge = import('@agent/core/speech-to-text-bridge').SpeechToTextBridge;
+type Bridge = import('@agent/core/voice/speech-to-text-bridge').SpeechToTextBridge;
 const { handleAction } = await import('./index.js');
 
 const calls: string[] = [];

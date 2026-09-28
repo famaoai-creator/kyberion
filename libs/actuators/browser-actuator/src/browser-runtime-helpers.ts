@@ -20,12 +20,12 @@ import {
 } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
-import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
-import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
+import { normalizeBrowserPipelineOp } from '@agent/core/pipeline/op-vocabulary';
+import { getOpInputContract, validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import {
   getBrowserAutomationRuntimeCapabilities,
   resolveBrowserAutomationRuntime,
-} from '@agent/core/browser-automation-runtime-bridge';
+} from '@agent/core/browser/browser-automation-runtime-bridge';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';

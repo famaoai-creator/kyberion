@@ -152,7 +152,7 @@ Chronos の `ViewerContext` は、server-side token の tenant set と role / ti
 
 本報告に基づく第一段階として、agent runtime の scope envelope を実装した。
 
-- `libs/core/runtime-scope.ts` を追加し、`EventScope` の normalize、mission state を authority とした解決、lineage mismatch、NHI の tenant / organization mismatch を fail closed にした。
+- `libs/core/tool/runtime-scope.ts` を追加し、`EventScope` の normalize、mission state を authority とした解決、lineage mismatch、NHI の tenant / organization mismatch を fail closed にした。
 - supervisor の prewarm request / result、ensure / ask payload、runtime registry / snapshot、supervisor event、token usage metrics に nested `scope` を伝播するようにした。
 - system-only runtime は `scope_kind: system` を付与し、mission 付き runtime は mission state または明示された task scope を解決できない場合に投入を拒否する。
 - mission team orchestrator と `AgentExecutionPort` から runtime scope を渡すようにした。
@@ -575,27 +575,27 @@ surface はサービス本体が記録し、supervisor は同じ receipt を重�
 - `libs/core/entity-scope.ts`
 - `libs/core/scope-context.ts`
 - `libs/core/event-scope.ts`
-- `libs/core/tenant-registry.ts`
-- `libs/core/agent-runtime-supervisor.ts`
-- `libs/core/agent-runtime-supervisor-client.ts`
-- `libs/core/runtime-scope.ts`
+- `libs/core/organization/tenant-registry.ts`
+- `libs/core/agent/agent-runtime-supervisor.ts`
+- `libs/core/agent/agent-runtime-supervisor-client.ts`
+- `libs/core/tool/runtime-scope.ts`
 - `libs/core/scope-migration.ts`
 - `libs/core/generation-scheduler.ts`
 - `libs/core/generation-quota.ts`
 - `knowledge/product/governance/media-generation-quota-policy.json`
-- `libs/core/agent-registry.ts`
-- `libs/core/agent-identity.ts`
+- `libs/core/agent/agent-registry.ts`
+- `libs/core/agent/agent-identity.ts`
 - `libs/core/generation-scheduler.ts`
 - `knowledge/product/schemas/generation-schedule.schema.json`
-- `libs/core/src/types/generation-schedule.ts`
-- `libs/core/channel-surface-types.ts`
-- `libs/core/surface-coordination-store.ts`
-- `libs/core/surface-delivery.ts`
-- `libs/core/surface-provider-policy.ts`
-- `libs/core/surface-provider-manifest.ts`
+- `libs/core/contracts/generation-schedule.ts`
+- `libs/core/surface/channel-surface-types.ts`
+- `libs/core/surface/surface-coordination-store.ts`
+- `libs/core/surface/surface-delivery.ts`
+- `libs/core/surface/surface-provider-policy.ts`
+- `libs/core/surface/surface-provider-manifest.ts`
 - `knowledge/product/governance/surface-provider-manifests.json`
 - `knowledge/product/governance/protocol-service-registry.json`
-- `libs/core/channel-directory.ts`
+- `libs/core/surface/channel-directory.ts`
 - `libs/core/customer-channel-binding.ts`
 - `knowledge/product/schemas/channel-port.schema.json`
 - `knowledge/product/schemas/runtime-surface-manifest.schema.json`

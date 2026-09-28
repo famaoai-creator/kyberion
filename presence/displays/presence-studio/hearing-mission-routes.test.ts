@@ -14,9 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
 import type express from 'express';
 
-vi.mock('@agent/core/member-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/member-registry')>(
-    '@agent/core/member-registry'
+vi.mock('@agent/core/organization/member-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/organization/member-registry')>(
+    '@agent/core/organization/member-registry'
   );
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
@@ -34,26 +34,26 @@ vi.mock('@agent/core/path-resolver', async () => {
   return { ...actual, findMissionPath: vi.fn() };
 });
 
-vi.mock('@agent/core/mission-state', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/mission-state')>(
-    '@agent/core/mission-state'
+vi.mock('@agent/core/mission/mission-state', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/mission/mission-state')>(
+    '@agent/core/mission/mission-state'
   );
   return { ...actual, loadState: vi.fn() };
 });
 
-vi.mock('@agent/core/approval-store', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/approval-store')>(
-    '@agent/core/approval-store'
+vi.mock('@agent/core/governance/approval-store', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/governance/approval-store')>(
+    '@agent/core/governance/approval-store'
   );
   return { ...actual, listApprovalRequests: vi.fn() };
 });
 
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { safeExecResult } from '@agent/core/secure-io';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadState } from '@agent/core/mission-state';
-import type { MissionState } from '@agent/core/mission-types';
-import { listApprovalRequests } from '@agent/core/approval-store';
+import { loadState } from '@agent/core/mission/mission-state';
+import type { MissionState } from '@agent/core/mission/mission-types';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 import {
   applyHearingTurn,

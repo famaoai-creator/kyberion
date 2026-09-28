@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@agent/core/network', () => ({ secureFetch: mocks.secureFetch }));
 
-vi.mock('@agent/core/tool-runtime-registry', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/tool-runtime-registry')>()),
+vi.mock('@agent/core/tool/tool-runtime-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/tool/tool-runtime-registry')>()),
   resolveManagedBinaryArtifact: mocks.resolveManagedBinaryArtifact,
   resolveManagedBinaryPath: mocks.resolveManagedBinaryPath,
   getToolRuntimeRecord: mocks.getToolRuntimeRecord,

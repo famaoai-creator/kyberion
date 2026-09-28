@@ -15,7 +15,10 @@
 
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant, type TenantRegistryPathOptions } from '@agent/core/tenant-registry';
+import {
+  resolveTenant,
+  type TenantRegistryPathOptions,
+} from '@agent/core/organization/tenant-registry';
 import { compileSchema, defineCatalog, nowIso } from '@agent/core/foundation';
 import type { IngestIr } from './parse-document.js';
 

@@ -171,7 +171,11 @@ function renderMarkdown(report: Omit<SeamCalibrationReport, 'report_markdown'>):
     const output = last?.output?.artifact_path
       ? `\`${last.output.artifact_path}\``
       : last?.output?.text
-        ? last.output.text.replace(/\s+/g, ' ').replace(/\|/g, '\\|').slice(0, 80)
+        ? last.output.text
+            .replace(/\s+/g, ' ')
+            .replace(/\\/g, '\\\\')
+            .replace(/\|/g, '\\|')
+            .slice(0, 80)
         : (last?.error ?? p.skipped_reason ?? (p.unmet ?? []).join(', ')).slice(0, 80);
     const metrics = Object.entries(p.metrics_mean)
       .map(([key, value]) => `${key}=${value}`)

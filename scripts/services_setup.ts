@@ -1,18 +1,18 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { inspectServiceAuth } from '@agent/core/service-validator';
-import { loadServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
+import { inspectServiceAuth } from '@agent/core/service/service-validator';
+import { loadServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
-} from '@agent/core/operator-notifications';
+} from '@agent/core/surface/operator-notifications';
 import { resolveOpsAlertChannelStatus } from '@agent/core/ops-alert';
-import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
 import {
   isServiceConnectionReady,
   requiredServiceConnectionKeys,
-} from '@agent/core/service-connection-readiness';
+} from '@agent/core/service/service-connection-readiness';
 import { safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';

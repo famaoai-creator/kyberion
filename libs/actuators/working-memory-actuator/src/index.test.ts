@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { MAX_FACTS } from '@agent/core/memory-notebook';
+import { MAX_FACTS } from '@agent/core/knowledge/memory-notebook';
 import { handleAction } from './index.js';
 
 const TEST_SCOPE_REF = 'working-memory-actuator-test';

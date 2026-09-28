@@ -14,10 +14,14 @@ import {
   distillPdfDesign,
   extractPptxSlides,
   protocolToMarkdown,
-} from '@agent/core/media-contracts';
+} from '@agent/core/media/media-contracts';
 import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from '@agent/core/visual-raster';
 import { recognizeDocumentImage } from './media-ocr.js';
-import { inferDocumentFormat, ocrPdfDesignImages, readDocument } from '@agent/core/document-reader';
+import {
+  inferDocumentFormat,
+  ocrPdfDesignImages,
+  readDocument,
+} from '@agent/core/media/document-reader';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 import { projectXlsxDesign } from './xlsx-extract-projection.js';
 import * as path from 'node:path';

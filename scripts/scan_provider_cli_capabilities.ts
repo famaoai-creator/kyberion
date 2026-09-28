@@ -2,18 +2,18 @@ import * as path from 'node:path';
 import {
   buildProviderCapabilitySnapshot,
   validateProviderCapabilitySnapshot,
-} from '@agent/core/provider-capability-overview';
+} from '@agent/core/provider/provider-capability-overview';
 import {
   discoverProviders,
   mergeProbedCapabilitiesIntoCatalog,
   type ProbedProviderCapabilities,
-} from '@agent/core/provider-discovery';
+} from '@agent/core/provider/provider-discovery';
 import {
   loadCapabilityRegistry,
   probeProviderAvailability,
   scanProviderCapabilities,
-} from '@agent/core/provider-capability-scanner';
-import { probeProviderCapabilities } from '@agent/core/provider-capability-registry';
+} from '@agent/core/provider/provider-capability-scanner';
+import { probeProviderCapabilities } from '@agent/core/provider/provider-capability-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';

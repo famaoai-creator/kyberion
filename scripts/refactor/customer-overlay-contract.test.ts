@@ -14,9 +14,9 @@ describe('mission refactor customer overlay contract', () => {
   it('uses the active customer root for mission prerequisites and a structured company vision ref', () => {
     // SO-01: these implementations moved to libs/core/ (scripts/refactor/
     // now holds thin re-export shims with no logic to grep).
-    const state = read('libs/core/mission-state.ts');
-    const creation = read('libs/core/mission-creation.ts');
-    const llm = read('libs/core/mission-llm.ts');
+    const state = read('libs/core/mission/mission-state.ts');
+    const creation = read('libs/core/mission/mission-creation.ts');
+    const llm = read('libs/core/mission/mission-llm.ts');
 
     // mission-state.ts uses resolveActiveProfileRoot() (refactored from customerResolver.customerRoot)
     expect(state).toContain('resolveActiveProfileRoot');

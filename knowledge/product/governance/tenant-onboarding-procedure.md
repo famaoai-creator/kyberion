@@ -14,7 +14,7 @@ authority: standard
 この文書は registry profile の登録だけを扱う。organization の binding、activation probe、
 first-work の開始までを含む標準順序は [オンボーディング標準フロー](./onboarding-flow.md) を参照する。
 
-テナントの正本(背骨)は **テナントプロファイル**(`libs/core/tenant-registry.ts` が読む
+テナントの正本(背骨)は **テナントプロファイル**(`libs/core/organization/tenant-registry.ts` が読む
 `knowledge/personal/tenants/{slug}.json`)である。`customer/{customer}/tenants/{tenant}.json`
 は customer stance 側の任意の参照ファセットであり、`KYBERION_CUSTOMER` の切替で正本が
 変わってはならない。他の系統

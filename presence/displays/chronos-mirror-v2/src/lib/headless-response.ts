@@ -11,7 +11,7 @@ import {
   ViewerContextError,
 } from './viewer-context';
 import { headlessViewerScope, HeadlessQueryError } from './headless-projections';
-import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 
 export function headlessManifest(): HeadlessApiManifest {
   return buildChronosHeadlessManifest();

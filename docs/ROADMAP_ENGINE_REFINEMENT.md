@@ -16,7 +16,7 @@
 
 ### Tasks
 
-- [x] **1.1** `PipelineRef` 型の定義 — `OnErrorConfig`, `RefParams` in `libs/core/src/pipeline-engine.ts`
+- [x] **1.1** `PipelineRef` 型の定義 — `OnErrorConfig`, `RefParams` in `libs/core/pipeline/pipeline-engine.ts`
 - [x] **1.2** パイプラインローダー — `resolveRef()` with depth tracking (max 10), `handleStepError()` with skip/abort/fallback
 - [x] **1.3** browser-actuator の `control` ステップに `ref` op を追加 + `on_error` handling in catch blocks
 - [x] **1.4** media-actuator にも同様の `ref` op + `on_error` を追加

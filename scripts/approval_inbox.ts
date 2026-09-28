@@ -4,14 +4,17 @@ import {
   renderDecisionDigestText,
   type DecisionDigest,
   type DigestMissionWait,
-} from '@agent/core/approval-digest';
-import { isFixtureApproval } from '@agent/core/approval-store-hygiene';
-import { listApprovalRequests } from '@agent/core/approval-store';
-import { tickVetoWindows, type VetoWindowTickResult } from '@agent/core/approval-veto-window';
+} from '@agent/core/governance/approval-digest';
+import { isFixtureApproval } from '@agent/core/governance/approval-store-hygiene';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import {
+  tickVetoWindows,
+  type VetoWindowTickResult,
+} from '@agent/core/governance/approval-veto-window';
 import { withExecutionContext } from '@agent/core/authority';
-import { getAutonomousOpsPolicy } from '@agent/core/autonomous-ops-gate';
-import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission-state';
-import { notifyOperatorSync } from '@agent/core/operator-notifications';
+import { getAutonomousOpsPolicy } from '@agent/core/governance/autonomous-ops-gate';
+import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission/mission-state';
+import { notifyOperatorSync } from '@agent/core/surface/operator-notifications';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

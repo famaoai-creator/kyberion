@@ -37,11 +37,11 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-import { readTenantProfile } from './tenant-registry.js';
+import { readTenantProfile } from './organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from './actor.js';
-import { resolveAccountableHuman } from './member-registry.js';
+import { resolveAccountableHuman } from './organization/member-registry.js';
 import { logger } from './core.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { nowIso } from './foundation/time.js';
 import { isVitestProcess } from './foundation/env.js';
 import {
@@ -49,7 +49,7 @@ import {
   retireAgentIdentity,
   type AgentIdentityLifecycleStatus,
   type AgentIdentityRecord,
-} from './agent-identity.js';
+} from './agent/agent-identity.js';
 
 // ---------------------------------------------------------------------------
 // Audit seam (NI-02/NI-04 pattern: injectable, best-effort, vitest no-op)

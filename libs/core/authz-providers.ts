@@ -30,7 +30,7 @@ import {
   readMemberProfile,
   resolveAccountableHuman,
   type MemberProfile,
-} from './member-registry.js';
+} from './organization/member-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
@@ -39,7 +39,7 @@ import {
   type SurfaceAuthorizationRole,
   type SurfacePermission,
   type SurfaceOperationPolicy,
-} from './surface-authorization.js';
+} from './surface/surface-authorization.js';
 import type { ResolvedPrincipal } from './authn-principal-resolver.js';
 import {
   registerAuthzProvider,

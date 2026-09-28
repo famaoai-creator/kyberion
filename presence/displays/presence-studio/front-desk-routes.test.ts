@@ -19,11 +19,11 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
-import { writeTenantProfile } from '@agent/core/tenant-registry';
+import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
-vi.mock('@agent/core/surface-runtime', () => ({
+vi.mock('@agent/core/surface/surface-runtime', () => ({
   loadSurfaceManifest: () => ({
     version: 1,
     surfaces: [

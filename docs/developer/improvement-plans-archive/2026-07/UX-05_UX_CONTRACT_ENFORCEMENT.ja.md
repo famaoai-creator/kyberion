@@ -13,7 +13,7 @@ status: archived
 
 [USER_EXPERIENCE_CONTRACT.md](../../../USER_EXPERIENCE_CONTRACT.md) は「内部語彙を露出しない」「readiness は平易な言葉で」等を定めるが、**契約は文書のままで、コードによる強制がほぼ無い**。
 
-- バリデータ `validateSurfaceUxContract`(`libs/core/surface-ux-contract.ts:44`)は実装・テスト済みだが、ランタイム呼び出しは 1 箇所のみ(`surface-runtime-orchestrator.ts:1834`。コメント自身が「以前は実装されテストされたが呼ばれていなかった」と認めている `:1830`)。しかもその 1 箇所も **logger.warn のみの非ブロッキング**(`:1835-1838`)で、違反文言はそのまま配信される。
+- バリデータ `validateSurfaceUxContract`(`libs/core/surface/surface-ux-contract.ts:44`)は実装・テスト済みだが、ランタイム呼び出しは 1 箇所のみ(`surface-runtime-orchestrator.ts:1834`。コメント自身が「以前は実装されテストされたが呼ばれていなかった」と認めている `:1830`)。しかもその 1 箇所も **logger.warn のみの非ブロッキング**(`:1835-1838`)で、違反文言はそのまま配信される。
 - 対象は会話面(`runSurfaceMessageConversation`)だけで、**生 enum 漏れが実際に起きているターミナル面(cli.ts / mission_controller / dashboard / run_pipeline)には一切かかっていない**。
 - 実際の違反: `printOperatorPacket` が `packet.readiness` を生表示(`cli.ts:807-809`)し、`question-resolver.ts:234` は生 enum `needs_clarification` / `fully_automatable` を発行。語彙カタログの `readiness_*`(`user-facing-vocabulary.json:386-397`)は**一度も読まれない死にエントリ**。
 - 明確化質問が `maxQuestions` で黙って切り捨てられ(`question-resolver.ts:323`)、`missing_inputs` は packet に載るのに CLI は表示しない(`cli.ts:816-824`)— 「残りのブロッカーがある」ことをユーザーが知れない。

@@ -5,24 +5,24 @@ import {
   ScriptExitError,
   stripSharedScriptFlags,
 } from './lib/harness.js';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import * as customerResolver from '@agent/core/customer-resolver';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { currentScope } from '@agent/core/scope-context';
-import { loadIntentContractMemorySnapshot } from '@agent/core/intent-contract-learning';
+import { loadIntentContractMemorySnapshot } from '@agent/core/intent/intent-contract-learning';
 import {
   loadIntentDeltasAtPath,
   loadIntentSnapshotsAtPath,
-} from '@agent/core/intent-snapshot-store';
+} from '@agent/core/intent/intent-snapshot-store';
 import { renderStatus, resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
 import { resolveLocale } from '@agent/core/locale';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { readJsonLines } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { validateTraceReplay } from '@agent/core/trace-schema';
-import type { AuditEntry } from '@agent/core/audit-chain';
-import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
-import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
+import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
+import type { AuditEntry } from '@agent/core/governance/audit-chain';
+import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
+import type { IntentDelta, IntentSnapshot } from '@agent/core/intent/intent-delta';
 import type { Trace } from '@agent/core/trace';
 import { listMissionsInSearchDirs, loadState, loadStateAtPath } from './refactor/mission-state.js';
 import type { MissionState } from './refactor/mission-types.js';

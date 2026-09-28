@@ -10,10 +10,10 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
-import type { ArtifactRecord } from './artifact-record.js';
-import type { ProjectRecord } from './project-registry.js';
-import type { ProjectTrackRecord } from './project-track-registry.js';
-import type { OrganizationWorkLoopSummary } from './work-design.js';
+import type { ArtifactRecord } from './workforce/artifact-record.js';
+import type { ProjectRecord } from './project/project-registry.js';
+import type { ProjectTrackRecord } from './project/project-track-registry.js';
+import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
 
 interface SdlcGateProfile {
   domain: string;
@@ -123,7 +123,8 @@ function sanitizeSeedFragment(value: string): string {
   return String(value)
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 
 function inferSpecialistForArtifact(artifactId: string): string {

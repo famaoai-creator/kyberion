@@ -4,7 +4,7 @@ import {
   type ShareGrantAuthorizer,
   type ShareGrantAuthorizationRequest,
 } from './share-grant-graph.js';
-import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
+import { resolveTenant, type TenantRegistryPathOptions } from './organization/tenant-registry.js';
 
 /**
  * Framework-neutral projection of a server-resolved viewer context.

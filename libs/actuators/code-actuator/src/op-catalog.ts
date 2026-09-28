@@ -2,8 +2,8 @@
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const CODE_CONTROL_SCHEMA: InputSchema = {

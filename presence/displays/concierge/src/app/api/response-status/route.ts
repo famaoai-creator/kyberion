@@ -3,7 +3,7 @@ import { listActiveDelegatedTaskRecords } from '@agent/core/delegated-task-obser
 import {
   getDelegationConcurrencyStats,
   peekPersistedDelegationChildrenRegistry,
-} from '@agent/core/delegation-concurrency';
+} from '@agent/core/mission/delegation-concurrency';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 

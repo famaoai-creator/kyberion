@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import type { KbActionRef, KbNextActionProps } from '@agent/core/a2ui-catalog';
+import type { KbActionRef, KbNextActionProps } from '@agent/core/surface/a2ui-catalog';
 import { Callout, NextAction, Section, Skeleton } from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText } from '../lib/ux-vocabulary';

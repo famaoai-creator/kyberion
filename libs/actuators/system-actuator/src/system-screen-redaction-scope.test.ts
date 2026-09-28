@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { VideoFrame } from '@agent/core/meeting-session-types';
+import type { VideoFrame } from '@agent/core/meeting/meeting-session-types';
 
 const mocks = vi.hoisted(() => ({
   redactScreenVideoFrame: vi.fn(async (frame: VideoFrame, _options?: { work_dir?: string }) => ({
@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@agent/core/screen-frame-redaction', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/screen-frame-redaction')>()),
+vi.mock('@agent/core/virtual/screen-frame-redaction', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/virtual/screen-frame-redaction')>()),
   redactScreenVideoFrame: mocks.redactScreenVideoFrame,
 }));
 

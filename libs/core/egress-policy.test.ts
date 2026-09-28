@@ -6,7 +6,7 @@ import {
   loadAllowedEgressDomains,
   loadEgressPolicy,
 } from './egress-policy.js';
-import { withSandboxPolicy, type SandboxPolicy } from './sandbox-policy.js';
+import { withSandboxPolicy, type SandboxPolicy } from './shell/sandbox-policy.js';
 
 describe('egress-policy', () => {
   beforeEach(() => {

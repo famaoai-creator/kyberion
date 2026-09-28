@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerRiskyApprovalHandler } from '@agent/core/risky-op-approval-port';
-import type { BuildVideoBriefOptions, VideoIngestOutcome } from '@agent/core/video-ingest';
+import type { BuildVideoBriefOptions, VideoIngestOutcome } from '@agent/core/video/ingest';
 import { handleBuildVideoBrief, handleFetchVideo } from './video-ops.js';
 
 const pending: VideoIngestOutcome = {

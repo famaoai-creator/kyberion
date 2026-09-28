@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Page } from '@playwright/test';
-import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
+import { getOpInputContract, validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';

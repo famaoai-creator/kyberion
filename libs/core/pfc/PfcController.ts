@@ -1,0 +1,139 @@
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '../secure-io.js';
+
+export type Layer =
+  'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8' | 'L9' | 'L10' | 'L11';
+
+export interface LayerState {
+  status: 'pending' | 'passed' | 'failed';
+  attempt_count: number;
+}
+
+export interface PfcState {
+  layers: Record<Layer, LayerState>;
+}
+
+export interface LayerResult {
+  passed: boolean;
+  circuit_broken: boolean;
+}
+
+const PFC_STATE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/pfc-state.schema.json');
+
+/** Load persisted PFC state through the governed schema and file boundary. */
+export function loadPfcStateAtPath(stateFilePath: string): PfcState {
+  const safeStateFilePath = assertSafeRepositoryPath(stateFilePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStateFilePath).isFile()) {
+    throw new Error(`[PFC_STATE] state must be a regular file: ${stateFilePath}`);
+  }
+  return defineCatalog<PfcState>({
+    id: 'pfc-state',
+    path: safeStateFilePath,
+    schema: PFC_STATE_SCHEMA_PATH,
+  }).load();
+}
+
+export class PfcController {
+  private stateFilePath: string;
+  private state: PfcState;
+  private readonly MAX_ATTEMPTS = 3;
+
+  constructor(stateFilePath: string) {
+    this.stateFilePath = assertSafeRepositoryPath(stateFilePath, { allowMissingLeaf: true });
+    this.state = this.loadState();
+  }
+
+  private getDefaultState(): PfcState {
+    return {
+      layers: {
+        L0: { status: 'pending', attempt_count: 0 },
+        L1: { status: 'pending', attempt_count: 0 },
+        L2: { status: 'pending', attempt_count: 0 },
+        L3: { status: 'pending', attempt_count: 0 },
+        L4: { status: 'pending', attempt_count: 0 },
+        L5: { status: 'pending', attempt_count: 0 },
+        L6: { status: 'pending', attempt_count: 0 },
+        L7: { status: 'pending', attempt_count: 0 },
+        L8: { status: 'pending', attempt_count: 0 },
+        L9: { status: 'pending', attempt_count: 0 },
+        L10: { status: 'pending', attempt_count: 0 },
+        L11: { status: 'pending', attempt_count: 0 },
+      },
+    };
+  }
+
+  private loadState(): PfcState {
+    if (safeExistsSync(this.stateFilePath)) {
+      try {
+        const parsed = loadPfcStateAtPath(this.stateFilePath);
+        // Forward-compat: a state file persisted before a new layer was
+        // added won't have that layer's key. Backfill defaults rather than
+        // crash the first time the new layer runs.
+        return { layers: { ...this.getDefaultState().layers, ...parsed.layers } };
+      } catch (err) {
+        return this.getDefaultState();
+      }
+    }
+    return this.getDefaultState();
+  }
+
+  private saveState(): void {
+    safeWriteFile(this.stateFilePath, JSON.stringify(this.state, null, 2));
+  }
+
+  public getState(): PfcState {
+    return this.state;
+  }
+
+  public async runLayer(layer: Layer, logic: () => Promise<boolean>): Promise<LayerResult> {
+    const layerState = this.state.layers[layer];
+
+    // Open circuit: probe once per run instead of returning immediately. A
+    // layer that has genuinely recovered (e.g. the scheduler daemon was
+    // reinstalled) closes its own circuit on the next pass; a still-broken
+    // layer stays open without inflating attempt_count further.
+    if (layerState.status === 'failed' && layerState.attempt_count >= this.MAX_ATTEMPTS) {
+      let recovered = false;
+      try {
+        recovered = await logic();
+      } catch {
+        recovered = false;
+      }
+      if (!recovered) {
+        return { passed: false, circuit_broken: true };
+      }
+      layerState.status = 'passed';
+      layerState.attempt_count = 0;
+      this.saveState();
+      return { passed: true, circuit_broken: false };
+    }
+
+    try {
+      const passed = await logic();
+      if (passed) {
+        layerState.status = 'passed';
+        layerState.attempt_count = 0;
+      } else {
+        layerState.attempt_count += 1;
+        layerState.status = layerState.attempt_count >= this.MAX_ATTEMPTS ? 'failed' : 'pending';
+      }
+    } catch (error) {
+      layerState.attempt_count += 1;
+      layerState.status = layerState.attempt_count >= this.MAX_ATTEMPTS ? 'failed' : 'pending';
+    }
+
+    this.saveState();
+
+    return {
+      passed: layerState.status === 'passed',
+      circuit_broken:
+        layerState.status === 'failed' && layerState.attempt_count >= this.MAX_ATTEMPTS,
+    };
+  }
+}

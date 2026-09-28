@@ -6,8 +6,8 @@
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { playAudioFile, type PlaybackHandle, type PlaybackResult } from './audio-playback.js';
-import type { AudioChunk } from './meeting-session-types.js';
+import { playAudioFile, type PlaybackHandle, type PlaybackResult } from './voice/audio-playback.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 export type StreamingSynthesizedAudio = string | AsyncIterable<AudioChunk>;
 

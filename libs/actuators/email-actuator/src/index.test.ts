@@ -17,8 +17,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeLstat: mocks.safeLstat,
 }));
 
-vi.mock('@agent/core/email-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/email-bridge')>()),
+vi.mock('@agent/core/integrations/email-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/integrations/email-bridge')>()),
   createDraft: mocks.createDraft,
   sendEmail: mocks.sendEmail,
 }));

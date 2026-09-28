@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
-import type { ApprovalActionDescriptor, ApprovalRequestSource } from './approval-store.js';
-import type { TraceContext } from './src/trace.js';
+import { enforceApprovalGate, type ApprovalGateResult } from './governance/approval-gate.js';
+import type {
+  ApprovalActionDescriptor,
+  ApprovalRequestSource,
+} from './governance/approval-store.js';
+import type { TraceContext } from './analysis/trace.js';
 
 export interface RequireApprovalParams {
   opId: string;

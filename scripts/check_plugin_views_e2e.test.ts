@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
+import { pluginViewFrameResponseHeaders } from '@agent/core/plugin/plugin-view-frame';
 import { safeReadFile } from '@agent/core/secure-io';
 import {
   E2eRun,

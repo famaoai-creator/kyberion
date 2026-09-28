@@ -10,7 +10,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
+import { resetPluginLifecycleForTests } from '@agent/core/plugin/plugin-lifecycle';
 import {
   isPluginLifecycleCommand,
   runPluginInstall,

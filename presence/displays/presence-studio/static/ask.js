@@ -104,7 +104,9 @@
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
       return window.crypto.randomUUID();
     }
-    return 'ask-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    return (
+      'ask-' + Date.now().toString(36) + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 6)
+    );
   }
 
   function readSessionId() {

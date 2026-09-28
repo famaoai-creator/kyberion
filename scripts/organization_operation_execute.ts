@@ -7,16 +7,16 @@ import {
   saveOrganizationOperationState,
   loadOrganizationIncident,
   saveOrganizationIncident,
-} from '@agent/core/organization-operating-model-operations';
-import { createOrganizationIncident } from '@agent/core/organization-interventions';
-import { organizationOperationDueProjection } from '@agent/core/organization-operation-runtime';
+} from '@agent/core/organization/organization-operating-model-operations';
+import { createOrganizationIncident } from '@agent/core/organization/organization-interventions';
+import { organizationOperationDueProjection } from '@agent/core/organization/organization-operation-runtime';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
 import type {
   OrganizationOperationRun,
   OrganizationOperationState,
-} from '@agent/core/organization-operating-model';
+} from '@agent/core/organization/organization-operating-model';
 import { executePipelineFile } from './run_pipeline.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';

@@ -9,7 +9,7 @@
  */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { generateNativePdf } from './src/native-pdf-engine/engine.js';
+import { generateNativePdf } from './media/native-pdf-engine/engine.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExec,
@@ -182,7 +182,7 @@ describe.skipIf(!capabilities.hasSoffice || !capabilities.hasPdfRaster)(
   'document rasterization (requires LibreOffice + poppler)',
   () => {
     it('rasterizes a rendered PPTX into page images', async () => {
-      const { generateNativePptx } = await import('./src/native-pptx-engine/engine.js');
+      const { generateNativePptx } = await import('./media/native-pptx-engine/engine.js');
       const workDir = pathResolver.sharedTmp('visual-raster-tests/pptx');
       safeMkdir(workDir, { recursive: true });
       const deckPath = path.join(workDir, 'deck.pptx');

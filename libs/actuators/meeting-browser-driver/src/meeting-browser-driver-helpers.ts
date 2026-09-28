@@ -1,9 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
-const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/meeting-browser-driver/manifest.json'
-);
 const DEFAULT_MEETING_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -12,10 +9,10 @@ const DEFAULT_MEETING_BROWSER_RETRY = {
   jitter: true,
 };
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: MEETING_BROWSER_MANIFEST_PATH,
-  defaults: DEFAULT_MEETING_BROWSER_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+const { buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json'),
+  retryDefaults: DEFAULT_MEETING_BROWSER_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 async function loadPlaywright(): Promise<any> {

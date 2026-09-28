@@ -53,15 +53,15 @@ vi.mock('../../../../lib/i18n', () => ({
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
 }));
-vi.mock('@agent/core/member-registry', () => ({
+vi.mock('@agent/core/organization/member-registry', () => ({
   resolveMemberByPrincipal: mocks.resolveMember,
 }));
-vi.mock('@agent/core/work-inventory', () => ({
+vi.mock('@agent/core/workforce/work-inventory', () => ({
   listWorkInventoryEntries: mocks.listEntries,
   loadWorkInventoryEntry: mocks.loadEntry,
   saveWorkInventoryEntry: mocks.saveEntry,
 }));
-vi.mock('@agent/core/work-inventory-observation', () => ({
+vi.mock('@agent/core/workforce/work-inventory-observation', () => ({
   listObservationSummaries: mocks.listSummaries,
   loadObservationSummary: mocks.loadSummary,
   confirmObservationSummary: mocks.confirm,
@@ -71,7 +71,7 @@ vi.mock('@agent/core/work-inventory-observation', () => ({
 }));
 
 import { GET, POST } from './route.js';
-import { WorkInventoryConsentError } from '@agent/core/work-inventory-consent';
+import { WorkInventoryConsentError } from '@agent/core/workforce/work-inventory-consent';
 
 function request(body?: unknown): NextRequest {
   return {

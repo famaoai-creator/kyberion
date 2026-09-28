@@ -1,14 +1,14 @@
-import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
-import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
-import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
-import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
+import { getStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell/shell-streaming-stt-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
-import { TtsLoopbackVerifier } from '@agent/core/tts-loopback-verifier';
-import { resolveVoiceBackend } from '@agent/core/media-backend-registry';
-import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
+import { TtsLoopbackVerifier } from '@agent/core/voice/tts-loopback-verifier';
+import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
+import { resolveVoiceEngineForPlatform } from '@agent/core/voice/voice-engine-registry';
 import { safeExec } from '@agent/core/secure-io';
-import { resolveAudioBus, type AudioBusId } from '@agent/core/audio-bus-resolver';
+import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
 import { performPlayback } from './voice-runtime-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
@@ -217,6 +217,7 @@ export function buildAudioRouteViewModel(
   return {
     screen: 'audio-route-setup',
     status: available ? 'ready' : 'blocked',
+    // i18n-exempt: JA voice-surface copy (product language)
     status_text: available ? '経路を検証できます' : '経路を確認してください',
     steps: [
       {
@@ -226,7 +227,8 @@ export function buildAudioRouteViewModel(
             ? 'PulseAudio route status'
             : busId === 'stub'
               ? 'Stub audio route'
-              : '仮想オーディオドライバのインストール状態',
+              : // i18n-exempt: JA voice-surface copy (product language)
+                '仮想オーディオドライバのインストール状態',
         status: available ? 'pass' : 'action_required',
       },
       {
@@ -248,6 +250,7 @@ export function buildAudioRouteViewModel(
           : 'action_required',
       },
       { id: 'consent', label: '音声出力consent', status: 'operator_confirmation_required' },
+      // i18n-exempt: JA voice-surface copy (product language)
       { id: 'test', label: 'テスト文言を確認して開始', status: available ? 'ready' : 'blocked' },
     ],
     devices: devices.map((device) => ({

@@ -14,10 +14,10 @@ import {
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
-import type { DistillCandidateRecord } from './distill-candidate-registry.js';
-import type { OrganizationWorkLoopSummary } from './work-design.js';
-import type { MemoryScopeEnvelope } from './memory-scope.js';
-import { isPublicMemoryEvidencePath } from './memory-promotion-queue.js';
+import type { DistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
+import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
+import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
+import { isPublicMemoryEvidencePath } from './knowledge/memory-promotion-queue.js';
 import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,

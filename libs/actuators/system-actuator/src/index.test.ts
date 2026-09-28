@@ -1101,7 +1101,7 @@ vi.mock('@agent/core/foundation', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/os-automation', () => ({
+vi.mock('@agent/core/virtual/os-automation', () => ({
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -1164,25 +1164,25 @@ vi.mock('@agent/core/path-resolver', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/path-resolver')),
   pathResolver,
 }));
-vi.mock('@agent/core/adf-engine', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/adf-engine')),
+vi.mock('@agent/core/pipeline/adf-engine', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/adf-engine')),
   executeAdfSteps,
 }));
-vi.mock('@agent/core/op-preflight-defaults', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-preflight-defaults')),
+vi.mock('@agent/core/pipeline/op-preflight-defaults', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/op-preflight-defaults')),
   ensureDefaultOpPreflight,
 }));
-vi.mock('@agent/core/op-preflight', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-preflight')),
+vi.mock('@agent/core/pipeline/op-preflight', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/op-preflight')),
   runOpPreflight,
 }));
-vi.mock('@agent/core/op-input-contracts', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/op-input-contracts')),
+vi.mock('@agent/core/pipeline/op-input-contracts', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/op-input-contracts')),
   getOpInputContract,
   validateOpInput,
 }));
-vi.mock('@agent/core/desktop-launch-adapter', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/desktop-launch-adapter')),
+vi.mock('@agent/core/virtual/desktop-launch-adapter', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/desktop-launch-adapter')),
   resolveDesktopLaunchAdapter,
 }));
 vi.mock('@agent/core/logic-utils', async () => ({
@@ -1211,75 +1211,79 @@ vi.mock('@agent/core/profile-root', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/profile-root')),
   resolveActiveProfileRoot,
 }));
-vi.mock('@agent/core/actuator-op-registry', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/actuator-op-registry')),
+vi.mock('@agent/core/actuator/actuator-op-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/actuator/actuator-op-registry')),
   buildUnknownActuatorOpError,
 }));
-vi.mock('@agent/core/virtual-media-device-control-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-media-device-control-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-media-device-control-bridge'
+    '@agent/core/virtual/virtual-media-device-control-bridge'
   )),
   createVirtualMediaDeviceControlBridge,
 }));
-vi.mock('@agent/core/virtual-device-inventory-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-device-inventory-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-device-inventory-bridge'
+    '@agent/core/virtual/virtual-device-inventory-bridge'
   )),
   createVirtualDeviceInventoryBridge,
 }));
-vi.mock('@agent/core/virtual-audio-output-playback-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-audio-output-playback-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-audio-output-playback-bridge'
+    '@agent/core/virtual/virtual-audio-output-playback-bridge'
   )),
   createVirtualAudioOutputPlaybackBridge,
 }));
-vi.mock('@agent/core/virtual-audio-input-recording-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-audio-input-recording-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-audio-input-recording-bridge'
+    '@agent/core/virtual/virtual-audio-input-recording-bridge'
   )),
   createVirtualAudioInputRecordingBridge,
 }));
-vi.mock('@agent/core/virtual-input-device-inventory-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-input-device-inventory-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-input-device-inventory-bridge'
+    '@agent/core/virtual/virtual-input-device-inventory-bridge'
   )),
   createVirtualInputDeviceInventoryBridge,
 }));
-vi.mock('@agent/core/virtual-camera-bridge', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual-camera-bridge')),
+vi.mock('@agent/core/virtual/virtual-camera-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/virtual-camera-bridge')),
   createVirtualCameraBridge,
 }));
-vi.mock('@agent/core/virtual-camera-injection-bridge', async () => ({
+vi.mock('@agent/core/virtual/virtual-camera-injection-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/virtual-camera-injection-bridge'
+    '@agent/core/virtual/virtual-camera-injection-bridge'
   )),
   createVirtualCameraInjectionBridge,
 }));
-vi.mock('@agent/core/screen-capture-bridge', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-capture-bridge')),
+vi.mock('@agent/core/virtual/screen-capture-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/screen-capture-bridge')),
   createScreenCaptureBridge,
 }));
-vi.mock('@agent/core/screen-recording-bridge', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-recording-bridge')),
+vi.mock('@agent/core/virtual/screen-recording-bridge', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/virtual/screen-recording-bridge'
+  )),
   createScreenRecordingBridge,
 }));
-vi.mock('@agent/core/screen-frame-redaction', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/screen-frame-redaction')),
+vi.mock('@agent/core/virtual/screen-frame-redaction', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/screen-frame-redaction')),
   redactScreenVideoFrame: vi.fn(async (frame: any) => frame),
   redactScreenCaptureFile: vi.fn(async (_input: string, _output: string) => undefined),
 }));
-vi.mock('@agent/core/screen-display-inventory-bridge', async () => ({
+vi.mock('@agent/core/virtual/screen-display-inventory-bridge', async () => ({
   ...(await vi.importActual<Record<string, unknown>>(
-    '@agent/core/screen-display-inventory-bridge'
+    '@agent/core/virtual/screen-display-inventory-bridge'
   )),
   createScreenDisplayInventoryBridge,
 }));
-vi.mock('@agent/core/tool-runtime-registry', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/tool-runtime-registry')),
+vi.mock('@agent/core/tool/tool-runtime-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/tool/tool-runtime-registry')),
   listToolRuntimeInventory,
 }));
-vi.mock('@agent/core/service-runtime-registry', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/service-runtime-registry')),
+vi.mock('@agent/core/service/service-runtime-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>(
+    '@agent/core/service/service-runtime-registry'
+  )),
   listServiceRuntimeInventory,
 }));
 vi.mock('@agent/core/reconcile-ops', async () => ({
@@ -1294,12 +1298,12 @@ vi.mock('@agent/core/report-ops', async () => ({
   runMemoryPromotionQueueSummary,
   runTaskModelRoutingSummary,
 }));
-vi.mock('@agent/core/video-frame-bus', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video-frame-bus')),
+vi.mock('@agent/core/video/video-frame-bus', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video/video-frame-bus')),
   StubVideoFrameBus,
 }));
-vi.mock('@agent/core/video-frame-archive', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video-frame-archive')),
+vi.mock('@agent/core/video/video-frame-archive', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/video/video-frame-archive')),
   writeVideoFrameBusToMp4,
   writeVideoFramesToMp4,
   pipeMp4ToVideoFrameBus,
@@ -1308,16 +1312,16 @@ vi.mock('@agent/core/ledger', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/ledger')),
   ledger: { verifyIntegrity: vi.fn(() => true) },
 }));
-vi.mock('@agent/core/project-registry', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/project-registry')),
+vi.mock('@agent/core/project/project-registry', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/project/project-registry')),
   listProjectRecords: vi.fn(() => []),
 }));
 vi.mock('@agent/core/platform', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/platform')),
   platform: { listRunningApps: vi.fn(async () => []) },
 }));
-vi.mock('@agent/core/voice-synth', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/voice-synth')),
+vi.mock('@agent/core/voice/voice-synth', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/voice/voice-synth')),
   say: vi.fn(async () => undefined),
 }));
 vi.mock('@agent/core/macos-automation-bridge', async () => ({
@@ -1383,7 +1387,7 @@ beforeEach(async () => {
 
 describe('system-actuator reconcile admission', () => {
   it('blocks direct reconcile before reading the strategy when preflight denies it', async () => {
-    const preflight = await import('@agent/core/op-preflight');
+    const preflight = await import('@agent/core/pipeline/op-preflight');
     const secureIo = await import('@agent/core/secure-io');
     vi.mocked(preflight.runOpPreflight).mockResolvedValueOnce({
       decision: 'block',
@@ -1404,7 +1408,7 @@ describe('system-actuator reconcile admission', () => {
     ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test system admission denial');
     expect(secureIo.safeReadFile).not.toHaveBeenCalled();
     expect(
-      (await import('@agent/core/op-preflight-defaults')).ensureDefaultOpPreflight
+      (await import('@agent/core/pipeline/op-preflight-defaults')).ensureDefaultOpPreflight
     ).toHaveBeenCalled();
   });
 

@@ -99,10 +99,10 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `scripts/mission_journal.ts`
 - `scripts/run_mission_orchestration_event_worker.ts`
 - `scripts/run_agent_runtime_supervisor.ts`
-- `libs/core/mission-orchestration-events.ts`
-- `libs/core/mission-orchestration-worker.ts`
-- `libs/core/agent-runtime-supervisor.ts`
-- `libs/core/a2a-bridge.ts`
+- `libs/core/mission/mission-orchestration-events.ts`
+- `libs/core/mission/mission-orchestration-worker.ts`
+- `libs/core/agent/agent-runtime-supervisor.ts`
+- `libs/core/mesh/a2a-bridge.ts`
 - `docs/developer/AGENT_COMMS.md`
 - `pipelines/vital-check.json`
 - `active/missions/`
@@ -214,8 +214,8 @@ Chronos does not directly own mission state. It delegates to:
 
 ### 5. Service binding and channel delivery
 
-- `libs/core/service-binding.ts`
-- `libs/core/service-preset-registry.ts`
+- `libs/core/service/service-binding.ts`
+- `libs/core/service/service-preset-registry.ts`
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
 - `libs/actuators/system-actuator/`
@@ -301,7 +301,7 @@ Kyberion uses four separate concepts here:
   - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, `chronos-mirror-v2` API routes
 - `service binding`
   - resolves authenticated service access from governed secrets
-  - examples: `libs/core/service-binding.ts`, `service-actuator`
+  - examples: `libs/core/service/service-binding.ts`, `service-actuator`
 - `delivery actuator`
   - sends approved responses or UI events back to a channel
   - example: `presence-actuator`

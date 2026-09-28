@@ -26,7 +26,7 @@ import {
   VoiceTtsEngineSelectionError,
   type VoiceEngineRecord,
   type VoiceTtsRequirements,
-} from '@agent/core/voice-engine-registry';
+} from '@agent/core/voice/voice-engine-registry';
 
 export interface VoiceEngineRoutingInput {
   text: string;

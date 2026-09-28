@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main as runCli } from '../scripts/cli.js';
 import { t } from '@agent/core/t';
 import { _resetLocaleModuleStateForTests } from '@agent/core/locale';
-import { formatClarificationPacketConcise } from '@agent/core/intent-contract';
+import { formatClarificationPacketConcise } from '@agent/core/intent/intent-contract';
 import { extractPlaceholderNames } from '@agent/core/message-format';
 import {
   CHRONOS_LOCALE_STORAGE_KEY,
@@ -80,7 +80,7 @@ describe('I18N-07 proof-of-locale: qps-ploc end to end', () => {
 
     it('falls back to English for a locale this CLI does not have a hardcoded phrasing for (formatClarificationPacketConcise)', () => {
       // I18N-07 finding: `formatClarificationPacketConcise` in
-      // libs/core/intent-contract.ts only has hand-written phrasing for
+      // libs/core/intent/intent-contract.ts only has hand-written phrasing for
       // 'ja' (else it renders English) — its `options.locale` type was
       // widened from a hardcoded `'en' | 'ja'` union to `string` so this
       // compiles for any locale, but the *phrasing* itself is still

@@ -1,4 +1,4 @@
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 
 /**
  * Surface projection for the four questions in IntentResolutionContract.

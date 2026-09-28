@@ -17,7 +17,7 @@ import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
-} from './memory-promotion-queue.js';
+} from './knowledge/memory-promotion-queue.js';
 
 /**
  * E2E-06 Task 4: the deal state machine — the persistent spine of a customer

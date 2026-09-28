@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type CSSProperties, type SyntheticEvent } from 'react';
-import type { KbTalkingAvatarProps, KbVoiceStateProps } from '@agent/core/a2ui-catalog';
+import type { KbTalkingAvatarProps, KbVoiceStateProps } from '@agent/core/surface/a2ui-catalog';
 import { useA2UIActions } from '../actions.js';
 import { useKbI18n, type KbTranslate } from '../i18n.js';
 import { VoiceState } from '../voice/voice-state.js';

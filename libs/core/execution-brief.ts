@@ -11,8 +11,8 @@ import {
   resolveDefaultApprovalSystem,
   resolveDefaultScheduleSource,
 } from './contextual-intent-memory.js';
-import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
-import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
+import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
+import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
 import { clamp } from './foundation/text.js';

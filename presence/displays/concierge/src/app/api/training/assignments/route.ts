@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { readTrainingAssignments, upsertTrainingAssignment } from '@agent/core/training-catalog';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';

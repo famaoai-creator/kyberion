@@ -13,15 +13,15 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('./virtual-device-inventory-bridge.js', () => ({
+vi.mock('./virtual/virtual-device-inventory-bridge.js', () => ({
   createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
 }));
 
-vi.mock('./virtual-camera-bridge.js', () => ({
+vi.mock('./virtual/virtual-camera-bridge.js', () => ({
   createVirtualCameraBridge: mocks.createVirtualCameraBridge,
 }));
 
-vi.mock('./task-session.js', () => ({
+vi.mock('./task/task-session.js', () => ({
   updateTaskSession: mocks.updateTaskSession,
   recordTaskSessionHistory: mocks.recordTaskSessionHistory,
 }));
@@ -31,7 +31,9 @@ describe('executeCapturePhotoTaskSession', () => {
     vi.resetModules();
     vi.clearAllMocks();
 
-    mocks.createVirtualDeviceInventoryBridge.mockReturnValue({ bridge_id: 'virtual-device-inventory-bridge' });
+    mocks.createVirtualDeviceInventoryBridge.mockReturnValue({
+      bridge_id: 'virtual-device-inventory-bridge',
+    });
     mocks.createVirtualCameraBridge.mockReturnValue({
       probe: vi.fn().mockResolvedValue({
         available: true,
@@ -66,7 +68,8 @@ describe('executeCapturePhotoTaskSession', () => {
   });
 
   it('captures a photo through the bridge and persists the task-session artifact', async () => {
-    const { executeCapturePhotoTaskSession } = await import('./capture-photo-task-session-executor.js');
+    const { executeCapturePhotoTaskSession } =
+      await import('./capture-photo-task-session-executor.js');
     const result = await executeCapturePhotoTaskSession({
       session: {
         session_id: 'TSK-TEST-CAPTURE',
@@ -109,7 +112,7 @@ describe('executeCapturePhotoTaskSession', () => {
       expect.objectContaining({
         inventory_bridge: expect.anything(),
         device_preference: 'FaceTime HD Camera',
-      }),
+      })
     );
     expect(mocks.updateTaskSession).toHaveBeenCalledWith(
       'TSK-TEST-CAPTURE',
@@ -119,7 +122,7 @@ describe('executeCapturePhotoTaskSession', () => {
           kind: 'image',
           output_path: expect.stringContaining('capture-photo/TSK-TEST-CAPTURE.jpg'),
         }),
-      }),
+      })
     );
   });
 });

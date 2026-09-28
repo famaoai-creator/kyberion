@@ -7,7 +7,7 @@ import type {
   KbButtonProps,
   KbButtonVariant,
   KbDisclosureProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { useA2UIActions, type A2UILinkProps } from '../actions.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { safeHref } from '../safety.js';

@@ -24,7 +24,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/streaming-tts-bridge.ts (StubStreamingTextToSpeechBridge: synthetic bytes, no real speech; eligible only when synthetic output is allowed)"
+            "libs/core/voice/streaming-tts-bridge.ts (StubStreamingTextToSpeechBridge: synthetic bytes, no real speech; eligible only when synthetic output is allowed)"
           ]
         },
         "gemini": {
@@ -39,7 +39,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/streaming-tts-bridge.ts (GeminiStreamingTextToSpeechBridge: buffers the whole prompt, cloud Gemini generate_tts)"
+            "libs/core/voice/streaming-tts-bridge.ts (GeminiStreamingTextToSpeechBridge: buffers the whole prompt, cloud Gemini generate_tts)"
           ]
         },
         "shell": {
@@ -54,7 +54,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/shell-streaming-tts-bridge.ts (operator command from KYBERION_TTS_COMMAND, e.g. piper; may be a cloud CLI, so privacy is kept low unless declared local)"
+            "libs/core/shell/shell-streaming-tts-bridge.ts (operator command from KYBERION_TTS_COMMAND, e.g. piper; may be a cloud CLI, so privacy is kept low unless declared local)"
           ]
         }
       },

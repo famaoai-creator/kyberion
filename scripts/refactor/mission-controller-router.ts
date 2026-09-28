@@ -1,34 +1,17 @@
-import { formatMissionTeamPlanView } from '@agent/core/mission-team-view';
+import { formatMissionTeamPlanView } from '@agent/core/mission/mission-team-view';
 /**
  * scripts/refactor/mission-controller-router.ts
  * Command routing for the Mission Controller CLI.
  */
 
 import { logger } from '@agent/core/core';
-import { auditChain } from '@agent/core/audit-chain';
-import {
-  clearSurfaceOutboxMessage,
-  listSurfaceOutboxMessages,
-} from '@agent/core/surface-coordination-store';
-import { resolveIntentTrackGate } from '@agent/core/intent-track-resolver';
-import { saveProjectTrackRecord } from '@agent/core/project-track-registry';
-import { writeIntentGoalHandoff } from '@agent/core/intent-handoff';
-import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
-import {
-  collectMissionHygieneReport,
-  formatMissionHygieneLine,
-  notifyMissionHygiene,
-} from '@agent/core/mission-hygiene';
-import {
-  applyProcessImprovementProposal,
-  decideProcessImprovementProposal,
-  listProcessImprovementProposals,
-  runMissionRetrospective,
-} from '@agent/core/mission-retrospective';
-import { generateMissionWorkReconciliationScaffold } from '@agent/core/mission-work-reconciliation';
-import type { HumanDecidedBy } from '@agent/core/mission-types';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import type { resolveIntentTrackGate } from '@agent/core/intent/intent-track-resolver';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
-import { parseMissionVisionRef } from './mission-creation.js';
+import { parseMissionVisionRef } from '@agent/core/mission/mission-vision-ref';
 import { resolveDecidedByFromArgv } from '../lib/decided-by-args.js';
 import type { MissionRelationships } from './mission-types.js';
 
@@ -244,27 +227,32 @@ export interface MissionControllerRoutingContext {
     deps: string[]
   ) => Awaitable<void>;
   dispatchNextMission: () => Awaitable<void>;
-  acceptRubricOverride: (id: string, reason?: string, severity?: string, print?: Print) => void;
+  acceptRubricOverride: (
+    id: string,
+    reason?: string,
+    severity?: string,
+    print?: Print
+  ) => Awaitable<void>;
   listMemoryQueue: (
     filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted',
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   showMemoryReview: (
     candidateId: string,
     tenantSlug?: string,
     jsonOutput?: boolean,
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   approveMemoryCandidate: (
     candidateId: string,
     note?: string,
     tenantSlug?: string,
-    knowledgeDomain?: import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain,
+    knowledgeDomain?: import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain,
     ownerNhi?: string,
     curationJson?: string,
     decidedBy?: HumanDecidedBy,
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   rejectMemoryCandidate: (
     candidateId: string,
     note?: string,
@@ -272,7 +260,7 @@ export interface MissionControllerRoutingContext {
     allDuplicates?: boolean,
     decidedBy?: HumanDecidedBy,
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   promoteMemoryCandidate: (
     candidateId: string,
     executionRole?: 'mission_controller' | 'chronos_gateway',
@@ -280,7 +268,7 @@ export interface MissionControllerRoutingContext {
     supersedes?: string,
     tenantSlug?: string,
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   promotePendingMemoryCandidates: (
     input: {
       executionRole?: 'mission_controller' | 'chronos_gateway';
@@ -289,7 +277,7 @@ export interface MissionControllerRoutingContext {
       supersedes?: string;
     },
     print?: Print
-  ) => void;
+  ) => Awaitable<void>;
   finishMission: (id: string, seal?: boolean) => Awaitable<void>;
   resumeMission: (id?: string) => Awaitable<void>;
   recordTask: (missionId: string, description: string, details?: any) => Awaitable<void>;
@@ -324,7 +312,7 @@ export interface MissionControllerRoutingContext {
   reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   archiveMissions: (options: { missionId?: string; execute?: boolean }) => Awaitable<void>;
-  listMissions: (filterStatus?: string) => void;
+  listMissions: (filterStatus?: string) => Awaitable<void>;
   listOrganizationCatalogs: (
     organizationId?: string,
     jsonOutput?: boolean,
@@ -342,8 +330,8 @@ export interface MissionControllerRoutingContext {
     summaryOnly?: boolean,
     print?: Print
   ) => Awaitable<void>;
-  showMissionStatus: (id: string, follow?: boolean) => void;
-  showReasoningBackendStatus: () => void;
+  showMissionStatus: (id: string, follow?: boolean) => Awaitable<void>;
+  showReasoningBackendStatus: () => void | Promise<void>;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
   reassignMissionProject: (
     missionId: string,
@@ -414,7 +402,12 @@ export interface MissionControllerRoutingContext {
  * enqueue progress/result messages into the terminal outbox; these helpers
  * are the CLI's read side (durable until acknowledged with --ack).
  */
-function showTerminalOutbox(options: { ack: boolean; missionId?: string }, print: Print): void {
+async function showTerminalOutbox(
+  options: { ack: boolean; missionId?: string },
+  print: Print
+): Promise<void> {
+  const { clearSurfaceOutboxMessage, listSurfaceOutboxMessages } =
+    await import('@agent/core/surface/surface-coordination-store');
   const messages = listSurfaceOutboxMessages('terminal', { includeTenantNamespaces: true }).filter(
     (message) => !options.missionId || message.correlation_id === options.missionId.toUpperCase()
   );
@@ -441,8 +434,10 @@ function showTerminalOutbox(options: { ack: boolean; missionId?: string }, print
   }
 }
 
-function showTerminalOutboxHint(): void {
+async function showTerminalOutboxHint(): Promise<void> {
   try {
+    const { listSurfaceOutboxMessages } =
+      await import('@agent/core/surface/surface-coordination-store');
     const pending = listSurfaceOutboxMessages('terminal', { includeTenantNamespaces: true }).length;
     if (pending > 0) {
       logger.info(
@@ -597,6 +592,7 @@ async function applyIntentTrackGate(
     );
   }
 
+  const { resolveIntentTrackGate } = await import('@agent/core/intent/intent-track-resolver');
   const result = await resolveIntentTrackGate({
     intentId,
     confidence: parseIntentConfidence(context.getOptionValue('--intent-confidence', context.argv)),
@@ -627,10 +623,11 @@ async function applyIntentTrackGate(
   };
 }
 
-function persistIntentTrackGate(
+async function persistIntentTrackGate(
   intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null
-): void {
+): Promise<void> {
   if (intentTrackGate?.status !== 'ready_to_provision') return;
+  const { saveProjectTrackRecord } = await import('@agent/core/project/project-track-registry');
   saveProjectTrackRecord(intentTrackGate.track_record);
 }
 
@@ -643,14 +640,15 @@ function persistIntentTrackGate(
  * intent drift. Keep the file-based contract, but make the common CLI path
  * create the governed handoff for the operator.
  */
-function resolveIntentGoalHandoffPath(
+async function resolveIntentGoalHandoffPath(
   context: MissionControllerRoutingContext,
   missionId: string | undefined
-): string | undefined {
+): Promise<string | undefined> {
   const explicit = context.getOptionValue('--intent-goal', context.argv);
   if (explicit) return explicit;
   const goal = context.getOptionValue('--goal', context.argv)?.trim();
   if (!goal || !missionId) return undefined;
+  const { writeIntentGoalHandoff } = await import('@agent/core/intent/intent-handoff');
   return writeIntentGoalHandoff(missionId, {
     source_text: goal,
     correlation_id: context.getOptionValue('--correlation-id', context.argv),
@@ -732,10 +730,10 @@ export async function runMissionControllerAction(
         createInput?.organizationId,
         {
           ephemeral: context.argv.includes('--ephemeral'),
-          intentGoal: resolveIntentGoalHandoffPath(context, arg1),
+          intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
         }
       );
-      persistIntentTrackGate(intentTrack.intentTrackGate);
+      await persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
@@ -791,12 +789,12 @@ export async function runMissionControllerAction(
         input?.organizationId,
         {
           ephemeral: context.argv.includes('--ephemeral'),
-          intentGoal: resolveIntentGoalHandoffPath(context, arg1),
+          intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
           force: context.argv.includes('--force'),
           decidedBy,
         }
       );
-      persistIntentTrackGate(intentTrack.intentTrackGate);
+      await persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
@@ -886,6 +884,8 @@ export async function runMissionControllerAction(
     case 'hygiene': {
       const staleDaysRaw = getValue('--stale-days', context.argv);
       const abandonedDaysRaw = getValue('--abandoned-days', context.argv);
+      const { collectMissionHygieneReport, formatMissionHygieneLine, notifyMissionHygiene } =
+        await import('@agent/core/mission/mission-hygiene');
       const report = collectMissionHygieneReport({
         ...(staleDaysRaw ? { staleDays: Number(staleDaysRaw) } : {}),
         ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
@@ -904,6 +904,7 @@ export async function runMissionControllerAction(
       }
       if (context.argv.includes('--notify')) {
         const sent = await notifyMissionHygiene(report);
+        // i18n-exempt: JA operator output
         context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
       }
       break;
@@ -912,6 +913,11 @@ export async function runMissionControllerAction(
       const approveId = getValue('--approve', context.argv);
       const rejectId = getValue('--reject', context.argv);
       const applyId = getValue('--apply', context.argv);
+      const {
+        applyProcessImprovementProposal,
+        decideProcessImprovementProposal,
+        listProcessImprovementProposals,
+      } = await import('@agent/core/mission/mission-retrospective');
       if (approveId) {
         context.print?.(
           JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
@@ -925,6 +931,7 @@ export async function runMissionControllerAction(
       } else {
         const proposals = listProcessImprovementProposals();
         if (proposals.length === 0) {
+          // i18n-exempt: JA operator output
           context.print?.('プロセス改善提案はありません。');
         }
         for (const proposal of proposals) {
@@ -936,6 +943,7 @@ export async function runMissionControllerAction(
       break;
     }
     case 'retrospective': {
+      const { runMissionRetrospective } = await import('@agent/core/mission/mission-retrospective');
       const result = await runMissionRetrospective(arg1!);
       context.print?.(
         JSON.stringify(
@@ -965,7 +973,7 @@ export async function runMissionControllerAction(
       await context.dispatchNextMission();
       break;
     case 'accept-with-override':
-      context.acceptRubricOverride(
+      await context.acceptRubricOverride(
         arg1!,
         getValue('--reason', context.argv),
         getValue('--severity', context.argv),
@@ -973,13 +981,13 @@ export async function runMissionControllerAction(
       );
       break;
     case 'memory-queue':
-      context.listMemoryQueue(
+      await context.listMemoryQueue(
         parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES),
         context.print
       );
       break;
     case 'memory-review':
-      context.showMemoryReview(
+      await context.showMemoryReview(
         arg1!,
         getValue('--tenant-slug', context.argv),
         context.argv.includes('--json'),
@@ -987,12 +995,12 @@ export async function runMissionControllerAction(
       );
       break;
     case 'memory-approve':
-      context.approveMemoryCandidate(
+      await context.approveMemoryCandidate(
         arg1!,
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
         getValue('--knowledge-domain', context.argv) as
-          import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
+          import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
         getValue('--owner-nhi', context.argv),
         getValue('--curation-json', context.argv),
         decidedBy,
@@ -1000,7 +1008,7 @@ export async function runMissionControllerAction(
       );
       break;
     case 'memory-reject':
-      context.rejectMemoryCandidate(
+      await context.rejectMemoryCandidate(
         arg1!,
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
@@ -1089,6 +1097,8 @@ export async function runMissionControllerAction(
     }
     case 'reconcile-work': {
       if (context.argv.includes('--generate')) {
+        const { generateMissionWorkReconciliationScaffold } =
+          await import('@agent/core/mission/mission-work-reconciliation');
         const scaffold = generateMissionWorkReconciliationScaffold({
           missionId: arg1!,
           outputPath: getValue('--output', context.argv),
@@ -1131,7 +1141,7 @@ export async function runMissionControllerAction(
       });
       break;
     case 'list':
-      context.listMissions(arg1);
+      await context.listMissions(arg1);
       break;
     case 'organization-catalogs':
       await context.listOrganizationCatalogs(
@@ -1162,12 +1172,12 @@ export async function runMissionControllerAction(
       );
       break;
     case 'status':
-      context.showMissionStatus(arg1!, context.argv.includes('--follow'));
-      context.showReasoningBackendStatus();
-      showTerminalOutboxHint();
+      await context.showMissionStatus(arg1!, context.argv.includes('--follow'));
+      await context.showReasoningBackendStatus();
+      await showTerminalOutboxHint();
       break;
     case 'outbox':
-      showTerminalOutbox(
+      await showTerminalOutbox(
         {
           ack: context.argv.includes('--ack'),
           missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,

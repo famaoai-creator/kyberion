@@ -14,7 +14,7 @@ status: archived
 CI/CD・デプロイは需要カタログ上の最大級の領域なのに、実行能力がスタブのまま。
 
 - **需要**: `docs/verification/500_intents_catalog.md` の 500 意図中 **100 が CI/CD ターゲット**(Audit/Generate/Validate/Monitor/Refactor × CI/CD)。`docs/USE_CASES.md` #18「CI/CD の状態確認と対応」は high_stakes 分類。実行時にも `Unsupported pipeline op: system:terraform` が 2 回記録されている(IaC 実行の需要)。
-- **供給**: `knowledge/product/pipeline-templates/deploy-release.json` → `wisdom:deploy_release` → `libs/core/deployment-adapter.ts` の `getDeploymentAdapter()` が既定で **`stubDeploymentAdapter`(`status:'dry_run'` を返すだけ)**。実デプロイにはプロジェクト側で `ShellDeploymentAdapter` 等を登録する必要があるが、その登録手順は実質未整備(`wisdom-actuator/src/decision-ops.ts:2614` 経由で確認済み)。
+- **供給**: `knowledge/product/pipeline-templates/deploy-release.json` → `wisdom:deploy_release` → `libs/core/actuator/deployment-adapter.ts` の `getDeploymentAdapter()` が既定で **`stubDeploymentAdapter`(`status:'dry_run'` を返すだけ)**。実デプロイにはプロジェクト側で `ShellDeploymentAdapter` 等を登録する必要があるが、その登録手順は実質未整備(`wisdom-actuator/src/decision-ops.ts:2614` 経由で確認済み)。
 - **関連ギャップ**(evaluation_report): V-4-12 CHANGELOG/リリース自動化 NOT_IMPLEMENTED。modeling-actuator は terraform を**読む**(`terraform_to_architecture_adf`)が **apply はどこにも無い**。
 - **設計方針との整合**: deployment-adapter 自身のコメントが「デプロイはプロジェクト固有」と明言しており、汎用 CD 基盤を作るのは方針違反。**「アダプタ登録体験 + GitHub Actions 連携 + リリース補助」の3点に絞る**のが正しいスコープ。
 
@@ -29,7 +29,7 @@ CI/CD・デプロイは需要カタログ上の最大級の領域なのに、実
 
 ### Task 1: ShellDeploymentAdapter の登録体験 — `claude-sonnet-4`
 
-1. `libs/core/deployment-adapter.ts` を読み、`ShellDeploymentAdapter` の実装状態を確認する(存在すれば設定経路を、無ければコマンド列+作業ディレクトリ+env を設定ファイルから読む実装を追加)。
+1. `libs/core/actuator/deployment-adapter.ts` を読み、`ShellDeploymentAdapter` の実装状態を確認する(存在すれば設定経路を、無ければコマンド列+作業ディレクトリ+env を設定ファイルから読む実装を追加)。
 2. 設定ファイルの置き場を既存規約に合わせて定義する(例: `knowledge/personal/deployments/<project>.json`、スキーマを `schemas/` に追加)。**デプロイ実行は approval-actuator の承認ゲートを必須にする**(high_stakes)。
 3. `deploy-release.json` テンプレートを設定参照型に更新し、設定が無い場合は「dry_run + 設定手順の案内」を返す(現行挙動を劣化させない)。
 4. unit test: 設定あり(モック shell)/設定なし/承認未取得の 3 経路。
@@ -54,13 +54,13 @@ CI/CD・デプロイは需要カタログ上の最大級の領域なのに、実
 ### Task 2 slice — 2026-07-04
 
 - `knowledge/product/orchestration/service-presets/github.json` に `actions_list_runs` / `actions_get_run` / `actions_dispatch_workflow` を追加した。
-- `libs/core/service-engine.test.ts` で workflow run 一覧・run 取得・dispatch の API 契約を固定した。
-- `libs/core/service-preset-registry.test.ts` で canonical preset に 3 op が載ることを確認した。
+- `libs/core/service/service-engine.test.ts` で workflow run 一覧・run 取得・dispatch の API 契約を固定した。
+- `libs/core/service/service-preset-registry.test.ts` で canonical preset に 3 op が載ることを確認した。
 - `knowledge/product/pipeline-templates/cicd-failure-investigation.json` を追加し、GitHub Actions run 一覧→reasoning→調査メモの導線を用意した。
-- `libs/core/deployment-adapter.test.ts` に、ShellDeploymentAdapter の config schema 逸脱が明示的に拒否される回帰テストを追加した。
+- `libs/core/actuator/deployment-adapter.test.ts` に、ShellDeploymentAdapter の config schema 逸脱が明示的に拒否される回帰テストを追加した。
 - `scripts/generate_changelog.ts` に export と直接実行ガードを入れ、`scripts/generate_changelog.test.ts` で Conventional Commits の分類と section 生成を契約化した。
 - 検証:
-  - `pnpm exec vitest run libs/core/service-preset-registry.test.ts libs/core/service-engine.test.ts tests/release-operations-contract.test.ts`
+  - `pnpm exec vitest run libs/core/service/service-preset-registry.test.ts libs/core/service/service-engine.test.ts tests/release-operations-contract.test.ts`
   - `pnpm exec vitest run tests/workflow-operations-contract.test.ts`
   - `pnpm exec tsc --noEmit --pretty false`
 

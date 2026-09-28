@@ -48,16 +48,16 @@ status: archived
 
 ## 実装結果(2026-07-04)
 
-- `delegateStructured<T>` を `libs/core/reasoning-backend.ts` に追加し、`planning_packet` / `task_result` / `a2a_task_contract` / `procedure_ranking` を名前付き schema として扱えるようにした。
+- `delegateStructured<T>` を `libs/core/reasoning/reasoning-backend.ts` に追加し、`planning_packet` / `task_result` / `a2a_task_contract` / `procedure_ranking` を名前付き schema として扱えるようにした。
 - `libs/core/structured-output-contracts.ts` に Zod schema registry を集約し、`renderStructuredOutputSchemaPrompt()` で prompt 側にも同じ正本を使うようにした。
-- `libs/core/planning-packet-contract.ts` / `libs/core/task-result-contract.ts` / `libs/core/a2a-task-contract.ts` を Ajv 個別実装から Zod 検証へ寄せた。
-- `libs/core/mission-orchestration-worker.ts` の planning / task_result / review 応答を schema 正本から生成し、review verdict も `planning_review_verdict` として検証するようにした。
-- `libs/core/a2a-task-contract.ts` と `libs/core/a2a-bridge.ts` は実運用 payload の `task_model_hint` / `user_language` を含む契約に合わせて調整した。
+- `libs/core/planning-packet-contract.ts` / `libs/core/task/task-result-contract.ts` / `libs/core/mesh/a2a-task-contract.ts` を Ajv 個別実装から Zod 検証へ寄せた。
+- `libs/core/mission/mission-orchestration-worker.ts` の planning / task_result / review 応答を schema 正本から生成し、review verdict も `planning_review_verdict` として検証するようにした。
+- `libs/core/mesh/a2a-task-contract.ts` と `libs/core/mesh/a2a-bridge.ts` は実運用 payload の `task_model_hint` / `user_language` を含む契約に合わせて調整した。
 - `surface-response-blocks.ts` は `task_result` の裸 JSON fallback を廃止し、明示ブロック受理に統一した。
 
 ## 検証
 
-- `pnpm exec vitest run libs/core/mission-orchestration-worker.test.ts libs/core/reasoning-backend.test.ts libs/core/a2a-bridge.test.ts libs/core/surface-response-blocks.test.ts libs/core/planning-packet-contract.test.ts libs/core/task-result-contract.test.ts libs/core/a2a-task-contract.test.ts`
+- `pnpm exec vitest run libs/core/mission/mission-orchestration-worker.test.ts libs/core/reasoning/reasoning-backend.test.ts libs/core/mesh/a2a-bridge.test.ts libs/core/surface/surface-response-blocks.test.ts libs/core/planning-packet-contract.test.ts libs/core/task/task-result-contract.test.ts libs/core/mesh/a2a-task-contract.test.ts`
 - `pnpm run typecheck`
 
 ## リスクと注意

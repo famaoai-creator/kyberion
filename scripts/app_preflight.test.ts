@@ -9,7 +9,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
   safeExecResult: mocks.safeExecResult,
 }));
-vi.mock('@agent/core/secret-guard', () => ({ secretGuard: { getSecret: mocks.getSecret } }));
+vi.mock('@agent/core/secret/secret-guard', () => ({ secretGuard: { getSecret: mocks.getSecret } }));
 
 import { runAppPreflight } from './app_preflight.js';
 

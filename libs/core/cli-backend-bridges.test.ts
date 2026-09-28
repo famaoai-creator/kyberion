@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./shell-claude-cli-backend.js', () => ({
+vi.mock('./shell/shell-claude-cli-backend.js', () => ({
   runClaudeCliQuery: vi.fn(async ({ schema }: any, _prompt: any) => {
     const voiceCandidate = {
       turns: [
@@ -26,7 +26,7 @@ vi.mock('./shell-claude-cli-backend.js', () => ({
   }),
 }));
 
-vi.mock('./gemini-cli-backend.js', () => ({
+vi.mock('./provider/gemini-cli-backend.js', () => ({
   runGeminiCliQuery: vi.fn(async ({ schema }: any) => {
     const voiceCandidate = {
       turns: [
@@ -52,7 +52,7 @@ vi.mock('./gemini-cli-backend.js', () => ({
   }),
 }));
 
-vi.mock('./agy-cli-backend.js', () => ({
+vi.mock('./provider/agy-cli-backend.js', () => ({
   runAgyCliQuery: vi.fn(async ({ schema }: any) => {
     const voiceCandidate = {
       turns: [
@@ -78,12 +78,12 @@ vi.mock('./agy-cli-backend.js', () => ({
   }),
 }));
 
-import { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
-import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
-import { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
-import { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
-import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
-import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
+import { ClaudeCliIntentExtractor } from './provider/claude-cli-intent-extractor.js';
+import { ClaudeCliVoiceBridge } from './provider/claude-cli-voice-bridge.js';
+import { GeminiCliIntentExtractor } from './provider/gemini-cli-intent-extractor.js';
+import { GeminiCliVoiceBridge } from './provider/gemini-cli-voice-bridge.js';
+import { AgyCliIntentExtractor } from './provider/agy-cli-intent-extractor.js';
+import { AgyCliVoiceBridge } from './provider/agy-cli-voice-bridge.js';
 
 describe('CLI backend bridges', () => {
   afterEach(() => {

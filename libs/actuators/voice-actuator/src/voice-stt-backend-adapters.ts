@@ -4,9 +4,9 @@ import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
-} from '@agent/core/streaming-stt-bridge';
+} from '@agent/core/voice/streaming-stt-bridge';
 import { safeMkdir, safeRmSync, safeWriteFile, safeExecResult } from '@agent/core/secure-io';
-import type { AudioChunk } from '@agent/core/meeting-session-types';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 import * as path from 'node:path';
 import { parseVoiceSttBridgeResponse, resolvePythonBin } from './voice-runtime-helpers.js';
 

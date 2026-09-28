@@ -5,7 +5,7 @@ import type {
   KbAction,
   KyberionBaseComponentType,
   KyberionBasePropsByType,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { A2UIActionProvider, type A2UIActionHandler } from './actions.js';
 import { resolveKbType } from './catalog.js';
 import { Button, Disclosure } from './components/controls.js';

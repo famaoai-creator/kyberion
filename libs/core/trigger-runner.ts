@@ -23,11 +23,11 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { loadAuthorityRoleIndex } from './authority-role-registry.js';
-import { auditChain } from './audit-chain.js';
+import { loadAuthorityRoleIndex } from './organization/authority-role-registry.js';
+import { auditChain } from './governance/audit-chain.js';
 import { resolveAssumedRole, resolveRole } from './authority.js';
 import { createLogger } from './logger.js';
-import { withLock } from './src/lock-utils.js';
+import { withLock } from './foundation/lock-utils.js';
 import {
   armWatch,
   type ManagedProcessWatchHandle,

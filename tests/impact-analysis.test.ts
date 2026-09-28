@@ -9,11 +9,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
  */
 
 const backendPrompt = vi.hoisted(() => vi.fn());
-// a877d9c12 moved impactAnalysisOp onto the '@agent/core/reasoning-backend'
+// a877d9c12 moved impactAnalysisOp onto the '@agent/core/reasoning/reasoning-backend'
 // subpath import, so mocking the '@agent/core' root no longer intercepts it
 // and the real backend answered instead.
-vi.mock('@agent/core/reasoning-backend', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/reasoning-backend')>();
+vi.mock('@agent/core/reasoning/reasoning-backend', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/reasoning/reasoning-backend')>();
   return {
     ...actual,
     getReasoningBackend: () => ({ prompt: backendPrompt }),

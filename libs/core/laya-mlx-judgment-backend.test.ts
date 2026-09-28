@@ -6,13 +6,13 @@ import {
   resetJudgmentBackends,
   selectJudgmentBackend,
   type JudgmentQuestion,
-} from './judgment-backend.js';
+} from './reasoning/judgment-backend.js';
 import {
   createLayaMlxBackend,
   LAYA_MLX_PROVIDER,
   type LayaWorker,
 } from './laya-mlx-judgment-backend.js';
-import { registerOrganizationWorkJudgment } from './organization-operating-model-persistence.js';
+import { registerOrganizationWorkJudgment } from './organization/organization-operating-model-persistence.js';
 
 /** What the backend writes to the worker, as far as these tests read it. */
 type SentJudgment = {

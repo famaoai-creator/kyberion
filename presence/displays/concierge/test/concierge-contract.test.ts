@@ -240,7 +240,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('/api/ingest-text');
     expect(route).toContain('AbortSignal.timeout');
     // Fallback path: lazy orchestrator import (no second daemon required).
-    expect(route).toContain("import('@agent/core/channel-surface')");
+    expect(route).toContain("import('@agent/core/surface/channel-surface')");
     expect(route).toContain('runSurfaceMessageConversation');
     // Conversation execution receives a server-resolved, non-personal scope
     // on both the rich bridge and the in-process fallback.

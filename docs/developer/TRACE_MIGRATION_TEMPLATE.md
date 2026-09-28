@@ -8,18 +8,20 @@ last_updated: 2026-05-07
 
 # Trace Integration Migration Template
 
-How to migrate an actuator from ad-hoc logging to the unified `Trace` model defined in `libs/core/src/trace.ts`.
+How to migrate an actuator from ad-hoc logging to the unified `Trace` model defined in `libs/core/analysis/trace.ts`.
 
 This is the pattern established in **Phase B-1** of the productization roadmap. The first reference implementation is `browser-actuator` (already done). Apply this template to any actuator that runs multi-step pipelines.
 
 ## Why
 
 Before:
+
 - Each actuator logs its own format (`action_trail`, ad-hoc strings, custom JSON).
 - No correlation across actuators within a single mission.
 - Chronos / observability tooling has to special-case each actuator.
 
 After:
+
 - Every actuator emits a `Trace` with hierarchical `Span`s.
 - Mission ID flows through metadata for cross-actuator correlation.
 - Trace JSONL is appended to `active/shared/logs/traces/traces-YYYY-MM-DD.jsonl` (or `customer/{slug}/logs/traces/...` when KYBERION_CUSTOMER is set).
@@ -38,8 +40,8 @@ import { TraceContext, persistTrace } from '@agent/core';
 ```typescript
 const traceCtx = new TraceContext(`{actuator-name}:{logical-name}`, {
   actuator: 'your-actuator',
-  pipelineId: sessionId,            // or whatever correlates this run
-  missionId: ctx.mission_id,        // when available
+  pipelineId: sessionId, // or whatever correlates this run
+  missionId: ctx.mission_id, // when available
 });
 ```
 

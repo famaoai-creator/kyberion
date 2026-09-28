@@ -22,7 +22,7 @@ function stripComments(source: string): string {
 }
 
 export function hasSharedThreadFormatterImport(source: string): boolean {
-  return /import\s*\{[\s\S]*\bformatChannelThreadContext\b[\s\S]*\}\s*from\s*['"]@agent\/core\/channel-adapter['"]/u.test(
+  return /import\s*\{[\s\S]*\bformatChannelThreadContext\b[\s\S]*\}\s*from\s*['"]@agent\/core\/(?:surface\/)?channel-adapter['"]/u.test(
     source
   );
 }

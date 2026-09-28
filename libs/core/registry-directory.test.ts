@@ -29,7 +29,7 @@ function envelope(provider: string): string {
       {
         mode: 'stub',
         provider,
-        module: './reasoning-backend',
+        module: './reasoning/reasoning-backend',
         capabilities: {
           reasoning: true,
           structured_output: true,

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
-import { validateService } from '@agent/core/service-validator';
+import { validateService } from '@agent/core/service/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
@@ -18,8 +18,8 @@ import {
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
 import { withExecutionContext } from '@agent/core/authority';
-import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
-import { killSwitch } from '@agent/core/kill-switch';
+import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
+import { killSwitch } from '@agent/core/governance/kill-switch';
 import {
   readJanitorLastRunMs,
   readJanitorLastSubmissionMs as readJanitorLastSubmissionMarkerMs,
@@ -28,19 +28,19 @@ import {
   writeSchedulerOpsAlertDay,
 } from '@agent/core/storage-janitor';
 import { listOrphanNhiIdentities } from '@agent/core/nhi-lifecycle-governance';
-import { readReasoningDegraded } from '@agent/core/reasoning-degradation';
+import { readReasoningDegraded } from '@agent/core/reasoning/reasoning-degradation';
 import {
   readReasoningFailover,
   type ReasoningFailoverMarker,
-} from '@agent/core/reasoning-failover';
+} from '@agent/core/reasoning/reasoning-failover';
 import { validateEnv } from '@agent/core/env-validator';
-import { secretGuard } from '@agent/core/secret-guard';
+import { secretGuard } from '@agent/core/secret/secret-guard';
 import {
   peekProviderCapabilityRegistry,
   loadProviderCapabilityRegistry,
   DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
   type ProviderCapability,
-} from '@agent/core/provider-capability-registry';
+} from '@agent/core/provider/provider-capability-registry';
 import { readDaemonHeartbeat, type DaemonHeartbeatStatus } from '@agent/core/daemon-heartbeat';
 import { loadScheduleRegistry, type ScheduledPipeline } from '@agent/core/pipeline-scheduler';
 import { matchesCron } from '@agent/core/cron-utils';
@@ -58,15 +58,15 @@ import { enqueueOperationalLearningSignal } from '@agent/core/operational-learni
 import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
-} from '@agent/core/operator-notifications';
+} from '@agent/core/surface/operator-notifications';
 import {
   hasRequiredServiceConnectionValue,
   loadServiceConnectionReadinessConfig,
-} from '@agent/core/service-connection-readiness';
+} from '@agent/core/service/service-connection-readiness';
 import {
   assessDesktopObservationReadiness,
   listDesktopObservationSources,
-} from '@agent/core/desktop-recording';
+} from '@agent/core/virtual/desktop-recording';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';

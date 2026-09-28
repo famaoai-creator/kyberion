@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import type { KbDisplayControlsProps } from '@agent/core/a2ui-catalog';
+import type { KbDisplayControlsProps } from '@agent/core/surface/a2ui-catalog';
 import {
   KB_DISPLAY_CONTROLS_ACTIONS,
   displayLocaleProps,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as autonomousOpsGate from '@agent/core/autonomous-ops-gate';
+import * as autonomousOpsGate from '@agent/core/governance/autonomous-ops-gate';
 import * as missionState from './refactor/mission-state.js';
 import * as maintenance from './refactor/mission-maintenance.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';

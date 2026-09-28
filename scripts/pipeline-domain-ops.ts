@@ -1,11 +1,11 @@
 import * as path from 'node:path';
-import { grantVoiceConsent } from '@agent/core/voice-consent';
+import { grantVoiceConsent } from '@agent/core/voice/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/logic-utils';
 import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
-import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
+import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 import { applyOnboardingInput } from './onboarding_apply.js';
@@ -38,12 +38,12 @@ import { runCapturePhoto } from './capture_photo.js';
 import { runGenerateAvatar } from './generate_avatar.js';
 import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
-import { runOrganizationDigest } from '@agent/core/organization-digest';
+import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
   parseOrganizationRecordRunParams,
   recordOrganizationOperationRunWithDefaults,
-} from '@agent/core/organization-operation-run-recording';
+} from '@agent/core/organization/organization-operation-run-recording';
 
 function sourceValue(params: Record<string, unknown>, ctx: Record<string, unknown>): unknown {
   const source = typeof params.source === 'string' ? params.source : '';

@@ -69,7 +69,7 @@ the ingest ceremony is the only sanctioned way into
 - `media:pptx_extract` → full design protocol (layout, theme, assets) when you need
   geometry, not just text.
 
-### DOCX / XLSX — native readers (`libs/core/src/docx-utils.ts`, `xlsx-utils.ts`)
+### DOCX / XLSX — native readers (`libs/core/media/docx-utils.ts`, `xlsx-utils.ts`)
 
 `native-docx-engine` / `native-xlsx-engine` are the _writers_; reading goes through
 `distillDocxDesign` / `distillXlsxDesign` (JSZip-based, no mammoth/exceljs). Both

@@ -1,7 +1,7 @@
 import {
   enqueueMissionOrchestrationEvent,
   startMissionOrchestrationWorker,
-} from '@agent/core/mission-orchestration-events';
+} from '@agent/core/mission/mission-orchestration-events';
 import { logger } from '@agent/core/core';
 import { defineCatalog } from '@agent/core/foundation/governed-catalog';
 import { pathResolver } from '@agent/core/path-resolver';

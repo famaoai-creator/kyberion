@@ -9,7 +9,7 @@
 // and the image URL allow-list (no `data:`).
 import { describe, expect, it, vi } from 'vitest';
 import { getUiMessageBundle } from '@agent/core';
-import { KB_AVATAR_ACTIONS as CORE_AVATAR_ACTIONS } from '@agent/core/a2ui-catalog';
+import { KB_AVATAR_ACTIONS as CORE_AVATAR_ACTIONS } from '@agent/core/surface/a2ui-catalog';
 import {
   createRmsFallbackAnimationCue,
   normalizeProviderViseme,

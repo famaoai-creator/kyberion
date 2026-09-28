@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   authorizeSurfaceMutation,
   extractSurfaceBearerToken,
-} from '@agent/core/surface-mutation-guard';
+} from '@agent/core/surface/surface-mutation-guard';
 import { guardConciergeRequest, resolveConciergeViewer } from './viewer-context';
 
 /**

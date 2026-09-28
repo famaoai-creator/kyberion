@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import type { KbVoiceStateProps } from '@agent/core/a2ui-catalog';
+import type { KbVoiceStateProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import { KB_VOICE_BAR_COUNT, voiceStateView } from '../../vanilla/voice.js';
 

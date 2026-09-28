@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExecResult,
@@ -1199,7 +1199,7 @@ export function runRestoreDrill(options: BackupCliOptions): {
     safeMkdir(path.dirname(target));
     runRequired(
       'git',
-      ['clone', '--local', '--no-hardlinks', pathResolver.rootDir(), target],
+      ['clone', '--local', '--no-hardlinks', '--', pathResolver.rootDir(), target],
       'clean checkout preparation failed'
     );
     if (options.verifyBaseline) {

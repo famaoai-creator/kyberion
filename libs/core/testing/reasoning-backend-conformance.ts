@@ -3,17 +3,17 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
   type ReasoningCallOptions,
-} from '../reasoning-backend.js';
+} from '../reasoning/reasoning-backend.js';
 import {
   assertReasoningEgressAllowedAtEndpoint,
   withReasoningPayloadScope,
   type ReasoningPayloadScope,
-} from '../reasoning-egress-scope.js';
+} from '../reasoning/reasoning-egress-scope.js';
 import type {
   ReasoningProviderConformanceCheck,
   ReasoningProviderConformanceEvidence,
   ReasoningProviderConformanceStatus,
-} from '../reasoning-provider-registry.js';
+} from '../reasoning/reasoning-provider-registry.js';
 
 export type ReasoningConformanceStatus = ReasoningProviderConformanceStatus;
 

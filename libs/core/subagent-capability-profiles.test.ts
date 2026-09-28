@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import {
   DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE,
   RESERVED_GOAL_OP_PREFIX,
@@ -17,20 +17,20 @@ import {
   getDefaultWorkerEventStream,
   resetDefaultWorkerEventStream,
   type WorkerEventEnvelope,
-} from './worker-event-stream.js';
+} from './workforce/worker-event-stream.js';
 import {
   buildMissionLifecycleService,
   type MissionLifecycleUnderlyingSystem,
-} from './mission-lifecycle-service.js';
+} from './mission/mission-lifecycle-service.js';
 
-vi.mock('./audit-chain.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
 }));
 
 const recordGovernanceAction = vi.fn();
-vi.mock('./governance-action-recorder.js', async () => {
-  const actual = await vi.importActual<typeof import('./governance-action-recorder.js')>(
-    './governance-action-recorder.js'
+vi.mock('./governance/governance-action-recorder.js', async () => {
+  const actual = await vi.importActual<typeof import('./governance/governance-action-recorder.js')>(
+    './governance/governance-action-recorder.js'
   );
   return {
     ...actual,
@@ -234,7 +234,7 @@ describe('subagent-capability-profiles (KD-05)', () => {
   });
 
   it('every explicit allowlist entry resolves against the real actuator op registry', async () => {
-    const { listKnownActuatorOps } = await import('./actuator-op-registry.js');
+    const { listKnownActuatorOps } = await import('./actuator/actuator-op-registry.js');
     for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
       if (profile.allowedOps === '*') continue;
       for (const entry of profile.allowedOps) {

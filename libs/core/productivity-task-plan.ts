@@ -1,5 +1,8 @@
-import { classifyTaskSessionIntent } from './task-session.js';
-import type { IntentResolutionOptions, IntentResolutionPacket } from './intent-resolution.js';
+import { classifyTaskSessionIntent } from './task/task-session.js';
+import type {
+  IntentResolutionOptions,
+  IntentResolutionPacket,
+} from './intent/intent-resolution.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 

@@ -1,4 +1,4 @@
-import { compileUserIntentFlow } from '@agent/core/intent-contract';
+import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
 import { logger } from '@agent/core/core';
 import { safeUnlinkSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';

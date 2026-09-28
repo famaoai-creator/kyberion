@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMissionNextTaskRecords } from '@agent/core/mission-next-task-reader';
+import { parseMissionNextTaskRecords } from '@agent/core/mission/mission-next-task-reader';
 import { collectActiveMissions } from './chronos-quick-action-helpers';
 
 function makeCore(state: unknown, nextTasks: unknown) {
