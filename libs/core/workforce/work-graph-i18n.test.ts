@@ -34,6 +34,7 @@ describe('Work Graph i18n boundary', () => {
         })
       )
     ) as { files?: Record<string, number> };
-    expect(report.count).toBe(baseline.files?.[relativePath]);
+    // A file absent from the baseline has no recorded violations (count 0).
+    expect(report.count).toBe(baseline.files?.[relativePath] ?? 0);
   });
 });
