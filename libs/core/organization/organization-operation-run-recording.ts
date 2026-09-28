@@ -69,7 +69,12 @@ export function assertScopedOperationRunRef(
     !scopeRoots.some((prefix) => ref.startsWith(prefix)) ||
     !safeExistsSync(rootDir ? path.resolve(rootDir, ref) : pathResolver.rootResolve(ref))
   ) {
-    throw new Error(`${label} must be an existing path within the operation scope: ${ref}`);
+    throw new Error(
+      `${label} must be an existing path within the operation scope: ${ref}. ` +
+        `Allowed prefixes for this ${operation.tier} operation: ${scopeRoots.join(', ')}. ` +
+        `Hint: the operation's executable (e.g. pipelines/...) belongs in the operation definition's ` +
+        `--execution-ref, not in run evidence — cite a trace or report file such as active/shared/logs/traces/<date>.jsonl instead.`
+    );
   }
 }
 
@@ -133,7 +138,10 @@ export function recordOrganizationOperationRun(
   const evidenceRefs = input.evidenceRefs || [];
   const exceptionRefs = input.exceptionRefs || [];
   if (input.runStatus === 'succeeded' && evidenceRefs.length === 0) {
-    throw new Error('A succeeded operation run requires an evidence ref.');
+    throw new Error(
+      'A succeeded operation run requires an evidence ref: pass --evidence-ref <path> pointing at an existing file ' +
+        'inside the operation scope (e.g. a trace log under active/shared/logs/traces/).'
+    );
   }
   const takenRunIds = new Set(listOrganizationOperationRuns(scope).map((run) => run.run_id));
   let runId = input.runId;

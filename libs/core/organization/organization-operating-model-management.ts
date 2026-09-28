@@ -439,7 +439,8 @@ export function buildOrganizationProjectLink(
     }
   } else if (current.includes(input.projectId)) {
     throw new Error(
-      `Project '${input.projectId}' is already attached to '${input.organizationId}'.`
+      `Project '${input.projectId}' is already attached to '${input.organizationId}'. ` +
+        `No action needed: 'project create --organization-id' attaches automatically, so a separate 'project attach' is only required for projects created without an organization.`
     );
   }
   const record: OrganizationOperationalState = {
