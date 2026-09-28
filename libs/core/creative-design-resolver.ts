@@ -7,6 +7,14 @@ import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
+  buildFoundationModeVars,
+  buildFoundationPrimitiveVars,
+  buildStyleVars,
+  findDesignStyle,
+  loadDesignFoundation,
+  type DesignStyle,
+} from './design-foundation.js';
+import {
   loadTenantDesignOverride,
   loadTenantDesignThemeOverlay,
 } from './organization/tenant-design-override.js';
@@ -146,6 +154,13 @@ export interface ResolvedCreativeDesign {
   /** CE-09: one derived palette shared by web, media, and operator surfaces. */
   accent_palette: CeAccentPalette;
   logo_url?: string;
+  /** KDS v2: present only when a known non-baseline `style` was requested. */
+  design_style?: Pick<
+    DesignStyle,
+    'id' | 'label' | 'radius' | 'elevation' | 'density' | 'gradient' | 'preferred_compositions'
+  >;
+  /** KDS v2: `--kds-*` primitives + mode + style variables for this resolution. */
+  foundation_css_vars?: Record<string, string>;
   projection: CreativeProjection;
 }
 
@@ -157,6 +172,13 @@ export interface ResolveCreativeDesignInput {
   /** Optional tenant accent override; tone is deliberately a single bounded value. */
   accent?: string;
   tone?: number;
+  /**
+   * KDS v2 style id (kyberion-foundation.json `styles`). Restyles the fixed
+   * scenario — palette, heading face, type ramp, radius/elevation — without
+   * touching scenario definitions. Unknown ids and `standard` are the baseline.
+   * Precedence: brand tokens → style → tenant override.
+   */
+  style?: string;
 }
 
 type CreativeBrandTokens = Omit<BrandTokens, 'tokens'> & {
@@ -696,6 +718,48 @@ function buildPromptProjection(
   };
 }
 
+function applyStyleColors(
+  base: CreativeDesignColors,
+  style: DesignStyle,
+  mode: CreativeDesignMode
+): CreativeDesignColors {
+  const source = style.colors?.[mode];
+  if (!source) return base;
+  const merged = { ...base };
+  for (const key of Object.keys(merged) as Array<keyof CreativeDesignColors>) {
+    merged[key] = normalizeCssToken(source[key], merged[key]);
+  }
+  return merged;
+}
+
+function applyStyleFonts(base: CreativeDesignFonts, style: DesignStyle): CreativeDesignFonts {
+  if (!style.fonts) return base;
+  const heading = normalizeCssToken(style.fonts.heading, base.heading);
+  const body = normalizeCssToken(style.fonts.body, base.body);
+  return { ...base, heading, body, sans: body };
+}
+
+function applyStyleTypography(
+  base: CreativeDesignTypography,
+  style: DesignStyle
+): CreativeDesignTypography {
+  if (!style.typography) return base;
+  const roles = { ...base.roles };
+  for (const name of Object.keys(roles) as CreativeTypeRoleName[]) {
+    const raw = style.typography.roles?.[name];
+    if (raw && typeof raw === 'object') {
+      roles[name] = mergeTypeRole(roles[name], raw as Record<string, unknown>);
+    }
+  }
+  return {
+    scale_ratio: normalizeFiniteNumber(style.typography.scale_ratio, base.scale_ratio, {
+      min: 1,
+      max: 3,
+    }),
+    roles,
+  };
+}
+
 export function resolveCreativeDesign(input: ResolveCreativeDesignInput): ResolvedCreativeDesign {
   const mode: CreativeDesignMode =
     input.mode ?? (input.surface === 'video' || input.surface === 'prompt' ? 'dark' : 'light');
@@ -710,6 +774,20 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
   let logoUrl: string | undefined;
   let brandName = base.brandName;
   let themeName = mode === 'dark' ? 'kyberion-sovereign' : 'kyberion-standard';
+
+  const foundation = input.style ? loadDesignFoundation() : null;
+  const style = findDesignStyle(input.style, foundation);
+  let foundationCssVars: Record<string, string> | undefined;
+  if (foundation && style) {
+    colors = applyStyleColors(colors, style, mode);
+    fonts = applyStyleFonts(fonts, style);
+    typography = applyStyleTypography(typography, style);
+    foundationCssVars = {
+      ...buildFoundationPrimitiveVars(foundation),
+      ...buildFoundationModeVars(foundation, mode),
+      ...buildStyleVars(foundation, style, mode),
+    };
+  }
 
   const tenantSlug = normalizeTenantSlug(input.tenantSlug);
   if (tenantSlug) {
@@ -756,6 +834,12 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
       break;
     case 'video':
       projection = buildVideoProjection(colors, fonts, typography, spacing, constraints);
+      if (foundationCssVars && projection.surface === 'video') {
+        projection = {
+          surface: 'video',
+          css_vars: { ...foundationCssVars, ...projection.css_vars },
+        };
+      }
       break;
     case 'prompt':
       projection = buildPromptProjection(colors, fonts);
@@ -776,6 +860,20 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
       input.tone ?? (mode === 'dark' ? 0.65 : 0.4)
     ),
     ...(logoUrl ? { logo_url: logoUrl } : {}),
+    ...(style
+      ? {
+          design_style: {
+            id: style.id,
+            label: style.label,
+            radius: style.radius,
+            elevation: style.elevation,
+            density: style.density,
+            gradient: style.gradient,
+            preferred_compositions: style.preferred_compositions,
+          },
+        }
+      : {}),
+    ...(foundationCssVars ? { foundation_css_vars: foundationCssVars } : {}),
     projection,
   };
 }
