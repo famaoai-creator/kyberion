@@ -87,7 +87,14 @@ describe('mission orchestration dashboard contract', () => {
       .join('\n');
     // SX: the intelligence route's control/observation data collectors were
     // extracted into sibling modules; the route handler is the three together.
-    const route = ['route.ts', 'intelligence-control-data.ts', 'intelligence-observation-data.ts']
+    // DS refactor split intelligence actions into dedicated modules.
+    const route = [
+      'route.ts',
+      'intelligence-control-data.ts',
+      'intelligence-observation-data.ts',
+      'intelligence-input.ts',
+      'actions.ts',
+    ]
       .map((file) => read(`presence/displays/chronos-mirror-v2/src/app/api/intelligence/${file}`))
       .join('\n');
     const streamRoute = read(

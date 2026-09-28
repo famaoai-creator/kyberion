@@ -65,14 +65,17 @@ describe('voice-hub request input boundary', () => {
   });
 
   it('uses response normalizers before treating provider output as successful', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('satellites/voice-hub/server.ts'), {
-        encoding: 'utf8',
-      })
+    // STT transcription handling was split out of server.ts into
+    // voice-stt-transcribe.ts — assert the boundary over both modules.
+    const readModule = (relPath: string) =>
+      String(safeReadFile(pathResolver.rootResolve(relPath), { encoding: 'utf8' }));
+    const serverSource = readModule('satellites/voice-hub/server.ts');
+    const transcribeSource = readModule('satellites/voice-hub/voice-stt-transcribe.ts');
+    expect(serverSource + transcribeSource).toMatch(
+      /parseVoiceBridgeResponse\(\s*parseSafeJsonInput\(/u
     );
-    expect(source).toMatch(/parseVoiceBridgeResponse\(\s*parseSafeJsonInput\(/u);
-    expect(source).toContain('parseVoiceTranscriptionResponse(await response.json())');
-    expect(source).not.toContain('as { text?: string }');
+    expect(transcribeSource).toContain('parseVoiceTranscriptionResponse(await response.json())');
+    expect(transcribeSource).not.toContain('as { text?: string }');
   });
 
   it('uses the shared surface conversation chokepoint without a local reply wrapper', () => {

@@ -11,6 +11,10 @@ function read(relPath: string): string {
 describe('mission controller contract', () => {
   it('documents customer-aware vision defaults in the CLI help', () => {
     const controller = read('scripts/mission_controller.ts');
-    expect(controller).toContain('Defaults to the active customer vision when KYBERION_CUSTOMER is set');
+    // DS refactor: help text lives in refactor/mission-controller-help.ts
+    const helpModule = read('scripts/refactor/mission-controller-help.ts');
+    expect(helpModule).toContain(
+      'Defaults to the active customer vision when KYBERION_CUSTOMER is set'
+    );
   });
 });
