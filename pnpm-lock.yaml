@@ -246,6 +246,9 @@ importers:
       c8:
         specifier: ^12.0.0
         version: 12.0.0
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.2
       eslint:
         specifier: ^10.10.0
         version: 10.10.0(jiti@1.21.7)(supports-color@7.2.0)
