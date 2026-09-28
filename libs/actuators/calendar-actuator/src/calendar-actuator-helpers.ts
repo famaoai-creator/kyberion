@@ -56,6 +56,7 @@ function missingRequiredFields(action: CalendarAction): string[] {
       )
     )) {
       missing.push(
+        // i18n-exempt: JA usage example in error text
         'params.calendar_names[0]、params.calendar_id、または params.calendar_targets[0] (例: "primary")'
       );
     }

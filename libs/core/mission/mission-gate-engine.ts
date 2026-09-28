@@ -433,13 +433,16 @@ async function evaluateGateCheck(
       }
       const content = readTextFile(safeArtifactPath).slice(0, 24_000);
       const prompt = [
+        // i18n-exempt: JA LLM prompt (model input)
         'あなたは品質ゲートの審査員です。以下の成果物を判定基準に照らして審査してください。',
+        // i18n-exempt: JA LLM prompt (model input)
         '出力は次のJSONのみ(コードフェンス可): {"pass": true|false, "reasons": ["..."], "improvements": ["..."]}',
         '',
         `## 判定基準`,
         ...(criteria.length > 0
           ? criteria.map((criterion, index) => `${index + 1}. ${criterion}`)
-          : ['1. 成果物として一貫しており、明らかな誤り・未完箇所・根拠欠落がないこと']),
+          : // i18n-exempt: JA LLM prompt (model input)
+            ['1. 成果物として一貫しており、明らかな誤り・未完箇所・根拠欠落がないこと']),
         '',
         '## 成果物',
         content,

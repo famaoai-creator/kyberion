@@ -22,14 +22,20 @@ const BUILTIN_ANSWERS: SmokeAnswers = {
   'email-filter-and-organize': {
     利用するメールサービスとアカウントは何か: 'Gmail / primary account',
     対象とする検索クエリやキーワードは何か: 'from:notifications.example.com is:unread',
+    // i18n-exempt: JA test fixture
     どの分類ルールでメールを振り分けるか: '通知メールを運用ラベルへ分類',
     移動先のラベル名またはフォルダ名は何か: 'Operations/Notifications',
+    // i18n-exempt: JA test fixture
     '受信トレイからアーカイブするか。削除は別途承認するか': 'アーカイブする。削除は明示承認する',
   },
   'daily-email-triage': {
+    // i18n-exempt: JA test fixture
     重要メールとして扱う送信元や条件は何か: '顧客、役員、採用候補者からのメール',
+    // i18n-exempt: JA test fixture
     返信下書きに含めてよいカテゴリや情報の範囲はどこまでか: '日程調整と受領確認のみ',
+    // i18n-exempt: JA test fixture
     送信前に人間承認が必要になる条件は何か: '外部送信は常に承認',
+    // i18n-exempt: JA test fixture
     返信トーンはどの程度まで自動化してよいか: '丁寧で簡潔',
   },
 };

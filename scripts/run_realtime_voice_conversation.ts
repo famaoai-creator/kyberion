@@ -350,12 +350,16 @@ function buildRecordOutputDir(sessionId: string): string {
 function describeVadState(state: VadTurnState): string {
   switch (state) {
     case 'calibrating':
+      // i18n-exempt: JA voice demo script output
       return '🎚  ノイズフロア較正中… (静かにしてください)';
     case 'listening':
+      // i18n-exempt: JA voice demo script output
       return '🎤 聞き取り待機中… (話し始めてください)';
     case 'recording':
+      // i18n-exempt: JA voice demo script output
       return '🔴 録音中… (話し終えると自動で区切ります)';
     case 'finalizing':
+      // i18n-exempt: JA voice demo script output
       return '⏹  発話終了を検出、文字起こしへ回します';
   }
 }
@@ -721,6 +725,7 @@ export async function runRealtimeVoiceConversationLoop(
       `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
   if (bargeInMode !== 'off') {
+    // i18n-exempt: JA voice demo script output
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
@@ -1111,6 +1116,7 @@ export async function main(
       type: 'boolean',
       default: true,
       describe:
+        // i18n-exempt: JA voice demo script output
         'Hold utterances that trail off (て/けど/えーと…, and/but…) and join them with the next one, up to 1.5s',
     })
     .option('respond-gate', {

@@ -390,6 +390,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
       {
         label: uxText('chronos_qa_action_upgrade_check', locale),
         query:
+          // i18n-exempt: JA usage example in command text
           'node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-check.json を実行して、アップデートの有無を表示して',
         icon: '⬆',
         tone: 'operate',

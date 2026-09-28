@@ -122,10 +122,15 @@ export function scanForInjection(content: string): ScanResult {
     'ignore everything',
     'system override',
     'you must now',
+    // i18n-exempt: JA prompt-injection detection pattern
     'あなたは今から',
+    // i18n-exempt: JA prompt-injection detection pattern
     '指示に従',
+    // i18n-exempt: JA prompt-injection detection pattern
     '次を実行して',
+    // i18n-exempt: JA prompt-injection detection pattern
     'システムプロンプト',
+    // i18n-exempt: JA prompt-injection detection pattern
     '前回の指示を無視',
   ];
   for (const pattern of instructionPatterns) {

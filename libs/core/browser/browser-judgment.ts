@@ -221,8 +221,11 @@ export async function judgePageReadiness(
     kind: 'bool',
     id: BROWSER_READY_QUESTION,
     instructions:
+      // i18n-exempt: JA LLM prompt (model input)
       `期待している状態: ${expectation}\n` +
+      // i18n-exempt: JA LLM prompt (model input)
       'このページはその状態になっていますか。読み込み中、エラー、ログイン要求、' +
+      // i18n-exempt: JA LLM prompt (model input)
       '同意バナーなどで内容が出ていない場合は false。',
   };
 

@@ -291,6 +291,7 @@ export const FONTKIT = FONTKIT_REQUIRE('fontkit') as {
 };
 export const CJK_FONT_CANDIDATES = [
   pathResolver.rootResolve('knowledge/public/design-patterns/fonts/NotoSansJP-Regular.ttf'),
+  // i18n-exempt: JA font file path (Hiragino font name)
   '/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc',
   '/System/Library/Fonts/Hiragino Sans W4.ttc',
   '/System/Library/Fonts/Supplemental/Hiragino Sans W4.ttc',

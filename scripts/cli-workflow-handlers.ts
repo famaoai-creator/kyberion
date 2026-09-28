@@ -178,10 +178,13 @@ function printTaskHelp(locale = resolveLocale()): void {
   printText('  scenario <list|init|run|smoke>  repeatable TaskScenario workflows');
   printText('');
   printText(t('cli_help_examples', locale));
+  // i18n-exempt: JA usage example in help text
   printText('  pnpm kyberion task plan "明日の会議資料とメール下書きを作って"');
   printText(
+    // i18n-exempt: JA usage example in help text
     '  pnpm kyberion task plan "ブラウザで購入して決済して" --output active/shared/tmp/purchase-plan.json'
   );
+  // i18n-exempt: JA usage example in help text
   printText('  pnpm kyberion task start "連携システムから情報収集して資料を作って"');
   printText('  pnpm kyberion task scenario list');
   printText('  pnpm kyberion task scenario run daily-email-triage --dry-run');

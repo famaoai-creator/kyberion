@@ -105,8 +105,11 @@ function relevanceQuestion(candidate: RelevanceCandidate, task: string): Judgmen
     id: `knowledge.relevant.${candidate.id}`,
     instructions:
       `作業: ${task}\n` +
+      // i18n-exempt: JA LLM prompt (model input)
       `この資料はその作業に必要ですか。` +
+      // i18n-exempt: JA LLM prompt (model input)
       `直接役立つ場合のみ true、関係がない場合は false。` +
+      // i18n-exempt: JA LLM prompt (model input)
       (candidate.title ? `\n資料タイトル: ${candidate.title}` : ''),
   };
 }

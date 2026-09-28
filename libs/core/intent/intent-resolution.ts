@@ -670,16 +670,22 @@ function inferMessagingBridgePlatformId(utterance: string): string | undefined {
   const normalized = normalizeForTriggerMatch(utterance);
   if (!normalized) return undefined;
 
+  // i18n-exempt: JA input keyword matcher
   if (normalized.includes('slack') || normalized.includes('すらっく')) return 'slack';
   if (
     normalized.includes('imessage') ||
     normalized.includes('i message') ||
+    // i18n-exempt: JA input keyword matcher
     normalized.includes('あいめっせーじ')
   )
     return 'imessage';
+  // i18n-exempt: JA input keyword matcher
   if (normalized.includes('telegram') || normalized.includes('てれぐらむ')) return 'telegram';
+  // i18n-exempt: JA input keyword matcher
   if (normalized.includes('line') || normalized.includes('らいん')) return 'line';
+  // i18n-exempt: JA input keyword matcher
   if (normalized.includes('discord') || normalized.includes('でぃすこーど')) return 'discord';
+  // i18n-exempt: JA input keyword matcher
   if (normalized.includes('teams') || normalized.includes('てぃーむす')) return 'teams';
 
   return undefined;
