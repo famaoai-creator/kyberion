@@ -62,7 +62,7 @@ export function ensureProjectMissionLedgerExists(ledgerPath: string): void {
 }
 
 export function escapeTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
 }
 
 function readProjectMissionLedger(filePath: string): ProjectMissionLedger | null {

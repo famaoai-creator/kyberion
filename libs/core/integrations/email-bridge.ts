@@ -26,17 +26,15 @@ export interface EmailBackendCandidate {
 }
 
 function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): string {
-  const to = (params.to ?? '').replace(/"/g, '\\"');
-  const cc = (params.cc ?? '').replace(/"/g, '\\"');
-  const subject = (params.subject ?? '(no subject)').replace(/"/g, '\\"');
+  const jxaEscape = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const to = jxaEscape(params.to ?? '');
+  const cc = jxaEscape(params.cc ?? '');
+  const subject = jxaEscape(params.subject ?? '(no subject)');
   const body = (params.body ?? '')
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n');
-  const fromAddr = (params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? '').replace(
-    /"/g,
-    '\\"'
-  );
+  const fromAddr = jxaEscape(params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? '');
 
   const sendLine = op === 'send' ? 'msg.send()' : '// draft only';
 

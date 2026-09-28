@@ -355,8 +355,9 @@ export function extractPromotableMissionMemory(raw: string): string | null {
     if (capturing && /^##\s+/u.test(line.trim())) {
       capturing = false;
     }
-    if (capturing && line.trim() && !/^<!--.*-->$/u.test(line.trim())) {
-      collected.push(line.trim());
+    const t = line.trim();
+    if (capturing && t && !(t.startsWith('<!--') && t.endsWith('-->'))) {
+      collected.push(t);
     }
   }
 

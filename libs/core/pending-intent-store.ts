@@ -53,7 +53,8 @@ function normalizeSegment(value: string): string {
     value
       .trim()
       .replace(/[^A-Za-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'pending'
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || 'pending'
   );
 }
 

@@ -164,7 +164,7 @@ export function resolveBlueBubblesWebhookSecret(input: {
   if (directSecret) return directSecret;
 
   const authorization = readIMessageHeader(input.authorization);
-  const bearer = authorization?.match(/^Bearer\s+(.+)$/iu)?.[1];
+  const bearer = authorization?.match(/^Bearer\s+(\S[^\n]*)$/iu)?.[1];
   return readIMessageHeader(bearer);
 }
 

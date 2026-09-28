@@ -160,7 +160,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     } catch (error) {
       return json(res, 400, {
         ok: false,
-        error: error instanceof Error ? error.message : 'decision request must be valid JSON',
+        error: 'decision request must be valid JSON',
       });
     }
     const decision =
@@ -219,7 +219,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     } catch (error) {
       return json(res, 409, {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: 'internal error',
       });
     }
   }
@@ -260,7 +260,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
       } catch (error) {
         json(res, 500, {
           ok: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: 'internal error',
         });
       }
     })();

@@ -92,7 +92,7 @@ class WindowsAudioInputAdapter implements AudioInputPlatformAdapter {
   backend = 'ffmpeg-dshow' as const;
   inputFormat = 'dshow' as const;
   inputSpec(deviceName: string, _index: number): string {
-    return `audio="${deviceName.replace(/"/g, '\\"')}"`;
+    return `audio="${deviceName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
 }
 
@@ -383,7 +383,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
                 '-f',
                 'dshow',
                 '-i',
-                `audio="${candidate.name.replace(/"/g, '\\"')}"`,
+                `audio="${candidate.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
                 '-t',
                 String(durationSec),
                 '-ac',

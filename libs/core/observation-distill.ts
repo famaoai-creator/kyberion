@@ -107,16 +107,16 @@ export function distillHttpResponse(
   const text = String(body ?? '');
   const looksHtml = /<html[\s>]|<!doctype html/i.test(text);
   if (looksHtml) {
-    const title = text.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim();
+    const title = text.match(/<title[^<>]*>([^<]*)<\/title>/i)?.[1]?.trim();
     const links: string[] = [];
     for (const match of text.matchAll(/href="([^"#][^"]*)"/gi)) {
       if (links.length >= maxLinks) break;
       links.push(match[1]);
     }
     const stripped = text
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
+      .replace(/<script\b[^<>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^<>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^<>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     return {

@@ -17,6 +17,8 @@ on:
 
 jobs:
   build-and-smoke:
+    permissions:
+      contents: read
     name: ${{ matrix.os }} / Node ${{ matrix.node-version }}${{ matrix.os != 'windows-latest' && format(' / shard {0}/{1}', matrix.shard, matrix.total) || '' }}
     runs-on: ${{ matrix.os }}
     # The Unix core suite takes ~21 minutes on macOS; build, follow-up smoke

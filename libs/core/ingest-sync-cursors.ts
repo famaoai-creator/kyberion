@@ -194,7 +194,7 @@ export function readSyncCursor(
       `[ingest-sync-cursors] cursor state at ${file} could not be read: ${String(
         (error as Error)?.message ?? error
       ).replace(
-        /\s*\.\s*$/,
+        /\.\s*$/,
         ''
       )}. Fail-closed: the watermark is intact — resolve access before re-running the sync.`
     );

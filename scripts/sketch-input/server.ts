@@ -295,7 +295,10 @@ export function createSketchInputRequestHandler(
               req.resume();
             } else if (!res.headersSent) {
               res.writeHead(500);
-              res.end(e instanceof Error ? e.message : String(e));
+              // Return a generic 500 — exception details stay in the server log
+              // (stack-trace-exposure / xss-through-exception hardening).
+              console.error(`[server:sketch-input] request failed:`, e);
+              res.end('internal server error');
             }
             print(`[export] ${e instanceof Error ? e.message : String(e)}`);
           } finally {
@@ -309,7 +312,10 @@ export function createSketchInputRequestHandler(
     } catch (e: unknown) {
       if (!res.headersSent) {
         res.writeHead(500);
-        res.end(e instanceof Error ? e.message : String(e));
+        // Return a generic 500 — exception details stay in the server log
+        // (stack-trace-exposure / xss-through-exception hardening).
+        console.error(`[server:sketch-input] request failed:`, e);
+        res.end('internal server error');
       }
     }
   };

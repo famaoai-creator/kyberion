@@ -33,7 +33,7 @@ function decodeEntities(text: string): string {
 /** Strip any remaining tags and collapse inline whitespace. */
 function inlineText(html: string): string {
   return html
-    .replace(/<[^>]*>/g, '')
+    .replace(/<[^<>]*>/g, '')
     .replace(/[ \t\r\n]+/g, ' ')
     .trim();
 }
@@ -66,7 +66,7 @@ function convertTable(tableHtml: string): string {
     const cells: string[] = [];
     const cellMatches = rowHtml.match(/<(th|td)\b[^>]*>[\s\S]*?<\/\1>/gi) ?? [];
     for (const cellHtml of cellMatches) {
-      const body = cellHtml.replace(/^<(th|td)\b[^>]*>/i, '').replace(/<\/(th|td)>$/i, '');
+      const body = cellHtml.replace(/^<(th|td)\b[^<>]*>/i, '').replace(/<\/(th|td)>$/i, '');
       cells.push(inlineText(convertInline(body)).replace(/\|/g, '\\|'));
     }
     if (cells.length > 0) rows.push(cells);
@@ -97,12 +97,12 @@ export function htmlToMarkdown(html: string): string {
 
   // Drop non-content blocks entirely.
   out = out.replace(/<!--[\s\S]*?-->/g, '');
-  out = out.replace(/<(script|style|head)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+  out = out.replace(/<(script|style|head)\b[^<>]*>[\s\S]*?<\/\1>/gi, '');
 
   // Protect <pre> blocks from inline/whitespace processing.
   const preBlocks: string[] = [];
   out = out.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_, body: string) => {
-    const code = decodeEntities(body.replace(/<[^>]*>/g, '')).replace(/^\n+|\n+$/g, '');
+    const code = decodeEntities(body.replace(/<[^<>]*>/g, '')).replace(/^\n+|\n+$/g, '');
     preBlocks.push(`\`\`\`\n${code}\n\`\`\``);
     return `\n\n@@KYB_PRE_${preBlocks.length - 1}@@\n\n`;
   });
@@ -124,7 +124,7 @@ export function htmlToMarkdown(html: string): string {
   out = out.replace(/<\/(div|section|article|blockquote)>/gi, '\n\n');
 
   out = convertInline(out);
-  out = out.replace(/<[^>]*>/g, '');
+  out = out.replace(/<[^<>]*>/g, '');
   out = decodeEntities(out);
 
   // Whitespace normalization: per-line trim, collapse 3+ newlines to 2.

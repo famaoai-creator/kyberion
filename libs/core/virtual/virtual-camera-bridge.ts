@@ -166,7 +166,7 @@ interface CameraCaptureAdapter {
 class WindowsCameraCaptureAdapter implements CameraCaptureAdapter {
   inputFormat = 'dshow';
   deviceArg(preference?: string): string {
-    return `video="${(preference || '').replace(/"/g, '\\"')}"`;
+    return `video="${(preference || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
 }
 

@@ -17,7 +17,12 @@ export interface CaptionCue {
 }
 
 export function parseCaptionLine(line: string): { speaker: string; text: string } {
-  const match = line.match(/^\s*([^:：]{1,64})\s*[:：]\s*(.*)$/u);
+  const trimmed = line.trimStart();
+  const sepIdx = trimmed.search(/[:：]/u);
+  const match =
+    sepIdx > 0 && sepIdx <= 64
+      ? [trimmed, trimmed.slice(0, sepIdx).trimEnd(), trimmed.slice(sepIdx + 1)]
+      : null;
   if (match) return { speaker: match[1].trim(), text: match[2].trim() };
   return { speaker: '', text: line.trim() };
 }

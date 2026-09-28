@@ -28,7 +28,8 @@ function slug(value: string, fallback: string): string {
     String(value || '')
       .trim()
       .replace(/[^a-zA-Z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || fallback
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || fallback
   );
 }
 

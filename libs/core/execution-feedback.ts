@@ -171,7 +171,7 @@ export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput
   const match = text
     .trim()
     .match(
-      /^評価\s+(use-case-[a-z0-9_-]+)\s*[:：]\s*(満足|一部違う|不満|satisfied|partially_satisfied|dissatisfied)(?:\s*[:：]\s*(.+))?$/iu
+      /^評価\s+(use-case-[a-z0-9_-]+)\s*[:：]\s*(満足|一部違う|不満|satisfied|partially_satisfied|dissatisfied)(?:\s*[:：]\s*(\S.*))?$/iu
     );
   if (!match) return null;
   const outcomeByLabel: Record<string, ExecutionFeedbackOutcome> = {
