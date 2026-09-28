@@ -55,4 +55,39 @@ describe('organization interventions', () => {
       }).status
     ).toBe('approved');
   });
+
+  it('guides operators with allowed states and the lifecycle on invalid decision transitions', () => {
+    const decision = {
+      version: '1.0.0',
+      decision_id: 'DEC-1',
+      organization_id: 'ORG-1',
+      cadence_id: 'CAD-1',
+      title: 'Proceed?',
+      status: 'pending_approval',
+      decision_owner: 'operator',
+      due_at: '2026-10-01T00:00:00.000Z',
+      options: ['yes', 'no'],
+      follow_up_refs: [],
+      tier: 'public',
+      updated_at: '2026-09-24T00:00:00.000Z',
+    } as OrganizationDecisionRecord;
+    expect(() => transitionOrganizationDecision(decision, 'implemented', {})).toThrow(
+      /pending_approval -> implemented.*Allowed next states.*approved, rejected, deferred.*Lifecycle: proposed -> pending_approval -> approved -> implemented/s
+    );
+  });
+
+  it('guides operators with allowed states and the lifecycle on invalid incident transitions', () => {
+    const incident = createOrganizationIncident({
+      incidentId: 'INC-1',
+      organizationId: 'ORG-1',
+      tier: 'public',
+      title: 'Failure',
+      severity: 'high',
+      ownerRole: 'operator',
+      impactSummary: 'Service unavailable',
+    });
+    expect(() => transitionOrganizationIncident(incident, 'resolved', {})).toThrow(
+      /detected -> resolved.*Allowed next states.*triaging.*Lifecycle: detected -> triaging -> mitigating -> resolved -> closed/s
+    );
+  });
 });

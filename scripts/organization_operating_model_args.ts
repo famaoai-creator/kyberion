@@ -251,7 +251,7 @@ export function usage(): string {
     '  pnpm organization incident list --organization-id <id> [--incident-id <id>] [--json]',
     '  pnpm organization lineage --organization-id <id> [--json]',
     '  pnpm organization learning list --organization-id <id> [--status <status>] [--json]',
-    '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <type> --source-ref <ref> --title <title> --summary <summary> --target-kind <kind> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
+    '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <incident_review|routine_exception|project_closure|governance_decision> --source-ref <ref> --title <title> --summary <summary> --target-kind <pattern|sop_candidate|knowledge_hint|report_template> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
     '  pnpm organization reconcile --organization-id <id> [--dry-run|--apply] [--json]',
     '  pnpm organization work resolve --organization-id <id> --intent "<request>" --dry-run [--json]',
     '',
@@ -291,5 +291,14 @@ export function usage(): string {
     '    reports a service with no state as services_without_state and will not infer health from absence.',
     '  - decision add requires an existing cadence and appends the decision to its decision_ids, so the',
     '    cadence record stays the index of everything that body decided. decision list is newest-first.',
+    '  - decision lifecycle: proposed -> pending_approval -> approved -> implemented (side branches:',
+    '    proposed/pending_approval -> deferred -> pending_approval; pending_approval -> rejected [terminal]).',
+    '    New decisions always start as proposed; approving requires --rationale and --approval-ref <channel:id>.',
+    '  - project create with --organization-id attaches the project automatically; a separate project attach',
+    '    is only needed for projects created without an organization.',
+    '  - operation tick/execute on confidential/personal tiers require a matching `pnpm scope use --tier <tier>`',
+    '    `--tenant <slug> --organization <id>` selection first, even for --dry-run.',
+    '  - operation run record requires --evidence-ref for succeeded runs; evidence/execution refs must be',
+    '    existing paths inside the operation scope (the operation definition holds the pipelines/ execution ref).',
   ].join('\n');
 }

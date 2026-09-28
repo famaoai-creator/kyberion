@@ -59,6 +59,20 @@ const INCIDENT_NEXT: Record<
   closed: [],
 };
 
+const INCIDENT_LIFECYCLE = 'detected -> triaging -> mitigating -> resolved -> closed';
+
+function describeIncidentTransition(
+  current: OrganizationIncidentRecord['status'],
+  status: OrganizationIncidentRecord['status']
+): string {
+  const allowed = INCIDENT_NEXT[current];
+  return (
+    `Invalid incident transition: ${current} -> ${status}. ` +
+    `Allowed next states from '${current}': ${allowed.length > 0 ? allowed.join(', ') : '(terminal — no further transitions)'}. ` +
+    `Lifecycle: ${INCIDENT_LIFECYCLE}.`
+  );
+}
+
 export function transitionOrganizationIncident(
   current: OrganizationIncidentRecord,
   status: OrganizationIncidentRecord['status'],
@@ -66,7 +80,7 @@ export function transitionOrganizationIncident(
   now = nowIso()
 ): OrganizationIncidentRecord {
   if (!INCIDENT_NEXT[current.status].includes(status))
-    throw new Error(`Invalid incident transition: ${current.status} -> ${status}`);
+    throw new Error(describeIncidentTransition(current.status, status));
   if (status === 'closed' && !(input.postIncidentReviewRef || current.post_incident_review_ref)) {
     throw new Error('Closing an incident requires a post-incident review reference.');
   }
@@ -97,6 +111,22 @@ const DECISION_NEXT: Record<
   implemented: [],
 };
 
+const DECISION_LIFECYCLE =
+  'proposed -> pending_approval -> approved -> implemented (side branches: proposed/pending_approval -> deferred -> pending_approval; pending_approval -> rejected [terminal])';
+
+function describeDecisionTransition(
+  current: OrganizationDecisionRecord['status'],
+  status: OrganizationDecisionRecord['status']
+): string {
+  const allowed = DECISION_NEXT[current];
+  return (
+    `Invalid decision transition: ${current} -> ${status}. ` +
+    `New decisions always start as proposed; advance one step at a time. ` +
+    `Allowed next states from '${current}': ${allowed.length > 0 ? allowed.join(', ') : '(terminal — no further transitions)'}. ` +
+    `Lifecycle: ${DECISION_LIFECYCLE}.`
+  );
+}
+
 export function transitionOrganizationDecision(
   current: OrganizationDecisionRecord,
   status: OrganizationDecisionRecord['status'],
@@ -109,7 +139,7 @@ export function transitionOrganizationDecision(
   now = nowIso()
 ): OrganizationDecisionRecord {
   if (!DECISION_NEXT[current.status].includes(status))
-    throw new Error(`Invalid decision transition: ${current.status} -> ${status}`);
+    throw new Error(describeDecisionTransition(current.status, status));
   const chosenOption = input.chosenOption || current.chosen_option;
   const rationale = input.rationale || current.rationale;
   if (chosenOption && !current.options.includes(chosenOption))

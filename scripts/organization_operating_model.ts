@@ -712,7 +712,10 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     const mode = resolveWriteMode(parsed, 'decision add');
     if (parsed.recordStatus && parsed.recordStatus !== 'proposed')
       throw new Error(
-        'New decisions must start as proposed; use decision transition for later states.'
+        "New decisions must start as proposed (omit --record-status or pass 'proposed'); then advance with " +
+          "'decision transition': proposed -> pending_approval -> approved (-> implemented), " +
+          "with 'deferred' as a side branch and 'rejected' as terminal. " +
+          'Approving also requires --rationale and --approval-ref <channel:id>.'
       );
     if (
       listOrganizationDecisions({

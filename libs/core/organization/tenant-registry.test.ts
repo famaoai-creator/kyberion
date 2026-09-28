@@ -232,6 +232,14 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
   });
 
+  it('guides operators away from reserved tier/partition names used as tenants', () => {
+    for (const reserved of ['shared', 'public', 'confidential', 'personal']) {
+      expect(() => resolveTenant(reserved, { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
+        /reserved tier\/partition name.*pnpm tenant list/
+      );
+    }
+  });
+
   // A refused/failed read used to be reported as "is not valid JSON", which sent
   // callers to inspect a file that was fine. The realistic cause is an
   // authorization failure on the personal tier (Sovereign Sanctuary), so the two

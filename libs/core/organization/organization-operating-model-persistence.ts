@@ -159,7 +159,9 @@ export function assertRecordIdentity(
   }
   if (record.tier === 'confidential' && record.tenant_slug === 'shared') {
     throw new Error(
-      `tenant_slug 'shared' is not a tenant for confidential organization records (${record.organization_id}).`
+      `tenant_slug 'shared' is not a tenant for confidential organization records (${record.organization_id}): ` +
+        `'shared' is a reserved partition name, not a tenant. ` +
+        `Run 'KYBERION_PERSONA=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
     );
   }
   recordTenant(record);
