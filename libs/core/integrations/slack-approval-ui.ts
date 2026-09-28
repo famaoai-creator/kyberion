@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  APPROVAL_CHANGE_INSTRUCTION_MAX,
   approvalEventLogicalPath,
   createApprovalRequest,
   loadApprovalRequest,
@@ -15,6 +16,7 @@ import {
   applySurfaceApprovalDecision,
   applySurfaceApprovalRejectionReason,
   buildSurfaceApprovalAskWhyActions,
+  formatDecisionCardLines,
   normalizeSurfaceApprovalAskWhyCategory,
 } from '../surface/surface-approval-ui.js';
 
@@ -139,6 +141,17 @@ export function buildSlackApprovalBlocks(
           },
         ]
       : []),
+    ...(record.decisionCard
+      ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: escapeSlackText(formatDecisionCardLines(record, { locale }).join('\n')),
+            },
+          },
+        ]
+      : []),
     {
       type: 'actions',
       elements: [
@@ -168,9 +181,117 @@ export function buildSlackApprovalBlocks(
             decision: 'rejected' satisfies SlackApprovalActionPayload['decision'],
           }),
         },
+        ...(record.decisionCard
+          ? [
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: t('bridge:decision_card_changes_button', undefined, locale),
+                },
+                action_id: 'slack_approval_changes',
+                value: JSON.stringify({ requestId: record.id } satisfies SlackCardActionPayload),
+              },
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: t('bridge:decision_card_explain_button', undefined, locale),
+                },
+                action_id: 'slack_approval_explain',
+                value: JSON.stringify({ requestId: record.id } satisfies SlackCardActionPayload),
+              },
+            ]
+          : []),
       ],
     },
   ];
+}
+
+/** Card text is agent-written; escaping keeps `<!channel>` and `<url|label>` inert. */
+export function escapeSlackText(value: string): string {
+  return value.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+}
+
+// ── Decision card: request changes / ask why ────────────────────────────
+
+export interface SlackCardActionPayload {
+  requestId: string;
+}
+
+export function parseSlackCardAction(value: string): SlackCardActionPayload {
+  const parsed = parseSafeJsonObjectInput(value, 'Slack decision card action');
+  if (!parsed || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+    throw new Error('Slack decision card action requires requestId');
+  }
+  return { requestId: parsed.requestId };
+}
+
+export interface SlackChangeRequestContext {
+  requestId: string;
+  channel: string;
+  threadTs: string;
+}
+
+export const SLACK_CHANGE_REQUEST_CALLBACK_ID = 'slack_approval_changes_submit';
+export const SLACK_CHANGE_REQUEST_BLOCK_ID = 'slack_approval_changes_input';
+
+/** The request, channel and thread travel in private_metadata; the decision re-checks them. */
+export function buildSlackChangeRequestModal(
+  context: SlackChangeRequestContext,
+  locale: SupportedLocale = 'en'
+): any {
+  return {
+    type: 'modal',
+    callback_id: SLACK_CHANGE_REQUEST_CALLBACK_ID,
+    private_metadata: JSON.stringify(context),
+    title: {
+      type: 'plain_text',
+      text: t('bridge:decision_card_changes_modal_title', undefined, locale),
+    },
+    submit: {
+      type: 'plain_text',
+      text: t('bridge:decision_card_changes_modal_submit', undefined, locale),
+    },
+    blocks: [
+      {
+        type: 'input',
+        block_id: SLACK_CHANGE_REQUEST_BLOCK_ID,
+        label: {
+          type: 'plain_text',
+          text: t('bridge:decision_card_changes_modal_label', undefined, locale),
+        },
+        element: {
+          type: 'plain_text_input',
+          action_id: 'value',
+          multiline: true,
+          max_length: APPROVAL_CHANGE_INSTRUCTION_MAX,
+        },
+      },
+    ],
+  };
+}
+
+export function parseSlackChangeRequestSubmission(view: {
+  private_metadata?: string;
+  state?: { values?: Record<string, Record<string, { value?: string | null }>> };
+}): SlackChangeRequestContext & { instruction: string } {
+  const parsed = parseSafeJsonObjectInput(
+    view.private_metadata || '',
+    'Slack change request metadata'
+  );
+  const requestId = parsed?.requestId;
+  const channel = parsed?.channel;
+  const threadTs = parsed?.threadTs;
+  if (
+    typeof requestId !== 'string' ||
+    typeof channel !== 'string' ||
+    typeof threadTs !== 'string'
+  ) {
+    throw new Error('Slack change request metadata requires requestId, channel and threadTs');
+  }
+  const instruction = view.state?.values?.[SLACK_CHANGE_REQUEST_BLOCK_ID]?.value?.value ?? '';
+  return { requestId, channel, threadTs, instruction };
 }
 
 export function parseSlackApprovalAction(value: string): SlackApprovalActionPayload {

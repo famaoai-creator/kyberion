@@ -295,6 +295,22 @@
       "types": "./dist/governance/approval-store-hygiene.d.ts",
       "default": "./dist/governance/approval-store-hygiene.js"
     },
+    "./approval-veto-window": {
+      "types": "./dist/governance/approval-veto-window.d.ts",
+      "default": "./dist/governance/approval-veto-window.js"
+    },
+    "./approval-decision-card": {
+      "types": "./dist/governance/approval-decision-card.d.ts",
+      "default": "./dist/governance/approval-decision-card.js"
+    },
+    "./approval-digest": {
+      "types": "./dist/governance/approval-digest.d.ts",
+      "default": "./dist/governance/approval-digest.js"
+    },
+    "./approval-decision-routing": {
+      "types": "./dist/governance/approval-decision-routing.d.ts",
+      "default": "./dist/governance/approval-decision-routing.js"
+    },
     "./approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
       "default": "./dist/governance/approval-audit.js"
@@ -898,6 +914,10 @@
     "./slack-approval-ui": {
       "types": "./dist/integrations/slack-approval-ui.d.ts",
       "default": "./dist/integrations/slack-approval-ui.js"
+    },
+    "./decision-card": {
+      "types": "./dist/governance/decision-card.d.ts",
+      "default": "./dist/governance/decision-card.js"
     },
     "./surface-approval-ui": {
       "types": "./dist/surface/surface-approval-ui.d.ts",
@@ -6954,6 +6974,26 @@
     "./provider/bundles": {
       "types": "./dist/provider/bundles/index.d.ts",
       "default": "./dist/provider/bundles/index.js"
+    },
+    "./governance/approval-decision-card": {
+      "types": "./dist/governance/approval-decision-card.d.ts",
+      "default": "./dist/governance/approval-decision-card.js"
+    },
+    "./governance/approval-digest": {
+      "types": "./dist/governance/approval-digest.d.ts",
+      "default": "./dist/governance/approval-digest.js"
+    },
+    "./governance/approval-veto-window": {
+      "types": "./dist/governance/approval-veto-window.d.ts",
+      "default": "./dist/governance/approval-veto-window.js"
+    },
+    "./governance/decision-card": {
+      "types": "./dist/governance/decision-card.d.ts",
+      "default": "./dist/governance/decision-card.js"
+    },
+    "./governance/approval-decision-routing": {
+      "types": "./dist/governance/approval-decision-routing.d.ts",
+      "default": "./dist/governance/approval-decision-routing.js"
     }
   },
   "dependencies": {

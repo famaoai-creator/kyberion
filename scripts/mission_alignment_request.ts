@@ -35,7 +35,9 @@ import {
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { findMissionPath as resolveMissionPath } from '@agent/core/path-resolver';
+import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path-resolver';
+import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
+import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
 import {
   loadMissionBriefAtPath,
   type MissionBrief,
@@ -172,9 +174,40 @@ export function openAlignmentApproval(
     // Binds the approval to this exact brief. mission_alignment_decision
     // re-computes the hash at gate time and fails closed on any drift.
     accountability: { finalDecision: 'human_only', payloadHash },
+    decisionCard: buildAlignmentDecisionCard(brief, briefPath),
   });
 
   return { missionId, created: true, requestId: record.id, payloadHash, briefPath };
+}
+
+function isHighRiskBrief(brief: MissionBrief): boolean {
+  const level = brief.gate?.riskLevel;
+  if (typeof level === 'number') return level >= 3;
+  return typeof level === 'string' && /^(high|critical|3|4|5)$/iu.test(level.trim());
+}
+
+function buildAlignmentDecisionCard(brief: MissionBrief, briefPath: string): DecisionCard {
+  const riskReasons = (brief.risks ?? [])
+    .filter((item) => typeof item?.risk === 'string' && item.risk.trim() !== '')
+    .map((item) => {
+      const risk = String(item.risk).trim();
+      const mitigation = typeof item.mitigation === 'string' ? item.mitigation.trim() : '';
+      return mitigation ? `${risk} (${mitigation})` : risk;
+    });
+  const briefRef = path.relative(rootDir(), briefPath).split(path.sep).join('/');
+  return buildDecisionCard({
+    question: mt('mission_alignment:card_question'),
+    recommendation: mt('mission_alignment:card_recommendation'),
+    gate: evaluateAutonomousOpsAction({
+      actionId: isHighRiskBrief(brief) ? 'mission_start_high' : 'mission_start_medium',
+    }),
+    riskTier: 'approve',
+    riskReasons,
+    evidence:
+      briefRef.startsWith('..') || path.isAbsolute(briefRef)
+        ? []
+        : [{ label: mt('mission_alignment:brief_title'), ref: briefRef }],
+  });
 }
 
 function findPendingAlignmentApproval(missionId: string): ApprovalRequestRecord | undefined {
