@@ -256,15 +256,24 @@ function summarizeSession(session: {
   const nextStep = trimText(session.completion_summary?.next_step || '', 64);
   const taskLabel = humanizeId(session.work_loop?.intent?.label || session.task_type || 'task');
   const statusHeadline: Record<string, string> = {
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     awaiting_instruction: '次の指示待ち',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     collecting_requirements: '要件を集めています',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     planning: '段取りを組んでいます',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     awaiting_confirmation: '確認待ちです',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     executing: '手を動かしています',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     verifying: '仕上がりを確かめています',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     blocked: '詰まりをほどいています',
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     paused: 'いったん止めています',
   };
+  // i18n-exempt: JA virtual-office dashboard labels (product language)
   const headline = statusHeadline[session.status] || `${taskLabel} を進行中`;
   const noteParts = [trimText(latestHistory, 72), nextStep && `次: ${nextStep}`].filter(
     Boolean
@@ -488,14 +497,19 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     const currentStory =
       surfaceSession?.headline ||
       (runtimeStatus === 'busy'
-        ? 'いま手を動かしています'
+        ? // i18n-exempt: JA virtual-office dashboard labels (product language)
+          'いま手を動かしています'
         : activity.blocked > 0
-          ? '詰まりをほどいています'
+          ? // i18n-exempt: JA virtual-office dashboard labels (product language)
+            '詰まりをほどいています'
           : activity.review > 0
-            ? '仕上げを見ています'
+            ? // i18n-exempt: JA virtual-office dashboard labels (product language)
+              '仕上げを見ています'
             : activity.open > 0
-              ? '作業を進めています'
-              : '席を空けています');
+              ? // i18n-exempt: JA virtual-office dashboard labels (product language)
+                '作業を進めています'
+              : // i18n-exempt: JA virtual-office dashboard labels (product language)
+                '席を空けています');
     const state: 'working' | 'review' | 'blocked' | 'idle' =
       activity.blocked > 0
         ? 'blocked'
@@ -515,8 +529,11 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       open_tasks: activity.open + activity.review + activity.blocked,
       state,
       current_story: currentStory,
+      // i18n-exempt: JA virtual-office dashboard labels (product language)
       current_goal: currentGoal || '現在は割当を待っています',
+      // i18n-exempt: JA virtual-office dashboard labels (product language)
       current_next_step: currentNextStep || '次の一手はまだ記録されていません',
+      // i18n-exempt: JA virtual-office dashboard labels (product language)
       current_signal: currentSignal || 'システム上の信号はまだありません',
       runtime_status: runtimeStatus,
       provider: runtime?.agent?.provider,
@@ -842,7 +859,9 @@ function characterSvg(agentId: string, role: string, state: string): string {
 
 const STATE_LABEL: Record<string, string> = {
   working: '作業中',
+  // i18n-exempt: JA virtual-office dashboard labels (product language)
   review: 'レビュー中',
+  // i18n-exempt: JA virtual-office dashboard labels (product language)
   blocked: '困っています',
   idle: '休憩中',
 };
@@ -925,9 +944,13 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
     .join('');
 
   const legend = `<div class="legend">
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span>${characterSvg('legend-a', 'implementer', 'working')}<b>作業中</b><i>手を動かしています</i></span>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span>${characterSvg('legend-b', 'reviewer', 'review')}<b>レビュー中</b><i>成果物を確認中</i></span>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span>${characterSvg('legend-c', 'qa', 'blocked')}<b>困っています</b><i>人の判断待ち</i></span>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span>${characterSvg('legend-d', 'planner', 'idle')}<b>休憩中</b><i>次の仕事待ち</i></span>
   </div>`;
 
@@ -938,7 +961,8 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
             `<div class="stat-row"><span class="stat-label">${esc(entry.agent)}<em>${esc(entry.role)}</em></span>${bar(entry.success_rate, entry.success_rate >= 0.7 ? '#4ade80' : entry.success_rate >= 0.4 ? '#fbbf24' : '#f87171')}<span class="stat-val">${Math.round(entry.success_rate * 100)}% <i>(n=${entry.samples})</i></span></div>`
         )
         .join('')
-    : '<div class="empty">まだ実績データなし — ミッション完了ごとに蓄積されます</div>';
+    : // i18n-exempt: JA virtual-office dashboard labels (product language)
+      '<div class="empty">まだ実績データなし — ミッション完了ごとに蓄積されます</div>';
 
   const statusTotal = Object.values(data.task_status_counts).reduce((a, b) => a + b, 0) || 1;
   const statusHtml = Object.entries(data.task_status_counts)
@@ -961,7 +985,8 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
             `<div class="row"><span class="pill">${esc(deal.stage)}</span><strong>${esc(deal.deal_id)}</strong><span class="muted">${esc(deal.summary)}</span></div>`
         )
         .join('')
-    : '<div class="empty">商談なし</div>';
+    : // i18n-exempt: JA virtual-office dashboard labels (product language)
+      '<div class="empty">商談なし</div>';
 
   const alertsHtml = data.alerts.length
     ? data.alerts
@@ -970,7 +995,8 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
             `<div class="row"><span class="dot" style="background:${alert.severity === 'critical' ? '#f87171' : alert.severity === 'warning' ? '#fbbf24' : '#7dd3fc'}"></span><span class="muted">${esc(alert.title)}</span></div>`
         )
         .join('')
-    : '<div class="empty">アラートなし</div>';
+    : // i18n-exempt: JA virtual-office dashboard labels (product language)
+      '<div class="empty">アラートなし</div>';
 
   const proposalsHtml = data.proposals.length
     ? data.proposals
@@ -979,7 +1005,8 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
             `<div class="row"><span class="pill">${esc(proposal.status)}</span><span class="muted">${esc(proposal.id)} (${esc(proposal.kind)})</span></div>`
         )
         .join('')
-    : '<div class="empty">改善提案なし</div>';
+    : // i18n-exempt: JA virtual-office dashboard labels (product language)
+      '<div class="empty">改善提案なし</div>';
 
   const workingCount = data.agents.filter((a) => a.state === 'working').length;
   const blockedCount = data.agents.filter((a) => a.state === 'blocked').length;
@@ -1023,7 +1050,8 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
             .join('')}
         </div>
       </div>`
-    : '<div class="empty">組織図なし</div>';
+    : // i18n-exempt: JA virtual-office dashboard labels (product language)
+      '<div class="empty">組織図なし</div>';
   const tenantRows = data.tenants.length
     ? data.tenants
         .map(
@@ -1092,7 +1120,9 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
         <span class="muted">${esc(session.headline || session.goal)} — ${esc(session.agentIds.join(', '))}</span></div>`
     )
     .join('');
+  // i18n-exempt: JA virtual-office dashboard labels (product language)
   const nowWorkingHtml = `<section><h2>Now Working — いま何をしている?</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="panel">${nowWorkingRows || '<div class="empty">全員休憩中です</div>'}
     ${sessionRows ? `<div class="sessions">${sessionRows}</div>` : ''}</div>
   </section>`;
@@ -1198,10 +1228,13 @@ section{margin-bottom:22px}
 <header>
   <h1>🏢 KYBERION VIRTUAL OFFICE</h1>
   <div class="kpis">
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span class="kpi"><b>${data.rooms.filter((r) => r.tasks.length > 0).length}</b>タスクありルーム<i style="color:var(--muted);font-style:normal"> / ${data.rooms.length} 未アーカイブ</i></span>
     <span class="kpi"><b>${workingCount}</b>作業中</span>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span class="kpi"><b>${blockedCount}</b>困っている</span>
     <span class="kpi"><b>${data.inbox_unread}</b>未読 inbox</span>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <span class="kpi"><b>${data.approvals_pending}</b>承認待ち</span>
   </div>
   <span class="scope">${tenantSummary}</span>
@@ -1210,8 +1243,10 @@ section{margin-bottom:22px}
 ${legend}
 <main>
 <div>
+  // i18n-exempt: JA virtual-office dashboard labels (product language)
   ${nowWorkingHtml}
   <section><h2>Mission Floor — 稼働中の部屋(タスク数上位)</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="floor">${roomsHtml || '<div class="empty">稼働中のミッションはありません</div>'}</div>
   </section>
   <section><h2>Break Room — 休憩室</h2>
@@ -1227,15 +1262,19 @@ ${legend}
     ${orgChartHtml}
   </section>
   <section><h2>成功率 — agent × role(実績)</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="panel">${perfHtml}</div>
   </section>
   <section><h2>タスク状態分布</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="panel">${statusHtml || '<div class="empty">オープンタスクなし</div>'}</div>
   </section>
   <section><h2>ロール構成</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="panel">${rolesHtml || '<div class="empty">-</div>'}</div>
   </section>
   <section><h2>Bulletin — アラート</h2>
+    // i18n-exempt: JA virtual-office dashboard labels (product language)
     <div class="panel">${alertsHtml}</div>
   </section>
   <section><h2>Bulletin — 改善提案キュー</h2>

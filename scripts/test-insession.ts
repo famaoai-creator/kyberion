@@ -20,6 +20,7 @@ async function test(print: Print = () => undefined) {
   logger.info('--- Delegating Task via Native invoke_agent ---');
   try {
     const result = await backend.delegateTask(
+      // i18n-exempt: JA test fixture
       '「こんにちは」と返事をしてください。他の言葉は不要です。'
     );
     logger.info('\n--- Sub-agent Result ---');

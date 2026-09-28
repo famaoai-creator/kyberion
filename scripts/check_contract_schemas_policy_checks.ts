@@ -380,6 +380,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
                 'landing page',
                 'design',
                 '踏襲',
+                // i18n-exempt: JA test fixture
                 'サイト',
               ],
               summary_template:
@@ -401,6 +402,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
             },
             {
               id: 'structured-delivery',
+              // i18n-exempt: JA test fixture
               trigger_keywords: ['作って', 'やって', 'まとめて', '改善', 'deliver', 'build'],
               summary_template:
                 'Generic structured delivery request requiring normalization before execution.',
@@ -466,6 +468,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
           },
           landing_match: {
             url_includes: 'travel.rakuten.co.jp',
+            // i18n-exempt: JA test fixture
             title_includes: '楽天トラベル',
           },
           blocked_actions: [
@@ -494,6 +497,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
           ],
           success_criteria: {
             landing_url_includes: 'travel.rakuten.co.jp',
+            // i18n-exempt: JA test fixture
             landing_title_includes: '楽天トラベル',
             handoff_export_absent: true,
             blocked_actions_not_executed: true,
@@ -677,6 +681,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
           device_preference: 'rear-camera',
           save_path: 'active/shared/tmp/photo.jpg',
           post_process: ['compress'],
+          // i18n-exempt: JA test fixture
           subject_hint: '記録用の写真',
         },
       ],
@@ -690,9 +695,11 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
     {
       id: 'productivity-task-plan',
       schemaPath: 'knowledge/product/schemas/productivity-task-plan.schema.json',
+      // i18n-exempt: JA test fixture
       validPayloads: [buildProductivityTaskPlan('会議の日程を変更して参加者にメールを送って')],
       invalidPayloads: [
         {
+          // i18n-exempt: JA test fixture
           ...buildProductivityTaskPlan('ブラウザで購入して決済して'),
           execution: {
             mode: 'dry_run',
@@ -795,6 +802,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
               mission_class: 'content_and_media',
               risk_profile: 'review_required',
               description: 'Capture a photo for record keeping, sharing, or OCR source use.',
+              // i18n-exempt: JA test fixture
               surface_examples: ['ちょっと写真をとって'],
               outcome_ids: ['artifact:image'],
               trigger_keywords: ['写真', '撮影', 'photo', 'picture', 'camera', 'OCR'],
@@ -856,6 +864,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       validPayloads: [
         {
           intent: 'request_mission_work',
+          // i18n-exempt: JA test fixture
           text: '進捗をまとめて',
           objective: 'team_status_summary',
           acceptance_criteria: ['summarize the mission', 'list open questions'],
@@ -871,6 +880,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       invalidPayloads: [
         {
           intent: 'request_mission_work',
+          // i18n-exempt: JA test fixture
           text: '進捗をまとめて',
           context: {
             mission_id: 'MSN-schema-1',
@@ -1031,6 +1041,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       validPayloads: [
         {
           kind: 'intent-contract',
+          // i18n-exempt: JA test fixture
           source_text: '提案資料を作って',
           intent_id: 'generate-presentation',
           capability_bundle_id: 'browser-exploration-governed',
@@ -1056,6 +1067,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       invalidPayloads: [
         {
           kind: 'intent-contract',
+          // i18n-exempt: JA test fixture
           source_text: '提案資料を作って',
           intent_id: 'generate-presentation',
           goal: {
@@ -1083,6 +1095,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       validPayloads: [
         {
           kind: 'agent-routing-decision',
+          // i18n-exempt: JA test fixture
           source_text: '今週の進捗レポートを作って',
           intent_id: 'generate-report',
           mode: 'subagent',
@@ -1101,6 +1114,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       invalidPayloads: [
         {
           kind: 'agent-routing-decision',
+          // i18n-exempt: JA test fixture
           source_text: '今週の進捗レポートを作って',
           intent_id: 'generate-report',
           mode: 'prompt',

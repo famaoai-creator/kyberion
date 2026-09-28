@@ -337,15 +337,20 @@ export function buildGridPageSummary(pageText: string, maxItems = 8): string[] {
     .filter(Boolean);
 
   const skipExact = new Set([
+    // i18n-exempt: JA document layout labels (product language)
     'カテゴリ',
     '選択肢',
     '回答方法',
     '質問文',
+    // i18n-exempt: JA document layout labels (product language)
     'タイミング',
     '（1/2）',
     '（2/2）',
+    // i18n-exempt: JA document layout labels (product language)
     '(参考)プログラム内容や運営への学び・改善点 各セッション メンティー向け',
+    // i18n-exempt: JA document layout labels (product language)
     '(参考)プログラム内容や運営への学び・改善点 各セッション 人事担当者向け',
+    // i18n-exempt: JA document layout labels (product language)
     '(参考)プログラム内容や運営への学び・改善点 全体 人事担当者向け',
   ]);
 

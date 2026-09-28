@@ -65,6 +65,7 @@ function probeIosRuntimes(): AppPreflightItem {
     'ios.runtime',
     'fail',
     result.status === 0 ? 'no iOS simulator runtime installed' : `simctl exited ${result.status}`,
+    // i18n-exempt: JA operator guidance
     'Xcode > Settings > Platforms から iOS Simulator runtime を導入'
   );
 }
@@ -79,6 +80,7 @@ function probeAndroidEnv(): AppPreflightItem {
     'android.env',
     'fail',
     'ANDROID_HOME / ANDROID_SDK_ROOT is not set',
+    // i18n-exempt: JA operator guidance
     'export ANDROID_HOME=$HOME/Library/Android/sdk (shell profile に追記)'
   );
 }
@@ -101,6 +103,7 @@ function probeAndroidDevices(): AppPreflightItem {
       'android.device',
       'warn',
       `no device attached, but ${avdCount} AVD(s) available (boot one to run device tests)`,
+      // i18n-exempt: JA operator guidance
       'emulator -avd <name> で起動'
     );
   }
@@ -108,6 +111,7 @@ function probeAndroidDevices(): AppPreflightItem {
     'android.device',
     'fail',
     'no attached device and no AVD defined',
+    // i18n-exempt: JA operator guidance
     'Android Studio Device Manager で AVD を作成、または実機を接続'
   );
 }
@@ -131,13 +135,16 @@ export function runAppPreflight(options: {
 
   if (platform === 'ios' || platform === 'all') {
     items.push(
+      // i18n-exempt: JA operator guidance
       probeBinary('ios.xcrun', 'xcrun', 'Xcode を導入し xcode-select を設定'),
+      // i18n-exempt: JA operator guidance
       probeBinary('ios.xcodebuild', 'xcodebuild', 'Xcode を導入し xcode-select を設定'),
       probeIosRuntimes()
     );
   }
   if (platform === 'android' || platform === 'all') {
     items.push(
+      // i18n-exempt: JA operator guidance
       probeBinary('android.adb', 'adb', 'Android platform-tools を導入し PATH に追加'),
       probeAndroidEnv(),
       probeAndroidDevices()
@@ -148,6 +155,7 @@ export function runAppPreflight(options: {
       probeBinary(
         'distribution.fastlane',
         'fastlane',
+        // i18n-exempt: JA operator guidance
         'gem install fastlane または brew install fastlane'
       )
     );
@@ -156,6 +164,7 @@ export function runAppPreflight(options: {
         probeSecret(
           'distribution.ios.api_key',
           'APP_STORE_CONNECT_API_KEY',
+          // i18n-exempt: JA operator guidance
           'vault に APP_STORE_CONNECT_API_KEY を登録 (値はログに出さない)'
         )
       );
@@ -165,6 +174,7 @@ export function runAppPreflight(options: {
         probeSecret(
           'distribution.android.keystore',
           'ANDROID_KEYSTORE_PATH',
+          // i18n-exempt: JA operator guidance
           'vault に ANDROID_KEYSTORE_PATH を登録 (keystore はコミットしない)'
         )
       );

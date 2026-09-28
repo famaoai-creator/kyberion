@@ -337,6 +337,7 @@ export function createContractSchemaChecksPart3(): ContractCheck[] {
               {
                 label: 'Restaurant preflight',
                 categories: ['restaurant'],
+                // i18n-exempt: JA test fixture
                 questions: ['人数と希望時間はいつですか?', '苦手食材や個室の要否はありますか?'],
               },
             ],
@@ -798,6 +799,7 @@ export function createContractSchemaChecksPart3(): ContractCheck[] {
             {
               action_id: 'step-1',
               op: 'fill_ref',
+              // i18n-exempt: JA test fixture
               summary: '会社名を入力（値は保存しない）',
               risk: 'low',
               captured_at: '2026-06-23T00:00:01.000Z',

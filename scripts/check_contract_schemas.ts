@@ -111,6 +111,7 @@ function createChecks(): ContractCheck[] {
                   'active/shared/runtime/recordings/attendance-approve-kingoftime.json',
               },
               target: { name: 'King of Time', origins: ['https://s2.kingtime.jp'] },
+              // i18n-exempt: JA test fixture
               intent_phrases: ['勤怠の承認', 'approve attendance'],
               execution_substrate: 'extension',
               pipeline_ref: 'pipelines/browser/attendance-approve-kingoftime.json',
@@ -128,6 +129,7 @@ function createChecks(): ContractCheck[] {
               substrate: 'service',
               adapter: { recorder: 'service-capture', executor: 'service:preset' },
               target: { name: 'Deal Intake', services: ['jira', 'slack', 'box'] },
+              // i18n-exempt: JA test fixture
               intent_phrases: ['起票してSlack通知してBoxに格納'],
               pipeline_ref: 'pipelines/service/deal-intake.json',
               risk_class: 'high',
@@ -223,6 +225,7 @@ function createChecks(): ContractCheck[] {
           schema_version: 'golden-scenario.v1',
           scenario_id: 'gs-1',
           procedure_id: 'attendance.approve.kingoftime',
+          // i18n-exempt: JA test fixture
           success_conditions: [{ kind: 'text_present', name_contains: '承認が完了しました' }],
           captured_from: 'receipt-123',
           version: '1.0.0',
@@ -300,6 +303,7 @@ function createChecks(): ContractCheck[] {
             {
               step_id: 'd1',
               op: 'click_element',
+              // i18n-exempt: JA test fixture
               summary: 'OKをクリック',
               risk_class: 'low',
               evidence: ['active_window:application'],

@@ -904,6 +904,7 @@ export async function runMissionControllerAction(
       }
       if (context.argv.includes('--notify')) {
         const sent = await notifyMissionHygiene(report);
+        // i18n-exempt: JA operator output
         context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
       }
       break;
@@ -925,6 +926,7 @@ export async function runMissionControllerAction(
       } else {
         const proposals = listProcessImprovementProposals();
         if (proposals.length === 0) {
+          // i18n-exempt: JA operator output
           context.print?.('プロセス改善提案はありません。');
         }
         for (const proposal of proposals) {

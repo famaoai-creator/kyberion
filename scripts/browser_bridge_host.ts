@@ -801,7 +801,8 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   const question =
     typeof message.question === 'string' && message.question.trim()
       ? message.question.trim().slice(0, 1000)
-      : '抽出されたデータの要点を整理し、変化・傾向・注目点を日本語で簡潔にレポートしてください。';
+      : // i18n-exempt: JA LLM prompt (model input)
+        '抽出されたデータの要点を整理し、変化・傾向・注目点を日本語で簡潔にレポートしてください。';
   const limit =
     Number.isInteger(message.limit) && message.limit > 0 ? Math.min(message.limit, 20) : 20;
 
@@ -813,6 +814,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   if (observations.length === 0) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: `手順「${procedureId}」の観測データがまだありません。実行して抽出データを集めてください。`,
     };
   }
@@ -848,6 +850,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: formatWireError(err, '分析バックエンドの実行に失敗しました'),
     };
   }
@@ -898,6 +901,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: formatWireError(err, 'レポートの保存に失敗しました'),
     };
   }

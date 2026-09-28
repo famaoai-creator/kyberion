@@ -136,6 +136,7 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText('  pnpm kyberion calendar status');
   printText('  pnpm kyberion calendar list-calendars');
   printText('  pnpm kyberion calendar agenda --calendar-id primary --days 7');
+  // i18n-exempt: JA usage example in help text
   printText('  pnpm kyberion task plan "明日の会議資料とメール下書きを作って"');
   printText('  pnpm kyberion offboard tenant acme');
   printText('');

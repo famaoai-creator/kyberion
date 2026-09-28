@@ -164,6 +164,7 @@ async function main(argv: string[]): Promise<void> {
 
     const conversation = await runSurfaceMessageConversation({
       surface,
+      // i18n-exempt: JA e2e fixture
       text: 'ナレッジで planner を調べて',
       locale: 'ja',
       channel,

@@ -470,13 +470,17 @@ async function opTransform(op: string, params: any, ctx: any) {
       const targetMissionId = requestText.match(/MSN-[A-Z0-9-]+/i)?.[0] || null;
       const targetProjectId = requestText.match(/PRJ-[A-Z0-9-]+/i)?.[0] || null;
       const scope =
+        // i18n-exempt: JA input keyword matcher
         targetMissionId || lowered.includes('mission') || lowered.includes('ミッション')
           ? 'missions'
-          : targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト')
+          : // i18n-exempt: JA input keyword matcher
+            targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト')
             ? 'projects'
-            : lowered.includes('actuator') || lowered.includes('アクチュエータ')
+            : // i18n-exempt: JA input keyword matcher
+              lowered.includes('actuator') || lowered.includes('アクチュエータ')
               ? 'actuators'
               : lowered.includes('surface') ||
+                  // i18n-exempt: JA input keyword matcher
                   lowered.includes('サービス') ||
                   lowered.includes('稼働')
                 ? 'surfaces'
