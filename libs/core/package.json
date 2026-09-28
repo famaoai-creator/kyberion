@@ -35,6 +35,10 @@
       "types": "./dist/foundation/primitives.d.ts",
       "default": "./dist/foundation/primitives.js"
     },
+    "./foundation/json": {
+      "types": "./dist/foundation/json.d.ts",
+      "default": "./dist/foundation/json.js"
+    },
     "./foundation/io": {
       "types": "./dist/foundation/io.d.ts",
       "default": "./dist/foundation/io.js"
@@ -42,6 +46,10 @@
     "./foundation/text": {
       "types": "./dist/foundation/text.d.ts",
       "default": "./dist/foundation/text.js"
+    },
+    "./foundation/time": {
+      "types": "./dist/foundation/time.d.ts",
+      "default": "./dist/foundation/time.js"
     },
     "./foundation/governed-catalog": {
       "types": "./dist/foundation/governed-catalog.d.ts",
@@ -4507,6 +4515,10 @@
       "types": "./dist/mission/mission-creation.d.ts",
       "default": "./dist/mission/mission-creation.js"
     },
+    "./mission/mission-vision-ref": {
+      "types": "./dist/mission/mission-vision-ref.d.ts",
+      "default": "./dist/mission/mission-vision-ref.js"
+    },
     "./mission/mission-dispatch-io": {
       "types": "./dist/mission/mission-dispatch-io.d.ts",
       "default": "./dist/mission/mission-dispatch-io.js"
@@ -5171,6 +5183,10 @@
       "types": "./dist/project/project-management.d.ts",
       "default": "./dist/project/project-management.js"
     },
+    "./project/project-track-scope": {
+      "types": "./dist/project/project-track-scope.d.ts",
+      "default": "./dist/project/project-track-scope.js"
+    },
     "./project/project-mission-ledger": {
       "types": "./dist/project/project-mission-ledger.d.ts",
       "default": "./dist/project/project-mission-ledger.js"
@@ -5198,6 +5214,10 @@
     "./project/project-trust": {
       "types": "./dist/project/project-trust.d.ts",
       "default": "./dist/project/project-trust.js"
+    },
+    "./reasoning/pipeline-bootstrap-needs": {
+      "types": "./dist/reasoning/pipeline-bootstrap-needs.d.ts",
+      "default": "./dist/reasoning/pipeline-bootstrap-needs.js"
     },
     "./reasoning/prompt-cache-discipline": {
       "types": "./dist/reasoning/prompt-cache-discipline.d.ts",

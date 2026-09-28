@@ -2,7 +2,8 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { pathResolver, rootResolve } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { parseSafeJsonInput, parseSafeJsonObjectValue, readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation/safe-json';
+import { readTextFile } from '@agent/core/foundation/text';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import {
   validatePipelineGuardrails,

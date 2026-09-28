@@ -27,7 +27,13 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '../execution-bounds.js';
 
-const actuatorContractAjv = createAjv();
+// Lazily created: actuator-sdk sits on every pipeline entry point's import
+// path, and ajv is only needed once a contract input validator is compiled.
+let actuatorContractAjvInstance: ReturnType<typeof createAjv> | null = null;
+function actuatorContractAjv(): ReturnType<typeof createAjv> {
+  if (!actuatorContractAjvInstance) actuatorContractAjvInstance = createAjv();
+  return actuatorContractAjvInstance;
+}
 
 export type ActuatorResultStatus = 'succeeded' | 'failed' | 'denied';
 
@@ -631,7 +637,7 @@ export function defineCatalogBackedActuator(options: {
       !Array.isArray(authored.properties)
         ? (authored.properties as Record<string, unknown>)
         : {};
-    const validate = actuatorContractAjv.compile({
+    const validate = actuatorContractAjv().compile({
       ...authored,
       properties: { ...properties, ...PIPELINE_EXECUTION_METADATA_PROPERTIES },
     });

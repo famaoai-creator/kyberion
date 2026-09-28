@@ -22,7 +22,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
   registerScheduledPipeline,

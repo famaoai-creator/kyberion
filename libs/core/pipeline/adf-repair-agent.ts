@@ -341,6 +341,8 @@ async function attemptSubagentRepair(
   validationErrors: string[],
   options: AdfRepairOptions = {}
 ): Promise<AdfRepairResult> {
+  const { installReasoningBackends } = await import('../reasoning/reasoning-bootstrap.js');
+  installReasoningBackends();
   const backend = getReasoningBackend();
   const errorSummary = parseError || validationErrors.join('; ');
 

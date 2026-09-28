@@ -1,7 +1,4 @@
 import { createLogger } from '../logger.js';
-import { agentRegistry } from '../agent/agent-registry.js';
-import { stopAgentRuntime } from '../agent/agent-runtime-supervisor.js';
-import { shutdownAgentRuntimeViaDaemon } from '../agent/agent-runtime-supervisor-client.js';
 import { loadTrustPolicy, trustEngine, type TrustPolicyAnomalyDetection } from '../trust-engine.js';
 import { auditChain } from './audit-chain.js';
 import { registerGovernanceActionSink } from './governance-action-recorder.js';
@@ -169,6 +166,7 @@ class KillSwitchImpl {
    * Execute graduated response: warn → isolate → kill.
    */
   async respond(agentId: string, anomalies: string[]): Promise<'warned' | 'isolated' | 'killed'> {
+    const { agentRegistry } = await import('../agent/agent-registry.js');
     const record = agentRegistry.get(agentId);
     if (!record) return 'warned';
 
@@ -222,8 +220,11 @@ class KillSwitchImpl {
       // Kill
       logger.error(`[KILL_SWITCH] Terminating ${agentId}: ${anomalies.join(', ')}`);
       try {
+        const { shutdownAgentRuntimeViaDaemon } =
+          await import('../agent/agent-runtime-supervisor-client.js');
         await shutdownAgentRuntimeViaDaemon(agentId, 'kill_switch');
       } catch (_) {
+        const { stopAgentRuntime } = await import('../agent/agent-runtime-supervisor.js');
         await stopAgentRuntime(agentId, 'kill_switch');
       }
       auditChain.recordLifecycle(agentId, 'shutdown');

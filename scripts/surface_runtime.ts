@@ -33,7 +33,9 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =

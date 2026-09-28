@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import type { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret/secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
@@ -196,6 +196,9 @@ export async function secureFetch<T = unknown>(options: SecureFetchOptions): Pro
       'User-Agent': 'Kyberion-Sovereign-Agent/2.1.0 (Physical-Integrity-Enforced)',
       ...(requestOptions.headers || {}),
     };
+    // axios and its dependency tree load on the first outbound request, so
+    // entry points that never leave the machine skip ~130 modules.
+    const { default: axios } = await import('axios');
     const response = await axios({
       timeout: 15000,
       ...requestOptions,

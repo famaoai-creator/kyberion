@@ -1,23 +1,14 @@
-import { parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
-import { checkAllActuatorCapabilities } from '@agent/core/actuator-capability';
-import { assertPipelinePreviewResourcePath, previewPipeline } from '@agent/core/pipeline-preview';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { printHelp } from './cli-presentation.js';
-import {
-  handleCalendarWorkflowCommand,
-  handleEmailWorkflowCommand,
-  handleOffboardCommand,
-  handleTaskCommand,
-  withWorkflowOutputPrinter,
-} from './cli-workflow-handlers.js';
-import {
-  listScheduledPipelines,
-  registerScheduledPipeline,
-  unregisterScheduledPipeline,
-} from '@agent/core/pipeline-scheduler';
 import { ScriptExitError } from './lib/harness.js';
 import type { SupportedLocale } from '@agent/core/locale';
 import type { ActuatorRecord } from './cli.js';
+
+function workflowHandlers() {
+  return import('./cli-workflow-handlers.js');
+}
 
 export type CliCommandContext = {
   command: string;
@@ -43,9 +34,9 @@ export interface CliCommandDeps {
     verb: 'approve' | 'reject',
     firstArg: string | undefined,
     channelArg: string | undefined
-  ) => void;
+  ) => Promise<void>;
   acceptNextAction: (packetPath: string, actionId: string) => void;
-  printApprovalRequests: (channelArg?: string) => void;
+  printApprovalRequests: (channelArg?: string) => Promise<void>;
   printActuatorList: (actuators: ActuatorRecord[]) => void;
   printActuatorInfo: (actuator: ActuatorRecord) => void;
   printActuatorExamples: (actuator: ActuatorRecord) => void;
@@ -57,7 +48,7 @@ export interface CliCommandDeps {
   printArtifactInfo: (targetPath: string) => void;
   openArtifact: (targetPath: string) => void;
   printInteractionPacketFile: (targetPath: string) => void;
-  requestProjectTrust: (inputPath: string, json?: boolean) => void;
+  requestProjectTrust: (inputPath: string, json?: boolean) => Promise<void>;
   runActuator: (
     actuators: ActuatorRecord[],
     actuatorName: string | undefined,
@@ -101,7 +92,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
   const handleApproveReject: CliCommandHandler = async (ctx) => {
     const { command, firstArg, restArgs } = ctx;
 
-    applyApprovalDecision(command as 'approve' | 'reject', firstArg, restArgs[0]);
+    await applyApprovalDecision(command as 'approve' | 'reject', firstArg, restArgs[0]);
     return;
   };
 
@@ -140,6 +131,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       printActuatorList(actuators);
       const hasCheck = normalizedArgs.includes('--check');
       if (hasCheck) {
+        const { checkAllActuatorCapabilities } = await import('@agent/core/actuator-capability');
         const statuses = await checkAllActuatorCapabilities();
         printText('\n=== Runtime Capability Check ===');
         for (const status of statuses) {
@@ -268,7 +260,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     approvals: async (ctx) => {
       const { firstArg } = ctx;
 
-      printApprovalRequests(firstArg);
+      await printApprovalRequests(firstArg);
       return;
     },
     'project-trust': async (ctx) => {
@@ -277,12 +269,13 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       if (firstArg !== 'request' || !restArgs[0]) {
         throw new Error('Usage: pnpm kyberion project-trust request <pipeline-path> [--json]');
       }
-      requestProjectTrust(restArgs[0], restArgs.includes('--json'));
+      await requestProjectTrust(restArgs[0], restArgs.includes('--json'));
       return;
     },
     email: async (ctx) => {
       const { firstArg, restArgs, locale, print } = ctx;
 
+      const { withWorkflowOutputPrinter, handleEmailWorkflowCommand } = await workflowHandlers();
       await withWorkflowOutputPrinter(print, () =>
         handleEmailWorkflowCommand(firstArg, restArgs, locale)
       );
@@ -291,6 +284,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     calendar: async (ctx) => {
       const { firstArg, restArgs, locale, print } = ctx;
 
+      const { withWorkflowOutputPrinter, handleCalendarWorkflowCommand } = await workflowHandlers();
       await withWorkflowOutputPrinter(print, () =>
         handleCalendarWorkflowCommand(firstArg, restArgs, locale)
       );
@@ -309,12 +303,14 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     task: async (ctx) => {
       const { firstArg, restArgs, locale, print } = ctx;
 
+      const { withWorkflowOutputPrinter, handleTaskCommand } = await workflowHandlers();
       await withWorkflowOutputPrinter(print, () => handleTaskCommand(firstArg, restArgs, locale));
       return;
     },
     offboard: async (ctx) => {
       const { firstArg, restArgs, locale, print } = ctx;
 
+      const { withWorkflowOutputPrinter, handleOffboardCommand } = await workflowHandlers();
       await withWorkflowOutputPrinter(print, () =>
         handleOffboardCommand(firstArg, restArgs, locale)
       );
@@ -379,6 +375,8 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       if (!filePath) {
         throw new ScriptExitError(1, 'Usage: pnpm kyberion preview <pipeline.json>');
       }
+      const { assertPipelinePreviewResourcePath, previewPipeline } =
+        await import('@agent/core/pipeline-preview');
       const resolvedPreviewPath = pathResolver.rootResolve(filePath);
       assertPipelinePreviewResourcePath(resolvedPreviewPath);
       const content = readCliTextFile(resolvedPreviewPath, 'pipeline preview file');
@@ -436,6 +434,8 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       const { firstArg, restArgs } = ctx;
 
       const subAction = firstArg; // register, list, remove
+      const { listScheduledPipelines, registerScheduledPipeline, unregisterScheduledPipeline } =
+        await import('@agent/core/pipeline-scheduler');
       if (subAction === 'list') {
         const schedules = listScheduledPipelines();
         if (schedules.length === 0) {
