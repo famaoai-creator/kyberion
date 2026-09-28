@@ -1154,6 +1154,45 @@ export async function runInlineCoreJanitor(
   return ctx;
 }
 
+export async function runInlineCoreMissionHygiene(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const { collectMissionHygieneReport, formatMissionHygieneLine } =
+    await import('@agent/core/mission/mission-hygiene');
+  const { sweepEmptyMissionDirs } = await import('@agent/core/storage-janitor');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
+  const staleDays = Number(resolveVars(params.stale_days ?? '', ctx)) || undefined;
+  const abandonedDays = Number(resolveVars(params.abandoned_days ?? '', ctx)) || undefined;
+  const report = collectMissionHygieneReport({
+    ...(staleDays ? { staleDays } : {}),
+    ...(abandonedDays ? { abandonedDays } : {}),
+  });
+  const emptyDirs = sweepEmptyMissionDirs({ dryRun: true });
+  // Purge preview also scans knowledge/personal/missions — a personal-tier
+  // read the shared `run_pipeline` role is deliberately denied. Keep the
+  // report honest instead of failing the whole weekly audit.
+  let purgePreview: unknown = null;
+  try {
+    purgePreview = await missionSystem.purgeMissions(true);
+  } catch (err: unknown) {
+    purgePreview = {
+      error: err instanceof Error ? err.message : String(err),
+      note: 'personal-tier scan is outside run_pipeline authority — run `pnpm mission purge` interactively for the full preview',
+    };
+  }
+  const result = {
+    line: formatMissionHygieneLine(report),
+    report,
+    empty_mission_dirs: emptyDirs.candidates,
+    purge_preview: purgePreview,
+  };
+  const exportKey = resolveExportKey(step, 'mission_hygiene_report');
+  ctx = { ...ctx, [exportKey]: result };
+  return ctx;
+}
+
 export async function runInlineCoreTransform(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
