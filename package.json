@@ -146,7 +146,8 @@
     "prepare": "husky",
     "mcp:server": "node dist/scripts/mcp_server.js",
     "knowledge:cowork-sync": "node dist/scripts/cowork_knowledge_bridge.js",
-    "build:bundle": "node scripts/bundle_entrypoints.mjs"
+    "build:bundle": "node scripts/bundle_entrypoints.mjs",
+    "check:dep-cycles": "node --import ./scripts/ts-loader.mjs scripts/check_dependency_cycles.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
