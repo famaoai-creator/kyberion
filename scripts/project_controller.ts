@@ -12,7 +12,7 @@ import {
   updateManagedProject,
 } from '@agent/core/project/project-management';
 import type { ProjectTrackRecord } from '@agent/core/project/project-track-registry';
-import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';

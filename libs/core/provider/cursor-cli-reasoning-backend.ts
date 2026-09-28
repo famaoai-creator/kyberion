@@ -8,11 +8,12 @@
  * Auth is `CURSOR_API_KEY` and/or an existing `cursor-agent login` session.
  */
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import { z } from 'zod';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { memoizedCliSpawnSync } from './provider-discovery.js';
 import { resolveProviderCliCommand } from './provider-managed-env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
@@ -704,12 +705,9 @@ export function probeCursorCliAvailability(
   const checkAuth = options.checkAuth ?? true;
 
   try {
-    const result = spawnSync(bin, ['--version'], {
-      encoding: 'utf8',
+    const result = memoizedCliSpawnSync(bin, ['--version'], {
       env: buildProviderChildEnv({ provider: 'cursor', baseEnv: { ...process.env, ...env } }),
-      shell: false,
       timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     if (result.error) {
@@ -732,12 +730,9 @@ export function probeCursorCliAvailability(
       return { available: true, authenticated: true };
     }
 
-    const status = spawnSync(bin, ['status'], {
-      encoding: 'utf8',
+    const status = memoizedCliSpawnSync(bin, ['status'], {
       env: buildProviderChildEnv({ provider: 'cursor', baseEnv: { ...process.env, ...env } }),
-      shell: false,
       timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
     const statusOut = `${status.stdout ?? ''}\n${status.stderr ?? ''}`.trim();
     const authenticated = status.status === 0 && /logged in|✓/iu.test(statusOut);

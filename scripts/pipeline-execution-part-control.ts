@@ -4,12 +4,7 @@ import { safeExistsSync, type SafeShell } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry } from '@agent/core/path-resolver';
-import {
-  getReasoningRuntimeInstructions,
-  renderRuntimeInstructions,
-} from '@agent/core/reasoning/reasoning-runtime-instructions';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
-import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   isScenarioApprovalGranted,
   resolveActuatorOperation,
@@ -17,53 +12,13 @@ import {
   resolveScenarioOpOverride,
   type ResolvedActuatorOperation,
 } from '@agent/core/actuator/actuator-op-registry';
-import { executeProgrammaticToolCall } from '@agent/core/programmatic-tool-calling';
 import type { AdfStep, AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { tryRepairJson } from '@agent/core/json-repair';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
-import {
-  runInlineProductivityDryRunValidation,
-  runInlineProductivityScore,
-  runInlineVoiceConsentGrant,
-  runInlineProposalBriefParse,
-  runInlineVitest,
-  runInlineOnboardingApply,
-  runInlineCampaignSuite,
-  runInlineAiAudit,
-  runInlineFirstWinLifecycle,
-  runInlineDependencyVulnerabilityScan,
-  runInlineHealthDegradationWatch,
-  runInlineUiUxGovernanceAudit,
-  runInlineTenantDriftWatch,
-  runInlineOrganizationDigest,
-  runInlineOrganizationRecordRun,
-  runInlineAutoCheckpoint,
-  runInlineBackupCreate,
-  runInlineBackupRestoreDrill,
-  runInlineSoftwareQualityReport,
-  runInlineSoakEndurance,
-  runInlineSoakRestartE2E,
-  runInlineMarketingVideoDryRun,
-  runInlineComplianceScan,
-  runInlineMeshDelivery,
-  runInlinePromoteProcedure,
-  runInlineI18nHardcoding,
-  runInlineCatalogIntegrity,
-  runInlineTranslationCoverage,
-  runInlineDocExamplesCheck,
-  runInlineRegistryManager,
-  runInlineMissionCreate,
-  runInlineMissionStartFromIssues,
-  runInlineCaptureAvatarPhoto,
-  runInlineGenerateAvatar,
-  runInlineRegisterAvatar,
-  runInlineOAuthSetup,
-} from './pipeline-domain-ops.js';
-
 import {
   resolveStepType,
   resolveExportKey,
@@ -271,6 +226,10 @@ export function parseFragmentJson(fragmentRaw: string, fragmentRef: string): any
   );
 }
 
+async function domainOps() {
+  return import('./pipeline-domain-ops.js');
+}
+
 export function isSkip(value: unknown): value is AdfSkippedStep {
   return Boolean(value) && typeof value === 'object' && (value as any).skipped === true;
 }
@@ -281,6 +240,10 @@ export async function dispatchReasoningLeaf(
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
   const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
+  const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
+  const { getReasoningRuntimeInstructions, renderRuntimeInstructions } =
+    await import('@agent/core/reasoning/reasoning-runtime-instructions');
+  installReasoningBackends();
   const backend = getReasoningBackend();
   const resolvedInstruction =
     typeof params.instruction === 'string'
@@ -291,13 +254,13 @@ export async function dispatchReasoningLeaf(
     : typeof params.context === 'string'
       ? resolveVars(params.context, ctx)
       : params.context || ctx;
-  const routeOptions = resolvePipelineReasoningOptions(
+  const routeOptions = await resolvePipelineReasoningOptions(
     stepPolicy,
     ctx,
     String(params._step_id || params.step_id || 'reasoning'),
     undefined
   );
-  const facetNote = resolvePipelineFacetNote(params, ctx);
+  const facetNote = await resolvePipelineFacetNote(params, ctx);
   const promptVisibility = buildPipelinePromptVisibilityContext(ctx);
   const reasoningCallOptions = {
     effort: stepPolicy.effort,
@@ -377,6 +340,7 @@ export async function dispatchProgrammaticToolCall(
       : [];
   const allowedOps = resolveList(params.allowed_ops ?? params.allowedOps);
   const grantedOps = resolveList(params.granted_ops ?? params.grantedOps ?? ctx.__ptc_granted_ops);
+  const { executeProgrammaticToolCall } = await import('@agent/core/programmatic-tool-calling');
   const result = await executeProgrammaticToolCall({
     request: {
       code: String(params.code || ''),
@@ -422,7 +386,10 @@ export async function dispatchProgrammaticToolCall(
  * emitted by this pipeline and the persisted request binds that decision to
  * the exact effect step.
  */
-export function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unknown>): boolean {
+export async function hasBoundApproval(
+  step: PipelineAdfStep,
+  ctx: Record<string, unknown>
+): Promise<boolean> {
   // ES-02: a scenario run may approve an op only when a fixture serves it,
   // so this never admits a real side effect. Unregistered -> false.
   if (typeof step.op === 'string' && step.op.includes(':')) {
@@ -445,6 +412,7 @@ export function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unkn
     return false;
   }
   try {
+    const { loadApprovalRequest } = await import('@agent/core/governance/approval-store');
     const request = loadApprovalRequest(decision.storage_channel, decision.approval_request_id);
     return (
       (request?.status === 'approved' || request?.status === 'applied') &&
@@ -564,182 +532,182 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
   'core:parse_proposal_brief': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineProposalBriefParse(step, params, ctx);
+    return (await domainOps()).runInlineProposalBriefParse(step, params, ctx);
   },
   'core:validate_productivity_dry_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineProductivityDryRunValidation(step, params, ctx);
+    return (await domainOps()).runInlineProductivityDryRunValidation(step, params, ctx);
   },
   'core:calculate_productivity_score': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineProductivityScore(step, params, ctx);
+    return (await domainOps()).runInlineProductivityScore(step, params, ctx);
   },
   'core:grant_voice_consent': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineVoiceConsentGrant(step, params, ctx);
+    return (await domainOps()).runInlineVoiceConsentGrant(step, params, ctx);
   },
   'core:run_vitest': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineVitest(step, params, ctx);
+    return (await domainOps()).runInlineVitest(step, params, ctx);
   },
   'core:apply_onboarding': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineOnboardingApply(step, params, ctx);
+    return (await domainOps()).runInlineOnboardingApply(step, params, ctx);
   },
   'core:run_campaign_suite': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineCampaignSuite(step, params, ctx);
+    return (await domainOps()).runInlineCampaignSuite(step, params, ctx);
   },
   'core:run_ai_audit': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineAiAudit(step, params, ctx);
+    return (await domainOps()).runInlineAiAudit(step, params, ctx);
   },
   'core:run_first_win_lifecycle': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineFirstWinLifecycle(step, params, ctx);
+    return (await domainOps()).runInlineFirstWinLifecycle(step, params, ctx);
   },
   'core:run_dependency_vulnerability_scan': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineDependencyVulnerabilityScan(step, params, ctx);
+    return (await domainOps()).runInlineDependencyVulnerabilityScan(step, params, ctx);
   },
   'core:run_health_degradation_watch': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineHealthDegradationWatch(step, params, ctx);
+    return (await domainOps()).runInlineHealthDegradationWatch(step, params, ctx);
   },
   'core:run_ui_ux_governance': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineUiUxGovernanceAudit(step, params, ctx);
+    return (await domainOps()).runInlineUiUxGovernanceAudit(step, params, ctx);
   },
   'core:run_tenant_drift_watch': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineTenantDriftWatch(step, params, ctx);
+    return (await domainOps()).runInlineTenantDriftWatch(step, params, ctx);
   },
   'core:organization_digest': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineOrganizationDigest(step, params, ctx);
+    return (await domainOps()).runInlineOrganizationDigest(step, params, ctx);
   },
   'core:organization_record_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineOrganizationRecordRun(step, params, ctx);
+    return (await domainOps()).runInlineOrganizationRecordRun(step, params, ctx);
   },
   'core:run_auto_checkpoint': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineAutoCheckpoint(step, params, ctx);
+    return (await domainOps()).runInlineAutoCheckpoint(step, params, ctx);
   },
   'core:run_backup_create': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineBackupCreate(step, params, ctx);
+    return (await domainOps()).runInlineBackupCreate(step, params, ctx);
   },
   'core:run_backup_restore_drill': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineBackupRestoreDrill(step, params, ctx);
+    return (await domainOps()).runInlineBackupRestoreDrill(step, params, ctx);
   },
   'core:run_software_quality_report': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineSoftwareQualityReport(step, params, ctx);
+    return (await domainOps()).runInlineSoftwareQualityReport(step, params, ctx);
   },
   'core:run_soak_endurance': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineSoakEndurance(step, params, ctx);
+    return (await domainOps()).runInlineSoakEndurance(step, params, ctx);
   },
   'core:run_soak_restart_e2e': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineSoakRestartE2E(step, params, ctx);
+    return (await domainOps()).runInlineSoakRestartE2E(step, params, ctx);
   },
   'core:run_marketing_video_dry_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineMarketingVideoDryRun(step, params, ctx);
+    return (await domainOps()).runInlineMarketingVideoDryRun(step, params, ctx);
   },
   'core:run_compliance_scan': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineComplianceScan(step, params, ctx);
+    return (await domainOps()).runInlineComplianceScan(step, params, ctx);
   },
   'core:run_mesh_delivery': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineMeshDelivery(step, params, ctx);
+    return (await domainOps()).runInlineMeshDelivery(step, params, ctx);
   },
   'core:run_promote_procedure': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlinePromoteProcedure(step, params, ctx);
+    return (await domainOps()).runInlinePromoteProcedure(step, params, ctx);
   },
   'core:run_i18n_hardcoding': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineI18nHardcoding(step, params, ctx);
+    return (await domainOps()).runInlineI18nHardcoding(step, params, ctx);
   },
   'core:run_catalog_integrity': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineCatalogIntegrity(step, params, ctx);
+    return (await domainOps()).runInlineCatalogIntegrity(step, params, ctx);
   },
   'core:run_translation_coverage': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineTranslationCoverage(step, params, ctx);
+    return (await domainOps()).runInlineTranslationCoverage(step, params, ctx);
   },
   'core:run_doc_examples_check': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineDocExamplesCheck(step, params, ctx);
+    return (await domainOps()).runInlineDocExamplesCheck(step, params, ctx);
   },
   'core:run_registry_manager': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineRegistryManager(step, params, ctx);
+    return (await domainOps()).runInlineRegistryManager(step, params, ctx);
   },
   'core:run_mission_create': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineMissionCreate(step, params, ctx);
+    return (await domainOps()).runInlineMissionCreate(step, params, ctx);
   },
   'core:run_mission_start_from_issues': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineMissionStartFromIssues(step, params, ctx);
+    return (await domainOps()).runInlineMissionStartFromIssues(step, params, ctx);
   },
   'core:capture_avatar_photo': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineCaptureAvatarPhoto(step, params, ctx);
+    return (await domainOps()).runInlineCaptureAvatarPhoto(step, params, ctx);
   },
   'core:generate_avatar': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineGenerateAvatar(step, params, ctx);
+    return (await domainOps()).runInlineGenerateAvatar(step, params, ctx);
   },
   'core:register_avatar': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineRegisterAvatar(step, params, ctx);
+    return (await domainOps()).runInlineRegisterAvatar(step, params, ctx);
   },
   'core:run_oauth_setup': async (dctx) => {
     const { step, params, ctx } = dctx;
 
-    return runInlineOAuthSetup(step, params, ctx);
+    return (await domainOps()).runInlineOAuthSetup(step, params, ctx);
   },
   'core:transform': async (dctx) => {
     const { step, params, ctx } = dctx;
@@ -797,7 +765,7 @@ export async function dispatchLeafOp(
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
 
-  const approvalGranted = hasBoundApproval(step, ctx);
+  const approvalGranted = await hasBoundApproval(step, ctx);
   const preflight = await runOpPreflight({
     op: normalizedOp,
     params,

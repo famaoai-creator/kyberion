@@ -12,28 +12,17 @@ import {
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
-import {
-  getReasoningBackend,
-  type ReasoningCallOptions,
-} from '@agent/core/reasoning/reasoning-backend';
-import {
-  getReasoningRuntimeInstructions,
-  renderRuntimeInstructions,
-} from '@agent/core/reasoning/reasoning-runtime-instructions';
+import type { ReasoningCallOptions } from '@agent/core/reasoning/reasoning-backend';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
-import { executeReportContract } from '@agent/core/report-contract';
-import { getReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
-import { renderFacets, resolveFacets } from '@agent/core/facet-registry';
-import { resolveStepReasoningRoute } from '@agent/core/reasoning/reasoning-route-resolver';
 import {
   determineActuatorStepType,
   resolveActuatorOperation,
 } from '@agent/core/actuator/actuator-op-registry';
-import { runJanitor } from '@agent/core/storage-janitor';
 import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
-import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
-import { resolveIdentityContext } from '@agent/core/authority';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { defineLegacyPipelineActuator } from '@agent/core/actuator/actuator-sdk';
 import type {
   PipelineRunJournalHandle,
@@ -41,7 +30,6 @@ import type {
   PipelineRunSuspendedPayload,
 } from '@agent/core/pipeline/pipeline-run-journal';
 
-import { markRouterActive, markRouterInactive } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
 import {
   type PipelineAdfStep,
@@ -292,18 +280,20 @@ export function buildReasoningPolicyNote(policy: ReasoningStepPolicy): string {
   return parts.length > 0 ? `\n\n[policy ${parts.join(' ')}]` : '';
 }
 
-export function resolvePipelineReasoningOptions(
+export async function resolvePipelineReasoningOptions(
   policy: ReasoningStepPolicy,
   ctx: Record<string, unknown>,
   stepId: string,
   trace?: TraceContext
-): ReasoningCallOptions {
+): Promise<ReasoningCallOptions> {
   const reasoning = policy.reasoning;
   const persona =
     (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
     (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
     registeredEnv('KYBERION_PERSONA') ||
     'default';
+  const { resolveStepReasoningRoute } =
+    await import('@agent/core/reasoning/reasoning-route-resolver');
   const route = resolveStepReasoningRoute({
     stepId,
     persona,
@@ -333,12 +323,15 @@ export function resolvePipelineReasoningOptions(
   } satisfies ReasoningCallOptions;
 }
 
-export function resolvePipelineFacetNote(
+export async function resolvePipelineFacetNote(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
-): string {
+): Promise<string> {
   const raw = params._facets ?? params.facets;
   if (!raw || typeof raw !== 'object') return '';
+  const { getReasoningPayloadScope } = await import('@agent/core/reasoning/reasoning-egress-scope');
+  const { renderFacets, resolveFacets } = await import('@agent/core/facet-registry');
+  const { resolveIdentityContext } = await import('@agent/core/authority');
   const request = raw as {
     persona?: string;
     policies?: string[];
@@ -386,6 +379,8 @@ export async function runPipelineReportPhase(
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     : [];
   if (reports.length === 0) return ctx;
+  const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
+  const { executeReportContract } = await import('@agent/core/report-contract');
   const backend = getReasoningBackend();
   let workingCtx = ctx;
   for (const contract of reports) {
@@ -621,6 +616,9 @@ export async function loadActuatorDispatch(
 
   if (domain === 'reasoning') {
     dispatchCache[domain] = async (op, params, ctx, type, _trace?, policy?) => {
+      const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
+      const { getReasoningRuntimeInstructions, renderRuntimeInstructions } =
+        await import('@agent/core/reasoning/reasoning-runtime-instructions');
       const backend = getReasoningBackend();
       if (REASONING_LEAF_OPS.has(op)) {
         const resolvedInstruction =
@@ -630,13 +628,13 @@ export async function loadActuatorDispatch(
         const resolvedContext = resolveReasoningContextParam(params, ctx);
         const reasoningPolicy =
           (params._reasoning_policy as ReasoningStepPolicy | undefined) ?? policy;
-        const routeOptions = resolvePipelineReasoningOptions(
+        const routeOptions = await resolvePipelineReasoningOptions(
           reasoningPolicy || {},
           ctx,
           String(params.step_id || params.op || 'reasoning'),
           _trace
         );
-        const facetNote = resolvePipelineFacetNote(params, ctx);
+        const facetNote = await resolvePipelineFacetNote(params, ctx);
         const promptVisibility = buildPipelinePromptVisibilityContext(ctx);
         const reasoningCallOptions = {
           effort: reasoningPolicy?.effort,
@@ -1089,6 +1087,8 @@ export async function runInlineSystemShell(
   }
   // Track BlackHole mic routing state for SIGINT cleanup.
   if (cmd.includes('blackhole_audio_router.py')) {
+    const { markRouterActive, markRouterInactive } =
+      await import('@agent/core/blackhole-routing-guard');
     if (cmd.includes('setup_routing')) {
       const pythonBin = cmd.split(/\s+/)[0];
       const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');
@@ -1140,13 +1140,14 @@ export async function runInlineCoreWait(
   return ctx;
 }
 
-export function runInlineCoreJanitor(
+export async function runInlineCoreJanitor(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const dryRunParam = resolveVars(params.dry_run ?? params.dryRun ?? true, ctx);
   const dryRun = dryRunParam === true || dryRunParam === 'true';
+  const { runJanitor } = await import('@agent/core/storage-janitor');
   const report = runJanitor({ dryRun });
   const exportKey = resolveExportKey(step, 'janitor_report');
   ctx = { ...ctx, [exportKey]: report };

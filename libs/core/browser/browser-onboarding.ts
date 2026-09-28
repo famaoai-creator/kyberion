@@ -542,19 +542,4 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
   );
 }
 
-export function loadOperatorProviderPreferences(): {
-  priority: string[];
-  default_models: Record<string, string>;
-} | null {
-  return withExecutionContext(
-    'sovereign_concierge',
-    () => {
-      const value = loadOperatorProviderPreferencesAtPath(
-        onboardingPath('provider-preferences.json')
-      );
-      if (!value?.priority?.length) return null;
-      return { priority: value.priority, default_models: value.default_models || {} };
-    },
-    'ecosystem_architect'
-  );
-}
+export { loadOperatorProviderPreferences } from '../surface/operator-provider-preferences.js';

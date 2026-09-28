@@ -386,14 +386,58 @@ export function mergeProbedCapabilitiesIntoCatalog(
   return validatedCatalog;
 }
 
+/**
+ * One process-local result per binary + argv.
+ *
+ * Provider discovery (`--version`) and backend construction (the same
+ * `--version`, plus auth) both spawn the CLI. Role and profile chain builds
+ * repeat the construction probe. The argv is the question being asked, so a
+ * later call with a different timeout or allowlisted env reuses the first
+ * answer instead of spawning again. Call `resetCliProbeMemo()` when a test
+ * changes what that argv would return.
+ */
+const cliProbeMemo = new Map<string, MemoizedCliSpawn>();
+
+export interface MemoizedCliSpawn {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  error?: Error;
+}
+
+export function resetCliProbeMemo(): void {
+  cliProbeMemo.clear();
+}
+
+export function memoizedCliSpawnSync(
+  bin: string,
+  args: readonly string[],
+  options: { env?: NodeJS.ProcessEnv; timeout?: number } = {}
+): MemoizedCliSpawn {
+  const key = `${bin}\0${args.join('\0')}`;
+  const cached = cliProbeMemo.get(key);
+  if (cached) return cached;
+
+  const res = spawnSync(bin, [...args], {
+    encoding: 'utf8',
+    timeout: options.timeout,
+    env: options.env,
+    shell: false,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const recorded: MemoizedCliSpawn = {
+    status: res.status,
+    stdout: typeof res.stdout === 'string' ? res.stdout : '',
+    stderr: typeof res.stderr === 'string' ? res.stderr : '',
+    ...(res.error instanceof Error ? { error: res.error } : {}),
+  };
+  cliProbeMemo.set(key, recorded);
+  return recorded;
+}
+
 function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; stdout: string } {
   try {
-    const res = spawnSync(cmd, args, {
-      encoding: 'utf8',
-      timeout: timeoutMs,
-      env: process.env,
-      shell: false,
-    });
+    const res = memoizedCliSpawnSync(cmd, args, { timeout: timeoutMs, env: process.env });
     return { ok: res.status === 0, stdout: (res.stdout || '').trim() };
   } catch (_) {
     return { ok: false, stdout: '' };

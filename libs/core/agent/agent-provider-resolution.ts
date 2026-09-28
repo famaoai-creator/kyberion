@@ -2,7 +2,7 @@ import { discoverProviders, type ProviderInfo } from '../provider/provider-disco
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from '../provider/provider-config.js';
 import { listDemotedProviders } from '../provider/provider-health-view.js';
-import { loadOperatorProviderPreferences } from '../browser/browser-onboarding.js';
+import { loadOperatorProviderPreferences } from '../surface/operator-provider-preferences.js';
 
 export interface ResolveAgentProviderOptions {
   preferredProvider: string;

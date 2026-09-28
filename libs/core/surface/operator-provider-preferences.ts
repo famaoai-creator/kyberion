@@ -1,5 +1,8 @@
+import * as path from 'node:path';
+import { withExecutionContext } from '../authority.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
+import { resolveActiveProfileRoot } from '../profile-root.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -35,6 +38,37 @@ export function loadOperatorProviderPreferencesAtPath(
   } catch {
     return null;
   }
+}
+
+/**
+ * Operator overlay for provider priority and default models, read from the
+ * active profile's onboarding directory. This lives in the leaf so provider
+ * resolution (and every reasoning-backend consumer behind it) reads the
+ * overlay without loading the browser onboarding surface.
+ */
+export function loadOperatorProviderPreferences(): {
+  priority: string[];
+  default_models: Record<string, string>;
+} | null {
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      const profileRoot = assertSafeRepositoryPath(resolveActiveProfileRoot(), {
+        allowMissingLeaf: true,
+      });
+      const value = loadOperatorProviderPreferencesAtPath(
+        assertSafeRepositoryPath(
+          path.join(profileRoot, 'onboarding', 'provider-preferences.json'),
+          {
+            allowMissingLeaf: true,
+          }
+        )
+      );
+      if (!value?.priority?.length) return null;
+      return { priority: value.priority, default_models: value.default_models || {} };
+    },
+    'ecosystem_architect'
+  );
 }
 
 /** Validate and persist provider preferences through the same catalog as reads. */

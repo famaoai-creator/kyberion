@@ -18,7 +18,8 @@
  * and parses the `structured_output` field from the CLI's JSON result.
  */
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
 import {
   buildDelegationSpawnEnv,
@@ -1035,16 +1036,13 @@ function probeClaudeBinOnce(
       provider: 'claude',
       baseEnv: { ...process.env, ...env },
     });
-    const versionResult = spawnSync(bin, ['--version'], {
-      encoding: 'utf8',
+    const versionResult = memoizedCliSpawnSync(bin, ['--version'], {
       // XP-02: minimal allowlisted env; overrides in `env` (e.g. a test's
       // KYBERION_CLAUDE_CLI_BIN, or the KYBERION_PROVIDER_ENV_ALLOWLIST=0
       // escape hatch) are applied before allowlisting so they still take
       // effect.
       env: childEnv,
-      shell: false,
       timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     if (versionResult.error) {
@@ -1059,12 +1057,9 @@ function probeClaudeBinOnce(
       };
     }
 
-    const authResult = spawnSync(bin, ['auth', 'status'], {
-      encoding: 'utf8',
+    const authResult = memoizedCliSpawnSync(bin, ['auth', 'status'], {
       env: childEnv,
-      shell: false,
       timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
     if (authResult.error) {
       return { available: false, reason: authResult.error.message };

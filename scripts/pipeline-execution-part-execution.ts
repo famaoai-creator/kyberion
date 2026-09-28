@@ -1,16 +1,9 @@
-import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
+import { readTextFile } from '@agent/core/foundation/text';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
-import {
-  createApprovalRequest,
-  isApprovalRequestExpired,
-  loadApprovalRequest,
-} from '@agent/core/governance/approval-store';
 import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
 import { compactStepOutputContext } from '@agent/core/output-artifacts';
 import {
@@ -47,7 +40,6 @@ import {
   type GraphRunArtifact,
 } from '@agent/core/graph-run-artifact';
 
-import { z } from 'zod';
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { formatPipelineFailure } from './pipeline-result-reporting.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
@@ -80,6 +72,15 @@ import {
   findStepByIdRecursive,
   hasBoundApproval,
 } from './pipeline-execution-part-control.js';
+
+/** Install on first use so a step that actually judges does not depend on the eager pre-pass. */
+async function structuredReasoning() {
+  const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
+  const { delegateStructured, getReasoningBackend } =
+    await import('@agent/core/reasoning/reasoning-backend');
+  installReasoningBackends();
+  return { delegateStructured, backend: getReasoningBackend() };
+}
 
 export function readPipelineIncludeTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -122,6 +123,7 @@ export async function runWithRepair(
             `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
           );
         }
+        const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
         const repaired = await attemptAutonomousRepair({
           step: { op: step.op, id: step.id, params: step.params },
           failure,
@@ -373,30 +375,34 @@ export async function runStepsInternal(
         const schemaRef = String(judge.schema_ref || params.schema_ref || 'judge_route_verdict');
         const verdict = fixtureVerdict
           ? fixtureVerdict
-          : await delegateStructured(
-              getReasoningBackend(),
-              [
-                String(
-                  resolveVars(
-                    judge.prompt ||
-                      judge.instruction_ref ||
-                      params.prompt ||
-                      'Classify the current pipeline context.',
-                    ctx
-                  )
-                ),
-                `Return a route verdict compatible with schema_ref=${schemaRef}.`,
-                `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
-              ].join('\n\n'),
-              z
-                .object({
-                  label: z.string().min(1),
-                  reason: z.string().optional(),
-                  value: z.unknown().optional(),
-                })
-                .passthrough(),
-              { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
-            );
+          : await (async () => {
+              const { delegateStructured, backend } = await structuredReasoning();
+              const { z } = await import('zod');
+              return delegateStructured(
+                backend,
+                [
+                  String(
+                    resolveVars(
+                      judge.prompt ||
+                        judge.instruction_ref ||
+                        params.prompt ||
+                        'Classify the current pipeline context.',
+                      ctx
+                    )
+                  ),
+                  `Return a route verdict compatible with schema_ref=${schemaRef}.`,
+                  `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
+                ].join('\n\n'),
+                z
+                  .object({
+                    label: z.string().min(1),
+                    reason: z.string().optional(),
+                    value: z.unknown().optional(),
+                  })
+                  .passthrough(),
+                { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
+              );
+            })();
         const routes = Array.isArray(params.routes)
           ? (params.routes as Array<{
               when?: Record<string, unknown>;
@@ -463,6 +469,8 @@ export async function runStepsInternal(
         return nextContext;
       },
       await_decision: async (dctx) => {
+        const { createApprovalRequest, isApprovalRequestExpired, loadApprovalRequest } =
+          await import('@agent/core/governance/approval-store');
         const { params, ctx, currentStep } = dctx;
         const approval = (params.approval || {}) as Record<string, unknown>;
         const stepId = currentStep?.id;
@@ -700,8 +708,10 @@ export async function runStepsInternal(
               : fixture;
           } else if (selection?.judge && typeof selection.judge === 'object') {
             const judge = selection.judge as Record<string, unknown>;
+            const { delegateStructured, backend } = await structuredReasoning();
+            const { z } = await import('zod');
             const selected = await delegateStructured(
-              getReasoningBackend(),
+              backend,
               [
                 String(judge.prompt || 'Select the pool items that satisfy the current task.'),
                 `Pool:\n${JSON.stringify(pool)}`,
@@ -791,8 +801,10 @@ export async function runStepsInternal(
           const fixtureTasks = params.fixture_tasks;
           if (Array.isArray(fixtureTasks)) tasks = fixtureTasks;
           else {
+            const { delegateStructured, backend } = await structuredReasoning();
+            const { z } = await import('zod');
             const plan = await delegateStructured(
-              getReasoningBackend(),
+              backend,
               String(
                 params.instruction || 'Decompose the current context into bounded parallel tasks.'
               ) + `\nContext:\n${JSON.stringify(params.context || ctx)}`,

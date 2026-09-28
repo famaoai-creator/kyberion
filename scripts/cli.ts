@@ -15,28 +15,22 @@ import {
 import { loadActuatorExampleCatalog } from '@agent/core/actuator-example-catalog';
 import type { ActuatorExampleRecord } from '@agent/core/actuator-example-catalog';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
-import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
-import { createProjectTrustApprovalRequest } from '@agent/core/project/project-trust';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import { isMacOS, isWindows } from '@agent/core/platform';
 import chalk from 'chalk';
-import {
-  getRegisteredEnvText,
-  nowIso,
-  parseSafeJsonInput,
-  readTextFile,
-} from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { readTextFile } from '@agent/core/foundation/text';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
-export { parseOffboardArgs } from './cli-workflow-handlers.js';
+export { parseOffboardArgs } from './cli-offboard-args.js';
 import {
   printBranchBanner,
   printHeader,
@@ -924,7 +918,8 @@ function acceptNextAction(packetPath: string, actionId: string) {
   }
 }
 
-function printApprovalRequests(channelArg?: string) {
+async function printApprovalRequests(channelArg?: string): Promise<void> {
+  const { listApprovalRequests } = await import('@agent/core/governance/approval-store');
   printHeader();
   const storageChannels = channelArg ? [channelArg] : undefined;
   const requests = listApprovalRequests({
@@ -968,17 +963,19 @@ function printApprovalRequests(channelArg?: string) {
   }
 }
 
-function applyApprovalDecision(
+async function applyApprovalDecision(
   command: 'approve' | 'reject',
   requestId: string | undefined,
   channelArg?: string
-) {
+): Promise<void> {
   if (!requestId) {
     throw new Error(
       `Usage: pnpm kyberion ${command} <request-id> [storage-channel]\nRun \`pnpm kyberion approvals\` first to list pending request IDs.`
     );
   }
 
+  const { decideApprovalRequest, listApprovalRequests } =
+    await import('@agent/core/governance/approval-store');
   const requests = listApprovalRequests({
     storageChannels: channelArg ? [channelArg] : undefined,
     status: 'pending',
@@ -1021,7 +1018,8 @@ function applyApprovalDecision(
   }
 }
 
-function requestProjectTrust(inputPath: string, json = false): void {
+async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
+  const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
   const record = createProjectTrustApprovalRequest({
     inputPath,
     requestedBy: resolveOperatorDisplayName(),
@@ -1153,6 +1151,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'speak',
   // draw binds only the image-generation bridge it routes through.
   'draw',
+  // Pipeline schedule registry edits read and write one JSON file.
+  'schedule',
 ]);
 
 /**
@@ -1203,8 +1203,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (shouldBootstrapRuntime(normalizedArgs)) {
+    // installReasoningBackends already installs the voice bridge; load both
+    // modules only for commands that reach a backend.
+    const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
     installReasoningBackends();
-    installPythonVoiceBridgeIfAvailable();
   }
 
   const handler = CLI_COMMAND_HANDLERS[command];
