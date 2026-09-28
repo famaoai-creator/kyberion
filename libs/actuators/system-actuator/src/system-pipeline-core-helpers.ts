@@ -1,6 +1,7 @@
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
 import { logger } from '@agent/core/core';
+import type { AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import {
   assertSafeRepositoryPath,
@@ -175,9 +176,14 @@ export async function writeRedactedScreenFrames(
         })()
       ),
   };
-  await bridge.pipeTo(redactingBus as any, input);
+  await bridge.pipeTo(redactingBus as never, input);
 }
-export async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+export async function opCapture(
+  op: string,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  resolve: (value: unknown) => unknown
+) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
   switch (op) {
@@ -208,7 +214,11 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         windowCandidates = getWindowList(application);
       }
       if (windowTitle) {
-        activateWindowByTitle(application || 'Google Chrome', windowTitle, windowMatchPolicy);
+        activateWindowByTitle(
+          application || 'Google Chrome',
+          windowTitle,
+          windowMatchPolicy as 'strict' | 'prefix' | 'contains'
+        );
         captureMode = 'focused_window';
       }
       const bridge = createScreenCaptureBridge();
@@ -219,11 +229,11 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         application: application || undefined,
         window_title: windowTitle || undefined,
         window_match_policy: windowMatchPolicy,
-      } as any);
+      } as never);
       await redactScreenCaptureFile(captureResult.save_path || rawScreenshotPath, screenshotPath);
       return {
         ...ctx,
-        [params.export_as || 'screenshot_path']: screenshotPath,
+        [String(params.export_as ?? 'screenshot_path')]: screenshotPath,
         screenshot_path: screenshotPath,
         screenshot_display_index: displaySelection.display_index,
         screenshot_display_name: displaySelection.display_name,
@@ -278,7 +288,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       });
       return {
         ...ctx,
-        [params.export_as || 'screen_recording']: {
+        [String(params.export_as ?? 'screen_recording')]: {
           ...result,
           status: 'succeeded',
           bridge_id: bridge.bridge_id,
@@ -300,7 +310,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'macos_automation_probe':
       return {
         ...ctx,
-        [params.export_as || 'macos_automation']: {
+        [String(params.export_as ?? 'macos_automation')]: {
           ...macosAutomationBridge.probe(),
           capabilities: macosAutomationBridge.listCapabilities(),
         },
@@ -313,21 +323,21 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       if (!application) {
         throw new Error('window_list requires application param');
       }
-      return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
+      return { ...ctx, [String(params.export_as ?? 'window_list')]: getWindowList(application) };
     }
     case 'chrome_tab_list': {
       const browser =
         typeof params.application === 'string' && params.application.trim()
           ? params.application.trim()
           : 'Google Chrome';
-      return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
+      return { ...ctx, [String(params.export_as ?? 'chrome_tab_list')]: listChromeTabs(browser) };
     }
     case 'clipboard_read':
-      return { ...ctx, [params.export_as || 'clipboard']: clipboardRead() };
+      return { ...ctx, [String(params.export_as ?? 'clipboard')]: clipboardRead() };
     case 'get_focused_input':
-      return { ...ctx, [params.export_as || 'focused_input']: detectFocusedInput() };
+      return { ...ctx, [String(params.export_as ?? 'focused_input')]: detectFocusedInput() };
     case 'get_screen_size':
-      return { ...ctx, [params.export_as || 'screen_size']: getScreenSize() };
+      return { ...ctx, [String(params.export_as ?? 'screen_size')]: getScreenSize() };
     case 'window_list': {
       const application =
         typeof params.application === 'string' && params.application.trim()
@@ -336,14 +346,14 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       if (!application) {
         throw new Error('window_list requires application param');
       }
-      return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
+      return { ...ctx, [String(params.export_as ?? 'window_list')]: getWindowList(application) };
     }
     case 'chrome_tab_list': {
       const browser =
         typeof params.application === 'string' && params.application.trim()
           ? params.application.trim()
           : 'Google Chrome';
-      return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
+      return { ...ctx, [String(params.export_as ?? 'chrome_tab_list')]: listChromeTabs(browser) };
     }
     case 'test_screen_stream': {
       const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
@@ -357,8 +367,8 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
         display_index: displaySelection.display_index,
         display_name: displaySelection.display_name,
-      } as any);
-      const frames: any[] = [];
+      } as never);
+      const frames: unknown[] = [];
       for await (const frame of bus.frameStream()) {
         frames.push(frame);
         if (frames.length >= Math.max(1, Number(params.max_frames || 2))) {
@@ -368,7 +378,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       await bus.close();
       return {
         ...ctx,
-        [params.export_as || 'screen_stream_test']: {
+        [String(params.export_as ?? 'screen_stream_test')]: {
           bridge_id: bridge.bridge_id,
           backend: 'stub',
           selected_display_index: displaySelection.display_index,
@@ -417,7 +427,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       await importBus.close();
       return {
         ...ctx,
-        [params.export_as || 'screen_roundtrip']: {
+        [String(params.export_as ?? 'screen_roundtrip')]: {
           bridge_id: bridge.bridge_id,
           selected_display_index: displaySelection.display_index,
           selected_display_name: displaySelection.display_name,
@@ -432,29 +442,38 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       assertUnsafeShellAllowed();
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await retry(
+        [String(params.export_as ?? 'last_capture')]: await retry(
           async () =>
             safeExecShellScript(
               resolveUserLoginShell(getRegisteredEnvText('SHELL'), '/bin/zsh'),
-              resolve(params.cmd),
+              String(resolve(String(params.cmd))),
               {
                 login: true,
                 cwd: rootDir,
-                env: stripAuthorityEnvOverrides(params.env),
+                env: stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined),
               }
             ).trim(),
-          buildRetryOptions(params.retry)
+          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
         ),
       };
     // LE-03: registry reconcile sweeps as in-process typed ops (formerly
     // `system:shell` wrappers around dist/scripts/reconcile_*.js). Structured
     // results land directly in ctx — no stdout parsing, no silent `|| echo` fallback.
     case 'reconcile_config_fallbacks':
-      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileConfigFallbacks() };
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks(),
+      };
     case 'reconcile_unclassified_errors':
-      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileUnclassifiedErrors() };
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'reconcile_result')]: reconcileUnclassifiedErrors(),
+      };
     case 'reconcile_unhandled_intents':
-      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileUnhandledIntents() };
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'reconcile_result')]: reconcileUnhandledIntents(),
+      };
     // LE-03 rollout batch 2: report/verify sweeps as in-process typed ops
     // (formerly system:shell/system:exec wrappers around dist/scripts/*.js).
     case 'cost_report': {
@@ -466,7 +485,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           : undefined;
       return {
         ...ctx,
-        [params.export_as || 'cost_report']: buildCostReportFromHistory({
+        [String(params.export_as ?? 'cost_report')]: buildCostReportFromHistory({
           since,
           until: params.until ? String(resolve(params.until)) : undefined,
         }),
@@ -475,7 +494,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'audit_verify':
       return {
         ...ctx,
-        [params.export_as || 'audit_report']: collectAuditVerifyReport({
+        [String(params.export_as ?? 'audit_report')]: collectAuditVerifyReport({
           since: params.since ? String(resolve(params.since)) : undefined,
           ledgers: Array.isArray(params.ledgers) ? params.ledgers.map(String) : undefined,
         }),
@@ -483,7 +502,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'summarize_memory_promotion_queue':
       return {
         ...ctx,
-        [params.export_as || 'memory_queue_summary']: runMemoryPromotionQueueSummary({
+        [String(params.export_as ?? 'memory_queue_summary')]: runMemoryPromotionQueueSummary({
           status: params.status ? String(resolve(params.status)) : undefined,
           output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
         }),
@@ -491,7 +510,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'summarize_task_model_routing':
       return {
         ...ctx,
-        [params.export_as || 'task_model_routing_summary']: runTaskModelRoutingSummary({
+        [String(params.export_as ?? 'task_model_routing_summary')]: runTaskModelRoutingSummary({
           task_events_path: params.task_events_path
             ? String(resolve(params.task_events_path))
             : undefined,
@@ -502,15 +521,17 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         }),
       };
     case 'cli_health_check': {
-      const command = resolve(params.command);
-      const args = params.args ? params.args.map((a: any) => resolve(a)) : ['--version'];
+      const command = String(resolve(params.command));
+      const args = params.args
+        ? (params.args as unknown[]).map((a) => String(resolve(a)))
+        : ['--version'];
       const result = await retry(
-        async () => safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 }),
-        buildRetryOptions(params.retry)
+        async () => safeExecResult(command, args, { timeoutMs: Number(params.timeout_ms) || 5000 }),
+        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
       );
       return {
         ...ctx,
-        [params.export_as || 'cli_health']: {
+        [String(params.export_as ?? 'cli_health')]: {
           available: result.status === 0,
           stdout: result.stdout.trim(),
           stderr: result.stderr.trim(),
@@ -520,26 +541,26 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     }
     case 'exec': {
       assertUnsafeShellAllowed();
-      const command = resolve(params.command);
-      const args = params.args ? params.args.map((a: any) => resolve(a)) : [];
+      const command = String(resolve(params.command));
+      const args = params.args ? (params.args as unknown[]).map((a) => String(resolve(a))) : [];
       // Pipeline-supplied env may not set execution authority (DR-01).
-      const env = stripAuthorityEnvOverrides(params.env);
+      const env = stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined);
       const result = await retry(
         async () =>
           safeExecResult(command, args, {
             cwd: params.cwd ? resolveSystemPath(String(resolve(params.cwd)), false) : rootDir,
             env,
-            timeoutMs: params.timeout_ms || 30000,
-            input: params.input ? resolve(params.input) : undefined,
+            timeoutMs: Number(params.timeout_ms) || 30000,
+            input: params.input ? String(resolve(params.input)) : undefined,
           }),
-        buildRetryOptions(params.retry)
+        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
       );
       if (result.status !== 0 && !params.allow_error) {
         throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
       }
       return {
         ...ctx,
-        [params.export_as || 'last_exec']: {
+        [String(params.export_as ?? 'last_exec')]: {
           stdout: result.stdout.trim(),
           stderr: result.stderr.trim(),
           status: result.status,
@@ -562,7 +583,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: readSystemJson(
+        [String(params.export_as ?? 'last_capture_data')]: readSystemJson(
           resolveSystemPath(String(resolve(params.path))),
           'system read_json input'
         ),
@@ -572,7 +593,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         const status = probeSileroVad();
         return {
           ...ctx,
-          [params.export_as || 'last_probe']: {
+          [String(params.export_as ?? 'last_probe')]: {
             capability: 'silero_vad',
             available: status.available,
             ...(status.reason ? { reason: status.reason } : {}),
@@ -589,12 +610,12 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       try {
         exists = await retry(
           async () => safeExistsSync(targetPath),
-          buildRetryOptions(params.retry)
+          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
         );
         if (exists) {
           const stats = await retry(
             async () => safeStat(targetPath),
-            buildRetryOptions(params.retry)
+            buildRetryOptions(params.retry as Record<string, unknown> | undefined)
           );
           kind = stats.isDirectory() ? 'dir' : 'file';
         }
@@ -603,7 +624,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       }
       return {
         ...ctx,
-        [params.export_as || 'last_probe']: {
+        [String(params.export_as ?? 'last_probe')]: {
           path: resolve(params.path),
           exists,
           kind,
@@ -633,7 +654,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       }
       return {
         ...ctx,
-        [params.export_as || 'last_probe']: {
+        [String(params.export_as ?? 'last_probe')]: {
           path: relativePath,
           exists,
           kind,
@@ -643,10 +664,10 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'glob_files':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: getAllFiles(
+        [String(params.export_as ?? 'file_list')]: getAllFiles(
           resolveSystemPath(String(resolve(params.dir)))
         )
-          .filter((f) => !params.ext || f.endsWith(params.ext))
+          .filter((f) => !params.ext || f.endsWith(String(params.ext)))
           .map((f) => path.relative(pathResolver.rootDir(), f)),
       };
     case 'scan_directory': {
@@ -655,7 +676,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       if (!scanExists(scanRoot)) {
         return {
           ...ctx,
-          [params.export_as || 'scan_result']: {
+          [String(params.export_as ?? 'scan_result')]: {
             files: [],
             count: 0,
             dir: resolve(params.path || '.'),
@@ -678,7 +699,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           (p) => rel.includes(p) || rel.split(path.sep).some((seg) => seg === p)
         );
 
-      const scanDir = (dir: string, depth: number): any[] => {
+      const scanDir = (dir: string, depth: number): Record<string, unknown>[] => {
         if (depth > maxDepth) return [];
         let entries: string[];
         try {
@@ -686,7 +707,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         } catch {
           return [];
         }
-        const results: any[] = [];
+        const results: Record<string, unknown>[] = [];
         for (const entry of entries) {
           if (entry.startsWith('.')) continue;
           let abs: string;
@@ -708,7 +729,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
             if (recursive) results.push(...scanDir(abs, depth + 1));
           } else {
             if (patternRe && !patternRe.test(rel)) continue;
-            const entry_result: any = { path: rel };
+            const entry_result: Record<string, unknown> = { path: rel };
             if (includeMetadata) {
               entry_result.size = stats.size;
               entry_result.mtime = stats.mtimeMs;
@@ -721,23 +742,27 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
 
       const files = scanDir(scanRoot, 0);
       const data = { files, count: files.length, dir: resolve(params.path || '.') };
-      return { ...ctx, [params.export_as || 'scan_result']: data };
+      return { ...ctx, [String(params.export_as ?? 'scan_result')]: data };
     }
     case 'vision_consult':
       return {
         ...ctx,
-        [params.export_as || 'vision_decision']: await retry(
-          async () => visionJudge.consultVision(resolve(params.context), params.tie_break_options),
-          buildRetryOptions(params.retry)
+        [String(params.export_as ?? 'vision_decision')]: await retry(
+          async () =>
+            visionJudge.consultVision(
+              resolve(params.context as Record<string, unknown>) as string,
+              params.tie_break_options as never
+            ),
+          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
         ),
       };
     case 'pulse_status': {
       const { ledger } = await import('@agent/core/ledger');
-      return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
+      return { ...ctx, [String(params.export_as ?? 'ledger_valid')]: ledger.verifyIntegrity() };
     }
     case 'baseline_check': {
       const report = await runBaselineCheck();
-      return { ...ctx, [params.export_as || 'baseline_check']: report };
+      return { ...ctx, [String(params.export_as ?? 'baseline_check')]: report };
     }
     case 'list_missions': {
       const missionRoot = resolveSystemPath('active/missions');
@@ -746,7 +771,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         typeof params.status === 'string' && params.status.trim()
           ? params.status.trim()
           : undefined;
-      const allMissions: any[] = [];
+      const allMissions: Record<string, unknown>[] = [];
       for (const tier of tiers) {
         const tierPath = path.join(missionRoot, tier);
         if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
@@ -773,18 +798,18 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         }
       }
       const data = { status: 'ok', mission_list: allMissions, count: allMissions.length };
-      return { ...ctx, [params.export_as || 'mission_list_data']: data };
+      return { ...ctx, [String(params.export_as ?? 'mission_list_data')]: data };
     }
     case 'list_projects': {
       const { listProjectRecords } = await import('@agent/core/project/project-registry');
       const projects = listProjectRecords();
       const data = { status: 'ok', project_list: projects, count: projects.length };
-      return { ...ctx, [params.export_as || 'project_list_data']: data };
+      return { ...ctx, [String(params.export_as ?? 'project_list_data')]: data };
     }
     case 'list_capabilities': {
       const actuatorRoot = pathResolver.rootResolve('libs/actuators');
       const { safeReaddir } = await import('@agent/core/secure-io');
-      const capabilities: any[] = [];
+      const capabilities: Record<string, unknown>[] = [];
       if (safeExistsSync(actuatorRoot)) {
         const entries = safeReaddir(actuatorRoot);
         for (const entry of entries) {
@@ -809,15 +834,15 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         }
       }
       const data = { status: 'ok', capability_list: capabilities, count: capabilities.length };
-      return { ...ctx, [params.export_as || 'capability_list_data']: data };
+      return { ...ctx, [String(params.export_as ?? 'capability_list_data')]: data };
     }
     case 'list_tool_runtimes': {
       const inventory = listToolRuntimeInventory(
-        typeof params.requested_mode === 'string' ? (params.requested_mode as any) : 'trial'
+        typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
       );
       return {
         ...ctx,
-        [params.export_as || 'tool_runtimes']: {
+        [String(params.export_as ?? 'tool_runtimes')]: {
           version: inventory.version,
           platform: inventory.platform,
           requested_mode: inventory.requested_mode,
@@ -840,11 +865,11 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     }
     case 'list_service_runtimes': {
       const inventory = await listServiceRuntimeInventory(
-        typeof params.requested_mode === 'string' ? (params.requested_mode as any) : 'trial'
+        typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
       );
       return {
         ...ctx,
-        [params.export_as || 'service_runtimes']: {
+        [String(params.export_as ?? 'service_runtimes')]: {
           version: inventory.version,
           platform: inventory.platform,
           requested_mode: inventory.requested_mode,
@@ -872,7 +897,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'list_knowledge': {
       const incidentRoot = pathResolver.rootResolve('knowledge/product/incidents');
       const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
-      const incidents: any[] = [];
+      const incidents: Record<string, unknown>[] = [];
       if (safeExistsSync(incidentRoot)) {
         const entries = readIncidentDir(incidentRoot);
         for (const entry of entries.filter((e) => e.endsWith('.md'))) {
@@ -883,7 +908,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         }
       }
       const data = { status: 'ok', incident_list: incidents, count: incidents.length };
-      return { ...ctx, [params.export_as || 'incident_list_data']: data };
+      return { ...ctx, [String(params.export_as ?? 'incident_list_data')]: data };
     }
     case 'collect_artifacts': {
       const missionRoot = path.resolve(process.cwd(), 'active/missions');
@@ -891,7 +916,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         const relative = path.relative(basePath, targetPath);
         return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
       };
-      const missionObjectToRelPath = (m: any): string =>
+      const missionObjectToRelPath = (m: Record<string, unknown>): string =>
         typeof m?.path === 'string'
           ? path.relative(missionRoot, path.resolve(process.cwd(), m.path))
           : `${m?.tier ?? 'confidential'}/${m?.id ?? ''}`;
@@ -916,7 +941,9 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
             !Array.isArray(resolved) &&
             'mission_list' in resolved
           ) {
-            return ((resolved as any).mission_list as any[]).map(missionObjectToRelPath);
+            return (
+              (resolved as Record<string, unknown>).mission_list as Record<string, unknown>[]
+            ).map(missionObjectToRelPath);
           }
           if (Array.isArray(resolved)) {
             return resolved.flatMap((entry) => {
@@ -974,12 +1001,12 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           }
         }
       }
-      return { ...ctx, [params.export_as || 'artifact_collection']: results };
+      return { ...ctx, [String(params.export_as ?? 'artifact_collection')]: results };
     }
     case 'sample_traces': {
       const missionRoot = resolveSystemPath('active/missions');
       const count = Number(params.count || 5);
-      const allTraces: any[] = [];
+      const allTraces: Record<string, unknown>[] = [];
       const tiers = ['personal', 'confidential', 'public'];
       const { safeReaddir } = await import('@agent/core/secure-io');
       for (const tier of tiers) {
@@ -1003,26 +1030,26 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
       const results = sampled.map((s) => ({
         missionId: s.missionId,
-        trace: readSystemJson(assertSafeRepositoryPath(s.path), 'system mission trace'),
+        trace: readSystemJson(assertSafeRepositoryPath(String(s.path)), 'system mission trace'),
       }));
-      return { ...ctx, [params.export_as || 'sampled_traces']: results };
+      return { ...ctx, [String(params.export_as ?? 'sampled_traces')]: results };
     }
     case 'list_running_apps': {
       const { platform } = await import('@agent/core/platform');
       const apps = await platform.listRunningApps();
-      return { ...ctx, [params.export_as || 'running_apps']: apps };
+      return { ...ctx, [String(params.export_as ?? 'running_apps')]: apps };
     }
     case 'list_input_devices': {
       const bridge = createVirtualInputDeviceInventoryBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'input_devices']: probe.inventory };
+      return { ...ctx, [String(params.export_as ?? 'input_devices')]: probe.inventory };
     }
     case 'list_displays': {
       const bridge = createScreenDisplayInventoryBridge();
       const probe = await bridge.probe();
       return {
         ...ctx,
-        [params.export_as || 'display_inventory']: {
+        [String(params.export_as ?? 'display_inventory')]: {
           inventory: probe.inventory,
           primary_display: Array.isArray(probe.inventory.displays)
             ? probe.inventory.displays.find((display) => display.primary) ||
@@ -1040,7 +1067,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const probe = await bridge.probe();
       return {
         ...ctx,
-        [params.export_as || 'media_devices']: {
+        [String(params.export_as ?? 'media_devices')]: {
           ...probe.selection,
           supported_actions: probe.supported_actions,
         },
@@ -1049,20 +1076,20 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'control_media_devices': {
       const bridge = createVirtualMediaDeviceControlBridge();
       const result = await bridge.control({
-        action: typeof params.action === 'string' ? params.action : 'select',
-        scope: typeof params.scope === 'string' ? params.scope : 'all',
+        action: (typeof params.action === 'string' ? params.action : 'select') as never,
+        scope: (typeof params.scope === 'string' ? params.scope : 'all') as never,
       });
-      return { ...ctx, [params.export_as || 'media_control']: result };
+      return { ...ctx, [String(params.export_as ?? 'media_control')]: result };
     }
     case 'list_audio_output_devices': {
       const bridge = createVirtualAudioOutputPlaybackBridge();
-      const result = await bridge.playOnOutputs(params.targets);
-      return { ...ctx, [params.export_as || 'audio_output_devices']: result };
+      const result = await bridge.playOnOutputs(params.targets as string[]);
+      return { ...ctx, [String(params.export_as ?? 'audio_output_devices')]: result };
     }
     case 'list_audio_input_devices': {
       const bridge = createVirtualAudioInputRecordingBridge();
-      const result = await bridge.recordOnInputs(params.targets);
-      return { ...ctx, [params.export_as || 'audio_input_devices']: result };
+      const result = await bridge.recordOnInputs(params.targets as string[]);
+      return { ...ctx, [String(params.export_as ?? 'audio_input_devices')]: result };
     }
     case 'camera_capture': {
       return runCameraCaptureProbe(params, ctx);
@@ -1073,22 +1100,22 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'screen_capture': {
       const bridge = createScreenCaptureBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'screen_capture']: probe };
+      return { ...ctx, [String(params.export_as ?? 'screen_capture')]: probe };
     }
     case 'screen_recording': {
       const bridge = createScreenRecordingBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'screen_recording']: probe };
+      return { ...ctx, [String(params.export_as ?? 'screen_recording')]: probe };
     }
     case 'test_audio_outputs': {
       const bridge = createVirtualAudioOutputPlaybackBridge();
-      const result = await bridge.playOnOutputs(params.targets);
-      return { ...ctx, [params.export_as || 'audio_test']: result };
+      const result = await bridge.playOnOutputs(params.targets as string[]);
+      return { ...ctx, [String(params.export_as ?? 'audio_test')]: result };
     }
     case 'test_audio_inputs': {
       const bridge = createVirtualAudioInputRecordingBridge();
-      const result = await bridge.recordOnInputs(params.targets);
-      return { ...ctx, [params.export_as || 'audio_input_test']: result };
+      const result = await bridge.recordOnInputs(params.targets as string[]);
+      return { ...ctx, [String(params.export_as ?? 'audio_input_test')]: result };
     }
     case 'test_camera_stream': {
       return runTestCameraStreamOp(params, ctx);
@@ -1137,7 +1164,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
             `resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`
           );
       }
-      return { ...ctx, [params.export_as || 'resolved_path']: result };
+      return { ...ctx, [String(params.export_as ?? 'resolved_path')]: result };
     }
     default:
       throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
@@ -1163,14 +1190,17 @@ export const {
   unsafeGates: { assertUnsafeJsAllowed: { env: 'KYBERION_ALLOW_UNSAFE_JS', label: 'JS' } },
 });
 
-export async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
+export async function delegateToFilePipeline(
+  step: PipelineStep,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
   const delegatedCtx = { ...ctx };
   delete delegatedCtx.context_path;
   const result = await handleFileAction({
     action: 'pipeline',
     steps: [step],
     context: delegatedCtx,
-  } as any);
+  } as unknown as Parameters<typeof handleFileAction>[0]);
   return result.context || ctx;
 }
 
@@ -1185,7 +1215,7 @@ export function warnDeprecatedSystemOpAlias(alias: string, canonical: string) {
   logger.warn(`[system-actuator] alias "${alias}" is deprecated; use "${canonical}" instead.`);
 }
 
-export function assertSystemOpInput(op: string, params: any) {
+export function assertSystemOpInput(op: string, params: Record<string, unknown>) {
   const validation = validateOpInput('system', op, params);
   if (!validation.valid) {
     throw new Error(
@@ -1194,8 +1224,12 @@ export function assertSystemOpInput(op: string, params: any) {
   }
 }
 
-export function promoteDelegatedCapture(resultCtx: any, params: any, fallbackKey: string): any {
-  const exportAs = params.export_as;
+export function promoteDelegatedCapture(
+  resultCtx: Record<string, unknown>,
+  params: Record<string, unknown>,
+  fallbackKey: string
+): Record<string, unknown> {
+  const exportAs = typeof params.export_as === 'string' ? params.export_as : undefined;
   if (!exportAs || resultCtx?.[exportAs] !== undefined) return resultCtx;
   if (resultCtx?.[fallbackKey] === undefined) return resultCtx;
   return { ...resultCtx, [exportAs]: resultCtx[fallbackKey] };
@@ -1226,7 +1260,7 @@ export function selectDisplayFromInventory(
 
 export async function resolveScreenDisplaySelection(
   params: Record<string, any>,
-  resolve: (value: any) => any
+  resolve: (value: unknown) => unknown
 ): Promise<ResolvedScreenDisplaySelection> {
   return systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
 }
@@ -1350,39 +1384,43 @@ export function windowTitleMatches(
 
 export async function opControl(
   op: string,
-  params: any,
-  ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
-  _resolve: (value: any) => any
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  runSteps: (
+    steps: AdfStep[],
+    seedCtx?: Record<string, unknown>
+  ) => Promise<AdfRunResult<Record<string, unknown>>>,
+  _resolve: (value: unknown) => unknown
 ) {
-  const runNested = async (steps: any[], seedCtx: any) => {
+  const runNested = async (steps: AdfStep[], seedCtx: Record<string, unknown> | undefined) => {
     const res = await runSteps(steps, seedCtx);
     if (res.status === 'failed') {
-      throw new Error(
-        res.results.find((entry: any) => entry.status === 'failed')?.error ||
-          'nested pipeline failed'
-      );
+      const failedEntry = res.results.find((entry) => entry.status === 'failed');
+      throw new Error(String(failedEntry?.error ?? 'nested pipeline failed'));
     }
-    return res.context;
+    return res.context as Record<string, unknown>;
   };
 
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        return await runNested(params.then, ctx);
+        return await runNested(params.then as AdfStep[], ctx);
       } else if (params.else) {
-        return await runNested(params.else, ctx);
+        return await runNested(params.else as AdfStep[], ctx);
       }
       return ctx;
 
     case 'while': {
       let iterations = 0;
       const maxIter = params.max_iterations || undefined;
-      while (evaluateCondition(params.condition, ctx) && withinLoopBounds(iterations, maxIter)) {
+      while (
+        evaluateCondition(params.condition, ctx) &&
+        withinLoopBounds(iterations as number, maxIter as number)
+      ) {
         logger.info(`    [LOOP] Iteration ${++iterations}...`);
-        ctx = await runNested(params.pipeline, ctx);
+        ctx = await runNested(params.pipeline as AdfStep[], ctx);
       }
-      if (!withinLoopBounds(iterations, maxIter))
+      if (!withinLoopBounds(iterations as number, maxIter as number))
         logger.warn(
           `[SAFETY_GUARD] Loop reached max_iterations (${maxIter ?? DEFAULT_MAX_LOOP_ITERATIONS})`
         );

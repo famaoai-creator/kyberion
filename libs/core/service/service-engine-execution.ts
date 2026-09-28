@@ -170,7 +170,9 @@ export async function executeServicePresetAlternative(
           return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
         });
         const execEnv = buildPresetProcessEnv(
-          stripUnresolvedTemplateValues(resolveTemplateValue(input.alt.env || {}, runtimeVars))
+          stripUnresolvedTemplateValues(
+            resolveTemplateValue(input.alt.env || {}, runtimeVars)
+          ) as Record<string, unknown>
         );
         logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
         return execEnv ? safeExec(bin, args, { env: execEnv }) : safeExec(bin, args);
@@ -185,7 +187,9 @@ export async function executeServicePresetAlternative(
   if (input.alt.type === 'mcp' && input.alt.url) {
     const remoteUrl = resolveVars(String(input.alt.url), runtimeVars);
     const mcpHeaders = buildChildEnv(
-      stripUnresolvedTemplateValues(resolveTemplateValue(input.alt.headers || {}, runtimeVars))
+      stripUnresolvedTemplateValues(
+        resolveTemplateValue(input.alt.headers || {}, runtimeVars)
+      ) as Record<string, unknown>
     );
 
     const mcpResult = await retry(
@@ -217,7 +221,9 @@ export async function executeServicePresetAlternative(
       throw new Error('CLI execution disabled.');
     }
     const mcpEnv = buildPresetProcessEnv(
-      stripUnresolvedTemplateValues(resolveTemplateValue(input.alt.env || {}, runtimeVars))
+      stripUnresolvedTemplateValues(
+        resolveTemplateValue(input.alt.env || {}, runtimeVars)
+      ) as Record<string, unknown>
     );
 
     const mcpResult = await retry(
@@ -277,7 +283,7 @@ export async function executeServicePresetAlternative(
         const payload = prepareRequestBody(rawPayload, headers);
         const requestParams = isPlainObject(rawQuery)
           ? {
-              ...resolveTemplateValue(rawQuery, runtimeVars),
+              ...(resolveTemplateValue(rawQuery, runtimeVars) as Record<string, unknown>),
               ...authQuery,
             }
           : Object.keys(authQuery).length > 0
