@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   loadState: vi.fn(),
 }));
 
-vi.mock('@agent/core/mission-state', () => ({
+vi.mock('@agent/core/mission/mission-state', () => ({
   loadState: mocks.loadState,
 }));
 

@@ -3,14 +3,14 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
-} from '@agent/core/memory-promotion-queue';
+} from '@agent/core/knowledge/memory-promotion-queue';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import { listMemoryQueue } from './refactor/mission-memory-commands.js';
 import { ScriptExitError } from './lib/harness.js';
 
 // Isolate this suite's queue reads from the repository's real (gitignored,
 // ambient) runtime queue, matching the documented override used by
-// libs/core/memory-promotion-queue.test.ts.
+// libs/core/knowledge/memory-promotion-queue.test.ts.
 const TEST_QUEUE_PATH =
   'active/shared/tmp/test-memory-queue-mission-memory-commands-entrypoint.jsonl';
 

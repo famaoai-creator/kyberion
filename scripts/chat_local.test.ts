@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core/reasoning-bootstrap', () => ({
+vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
   installReasoningBackends: mocks.installReasoningBackends,
 }));
 

@@ -31,16 +31,17 @@ vi.mock('@agent/core', async (importOriginal) => {
 // (SX simplicity abstraction pass, commit a877d9c12) rather than the
 // aggregate `@agent/core` entry point mocked above, so the fixtures above
 // never reached the real call sites — mock the actual import sites too.
-vi.mock('@agent/core/service-endpoint-registry', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/service-endpoint-registry')>();
+vi.mock('@agent/core/service/service-endpoint-registry', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/service/service-endpoint-registry')>();
   return {
     ...actual,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
   };
 });
 
-vi.mock('@agent/core/service-validator', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/service-validator')>();
+vi.mock('@agent/core/service/service-validator', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/service/service-validator')>();
   return {
     ...actual,
     inspectServiceAuth: mocks.inspectServiceAuth,

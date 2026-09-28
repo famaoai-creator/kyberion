@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { resolveTenantDesign } from '@agent/core/tenant-design-resolver';
+import { resolveTenantDesign } from '@agent/core/organization/tenant-design-resolver';
 import { isWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { guardRequest } from '../../../lib/api-guard';

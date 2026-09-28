@@ -16,9 +16,9 @@ vi.mock('@agent/core/foundation', async () => {
   return { ...actual, readJson: mocks.readJson };
 });
 
-vi.mock('@agent/core/a2a-envelope', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/a2a-envelope')>(
-    '@agent/core/a2a-envelope'
+vi.mock('@agent/core/mesh/a2a-envelope', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/mesh/a2a-envelope')>(
+    '@agent/core/mesh/a2a-envelope'
   );
   return {
     ...actual,

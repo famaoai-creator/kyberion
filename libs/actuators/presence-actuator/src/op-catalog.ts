@@ -6,8 +6,8 @@
 // is strictly additive — determineActuatorStepType previously threw
 // unknown-op for all of them.
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 const PRESENCE_SCHEMA = {
   type: 'object',

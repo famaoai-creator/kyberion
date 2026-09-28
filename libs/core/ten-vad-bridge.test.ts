@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { probeTenVad, TenVad } from './ten-vad-bridge.js';
-import type { AudioChunk } from './meeting-session-types.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 function fakeBridgeCommand(): string[] {
   return [

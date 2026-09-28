@@ -41,8 +41,12 @@ describe('Customer onboarding contract', () => {
     // the cli must still render it via its key.
     const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
     expect(vocabulary).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
-    expect(cli).toContain("from './cli-presentation.js'");
-    expect(cli).toContain('printHelp');
+    // DS-08: help dispatch moved from cli.ts into cli-command-handlers.ts;
+    // the contract is that the CLI still renders help via printHelp.
+    const cliCommandHandlers = read('scripts/cli-command-handlers.ts');
+    expect(cli).toContain("from './cli-command-handlers.js'");
+    expect(cliCommandHandlers).toContain("from './cli-presentation.js'");
+    expect(cliCommandHandlers).toContain('printHelp');
     expect(cliPresentation).toContain("t('cli_help_onboard', locale)");
     expect(dashboard).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(localDev).toContain(

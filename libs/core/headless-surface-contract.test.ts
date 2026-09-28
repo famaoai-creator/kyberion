@@ -5,7 +5,7 @@ import {
   buildChronosHeadlessManifest,
   createHeadlessEnvelope,
 } from './headless-surface-contract.js';
-import { authorizeSurfaceContextOperation } from './surface-authn.js';
+import { authorizeSurfaceContextOperation } from './surface/surface-authn.js';
 
 describe('headless surface contract', () => {
   it('publishes discoverable read resources and an explicit localadmin write operation', () => {

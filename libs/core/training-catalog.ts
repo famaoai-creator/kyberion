@@ -10,7 +10,7 @@ import {
   safeWriteFile,
   assertSafeRepositoryPath,
 } from './secure-io.js';
-import { isValidMemberId } from './member-registry.js';
+import { isValidMemberId } from './organization/member-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
 export type TrainingStatus = 'not_started' | 'in_progress' | 'complete';

@@ -45,9 +45,9 @@ function formatSec(totalSec: number): string {
 
 function stripCueMarkup(text: string): string {
   return text
-    .replace(/<\s*v\s+([^>]+)>/giu, '$1: ')
+    .replace(/<\s*v\s+([^<>]+)>/giu, '$1: ')
     .replace(/<\/\s*v\s*>/giu, '')
-    .replace(/<[^>]*>/gu, '')
+    .replace(/<[^<>]*>/gu, '')
     .replace(/&nbsp;/gu, ' ')
     .replace(/&amp;/gu, '&')
     .replace(/&lt;/gu, '<')

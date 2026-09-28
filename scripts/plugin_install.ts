@@ -33,18 +33,18 @@
  *   pnpm plugin:install --deactivate my-plugin [--json]
  */
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { importPluginPack } from '@agent/core/plugin-pack';
+import { importPluginPack } from '@agent/core/plugin/plugin-pack';
 import {
   formatPermissionDiffTable,
   installPluginManaged,
   PluginPermissionNarrowedError,
   type ManagedPluginRecord,
-} from '@agent/core/plugin-managed-install';
+} from '@agent/core/plugin/plugin-managed-install';
 import {
   deactivatePlugin,
   reloadPlugin,
   type PluginLifecycleResult,
-} from '@agent/core/plugin-lifecycle';
+} from '@agent/core/plugin/plugin-lifecycle';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

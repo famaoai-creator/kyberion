@@ -1,9 +1,9 @@
-import type { UserIntentFlow } from '@agent/core/intent-contract';
-import { deriveIntentDeliveryDecision } from '@agent/core/intent-contract';
+import type { UserIntentFlow } from '@agent/core/intent/intent-contract';
+import { deriveIntentDeliveryDecision } from '@agent/core/intent/intent-contract';
 import {
   composeMissionTeamPlan,
   type MissionTeamPlan,
-} from '@agent/core/mission-team-plan-composer';
+} from '@agent/core/mission/mission-team-plan-composer';
 
 export interface PlanPreviewRequestContext {
   missionId: string;

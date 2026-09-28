@@ -1,5 +1,5 @@
 import type { ContextSecurityScope } from './context-security-scope.js';
-import type { ReasoningParticipant } from './reasoning-participant.js';
+import type { ReasoningParticipant } from './reasoning/reasoning-participant.js';
 
 export type ParticipantRisk = 'low' | 'medium' | 'high' | 'high_stakes';
 

@@ -7,8 +7,8 @@ import {
   planActuatorDryRun,
   resolveCliActionKind,
   type ActuatorDefinition,
-} from './actuator-sdk.js';
-import type { PipelineStepType } from './actuator-op-registry.js';
+} from './actuator/actuator-sdk.js';
+import type { PipelineStepType } from './actuator/actuator-op-registry.js';
 import { createAjv } from './foundation/ajv.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord, readTextFile } from './foundation/text.js';

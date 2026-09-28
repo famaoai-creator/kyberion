@@ -1,5 +1,5 @@
-import type { AudioChunk } from './meeting-session-types.js';
-import { chunkDurationMs, type AudioBufferPolicy } from './audio-route.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
+import { chunkDurationMs, type AudioBufferPolicy } from './voice/audio-route.js';
 
 export interface BoundedAudioQueueMetrics {
   depth: number;

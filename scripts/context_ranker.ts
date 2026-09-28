@@ -22,7 +22,10 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { currentScope } from '@agent/core/scope-context';
 import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { loadKnowledgeTaxonomy, type KnowledgeTaxonomy } from '@agent/core/knowledge-taxonomy';
+import {
+  loadKnowledgeTaxonomy,
+  type KnowledgeTaxonomy,
+} from '@agent/core/knowledge/knowledge-taxonomy';
 import {
   scopeAffinityScore,
   docAuthorityScore,
@@ -30,9 +33,12 @@ import {
   knowledgeScopeProximityScore,
   loadKnowledgeRankingWeights,
 } from '@agent/core/ranking-signals';
-import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/core/knowledge-scope';
+import {
+  resolveKnowledgeScopeSet,
+  assertKnowledgePathInScope,
+} from '@agent/core/knowledge/knowledge-scope';
 import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop';
-import { loadAnalysisConfigAtPath } from '@agent/core/analysis-config';
+import { loadAnalysisConfigAtPath } from '@agent/core/analysis/analysis-config';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';
 import { isRecord, readTextFile } from '@agent/core/foundation';

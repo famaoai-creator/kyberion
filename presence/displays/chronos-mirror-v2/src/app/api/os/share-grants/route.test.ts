@@ -65,7 +65,7 @@ vi.mock('@agent/core/provenance-taint', () => ({
   ProvenanceTaintPolicyError: mocks.ProvenanceTaintPolicyError,
 }));
 
-vi.mock('@agent/core/tenant-registry', () => ({
+vi.mock('@agent/core/organization/tenant-registry', () => ({
   resolveTenant: vi.fn(() => ({ profile: null })),
 }));
 

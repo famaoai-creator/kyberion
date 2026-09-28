@@ -28,12 +28,12 @@ import {
   buildMeetingOperationsBrief,
   getMeetingBriefQuestions,
   loadMeetingOperationsProfileAtPath,
-} from '@agent/core/meeting-operations-profile';
+} from '@agent/core/meeting/meeting-operations-profile';
 import {
   loadMeetingAttendeesAtPath,
   validateMeetingAttendees,
   type MeetingAttendee,
-} from '@agent/core/meeting-attendees';
+} from '@agent/core/meeting/meeting-attendees';
 import {
   listOperatorSelfPending,
   listOthersPending,

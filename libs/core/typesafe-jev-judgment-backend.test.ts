@@ -5,12 +5,12 @@ import {
   resetJudgmentBackends,
   selectJudgmentBackend,
   type JudgmentQuestion,
-} from './judgment-backend.js';
+} from './reasoning/judgment-backend.js';
 import {
   createTypeSafeJevBackend,
   TYPESAFE_JEV_PROVIDER,
 } from './typesafe-jev-judgment-backend.js';
-import { registerOrganizationWorkJudgment } from './organization-operating-model-persistence.js';
+import { registerOrganizationWorkJudgment } from './organization/organization-operating-model-persistence.js';
 
 const QUESTION: JudgmentQuestion = {
   kind: 'choice',

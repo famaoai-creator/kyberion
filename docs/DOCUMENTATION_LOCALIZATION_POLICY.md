@@ -66,7 +66,7 @@ locales every key must define — adding a locale is a data edit to that array p
 `pnpm generate:vocabulary-types`, never a hand-edited type union.
 
 The single type-safe entry point is `t(key, params?, locale?)` (`libs/core/t.ts`). `key` is a
-generated union (`libs/core/vocabulary-keys.generated.ts`), so referencing a key the catalog does
+generated union (`libs/core/knowledge/vocabulary-keys.generated.ts`), so referencing a key the catalog does
 not define is a compile-time error, not a runtime "renders the key itself" surprise. `params`
 render through an intentionally small ICU MessageFormat subset (`libs/core/message-format.ts`):
 simple `{name}` interpolation and `{count, plural, one {...} other {...}}` — nothing more (no

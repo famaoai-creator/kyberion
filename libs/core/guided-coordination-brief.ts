@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
+import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'

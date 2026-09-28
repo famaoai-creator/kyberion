@@ -52,7 +52,7 @@ export interface ReviewedChildProcess {
 const EXTERNAL_BINARY = 'runs an external binary, never a Kyberion entry point';
 
 export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
-  'libs/core/service-engine-execution.ts#executeServicePresetAlternative': {
+  'libs/core/service/service-engine-execution.ts#executeServicePresetAlternative': {
     targets: [],
     rationale:
       'runs a service preset CLI alternative through safeExec with an env built only from the preset (buildChildEnv), so buildSafeExecEnv never passes SYSTEM_ROLE on',
@@ -66,15 +66,15 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
     targets: [],
     rationale: `Apple Foundation Models helper; ${EXTERNAL_BINARY}`,
   },
-  'libs/core/src/pfc/PhysicalLayer.ts#checkBinary': {
+  'libs/core/pfc/PhysicalLayer.ts#checkBinary': {
     targets: [],
     rationale: `\`command -v\` / \`where\` probe; ${EXTERNAL_BINARY}`,
   },
-  'libs/core/virtual-camera-bridge.ts#isAvailableCommand': {
+  'libs/core/virtual/virtual-camera-bridge.ts#isAvailableCommand': {
     targets: [],
     rationale: `camera capture tool probe (imagesnap / ffmpeg); ${EXTERNAL_BINARY}`,
   },
-  'libs/core/virtual-camera-bridge.ts#ensureBuiltinVirtualCameraCaptureBackends': {
+  'libs/core/virtual/virtual-camera-bridge.ts#ensureBuiltinVirtualCameraCaptureBackends': {
     targets: [],
     rationale: `camera capture tools (imagesnap / ffmpeg / sips / cp); ${EXTERNAL_BINARY}`,
   },

@@ -3,8 +3,8 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
-import type { MissionState } from './mission-types.js';
+import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
+import type { MissionState } from './mission/mission-types.js';
 
 interface InjectionSignal {
   injection_suspected?: boolean;

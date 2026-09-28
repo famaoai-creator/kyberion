@@ -1,8 +1,8 @@
 import {
   collectMissionHygieneReport,
   type PlannedMissionFinding,
-} from '@agent/core/mission-hygiene';
-import { loadState } from '@agent/core/mission-state';
+} from '@agent/core/mission/mission-hygiene';
+import { loadState } from '@agent/core/mission/mission-state';
 import { withExecutionContext } from '@agent/core/authority';
 import type { ConciergeViewerContext } from './viewer-context';
 

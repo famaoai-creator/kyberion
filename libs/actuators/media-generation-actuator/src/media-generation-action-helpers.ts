@@ -1,15 +1,15 @@
 import { logger } from '@agent/core/core';
-import { executeServicePreset } from '@agent/core/service-engine';
-import { derivePipelineStatus } from '@agent/core/pipeline-contract';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { executeServicePreset } from '@agent/core/service/service-engine';
+import { derivePipelineStatus } from '@agent/core/pipeline/pipeline-contract';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { classifyError } from '@agent/core/error-classifier';
 import { normalizeEventScope } from '@agent/core/event-scope';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
-import type { GenerationJob } from '@agent/core/types/generation-job';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import type { GenerationJob } from '@agent/core/contracts/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
@@ -146,7 +146,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       !prepared.params.image_adf
     ) {
       const { generateImage, imageGenerationBackendIdForProvider } =
-        await import('@agent/core/image-generation-bridge');
+        await import('@agent/core/media/image-generation-bridge');
       const backend = resolveGenerationBackend(action, prepared.params);
       const bridgeRes = await generateImage({
         prompt: typeof prepared.params.prompt === 'string' ? prepared.params.prompt : '',
@@ -213,7 +213,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       // ranks the local providers; no purpose keeps the ComfyUI default.
       const musicPurpose = resolveMusicProviderPurpose(prepared.params);
       if (isDirectMusicGenerationBackend(backend) || musicPurpose) {
-        const { generateMusic } = await import('@agent/core/music-generation-bridge');
+        const { generateMusic } = await import('@agent/core/media/music-generation-bridge');
         const bridgeRequest = resolveMusicBridgeRequest(prepared.params);
         const format = musicPurpose ? resolveMusicRequestedFormat(prepared.params) : undefined;
         const bridgeRes = await generateMusic({

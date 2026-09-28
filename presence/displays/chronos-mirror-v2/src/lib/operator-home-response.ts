@@ -3,7 +3,7 @@ import type {
   OperatorHomeSummary,
   OperatorHomeMissionItem,
   OperatorHomeCostSummary,
-} from '@agent/core/operator-home-summary';
+} from '@agent/core/surface/operator-home-summary';
 
 export type ClientOperatorHomeSummary = OperatorHomeSummary & {
   /** Kept optional for older projections; the current API derives active missions only. */

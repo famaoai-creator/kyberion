@@ -24,14 +24,10 @@
  * labelled where reconciled, and a queue to label where not.
  */
 
-import {
-  classifyError,
-  type ErrorCategory,
-  type ErrorClassification,
-} from './error-classifier.js';
-import { assistWithJudgment, choiceAnswer } from './judgment-assist.js';
+import { classifyError, type ErrorCategory, type ErrorClassification } from './error-classifier.js';
+import { assistWithJudgment, choiceAnswer } from './reasoning/judgment-assist.js';
 import { listUnclassifiedErrors } from './unclassified-error-registry.js';
-import type { JudgmentQuestion } from './judgment-backend.js';
+import type { JudgmentQuestion } from './reasoning/judgment-backend.js';
 import type { TierLevel } from './types.js';
 
 export const ERROR_CATEGORY_QUESTION = 'error.category';
@@ -49,7 +45,8 @@ export const ERROR_CATEGORY_DESCRIPTIONS: Record<Exclude<ErrorCategory, 'unknown
   missing_dependency: 'a required binary or package is not installed',
   missing_secret: 'an expected environment variable or keychain entry is absent',
   invalid_input: 'the input was malformed: bad JSON, a schema violation, a broken contract',
-  resource_unavailable: 'a resource is taken or exhausted: a port in use, a locked file, a full disk',
+  resource_unavailable:
+    'a resource is taken or exhausted: a port in use, a locked file, a full disk',
   timeout: 'the operation ran past its time limit',
   governance_block: 'a governance policy refused it, or an approval is required first',
   tier_violation: 'the data tier guard refused the access',
@@ -62,8 +59,7 @@ export function errorCategoryQuestion(): JudgmentQuestion {
     id: ERROR_CATEGORY_QUESTION,
     options: Object.keys(ERROR_CATEGORY_DESCRIPTIONS),
     optionDescriptions: ERROR_CATEGORY_DESCRIPTIONS,
-    instructions:
-      'This is an error produced by an automation system. Which kind of failure is it?',
+    instructions: 'This is an error produced by an automation system. Which kind of failure is it?',
   };
 }
 
@@ -138,7 +134,8 @@ export async function classifyErrorAssisted(
         ...current,
         category,
         label: `${current.label} (judged ${category})`,
-        remediation: ERROR_CATEGORY_DESCRIPTIONS[category as keyof typeof ERROR_CATEGORY_DESCRIPTIONS],
+        remediation:
+          ERROR_CATEGORY_DESCRIPTIONS[category as keyof typeof ERROR_CATEGORY_DESCRIPTIONS],
         ruleId: 'judgment',
       };
     },

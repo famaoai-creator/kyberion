@@ -10,7 +10,7 @@ import {
   Section,
   StatusPill,
 } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import type { AttentionItem } from '../lib/operator-console';
 import {
   attentionActionLabel,

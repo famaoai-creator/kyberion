@@ -92,13 +92,13 @@ Mission の実装を `dispatch-workitems` 外で完了して `reconcile-work` �
 
 ## 7. 検証結果
 
-- `pnpm vitest run libs/core/artifact-review.test.ts libs/core/mission-review-gates.test.ts libs/core/mission-team-composer.test.ts libs/core/mission-orchestration-worker.test.ts libs/core/marketing-workload.test.ts scripts/marketing_review_aggregate.test.ts scripts/refactor/mission-governance.test.ts scripts/refactor/mission-lifecycle.test.ts scripts/refactor/mission-work-reconciliation.test.ts scripts/refactor/mission-ticket-dispatch.test.ts scripts/refactor/mission-workitem-dispatch.test.ts`: 11 files / 120 tests passed
+- `pnpm vitest run libs/core/workforce/artifact-review.test.ts libs/core/mission/mission-review-gates.test.ts libs/core/mission/mission-team-composer.test.ts libs/core/mission/mission-orchestration-worker.test.ts libs/core/marketing-workload.test.ts scripts/marketing_review_aggregate.test.ts scripts/refactor/mission-governance.test.ts scripts/refactor/mission-lifecycle.test.ts scripts/refactor/mission-work-reconciliation.test.ts scripts/refactor/mission-ticket-dispatch.test.ts scripts/refactor/mission-workitem-dispatch.test.ts`: 11 files / 120 tests passed
 - `pnpm validate`: exit 0。build、typecheck、catalog、governance、schema、semver、type-ratchet、tier hygiene を含む全ゲートを完走
 - `pnpm test`: 1 file / 2 tests passed
 - `pnpm test:unit`: 527 files / 3,323 tests passed / 11 skipped / 0 failed
 - `pnpm vitest run scripts/refactor/mission-workitem-dispatch.test.ts`: 17 tests passed。approved receipt、criterion-bound Evidence による task 完了、canonical dependency 順序を含む
 - `pnpm lint`: exit 0
-- `pnpm vitest run libs/core/peer-messaging.test.ts`: localhost listen を許可した環境で 5 tests passed
+- `pnpm vitest run libs/core/mesh/peer-messaging.test.ts`: localhost listen を許可した環境で 5 tests passed
 - `pnpm vitest run libs/core/security-boundary.contract.test.ts`: 1 test passed。package build が生成する `.d.ts` を production TypeScript source と誤認しないよう fixture を修正
 
 既知 warning は Next.js dynamic dependency、既存の未 baseline Actuator 1 件、SA-01 warn-only audit observation であり、本変更の gate failure ではない。

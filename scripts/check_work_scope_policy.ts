@@ -9,7 +9,7 @@ import {
   DERIVABLE_MANDATORY_TRIGGER_IDS,
   loadWorkScopePolicy,
   type WorkScopePolicy,
-} from '@agent/core/work-scope-decision';
+} from '@agent/core/workforce/work-scope-decision';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function collectWorkScopePolicyViolations(policy: WorkScopePolicy): string[] {

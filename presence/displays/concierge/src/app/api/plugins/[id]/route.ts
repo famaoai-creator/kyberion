@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   listManagedPlugins,
   refreshManagedPluginActivation,
-} from '@agent/core/plugin-managed-install';
+} from '@agent/core/plugin/plugin-managed-install';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';

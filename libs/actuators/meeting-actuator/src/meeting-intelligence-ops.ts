@@ -16,13 +16,13 @@ import {
 import {
   enqueueSlackOutboxMessage,
   listSlackOutboxMessages,
-} from '@agent/core/surface-coordination-store';
-import { delegateBestOf, getReasoningBackend } from '@agent/core/reasoning-backend';
-import { getVoiceBridge } from '@agent/core/voice-bridge';
-import { loadMeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
+} from '@agent/core/surface/surface-coordination-store';
+import { delegateBestOf, getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { getVoiceBridge } from '@agent/core/voice/voice-bridge';
+import { loadMeetingFacilitatorPolicy } from '@agent/core/meeting/meeting-facilitator-policy';
 import { logger } from '@agent/core/core';
 import { matchRestrictedAction } from '@agent/core/restricted-action-policy';
-import { listMissionSummaries } from '@agent/core/mission-read-model';
+import { listMissionSummaries } from '@agent/core/mission/mission-read-model';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -32,10 +32,10 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 import { z } from 'zod';
-import { getWorkItem } from '@agent/core/work-coordination';
-import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning-backend-execution-adapter';
+import { getWorkItem } from '@agent/core/workforce/work-coordination';
+import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning/reasoning-backend-execution-adapter';
 import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
-import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
+import type { MeetingFacilitatorPolicy } from '@agent/core/meeting/meeting-facilitator-policy';
 
 function writeJSON(rel: string, data: unknown): string {
   const abs = assertSafeRepositoryPath(pathResolver.rootResolve(rel), { allowMissingLeaf: true });

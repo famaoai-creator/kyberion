@@ -10,7 +10,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
-import { stubSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
+import { stubSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import { LISTEN_USAGE, runListenCommand } from './cli-listen.js';
 import { createFakeDeps, fakeBridge } from './lib/perception.test-support.js';
 

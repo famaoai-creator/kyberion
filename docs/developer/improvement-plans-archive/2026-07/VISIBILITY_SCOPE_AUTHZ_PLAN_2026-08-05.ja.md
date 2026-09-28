@@ -65,7 +65,7 @@ status: archived
 
 ### Task 3: 可視化ルートの server-side tenant 解決 — `claude-sonnet-5`
 
-1. `libs/core/work-visibility.ts`: `buildWorkVisibilityProjection` の入力に `viewer: { tenantSlugs: string[] | 'all' }` を**必須**で追加。フィルタ順序は「viewer 許可集合で先に絞る → クエリパラメータで更に絞る」。許可外 tenant 要求は型付きエラー。
+1. `libs/core/workforce/work-visibility.ts`: `buildWorkVisibilityProjection` の入力に `viewer: { tenantSlugs: string[] | 'all' }` を**必須**で追加。フィルタ順序は「viewer 許可集合で先に絞る → クエリパラメータで更に絞る」。許可外 tenant 要求は型付きエラー。
 2. `WorkItemFilter`(`work-coordination.ts:283-292`)に `tenant_slugs` を追加し、`listWorkItems` 段階で絞れるようにする(`listWorkItems({})` 全件読みの解消)。
 3. 対象ルートを organization-operating-model パターンに統一: `organization-operating-model`、`workitems`(GET/POST)、`agent-activity`、`approvals`、`collaboration`、`missions/search`、`plan-preview`、`tenant-design`。組織ビューはアクティブ customer を server-side 解決し、scoped viewer の許可 tenant と照合する。POST 系は対象レコードの tenant を viewer 許可集合と照合してから mutate。
 4. `missions/search` の `tier` パラメータはクライアント指定を廃止し、role から導出(`readonly` は confidential まで、personal tier は sovereign のみ — `security-policy.json` の `tier_restrictions` に整合)。

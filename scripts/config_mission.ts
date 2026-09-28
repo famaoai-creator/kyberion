@@ -23,7 +23,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   assertConfigChangeApplyable,
   computeConfigChangeFingerprint,
@@ -34,7 +34,7 @@ import {
   createApprovalRequest,
   loadApprovalRequest,
   recordApprovalApplyResult,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import {
   loadConfigMissionBriefAtPath,

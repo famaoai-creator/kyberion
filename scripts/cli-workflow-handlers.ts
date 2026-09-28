@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { readTextFile } from '@agent/core/foundation';
-import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
@@ -23,8 +23,8 @@ import {
   createTaskSession,
   saveTaskSession,
   validateTaskSession,
-} from '@agent/core/task-session';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+} from '@agent/core/task/task-session';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   executeEmailDelivery,
   generateEmailReplyDraft,
@@ -33,19 +33,21 @@ import {
   readEmailDraftArtifact,
   readGwsAuthStatus,
   resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
+} from '@agent/core/integrations/email-workflow';
 import {
   createCalendarEvent,
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
   readM365AuthStatus,
-} from '@agent/core/calendar-workflow';
+} from '@agent/core/meeting/calendar-workflow';
 import { main as taskInitMain } from './task_init.js';
 import { main as taskListMain } from './task_list.js';
 import { main as taskRunMain } from './task_run.js';
 import { main as taskSmokeMain } from './task_smoke.js';
 import { ScriptExitError } from './lib/harness.js';
+import { parseCliWorkflowOptions, parseOffboardArgs } from './cli-offboard-args.js';
+export { parseOffboardArgs, type ParsedOffboardCommand } from './cli-offboard-args.js';
 
 type Print = (value: unknown) => void;
 
@@ -178,10 +180,13 @@ function printTaskHelp(locale = resolveLocale()): void {
   printText('  scenario <list|init|run|smoke>  repeatable TaskScenario workflows');
   printText('');
   printText(t('cli_help_examples', locale));
+  // i18n-exempt: JA usage example in help text
   printText('  pnpm kyberion task plan "明日の会議資料とメール下書きを作って"');
   printText(
+    // i18n-exempt: JA usage example in help text
     '  pnpm kyberion task plan "ブラウザで購入して決済して" --output active/shared/tmp/purchase-plan.json'
   );
+  // i18n-exempt: JA usage example in help text
   printText('  pnpm kyberion task start "連携システムから情報収集して資料を作って"');
   printText('  pnpm kyberion task scenario list');
   printText('  pnpm kyberion task scenario run daily-email-triage --dry-run');
@@ -224,24 +229,8 @@ async function handleTaskScenarioCommand(args: string[]): Promise<void> {
   }
 }
 
-function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
-  const parsed: Record<string, string | boolean> = {};
-  for (let index = 0; index < args.length; index += 1) {
-    const current = args[index];
-    if (!current.startsWith('--')) continue;
-    const next = args[index + 1];
-    if (!next || next.startsWith('--')) {
-      parsed[current] = true;
-      continue;
-    }
-    parsed[current] = next;
-    index += 1;
-  }
-  return parsed;
-}
-
 function parseTaskRequest(args: string[]): { request: string; outputPath?: string } {
-  const options = parseEmailWorkflowOptions(args);
+  const options = parseCliWorkflowOptions(args);
   const requestOption = typeof options['--request'] === 'string' ? options['--request'] : '';
   const positional: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
@@ -276,70 +265,6 @@ function printOffboardHelp(locale = resolveLocale()): void {
   printText(
     '  pnpm kyberion offboard project PRJ-ALPHA --tenant-slug acme --organization-id ORG-ALPHA --json'
   );
-}
-
-export interface ParsedOffboardCommand {
-  scopeType: 'tenant' | 'project';
-  scopeId: string;
-  tenantSlug?: string;
-  organizationId?: string;
-  mode: 'dry_run' | 'execute';
-  json: boolean;
-  approval?: { approved_by: string; purpose: string };
-}
-
-/**
- * AL-04 offboarding CLI arguments. Pure and exported so the fail-closed
- * rules (execute needs BOTH --approved-by and --purpose) are unit-testable
- * without touching a scope tree. The library verb refuses an unapproved
- * delete too — this is the earlier, friendlier of the two gates.
- */
-export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
-  const [scopeType, scopeId, ...rest] = args;
-  if (scopeType !== 'tenant' && scopeType !== 'project') {
-    throw new Error(
-      `offboard scope must be 'tenant' or 'project' (received: ${scopeType ?? '<none>'})`
-    );
-  }
-  if (!scopeId || scopeId.startsWith('--')) {
-    throw new Error(`offboard requires a ${scopeType} id`);
-  }
-
-  const options = parseEmailWorkflowOptions(rest);
-  const mode = options['--execute'] === true ? 'execute' : 'dry_run';
-  const json = options['--json'] === true;
-  const tenantSlug =
-    typeof options['--tenant-slug'] === 'string' ? options['--tenant-slug'] : undefined;
-  const organizationId =
-    typeof options['--organization-id'] === 'string' ? options['--organization-id'] : undefined;
-  const approvedBy = typeof options['--approved-by'] === 'string' ? options['--approved-by'] : '';
-  const purpose = typeof options['--purpose'] === 'string' ? options['--purpose'] : '';
-
-  if (mode === 'dry_run') {
-    return {
-      scopeType,
-      scopeId,
-      ...(tenantSlug ? { tenantSlug } : {}),
-      ...(organizationId ? { organizationId } : {}),
-      mode,
-      json,
-    };
-  }
-  if (!approvedBy.trim() || !purpose.trim()) {
-    throw new Error(
-      'offboard --execute deletes a scope: it requires --approved-by <who> and --purpose "<why>". ' +
-        'Run without --execute for a dry run.'
-    );
-  }
-  return {
-    scopeType,
-    scopeId,
-    ...(tenantSlug ? { tenantSlug } : {}),
-    ...(organizationId ? { organizationId } : {}),
-    mode,
-    json,
-    approval: { approved_by: approvedBy.trim(), purpose: purpose.trim() },
-  };
 }
 
 export async function handleOffboardCommand(
@@ -501,7 +426,7 @@ export async function handleEmailWorkflowCommand(
     printEmailHelp(locale);
     return;
   }
-  const options = parseEmailWorkflowOptions(args);
+  const options = parseCliWorkflowOptions(args);
 
   if (subcommand === 'status') {
     printHeader();
@@ -623,7 +548,7 @@ export async function handleCalendarWorkflowCommand(
     return;
   }
 
-  const options = parseEmailWorkflowOptions(args);
+  const options = parseCliWorkflowOptions(args);
 
   if (subcommand === 'status') {
     const provider = getCalendarProvider(options);

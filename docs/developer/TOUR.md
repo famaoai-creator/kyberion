@@ -71,7 +71,7 @@ A declarative, schema-validated description of _what to do_. Steps reference act
 - Validated before execution (preflight). Repaired by an LLM sub-agent on validation failure.
 - The canonical first-win smoke is `pipelines/verify-session.json`; the optional voice smoke is `pipelines/voice-hello.json`.
 
-Code: `libs/core/src/pipeline-engine.ts`, `pipelines/`, `schemas/*-pipeline.schema.json`.
+Code: `libs/core/pipeline/pipeline-engine.ts`, `pipelines/`, `schemas/*-pipeline.schema.json`.
 
 ### 2.4 Knowledge Tier
 
@@ -96,7 +96,7 @@ OTel-inspired structured tracing per pipeline run. Captures spans, events, artif
 - Persisted as JSONL under `active/shared/logs/traces/` (or `customer/{slug}/logs/traces/` when active).
 - Read by Chronos (the operator viewer), distillation (failure → reusable hint), and the error classifier.
 
-Code: `libs/core/src/trace.ts`, `docs/developer/TRACE_MIGRATION_TEMPLATE.md`.
+Code: `libs/core/analysis/trace.ts`, `docs/developer/TRACE_MIGRATION_TEMPLATE.md`.
 
 ## 3. The path of a single request (15 min)
 
@@ -107,11 +107,11 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
    → libs/actuators/presence-actuator/
 
 2. Intent resolution turns utterance into a structured intent
-   → libs/core/src/intent-compiler.ts (uses an LLM via reasoning-backend)
+   → libs/core/intent/intent-compiler.ts (uses an LLM via reasoning-backend)
 
 3. Mission classification picks the right mission shape
-   → libs/core/mission-classification.ts
-   → libs/core/mission-team-orchestrator.ts
+   → libs/core/mission/mission-classification.ts
+   → libs/core/mission/mission-team-orchestrator.ts
    → reads knowledge/product/governance/mission-classification-policy.json
 
 4. Mission seed → mission creation
@@ -122,12 +122,12 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
    → pipelines/<seed-pipeline>.json
 
 6. Pipeline executes step-by-step
-   → libs/core/src/pipeline-engine.ts orchestrates
+   → libs/core/pipeline/pipeline-engine.ts orchestrates
    → each step routes to the right actuator
    → actuator's main loop in libs/actuators/<name>/src/index.ts
 
 7. Actuator emits Trace + records evidence
-   → libs/core/src/trace.ts (TraceContext)
+   → libs/core/analysis/trace.ts (TraceContext)
    → evidence written under active/missions/<id>/evidence/
 
 8. Mission lifecycle: checkpoint → finish
@@ -246,7 +246,7 @@ If you're going to read these files end-to-end, these are the ones:
 3. `knowledge/product/architecture/organization-work-loop.md` — the core model.
 4. `libs/core/path-resolver.ts` — every file IO starts here.
 5. `libs/core/secure-io.ts` — the tier-enforcement boundary.
-6. `libs/core/src/pipeline-engine.ts` — the executor.
+6. `libs/core/pipeline/pipeline-engine.ts` — the executor.
 7. `scripts/mission_controller.ts` + `scripts/refactor/mission-maintenance.ts` — mission lifecycle.
 8. `libs/actuators/browser-actuator/src/index.ts` — a complete actuator reference.
 9. `docs/developer/EXTENSION_POINTS.md` — what is stable vs internal.
@@ -281,7 +281,7 @@ Meeting-specific orientation:
 
 - Public op boundary: `libs/actuators/meeting-actuator/` and the `meeting:participate` CLI.
 - Internal browser join helper: `libs/actuators/meeting-browser-driver/`.
-- Runtime loop: `libs/core/meeting-participation-coordinator.ts`.
+- Runtime loop: `libs/core/meeting/meeting-participation-coordinator.ts`.
 - Consent boundary: `voice-consent.json` is checked before meeting recording/capture and again before TTS speech.
 - Cross-OS dry-run: `pnpm test -- --suite meeting-dry-run`.
 

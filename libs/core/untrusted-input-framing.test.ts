@@ -4,7 +4,10 @@ import {
   UNTRUSTED_DATA_BOILERPLATE,
   type FrameUntrustedInputParams,
 } from './untrusted-input-framing.js';
-import { delegateTaskWithUntrustedData, type ReasoningBackend } from './reasoning-backend.js';
+import {
+  delegateTaskWithUntrustedData,
+  type ReasoningBackend,
+} from './reasoning/reasoning-backend.js';
 
 describe('frameUntrustedInput (KD-04)', () => {
   it('HTML-escapes the payload and wraps it in a <untrusted_data source="..."> tag', () => {

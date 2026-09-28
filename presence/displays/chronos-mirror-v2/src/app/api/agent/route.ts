@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
-import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
+import { resolveRuntimeModelId } from '@agent/core/reasoning/reasoning-model-routing';
 import { toWireError } from '@agent/core/wire-error';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
@@ -32,7 +32,7 @@ import {
   type ChronosMissionProposalState,
   type MissionProposal,
 } from './chronos-persisted-parsers';
-import type { AgentRoutingDecision } from '@agent/core/intent-contract';
+import type { AgentRoutingDecision } from '@agent/core/intent/intent-contract';
 
 async function loadChronosCore() {
   const [
@@ -54,16 +54,16 @@ async function loadChronosCore() {
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
     import('@agent/core/secure-io'),
-    import('@agent/core/channel-surface'),
-    import('@agent/core/agent-runtime-supervisor'),
-    import('@agent/core/agent-runtime-supervisor-client'),
-    import('@agent/core/pipeline-contract'),
-    import('@agent/core/agent-manifest'),
-    import('@agent/core/mission-orchestration-events'),
-    import('@agent/core/tool-runtime-registry'),
+    import('@agent/core/surface/channel-surface'),
+    import('@agent/core/agent/agent-runtime-supervisor'),
+    import('@agent/core/agent/agent-runtime-supervisor-client'),
+    import('@agent/core/pipeline/pipeline-contract'),
+    import('@agent/core/agent/agent-manifest'),
+    import('@agent/core/mission/mission-orchestration-events'),
+    import('@agent/core/tool/tool-runtime-registry'),
     import('@agent/core/core'),
-    import('@agent/core/mission-state'),
-    import('@agent/core/mission-next-task-reader'),
+    import('@agent/core/mission/mission-state'),
+    import('@agent/core/mission/mission-next-task-reader'),
     import('@agent/core/foundation'),
   ]);
 

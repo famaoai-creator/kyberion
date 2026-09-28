@@ -1,6 +1,6 @@
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { handleApprovalAction } from './approval-actuator-helpers.js';
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
 import {
   currentProcessArgv,

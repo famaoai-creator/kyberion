@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderInfo } from './provider-discovery.js';
+import type { ProviderInfo } from './provider/provider-discovery.js';
 // provider-config is a fail-closed governed catalog (main 6bbc36905): the
 // virtual fs below must serve the real artifact and its schema.
 import providerConfig from '../../knowledge/product/governance/provider-config.json';
@@ -13,8 +13,8 @@ const nonRegularPaths = new Set<string>();
 // Monotonic across tests so a rewritten path never reuses an old catalog cache key.
 const fileVersions = new Map<string, number>();
 
-vi.mock('./audit-chain.js', () => ({ auditChain: { record: recordMock } }));
-vi.mock('./src/lock-utils.js', () => ({
+vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: recordMock } }));
+vi.mock('./foundation/lock-utils.js', () => ({
   withLockSync: <T>(_resourceId: string, fn: () => T): T => fn(),
 }));
 
@@ -129,7 +129,7 @@ describe('capability-broker', () => {
     );
     recordMock.mockClear();
     delete process.env.MISSION_ID;
-    const { clearProviderHealth } = await import('./provider-health-registry.js');
+    const { clearProviderHealth } = await import('./provider/provider-health-registry.js');
     clearProviderHealth();
   });
 

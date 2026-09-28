@@ -11,15 +11,14 @@ import {
   saveProjectRecord,
   saveProjectTrackRecord,
 } from '@agent/core';
-import * as killSwitch from '@agent/core/kill-switch';
-import * as orchestratorSession from '@agent/core/orchestrator-session';
+import * as killSwitch from '@agent/core/governance/kill-switch';
+import * as orchestratorSession from '@agent/core/mission/orchestrator-session';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
   buildHelpText,
-  buildOrganizationDiscoveryReport,
   handoffMission,
   main,
   resolveMissionStartCreateInputFromArgv,
@@ -28,6 +27,7 @@ import {
   shouldSkipReasoningBootstrap,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
+import { buildOrganizationDiscoveryReport } from './refactor/mission-organization-commands.js';
 import * as missionControllerRouter from './refactor/mission-controller-router.js';
 import type { MissionControllerRoutingContext } from './refactor/mission-controller-router.js';
 
@@ -79,6 +79,8 @@ describe('mission_controller argument parsing', () => {
     // can never silently fall back to the stub.
     expect(shouldSkipReasoningBootstrap('record-task')).toBe(true);
     expect(shouldSkipReasoningBootstrap('record-evidence')).toBe(true);
+    expect(shouldSkipReasoningBootstrap('help')).toBe(true);
+    expect(shouldSkipReasoningBootstrap('list')).toBe(true);
     expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
     expect(shouldSkipReasoningBootstrap('status')).toBe(false);
     expect(shouldSkipReasoningBootstrap(undefined)).toBe(false);

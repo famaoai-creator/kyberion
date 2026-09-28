@@ -36,12 +36,12 @@ export async function GET(req: NextRequest) {
         runtimeSupervisor,
         runtimeSupervisorClient,
       ] = await Promise.all([
-        import('@agent/core/provider-discovery'),
-        import('@agent/core/agent-manifest'),
-        import('@agent/core/mission-team-index'),
-        import('@agent/core/agent-registry'),
-        import('@agent/core/agent-runtime-supervisor'),
-        import('@agent/core/agent-runtime-supervisor-client'),
+        import('@agent/core/provider/provider-discovery'),
+        import('@agent/core/agent/agent-manifest'),
+        import('@agent/core/mission/mission-team-index'),
+        import('@agent/core/agent/agent-registry'),
+        import('@agent/core/agent/agent-runtime-supervisor'),
+        import('@agent/core/agent/agent-runtime-supervisor-client'),
       ]);
 
       // ?providers=true returns installed provider info with models
@@ -166,8 +166,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: parsedBody.error }, { status: 400 });
       const { body, action } = parsedBody;
       const [runtimeSupervisor, runtimeSupervisorClient] = await Promise.all([
-        import('@agent/core/agent-runtime-supervisor'),
-        import('@agent/core/agent-runtime-supervisor-client'),
+        import('@agent/core/agent/agent-runtime-supervisor'),
+        import('@agent/core/agent/agent-runtime-supervisor-client'),
       ]);
 
       switch (action) {
@@ -326,7 +326,7 @@ export async function POST(req: NextRequest) {
             readManualDriverDescriptor,
             enqueueManualDriverCommand,
             readManualDriverCommandStatus,
-          } = await import('@agent/core/agent-runtime-manual-drive');
+          } = await import('@agent/core/agent/agent-runtime-manual-drive');
           const registration = getAgentRuntimeManualDriverRegistration(agentId);
           const durableDescriptor = readManualDriverDescriptor(agentId);
           const targetScope = registration?.scope ?? durableDescriptor?.scope;
@@ -381,7 +381,7 @@ export async function POST(req: NextRequest) {
                 );
               }
               const { cancelManualDriverCommand } =
-                await import('@agent/core/agent-runtime-manual-drive');
+                await import('@agent/core/agent/agent-runtime-manual-drive');
               const cancellation = await cancelManualDriverCommand({
                 agentId,
                 commandId: typeof body.commandId === 'string' ? body.commandId.trim() : '',
@@ -408,7 +408,7 @@ export async function POST(req: NextRequest) {
                 );
               }
               const { resumeManualDriverCommand } =
-                await import('@agent/core/agent-runtime-manual-drive');
+                await import('@agent/core/agent/agent-runtime-manual-drive');
               const receipt = await resumeManualDriverCommand({
                 agentId,
                 commandId: typeof body.commandId === 'string' ? body.commandId.trim() : '',
@@ -487,9 +487,9 @@ export async function POST(req: NextRequest) {
           if (forbidden) return forbidden;
           if (!body.envelope?.header)
             return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
-          const { a2aBridge } = await import('@agent/core/a2a-bridge');
+          const { a2aBridge } = await import('@agent/core/mesh/a2a-bridge');
           const response = await a2aBridge.route(
-            body.envelope as unknown as import('@agent/core/a2a-bridge').A2AMessage
+            body.envelope as unknown as import('@agent/core/mesh/a2a-bridge').A2AMessage
           );
           return NextResponse.json({ status: 'ok', response });
         }
@@ -519,8 +519,8 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: parsedBody.error }, { status: 400 });
       const { body } = parsedBody;
       const [{ stopAgentRuntime }, runtimeSupervisorClient] = await Promise.all([
-        import('@agent/core/agent-runtime-supervisor'),
-        import('@agent/core/agent-runtime-supervisor-client'),
+        import('@agent/core/agent/agent-runtime-supervisor'),
+        import('@agent/core/agent/agent-runtime-supervisor-client'),
       ]);
       try {
         await runtimeSupervisorClient.shutdownAgentRuntimeViaDaemon(

@@ -38,9 +38,9 @@ status: archived
 
 ### 1.2 保持: 既存 GC が2箇所で実質死んでいる
 
-- **ミッション自動アーカイブは dead path**: `libs/core/mission-maintenance.ts::purgeMissions`(`:863-945`)は ADF を `knowledge/governance/mission-lifecycle.json` から読むが、実在するのは `knowledge/product/governance/mission-lifecycle.json`。「ADF not found」で early return し、**max_age_days:30 のアーカイブは一度も動いていない**。
+- **ミッション自動アーカイブは dead path**: `libs/core/mission/mission-maintenance.ts::purgeMissions`(`:863-945`)は ADF を `knowledge/governance/mission-lifecycle.json` から読むが、実在するのは `knowledge/product/governance/mission-lifecycle.json`。「ADF not found」で early return し、**max_age_days:30 のアーカイブは一度も動いていない**。
 - **janitor が実際に回っていない**: `active/shared/tmp/` に 261 エントリ、うち 24h TTL を大幅超過した 7/6〜7/8 のファイルが残存。cron(`pipelines/storage-janitor.json`、JST 4:30)は chronos daemon / baseline-check 提出に依存するが、稼働鮮度を観測する層が無く、止まっていても誰も気づかない。
-- ミッション `finish`(`mission-lifecycle.ts:1160`)はゲート評価と状態遷移のみで、**ミッションツリー・per-mission git repo・evidence の整理を一切しない**。mission-hygiene(`libs/core/mission-hygiene.ts:11-20`)は明示的に detect-only。
+- ミッション `finish`(`mission-lifecycle.ts:1160`)はゲート評価と状態遷移のみで、**ミッションツリー・per-mission git repo・evidence の整理を一切しない**。mission-hygiene(`libs/core/mission/mission-hygiene.ts:11-20`)は明示的に detect-only。
 
 ### 1.3 保持: tmp-by-default 習慣
 
@@ -51,7 +51,7 @@ status: archived
 - 表現が6系統に分裂: (a) `agent-registry.ts` の `AgentRecord`(**in-memory Map のみ**、`:28-29` — 再起動で全消失)、(b) `agent-manifest.ts` の宣言 manifest、(c) `authority.ts::resolveRole` は **env とプロセス名から role 文字列を推定**(`:177-188`)、(d) mission-state の `assigned_persona`、(e) `work-coordination.ts` の `actorPeerId` / `holder_peer_id`(**無検証の自由文字列**)、(f) `mission-team-binding.ts` の `resource_id`。相互の対応表が無い。
 - `orchestrator-session.ts` の `owner_actor`(`:479`)も呼び出し側が名乗るだけの文字列。**リースの排他は効くが、「そのリースを持つのが誰(何)か」は誰も検証しない。**
 - `runtime_identity` フィールドは 4 schema + 2 core interface に定義済みだが、本番経路では**常に null**(`mission-team-binding.ts:157,288`。非 null はテストフィクスチャの `'stripe-prod'` のみ)。
-- trace モデル(`libs/core/src/trace.ts:42-51`)の metadata は missionId / correlationId / actuator / tenantSlug のみで **actor 帰属フィールドが無い**。A2A 署名(AA-03)は same-host 共有秘密の完全性保証であり、per-agent の識別ではない(文書に明記済みの既知限界)。
+- trace モデル(`libs/core/analysis/trace.ts:42-51`)の metadata は missionId / correlationId / actuator / tenantSlug のみで **actor 帰属フィールドが無い**。A2A 署名(AA-03)は same-host 共有秘密の完全性保証であり、per-agent の識別ではない(文書に明記済みの既知限界)。
 - ライフサイクルも無い: spawn→shutdown はプロセス寿命の話で、「このエージェント identity はいつ生まれ、誰が所有し、いつ退役したか」の台帳・監査が存在しない。ミッションが終わってもそのミッション所属のエージェント概念は**孤児として残らない(そもそも記録されない)**。
 
 ### 1.5 概念的な足場は既にある(実装だけが無い)
@@ -102,7 +102,7 @@ status: archived
 
 > 優先度 P1 / 規模 M / 依存: AL-01(カタログ語彙)
 
-1. `libs/core/artifact-store.ts` を拡張し、`writeScopedArtifact({ scope: { tenant?, project?, mission?, task?, session? }, artifact_class, name, content })` を新設する。配置は path-resolver の既存正準位置(missionDir / projectWorkspaceDir / volatile)へ解決し、`artifact_class` を index(mission-local `artifacts-index.jsonl` 等)に記録して AL-03/AL-04 の GC が判定に使えるようにする。
+1. `libs/core/workforce/artifact-store.ts` を拡張し、`writeScopedArtifact({ scope: { tenant?, project?, mission?, task?, session? }, artifact_class, name, content })` を新設する。配置は path-resolver の既存正準位置(missionDir / projectWorkspaceDir / volatile)へ解決し、`artifact_class` を index(mission-local `artifacts-index.jsonl` 等)に記録して AL-03/AL-04 の GC が判定に使えるようにする。
 2. **tmp 直書きの主要 3 経路を移行**: (a) `output-artifacts.ts::offloadLargeOutput` の退避先を mission-local(`<missionDir>/artifacts/tool-output/`、mission 不明時のみ従来 tmp)へ。OH-04 の宣言チャンネル除外の回帰を維持する。(b) `mission-seal.ts` の成果物(`.enc`/`.key.enc`)を archive 配下へ。(c) janitor レポートを `runtime/reports/` へ。
 3. **`sharedTmp` ratchet**: 非テスト呼び出し 63 箇所を allowlist 台帳(registration ceremony 型、boundary-test と同方式)に固定し、**新規追加は CI で fail** させる。既存分は「本当に消耗品(tmp が正しい)」と「スコープ持ち成果物(移行すべき)」に分類コメントを台帳へ付し、移行は後続増分とする(本タスクでは増加ゼロの固定まで)。
 
@@ -150,7 +150,7 @@ status: archived
 
 > 優先度 P1 / 規模 M〜L / 依存: なし(SO-02 の event sourcing パターンを流用)
 
-1. `libs/core/agent-identity.ts` を新設: `AgentIdentityRecord { nhi_id, kind: 'agent'|'service', display_name, accountable_human_id, affiliation: { organization_id, project_id?, mission_id?, task_id? }, lifecycle_status: 'provisioned'|'active'|'suspended'|'retired', provider_hint?, model_hint?, trust_ref?, created_at, retired_at?, retire_reason? }`。`nhi_id` は `kyberion://agent/<org>/<slug>` の URI 形式(SPIFFE-ID と同型、外部写像は NI-05)。provider/model は hint 属性であり identity ではない(AO-05)。`accountable_human_id` は agent/service に必須(CO-06 の不変条件をレコード発行時に強制)。
+1. `libs/core/agent/agent-identity.ts` を新設: `AgentIdentityRecord { nhi_id, kind: 'agent'|'service', display_name, accountable_human_id, affiliation: { organization_id, project_id?, mission_id?, task_id? }, lifecycle_status: 'provisioned'|'active'|'suspended'|'retired', provider_hint?, model_hint?, trust_ref?, created_at, retired_at?, retire_reason? }`。`nhi_id` は `kyberion://agent/<org>/<slug>` の URI 形式(SPIFFE-ID と同型、外部写像は NI-05)。provider/model は hint 属性であり identity ではない(AO-05)。`accountable_human_id` は agent/service に必須(CO-06 の不変条件をレコード発行時に強制)。
 2. 永続化は SO-02 と同型の journal-backed event sourcing(`active/shared/coordination/identity/agent-identities.jsonl`、純粋 reducer・破損行耐性 replay・governed write は execution context 検証つき)。
 3. 既存系の接続: `agent-registry`(in-memory)はこのレジストリの **runtime instance cache** と位置づけ、`agent-lifecycle.spawn` で identity を発行(既存 identity への instance 紐付けも可)、shutdown で instance 解放(identity は retire まで存続)。`mission-team-binding` / `team-role-assignment-selection` の `runtime_identity` に nhi_id を実装する(**常に null の現状を解消**)。manifest の `agentId` は provisioned identity の slug として台帳と突合する。
 
@@ -167,7 +167,7 @@ status: archived
 > 優先度 P1 / 規模 M / 依存: NI-01
 
 1. **claim/session の actor 検証**: `orchestrator-session` の `owner_actor`・`work-coordination` の `actorPeerId`/`holder_peer_id` を nhi_id(または registry 登録済み actor)で検証する。`KYBERION_NHI_ACTOR=warn|enforce`(既定 warn)を導入し、warn は未登録 actor を監査記録、enforce は拒否(AA-03 と同じ移行方式。enforce 切替は観測後に単独コミット)。
-2. **trace への actor 帰属**: `libs/core/src/trace.ts` の metadata に `actor_nhi_id?` / `on_behalf_of?` を追加し、actuator-trace・execution ledger と同一の帰属語彙にする(OP-01 コスト集計の軸にも乗せる)。
+2. **trace への actor 帰属**: `libs/core/analysis/trace.ts` の metadata に `actor_nhi_id?` / `on_behalf_of?` を追加し、actuator-trace・execution ledger と同一の帰属語彙にする(OP-01 コスト集計の軸にも乗せる)。
 3. **A2A の sender claim**: A2A envelope に `sender_nhi_id` claim を追加して既存 HMAC 署名(AA-03 の `a2a-envelope-signature.ts`)の署名対象へ含める。per-agent 鍵は非目標(E4)— 本タスクは「same-host 完全性の内側で送信者申告を改竄不能にする」まで。
 
 **受入条件**

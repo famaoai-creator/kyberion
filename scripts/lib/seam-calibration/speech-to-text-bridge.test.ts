@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core/speech-to-text-bridge', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/speech-to-text-bridge')>();
+vi.mock('@agent/core/voice/speech-to-text-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/voice/speech-to-text-bridge')>();
   return {
     ...actual,
     installShellSpeechToTextBridgeIfAvailable: () => false,
@@ -18,7 +18,7 @@ vi.mock('@agent/core/apple-speech-file-stt-bridge', () => ({
 }));
 
 const { registerSpeechToTextBridge, resetSpeechToTextBridge } =
-  await import('@agent/core/speech-to-text-bridge');
+  await import('@agent/core/voice/speech-to-text-bridge');
 const { pathResolver } = await import('@agent/core/path-resolver');
 const { safeRmSync } = await import('@agent/core/secure-io');
 const { registerSeamCalibrationAdapter, runSeamCalibration } =
@@ -28,7 +28,7 @@ const {
   speechToTextBridgeCalibrationAdapter: adapter,
   transcriptCharErrorRate,
 } = await import('./speech-to-text-bridge.js');
-type Bridge = import('@agent/core/speech-to-text-bridge').SpeechToTextBridge;
+type Bridge = import('@agent/core/voice/speech-to-text-bridge').SpeechToTextBridge;
 
 const outRoot = pathResolver.sharedTmp('stt-calibration-adapter-test');
 

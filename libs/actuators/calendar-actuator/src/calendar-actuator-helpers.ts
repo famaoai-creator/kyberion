@@ -2,8 +2,8 @@ import { classifyError } from '@agent/core/error-classifier';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
 import { persistTrace, TraceContext } from '@agent/core/trace';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
 import type { ValidateFunction } from 'ajv';
 import {
@@ -56,6 +56,7 @@ function missingRequiredFields(action: CalendarAction): string[] {
       )
     )) {
       missing.push(
+        // i18n-exempt: JA usage example in error text
         'params.calendar_names[0]、params.calendar_id、または params.calendar_targets[0] (例: "primary")'
       );
     }

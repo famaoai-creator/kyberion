@@ -52,7 +52,7 @@ pnpm project list --json
 pnpm project reconcile --dry-run --json
 pnpm mission reassign-project <MISSION_ID> --project-id <PROJECT_ID> --project-path <PATH> --dry-run
 pnpm pipeline --input pipelines/project-management-validation.json
-pnpm exec vitest run libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts
+pnpm exec vitest run libs/core/project/project-management.test.ts libs/core/mission/mission-project-reassignment.test.ts
 pnpm run typecheck
 pnpm run build
 ```

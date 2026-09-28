@@ -7,7 +7,7 @@
  * (inbox / approvals) is actionable in place; `ask` talks to the same brain
  * every other surface uses.
  */
-import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
+import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import {
   getRegisteredEnvText,
   nowIso,
@@ -19,43 +19,43 @@ import {
   listInboxEntries,
   markInboxEntry,
 } from '@agent/core/deliverable-inbox';
-import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
-import { createDesktopEventFeed } from '@agent/core/desktop-event-feed';
+import { createScreenRecordingBridge } from '@agent/core/virtual/screen-recording-bridge';
+import { createDesktopEventFeed } from '@agent/core/virtual/desktop-event-feed';
 import {
   computeDesktopRecordingHash,
   DesktopDemonstrationRecorder,
   sanitizeDesktopObservationText,
   sampleDesktopObservation,
   validateDesktopRecording,
-} from '@agent/core/desktop-recording';
-import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
-import { loadDesktopPipeline } from '@agent/core/desktop-pipeline';
+} from '@agent/core/virtual/desktop-recording';
+import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
+import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance/approval-store';
+import { loadDesktopPipeline } from '@agent/core/virtual/desktop-pipeline';
 import {
   loadProcedures,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-} from '@agent/core/procedure-registry';
+} from '@agent/core/knowledge/procedure-registry';
 import {
   loadNotificationPreferences,
   saveNotificationPreferences,
-} from '@agent/core/operator-notifications';
+} from '@agent/core/surface/operator-notifications';
 import { materializeExecutionFeedbackCandidate } from '@agent/core/execution-feedback';
-import { promoteDesktopProcedure } from '@agent/core/desktop-recording-compiler';
-import { reconcileDesktopPromotionTransaction } from '@agent/core/desktop-promotion-transaction';
+import { promoteDesktopProcedure } from '@agent/core/virtual/desktop-recording-compiler';
+import { reconcileDesktopPromotionTransaction } from '@agent/core/virtual/desktop-promotion-transaction';
 import {
   intentDraftHash,
   loadDesktopIntentDraftAtPath,
   reconstructDesktopIntent,
   reviewDesktopIntent,
-} from '@agent/core/desktop-intent-reconstruction';
-import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
-import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
-import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
-import { loadDesktopRecordingAtPath } from '@agent/core/desktop-recording';
+} from '@agent/core/virtual/desktop-intent-reconstruction';
+import { redactScreenVideoFrame } from '@agent/core/virtual/screen-frame-redaction';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
+import { loadServiceRecordingAtPath } from '@agent/core/service/service-recording';
+import { loadDesktopRecordingAtPath } from '@agent/core/virtual/desktop-recording';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import {
   safeExistsSync,
   safeLstat,
@@ -63,14 +63,14 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+import { osAutomationBridge } from '@agent/core/virtual/os-automation-bridge';
 import type {
   BrowserExtensionOperation,
   BrowserExtensionRecording,
-} from '@agent/core/browser-extension-bridge';
-import type { DesktopRecording } from '@agent/core/desktop-recording';
-import type { ServiceRecording } from '@agent/core/service-recording';
-import type { NotificationChannelTarget } from '@agent/core/operator-notifications';
+} from '@agent/core/browser/browser-extension-bridge';
+import type { DesktopRecording } from '@agent/core/virtual/desktop-recording';
+import type { ServiceRecording } from '@agent/core/service/service-recording';
+import type { NotificationChannelTarget } from '@agent/core/surface/operator-notifications';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runDoctor } from './run_doctor.js';
 import {
@@ -93,7 +93,7 @@ import type { VocabularyKey } from '@agent/core/t';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
-} from '@agent/core/intent-resolution-contract';
+} from '@agent/core/intent/intent-resolution-contract';
 
 let activePrint: HomePrint = () => undefined;
 

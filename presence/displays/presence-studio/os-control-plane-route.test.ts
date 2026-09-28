@@ -13,7 +13,7 @@ describe('Presence Studio OS control-plane route contract', () => {
     const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
 
     expect(source).toContain(
-      "import { loadStandardIntentCatalog } from '@agent/core/intent-resolution'"
+      "import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution'"
     );
     expect(route).toContain('loadStandardIntentCatalog()');
     expect(route).not.toContain('readJson');

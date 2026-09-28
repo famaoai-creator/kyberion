@@ -95,7 +95,7 @@ status: archived
    - PLAN に「入力: 会議URL/参加者/アジェンダ」「成果物: minutes.md, action-items.jsonl, delivery pack」を明記。
 2. `mission-team-plan-composer.ts` のチームテンプレートキー解決(`:148-159`)が `meeting_facilitation` を未定義キーとして fallback しないか確認し、必要なら `mission-team-templates.json` に同名エントリ(planner+operator の最小編成)を追加。
 3. test: `mission-workflow-catalog.test.ts` の流儀で「`missionTypeHint: 'meeting_facilitation'` の分類が `operations_and_release` 系に落ち、workflow が `ai-meeting-facilitator-followup` になる」ことを固定(分類ルールが無ければ `mission-task-classification-scenarios.json` 側にルール追加)。
-4. **検証**: `node dist/scripts/mission_controller.js create MSN-MEETING-TEST --mission-type meeting_facilitation --ephemeral` で TASK_BOARD に会議フェーズが並ぶこと。`pnpm exec vitest run libs/core/mission-workflow-catalog.test.ts`。
+4. **検証**: `node dist/scripts/mission_controller.js create MSN-MEETING-TEST --mission-type meeting_facilitation --ephemeral` で TASK_BOARD に会議フェーズが並ぶこと。`pnpm exec vitest run libs/core/mission/mission-workflow-catalog.test.ts`。
 
 ### Task 4: 会議後フォローアップの連結パイプライン — `gpt-5.4-mini`(op は全て既存。新規ロジック無し)
 

@@ -1,10 +1,10 @@
 import { logger } from '@agent/core/core';
-import { agentRegistry } from '@agent/core/agent-registry';
-import { a2aBridge, type A2AMessage } from '@agent/core/a2a-bridge';
+import { agentRegistry } from '@agent/core/agent/agent-registry';
+import { a2aBridge, type A2AMessage } from '@agent/core/mesh/a2a-bridge';
 import {
   resolveMissionTeamPlan,
   getMissionTeamAssignment,
-} from '@agent/core/mission-team-plan-composer';
+} from '@agent/core/mission/mission-team-plan-composer';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
   enqueueMissionTeamPrewarmRequest,
@@ -17,7 +17,7 @@ import {
   refreshAgentRuntime,
   restartAgentRuntime,
   askAgentRuntime,
-} from '@agent/core/agent-runtime-supervisor';
+} from '@agent/core/agent/agent-runtime-supervisor';
 import {
   ensureAgentRuntimeViaDaemon,
   askAgentRuntimeViaDaemon,
@@ -26,18 +26,22 @@ import {
   shutdownAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
-} from '@agent/core/agent-runtime-supervisor-client';
-import { getAgentExecutionPort, type AgentTaskEnvelope } from '@agent/core/agent-execution-port';
+} from '@agent/core/agent/agent-runtime-supervisor-client';
+import {
+  getAgentExecutionPort,
+  type AgentTaskEnvelope,
+} from '@agent/core/agent/agent-execution-port';
 import {
   delegateCoordinatedAgentTask,
   type CoordinatedAgentTaskEnvelope,
 } from '@agent/core/coordinated-agent-execution-port';
 import * as pathResolver from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import type { AgentProvider, AgentRecord } from '@agent/core/agent-registry';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import type { AgentProvider, AgentRecord } from '@agent/core/agent/agent-registry';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
 const DEFAULT_AGENT_RETRY = {
@@ -93,10 +97,10 @@ export interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: AGENT_MANIFEST_PATH,
-  defaults: DEFAULT_AGENT_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_AGENT_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
@@ -244,7 +248,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     }
 
     case 'list_manifests': {
-      const { loadAgentManifests } = await import('@agent/core/agent-manifest');
+      const { loadAgentManifests } = await import('@agent/core/agent/agent-manifest');
       const manifests = loadAgentManifests();
       const data = { status: 'ok', manifests, count: manifests.length };
       return params.export_as ? { ...data, context: { ...ctx, [params.export_as]: data } } : data;

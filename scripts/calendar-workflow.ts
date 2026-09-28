@@ -5,7 +5,7 @@ import {
   queryCalendarFreeBusy,
   readGwsAuthStatus,
   readM365AuthStatus,
-} from '@agent/core/calendar-workflow';
+} from '@agent/core/meeting/calendar-workflow';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;

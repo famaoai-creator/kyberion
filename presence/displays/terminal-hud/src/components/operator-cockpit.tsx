@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
-import type { OperatorHomeSummary } from '@agent/core/operator-home-summary';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
+import type { OperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 import { useI18n } from '../i18n.js';
 import { theme } from '../theme.js';
 import { IntentPreview } from './intent-preview.js';

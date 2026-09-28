@@ -2,14 +2,15 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { pathResolver, rootResolve } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { parseSafeJsonInput, parseSafeJsonObjectValue, readTextFile } from '@agent/core/foundation';
-import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation/safe-json';
+import { readTextFile } from '@agent/core/foundation/text';
+import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import {
   validatePipelineGuardrails,
   type AdfScriptWrapperBaselineEntry,
-} from '@agent/core/adf-guardrails';
+} from '@agent/core/pipeline/adf-guardrails';
 import { tryRepairJson } from '@agent/core/json-repair';
-import { assertProjectTrustApproval } from '@agent/core/project-trust';
+import { assertProjectTrustApproval } from '@agent/core/project/project-trust';
 import {
   isBuiltinPipelineResource,
   requiresProjectTrust,

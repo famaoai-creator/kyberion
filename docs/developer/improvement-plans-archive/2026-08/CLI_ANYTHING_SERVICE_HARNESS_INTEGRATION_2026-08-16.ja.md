@@ -117,7 +117,7 @@ personal procedure catalog + pipelines/service/*.json
 
 検証コマンド:
 
-- `pnpm vitest run libs/core/service-harness.test.ts libs/actuators/service-actuator/src/index.test.ts`
+- `pnpm vitest run libs/core/service/service-harness.test.ts libs/actuators/service-actuator/src/index.test.ts`
 - `pnpm run generate:service-harness-registry`
 - `pnpm run check:service-harness-registry`
 - `pnpm kyberion service harness --service github --action describe --detail false`

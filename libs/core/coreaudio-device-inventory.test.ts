@@ -3,7 +3,7 @@ import {
   resolveAudioDevice,
   CoreAudioDeviceInventoryBridge,
 } from './coreaudio-device-inventory.js';
-import type { AudioDeviceDescriptor } from './audio-route.js';
+import type { AudioDeviceDescriptor } from './voice/audio-route.js';
 
 const blackhole: AudioDeviceDescriptor = {
   uid: 'BlackHole_UID_2ch',

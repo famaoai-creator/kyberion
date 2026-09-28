@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeFsyncFile, safeWriteFile } from './secure-io.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import type {
   ShareGrantLiveSessionEvictionRequest,
   ShareGrantLiveSessionEvictionResult,

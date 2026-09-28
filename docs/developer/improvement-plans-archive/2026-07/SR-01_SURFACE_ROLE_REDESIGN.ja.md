@@ -22,7 +22,7 @@ surface 層の役割は文書(`surface-responsibility-model.md`、`ceo-ux.md`)�
 
 ## 実装状況 (2026-07-06) — 完了
 
-- **Phase 0**: operator-surface を root tsconfig から除外(chronos と同扱い。Next アプリは自前 tsconfig/bundler 解決で検査)→ **root `pnpm typecheck` が本ブランチで初めて 0 エラー**。`libs/core/surface-mutation-guard.ts` に framework 非依存の変更ガードを抽出(operator-surface の no-write 契約は不変)。dangling な avatar-studio スクリプトを削除。
+- **Phase 0**: operator-surface を root tsconfig から除外(chronos と同扱い。Next アプリは自前 tsconfig/bundler 解決で検査)→ **root `pnpm typecheck` が本ブランチで初めて 0 エラー**。`libs/core/surface/surface-mutation-guard.ts` に framework 非依存の変更ガードを抽出(operator-surface の no-write 契約は不変)。dangling な avatar-studio スクリプトを削除。
 - **Phase 1**: `surface-roles.json` + 契約テスト `scripts/check_surface_roles.test.ts`(役割定義・dir 実在・ヘッダに tagline 表示・read-only 宣言を固定)。全サーフェスのヘッダに役割バッジ。`docs/SURFACES.md` を5役割表に刷新、`surface-responsibility-model.md` に §3.3b/3.3c と5列の責務表。
 - **Phase 2 (SU-02/SU-03)**: `A2UIRenderer` に `onAction` を追加し `kb-intervention-panel` / `kb-artifact-tile` のクリックを実配線(approval_id → `/api/intelligence approval_decision`、mission_id → `intervention_respond`、成果物 → mission-asset を開く)。plan-preview の確認事項はクリックで依頼文に回答欄を追記。`DeliverableInboxStatus` に `rejected`/`changes_requested` + `verdict_note`/`reviewed_by` を追加し、chronos の deliverable-review が共有インボックス(entries.jsonl)へ verdict を同期。
 - **Phase 3 (concierge 新設)**: `presence/displays/concierge`(Next 15、port 3050、`active-surfaces.json` 登録済み)。データ層 `libs/core/ceo-surface-summary.ts`(`buildCeoSurfaceSummary` — ceo-ux.md の4ペイン+デイリーブリーフィングへ写像、内部用語を出さない契約テスト付き)。API: GET /api/summary・/api/theme(`createConciergeWebThemePack`)、POST /api/approvals/[id](`decideApprovalRequest` as sovereign_concierge)、POST /api/outcomes/[id](verdict)。UI はです・ます調(「本日はご承認待ちが◯件ございます」)。
@@ -56,6 +56,6 @@ surface-mutation-guard(5)/ surface-roles 契約(4)/ deliverable-inbox 拡張(2)/
 
 ## 実装メモ 追記3 (2026-07-07) — 可視化ダッシュボード群(V1-V3)
 
-- `libs/core/agent-activity-board.ts`: work items+mission state から「エージェント×現在タスク×ブロッカー(blocked/依存待ち/レビュー待ち/未割当)」を集約(テナントフィルタ対応、テスト付き)。
+- `libs/core/agent/agent-activity-board.ts`: work items+mission state から「エージェント×現在タスク×ブロッカー(blocked/依存待ち/レビュー待ち/未割当)」を集約(テナントフィルタ対応、テスト付き)。
 - chronos: `GET /api/agent-activity`(?tenant=)+ `GET/POST /api/workitems`(看板の状態遷移は updateWorkItem 統制API)。ヘッダの「エージェント/看板」トグルで Activity Board(エージェント別サマリ+ブロッカーチップ)と5列看板を表示。実データ(aurora契約案件のエージェント5作業)で表示確認済み。
 - concierge: `/setup` ページ + `GET /api/setup` — オンボーディング進捗(推論バックエンド/5サーフェスの有効・ポート)と拡張設定の読み取りビュー(モデル振り分け表・主要コマンド)。

@@ -55,20 +55,20 @@ In practice, the simulation can be split into two roles:
 
 These are the most likely CEO-style request families.
 
-| Family | Example request | What Kyberion should do | Expected outcome |
-|---|---|---|---|
-| Strategy | `今期の成長戦略を3案で比較して、最も現実的な案を提案して` | clarify goals and constraints, compare options, recommend one path | strategy memo, tradeoff table, risks |
-| Prioritization | `次の四半期にやることを5つに絞って、やらないことも決めて` | rank work, show exclusions, tie to business goals | prioritized roadmap |
-| Hiring | `営業責任者候補の採用方針と面接評価軸を作って` | define role, evaluation axes, interview process | hiring rubric, interview sheet |
-| Finance | `来月の資金繰りと投資余地を確認したい` | normalize cash flow, scenarios, and limits | cash forecast, investment room |
-| Executive reporting | `今月の経営会議向けにKPIサマリを1枚でまとめて` | reduce to decision-ready summary | executive one-pager |
-| Stakeholder comms | `役員会向けに社員向けメッセージのたたき台を作って` | draft message, anticipate objections, align tone | communication draft |
-| Decision support | `A案とB案の投資判断を、前提・リスク・撤退条件込みで比較して` | compare options with decision criteria | decision memo |
-| Sales/account strategy | `大口顧客のアップセル戦略を整理して、提案の切り口を出して` | map account context and propose sales story | account plan |
-| Org/process | `組織の役割が重複しているので、責任分界と会議体を見直したい` | analyze role overlap, process, meetings | org/process redesign |
-| Risk/governance | `監査指摘が出そうな領域を洗い出して優先順位を付けて` | classify risk and remediation order | risk register |
-| Customer escalation | `解約しそうな顧客への対応方針を考えて` | identify issue, constraints, and response path | retention plan |
-| Crisis response | `障害対応の対外説明と再発防止策をまとめて` | separate facts, explanation, prevention | incident statement |
+| Family                 | Example request                                              | What Kyberion should do                                            | Expected outcome                     |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------ |
+| Strategy               | `今期の成長戦略を3案で比較して、最も現実的な案を提案して`    | clarify goals and constraints, compare options, recommend one path | strategy memo, tradeoff table, risks |
+| Prioritization         | `次の四半期にやることを5つに絞って、やらないことも決めて`    | rank work, show exclusions, tie to business goals                  | prioritized roadmap                  |
+| Hiring                 | `営業責任者候補の採用方針と面接評価軸を作って`               | define role, evaluation axes, interview process                    | hiring rubric, interview sheet       |
+| Finance                | `来月の資金繰りと投資余地を確認したい`                       | normalize cash flow, scenarios, and limits                         | cash forecast, investment room       |
+| Executive reporting    | `今月の経営会議向けにKPIサマリを1枚でまとめて`               | reduce to decision-ready summary                                   | executive one-pager                  |
+| Stakeholder comms      | `役員会向けに社員向けメッセージのたたき台を作って`           | draft message, anticipate objections, align tone                   | communication draft                  |
+| Decision support       | `A案とB案の投資判断を、前提・リスク・撤退条件込みで比較して` | compare options with decision criteria                             | decision memo                        |
+| Sales/account strategy | `大口顧客のアップセル戦略を整理して、提案の切り口を出して`   | map account context and propose sales story                        | account plan                         |
+| Org/process            | `組織の役割が重複しているので、責任分界と会議体を見直したい` | analyze role overlap, process, meetings                            | org/process redesign                 |
+| Risk/governance        | `監査指摘が出そうな領域を洗い出して優先順位を付けて`         | classify risk and remediation order                                | risk register                        |
+| Customer escalation    | `解約しそうな顧客への対応方針を考えて`                       | identify issue, constraints, and response path                     | retention plan                       |
+| Crisis response        | `障害対応の対外説明と再発防止策をまとめて`                   | separate facts, explanation, prevention                            | incident statement                   |
 
 ### CEO signal to watch
 
@@ -81,22 +81,22 @@ These are the most likely CEO-style request families.
 
 These are the most likely CTO-style request families.
 
-| Family | Example request | What Kyberion should do | Expected outcome |
-|---|---|---|---|
-| Architecture review | `このモノリスを 3 つの分割案で比較して。運用コストと移行リスクも出して` | compare architecture options with tradeoffs | architecture memo |
-| Hotfix / refactor | `本番バグを最小差分で直して、回帰テストも回して` | reproduce, patch, validate, summarize | patch + test results |
-| Incident triage | `本番で 5xx が増えている。切り分けて初動案を出して` | isolate impact, propose containment | incident response plan |
-| Observability patrol | `Datadog/Grafana で異常がないか巡回して、要点だけまとめて` | inspect metrics and summarize anomalies | monitoring summary |
-| CI/CD triage | `CI が落ちた。原因を特定して、再発防止まで整理して` | inspect pipeline failures and root cause | triage report |
-| Workspace bootstrap | `新メンバーの開発環境を macOS 前提で一式そろえて` | setup dependencies and confirm readiness | bootstrap checklist |
-| LLM/provider selection | `OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して` | compare provider capabilities and cost | provider recommendation |
-| Runtime tuning | `エージェントの起動数とメモリ上限を調整して、遅延を半分にして` | propose tuning and measure impact | tuning report |
-| Governance of risky change | `この危険な設定変更の承認フローを作って、監査証跡も残して` | design approval gates and evidence | approval workflow |
-| Knowledge retrieval | `過去の障害対応メモを探して、今回に使える手順だけ抜き出して` | search, summarize, and reuse knowledge | distilled runbook |
-| Technical decision memo | `この投資判断の技術面を整理して、採用可否を 1 枚でまとめて` | compare choices and write a decision memo | decision memo |
-| Release readiness | `明日のデプロイを go / no-go 判定して、条件付きなら条件も出して` | compile readiness checks and determine status | go/no-go report |
-| Secret rotation | `期限切れのシークレットを洗い出して、ローテーション計画を作って` | identify credentials and plan rotation | rotation plan |
-| ADR sync | `この決定を ADR にして、関係者向けの要約も作って` | turn decisions into durable records | ADR + summary |
+| Family                     | Example request                                                          | What Kyberion should do                       | Expected outcome        |
+| -------------------------- | ------------------------------------------------------------------------ | --------------------------------------------- | ----------------------- |
+| Architecture review        | `このモノリスを 3 つの分割案で比較して。運用コストと移行リスクも出して`  | compare architecture options with tradeoffs   | architecture memo       |
+| Hotfix / refactor          | `本番バグを最小差分で直して、回帰テストも回して`                         | reproduce, patch, validate, summarize         | patch + test results    |
+| Incident triage            | `本番で 5xx が増えている。切り分けて初動案を出して`                      | isolate impact, propose containment           | incident response plan  |
+| Observability patrol       | `Datadog/Grafana で異常がないか巡回して、要点だけまとめて`               | inspect metrics and summarize anomalies       | monitoring summary      |
+| CI/CD triage               | `CI が落ちた。原因を特定して、再発防止まで整理して`                      | inspect pipeline failures and root cause      | triage report           |
+| Workspace bootstrap        | `新メンバーの開発環境を macOS 前提で一式そろえて`                        | setup dependencies and confirm readiness      | bootstrap checklist     |
+| LLM/provider selection     | `OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して` | compare provider capabilities and cost        | provider recommendation |
+| Runtime tuning             | `エージェントの起動数とメモリ上限を調整して、遅延を半分にして`           | propose tuning and measure impact             | tuning report           |
+| Governance of risky change | `この危険な設定変更の承認フローを作って、監査証跡も残して`               | design approval gates and evidence            | approval workflow       |
+| Knowledge retrieval        | `過去の障害対応メモを探して、今回に使える手順だけ抜き出して`             | search, summarize, and reuse knowledge        | distilled runbook       |
+| Technical decision memo    | `この投資判断の技術面を整理して、採用可否を 1 枚でまとめて`              | compare choices and write a decision memo     | decision memo           |
+| Release readiness          | `明日のデプロイを go / no-go 判定して、条件付きなら条件も出して`         | compile readiness checks and determine status | go/no-go report         |
+| Secret rotation            | `期限切れのシークレットを洗い出して、ローテーション計画を作って`         | identify credentials and plan rotation        | rotation plan           |
+| ADR sync                   | `この決定を ADR にして、関係者向けの要約も作って`                        | turn decisions into durable records           | ADR + summary           |
 
 ### CTO signal to watch
 
@@ -140,11 +140,11 @@ The operator-specific learning process should be normalized as a repeated loop.
 
 ## 6. Tiering Rules
 
-| Tier | Store here | Example |
-|---|---|---|
-| Personal | private preferences, style, wording, approval habits, correction history | `knowledge/personal/operator-profile.json` |
-| Confidential | company-specific operating norms, internal thresholds, customer strategy | `knowledge/confidential/...` |
-| Public | generic schema, reusable learning loop, sanitized examples | `knowledge/public/...` |
+| Tier         | Store here                                                               | Example                                    |
+| ------------ | ------------------------------------------------------------------------ | ------------------------------------------ |
+| Personal     | private preferences, style, wording, approval habits, correction history | `knowledge/personal/operator-profile.json` |
+| Confidential | company-specific operating norms, internal thresholds, customer strategy | `knowledge/confidential/...`               |
+| Public       | generic schema, reusable learning loop, sanitized examples               | `knowledge/public/...`                     |
 
 The important distinction is:
 
@@ -163,7 +163,7 @@ The important distinction is:
     "preferred_language": "ja",
     "response_style": "brief_direct",
     "preferred_detail_level": "compact",
-    "question_budget_default": 1
+    "question_budget_default": 1,
   },
   "decision_style": {
     "ambiguity_tolerance": "medium",
@@ -174,31 +174,31 @@ The important distinction is:
       "high_risk_action",
       "financial_commitment",
       "external_side_effect",
-      "authority_unclear"
-    ]
+      "authority_unclear",
+    ],
   },
   "terminology": {
     "canonical_terms": [
       { "term": "mission", "aliases": ["task", "案件"] },
-      { "term": "execution brief", "aliases": ["request understanding"] }
-    ]
+      { "term": "execution brief", "aliases": ["request understanding"] },
+    ],
   },
   "recurring_tasks": [
     {
       "family": "decision_support",
-      "trigger_phrases": ["比較して", "論点整理", "どう思う"]
+      "trigger_phrases": ["比較して", "論点整理", "どう思う"],
     },
     {
       "family": "reporting",
-      "trigger_phrases": ["経営レポート", "1枚でまとめて"]
-    }
+      "trigger_phrases": ["経営レポート", "1枚でまとめて"],
+    },
   ],
   "learning": {
     "update_policy": "incremental",
     "min_samples_to_promote": 5,
     "retain_counterexamples": true,
-    "drift_detection": true
-  }
+    "drift_detection": true,
+  },
 }
 ```
 
@@ -212,30 +212,30 @@ The important distinction is:
   "raw_request": "Adapt Kyberion to me as a CEO/CTO hybrid.",
   "normalized_intent": {
     "intent_id": "operator_learning",
-    "task_family": "operator_profile_learning"
+    "task_family": "operator_profile_learning",
   },
   "route": {
     "shape": "direct_reply",
-    "confidence": 0.93
+    "confidence": 0.93,
   },
   "signals": {
     "decision_style_observed": "executive_shortform",
     "terminology_observed": ["profile", "schema", "request log"],
-    "approval_threshold_observed": ["no file edits", "return schema only"]
+    "approval_threshold_observed": ["no file edits", "return schema only"],
   },
   "verification": {
     "result": "satisfied",
-    "operator_correction_count": 0
+    "operator_correction_count": 0,
   },
   "learning_update": {
     "candidate_created": true,
     "candidate_kind": "operator-preference-card",
-    "promote_eligible": true
+    "promote_eligible": true,
   },
   "privacy": {
     "tier": "personal",
-    "contains_sensitive_info": false
-  }
+    "contains_sensitive_info": false,
+  },
 }
 ```
 
@@ -255,18 +255,18 @@ single generic assistant memory.
 
 The simulation is now backed by first-class surface intents:
 
-| Intent | Role signal | Outcome |
-|---|---|---|
-| `executive-strategy-brief` | CEO strategy comparison | `strategy_brief` |
-| `executive-prioritization` | CEO focus and tradeoff selection | `priority_roadmap` |
-| `executive-reporting` | CEO reporting and KPI summary | `executive_report` |
-| `stakeholder-communication` | CEO stakeholder messaging | `stakeholder_message` |
-| `sales-account-strategy` | CEO customer/account strategy | `account_strategy_plan` |
-| `technical-decision-memo` | CTO decision memo | `technical_decision_memo` |
-| `llm-provider-selection` | CTO provider/model choice | `provider_selection_report` |
-| `agent-runtime-tuning` | CTO runtime optimization | `runtime_tuning_plan` |
-| `release-readiness-review` | CTO go/no-go judgment | `release_readiness_report` |
-| `operator-profile-learning` | personal adaptation loop | `operator_learning_update` |
+| Intent                      | Role signal                      | Outcome                     |
+| --------------------------- | -------------------------------- | --------------------------- |
+| `executive-strategy-brief`  | CEO strategy comparison          | `strategy_brief`            |
+| `executive-prioritization`  | CEO focus and tradeoff selection | `priority_roadmap`          |
+| `executive-reporting`       | CEO reporting and KPI summary    | `executive_report`          |
+| `stakeholder-communication` | CEO stakeholder messaging        | `stakeholder_message`       |
+| `sales-account-strategy`    | CEO customer/account strategy    | `account_strategy_plan`     |
+| `technical-decision-memo`   | CTO decision memo                | `technical_decision_memo`   |
+| `llm-provider-selection`    | CTO provider/model choice        | `provider_selection_report` |
+| `agent-runtime-tuning`      | CTO runtime optimization         | `runtime_tuning_plan`       |
+| `release-readiness-review`  | CTO go/no-go judgment            | `release_readiness_report`  |
+| `operator-profile-learning` | personal adaptation loop         | `operator_learning_update`  |
 
 Two schemas anchor the learning layer:
 
@@ -277,7 +277,7 @@ Two schemas anchor the learning layer:
 
 The runtime helper is:
 
-- [`operator-learning.ts`](/Users/famao/kyberion/libs/core/operator-learning.ts)
+- [`operator-learning.ts`](/Users/famao/kyberion/libs/core/surface/operator-learning.ts)
 
 It validates profile and request-log records, can create an
 `operator-request-log` from an `intent_resolution_packet`, builds an

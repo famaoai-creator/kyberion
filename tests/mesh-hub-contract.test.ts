@@ -14,7 +14,7 @@ import {
   isMeshRequestKind,
   isMeshSelectorKind,
   isMeshTopicVisibility,
-} from '../libs/core/mesh-hub-contract.js';
+} from '../libs/core/mesh/mesh-hub-contract.js';
 
 function loadJson(filePath: string) {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);

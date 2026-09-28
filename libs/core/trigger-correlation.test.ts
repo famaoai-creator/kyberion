@@ -4,7 +4,10 @@ import {
   currentTriggerDeliveryId,
   currentTriggerCorrelation,
 } from './trigger-correlation.js';
-import { WorkerEventStream, resetDefaultWorkerEventStream } from './worker-event-stream.js';
+import {
+  WorkerEventStream,
+  resetDefaultWorkerEventStream,
+} from './workforce/worker-event-stream.js';
 
 /**
  * EV-09: one cron firing produced a delivery receipt, a pipeline trace, worker

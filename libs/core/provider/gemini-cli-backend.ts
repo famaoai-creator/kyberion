@@ -1,0 +1,544 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/**
+ * Gemini CLI Backend — spawns the local `gemini` CLI in `-p -o json -y`
+ * mode to run structured-output reasoning tasks.
+ */
+
+import { spawn } from 'node:child_process';
+import { recordEstimatedCliUsage } from '../cli-usage-metering.js';
+import { z, type ZodType } from 'zod';
+import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import {
+  resolveActiveProviderPermissionArgs,
+  resolveEffectiveProviderPermissionProfile,
+  type ProviderPermissionProfileName,
+} from './provider-permission-profiles.js';
+import {
+  buildDelegationSpawnEnv,
+  newDelegationSessionId,
+  spawnWithDelegationEnv,
+} from './provider-spawn-env.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
+import type {
+  ReasoningBackend,
+  DivergeHypothesisInput,
+  HypothesisSketch,
+  CritiqueInput,
+  CritiqueResult,
+  PersonaSynthesisInput,
+  SynthesizedPersona,
+  BranchForkInput,
+  ForkedBranch,
+  SimulationInput,
+  SimulationResult,
+  ExtractRequirementsInput,
+  ExtractedRequirements,
+  ExtractDesignSpecInput,
+  ExtractedDesignSpec,
+  ExtractTestPlanInput,
+  ExtractedTestPlan,
+  DecomposeIntoTasksInput,
+  DecomposedTaskPlan,
+} from '../reasoning/reasoning-backend.js';
+
+export interface GeminiCliBackendOptions {
+  /** CLI binary. Defaults to `gemini` (resolved via PATH). */
+  bin?: string;
+  /** Model alias. Defaults to the centralized gemini-default runtime model. */
+  model?: string;
+  /** Per-call timeout. Defaults to 5 min. */
+  timeoutMs?: number;
+  /** Additional CLI args to inject. */
+  extraArgs?: string[];
+}
+
+export class GeminiCliBackend implements ReasoningBackend {
+  readonly name = 'gemini-cli';
+  private readonly bin: string;
+  private readonly model: string;
+  private readonly timeoutMs: number;
+  private readonly extraArgs: string[];
+
+  constructor(options: GeminiCliBackendOptions = {}) {
+    this.bin = options.bin ?? 'gemini';
+    this.model = options.model ?? resolveRuntimeModelId('gemini-default');
+    this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
+    this.extraArgs = options.extraArgs ?? [];
+  }
+
+  /** Keep caller extras, but never let them widen an ambient sandbox policy. */
+  private permissionArgs(
+    active = resolveActiveProviderPermissionArgs('gemini')
+  ): readonly string[] {
+    if (!active) return this.extraArgs;
+
+    const filtered: string[] = [];
+    for (let index = 0; index < this.extraArgs.length; index += 1) {
+      const arg = this.extraArgs[index]!;
+      if (arg === '-y' || arg === '--yolo' || arg === '--sandbox' || arg.startsWith('--sandbox=')) {
+        continue;
+      }
+      if (arg === '--approval-mode') {
+        index += 1;
+        continue;
+      }
+      if (arg.startsWith('--approval-mode=')) continue;
+      filtered.push(arg);
+    }
+    return [...filtered, ...active];
+  }
+
+  async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
+    const schema = z.object({
+      hypotheses: z.array(
+        z.object({
+          id: z.string(),
+          proposed_by: z.string(),
+          content: z.string(),
+          status: z.enum(['pending', 'survived', 'rejected']).optional(),
+        })
+      ),
+    });
+    const result = await this.runStructured({
+      systemPrompt: [
+        'Generate divergent hypotheses from multiple personas independently.',
+        'You MUST return a JSON object with EXACTLY this key:',
+        '  hypotheses: array of { id: string, proposed_by: string, content: string, status: "pending"|"survived"|"rejected" }',
+        `Each persona (${input.personas.join(', ')}) must contribute at least ${input.minPerPersona ?? 2} hypotheses.`,
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
+      userPrompt: `Topic: ${input.topic}\nPersonas: ${input.personas.join(', ')}`,
+      schema,
+    });
+    return result.hypotheses;
+  }
+
+  async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
+    const schema = z.object({
+      hypotheses: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: [
+        'Run a cross-critique pass on the provided hypotheses.',
+        'You MUST return a JSON object with EXACTLY this key:',
+        '  hypotheses: array of { id, persona, hypothesis, critiques: [{ persona, content, verdict }], final_score }',
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
+      userPrompt: `Topic: ${input.topic}\nHypotheses: ${JSON.stringify(input.hypotheses)}`,
+      schema,
+    })) as CritiqueResult;
+  }
+
+  async synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona> {
+    const schema = z.object({
+      fidelity: z.enum(['low', 'medium', 'high']),
+      identity: z.record(z.string(), z.any()),
+      style_hints: z.record(z.string(), z.any()),
+      ng_topics: z.array(z.string()),
+      recent_history_summary: z.array(z.any()),
+    });
+    return this.runStructured({
+      systemPrompt: 'Synthesize a counterparty persona. Output JSON ONLY.',
+      userPrompt: JSON.stringify(input.relationshipNode),
+      schema,
+    });
+  }
+
+  async forkBranches(input: BranchForkInput): Promise<ForkedBranch[]> {
+    const schema = z.object({
+      branches: z.array(z.any()),
+    });
+    const result = await this.runStructured({
+      systemPrompt: 'Fork short-horizon branches. Output JSON ONLY.',
+      userPrompt: JSON.stringify(input.hypotheses),
+      schema,
+    });
+    return result.branches;
+  }
+
+  async simulateBranches(input: SimulationInput): Promise<SimulationResult> {
+    const schema = z.object({
+      branches: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: 'Simulate branch execution. Output JSON ONLY.',
+      userPrompt: [
+        `Max steps per branch: ${input.maxStepsPerBranch ?? 10}`,
+        JSON.stringify(input.branches),
+      ].join('\n'),
+      schema,
+    })) as SimulationResult;
+  }
+
+  async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
+    const schema = z.object({
+      functional_requirements: z.array(z.any()),
+      non_functional_requirements: z.array(z.any()),
+      constraints: z.array(z.any()),
+      assumptions: z.array(z.any()),
+      open_questions: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: [
+        'Extract structured requirements from the provided text.',
+        'You MUST return a JSON object with EXACTLY these keys (all required, all arrays):',
+        '  functional_requirements: array of { id, title, description, priority, source }',
+        '  non_functional_requirements: array of { id, title, description, category }',
+        '  constraints: array of { id, description }',
+        '  assumptions: array of { id, description }',
+        '  open_questions: array of { id, question }',
+        'Set open_questions[].blocking=true only when the unanswered item blocks the current MVP; otherwise omit it or set it false.',
+        'Do not convert interviewer follow-up questions into open questions unless the customer explicitly says the detail is unknown or blocking.',
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
+      userPrompt: input.sourceText,
+      schema,
+    })) as ExtractedRequirements;
+  }
+
+  async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
+    const schema = z.object({
+      architecture_summary: z.string().optional(),
+      components: z.array(z.any()),
+      data_flows: z.array(z.any()),
+      trade_offs: z.array(z.any()),
+      risks: z.array(z.any()),
+      open_decisions: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: 'Derive architectural design spec. Output JSON ONLY.',
+      userPrompt: JSON.stringify(input.requirementsDraft),
+      schema,
+    })) as ExtractedDesignSpec;
+  }
+
+  async extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan> {
+    const schema = z.object({
+      app_id: z.string(),
+      cases: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: 'Derive test plan. Output JSON ONLY.',
+      userPrompt: JSON.stringify(input.requirementsDraft),
+      schema,
+    })) as ExtractedTestPlan;
+  }
+
+  async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
+    const schema = z.object({
+      strategy_summary: z.string().optional(),
+      tasks: z.array(z.any()),
+    });
+    return (await this.runStructured({
+      systemPrompt: 'Decompose into task plan. Output JSON ONLY.',
+      userPrompt: JSON.stringify(input.requirementsDraft),
+      schema,
+    })) as DecomposedTaskPlan;
+  }
+
+  async delegateTask(instruction: string, context?: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const activePermissionArgs = resolveActiveProviderPermissionArgs('gemini');
+    const args = [
+      '-p',
+      `${instruction}\n\nContext: ${context ?? 'none'}`,
+      ...(activePermissionArgs
+        ? [
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.permissionArgs(activePermissionArgs),
+          ]
+        : [
+            '-y', // YOLO mode for autonomous task execution
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.extraArgs,
+          ]),
+    ];
+    // For delegation, we don't necessarily want JSON format, we want it to just do the work.
+    // However, the caller expects a string result (the report).
+    const stdout = await this.spawnCli(
+      args,
+      activePermissionArgs ? resolveEffectiveProviderPermissionProfile('gemini') : undefined
+    );
+    const lines = stdout.split('\n');
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+    if (jsonStartIdx === -1) {
+      return stdout.trim(); // Fallback if no JSON envelope at all
+    }
+    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+    try {
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
+      const response = typeof cliResult.response === 'string' ? cliResult.response : undefined;
+      return (response || stdout).trim();
+    } catch (_) {
+      return stdout.trim();
+    }
+  }
+
+  async prompt(prompt: string): Promise<string> {
+    return this.runPrompt(prompt);
+  }
+
+  private async runStructured<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+  }): Promise<T> {
+    assertReasoningEgressAllowed(this.name);
+    const args = [
+      '-p',
+      `${params.systemPrompt}\n\n${params.userPrompt}`,
+      '-o',
+      'json',
+      ...(this.model ? ['--model', this.model] : []),
+      ...this.permissionArgs(),
+    ];
+
+    const stdout = await this.spawnCli(args);
+
+    // Extract only the JSON part from stdout (Gemini CLI might print "YOLO mode enabled" etc)
+    const lines = stdout.split('\n');
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+    if (jsonStartIdx === -1) {
+      throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
+    }
+    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+
+    let cliResult: any;
+    try {
+      cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response');
+    } catch (err: any) {
+      throw new Error(
+        `[gemini-cli] failed to parse CLI JSON output: ${err.message}. Raw: ${cleanStdout.slice(0, 500)}`
+      );
+    }
+
+    const responseStr = cliResult.response;
+    if (!responseStr) {
+      throw new Error(
+        `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+      );
+    }
+
+    // Attempt to extract JSON from the response string (it might be wrapped in ```json ... ```)
+    const jsonMatch =
+      responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
+    const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
+
+    try {
+      const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
+      const parsed = params.schema.safeParse(structured);
+      if (!parsed.success) {
+        throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
+      }
+      return parsed.data;
+    } catch (err: any) {
+      throw new Error(
+        `[gemini-cli] failed to parse inner JSON: ${err.message}. Raw response: ${responseStr.slice(0, 500)}`
+      );
+    }
+  }
+
+  private async runPrompt(prompt: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const args = [
+      '-p',
+      prompt,
+      '-o',
+      'json',
+      ...(this.model ? ['--model', this.model] : []),
+      ...this.permissionArgs(),
+    ];
+
+    const stdout = await this.spawnCli(args);
+    const lines = stdout.split('\n');
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+    if (jsonStartIdx === -1) {
+      return stdout.trim();
+    }
+    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+    try {
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
+      if (cliResult.error) {
+        throw new Error(`[gemini-cli] CLI returned error: ${JSON.stringify(cliResult.error)}`);
+      }
+      if (typeof cliResult.response !== 'string') {
+        throw new Error('[gemini-cli] CLI result missing "response" field');
+      }
+      return cliResult.response.trim() || stdout.trim();
+    } catch (err: any) {
+      if (err.message.startsWith('[gemini-cli]')) throw err;
+      return stdout.trim();
+    }
+  }
+
+  private async spawnCli(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
+    const started = Date.now();
+    const promptChars = args.join(' ').length;
+    try {
+      const stdout = await this.spawnCliRaw(args, profile);
+      recordEstimatedCliUsage(
+        'gemini-cli',
+        this.model,
+        started,
+        'success',
+        promptChars,
+        stdout.length
+      );
+      return stdout;
+    } catch (err) {
+      recordEstimatedCliUsage('gemini-cli', this.model, started, 'error', promptChars, 0);
+      throw err;
+    }
+  }
+
+  private spawnCliRaw(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const spawnEnv = buildDelegationSpawnEnv({
+        provider: 'gemini',
+        sessionId: newDelegationSessionId('gemini'),
+        ...(profile ? { profile } : {}),
+      });
+      const child = spawnWithDelegationEnv(spawnEnv, () =>
+        spawn(this.bin, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: spawnEnv.env,
+        })
+      );
+      let stdout = '';
+      let stderr = '';
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        spawnEnv.dispose();
+        reject(new Error(`[gemini-cli] timed out after ${this.timeoutMs}ms`));
+      }, this.timeoutMs);
+      child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
+      child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+          reject(new Error(`[gemini-cli] CLI exited with code ${code}. stderr: ${stderr}`));
+          return;
+        }
+        resolve(stdout);
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(new Error(`[gemini-cli] spawn failed: ${err.message}`));
+      });
+      child.stdin.end();
+    });
+  }
+}
+
+export function buildGeminiCliBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  modelOverride?: string
+): GeminiCliBackend | null {
+  const bin =
+    getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim() ||
+    resolveProviderCliCommand('gemini');
+  const model =
+    modelOverride ||
+    getRegisteredEnvText('KYBERION_GEMINI_CLI_MODEL', { env })?.trim() ||
+    resolveRuntimeModelId('gemini-default', env);
+  const timeoutRaw = getRegisteredEnvText('KYBERION_GEMINI_CLI_TIMEOUT', { env })?.trim();
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
+  const backend = new GeminiCliBackend({
+    ...(bin ? { bin } : {}),
+    ...(model ? { model } : {}),
+    ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
+  });
+  logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model})`);
+  return backend;
+}
+
+export async function runGeminiCliQuery<T>(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  schema: ZodType<T>;
+  options?: GeminiCliBackendOptions;
+}): Promise<T> {
+  const backendOptions = params.options || {};
+  const bin = backendOptions.bin ?? 'gemini';
+  const model = backendOptions.model ?? resolveRuntimeModelId('gemini-default');
+  const timeoutMs = backendOptions.timeoutMs ?? 5 * 60 * 1000;
+  const extraArgs = backendOptions.extraArgs ?? [];
+
+  const args = [
+    '-p',
+    `${params.systemPrompt}\n\n${params.userPrompt}`,
+    '-o',
+    'json',
+    '-y',
+    ...(model ? ['--model', model] : []),
+    ...extraArgs,
+  ];
+
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const spawnEnv = buildDelegationSpawnEnv({
+      provider: 'gemini',
+      sessionId: newDelegationSessionId('gemini'),
+    });
+    const child = spawnWithDelegationEnv(spawnEnv, () =>
+      spawn(bin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv.env,
+      })
+    );
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`[gemini-cli] timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.stdout.on('data', (chunk) => (out += chunk.toString()));
+    child.stderr.on('data', (chunk) => (err += chunk.toString()));
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`[gemini-cli] CLI exited with code ${code}. stderr: ${err}`));
+        return;
+      }
+      resolve(out);
+    });
+    child.on('error', (spawnErr) => {
+      clearTimeout(timer);
+      reject(new Error(`[gemini-cli] spawn failed: ${(spawnErr as Error).message}`));
+    });
+    child.stdin.end();
+  });
+
+  const lines = stdout.split('\n');
+  const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+  if (jsonStartIdx === -1) {
+    throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
+  }
+  const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+  const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+    response?: unknown;
+  };
+  if (typeof cliResult.response !== 'string' || !cliResult.response) {
+    throw new Error(
+      `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+    );
+  }
+  const responseStr = cliResult.response;
+  const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
+  const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
+  const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
+  const parsed = params.schema.safeParse(structured);
+  if (!parsed.success) {
+    throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
+  }
+  return parsed.data;
+}

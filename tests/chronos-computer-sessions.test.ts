@@ -57,7 +57,7 @@ vi.mock('@agent/core/secure-io', () => ({
   }),
 }));
 
-vi.mock('@agent/core/pty-engine', () => ({
+vi.mock('@agent/core/shell/pty-engine', () => ({
   ptyEngine: {
     list: vi.fn(() => ['pty-1']),
     get: vi.fn(() => ({

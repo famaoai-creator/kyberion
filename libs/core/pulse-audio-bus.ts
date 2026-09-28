@@ -21,12 +21,16 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
 import { buildSafeExecEnv, safeExec } from './secure-io.js';
-import { resolveFfmpegBin } from './tool-binary-resolvers.js';
+import { resolveFfmpegBin } from './tool/tool-binary-resolvers.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
-import type { AudioBus, AudioBusProbe } from './audio-bus.js';
-import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import type { AudioBus, AudioBusProbe } from './voice/audio-bus.js';
+import type { AudioChunk, AudioFormat } from './meeting/meeting-session-types.js';
 import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';
-import type { AudioBufferPolicy, AudioRouteHealth, AudioRouteMetrics } from './audio-route.js';
+import type {
+  AudioBufferPolicy,
+  AudioRouteHealth,
+  AudioRouteMetrics,
+} from './voice/audio-route.js';
 
 export interface PulseAudioBusOptions {
   /** Source name we expose to the meeting client as its mic. */

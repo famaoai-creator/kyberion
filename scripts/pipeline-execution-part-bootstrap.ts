@@ -1,4 +1,4 @@
-import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
 import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import {
@@ -12,35 +12,29 @@ import {
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
-import { getReasoningBackend, type ReasoningCallOptions } from '@agent/core/reasoning-backend';
-import {
-  getReasoningRuntimeInstructions,
-  renderRuntimeInstructions,
-} from '@agent/core/reasoning-runtime-instructions';
+import type { ReasoningCallOptions } from '@agent/core/reasoning/reasoning-backend';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
-import { executeReportContract } from '@agent/core/report-contract';
-import { getReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
-import { renderFacets, resolveFacets } from '@agent/core/facet-registry';
-import { resolveStepReasoningRoute } from '@agent/core/reasoning-route-resolver';
 import {
   determineActuatorStepType,
   resolveActuatorOperation,
-} from '@agent/core/actuator-op-registry';
-import { runJanitor } from '@agent/core/storage-janitor';
+} from '@agent/core/actuator/actuator-op-registry';
 import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
-import { validateOpInput } from '@agent/core/op-input-contracts';
-import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
-import { resolveIdentityContext } from '@agent/core/authority';
-import { defineLegacyPipelineActuator } from '@agent/core/actuator-sdk';
+import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { defineLegacyPipelineActuator } from '@agent/core/actuator/actuator-sdk';
 import type {
   PipelineRunJournalHandle,
   PipelineRunJournalState,
   PipelineRunSuspendedPayload,
-} from '@agent/core/pipeline-run-journal';
+} from '@agent/core/pipeline/pipeline-run-journal';
 
-import { markRouterActive, markRouterInactive } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { type PipelineAdfStep, type PipelineStepReasoning } from '@agent/core/pipeline-contract';
+import {
+  type PipelineAdfStep,
+  type PipelineStepReasoning,
+} from '@agent/core/pipeline/pipeline-contract';
 import { type PipelineFailure } from './pipeline-result-reporting.js';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -286,18 +280,20 @@ export function buildReasoningPolicyNote(policy: ReasoningStepPolicy): string {
   return parts.length > 0 ? `\n\n[policy ${parts.join(' ')}]` : '';
 }
 
-export function resolvePipelineReasoningOptions(
+export async function resolvePipelineReasoningOptions(
   policy: ReasoningStepPolicy,
   ctx: Record<string, unknown>,
   stepId: string,
   trace?: TraceContext
-): ReasoningCallOptions {
+): Promise<ReasoningCallOptions> {
   const reasoning = policy.reasoning;
   const persona =
     (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
     (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
     registeredEnv('KYBERION_PERSONA') ||
     'default';
+  const { resolveStepReasoningRoute } =
+    await import('@agent/core/reasoning/reasoning-route-resolver');
   const route = resolveStepReasoningRoute({
     stepId,
     persona,
@@ -327,12 +323,15 @@ export function resolvePipelineReasoningOptions(
   } satisfies ReasoningCallOptions;
 }
 
-export function resolvePipelineFacetNote(
+export async function resolvePipelineFacetNote(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
-): string {
+): Promise<string> {
   const raw = params._facets ?? params.facets;
   if (!raw || typeof raw !== 'object') return '';
+  const { getReasoningPayloadScope } = await import('@agent/core/reasoning/reasoning-egress-scope');
+  const { renderFacets, resolveFacets } = await import('@agent/core/facet-registry');
+  const { resolveIdentityContext } = await import('@agent/core/authority');
   const request = raw as {
     persona?: string;
     policies?: string[];
@@ -380,6 +379,8 @@ export async function runPipelineReportPhase(
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     : [];
   if (reports.length === 0) return ctx;
+  const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
+  const { executeReportContract } = await import('@agent/core/report-contract');
   const backend = getReasoningBackend();
   let workingCtx = ctx;
   for (const contract of reports) {
@@ -615,8 +616,11 @@ export async function loadActuatorDispatch(
 
   if (domain === 'reasoning') {
     dispatchCache[domain] = async (op, params, ctx, type, _trace?, policy?) => {
+      const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
+      const { getReasoningRuntimeInstructions, renderRuntimeInstructions } =
+        await import('@agent/core/reasoning/reasoning-runtime-instructions');
       const backend = getReasoningBackend();
-      if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
+      if (REASONING_LEAF_OPS.has(op)) {
         const resolvedInstruction =
           typeof params.instruction === 'string'
             ? resolveVars(params.instruction, ctx)
@@ -624,13 +628,13 @@ export async function loadActuatorDispatch(
         const resolvedContext = resolveReasoningContextParam(params, ctx);
         const reasoningPolicy =
           (params._reasoning_policy as ReasoningStepPolicy | undefined) ?? policy;
-        const routeOptions = resolvePipelineReasoningOptions(
+        const routeOptions = await resolvePipelineReasoningOptions(
           reasoningPolicy || {},
           ctx,
           String(params.step_id || params.op || 'reasoning'),
           _trace
         );
-        const facetNote = resolvePipelineFacetNote(params, ctx);
+        const facetNote = await resolvePipelineFacetNote(params, ctx);
         const promptVisibility = buildPipelinePromptVisibilityContext(ctx);
         const reasoningCallOptions = {
           effort: reasoningPolicy?.effort,
@@ -701,7 +705,7 @@ export async function loadActuatorDispatch(
   }
 
   const { resolveProviderCapabilityId, invokeProviderCapability } =
-    await import('@agent/core/provider-bridge');
+    await import('@agent/core/provider/provider-bridge');
 
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
@@ -801,30 +805,46 @@ export async function loadActuatorDispatch(
   return dispatchCache[domain];
 }
 
+/** Reasoning leaf ops served directly by the reasoning backend. */
+const REASONING_LEAF_OPS = new Set(['analyze', 'transform', 'synthesize']);
+
+/** Qualified op aliases: legacy `domain:action` spellings → canonical op. */
+const QUALIFIED_OP_ALIASES: Record<string, string> = {
+  'mission:list': 'system:list_missions',
+  'project:list': 'system:list_projects',
+  'knowledge:list': 'system:list_knowledge',
+  'capability:list': 'system:list_capabilities',
+  'agent:list-manifests': 'agent:list_manifests',
+  'agent:list_manifests': 'agent:list_manifests',
+  'agent:list-runtimes': 'agent:list_runtimes',
+  'agent:list_runtimes': 'agent:list_runtimes',
+};
+
+/** Bare control-flow aliases → canonical core:* ops. */
+const BARE_OP_ALIASES: Record<string, string> = {
+  if: 'core:if',
+  while: 'core:while',
+  loop_until: 'core:while',
+  retry_until_quality: 'core:retry_until_quality',
+  parallel_foreach: 'core:parallel_foreach',
+  team_lead: 'core:team_lead',
+  parallel_calls: 'core:parallel_calls',
+  accumulate: 'core:accumulate',
+  judge_route: 'core:judge_route',
+  await_decision: 'core:await_decision',
+};
+
 export function normalizePipelineOp(op: string): string {
   if (op.includes(':')) {
     const [domain, action] = op.split(':');
-    if (domain === 'mission' && action === 'list') return 'system:list_missions';
-    if (domain === 'project' && action === 'list') return 'system:list_projects';
-    if (domain === 'knowledge' && action === 'list') return 'system:list_knowledge';
-    if (domain === 'capability' && action === 'list') return 'system:list_capabilities';
-    if (domain === 'agent' && (action === 'list-manifests' || action === 'list_manifests'))
-      return 'agent:list_manifests';
-    if (domain === 'agent' && (action === 'list-runtimes' || action === 'list_runtimes'))
-      return 'agent:list_runtimes';
+    const alias = QUALIFIED_OP_ALIASES[op];
+    if (alias) return alias;
 
     if (domain === 'mission') return `system:${action}`;
     return op;
   }
-  if (op === 'if') return 'core:if';
-  if (op === 'while' || op === 'loop_until') return 'core:while';
-  if (op === 'retry_until_quality') return 'core:retry_until_quality';
-  if (op === 'parallel_foreach') return 'core:parallel_foreach';
-  if (op === 'team_lead') return 'core:team_lead';
-  if (op === 'parallel_calls') return 'core:parallel_calls';
-  if (op === 'accumulate') return 'core:accumulate';
-  if (op === 'judge_route') return 'core:judge_route';
-  if (op === 'await_decision') return 'core:await_decision';
+  const alias = BARE_OP_ALIASES[op];
+  if (alias) return alias;
   return `system:${op}`;
 }
 
@@ -1067,6 +1087,8 @@ export async function runInlineSystemShell(
   }
   // Track BlackHole mic routing state for SIGINT cleanup.
   if (cmd.includes('blackhole_audio_router.py')) {
+    const { markRouterActive, markRouterInactive } =
+      await import('@agent/core/blackhole-routing-guard');
     if (cmd.includes('setup_routing')) {
       const pythonBin = cmd.split(/\s+/)[0];
       const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');
@@ -1118,13 +1140,14 @@ export async function runInlineCoreWait(
   return ctx;
 }
 
-export function runInlineCoreJanitor(
+export async function runInlineCoreJanitor(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const dryRunParam = resolveVars(params.dry_run ?? params.dryRun ?? true, ctx);
   const dryRun = dryRunParam === true || dryRunParam === 'true';
+  const { runJanitor } = await import('@agent/core/storage-janitor');
   const report = runJanitor({ dryRun });
   const exportKey = resolveExportKey(step, 'janitor_report');
   ctx = { ...ctx, [exportKey]: report };

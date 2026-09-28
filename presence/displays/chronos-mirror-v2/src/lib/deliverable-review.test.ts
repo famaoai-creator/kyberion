@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadArtifactRecord, saveArtifactRecord } from '@agent/core/artifact-record';
+import { loadArtifactRecord, saveArtifactRecord } from '@agent/core/workforce/artifact-record';
 import { loadDeliverableReviewState, reviewDeliverable } from './deliverable-review';
 
 describe('deliverable review', () => {

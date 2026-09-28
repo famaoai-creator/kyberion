@@ -1,7 +1,7 @@
-import { resolveDocumentContentsLabel } from '@agent/core/document-contents-policy';
-import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
+import { resolveDocumentContentsLabel } from '@agent/core/media/document-contents-policy';
+import { resolveReportSectionTitle } from '@agent/core/media/document-outline-label-policy';
 import { nowIso } from '@agent/core/foundation';
-import { measureTextWidthPt, wrapLine } from '@agent/core/native-pptx-engine/text-metrics';
+import { measureTextWidthPt, wrapLine } from '@agent/core/media/native-pptx-engine/text-metrics';
 import { normalizeStructuredSection } from './media-structured-content.js';
 import { appendStructuredPdfBlocks } from './media-structured-pdf.js';
 import {

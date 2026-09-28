@@ -16,8 +16,8 @@ import {
   resolveCurrentTriggerAuthority,
   runWakeTrigger,
 } from './trigger-runner.js';
-import { auditChain } from './audit-chain.js';
-import { deriveTraceOrigin } from './src/trace.js';
+import { auditChain } from './governance/audit-chain.js';
+import { deriveTraceOrigin } from './analysis/trace.js';
 
 describe('QM-02 trigger runner', () => {
   const stores: string[] = [];

@@ -18,7 +18,7 @@ import {
   listWorkspaces,
   type WorkspaceLedgerOptions,
   type WorkspaceRecord,
-} from '@agent/core/workspace-ledger';
+} from '@agent/core/workforce/workspace-ledger';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const USAGE =

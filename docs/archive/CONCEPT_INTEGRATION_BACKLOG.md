@@ -122,8 +122,8 @@ last_updated: 2026-04-20
 
 - **実装済み**：
   - `intent-snapshot.schema.json` / `intent-delta.schema.json`
-  - `libs/core/intent-delta.ts`：`computeIntentDelta` / `goalSimilarity`（Jaccard） / `classifyDrift` / `isBlockingDrift`。閾値は `DEFAULT_THRESHOLDS` で調整可能。
-  - `libs/core/intent-delta.test.ts`：14 ケース（identical / disjoint / field diff / cross-mission refusal）通過。
+  - `libs/core/intent/intent-delta.ts`：`computeIntentDelta` / `goalSimilarity`（Jaccard） / `classifyDrift` / `isBlockingDrift`。閾値は `DEFAULT_THRESHOLDS` で調整可能。
+  - `libs/core/intent/intent-delta.test.ts`：14 ケース（identical / disjoint / field diff / cross-mission refusal）通過。
   - `mission-review-gate-registry.json` に `INTENT_DRIFT` ゲート追加。
 - **残件（次イテレーション）**：ミッションライフサイクル遷移での snapshot emission hooks、execution-receipt への intent_delta 累積記録。
 
@@ -131,12 +131,12 @@ last_updated: 2026-04-20
 
 #### P2-1. decision-ops の LLM 依存 op を実装化 ✅ contract 完了（2026-04-20）
 
-- `libs/core/reasoning-backend.ts`：`ReasoningBackend` インタフェース（divergePersonas / crossCritique / synthesizePersona / forkBranches / simulateBranches）と stub 実装。`registerReasoningBackend` でホスト CLI アダプタを差し込める。
+- `libs/core/reasoning/reasoning-backend.ts`：`ReasoningBackend` インタフェース（divergePersonas / crossCritique / synthesizePersona / forkBranches / simulateBranches）と stub 実装。`registerReasoningBackend` でホスト CLI アダプタを差し込める。
 - 5 op のロジックは現状 stub backend 経由で従来挙動を維持。wisdom-actuator decision-ops を本 contract に移植するのは follow-up（ホスト CLI 委譲の実装はモデル世代に依存するため別セッションで行う）。
 
 #### P2-2. 音声系 op の voice actuator 接続 ✅ contract 完了（2026-04-20）
 
-- `libs/core/voice-bridge.ts`：`VoiceBridge` インタフェース（runRoleplaySession / runOneOnOneSession）と stub 実装。`_synthetic: true` フラグで合成 transcript と governed voice run を下流が識別可能。
+- `libs/core/voice/voice-bridge.ts`：`VoiceBridge` インタフェース（runRoleplaySession / runOneOnOneSession）と stub 実装。`_synthetic: true` フラグで合成 transcript と governed voice run を下流が識別可能。
 - 実際の voice-engine-registry / voice-generation-runtime への結線は bridge 実装として別 commit で追加する想定（現在は stub がセッションを捏造）。
 
 #### P2-3. Relationship-graph を presence / voice actuator に結線 ✅ store 完了（2026-04-20）

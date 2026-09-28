@@ -1,7 +1,10 @@
 import { withExecutionContext } from '@agent/core/authority';
-import { listApprovalRequests, type ApprovalRequestRecord } from '@agent/core/approval-store';
-import { isFixtureApproval } from '@agent/core/approval-store-hygiene';
-import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission-state';
+import {
+  listApprovalRequests,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
+import { isFixtureApproval } from '@agent/core/governance/approval-store-hygiene';
+import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission/mission-state';
 import { safeExecResult } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

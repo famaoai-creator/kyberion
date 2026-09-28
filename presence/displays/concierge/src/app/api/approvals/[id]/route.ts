@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';

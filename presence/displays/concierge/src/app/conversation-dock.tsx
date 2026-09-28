@@ -15,7 +15,7 @@ import type {
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract-parser';
+} from '@agent/core/intent/intent-resolution-contract-parser';
 
 type DockMessage = {
   id: string;
@@ -68,7 +68,7 @@ const QUICK_REQUEST_KEYS: ConciergeMessageKey[] = [
 export const CONVERSATION_DOCK_OPEN_EVENT = 'concierge:open-dock';
 
 function newMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `msg-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`;
 }
 
 export function ConversationDock() {
@@ -81,7 +81,7 @@ export function ConversationDock() {
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
   const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
   const sessionIdRef = React.useRef(
-    `concierge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    `concierge-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`
   );
   const logRef = React.useRef<HTMLDivElement | null>(null);
 

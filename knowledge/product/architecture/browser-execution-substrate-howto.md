@@ -58,7 +58,7 @@ const draft = compileBrowserRecordingToPipeline(approvedRecording, {
 
 ## How to dispatch it
 
-`libs/core/procedure-dispatcher.ts`'s `dispatchProcedure` routes a `ProcedureEntry` with
+`libs/core/knowledge/procedure-dispatcher.ts`'s `dispatchProcedure` routes a `ProcedureEntry` with
 `substrate: 'browser'` and `execution_substrate: 'playwright'` to `dispatchPlaywrightPipeline`
 — a sibling function to the pre-existing `dispatchExtensionSession` (never edited to
 accommodate this; see the design doc's §9 rule: substrate branches live in separate
@@ -165,13 +165,13 @@ Attach to an already-running Chrome only when you pass `--cdp-url` / `--cdp-port
 
 - `libs/actuators/browser-actuator/src/recorded-ref-resolver.test.ts` — resolver unit tests,
   including the spoofing-defense cases (fake `page.evaluate`, no real browser needed).
-- `libs/core/procedure-dispatcher.test.ts` (`describe('dispatchProcedure — playwright
+- `libs/core/knowledge/procedure-dispatcher.test.ts` (`describe('dispatchProcedure — playwright
 substrate')`) — dispatcher routing, approval-gate parity, and blocked/executed outcomes,
   with `executeBrowserPipeline` mocked.
 - `libs/actuators/browser-actuator/src/index.test.ts` — end-to-end through the real
   actuator's `handleAction`, including the fallback-resolution and fail-closed cases.
 
-Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser-extension-bridge.test.ts libs/core/procedure-dispatcher.test.ts scripts/browser_playwright_executor.test.ts scripts/run_browser_procedure.test.ts`
+Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser/browser-extension-bridge.test.ts libs/core/knowledge/procedure-dispatcher.test.ts scripts/browser_playwright_executor.test.ts scripts/run_browser_procedure.test.ts`
 
 ## Review process note
 

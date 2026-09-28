@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { writeMemberProfile } from '@agent/core/member-registry';
+import { writeMemberProfile } from '@agent/core/organization/member-registry';
 import {
   applyClassification,
   createWorkInventoryEntry,
@@ -11,9 +11,9 @@ import {
   WorkInventoryStoreError,
   type WorkInventoryEntry,
   type WorkInventoryStep,
-} from '@agent/core/work-inventory';
-import type { WorkInventoryScoreResult } from '@agent/core/work-inventory-scoring';
-import type { WorkInventoryConsent } from '@agent/core/work-inventory-consent';
+} from '@agent/core/workforce/work-inventory';
+import type { WorkInventoryScoreResult } from '@agent/core/workforce/work-inventory-scoring';
+import type { WorkInventoryConsent } from '@agent/core/workforce/work-inventory-consent';
 
 import { run } from './work_inventory.js';
 import type {

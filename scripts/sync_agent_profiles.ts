@@ -1,7 +1,7 @@
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
-import { loadAgentProfileDirectory } from '@agent/core/mission-team-index';
+import { loadAgentProfileDirectory } from '@agent/core/mission/mission-team-index';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 /**

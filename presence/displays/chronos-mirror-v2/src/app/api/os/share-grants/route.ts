@@ -11,7 +11,7 @@ import {
   ShareGrantValidationError,
 } from '@agent/core/share-grant-graph';
 import { ShareGrantLiveSessionRegistry } from '@agent/core/share-grant-live-sessions';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,

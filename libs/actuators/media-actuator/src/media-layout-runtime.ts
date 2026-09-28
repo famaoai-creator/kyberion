@@ -1,7 +1,7 @@
 import { logger } from '@agent/core/core';
 import { clamp } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
-import { splitLinesBalanced } from '@agent/core/native-pptx-engine/text-metrics';
+import { splitLinesBalanced } from '@agent/core/media/native-pptx-engine/text-metrics';
 import { buildStructuredSlideBody } from './media-structured-pptx.js';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
@@ -483,6 +483,7 @@ function buildPptxSlideFromPattern(
           rightLines.join('\n') || data.objective || leftLines[leftLines.length - 1] || '';
         const calloutLabels = zc.semantic_labels || {};
         const calloutLabel =
+          // i18n-exempt: JA document layout labels (product language)
           calloutLabels[semanticType] ?? calloutLabels['default'] ?? '  根拠データ';
         if (leftLines.length > 0) {
           const leftText = leftLines.join('\n');
@@ -652,6 +653,7 @@ function buildPptxSlideFromPattern(
             valign: 'middle',
             margin: zc.panel_header_margin,
           },
+          // i18n-exempt: JA document layout labels (product language)
           text: zc.panel_label ?? '  リスク対策',
         });
         const riskPanelH = bodyH - zc.panel_h;
@@ -686,6 +688,7 @@ function buildPptxSlideFromPattern(
       } else if (bodyZoneKey === 'timeline') {
         const zc = bzl.body_zones.timeline;
         const tlLabels = zc.semantic_labels || {};
+        // i18n-exempt: JA document layout labels (product language)
         const tlLabel = tlLabels[semanticType] ?? tlLabels['default'] ?? '  ロードマップ';
         const timelineLeftFit = recordFit(
           'timeline.left',
@@ -850,6 +853,7 @@ function buildPptxSlideFromPattern(
             valign: 'middle',
             margin: zc.panel_header_margin,
           },
+          // i18n-exempt: JA document layout labels (product language)
           text: zc.panel_label ?? '  システム構成概要',
         });
         const archText = (archLines.length > 0 ? archLines : bodyLines).join('\n');

@@ -33,7 +33,7 @@ import {
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isMacOS, isWindows } from './platform.js';
-import { normalizePersistedAuditEntry } from './audit-chain.js';
+import { normalizePersistedAuditEntry } from './governance/audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
@@ -43,7 +43,7 @@ import {
   registerEnvironmentCapabilityProbe,
   type RegisteredProbe,
 } from './environment-capability.js';
-import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
+import { probeShellClaudeCliAvailability } from './shell/shell-claude-cli-backend.js';
 import {
   probeNemotronBackendAvailability,
   probeOpenAiCompatibleBackendAvailability,
@@ -53,15 +53,15 @@ import {
   probeLlamaCppBackendAvailability,
   probeMlxBackendAvailability,
   probeLocalAiBackendAvailability,
-} from './openai-compatible-backend.js';
-import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
-import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
-import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
-import { probeAnthropicApiBackendAvailability } from './anthropic-api-probe.js';
+} from './provider/openai-compatible-backend.js';
+import { probeOpenRouterBackendAvailability } from './provider/openrouter-backend.js';
+import { probeGeminiApiBackendAvailability } from './provider/gemini-api-backend.js';
+import { probeGrokApiBackendAvailability } from './provider/grok-api-backend.js';
+import { probeAnthropicApiBackendAvailability } from './provider/anthropic-api-probe.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
-} from './reasoning-backend-policy.js';
+} from './reasoning/reasoning-backend-policy.js';
 
 export function installCoreEnvironmentProbes(): void {
   const coreProbes: Array<[string, RegisteredProbe]> = [
@@ -259,22 +259,25 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (explicit) {
     return probeExplicitReasoningBackend(explicit, process.env);
   }
-  if (binaryAvailable('codex', ['--version'])) {
-    return { available: true };
+  // CLI probes are `spawnSync` (~100-800ms each on this host). They only gate
+  // on availability — which binary answered first does not change the result,
+  // so they race in parallel and short-circuit on the first hit.
+  const cliProbes: Array<Promise<boolean>> = [
+    Promise.resolve().then(() => binaryAvailable('codex', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('gemini', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('agy', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('grok', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('devin', ['--version'])),
+  ];
+  for (const probe of cliProbes) {
+    if (await probe) {
+      return { available: true };
+    }
   }
-  if (binaryAvailable('gemini', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('agy', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('grok', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('devin', ['--version'])) {
-    return { available: true };
-  }
-  if (kyberionEnv('CLAUDE_API_KEY') || probeShellClaudeCliAvailability().available) {
+  if (
+    kyberionEnv('CLAUDE_API_KEY') ||
+    (await Promise.resolve().then(() => probeShellClaudeCliAvailability())).available
+  ) {
     return { available: true };
   }
   if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {

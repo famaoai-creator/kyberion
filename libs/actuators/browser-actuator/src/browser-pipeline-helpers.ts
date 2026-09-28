@@ -6,17 +6,20 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
-import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/adf-engine';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
+import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
 import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 import { getPathValue } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
-import { getSecret } from '@agent/core/secret-guard';
+import { getSecret } from '@agent/core/secret/secret-guard';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
@@ -85,9 +88,7 @@ interface BrowserRuntimeLeaseLike {
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/browser-actuator/manifest.json'
-);
+
 const DEFAULT_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -96,10 +97,10 @@ const DEFAULT_BROWSER_RETRY = {
   jitter: true,
 };
 
-const buildBrowserRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: BROWSER_MANIFEST_PATH,
-  defaults: DEFAULT_BROWSER_RETRY,
-  fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
+const { buildStepRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json'),
+  retryDefaults: DEFAULT_BROWSER_RETRY,
+  retryFallbackCategories: ['network', 'timeout', 'resource_unavailable'],
   additionalShouldRetry: (error) =>
     /selector|not visible|strict mode violation|detached/i.test(error.message),
 });
@@ -108,18 +109,6 @@ function resolveBrowserRepositoryPath(ref: unknown, allowMissingLeaf = true): st
   return assertSafeRepositoryPath(pathResolver.rootResolve(String(ref || '').trim()), {
     allowMissingLeaf,
   });
-}
-
-function buildRetryOptions(stepParams: Record<string, any>) {
-  const explicitRetry =
-    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
-      ? { ...(stepParams.retry as Record<string, any>) }
-      : {};
-  if (stepParams?.max_retries !== undefined)
-    explicitRetry.maxRetries = Number(stepParams.max_retries);
-  if (stepParams?.retry_delay_ms !== undefined)
-    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildBrowserRetryOptions(explicitRetry);
 }
 
 export async function executePipeline(

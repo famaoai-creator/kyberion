@@ -272,6 +272,7 @@ export function createContractSchemaChecksPart2(): ContractCheck[] {
           },
           lyrics: {
             mode: 'provided',
+            // i18n-exempt: JA test fixture
             text: '[Verse]\nありがとう',
           },
           arrangement: {

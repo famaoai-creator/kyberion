@@ -26,7 +26,7 @@ import {
   probeToolRuntime,
   resolveManagedBinaryArtifact,
   resolveManagedBinaryPath,
-} from '@agent/core/tool-runtime-registry';
+} from '@agent/core/tool/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeChmodSync, safeExecResult, safeMoveSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

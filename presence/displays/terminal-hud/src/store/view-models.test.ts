@@ -7,7 +7,7 @@ import { settingsViewModel, type SettingsData } from './settings.js';
 import { processesViewModel, heartbeatSummary, type ProcessesData } from './processes.js';
 import { coordinationViewModel, type CoordinationData } from './coordination.js';
 import { agentGraphViewModel, formatElapsedDuration, type AgentGraphData } from './agent-graph.js';
-import type { CollaborationTree } from '@agent/core/agent-collaboration-tree';
+import type { CollaborationTree } from '@agent/core/agent/agent-collaboration-tree';
 
 const ja = makeI18n('ja');
 

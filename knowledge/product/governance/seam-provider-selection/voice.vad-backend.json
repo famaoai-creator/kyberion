@@ -23,8 +23,8 @@
             "footprint": "declared"
           },
           "evidence": [
-            "libs/core/voice-activity-detector.ts (EnergyVad: RMS threshold per 16-bit PCM frame, 'replace before high-noise environments')",
-            "libs/core/vad-registry.ts (built in, always available)"
+            "libs/core/voice/voice-activity-detector.ts (EnergyVad: RMS threshold per 16-bit PCM frame, 'replace before high-noise environments')",
+            "libs/core/voice/vad-registry.ts (built in, always available)"
           ]
         },
         "silero": {

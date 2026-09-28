@@ -29,7 +29,7 @@ status: archived
 
 ### Task 1: 共有解決層の抽出 — `claude-sonnet-4`
 
-1. `media-actuator/src/index.ts:324,354-366,404` の解決ロジックを `libs/core/tenant-design-resolver.ts` に抽出する: `resolveTenantDesign({ customerId?, brandName?, designSystemId? }): { tokens: 正準トークン部分集合, layoutCatalog?, logoPath?, source: 'tenant'|'default' }`。読み込みは secure-io 経由、confidential tier のパス解決は既存の customerResolver / tier-guard に従う。
+1. `media-actuator/src/index.ts:324,354-366,404` の解決ロジックを `libs/core/organization/tenant-design-resolver.ts` に抽出する: `resolveTenantDesign({ customerId?, brandName?, designSystemId? }): { tokens: 正準トークン部分集合, layoutCatalog?, logoPath?, source: 'tenant'|'default' }`。読み込みは secure-io 経由、confidential tier のパス解決は既存の customerResolver / tier-guard に従う。
 2. media-actuator を新層の呼び出しに置換し、`scripts/verify-design-resolution.mjs` と既存テストで挙動不変を確認する(このレプリカスクリプトも新層を呼ぶ形にして二重実装を解消)。
 3. unit test: tenant あり/なし/matchers 不一致/palette_ref 欠落。
 
@@ -62,20 +62,20 @@ status: archived
 
 ### Task 1 slice — 2026-07-05
 
-- `libs/core/tenant-design-resolver.ts` を追加し、confidential tenant override / theme pack / layout catalog / logo path の解決を共通化した。
+- `libs/core/organization/tenant-design-resolver.ts` を追加し、confidential tenant override / theme pack / layout catalog / logo path の解決を共通化した。
 - `libs/actuators/media-actuator/src/index.ts` の tenant override 解決は shared resolver 経由に差し替えた。
 - `scripts/verify-design-resolution.mjs` も shared resolver を参照するようにして、runtime と検証の二重実装を解消した。
-- `libs/core/tenant-design-resolver.test.ts` で tenant あり / default fallback を固定した。
+- `libs/core/organization/tenant-design-resolver.test.ts` で tenant あり / default fallback を固定した。
 - 検証:
-  - `pnpm exec vitest run libs/core/tenant-design-resolver.test.ts`
+  - `pnpm exec vitest run libs/core/organization/tenant-design-resolver.test.ts`
   - `pnpm --filter @actuator/media test`
   - `pnpm run validate`
 
 ### Task 3 slice — 2026-07-04
 
 - `video-content-brief` に `design_profile` を追加し、tenant/customer 指定から `resolveTenantDesign` → theme pack → video storyboard の `css_vars` へ流す経路を追加した。
-- `libs/core/video-design-system.ts` を追加し、video の既定トークン生成を `libs/core` へ集約した。
-- `libs/core/video-content-brief-contract.test.ts` で tenant palette が storyboard に反映されることを固定した。
+- `libs/core/video/video-design-system.ts` を追加し、video の既定トークン生成を `libs/core` へ集約した。
+- `libs/core/video/video-content-brief-contract.test.ts` で tenant palette が storyboard に反映されることを固定した。
 
 ### Task 2 slice — 2026-07-04
 

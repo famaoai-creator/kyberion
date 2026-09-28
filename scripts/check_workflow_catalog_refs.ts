@@ -15,11 +15,11 @@
  */
 
 import * as path from 'node:path';
-import { expandProcessTemplateTasks } from '@agent/core/mission-process-task-expansion';
+import { expandProcessTemplateTasks } from '@agent/core/mission/mission-process-task-expansion';
 import {
   loadMissionWorkflowCatalog,
   normalizeWorkflowPhases,
-} from '@agent/core/mission-workflow-catalog';
+} from '@agent/core/mission/mission-workflow-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

@@ -110,11 +110,11 @@ describe('isTestFile / isExcludedFile', () => {
   });
 
   it('excludes native-*-engine/examples per plan §2.7', () => {
-    expect(isExcludedFile('libs/core/src/native-pptx-engine/examples/gen_project_plan.ts')).toBe(
+    expect(isExcludedFile('libs/core/media/native-pptx-engine/examples/gen_project_plan.ts')).toBe(
       true
     );
-    expect(isExcludedFile('libs/core/src/native-xlsx-engine/examples/gen_wbs.ts')).toBe(true);
-    expect(isExcludedFile('libs/core/src/native-pptx-engine/builders.ts')).toBe(false);
+    expect(isExcludedFile('libs/core/media/native-xlsx-engine/examples/gen_wbs.ts')).toBe(true);
+    expect(isExcludedFile('libs/core/media/native-pptx-engine/builders.ts')).toBe(false);
   });
 });
 

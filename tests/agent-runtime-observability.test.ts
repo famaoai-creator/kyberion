@@ -16,15 +16,15 @@ const { resolveAgentProviderTargetMock } = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('@agent/core/agent-provider-resolution', async () => ({
+vi.mock('@agent/core/agent/agent-provider-resolution', async () => ({
   resolveAgentProviderTarget: resolveAgentProviderTargetMock,
 }));
 
-import { agentLifecycle } from '@agent/core/agent-lifecycle';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
-import { agentRegistry } from '@agent/core/agent-registry';
-import { ACPMediator } from '@agent/core/acp-mediator';
-import { CodexAppServerAdapter } from '@agent/core/agent-adapter';
+import { agentLifecycle } from '@agent/core/agent/agent-lifecycle';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
+import { agentRegistry } from '@agent/core/agent/agent-registry';
+import { ACPMediator } from '@agent/core/mesh/acp-mediator';
+import { CodexAppServerAdapter } from '@agent/core/agent/agent-adapter';
 
 describe('agent runtime observability', () => {
   beforeEach(async () => {

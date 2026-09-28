@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ImageGenerationProvider } from '@agent/core/image-generation-types';
+import type { ImageGenerationProvider } from '@agent/core/media/image-generation-types';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { registerSeamCalibrationAdapter, runSeamCalibration } from '@agent/core/seam-calibration';

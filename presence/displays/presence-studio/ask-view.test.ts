@@ -5,7 +5,7 @@ import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
   type IntentResolutionShape,
-} from '@agent/core/intent-resolution-contract-parser';
+} from '@agent/core/intent/intent-resolution-contract-parser';
 import {
   ASK_SHAPE_LABEL_KEY,
   humanizeSlug,

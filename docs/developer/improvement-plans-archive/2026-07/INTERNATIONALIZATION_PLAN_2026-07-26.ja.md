@@ -40,7 +40,7 @@ status: archived
 
 | #   | 実装                                                                               | 優先順位                                          | 既定     |
 | --- | ---------------------------------------------------------------------------------- | ------------------------------------------------- | -------- |
-| 1   | `resolveOperatorLocale()` `libs/core/operator-identity.ts:30`                      | `KYBERION_LOCALE` → identity の `language` → 引数 | **`ja`** |
+| 1   | `resolveOperatorLocale()` `libs/core/surface/operator-identity.ts:30`              | `KYBERION_LOCALE` → identity の `language` → 引数 | **`ja`** |
 | 2   | `resolveVocabularyLocale()` `libs/core/ux-vocabulary.ts:97`                        | 引数のみ(呼び出し側が `process.env.LANG` を渡す)  | **`en`** |
 | 3   | `resolveLocale()` `scripts/cli.ts:171`                                             | `--locale` → `KYBERION_UI_LOCALE` → `LANG`        | **`en`** |
 | 4   | `resolveQuestionLocale()` `libs/core/question-resolver.ts:100`                     | `KYBERION_UI_LOCALE` → `LANG`                     | **`en`** |
@@ -52,9 +52,9 @@ status: archived
 
 ### 2.3 型のハードコード — 第3言語追加のブロッカー
 
-- `'ja' | 'en'` / `'en' | 'ja'` のリテラル union が **22箇所**(`libs/core/surface-ux.ts:532,551`、`operator-identity.ts:30`、`chronos/src/app/api/agent/route.ts:397` ほか)。
+- `'ja' | 'en'` / `'en' | 'ja'` のリテラル union が **22箇所**(`libs/core/surface/surface-ux.ts:532,551`、`operator-identity.ts:30`、`chronos/src/app/api/agent/route.ts:397` ほか)。
 - `ja`/`en` の二択を前提にした**インライン三項ヘルパー**が独自に生えている: `function l(locale: 'en'|'ja', en: string, ja: string)`(`chronos/src/app/api/agent/route.ts:397`、4箇所で使用)。**これがカタログを迂回する6つ目の経路**。
-- `libs/core/onboarding-flow-policy.ts` ほか4ファイルに `{ en: '…', ja: '…' }` のインラインマップ。
+- `libs/core/organization/onboarding-flow-policy.ts` ほか4ファイルに `{ en: '…', ja: '…' }` のインラインマップ。
 
 ### 2.4 コード直書き文言 — 止血できていない
 
@@ -64,19 +64,19 @@ status: archived
 合計: 139 ファイル / 1,975 行(コメント内は別途 165 行)
 ```
 
-| 行数 | ファイル                                                        | 性質                   |
-| ---- | --------------------------------------------------------------- | ---------------------- |
-| 134  | `satellites/voice-hub/server.ts`                                | 音声 UI 応答           |
-| 131  | `libs/core/src/native-pptx-engine/examples/gen_project_plan.ts` | サンプル(対象外候補)   |
-| 110  | `libs/core/src/native-xlsx-engine/examples/gen_wbs.ts`          | サンプル(対象外候補)   |
-| 107  | `tools/adf-replay-extension/background.js`                      | 拡張(対象外候補)       |
-| 63   | `libs/core/surface-mission-steering.ts`                         | **オペレータ面**       |
-| 54   | `scripts/virtual_office.ts`                                     | **オペレータ面**       |
-| 46   | `libs/core/browser-conversation-session.ts`                     | **オペレータ面**       |
-| 44   | `presence/displays/concierge/src/app/page.tsx`                  | **顧客面**             |
-| 40   | `scripts/onboarding_wizard.ts`                                  | **オペレータ面**(残余) |
-| 34   | `chronos/src/app/page.tsx` / `AgentCollaborationBoard.tsx`      | **オペレータ面**       |
-| 32   | `libs/core/surface-runtime-orchestrator.ts`                     | **オペレータ面**       |
+| 行数 | ファイル                                                          | 性質                   |
+| ---- | ----------------------------------------------------------------- | ---------------------- |
+| 134  | `satellites/voice-hub/server.ts`                                  | 音声 UI 応答           |
+| 131  | `libs/core/media/native-pptx-engine/examples/gen_project_plan.ts` | サンプル(対象外候補)   |
+| 110  | `libs/core/media/native-xlsx-engine/examples/gen_wbs.ts`          | サンプル(対象外候補)   |
+| 107  | `tools/adf-replay-extension/background.js`                        | 拡張(対象外候補)       |
+| 63   | `libs/core/surface/surface-mission-steering.ts`                   | **オペレータ面**       |
+| 54   | `scripts/virtual_office.ts`                                       | **オペレータ面**       |
+| 46   | `libs/core/browser/browser-conversation-session.ts`               | **オペレータ面**       |
+| 44   | `presence/displays/concierge/src/app/page.tsx`                    | **顧客面**             |
+| 40   | `scripts/onboarding_wizard.ts`                                    | **オペレータ面**(残余) |
+| 34   | `chronos/src/app/page.tsx` / `AgentCollaborationBoard.tsx`        | **オペレータ面**       |
+| 32   | `libs/core/surface/surface-runtime-orchestrator.ts`               | **オペレータ面**       |
 
 ブリッジ4種にも日本語固定応答が残存: `slack-bridge/src/index.ts:195,328,372` / `discord-bridge/src/index.ts:327,339` / `imessage-bridge/src/index.ts:321`。
 
@@ -84,7 +84,7 @@ status: archived
 
 ### 2.5 日時・数値の書式 — ロケール非対応かつ非決定的
 
-- `'ja-JP'` / `'en-US'` のロケール文字列直書きが **102箇所**。`libs/core/src/native-pptx-engine/builders.ts` に7箇所など、**成果物(PPTX/XLSX)の書式が日本語固定**。
+- `'ja-JP'` / `'en-US'` のロケール文字列直書きが **102箇所**。`libs/core/media/native-pptx-engine/builders.ts` に7箇所など、**成果物(PPTX/XLSX)の書式が日本語固定**。
 - 引数なし `toLocaleString()` / `toLocaleTimeString()` が **32箇所**(`chronos/src/components/MissionIntelligence.tsx` に15箇所)。これは**実行環境のロケールに依存**するため、多言語対応以前に [kyberion-development-practices](../../../../knowledge/product/governance/kyberion-development-practices.md) の hermetic テスト方針と衝突する(CI と開発機で出力が変わる)。
 - タイムゾーンも同様に暗黙。`pipelines/baseline-check.json` は `Asia/Tokyo` 固定。
 

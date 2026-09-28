@@ -50,8 +50,8 @@ vi.mock('@agent/core/ledger', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/secret-bridge', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/secret-bridge')>();
+vi.mock('@agent/core/secret/secret-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secret/secret-bridge')>();
   return {
     ...actual,
     fetchSecret: mocks.fetchSecret,

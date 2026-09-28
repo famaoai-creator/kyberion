@@ -12,7 +12,7 @@ status: archived
 ## 背景と課題
 
 - VIDEO_DESIGN_SYSTEM_INTEGRATION_PLAN により、brief → storyboard → composition ADF への **css_vars の配管は完成している**(VDS-01/02)。PPTX への正規化ブリッジ(VDS-08、`media-actuator/src/index.ts:1397-1417`)も実装済み。
-- しかし配管の**終端**である `libs/core/video-composition-compiler.ts`(1,387行)のシーン HTML テンプレートは、数百個のリテラル hex(既定背景 `#0B1020` `:18`、`#93c5fd`、`#60a5fa`、`#f59e0b`、`#060913`、`#fecaca` 等)で描かれており、トークン対応は `var(--bg, …)`/`var(--text, …)`/`var(--font-sans, …)` の 3 変数のフォールバックのみ。**css_vars を渡してもシーンの大半の色は変わらない**。
+- しかし配管の**終端**である `libs/core/video/video-composition-compiler.ts`(1,387行)のシーン HTML テンプレートは、数百個のリテラル hex(既定背景 `#0B1020` `:18`、`#93c5fd`、`#60a5fa`、`#f59e0b`、`#060913`、`#fecaca` 等)で描かれており、トークン対応は `var(--bg, …)`/`var(--text, …)`/`var(--font-sans, …)` の 3 変数のフォールバックのみ。**css_vars を渡してもシーンの大半の色は変わらない**。
 - `visual-workflow-compiler.ts`(110行)にはトークンが一切ない。
 - つまり DS-02(テナントブランド動画)を実装しても、実際に変わるのは背景と文字色程度 — 本計画がその残りを埋める。
 
@@ -59,7 +59,7 @@ status: archived
 ## 実装状況 追記(2026-07-12 — agy 縦型ショート動画の品質修復)
 
 - **原因診断**: (1) scene の見た目が compiler 内ハードコード CSS(紺一色・68px 見出し・単一骨格)で、LLM はテキスト欄のみ供給 = ストーリーに合わせた art direction が構造的に不可能。(2) `visual_steps` 欠落時に英語デモ工程(Brief intake / Content plan / Render package)が実動画へ混入。(3) 9:16 縦型でも横型と同じタイポグラフィスケール。
-- **修復**: `libs/core/video-visual-direction.ts` 新設 — reasoning backend がストーリー(storyboard beats / narration)から visual direction(mood・6色パレット・タイポスケール・scene 別 layout_variant)を JSON 起草(LLM zone)→ スキーマ検証 + クランプ(hex 必須・縦型は 72–132px 等、compiler zone は決定論維持)→ 失敗時は旧既定へ縮退(レンダを絶対に止めない)。既存の `--kb-*` トークン間接層に `:root` 注入で適用、font-size もトークン化。actuator の narrated 系2アクションへ自動配線。プレースホルダ工程図は全廃(契約テストも新契約へ更新)。
+- **修復**: `libs/core/video/video-visual-direction.ts` 新設 — reasoning backend がストーリー(storyboard beats / narration)から visual direction(mood・6色パレット・タイポスケール・scene 別 layout_variant)を JSON 起草(LLM zone)→ スキーマ検証 + クランプ(hex 必須・縦型は 72–132px 等、compiler zone は決定論維持)→ 失敗時は旧既定へ縮退(レンダを絶対に止めない)。既存の `--kb-*` トークン間接層に `:root` 注入で適用、font-size もトークン化。actuator の narrated 系2アクションへ自動配線。プレースホルダ工程図は全廃(契約テストも新契約へ更新)。
 - テスト: direction 検証6本 + compiler/narrated/actuator/render 計38本緑。
 
 ### 追記(2026-07-13 — 選択方式への転換)

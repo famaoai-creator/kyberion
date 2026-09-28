@@ -33,7 +33,7 @@ The mission strengthened mission-to-WorkItem dispatch by propagating typed proje
 
 ## Reusable Artifacts
 
-- libs/core/mission-workitem-dispatch.ts
+- libs/core/mission/mission-workitem-dispatch.ts
 - Mission CLI help and required mission-ID guard introduced in checkpoint 3a377b5f
 - Tenant-context dispatcher regression suite, including 32 dispatcher/onboarding checks and the broader 88-test CLI/router verification
 - Evidence-bound provider sync audit, supervisor watchdog probe, and Work Graph projection from checkpoint 8c36a78c

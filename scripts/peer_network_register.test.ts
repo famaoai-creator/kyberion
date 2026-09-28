@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   logger: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@agent/core/peer-messaging', () => ({
+vi.mock('@agent/core/mesh/peer-messaging', () => ({
   registerPeerNetworkPeer: mocks.registerPeerNetworkPeer,
 }));
 

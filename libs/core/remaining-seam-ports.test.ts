@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ensureAgentRuntime, registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
+import { ensureAgentRuntime, registerAgentRuntimeEnsurer } from './agent/agent-runtime-port.js';
 import { coreSeamCatalog } from './seam.js';
 import {
   executeRegisteredSuperPipeline,
   registerSuperNerveExecutor,
 } from './super-nerve-execution-port.js';
-import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
+import {
+  listDemotedProviders,
+  registerHealthyInstancesResolver,
+} from './provider/provider-health-view.js';
 import {
   registerIdentityContextResolver,
   resolvePolicyIdentityContext,
@@ -13,7 +16,7 @@ import {
 import {
   dispatchThroughMissionWorkerCore,
   registerMissionWorkerCoreDispatcher,
-} from './mission-orchestration-worker-dispatch-port.js';
+} from './mission/mission-orchestration-worker-dispatch-port.js';
 
 describe('remaining sole seam ports', () => {
   it('registers and disposes the runtime ensurer seam', async () => {

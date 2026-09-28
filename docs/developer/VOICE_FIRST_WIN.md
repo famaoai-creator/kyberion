@@ -44,17 +44,17 @@ Tier 0 is the first-win path. This document is about wiring tier 0.
            │ system:native_tts_speak
            ▼
 ┌─────────────────────────────┐
-│ libs/core/native-tts.ts     │  Spawns say / espeak / PowerShell
+│ libs/core/media/native-tts.ts     │  Spawns say / espeak / PowerShell
 └─────────────────────────────┘
 ```
 
 ## What's implemented (Phase A-5 partial)
 
-- [x] `libs/core/native-tts.ts` — OS native TTS wrapper (`speak`, `probeNativeTts`, `hasBuiltInTts`).
-- [x] `libs/core/native-tts.test.ts` — unit tests for command building, control char sanitization.
+- [x] `libs/core/media/native-tts.ts` — OS native TTS wrapper (`speak`, `probeNativeTts`, `hasBuiltInTts`).
+- [x] `libs/core/media/native-tts.test.ts` — unit tests for command building, control char sanitization.
 - [x] Exported via `@agent/core` as `nativeTtsSpeak` / `probeNativeTts` / etc.
 - [x] `pipelines/voice-hello.json` — the tier-0 first-win ADF.
-- [x] `system:native_tts_speak` — system actuator wiring from the voice pipeline to `libs/core/native-tts.ts`.
+- [x] `system:native_tts_speak` — system actuator wiring from the voice pipeline to `libs/core/media/native-tts.ts`.
 - [x] `system:check_native_tts` — preflight probe that calls `probeNativeTts()` and exports its status.
 - [x] `system:voice_input_toggle` — macOS fallback for dictation-based input when browser Web Speech is unavailable or the focused field needs OS-level dictation; this is an OS control op, not a voice-actuator op.
 - [x] README / Quickstart now point at the first-win smoke commands.
@@ -96,5 +96,5 @@ The primary tier-0 path still uses browser Web Speech for input. If that path is
 ## Related
 
 - [`docs/PRODUCTIZATION_ROADMAP.md` §10 付録 A](../PRODUCTIZATION_ROADMAP.md) — full voice first-win specification.
-- [`libs/core/native-tts.ts`](../../libs/core/native-tts.ts) — TTS wrapper.
+- [`libs/core/media/native-tts.ts`](../../libs/core/media/native-tts.ts) — TTS wrapper.
 - [`pipelines/voice-hello.json`](../../pipelines/voice-hello.json) — ADF.

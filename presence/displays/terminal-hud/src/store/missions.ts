@@ -2,7 +2,7 @@ import {
   listMissionSummaries,
   buildMissionStatusView,
   type MissionSummary,
-} from '@agent/core/mission-read-model';
+} from '@agent/core/mission/mission-read-model';
 import { currentScope, type ScopeContext } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor } from '../theme.js';

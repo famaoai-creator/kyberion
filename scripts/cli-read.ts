@@ -18,7 +18,7 @@ import {
   READABLE_DOCUMENT_EXTENSIONS,
   readDocument,
   type ReadDocumentResult,
-} from '@agent/core/document-reader';
+} from '@agent/core/media/document-reader';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { ScriptExitError } from './lib/harness.js';
 

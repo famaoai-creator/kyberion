@@ -35,7 +35,7 @@ Claude 向け初版の最小追加は2つであり、Codex 対応は CT-05 で�
 
 ### 1.1 切替 seam は既にあり、Claude の governed harness 委譲まで実装済み
 
-- `libs/core/agent-dispatch.ts` — `AgentDispatcher` interface。既定 `ProcessSpawnDispatcher` は backend の `delegateTask` に処理を渡すため、provider によっては委譲ごとに CLI/SDK プロセスを増やす。`KYBERION_IN_SESSION_SUBAGENT=1` の `InSessionDispatcher` は A2A ブリッジ経由、`KYBERION_HARNESS_SUBAGENT=1` の `HarnessSubagentDispatcher` は Claude Agent SDK の governed path 経由である。`maybeWrapWithDispatcher` が実行面切替の単一点。
+- `libs/core/agent/agent-dispatch.ts` — `AgentDispatcher` interface。既定 `ProcessSpawnDispatcher` は backend の `delegateTask` に処理を渡すため、provider によっては委譲ごとに CLI/SDK プロセスを増やす。`KYBERION_IN_SESSION_SUBAGENT=1` の `InSessionDispatcher` は A2A ブリッジ経由、`KYBERION_HARNESS_SUBAGENT=1` の `HarnessSubagentDispatcher` は Claude Agent SDK の governed path 経由である。`maybeWrapWithDispatcher` が実行面切替の単一点。
 - `claude-agent-reasoning-backend.ts` — `KYBERION_CLAUDE_AGENT_TOOLS=1` の governed agentic path(Agent SDK + Kyberion MCP + `GOVERNED_AGENT_ALLOWED_TOOLS` + `createKyberionCanUseTool` の tier/approval gate)が実装済み。ただし現状の harness 実装は Claude に限定され、Codex の既存 app-server session/thread へは接続されていない。
 
 ### 1.2 チーム構成の SSoT はあるが、CLI サブエージェント定義に射影されていない
@@ -84,7 +84,7 @@ Claude 向け初版の最小追加は2つであり、Codex 対応は CT-05 で�
 
 > 優先度 P1 / 規模 M / 依存: CT-01
 
-`libs/core/agent-dispatch.ts` に `HarnessSubagentDispatcher implements AgentDispatcher` を追加する。Claude の governed path(`runClaudeAgentTask` + Kyberion MCP + `canUseTool`)を第一 adapter とし、CT-01 の役割定義を provider-specific な subagent/agent/thread オプションへ射影する。`maybeWrapWithDispatcher` に `KYBERION_HARNESS_SUBAGENT=1`(仮)の分岐を1本追加 — **呼び出し側(mission-orchestration-worker / background-review 等)は無変更**であること。provider adapter が capability を持たない場合の降格・未対応表面化は CT-05 の契約に従う。
+`libs/core/agent/agent-dispatch.ts` に `HarnessSubagentDispatcher implements AgentDispatcher` を追加する。Claude の governed path(`runClaudeAgentTask` + Kyberion MCP + `canUseTool`)を第一 adapter とし、CT-01 の役割定義を provider-specific な subagent/agent/thread オプションへ射影する。`maybeWrapWithDispatcher` に `KYBERION_HARNESS_SUBAGENT=1`(仮)の分岐を1本追加 — **呼び出し側(mission-orchestration-worker / background-review 等)は無変更**であること。provider adapter が capability を持たない場合の降格・未対応表面化は CT-05 の契約に従う。
 
 **受入条件**
 

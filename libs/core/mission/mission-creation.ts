@@ -1,0 +1,702 @@
+/**
+ * scripts/refactor/mission-creation.ts
+ * Mission creation and activation helpers.
+ */
+
+import * as path from 'node:path';
+import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
+import * as customerResolver from '../customer-resolver.js';
+import { resolveCompany, buildCompanyVisionRef } from '../company.js';
+import * as pathResolver from '../path-resolver.js';
+import {
+  findMissionPath,
+  missionDir as resolveMissionDir,
+  tenantMissionDir,
+} from '../path-resolver.js';
+import { initializeMissionTeamBindings } from './mission-team-binding.js';
+import { ledger } from '../ledger.js';
+import { logger } from '../core.js';
+import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
+import { readTextFile } from '../foundation/text.js';
+import { inferMissionOutcomeContract } from '../outcome-contract.js';
+import { ensureDefaultTenantProfile, resolveTenant } from '../organization/tenant-registry.js';
+import { loadOrganizationProfile } from '../organization/organization-profile.js';
+import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
+import { resolveMissionReviewDesign } from './mission-review-gates.js';
+import { consumeIntentGoalHandoff } from '../intent/intent-handoff.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { transitionStatus } from './mission-status.js';
+import { withExecutionContext } from '../authority.js';
+import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
+import { applyProcessTemplatePlan } from './mission-process-planning.js';
+import {
+  calculateRequiredTier,
+  checkPrerequisites,
+  loadState,
+  normalizeRelationships,
+  saveState,
+  type KnowledgeInjectionDeclaration,
+} from './mission-state.js';
+import { syncRoleProcedure } from './mission-governance.js';
+import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
+import type { HumanDecidedBy, MissionState } from './mission-types.js';
+import {
+  normalizeMissionTenantSlug as normalizeTenantSlug,
+  parseMissionVisionRef,
+  type MissionVisionRefSummary,
+} from './mission-vision-ref.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
+
+const MISSION_TEMPLATES_PATH = pathResolver.knowledge('product/governance/mission-templates.json');
+const MISSION_TEMPLATES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-template.schema.json'
+);
+
+interface MissionTemplateFile {
+  path: string;
+  content_template: string;
+}
+
+interface MissionTemplate {
+  name: string;
+  knowledge_injections?: KnowledgeInjectionDeclaration[];
+  files: MissionTemplateFile[];
+}
+
+export interface MissionTemplateCatalog {
+  templates: MissionTemplate[];
+}
+
+const missionTemplateCatalog = defineCatalog<MissionTemplateCatalog>({
+  id: 'mission-templates',
+  path: MISSION_TEMPLATES_PATH,
+  schema: MISSION_TEMPLATES_SCHEMA_PATH,
+});
+
+export function validateMissionTemplateCatalog(
+  value: unknown,
+  label = MISSION_TEMPLATES_PATH
+): MissionTemplateCatalog {
+  return missionTemplateCatalog.validate(value, label);
+}
+
+export function loadMissionTemplateCatalog(): MissionTemplateCatalog {
+  return missionTemplateCatalog.load();
+}
+
+function resolveMissionTemplateFilePath(missionDir: string, templatePath: string): string {
+  const basePath = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+  const targetPath = path.resolve(basePath, templatePath);
+  if (targetPath !== basePath && !targetPath.startsWith(`${basePath}${path.sep}`)) {
+    throw new Error(`Mission template file path escapes mission directory: ${templatePath}`);
+  }
+  return assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
+}
+
+export { parseMissionVisionRef, type MissionVisionRefSummary };
+
+export function normalizeMissionVisionRef(
+  inputVisionRef: string | undefined,
+  tenantSlug: string | undefined,
+  rootDir: string
+): string {
+  const raw = String(inputVisionRef || '').trim();
+  if (raw.startsWith('company://') || raw.startsWith('vision://')) {
+    return raw;
+  }
+
+  const company = resolveCompany(
+    tenantSlug || customerResolver.activeCustomer() || 'default',
+    rootDir
+  );
+  const structuredRef = buildCompanyVisionRef(company.tenant_slug);
+  if (!raw) {
+    return structuredRef;
+  }
+
+  return `${structuredRef}?source=${encodeURIComponent(raw)}`;
+}
+
+export async function createMission(args: {
+  id: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  /** Organization scope for the canonical work-item context chain. */
+  organizationId?: string;
+  /**
+   * Tenant slug for multi-tenant deployments. When set (and matches the
+   * `^[a-z][a-z0-9-]{1,30}$` pattern), the resulting mission-state.json
+   * will carry `tenant_slug` so tier-guard and audit-chain enforce
+   * cross-tenant isolation.
+   */
+  tenantSlug?: string;
+  missionType?: string;
+  visionRef?: string;
+  persona?: string;
+  relationships?: any;
+  rootDir: string;
+  /**
+   * SO-01: explicit options replacing direct `process.argv` reads. The CLI
+   * router (scripts/refactor/mission-controller-router.ts) parses these
+   * flags from argv and passes them through; in-process callers (the
+   * governed facade, other surfaces) pass them explicitly or accept the
+   * deterministic defaults below. Never read `process.argv` in this module.
+   */
+  ephemeral?: boolean;
+  /** Path to a governed intent-goal handoff file (`--intent-goal <path>`). */
+  intentGoal?: string;
+}): Promise<void> {
+  const {
+    id,
+    tier = 'confidential',
+    tenantId = 'default',
+    organizationId,
+    tenantSlug: rawTenantSlug,
+    missionType = 'development',
+    visionRef,
+    persona = 'worker',
+    relationships = {},
+    rootDir,
+    ephemeral = false,
+    intentGoal,
+  } = args;
+  const tenantSlug = normalizeTenantSlug(rawTenantSlug);
+  if (tier === 'confidential' && !tenantSlug) {
+    const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
+    const message =
+      `[SCOPE_CONTEXT_INVALID] Confidential mission '${id}' requires --tenant-slug (registered tenant). ` +
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+    if (policy === 'strict') throw new Error(message);
+    if (policy === 'warn') logger.warn(message);
+  }
+  if (rawTenantSlug && !tenantSlug) {
+    throw new Error(
+      `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
+    );
+  }
+  if (
+    tenantSlug &&
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
+  ) {
+    resolveTenant(tenantSlug, { rootDir });
+  }
+  withExecutionContext(
+    'knowledge_steward',
+    () => ensureDefaultTenantProfile(),
+    'ecosystem_architect'
+  );
+
+  const upperId = id.toUpperCase();
+  assertValidMissionId(upperId);
+  const isEphemeral = ephemeral;
+  // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
+  // via a governed tmp handoff file; consume (read + delete) it here so the
+  // outcome contract reflects the real request. SO-01: the path now arrives
+  // as an explicit option (`args.intentGoal`) instead of a direct
+  // `process.argv` read — the CLI router extracts `--intent-goal <path>`
+  // and passes it through, so in-process callers get deterministic behavior
+  // regardless of the host process's argv.
+  const intentGoalPath = intentGoal;
+  const intentHandoff = intentGoalPath ? consumeIntentGoalHandoff(intentGoalPath) : null;
+  const normalizedRelationships = normalizeRelationships(relationships);
+  const organizationProfile = loadOrganizationProfile(rootDir);
+  const templates = loadMissionTemplateCatalog().templates;
+  const template = templates.find((entry) => entry.name === missionType) || templates[0];
+
+  const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
+  const missionBaseDir = isEphemeral
+    ? pathResolver.active('missions/ephemeral')
+    : tenantSlug
+      ? tenantMissionDir(upperId, tenantSlug, finalTier)
+      : resolveMissionDir(upperId, finalTier);
+  const missionDir = assertSafeRepositoryPath(
+    isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir,
+    { allowMissingLeaf: true }
+  );
+
+  if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
+  const missionStatePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(missionStatePath)) {
+    logger.info(`Mission ${upperId} already exists at ${missionDir}.`);
+    return;
+  }
+
+  const gitBranch = getCurrentBranch(rootDir);
+  const gitHash = getGitHash(rootDir);
+  const now = nowIso();
+  const owner = getRegisteredEnvText('USER') || 'famao';
+  const resolvedVision = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
+
+  for (const file of template.files) {
+    const content = file.content_template
+      .replace(/{MISSION_ID}/g, upperId)
+      .replace(/{TENANT_ID}/g, tenantId)
+      .replace(/{TYPE}/g, missionType)
+      .replace(/{VISION_REF}/g, resolvedVision)
+      .replace(/{PERSONA}/g, persona)
+      .replace(/{OWNER}/g, owner)
+      .replace(/{BRANCH}/g, gitBranch)
+      .replace(/{HASH}/g, gitHash)
+      .replace(/{NOW}/g, now);
+    safeWriteFile(resolveMissionTemplateFilePath(missionDir, file.path), content);
+  }
+
+  const teamPlan = composeMissionTeamPlan({
+    missionId: upperId,
+    missionType,
+    tier: finalTier,
+    assignedPersona: persona,
+    tenantSlug,
+    organizationProfile,
+  });
+  writeMissionTeamPlan(missionDir, teamPlan);
+  initializeMissionTeamBindings(missionDir, teamPlan);
+
+  // MO-01: the policy-driven classification (not the free-string mission_type)
+  // is the authoritative record; the selected workflow template drives the
+  // process phases. Both are persisted into mission-state.json below.
+  const classification = teamPlan.mission_classification;
+  const workflowDesign = classification
+    ? resolveMissionWorkflowDesign({
+        missionClass: classification.mission_class,
+        deliveryShape: classification.delivery_shape,
+        riskProfile: classification.risk_profile,
+        stage: classification.stage,
+        executionShape: 'mission',
+        missionTypeHint: missionType,
+      })
+    : undefined;
+  if (classification && workflowDesign) {
+    const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+    const safeTaskBoardPath = assertSafeRepositoryPath(taskBoardPath, { allowMissingLeaf: true });
+    if (safeExistsSync(safeTaskBoardPath)) {
+      const board = readTextFile(safeTaskBoardPath);
+      const headerLine =
+        `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
+        `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}`;
+      const lines = board.split('\n');
+      lines.splice(1, 0, '', headerLine);
+      safeWriteFile(safeTaskBoardPath, lines.join('\n'));
+    }
+
+    // The task-board header is a one-line summary; this is the queryable
+    // record of how the mission is meant to proceed (workflow pattern/phases
+    // + review mode), so later tooling and humans don't have to re-derive it
+    // from the classification inputs.
+    const reviewDesign = resolveMissionReviewDesign({
+      missionClass: classification.mission_class,
+      deliveryShape: classification.delivery_shape,
+      riskProfile: classification.risk_profile,
+      workflowPattern: workflowDesign.pattern,
+      stage: classification.stage,
+    });
+    safeWriteFile(
+      assertSafeRepositoryPath(path.join(missionDir, 'mission-workflow.json'), {
+        allowMissingLeaf: true,
+      }),
+      JSON.stringify(
+        { classification, workflow_design: workflowDesign, review_design: reviewDesign },
+        null,
+        2
+      )
+    );
+  }
+
+  // MO-01: when the selected process template declares per-phase default
+  // tasks, expand them deterministically into NEXT_TASKS.json + gate
+  // definitions so the phases are executable, not just labels.
+  if (workflowDesign?.phase_specs) {
+    const planResult = applyProcessTemplatePlan({
+      missionId: upperId,
+      missionDir,
+      design: workflowDesign,
+      // `when`-guarded optional tasks evaluate against the same signals the
+      // classification used, plus the original utterance for keyword guards.
+      conditions: {
+        missionClass: classification?.mission_class,
+        deliveryShape: classification?.delivery_shape,
+        riskProfile: classification?.risk_profile,
+        intentId: intentHandoff?.origin_intent_id,
+        taskType: missionType,
+        text: [
+          intentHandoff?.source_text,
+          intentHandoff?.goal?.summary,
+          intentHandoff?.goal?.success_condition,
+          resolvedVision,
+          missionType,
+          upperId,
+        ]
+          .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+          .join('\n'),
+      },
+    });
+    if (planResult.tasks.length > 0) {
+      logger.info(
+        `📋 [Process] Expanded ${workflowDesign.workflow_id} into ${planResult.tasks.length} tasks (${planResult.gatePaths.length} gates).`
+      );
+    }
+  }
+
+  const evidenceDir = assertSafeRepositoryPath(path.join(missionDir, 'evidence'), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(evidenceDir)) {
+    safeMkdir(evidenceDir, { recursive: true });
+    safeWriteFile(
+      assertSafeRepositoryPath(path.join(evidenceDir, '.gitkeep'), { allowMissingLeaf: true }),
+      ''
+    );
+    logger.info(`📁 [Architecture] Created evidence directory for mission ${upperId}.`);
+  }
+
+  if (!isEphemeral) {
+    initMissionRepo(missionDir, upperId);
+  }
+
+  // Initialize volatile working-memory faces (MEMORY.md + NOW.md with sidecar)
+  try {
+    const { initMissionMemory } = await import(
+      /* webpackIgnore: true */
+      assertSafeRepositoryPath(
+        pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
+      )
+    );
+    initMissionMemory({ missionId: upperId, tier: finalTier });
+    logger.info(`📝 [WorkingMemory] Volatile memory faces initialized for ${upperId}.`);
+  } catch {
+    // Best-effort: working-memory-actuator may not be compiled yet
+  }
+
+  const missionGitHash = !isEphemeral ? getGitHash(missionDir) : 'ephemeral';
+  const missionBranch = !isEphemeral ? getCurrentBranch(missionDir) : 'ephemeral';
+  const initialState: MissionState & { is_ephemeral?: boolean } = {
+    mission_id: upperId,
+    mission_type: missionType,
+    ...(classification ? { classification } : {}),
+    ...(workflowDesign
+      ? {
+          process_template: {
+            workflow_id: workflowDesign.workflow_id,
+            pattern: workflowDesign.pattern,
+            phases: workflowDesign.phases,
+            ...(workflowDesign.phase_specs ? { phase_specs: workflowDesign.phase_specs } : {}),
+          },
+        }
+      : {}),
+    tier: finalTier,
+    status: 'planned',
+    execution_mode: 'local',
+    is_ephemeral: isEphemeral,
+    relationships: normalizedRelationships,
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(intentHandoff?.correlation_id ? { correlation_id: intentHandoff.correlation_id } : {}),
+    ...(intentHandoff?.origin_intent_id
+      ? { origin_intent_id: intentHandoff.origin_intent_id }
+      : {}),
+    ...(intentHandoff?.origin_utterance_ref
+      ? { origin_utterance_ref: intentHandoff.origin_utterance_ref }
+      : {}),
+    priority: 3,
+    assigned_persona: persona,
+    confidence_score: 1.0,
+    git: {
+      branch: missionBranch,
+      start_commit: missionGitHash,
+      latest_commit: missionGitHash,
+      checkpoints: [],
+    },
+    outcome_contract: inferMissionOutcomeContract({
+      missionId: upperId,
+      missionType,
+      visionRef: resolvedVision,
+      ...(intentHandoff
+        ? {
+            intentGoal: {
+              source_text: intentHandoff.source_text,
+              summary: intentHandoff.goal?.summary,
+              success_condition: intentHandoff.goal?.success_condition,
+            },
+          }
+        : {}),
+    }),
+    ...(intentHandoff
+      ? {
+          intent: {
+            source_text: intentHandoff.source_text,
+            goal_summary: intentHandoff.goal?.summary,
+            success_condition: intentHandoff.goal?.success_condition,
+            outcome_ids: intentHandoff.outcome_ids,
+          },
+        }
+      : {}),
+    history: [
+      {
+        ts: now,
+        event: 'CREATE',
+        note: `Mission created in ${finalTier} tier ${isEphemeral ? '(Ephemeral Mode)' : '(Independent Micro-Repo)'}.`,
+      },
+    ],
+  };
+  await saveState(upperId, initialState);
+  await emitMissionLifecycleIntentSnapshot({
+    missionId: upperId,
+    stage: 'intake',
+    text:
+      intentHandoff?.goal?.summary ||
+      intentHandoff?.source_text ||
+      resolvedVision ||
+      `Mission ${upperId} (${missionType})`,
+    source: intentHandoff ? 'user_prompt' : 'mission_state',
+    traceRef: intentHandoff?.correlation_id,
+  });
+
+  ledger.record('MISSION_CREATE', {
+    mission_id: upperId,
+    tier: finalTier,
+    type: missionType,
+    persona,
+    owner,
+    is_ephemeral: isEphemeral,
+  });
+
+  logger.success(
+    `🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven${isEphemeral ? ', Ephemeral' : ''}).`
+  );
+}
+
+const MISSION_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/;
+
+/**
+ * Mission ids become directory names, git branch material, and task-id
+ * prefixes — whitespace or shell-split accidents must fail at creation, not
+ * surface later as broken mission dirs.
+ */
+export function assertValidMissionId(missionId: string): void {
+  if (!MISSION_ID_PATTERN.test(missionId)) {
+    throw new Error(
+      `[mission-creation] invalid mission id '${missionId}'; must match ${MISSION_ID_PATTERN.source} (no spaces — check shell quoting)`
+    );
+  }
+}
+
+export async function startMission(args: {
+  id: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  persona?: string;
+  tenantId?: string;
+  /** Organization scope for the canonical work-item context chain. */
+  organizationId?: string;
+  tenantSlug?: string;
+  missionType?: string;
+  visionRef?: string;
+  relationships?: any;
+  rootDir: string;
+  /**
+   * SO-01: explicit options replacing direct `process.argv` reads — see
+   * `createMission` above. `ephemeral`/`intentGoal` are forwarded to the
+   * internal `createMission` call below when the mission does not exist yet
+   * (mirrors the CLI's prior implicit behavior: `start` and `create` shared
+   * the same process, so `--ephemeral`/`--intent-goal` on the `start`
+   * invocation reached `createMission` via `process.argv`).
+   */
+  force?: boolean;
+  ephemeral?: boolean;
+  intentGoal?: string;
+  /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
+  decidedBy?: HumanDecidedBy;
+}): Promise<void> {
+  const {
+    id,
+    tier = 'confidential',
+    persona = 'worker',
+    tenantId = 'default',
+    organizationId,
+    tenantSlug,
+    missionType = 'development',
+    visionRef,
+    relationships = {},
+    rootDir,
+    force = false,
+    ephemeral,
+    intentGoal,
+    decidedBy,
+  } = args;
+
+  if (!id) {
+    logger.error(
+      'Usage: mission_controller start <MISSION_ID> [--tier <personal|confidential|public>]'
+    );
+    logger.info(
+      '  Preferred: use named options for tier, persona, type, vision, relationships, and --dry-run.'
+    );
+    return;
+  }
+
+  checkPrerequisites();
+  const upperId = id.toUpperCase();
+  const normalizedRelationships = normalizeRelationships(relationships);
+
+  let state = loadState(upperId);
+  const finalTier = state ? state.tier : tier;
+  if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
+    const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
+    const message =
+      `[SCOPE_CONTEXT_INVALID] Confidential mission '${upperId}' requires --tenant-slug (registered tenant) before start. ` +
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+    if (policy === 'strict') throw new Error(message);
+    if (policy === 'warn') logger.warn(message);
+  }
+
+  if (!force) {
+    const prereqs = state?.relationships?.prerequisites || normalizedRelationships?.prerequisites;
+    if (prereqs) {
+      const missing = prereqs.filter((pre) => {
+        const preState = loadState(pre);
+        return !preState || preState.status !== 'completed';
+      });
+      if (missing.length > 0) {
+        logger.error(
+          `🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`
+        );
+        logger.info('Use --force to bypass this check.');
+        return;
+      }
+    }
+  }
+
+  logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
+
+  try {
+    if (!state) {
+      await createMission({
+        id: upperId,
+        tier: finalTier,
+        tenantId,
+        ...(tenantSlug ? { tenantSlug } : {}),
+        ...(organizationId ? { organizationId } : {}),
+        missionType,
+        visionRef,
+        persona,
+        relationships: normalizedRelationships,
+        rootDir,
+        ephemeral,
+        intentGoal,
+      });
+      state = loadState(upperId);
+      if (state) {
+        state.status = transitionStatus(state.status, 'active');
+        state.history.push({
+          ts: nowIso(),
+          event: 'ACTIVATE',
+          note: 'Mission activated.',
+          ...(decidedBy ? { decided_by: decidedBy } : {}),
+        });
+        await saveState(upperId, state);
+      }
+    } else {
+      if (!state.outcome_contract) {
+        state.outcome_contract = inferMissionOutcomeContract({
+          missionId: upperId,
+          missionType: state.mission_type,
+          visionRef: state.vision_ref,
+        });
+      }
+      // MO-01 backward compatibility: missions created before classification
+      // persistence get lazily classified on activation.
+      if (!state.classification) {
+        try {
+          const { resolveMissionClassification } = await import('./mission-classification.js');
+          const classification = resolveMissionClassification({
+            missionTypeHint: state.mission_type,
+            shape: 'mission',
+            utterance: `${state.mission_type || ''} ${state.vision_ref || ''}`.trim(),
+          });
+          state.classification = classification;
+          state.process_template = (() => {
+            const workflow = resolveMissionWorkflowDesign({
+              missionClass: classification.mission_class,
+              deliveryShape: classification.delivery_shape,
+              riskProfile: classification.risk_profile,
+              stage: classification.stage,
+              executionShape: 'mission',
+              missionTypeHint: state.mission_type,
+            });
+            return {
+              workflow_id: workflow.workflow_id,
+              pattern: workflow.pattern,
+              phases: workflow.phases,
+              ...(workflow.phase_specs ? { phase_specs: workflow.phase_specs } : {}),
+            };
+          })();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.warn(`[mission-creation] lazy classification failed for ${upperId}: ${message}`);
+        }
+      }
+      if (normalizedRelationships.project) {
+        state.relationships = {
+          ...(state.relationships || {}),
+          project: {
+            ...(state.relationships?.project || {}),
+            ...normalizedRelationships.project,
+          },
+        };
+      }
+      if (normalizedRelationships.track) {
+        state.relationships = {
+          ...(state.relationships || {}),
+          track: {
+            ...(state.relationships?.track || {}),
+            ...normalizedRelationships.track,
+          },
+        };
+      }
+      state.status = transitionStatus(state.status, 'active');
+      state.history.push({
+        ts: nowIso(),
+        event: 'RESUME',
+        note: 'Mission resumed.',
+        ...(decidedBy ? { decided_by: decidedBy } : {}),
+      });
+      await saveState(upperId, state);
+    }
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: upperId,
+      stage: 'intake',
+      text:
+        state?.intent?.goal_summary ||
+        state?.intent?.source_text ||
+        visionRef ||
+        `Start mission ${upperId} (${missionType})`,
+      source: 'mission_state',
+      traceRef: state?.correlation_id,
+    });
+
+    const missionPath = findMissionPath(upperId);
+    if (missionPath) {
+      initMissionRepo(missionPath);
+    }
+
+    syncRoleProcedure(upperId, persona);
+
+    ledger.record('MISSION_ACTIVATE', {
+      mission_id: upperId,
+      branch: state?.git.branch || 'main',
+      persona,
+    });
+
+    logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
+  } catch (err: any) {
+    logger.error(`Failed to start mission: ${err.message}`);
+  }
+}

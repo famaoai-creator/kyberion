@@ -1,5 +1,6 @@
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { getRegisteredEnvText, readTextFile, setRegisteredEnv } from './foundation/index.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import { withExecutionContext } from './authority.js';
 import { isDirectEntry } from './direct-entry.js';
 

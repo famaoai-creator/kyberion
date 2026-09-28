@@ -5,7 +5,7 @@ import { safeRmSync } from '@agent/core/secure-io';
 import { setSeamSelectionRule } from '@agent/core/seam-selection-rules';
 
 const record = vi.fn();
-vi.mock('@agent/core/audit-chain', () => ({
+vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
 

@@ -37,7 +37,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
 /* ------------------------------------------------------------------ *

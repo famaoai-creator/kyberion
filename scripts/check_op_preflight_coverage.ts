@@ -9,10 +9,10 @@ const boundaries = [
   // the CLI facade and must not satisfy this gate with a dead import.
   'scripts/pipeline-execution-part-control.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
-  'libs/core/agent-dispatch.ts',
+  'libs/core/agent/agent-dispatch.ts',
   'libs/shared-network/src/mcp-server-engine.ts',
   'libs/actuators/orchestrator-actuator/src/super-nerve/index.ts',
-  'libs/core/adf-engine.ts',
+  'libs/core/pipeline/adf-engine.ts',
   'libs/actuators/terminal-actuator/src/terminal-actuator-helpers.ts',
   'libs/actuators/vision-actuator/src/index.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
@@ -51,8 +51,8 @@ const boundaries = [
 export const OP_PREFLIGHT_BOUNDARIES = boundaries;
 
 const sharedPreflightHelpers = {
-  actuatorSdk: 'libs/core/actuator-sdk.ts',
-  adfEngine: 'libs/core/adf-engine.ts',
+  actuatorSdk: 'libs/core/actuator/actuator-sdk.ts',
+  adfEngine: 'libs/core/pipeline/adf-engine.ts',
 } as const;
 
 export interface OpPreflightCoverageSources {

@@ -18,8 +18,8 @@ blocking finding は 0 件としてレビューを受領する。
 | 対象               | 確認                                                                                                        | 結果            |
 | ------------------ | ----------------------------------------------------------------------------------------------------------- | --------------- |
 | PM pipeline        | `pnpm pipeline --input pipelines/project-management-validation.json`                                        | 完了            |
-| PM focused tests   | `libs/core/project-management.test.ts` / `libs/core/mission-project-reassignment.test.ts`                   | 3 tests passed  |
-| OM focused tests   | `libs/core/organization-operating-model.test.ts`                                                            | 10 tests passed |
+| PM focused tests   | `libs/core/project/project-management.test.ts` / `libs/core/mission/mission-project-reassignment.test.ts`   | 3 tests passed  |
+| OM focused tests   | `libs/core/organization/organization-operating-model.test.ts`                                               | 10 tests passed |
 | Contract / catalog | `pnpm run check -- --scope full --only contract-schemas` / `pnpm run check -- --scope full --only catalogs` | OK              |
 | Baseline           | `pnpm pipeline --input pipelines/baseline-check.json`                                                       | 完了            |
 

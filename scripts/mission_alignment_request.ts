@@ -34,10 +34,10 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
-import { evaluateAutonomousOpsAction } from '@agent/core/autonomous-ops-gate';
-import { buildDecisionCard, type DecisionCard } from '@agent/core/decision-card';
+} from '@agent/core/governance/approval-store';
 import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path-resolver';
+import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
+import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
 import {
   loadMissionBriefAtPath,
   type MissionBrief,

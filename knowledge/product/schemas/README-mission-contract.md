@@ -2,7 +2,7 @@
 
 `schemas/mission-contract.schema.json` describes a single actuator-dispatchable contract
 inside a mission (not the whole `mission-state.json` — see `mission-state.schema.json` for that).
-Generated TypeScript: `libs/core/src/types/mission-contract.ts` (`pnpm generate:types`).
+Generated TypeScript: `libs/core/contracts/mission-contract.ts` (`pnpm generate:types`).
 
 ## `knowledge_injections` — declare scope, not paths
 

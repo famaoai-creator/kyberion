@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   authorizeSurfaceMutation,
   type SurfaceMutationDecision,
-} from '@agent/core/surface-mutation-guard';
+} from '@agent/core/surface/surface-mutation-guard';
 
 export function authorizeOperatorSurfaceMutation(
   req: Pick<NextRequest, 'headers' | 'url'>

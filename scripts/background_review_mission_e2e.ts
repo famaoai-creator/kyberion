@@ -12,28 +12,28 @@ import { createHash } from 'node:crypto';
 import {
   applyBackgroundReviewPipelinePatch,
   inspectBackgroundReviewProposal,
-} from '@agent/core/background-review-patch';
+} from '@agent/core/workforce/background-review-patch';
 import {
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-} from '@agent/core/reasoning-backend';
-import { resolveSurfaceApprovalReply } from '@agent/core/surface-approval-ui';
-import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+} from '@agent/core/reasoning/reasoning-backend';
+import { resolveSurfaceApprovalReply } from '@agent/core/surface/surface-approval-ui';
+import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import {
   approvalRequestLogicalPath,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import {
   backgroundReviewNudgeStatePath,
   recordBackgroundReviewActivity,
-} from '@agent/core/background-review-nudge';
+} from '@agent/core/workforce/background-review-nudge';
 import {
   clearSurfaceOutboxMessage,
   listSurfaceNotifications,
   listSurfaceOutboxMessages,
-} from '@agent/core/surface-coordination-store';
+} from '@agent/core/surface/surface-coordination-store';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -42,8 +42,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { loadStateAtPath } from '@agent/core/mission-state';
-import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline/pipeline-contract';
 import type { EventScope } from '@agent/core/event-scope';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -164,6 +164,7 @@ async function main(argv: string[]): Promise<void> {
 
     const conversation = await runSurfaceMessageConversation({
       surface,
+      // i18n-exempt: JA e2e fixture
       text: 'ナレッジで planner を調べて',
       locale: 'ja',
       channel,

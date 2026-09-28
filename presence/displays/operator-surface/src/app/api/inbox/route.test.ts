@@ -10,7 +10,7 @@ vi.mock('@agent/core/deliverable-inbox', () => ({
   markInboxEntry: mocks.markInboxEntry,
 }));
 
-vi.mock('@agent/core/surface-mutation-guard', () => ({
+vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: () => ({ ok: true }),
 }));
 

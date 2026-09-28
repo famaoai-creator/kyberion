@@ -10,7 +10,7 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'libs/shared-network/src/mcp-facade-discover.ts',
   'libs/shared-network/src/mcp-facade-act.ts',
   'libs/shared-network/src/mcp-service-capture-tool.ts',
-  'libs/core/peer-messaging.ts',
+  'libs/core/mesh/peer-messaging.ts',
   'presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts',
   'presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts',

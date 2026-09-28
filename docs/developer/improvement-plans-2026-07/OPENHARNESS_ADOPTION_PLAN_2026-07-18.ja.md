@@ -25,7 +25,7 @@ Claude Code 型のエージェントハーネスの OSS 再実装(agent loop / 4
 
 | 機構                     | OpenHarness 実装                                                     | Kyberion 現状                                                                                            | 判定                       |
 | ------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------- |
-| Agent loop / failover    | `engine/query.py`(max_turns、並列 tool 実行)                         | `libs/core/reasoning-backend.ts` FailoverReasoningBackend + `provider-health-registry.ts`                | **既に成熟**               |
+| Agent loop / failover    | `engine/query.py`(max_turns、並列 tool 実行)                         | `libs/core/reasoning/reasoning-backend.ts` FailoverReasoningBackend + `provider-health-registry.ts`      | **既に成熟**               |
 | コンテキスト自動圧縮     | `services/compact/`(~1,900 LOC、2 段階圧縮 + carryover attachment)   | `mission-working-memory.ts` はあるが token 窓ベースの auto-compact は無し                                | **欠落 → OH-01**           |
 | 機密パス常時 deny        | `permissions/checker.py` `SENSITIVE_PATH_PATTERNS`(上書き不可)       | `tier-guard.ts` / `shell-command-policy.ts` は tier 境界が主で、資格情報パスの無条件 deny 層は無し       | **部分 → OH-02**           |
 | API リトライ             | `api/client.py:87-201`(指数 backoff + jitter + Retry-After 尊重)     | failover/demotion で代替(その場リトライ無し)                                                             | **部分 → OH-03**           |

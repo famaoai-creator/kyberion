@@ -17,7 +17,7 @@ status: archived
 | 系統                             | 発火源                                                     | 正本の置き場                                                                                                    | 実装                                                                               |
 | -------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | ① **トリガ層**(外→実行の起動)    | cron / process watch / surface wake                        | `active/shared/runtime/trigger-deliveries.jsonl`                                                                | `libs/core/trigger-runner.ts`                                                      |
-| ② **実行内イベント**(プロセス内) | turn / step / phase / approval / notification              | プロセス内 SPMC + `active/shared/logs/worker-events/**.jsonl`                                                   | `libs/core/worker-event-stream.ts`                                                 |
+| ② **実行内イベント**(プロセス内) | turn / step / phase / approval / notification              | プロセス内 SPMC + `active/shared/logs/worker-events/**.jsonl`                                                   | `libs/core/workforce/worker-event-stream.ts`                                       |
 | ③ **ミッション/タスクイベント**  | orchestration 要求、task 発行〜受入                        | `active/shared/coordination/orchestration/events/*.json`、`active/shared/observability/mission-control/*.jsonl` | `mission-orchestration-events.ts` / `mission-task-events.ts`                       |
 | ④ **神経系(KANS)刺激バス**       | 任意プロセスからの `NerveMessage`                          | `presence/bridge/runtime/stimuli.jsonl`                                                                         | `nerve-bridge.ts` / `sensory-memory.ts` / `shared-nerve/reflex-engine.ts`          |
 | ⑤ **surface 入出力**             | Slack / iMessage / Telegram / Discord / Chronos / Presence | `active/shared/coordination/channels/{surface}/inbox\|outbox`、`active/shared/observability/channels/**`        | `channel-surface.ts` / `surface-ingress-contract.ts` / `operator-notifications.ts` |
@@ -67,7 +67,7 @@ status: archived
 2. authority スナップショットと非昇格チェック
 3. leader lease — 複数ホスト/複数プロセスでの排他がない
 4. 監査チェーン記録
-5. **取りこぼし補償** — `pipeline-scheduler` は `hasMissedCronOccurrence()`(`libs/core/src/pipeline-scheduler.ts:98`)で停止中に過ぎた発火を次回 tick で回収するが、generation 側は「今この分が cron にマッチするか」しか見ないため、デーモン停止中の発火は**恒久的に消える**
+5. **取りこぼし補償** — `pipeline-scheduler` は `hasMissedCronOccurrence()`(`libs/core/pipeline/pipeline-scheduler.ts:98`)で停止中に過ぎた発火を次回 tick で回収するが、generation 側は「今この分が cron にマッチするか」しか見ないため、デーモン停止中の発火は**恒久的に消える**
 
 **実装**:
 
@@ -280,7 +280,7 @@ if (stats.size > lastSize) { …読む…; lastSize = stats.size; }
 
 ```bash
 pnpm vitest run libs/core/trigger-runner.test.ts                # ① トリガ関門
-pnpm vitest run libs/core/src/pipeline-scheduler.test.ts        # cron due 判定 / catch-up
+pnpm vitest run libs/core/pipeline/pipeline-scheduler.test.ts        # cron due 判定 / catch-up
 pnpm vitest run libs/core/managed-process.watch.test.ts         # process watch
 pnpm vitest run libs/shared-nerve/src/reflex-engine.test.ts     # reflex
 pnpm pipeline --input pipelines/qm02-trigger-validation.json    # QM-02 検証パイプライン

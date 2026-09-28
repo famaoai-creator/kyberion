@@ -1,10 +1,10 @@
 import { logger } from './core.js';
-import { loadOrganizationProfile } from './organization-profile.js';
+import { loadOrganizationProfile } from './organization/organization-profile.js';
 import {
   enqueueOrganizationLearningCandidate,
   type OrganizationLearningSourceType,
   type OrganizationTier,
-} from './organization-operating-model.js';
+} from './organization/organization-operating-model.js';
 
 export interface OperationalLearningSignal {
   signalId: string;
@@ -26,7 +26,8 @@ function slug(value: string): string {
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'signal'
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || 'signal'
   );
 }
 

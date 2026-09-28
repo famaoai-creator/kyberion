@@ -130,8 +130,8 @@ The intended design is documented here:
 This pass introduced:
 
 - [knowledge/product/schemas/intent-resolution-packet.schema.json](/Users/famao/kyberion/knowledge/product/schemas/intent-resolution-packet.schema.json)
-- [libs/core/intent-resolution.ts](/Users/famao/kyberion/libs/core/intent-resolution.ts)
-- [libs/core/task-session.ts](/Users/famao/kyberion/libs/core/task-session.ts)
+- [libs/core/intent/intent-resolution.ts](/Users/famao/kyberion/libs/core/intent/intent-resolution.ts)
+- [libs/core/task/task-session.ts](/Users/famao/kyberion/libs/core/task/task-session.ts)
 
 That now covers:
 
@@ -148,14 +148,14 @@ The remaining extension is optional, not blocking:
 
 `work-design.ts` already reads knowledge catalogs, which is the right direction:
 
-- [libs/core/work-design.ts](/Users/famao/kyberion/libs/core/work-design.ts#L153)
+- [libs/core/workforce/work-design.ts](/Users/famao/kyberion/libs/core/workforce/work-design.ts#L153)
 
 This pass moved those semantics into knowledge catalogs:
 
 - [knowledge/product/governance/execution-boundary-profiles.json](/Users/famao/kyberion/knowledge/product/governance/execution-boundary-profiles.json)
 - [knowledge/product/governance/runtime-design-profiles.json](/Users/famao/kyberion/knowledge/product/governance/runtime-design-profiles.json)
 - [knowledge/product/governance/work-policy.json](/Users/famao/kyberion/knowledge/product/governance/work-policy.json)
-- [libs/core/work-design.ts](/Users/famao/kyberion/libs/core/work-design.ts)
+- [libs/core/workforce/work-design.ts](/Users/famao/kyberion/libs/core/workforce/work-design.ts)
 
 The remaining gap is narrower:
 
@@ -178,13 +178,13 @@ Current declared gaps include:
 
 This pass closed the immediate runtime drift in:
 
-- [libs/core/task-session.ts](/Users/famao/kyberion/libs/core/task-session.ts)
-- [libs/core/task-session.test.ts](/Users/famao/kyberion/libs/core/task-session.test.ts)
+- [libs/core/task/task-session.ts](/Users/famao/kyberion/libs/core/task/task-session.ts)
+- [libs/core/task/task-session.test.ts](/Users/famao/kyberion/libs/core/task/task-session.test.ts)
 
 Approval policy now lives in:
 
 - [knowledge/product/governance/approval-policy.json](/Users/famao/kyberion/knowledge/product/governance/approval-policy.json)
-- [libs/core/approval-policy.ts](/Users/famao/kyberion/libs/core/approval-policy.ts)
+- [libs/core/governance/approval-policy.ts](/Users/famao/kyberion/libs/core/governance/approval-policy.ts)
 
 The remaining work here is additive, not corrective:
 

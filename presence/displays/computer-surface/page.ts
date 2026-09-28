@@ -28,7 +28,7 @@ import express from 'express';
 import { getUiMessageBundle, pathResolver, safeReadFile } from '@agent/core';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 
 export const COMPUTER_SURFACE_PAGE_FILE = 'index.html';
 export const COMPUTER_SURFACE_LOCALE_COOKIE = 'kb-ui-locale';

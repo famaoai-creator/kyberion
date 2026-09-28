@@ -1,0 +1,392 @@
+/**
+ * Dynamic Actuator Capability Contracts
+ *
+ * Transforms static manifest.json declarations into runtime capability detection,
+ * so the orchestrator can determine which actuators are actually usable in the
+ * current environment.
+ */
+
+import path from 'node:path';
+import { logger } from '../core.js';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
+import { nowIso } from '../foundation/time.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
+import {
+  loadActuatorManifest,
+  loadActuatorManifestCatalog,
+  type ActuatorManifestFile,
+} from './actuator-manifest-index.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+
+export interface ActuatorCapability {
+  op: string;
+  available: boolean;
+  reason?: string; // why unavailable
+  prerequisites?: string[]; // what's needed to make it available
+  cost?: 'free' | 'api_call' | 'compute_light' | 'compute_intensive';
+}
+
+export interface ActuatorStatus {
+  actuatorId: string;
+  version: string;
+  capabilities: ActuatorCapability[];
+  checkedAt: string;
+}
+
+type ManifestCapability = NonNullable<ActuatorManifestFile['capabilities']>[number];
+
+export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
+
+const capabilityProbeSeam = createSeam<ActuatorCapabilityProbe>({
+  key: 'actuator.capability-probe',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+let actuatorCatalogOrderCache: Map<string, number> | null = null;
+
+export function registerCapabilityProbe(
+  actuatorId: string,
+  probe: ActuatorCapabilityProbe,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/actuator/actuator-capability.ts',
+  }
+): () => void {
+  return capabilityProbeSeam.register(actuatorId, probe, metadata);
+}
+
+function loadActuatorCatalogOrder(): Map<string, number> {
+  if (actuatorCatalogOrderCache) return actuatorCatalogOrderCache;
+  const order = new Map<string, number>();
+  try {
+    for (const [index, entry] of loadActuatorManifestCatalog().entries()) {
+      if (entry?.n) order.set(entry.n, index);
+    }
+  } catch {
+    // Fall back to lexical order when the manifest catalog cannot be loaded.
+  }
+
+  actuatorCatalogOrderCache = order;
+  return order;
+}
+
+function compareActuatorCatalogOrder(left: string, right: string): number {
+  const order = loadActuatorCatalogOrder();
+  const leftOrder = order.has(left) ? order.get(left)! : Number.POSITIVE_INFINITY;
+  const rightOrder = order.has(right) ? order.get(right)! : Number.POSITIVE_INFINITY;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return left.localeCompare(right);
+}
+
+// `which` costs one spawned process per call; scanning PATH entries with stat
+// checks is milliseconds for the whole manifest set. PATHEXT covers Windows
+// .cmd/.exe shims just like `where`.
+const binaryPresenceCache = new Map<string, boolean>();
+let pathDirsCache: string[] | null = null;
+const PATHEXT_EXTENSIONS =
+  process.platform === 'win32'
+    ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').toLowerCase().split(';')
+    : [''];
+
+function binarySearchDirs(): string[] {
+  if (!pathDirsCache) {
+    pathDirsCache = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  }
+  return pathDirsCache;
+}
+
+function hasBinary(binary: string): boolean {
+  const cached = binaryPresenceCache.get(binary);
+  if (cached !== undefined) return cached;
+  const lower = binary.toLowerCase();
+  const variants =
+    PATHEXT_EXTENSIONS.some((ext) => lower.endsWith(ext)) && process.platform === 'win32'
+      ? [binary]
+      : PATHEXT_EXTENSIONS.map((ext) => binary + ext);
+  const present = binarySearchDirs().some((dir) =>
+    variants.some((name) => safeExistsSync(path.join(dir, name)))
+  );
+  binaryPresenceCache.set(binary, present);
+  return present;
+}
+
+function envRequirementMet(name: string): boolean {
+  const flag = getRegisteredEnvBool(name);
+  if (flag === true) return true;
+  if (flag === false) return false;
+  return Boolean(getRegisteredEnvText(name));
+}
+
+function prerequisiteInstallHints(capability: ManifestCapability): string[] {
+  const install = capability.prerequisites?.install;
+  if (Array.isArray(install)) return install;
+  if (install && typeof install === 'object') return Object.values(install).filter(Boolean);
+  const binaries = [
+    ...(capability.prerequisites?.binaries || []),
+    ...(capability.requirements?.bin || []),
+  ];
+  return binaries.map((binary) => `Install ${binary} and ensure it is on PATH.`);
+}
+
+function evaluateManifestCapability(capability: ManifestCapability): ActuatorCapability {
+  if (capability.implemented === false) {
+    return {
+      op: capability.op,
+      available: false,
+      reason:
+        'not_implemented: declared in the manifest but the dispatch has no implementation yet',
+      prerequisites: ['Track implementation or removal via AC-06 stub capability triage.'],
+      cost: 'free',
+    };
+  }
+  const platformRequirements = capability.prerequisites?.platforms || capability.platforms || [];
+  const binaryRequirements = [
+    ...(capability.prerequisites?.binaries || []),
+    ...(capability.requirements?.bin || []),
+  ];
+  const envRequirements = [
+    ...(capability.prerequisites?.env || []),
+    ...(capability.requirements?.env || []),
+  ];
+  const serviceRequirements = capability.prerequisites?.services || [];
+
+  const missing: string[] = [];
+
+  if (platformRequirements.length > 0 && !platformRequirements.includes(process.platform)) {
+    missing.push(
+      `requires platform ${platformRequirements.join('|')} (current: ${process.platform})`
+    );
+  }
+  for (const binary of binaryRequirements) {
+    if (!hasBinary(binary)) missing.push(`missing binary: ${binary}`);
+  }
+  const envPlatforms = capability.requirements?.env_platforms;
+  const envApplies =
+    !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(process.platform);
+  if (envApplies) {
+    for (const envName of envRequirements) {
+      if (!envRequirementMet(envName)) missing.push(`missing env: ${envName}`);
+    }
+  }
+  for (const service of serviceRequirements) {
+    missing.push(`service prerequisite requires a dedicated probe: ${service}`);
+  }
+
+  return {
+    op: capability.op,
+    available: missing.length === 0,
+    reason: missing.length > 0 ? missing.join('; ') : undefined,
+    prerequisites: missing.length > 0 ? prerequisiteInstallHints(capability) : undefined,
+    cost: 'free',
+  };
+}
+
+function mergeCapabilityProbeResult(
+  manifestCapability: ActuatorCapability | undefined,
+  probedCapability: ActuatorCapability
+): ActuatorCapability {
+  if (!manifestCapability) return probedCapability;
+  if (manifestCapability.available && probedCapability.available) {
+    return { ...manifestCapability, ...probedCapability, available: true };
+  }
+  const reasons = [manifestCapability.reason, probedCapability.reason].filter(Boolean) as string[];
+  const prerequisites = [
+    ...(manifestCapability.prerequisites || []),
+    ...(probedCapability.prerequisites || []),
+  ];
+  return {
+    ...manifestCapability,
+    ...probedCapability,
+    available: false,
+    reason: reasons.join('; ') || 'capability unavailable',
+    prerequisites: prerequisites.length > 0 ? Array.from(new Set(prerequisites)) : undefined,
+  };
+}
+
+/**
+ * Check capabilities for a specific actuator by running environment probes.
+ * Each actuator can register a checkFn, or fall back to manifest-based static check.
+ */
+export async function checkActuatorCapabilities(
+  actuatorId: string,
+  manifestPath: string
+): Promise<ActuatorStatus> {
+  // Read manifest
+  const manifest = loadActuatorManifest(manifestPath);
+  const manifestCapabilities = (manifest.capabilities || []).map(evaluateManifestCapability);
+  const manifestByOp = new Map(
+    manifestCapabilities.map((capability) => [capability.op, capability])
+  );
+
+  // Run registered probe if exists
+  const probe = capabilityProbeSeam.getOptional(actuatorId);
+  if (probe) {
+    const probed = await probe();
+    const probedOps = new Set(probed.map((capability) => capability.op));
+    const capabilities = [
+      ...probed.map((capability) =>
+        mergeCapabilityProbeResult(manifestByOp.get(capability.op), capability)
+      ),
+      ...manifestCapabilities.filter((capability) => !probedOps.has(capability.op)),
+    ];
+    return {
+      actuatorId: manifest.actuator_id || actuatorId,
+      version: manifest.version || '0.0.0',
+      capabilities,
+      checkedAt: nowIso(),
+    };
+  } else {
+    // Fallback: evaluate manifest prerequisites. Capabilities without
+    // prerequisites remain available for backward compatibility.
+    return {
+      actuatorId: manifest.actuator_id || actuatorId,
+      version: manifest.version || '0.0.0',
+      capabilities: manifestCapabilities,
+      checkedAt: nowIso(),
+    };
+  }
+}
+
+/**
+ * Scan all actuators in libs/actuators/ and check their capabilities
+ */
+export async function checkAllActuatorCapabilities(
+  actuatorsDir?: string
+): Promise<ActuatorStatus[]> {
+  const dir = actuatorsDir
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(actuatorsDir), {
+        allowMissingLeaf: true,
+      })
+    : assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
+  const catalog = loadActuatorManifestCatalog(dir);
+  const results: ActuatorStatus[] = (
+    await Promise.all(
+      catalog.map(async (entry) => {
+        try {
+          return await checkActuatorCapabilities(
+            entry.n,
+            assertSafeRepositoryPath(pathResolver.rootResolve(entry.manifest_path))
+          );
+        } catch (e: any) {
+          logger.error(`Failed to check ${entry.n}: ${e.message}`);
+          return null;
+        }
+      })
+    )
+  ).filter((status): status is ActuatorStatus => status !== null);
+
+  return results.sort((left, right) =>
+    compareActuatorCatalogOrder(left.actuatorId, right.actuatorId)
+  );
+}
+
+// ─── Built-in Probes ───────────────────────────────────────────────────────────
+
+// Browser actuator: check if Playwright is installed
+registerCapabilityProbe('browser-actuator', async () => {
+  try {
+    const pwPath = pathResolver.rootResolve('node_modules/playwright-core');
+    const pwTestPath = pathResolver.rootResolve('node_modules/@playwright/test');
+    const available = safeExistsSync(pwPath) || safeExistsSync(pwTestPath);
+    return [
+      {
+        op: 'pipeline',
+        available,
+        reason: available ? undefined : '@playwright/test or playwright-core not installed',
+        prerequisites: available
+          ? undefined
+          : ['pnpm add -D @playwright/test', 'npx playwright install chromium'],
+      },
+    ];
+  } catch {
+    return [{ op: 'pipeline', available: false, reason: 'check failed' }];
+  }
+});
+
+// Voice actuator: check if TTS server is reachable
+registerCapabilityProbe('voice-actuator', async () => {
+  try {
+    const { platform } = await import('../platform.js');
+    const capabilities = await platform.getCapabilities();
+    const available = capabilities.hasSpeech;
+    const reason = available ? undefined : 'No native speech binary is available on this host';
+    return [
+      { op: 'speak_local', available, reason, cost: 'free' },
+      { op: 'list_voices', available, reason },
+      { op: 'generate_voice', available, reason, cost: 'compute_light' },
+    ];
+  } catch {
+    return [
+      { op: 'speak_local', available: false, reason: 'probe failed' },
+      { op: 'list_voices', available: false, reason: 'probe failed' },
+      { op: 'generate_voice', available: false, reason: 'probe failed' },
+    ];
+  }
+});
+
+// Vision actuator: check platform
+registerCapabilityProbe('vision-actuator', async () => {
+  const { platform } = await import('../platform.js');
+  const { probeWindowsNativeImageRecognition } =
+    await import('../windows-native-image-recognition-bridge.js');
+  const capabilities = await platform.getCapabilities();
+  const available = capabilities.hasScreenCapture;
+  const nativeRecognition = probeWindowsNativeImageRecognition();
+  return [
+    {
+      op: 'capture',
+      available,
+      reason: available ? undefined : 'No screen-capture backend is available',
+      prerequisites: available ? undefined : ['Install FFmpeg or a native screen-capture backend'],
+    },
+    {
+      op: 'pipeline',
+      available,
+      reason: available ? undefined : 'vision pipeline requires a screen-capture backend',
+    },
+    {
+      op: 'ocr_image',
+      available: process.platform !== 'win32' || nativeRecognition.ocr,
+      reason:
+        process.platform !== 'win32' || nativeRecognition.ocr
+          ? undefined
+          : nativeRecognition.reason || 'Windows native OCR helper is unavailable',
+    },
+    {
+      op: 'describe_image',
+      available: nativeRecognition.description,
+      reason: nativeRecognition.description
+        ? undefined
+        : nativeRecognition.reason || 'No native image description provider is available',
+    },
+  ];
+});
+
+// Media actuator: always available (pure Node.js)
+registerCapabilityProbe('media-actuator', async () => [
+  { op: 'pipeline', available: true, cost: 'free' },
+]);
+
+// System actuator: check shell availability
+registerCapabilityProbe('system-actuator', async () => [
+  { op: 'exec', available: true, cost: 'free' },
+  { op: 'pipeline', available: true, cost: 'free' },
+]);
+
+// Gemini CLI: check sub-commands and extensions
+registerCapabilityProbe('gemini-cli', async () => {
+  const { safeExec } = await import('../secure-io.js');
+  try {
+    const help = safeExec('gemini', ['--help']);
+    return [
+      { op: 'prompt', available: help.includes('--prompt'), cost: 'compute_intensive' },
+      { op: 'extensions', available: help.includes('extensions'), cost: 'free' },
+      { op: 'skills', available: help.includes('skills'), cost: 'free' },
+      { op: 'hooks', available: help.includes('hooks'), cost: 'free' },
+      { op: 'mcp', available: help.includes('mcp'), cost: 'free' },
+    ];
+  } catch {
+    return [{ op: 'prompt', available: false, reason: 'gemini binary not in PATH' }];
+  }
+});

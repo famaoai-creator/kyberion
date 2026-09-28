@@ -16,7 +16,10 @@
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
-import { listManagedPlugins, type ManagedPluginRecord } from '@agent/core/plugin-managed-install';
+import {
+  listManagedPlugins,
+  type ManagedPluginRecord,
+} from '@agent/core/plugin/plugin-managed-install';
 import {
   composePluginViewsA2UI,
   listPluginViewsForViewer,
@@ -25,18 +28,18 @@ import {
   type LoadedPluginView,
   type PluginViewViewer,
   type ResolvedPluginViewAction,
-} from '@agent/core/plugin-view-contract';
+} from '@agent/core/plugin/plugin-view-contract';
 import {
   dispatchPluginViewAction,
   type PluginViewActionOutcome,
-} from '@agent/core/plugin-view-actions';
+} from '@agent/core/plugin/plugin-view-actions';
 import {
   createPluginHost,
   getOrCreatePluginHost,
   resolvePluginHostPollMs,
   type PluginHost,
-} from '@agent/core/plugin-host';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+} from '@agent/core/plugin/plugin-host';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { defaultPadLocale } from './i18n.js';
 
 export const PERSONAL_PADS_PLUGIN_VIEWS_SURFACE_ID = 'personal-pads.plugin-views';

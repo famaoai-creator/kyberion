@@ -10,7 +10,7 @@ import {
   isLocalReasoningBackend,
   reasoningBackendEndpoint,
   withReasoningPayloadScope,
-} from './reasoning-egress-scope.js';
+} from './reasoning/reasoning-egress-scope.js';
 import { detectRasterCapabilities, rasterInstallHint } from './visual-raster.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
@@ -314,7 +314,8 @@ export async function runVisualReview(input: RunVisualReviewInput): Promise<Visu
   // shown and get back confident findings about nothing.
   let critique = input.critique;
   if (!critique) {
-    const { getReasoningBackend, backendSupportsVision } = await import('./reasoning-backend.js');
+    const { getReasoningBackend, backendSupportsVision } =
+      await import('./reasoning/reasoning-backend.js');
     const backend = getReasoningBackend();
     if (!backendSupportsVision(backend)) {
       return {

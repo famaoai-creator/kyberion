@@ -50,7 +50,7 @@ terminal / web) may hold mission-owner authority — the same authority a CLI
 orchestrator process holds — but ONLY through an active
 [`OrchestratorSession`](../../../docs/GLOSSARY.md#orchestratorsession)
 (SO-02) backed by a `mission-ownership:<MISSION_ID>` work-item claim (SO-03,
-`libs/core/orchestrator-session.ts`). There is no other path to owner
+`libs/core/mission/orchestrator-session.ts`). There is no other path to owner
 authority for a surface: no surface may be granted mission-owner permissions
 by configuration alone, and `surface-roles.json`'s `writes: 'orchestrator'`
 vocabulary member (SO-03) marks this exact ceremony as the only legitimate
@@ -74,7 +74,7 @@ another claim holder's write scope by conversation alone.
   `mission_controller` execution context must not leak that role into any
   spawned provider CLI delegation's environment (KD-05 capability-tier
   projection, XP-02's `buildProviderChildEnv` env minimization) — see
-  `libs/core/provider-permission-profiles.ts`'s exclusion of
+  `libs/core/provider/provider-permission-profiles.ts`'s exclusion of
   `MISSION_ROLE`/`SYSTEM_ROLE` from the delegation env allowlist. A
   delegation always runs at its assigned KD-05 tier (implementer / explorer /
   planner), never at the owner's authority.

@@ -3,7 +3,7 @@ import { buildCompanyVisionRef, type CompanyAggregate } from '@agent/core/compan
 import {
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
-} from '@agent/core/approval-audit';
+} from '@agent/core/governance/approval-audit';
 import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
+import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
   assertSafeRepositoryPath,
@@ -15,46 +15,25 @@ import {
 import { loadActuatorExampleCatalog } from '@agent/core/actuator-example-catalog';
 import type { ActuatorExampleRecord } from '@agent/core/actuator-example-catalog';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
 import { renderStatus } from '@agent/core/ux-vocabulary';
-import { checkAllActuatorCapabilities } from '@agent/core/actuator-capability';
-import { assertPipelinePreviewResourcePath, previewPipeline } from '@agent/core/pipeline-preview';
-import {
-  listScheduledPipelines,
-  registerScheduledPipeline,
-  unregisterScheduledPipeline,
-} from '@agent/core/pipeline-scheduler';
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
-import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
-import { loadStateAtPath } from '@agent/core/mission-state';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
-import { createProjectTrustApprovalRequest } from '@agent/core/project-trust';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import { isMacOS, isWindows } from '@agent/core/platform';
 import chalk from 'chalk';
-import {
-  getRegisteredEnvText,
-  nowIso,
-  parseSafeJsonInput,
-  readTextFile,
-  setRegisteredEnv,
-} from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import {
-  handleCalendarWorkflowCommand,
-  handleEmailWorkflowCommand,
-  handleOffboardCommand,
-  handleTaskCommand,
-  withWorkflowOutputPrinter,
-} from './cli-workflow-handlers.js';
-export { parseOffboardArgs } from './cli-workflow-handlers.js';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { readTextFile } from '@agent/core/foundation/text';
+import { defineScript, isDirectScript } from './lib/harness.js';
+import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
+export { parseOffboardArgs } from './cli-offboard-args.js';
 import {
   printBranchBanner,
   printHeader,
-  printHelp,
   withPresentationOutputPrinter,
 } from './cli-presentation.js';
 import { parseInteractionPacket } from './cli-packet-parser.js';
@@ -939,7 +918,8 @@ function acceptNextAction(packetPath: string, actionId: string) {
   }
 }
 
-function printApprovalRequests(channelArg?: string) {
+async function printApprovalRequests(channelArg?: string): Promise<void> {
+  const { listApprovalRequests } = await import('@agent/core/governance/approval-store');
   printHeader();
   const storageChannels = channelArg ? [channelArg] : undefined;
   const requests = listApprovalRequests({
@@ -983,17 +963,19 @@ function printApprovalRequests(channelArg?: string) {
   }
 }
 
-function applyApprovalDecision(
+async function applyApprovalDecision(
   command: 'approve' | 'reject',
   requestId: string | undefined,
   channelArg?: string
-) {
+): Promise<void> {
   if (!requestId) {
     throw new Error(
       `Usage: pnpm kyberion ${command} <request-id> [storage-channel]\nRun \`pnpm kyberion approvals\` first to list pending request IDs.`
     );
   }
 
+  const { decideApprovalRequest, listApprovalRequests } =
+    await import('@agent/core/governance/approval-store');
   const requests = listApprovalRequests({
     storageChannels: channelArg ? [channelArg] : undefined,
     status: 'pending',
@@ -1036,7 +1018,8 @@ function applyApprovalDecision(
   }
 }
 
-function requestProjectTrust(inputPath: string, json = false): void {
+async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
+  const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
   const record = createProjectTrustApprovalRequest({
     inputPath,
     requestedBy: resolveOperatorDisplayName(),
@@ -1168,6 +1151,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'speak',
   // draw binds only the image-generation bridge it routes through.
   'draw',
+  // Pipeline schedule registry edits read and write one JSON file.
+  'schedule',
 ]);
 
 /**
@@ -1183,6 +1168,30 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
 
+const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = createCliCommandHandlers({
+  printText,
+  searchActuators,
+  findActuator,
+  readCliTextFile,
+  routeLegacyIntentToAsk,
+  applyApprovalDecision,
+  acceptNextAction,
+  printApprovalRequests,
+  printActuatorList,
+  printActuatorInfo,
+  printActuatorExamples,
+  printActuatorExampleSummary,
+  printMobileAppProfile,
+  printMobileAppProfilesSummary,
+  printWebAppProfile,
+  printWebAppProfilesSummary,
+  printArtifactInfo,
+  openArtifact,
+  printInteractionPacketFile,
+  requestProjectTrust,
+  runActuator,
+});
+
 async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   activeCliArgs = [...args];
   const missionId = getRegisteredEnvText('MISSION_ID');
@@ -1194,369 +1203,25 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (shouldBootstrapRuntime(normalizedArgs)) {
+    // installReasoningBackends already installs the voice bridge; load both
+    // modules only for commands that reach a backend.
+    const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
     installReasoningBackends();
-    installPythonVoiceBridgeIfAvailable();
   }
 
-  if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp(actuators, locale);
-    return;
-  }
-
-  if (command === 'list') {
-    printActuatorList(actuators);
-    const hasCheck = normalizedArgs.includes('--check');
-    if (hasCheck) {
-      const statuses = await checkAllActuatorCapabilities();
-      printText('\n=== Runtime Capability Check ===');
-      for (const status of statuses) {
-        const available = status.capabilities.filter((c) => c.available).length;
-        const total = status.capabilities.length;
-        const icon = available === total ? '\u2705' : available > 0 ? '\u26A0\uFE0F' : '\u274C';
-        printText(
-          `${icon} ${status.actuatorId} (v${status.version}): ${available}/${total} ops available`
-        );
-        for (const cap of status.capabilities) {
-          if (!cap.available) {
-            printText(`   \u274C ${cap.op}: ${cap.reason}`);
-            if (cap.prerequisites) printText(`      Fix: ${cap.prerequisites.join(', ')}`);
-          }
-        }
-      }
-    }
-    return;
-  }
-
-  if (command === 'search') {
-    const matches = searchActuators(actuators, firstArg || '');
-    printActuatorList(matches);
-    return;
-  }
-
-  if (command === 'info') {
-    if (!firstArg) {
-      throw new Error('Missing actuator name. Try `pnpm kyberion list`.');
-    }
-
-    const actuator = findActuator(actuators, firstArg);
-    if (!actuator) {
-      throw new Error(`Actuator "${firstArg}" not found.`);
-    }
-
-    printActuatorInfo(actuator);
-    return;
-  }
-
-  if (command === 'examples') {
-    if (!firstArg) {
-      printActuatorExampleSummary(actuators);
-      return;
-    }
-
-    const actuator = findActuator(actuators, firstArg);
-    if (!actuator) {
-      throw new Error(`Actuator "${firstArg}" not found.`);
-    }
-
-    printActuatorExamples(actuator);
-    return;
-  }
-
-  if (command === 'mobile-profiles') {
-    if (!firstArg) {
-      printMobileAppProfilesSummary();
-      return;
-    }
-
-    printMobileAppProfile(firstArg);
-    return;
-  }
-
-  if (command === 'web-profiles') {
-    if (!firstArg) {
-      printWebAppProfilesSummary();
-      return;
-    }
-
-    printWebAppProfile(firstArg);
-    return;
-  }
-
-  if (command === 'artifact') {
-    if (!firstArg) {
-      throw new Error(
-        'Missing artifact path. Try `pnpm kyberion artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
-      );
-    }
-
-    printArtifactInfo(firstArg);
-    return;
-  }
-
-  if (command === 'open-artifact') {
-    if (!firstArg) {
-      throw new Error(
-        'Missing artifact path. Try `pnpm kyberion open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
-      );
-    }
-
-    openArtifact(firstArg);
-    return;
-  }
-
-  if (command === 'packet') {
-    if (!firstArg) {
-      throw new Error(
-        'Missing packet path. Try `pnpm kyberion packet active/shared/tmp/orchestrator/operator-interaction-packet.json`.'
-      );
-    }
-
-    printInteractionPacketFile(firstArg);
-    return;
-  }
-
-  if (command === 'accept-next-action') {
-    if (!firstArg || !restArgs[0]) {
-      throw new Error('Usage: pnpm kyberion accept-next-action <packet-path> <action-id>');
-    }
-
-    acceptNextAction(firstArg, restArgs[0]);
-    return;
-  }
-
-  if (command === 'approvals') {
-    printApprovalRequests(firstArg);
-    return;
-  }
-
-  if (command === 'approve' || command === 'reject') {
-    applyApprovalDecision(command, firstArg, restArgs[0]);
-    return;
-  }
-
-  if (command === 'project-trust') {
-    if (firstArg !== 'request' || !restArgs[0]) {
-      throw new Error('Usage: pnpm kyberion project-trust request <pipeline-path> [--json]');
-    }
-    requestProjectTrust(restArgs[0], restArgs.includes('--json'));
-    return;
-  }
-
-  if (command === 'email') {
-    await withWorkflowOutputPrinter(print, () =>
-      handleEmailWorkflowCommand(firstArg, restArgs, locale)
-    );
-    return;
-  }
-
-  if (command === 'calendar') {
-    await withWorkflowOutputPrinter(print, () =>
-      handleCalendarWorkflowCommand(firstArg, restArgs, locale)
-    );
-    return;
-  }
-
-  if (command === 'memory') {
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runMemoryCommand } = await import('./cli-memory.js');
-    await runMemoryCommand(
-      [firstArg, ...restArgs].filter((arg): arg is string => arg !== undefined)
-    );
-    return;
-  }
-
-  if (command === 'task') {
-    await withWorkflowOutputPrinter(print, () => handleTaskCommand(firstArg, restArgs, locale));
-    return;
-  }
-
-  if (command === 'offboard') {
-    await withWorkflowOutputPrinter(print, () => handleOffboardCommand(firstArg, restArgs, locale));
-    return;
-  }
-
-  if (command === 'read') {
-    // stdout carries the document; keep runtime logs out of it. Errors still
-    // print, and reader caveats arrive as `> [read]` warnings. --verbose keeps logs.
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runReadCommand } = await import('./cli-read.js');
-    await runReadCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
-  if (command === 'write') {
-    // Inverse of `read`: stdout carries the summary (or --json), not runtime logs.
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runWriteCommand } = await import('./cli-write.js');
-    await runWriteCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
-  if (command === 'diff') {
-    // Fidelity check between two documents; stdout carries the diff summary (or --json).
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runDiffCommand } = await import('./cli-diff.js');
-    await runDiffCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
-  if (command === 'see' || command === 'listen' || command === 'watch') {
-    // Same contract as `read`: stdout carries the content, caveats arrive as
-    // `> [<command>]` lines, --verbose keeps runtime logs.
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
-    if (command === 'see') {
-      const { runSeeCommand } = await import('./cli-see.js');
-      await runSeeCommand(commandArgs, printText);
-    } else if (command === 'listen') {
-      const { runListenCommand } = await import('./cli-listen.js');
-      await runListenCommand(commandArgs, printText);
-    } else {
-      const { runWatchCommand } = await import('./cli-watch.js');
-      await runWatchCommand(commandArgs, printText);
-    }
-    return;
-  }
-
-  if (command === 'speak') {
-    // Output is audio; stdout carries only the `[speak]` summary (or --json).
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runSpeakCommand } = await import('./cli-speak.js');
-    await runSpeakCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
-  if (command === 'draw') {
-    // Output is an image; stdout carries only the `[draw]` summary (or --json).
-    if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
-    const { runDrawCommand } = await import('./cli-draw.js');
-    await runDrawCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], printText);
-    return;
-  }
-
-  const { dispatchCaptureCommand } = await import('./lib/capture-dispatch.js');
-  if (
-    await dispatchCaptureCommand({
+  const handler = CLI_COMMAND_HANDLERS[command];
+  if (handler) {
+    await handler({
       command,
       firstArg,
       restArgs,
       normalizedArgs,
-      print: (text: string) => printText(text),
-    })
-  ) {
-    return;
-  }
-
-  if (command === 'run') {
-    runActuator(actuators, firstArg, restArgs, missionId);
-    return;
-  }
-
-  if (command === 'preview') {
-    const filePath = firstArg;
-    if (!filePath) {
-      throw new ScriptExitError(1, 'Usage: pnpm kyberion preview <pipeline.json>');
-    }
-    const resolvedPreviewPath = pathResolver.rootResolve(filePath);
-    assertPipelinePreviewResourcePath(resolvedPreviewPath);
-    const content = readCliTextFile(resolvedPreviewPath, 'pipeline preview file');
-    const pipeline = parseSafeJsonInput(content, 'Pipeline preview file');
-    const preview = previewPipeline(pipeline);
-
-    printText(`\n=== Pipeline Preview ===`);
-    printText(`Valid: ${preview.valid ? '\u2705' : '\u274C'}`);
-    printText(`Total steps: ${preview.totalSteps}`);
-    if (preview.errors.length > 0) {
-      printText(`\nErrors:`);
-      preview.errors.forEach((e: string) => printText(`  \u274C ${e}`));
-    }
-    if (preview.warnings.length > 0) {
-      printText(`\nWarnings:`);
-      preview.warnings.forEach((w: string) => printText(`  \u26A0\uFE0F  ${w}`));
-    }
-    printText(`\nSteps:`);
-    const printStep = (step: any, indent: number = 0) => {
-      const pad = '  '.repeat(indent);
-      const warn = step.warnings?.length ? ` \u26A0\uFE0F ${step.warnings.length}` : '';
-      printText(`${pad}${step.index + 1}. [${step.type}:${step.op}] ${step.description}${warn}`);
-      if (step.children) step.children.forEach((c: any) => printStep(c, indent + 1));
-    };
-    preview.steps.forEach((s: any) => printStep(s));
-    if (restArgs.includes('--preview-graph') && preview.graph) {
-      printText(`\n=== Effective Graph (Mermaid) ===\n${preview.graph.mermaid}`);
-    }
-    if (!preview.valid) throw new ScriptExitError(1, '', true);
-    return;
-  }
-
-  if (command === 'intent') {
-    // Free-text compatibility route → canonical ask resolution/execution
-    // Usage: pnpm kyberion intent "仮説を発散させて" [--run|--clarify]
-    const flags = normalizedArgs.filter((a) => a.startsWith('--'));
-    const words = normalizedArgs.slice(1).filter((a) => !a.startsWith('--'));
-    const utterance = words.join(' ').trim();
-    if (!utterance) {
-      throw new ScriptExitError(
-        1,
-        'Usage: pnpm kyberion intent "<utterance>" [--run|--clarify]\n  --run  Compatibility alias; route through governed `kyberion ask` execution\n  --clarify  Print a clarification packet for the utterance'
-      );
-    }
-    const doClarify = flags.includes('--clarify');
-
-    // Both the historical read-only form and --run now use one governed
-    // surface route. `kyberion ask` decides whether to explain, clarify, or
-    // execute after the canonical resolver and approval gates have run.
-    await routeLegacyIntentToAsk(utterance, doClarify ? 'clarify' : 'explain', print);
-    return;
-  }
-
-  if (command === 'schedule') {
-    const subAction = firstArg; // register, list, remove
-    if (subAction === 'list') {
-      const schedules = listScheduledPipelines();
-      if (schedules.length === 0) {
-        printText('No scheduled pipelines.');
-      } else {
-        printText(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
-        for (const s of schedules) {
-          const status = s.enabled ? '\u2705' : '\u23F8\uFE0F';
-          const trigger =
-            s.trigger.type === 'cron'
-              ? `cron: ${s.trigger.cron}`
-              : `interval: ${s.trigger.intervalMs}ms`;
-          const last = s.lastRun ? ` | last: ${s.lastRun} (${s.lastStatus})` : '';
-          printText(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
-          printText(`   pipeline: ${s.pipelinePath}`);
-        }
-      }
-    } else if (subAction === 'register') {
-      // pnpm kyberion schedule register <id> <pipeline-path> <actuator> <cron>
-      const [id, pipelinePath, actuator, cron] = restArgs;
-      if (!id || !pipelinePath || !actuator || !cron) {
-        throw new ScriptExitError(
-          1,
-          'Usage: pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"'
-        );
-      }
-      registerScheduledPipeline({
-        id,
-        name: id,
-        pipelinePath,
-        actuator,
-        trigger: { type: 'cron', cron },
-        enabled: true,
-      });
-      printText(`Registered: ${id} \u2192 ${pipelinePath} [${actuator}] cron: ${cron}`);
-    } else if (subAction === 'remove') {
-      const id = restArgs[0];
-      if (!id) {
-        throw new ScriptExitError(1, 'Usage: pnpm kyberion schedule remove <id>');
-      }
-      unregisterScheduledPipeline(id);
-      printText(`Removed: ${id}`);
-    } else {
-      printText('Usage: pnpm kyberion schedule [list|register|remove]');
-    }
+      args,
+      actuators,
+      locale,
+      print,
+      missionId,
+    });
     return;
   }
 

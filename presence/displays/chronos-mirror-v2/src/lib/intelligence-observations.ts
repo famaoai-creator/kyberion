@@ -1,6 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
-import { validateBrowserConversationSession } from '@agent/core/browser-conversation-session';
+import { validateBrowserConversationSession } from '@agent/core/browser/browser-conversation-session';
 import path from 'node:path';
 import {
   assertSafeRepositoryPath,

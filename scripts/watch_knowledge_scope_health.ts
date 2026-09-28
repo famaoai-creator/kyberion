@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /** KO-18: deterministic health report for registered tenant knowledge roots. */
 import * as path from 'node:path';
-import { buildTenantKnowledgeScopeSet } from '@agent/core/tenant-knowledge-retrieval';
-import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { buildTenantKnowledgeScopeSet } from '@agent/core/organization/tenant-knowledge-retrieval';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   readKnowledgeScopeHealthCount,
   writeKnowledgeScopeHealthCount,
-} from '@agent/core/knowledge-scope-health-history';
-import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+} from '@agent/core/knowledge/knowledge-scope-health-history';
+import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge/knowledge-scope-check-policy';
 import { safeExistsSync, safeStat } from '@agent/core/secure-io';
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';

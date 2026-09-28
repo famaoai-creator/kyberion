@@ -1,8 +1,11 @@
 import path from 'node:path';
-import { resolveOperatorDisplayName, resolveOperatorLocale } from '@agent/core/operator-identity';
+import {
+  resolveOperatorDisplayName,
+  resolveOperatorLocale,
+} from '@agent/core/surface/operator-identity';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { listAgentIdentities } from '@agent/core/agent-identity';
-import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { listAgentIdentities } from '@agent/core/agent/agent-identity';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
 import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';

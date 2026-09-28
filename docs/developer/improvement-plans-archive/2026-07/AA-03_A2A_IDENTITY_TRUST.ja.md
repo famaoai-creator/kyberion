@@ -13,7 +13,7 @@ status: archived
 
 「誰からのメッセージか」をシステムが実質検証していない。
 
-- **A2A 署名の秘密鍵がプロセス毎に使い捨て**: `KYBERION_A2A_SECRET || crypto.randomBytes(32)`(`libs/core/a2a-bridge.ts:46`)。env 未設定(通常)ではプロセスごとに乱数が変わるため、**プロセスを跨ぐ署名は決して検証できない**。
+- **A2A 署名の秘密鍵がプロセス毎に使い捨て**: `KYBERION_A2A_SECRET || crypto.randomBytes(32)`(`libs/core/mesh/a2a-bridge.ts:46`)。env 未設定(通常)ではプロセスごとに乱数が変わるため、**プロセスを跨ぐ署名は決して検証できない**。
 - **署名が無ければ検証をスキップ**(`a2a-bridge.ts:81`)、**未知の送信者も通す**(`validateSender` は「Don't throw」の明示コメント付きで警告のみ、`:270-280`)。つまり署名機構は実質飾り。
 - **信頼スコアの尺度が不整合で、ゲートが形骸化**: trust-engine は 0–1000 の5次元合成(`trust-engine.ts:14-70`)なのに、supervisor 経由のハンドルは `trustScore: 5` をハードコード(`agent-runtime-supervisor-client.ts:290`)、lifecycle も `5.0` をシード(`agent-lifecycle.ts:253`)。スコアを見る唯一の実行時ゲートは spawn 時の `manifest.trustRequired` 比較(`agent-lifecycle.ts:235-242`)で、尺度不一致のためまともに機能していない可能性が高い。`updateTrustScore`(検証結果からの更新)は mission-lifecycle 側にあり通信路とは未接続。
 - Mesh 側は HMAC 共有秘密(peer catalog 由来、`peer-messaging.ts:160-178,240-247`)で「完全性は守るがアイデンティティ・ローテーション・失効は無い」(roadmap 自身の評価 `kyberion-ecosystem-evolution-roadmap-2026-06.md:46`)。
@@ -30,7 +30,7 @@ status: archived
 
 ### Task 1: 署名基盤の抽象化と鍵の永続化 — `claude-sonnet-4`
 
-1. `libs/core/a2a-envelope-signature.ts` を新設: `sign(envelope) / verify(envelope): { valid, reason }` を提供し、内部実装は HMAC-SHA256。鍵解決順: `KYBERION_A2A_SECRET` env → `active/shared/runtime/agent-supervisor/a2a-secret`(初回に生成、secret-guard/secure-io 経由で書き込み)→ 生成。**プロセス毎乱数フォールバックは廃止**。
+1. `libs/core/mesh/a2a-envelope-signature.ts` を新設: `sign(envelope) / verify(envelope): { valid, reason }` を提供し、内部実装は HMAC-SHA256。鍵解決順: `KYBERION_A2A_SECRET` env → `active/shared/runtime/agent-supervisor/a2a-secret`(初回に生成、secret-guard/secure-io 経由で書き込み)→ 生成。**プロセス毎乱数フォールバックは廃止**。
 2. `a2a-bridge.ts` の署名・検証(`:46,81` 周辺)を新モジュール呼び出しに置換。E4 を見据え、envelope に `sig_alg: 'hmac-sha256'` フィールドを追加(将来 `ed25519` が並ぶ)。
 3. unit test: プロセス跨ぎ相当(モジュール再ロード)で検証成功、鍵不一致で失敗、旧形式(無署名)の互換動作。
 
@@ -61,7 +61,7 @@ status: archived
 ### Task 3 slice — 2026-07-04
 
 - `agent-registry` を trust score の参照元として明示し、`agent-lifecycle` の spawn gate と `agent-runtime-supervisor-client` の supervisor-backed handle が 5 固定の初期値ではなく trust engine の現在値を見るようにした。
-- `libs/core/agent-lifecycle.model-routing.test.ts` に trust score の参照テストを追加した。
+- `libs/core/agent/agent-lifecycle.model-routing.test.ts` に trust score の参照テストを追加した。
 
 ### Peer HTTP read boundary slice — 2026-07-11
 
@@ -71,7 +71,7 @@ status: archived
 
 ## 実装状況 追記 (2026-07-12)
 
-- **Task 1 完了**: `libs/core/a2a-envelope-signature.ts` 新設 — 鍵解決順 env → `active/shared/runtime/agent-supervisor/a2a-secret`(初回生成・0600 永続化)→ プロセスローカル(永続化失敗時のみ、警告付き)。**プロセス毎使い捨て乱数は廃止**され、ホスト内全プロセスが同一鍵で署名/検証可能に。`sig_alg: 'hmac-sha256'` を envelope に付与(E4 の ed25519 が並置できる形)。a2a-bridge は薄い委譲に。
+- **Task 1 完了**: `libs/core/mesh/a2a-envelope-signature.ts` 新設 — 鍵解決順 env → `active/shared/runtime/agent-supervisor/a2a-secret`(初回生成・0600 永続化)→ プロセスローカル(永続化失敗時のみ、警告付き)。**プロセス毎使い捨て乱数は廃止**され、ホスト内全プロセスが同一鍵で署名/検証可能に。`sig_alg: 'hmac-sha256'` を envelope に付与(E4 の ed25519 が並置できる形)。a2a-bridge は薄い委譲に。
 - **Task 2 完了(warn 段階)**: `KYBERION_A2A_SIGNATURE=warn|enforce`(既定 warn)。無署名メッセージは audit chain に `a2a_signature_missing` を記録(enforce では拒否)。未知送信者(registry/manifest 不在、kyberion: 名前空間外)は `a2a_unknown_sender` を記録(enforce では拒否)。**署名不正は従来どおり常に拒否**。enforce 切替は audit chain の観測(無署名/未知送信者ゼロ確認)後に単独コミットで実施。
 - **Task 3**: trust 尺度ハードコードは解消済みを確認(`resolveAgentTrustScore` 参照化済み)。
 - **Task 4 完了**: `docs/developer/A2A_SIGNING.md`(鍵の場所・ローテーション・enforce 手順・same-host 限界の明記)。

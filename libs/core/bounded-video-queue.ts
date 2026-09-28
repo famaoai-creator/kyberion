@@ -1,5 +1,5 @@
-import type { VideoFrame } from './meeting-session-types.js';
-import type { VideoBufferPolicy } from './video-route.js';
+import type { VideoFrame } from './meeting/meeting-session-types.js';
+import type { VideoBufferPolicy } from './video/video-route.js';
 
 export interface BoundedVideoQueueMetrics {
   depth: number;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
-import { registerReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
+import { registerReasoningBackend, resetReasoningBackend } from './reasoning/reasoning-backend.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SoftwareQualityContract, TestInventory } from './software-quality.js';
 import {

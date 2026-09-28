@@ -6,7 +6,7 @@ import {
   safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { ptyEngine } from '@agent/core/pty-engine';
+import { ptyEngine } from '@agent/core/shell/pty-engine';
 import path from 'node:path';
 import { parseJsonRecord, stringField, numberField } from './json-record';
 

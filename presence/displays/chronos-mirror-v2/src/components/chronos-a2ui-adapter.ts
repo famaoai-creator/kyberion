@@ -96,9 +96,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Strip script tags / inline handlers from string props (kept from the
- * pre-UI-07 library). React escapes text anyway; this keeps hostile markup out
- * of props that reach `onAction` payloads.
+ * Neutralize markup in string props (kept from the pre-UI-07 library). React
+ * escapes text anyway; this keeps hostile markup out of props that reach
+ * `onAction` payloads. Fullwidth substitution is complete by construction —
+ * unlike pattern-strip regexes it cannot be bypassed by obfuscated tags.
  */
 export function sanitizeProps(props: Record<string, unknown>, depth = 0): Record<string, unknown> {
   const clean: Record<string, unknown> = {};
@@ -112,9 +113,7 @@ export function sanitizeProps(props: Record<string, unknown>, depth = 0): Record
 
 function sanitizeValue(value: unknown, depth: number): unknown {
   if (typeof value === 'string') {
-    return value
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/on\w+\s*=/gi, 'data-blocked=');
+    return value.replace(/</g, '＜').replace(/>/g, '＞');
   }
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1));
   if (isRecord(value)) return sanitizeProps(value, depth);

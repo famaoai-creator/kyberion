@@ -6,7 +6,10 @@
 
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
-import { loadChannelRegistry, type ChannelRegistryChannel } from '@agent/core/channel-registry';
+import {
+  loadChannelRegistry,
+  type ChannelRegistryChannel,
+} from '@agent/core/surface/channel-registry';
 import {
   getRegisteredEnvText,
   nowIso,
@@ -14,7 +17,7 @@ import {
   readJson,
   readJsonLines,
 } from '@agent/core/foundation';
-import { terminalBridge } from '@agent/core/terminal-bridge';
+import { terminalBridge } from '@agent/core/shell/terminal-bridge';
 import {
   assertSafeRepositoryPath,
   safeWriteFile,
@@ -26,7 +29,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
-import { secretGuard } from '@agent/core/secret-guard';
+import { secretGuard } from '@agent/core/secret/secret-guard';
 import { sensoryMemory } from '@agent/core/sensory-memory';
 import { reflexEngine } from '@agent/shared-nerve';
 import { handleAction as dispatchService } from '@actuator/service';

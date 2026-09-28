@@ -200,30 +200,32 @@ vi.mock('@agent/core/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/core')>()),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock('@agent/core/video-composition-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-composition-compiler')>()),
+vi.mock('@agent/core/video/video-composition-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/video-composition-compiler')>()),
   compileVideoCompositionADF: mocks.compileVideoCompositionADF,
   writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
 }));
-vi.mock('@agent/core/narrated-video-brief-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/narrated-video-brief-compiler')>()),
+vi.mock('@agent/core/video/narrated-video-brief-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/narrated-video-brief-compiler')>()),
   compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
 }));
-vi.mock('@agent/core/video-content-brief-contract', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-content-brief-contract')>()),
+vi.mock('@agent/core/video/video-content-brief-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/video-content-brief-contract')>()),
   compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
 }));
-vi.mock('@agent/core/video-composition-template-registry', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-composition-template-registry')>()),
+vi.mock('@agent/core/video/video-composition-template-registry', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('@agent/core/video/video-composition-template-registry')
+  >()),
   getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
 }));
-vi.mock('@agent/core/video-render-runtime-policy', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-render-runtime-policy')>()),
+vi.mock('@agent/core/video/video-render-runtime-policy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/video-render-runtime-policy')>()),
   getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
 }));
-vi.mock('@agent/core/video-render-backend', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-render-backend')>()),
+vi.mock('@agent/core/video/video-render-backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/video-render-backend')>()),
   renderNarratedFallbackVideo: mocks.renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
 }));

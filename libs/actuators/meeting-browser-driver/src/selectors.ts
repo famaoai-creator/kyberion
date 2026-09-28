@@ -9,7 +9,7 @@
  * easy to add fallback selectors as platforms re-skin.
  */
 
-import type { MeetingPlatform } from '@agent/core/meeting-session-types';
+import type { MeetingPlatform } from '@agent/core/meeting/meeting-session-types';
 
 export interface MeetingPreJoinSelectors {
   /** Optional input where the AI's display name goes (Meet for guests). */
@@ -44,7 +44,9 @@ export const MEET_SELECTORS: MeetingPreJoinSelectors = {
     'input[jsname="YPqjbf"]',
     'input[aria-label="Your name"]',
     'input[placeholder="Your name"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'input[aria-label="お名前を入力"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'input[placeholder="お名前を入力"]',
   ],
   meeting_id_input: [],
@@ -52,7 +54,9 @@ export const MEET_SELECTORS: MeetingPreJoinSelectors = {
   continue_without_audio_video_button: [
     'button:has-text("Continue without microphone and camera")',
     'button:has-text("Continue without audio and video")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("マイクとカメラをオフにして参加")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("マイクとカメラなしで続行")',
     '[role="button"]:has-text("Continue without microphone and camera")',
   ],
@@ -66,18 +70,21 @@ export const MEET_SELECTORS: MeetingPreJoinSelectors = {
   microphone_device_button: [
     'button[aria-label*="Microphone" i]',
     'button:has-text("Microphone")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("マイク")',
     '[role="button"][aria-label*="Microphone" i]',
   ],
   speaker_device_button: [
     'button[aria-label*="Speaker" i]',
     'button:has-text("Speaker")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("スピーカー")',
     '[role="button"][aria-label*="Speaker" i]',
   ],
   camera_device_button: [
     'button[aria-label*="Camera" i]',
     'button:has-text("Camera")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("カメラ")',
     '[role="button"][aria-label*="Camera" i]',
   ],
@@ -90,27 +97,34 @@ export const MEET_SELECTORS: MeetingPreJoinSelectors = {
   mute_mic_button: [
     // Confirmed via live DOM inspection 2026-05-26
     '[aria-label="Turn off microphone"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     '[aria-label="マイクをオフにする"]',
     'button[aria-label*="Microphone" i]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     '[data-tooltip="マイクをオフにする"]',
   ],
   disable_camera_button: [
     // Confirmed via live DOM inspection 2026-05-26
     '[aria-label="Turn off camera"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     '[aria-label="カメラをオフにする"]',
     'button[aria-label*="Camera" i]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     '[data-tooltip="カメラをオフにする"]',
   ],
   join_button: [
     // "Ask to join" = guest without host present; "Join now" = host or admitted
     'button:has-text("Ask to join")',
     'button:has-text("Join now")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("参加をリクエスト")',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("今すぐ参加")',
     'button[jsname="Qx7uuf"]',
   ],
   leave_button: [
     'button[aria-label*="Leave call" i]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button[aria-label*="通話を終了"]',
     '[data-tooltip*="Leave" i]',
   ],
@@ -134,6 +148,7 @@ export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
     // Pre-join: aria-label="Mute" = mic is ON, clicking mutes it
     '#preview-audio-control-button',
     'button[aria-label="Mute"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button[aria-label="マイクをミュート"]',
   ],
   disable_camera_button: [
@@ -141,6 +156,7 @@ export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
     // If "Stop Video", click to disable
     '#preview-video-control-button',
     'button[aria-label="Stop Video"]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button[aria-label="ビデオの停止"]',
   ],
   join_button: ['.preview-join-button', 'button:has-text("Join")'],
@@ -165,7 +181,9 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
     'input[data-tid="meeting-id-input"]',
   ],
   meeting_passcode_input: [
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'input[aria-label*="会議パスコード" i]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'input[placeholder*="会議パスコード" i]',
     'input[aria-label*="passcode" i]',
     'input[placeholder*="passcode" i]',
@@ -186,6 +204,7 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
     'input[data-tid="toggle-video"]',
   ],
   join_button: [
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button:has-text("会議に参加する")',
     'button:has-text("Join the meeting")',
     'button[data-tid="prejoin-join-button"]',
@@ -194,6 +213,7 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
   leave_button: [
     'button[data-tid="hangup-button"]',
     'button[aria-label*="Leave" i]',
+    // i18n-exempt: JA DOM selector for meeting platform UI
     'button[aria-label*="通話を終了"]',
   ],
 };

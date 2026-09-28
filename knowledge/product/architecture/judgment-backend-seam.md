@@ -10,7 +10,7 @@ A **judgment** is a bounded, typed question asked over a piece of state —
 "which of these six shapes is this?", "is this done?", "how risky is this?" —
 answered with a value and a confidence and nothing else.
 
-The executable declaration is `libs/core/judgment-backend.ts`; this document
+The executable declaration is `libs/core/reasoning/judgment-backend.ts`; this document
 is the human-facing explanation of why it exists and how to add a provider.
 
 ## This is not the reasoning backend

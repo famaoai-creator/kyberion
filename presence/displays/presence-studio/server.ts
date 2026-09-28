@@ -1,7 +1,10 @@
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
-import { ensureOwnerMember, resolveMemberByPrincipal } from '@agent/core/member-registry';
+import {
+  ensureOwnerMember,
+  resolveMemberByPrincipal,
+} from '@agent/core/organization/member-registry';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -12,31 +15,31 @@ import {
   createBrowserConversationSession,
   listBrowserConversationSessions,
   saveBrowserConversationSession,
-} from '@agent/core/browser-conversation-session';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
-import { listArtifactRecords } from '@agent/core/artifact-record';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+} from '@agent/core/browser/browser-conversation-session';
+import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance/approval-store';
+import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import {
   listSurfaceAsyncRequestsAcrossChannels,
   listSurfaceNotificationsAcrossChannels,
-} from '@agent/core/surface-ux';
-import { resolveWorkDesign } from '@agent/core/work-design';
-import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+} from '@agent/core/surface/surface-ux';
+import { resolveWorkDesign } from '@agent/core/workforce/work-design';
+import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { buildTrackGateReadinessSummaries } from '@agent/core/sdlc-gate-readiness';
-import { listProjectRecords } from '@agent/core/project-registry';
-import { listManagedProjects } from '@agent/core/project-management';
-import { listProjectTrackRecords } from '@agent/core/project-track-registry';
-import { listServiceBindingRecords } from '@agent/core/service-binding-registry';
-import { listMissionSeedRecords } from '@agent/core/mission-seed-registry';
-import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
-import { getActiveTaskSession, listTaskSessions } from '@agent/core/task-session';
+import { listProjectRecords } from '@agent/core/project/project-registry';
+import { listManagedProjects } from '@agent/core/project/project-management';
+import { listProjectTrackRecords } from '@agent/core/project/project-track-registry';
+import { listServiceBindingRecords } from '@agent/core/service/service-binding-registry';
+import { listMissionSeedRecords } from '@agent/core/mission/mission-seed-registry';
+import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
+import { getActiveTaskSession, listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   getVoiceSelectionSnapshot,
   saveVoiceSelectionPreferences,
-} from '@agent/core/voice-selection-preferences';
+} from '@agent/core/voice/voice-selection-preferences';
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -73,7 +76,7 @@ import {
   generateEmailReplyDraft,
   listEmailAccountProviders,
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
-} from '@agent/core/email-workflow';
+} from '@agent/core/integrations/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';

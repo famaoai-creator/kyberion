@@ -1,9 +1,9 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { agentLifecycle } from '@agent/core/agent-lifecycle';
-import { agentRegistry } from '@agent/core/agent-registry';
-import { getAgentManifest, loadAgentManifests } from '@agent/core/agent-manifest';
+import { agentLifecycle } from '@agent/core/agent/agent-lifecycle';
+import { agentRegistry } from '@agent/core/agent/agent-registry';
+import { getAgentManifest, loadAgentManifests } from '@agent/core/agent/agent-manifest';
 import { logger } from '@agent/core/core';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { classifyError } from '@agent/core/error-classifier';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';

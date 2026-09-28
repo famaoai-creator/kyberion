@@ -22,8 +22,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeLstat: mocks.safeLstat,
 }));
 
-vi.mock('@agent/core/service-engine', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/service-engine')>()),
+vi.mock('@agent/core/service/service-engine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/service/service-engine')>()),
   executeServicePreset: mocks.executeServicePreset,
 }));
 
@@ -38,8 +38,8 @@ vi.mock('@agent/core/core', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/image-description-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/image-description-bridge')>()),
+vi.mock('@agent/core/media/image-description-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/image-description-bridge')>()),
   describeImage: mocks.describeImage,
 }));
 

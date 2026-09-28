@@ -14,7 +14,7 @@ last_updated: 2026-09-21
 [Lightpanda](https://github.com/lightpanda-io/browser) is a headless browser
 written from scratch in Zig (V8 for JS, libcurl, html5ever; no Blink/WebKit, no
 layout engine). It serves CDP, so it can back the `browser-automation-runtime`
-seam (`libs/core/browser-automation-runtime-bridge.ts`) through Playwright's
+seam (`libs/core/browser/browser-automation-runtime-bridge.ts`) through Playwright's
 `chromium.connectOverCDP()`. Upstream claims ~16x less memory and ~9x faster
 than headless Chrome for page loads.
 

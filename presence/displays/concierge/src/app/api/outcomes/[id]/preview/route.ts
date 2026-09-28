@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { listInboxEntries } from '@agent/core/deliverable-inbox';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

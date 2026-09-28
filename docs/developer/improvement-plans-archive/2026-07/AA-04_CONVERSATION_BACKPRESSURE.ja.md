@@ -30,7 +30,7 @@ status: archived
 
 ### Task 1: 会話ストア — `claude-sonnet-4`
 
-1. `libs/core/a2a-conversation-store.ts` を新設: `active/shared/runtime/a2a-conversations/<conversation_id>.jsonl` にターン(ts / sender / receiver / performative / prompt 要約 200 字 / result 要約 200 字 / provider_session_id)を追記。書き込みは secure-io、要約はプロンプト/結果の先頭切出し(LLM 要約はしない — 決定論優先)。
+1. `libs/core/mesh/a2a-conversation-store.ts` を新設: `active/shared/runtime/a2a-conversations/<conversation_id>.jsonl` にターン(ts / sender / receiver / performative / prompt 要約 200 字 / result 要約 200 字 / provider_session_id)を追記。書き込みは secure-io、要約はプロンプト/結果の先頭切出し(LLM 要約はしない — 決定論優先)。
 2. `a2aBridge.route` の送信時・応答時にストアへ記録(`conversation_id` が無い呼び出しは記録しない = 現行互換)。`onResponse` のエラー黙殺(`:177`)は logger.warn に変更(IP-08 規約)。
 3. サイズ管理: 1 会話 500 ターンでローテーション、KM-01 の janitor に TTL(30日)を登録。
 4. unit test: 記録・相関(conversation_id での読み出し)・ローテーション。

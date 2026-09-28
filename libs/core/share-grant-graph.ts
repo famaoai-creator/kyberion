@@ -2,7 +2,7 @@ import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { auditChain } from './audit-chain.js';
+import { auditChain } from './governance/audit-chain.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
@@ -15,7 +15,7 @@ import {
   safeMkdir,
   assertSafeRepositoryPath,
 } from './secure-io.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
 import {

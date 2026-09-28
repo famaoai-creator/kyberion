@@ -107,20 +107,20 @@ WorkInventoryEntry(業務 1 件)
 
 ## 3. 項目一覧
 
-| ID    | 区分   | 内容                                                                                                                                                                     | 優先度 |
-| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| WI-01 | 土台   | 語彙・振り分け規則のカタログ `work-inventory-taxonomy.json` と、記録型・カタログの JSON Schema                                                                           | P0     |
-| WI-02 | 土台   | `libs/core/work-inventory.ts`: 型、検証、規則による手段判定 `classifyWorkStep`、テナント単位の保存・一覧                                                                 | P0     |
-| WI-03 | 収集②  | `libs/core/work-inventory-harvest.ts`: トレース・繰り返し実行・未処理意図から需要信号を作り、業務に紐づける                                                              | P1     |
-| WI-04 | 収集①  | `libs/core/work-inventory-decompose.ts`: 自由記述 → ステップ列の LLM 提案(推論バックエンド経由、スキーマ検証、規則で再判定、stub で決定的)                               | P1     |
-| WI-05 | 収集③  | `libs/core/work-inventory-consent.ts` + `work-inventory-observation.ts`: 同意の記録(付与・撤回・期限)と、同意済みの desktop / browser 記録の要約取り込み(本人確認、監査) | P1     |
-| WI-06 | 学習   | `libs/core/work-inventory-scoring.ts`: 候補の順位付けと、テナント単位の校正                                                                                              | P1     |
-| WI-07 | CLI    | `pnpm inventory`(add / list / show / classify / decompose / harvest / consent / observe / candidates / promote / outcomes / calibrate)                                   | P1     |
-| WI-08 | 収集①  | ヒアリングのシナリオカタログ化と `work_inventory` シナリオ、確定時の棚卸し記録への受け渡し                                                                               | P1     |
-| WI-09 | 改善   | 昇格(mission / pipeline)と実績計測、校正、組織学習キューへの信号                                                                                                         | P1     |
-| WI-10 | 登録   | 標準意図 `inventory-work` と intent-outcome パターン、保存領域の保持期間登録、knowledge 文書                                                                             | P2     |
-| WI-11 | 画面   | 相棒「進み具合」に候補一覧と同意状態を出す                                                                                                                               | P2     |
-| WI-12 | ゲート | 各波の型検査・テスト・`pnpm check -- --scope pr`                                                                                                                         | 並走   |
+| ID    | 区分   | 内容                                                                                                                                                                               | 優先度 |
+| ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| WI-01 | 土台   | 語彙・振り分け規則のカタログ `work-inventory-taxonomy.json` と、記録型・カタログの JSON Schema                                                                                     | P0     |
+| WI-02 | 土台   | `libs/core/workforce/work-inventory.ts`: 型、検証、規則による手段判定 `classifyWorkStep`、テナント単位の保存・一覧                                                                 | P0     |
+| WI-03 | 収集②  | `libs/core/workforce/work-inventory-harvest.ts`: トレース・繰り返し実行・未処理意図から需要信号を作り、業務に紐づける                                                              | P1     |
+| WI-04 | 収集①  | `libs/core/workforce/work-inventory-decompose.ts`: 自由記述 → ステップ列の LLM 提案(推論バックエンド経由、スキーマ検証、規則で再判定、stub で決定的)                               | P1     |
+| WI-05 | 収集③  | `libs/core/workforce/work-inventory-consent.ts` + `work-inventory-observation.ts`: 同意の記録(付与・撤回・期限)と、同意済みの desktop / browser 記録の要約取り込み(本人確認、監査) | P1     |
+| WI-06 | 学習   | `libs/core/workforce/work-inventory-scoring.ts`: 候補の順位付けと、テナント単位の校正                                                                                              | P1     |
+| WI-07 | CLI    | `pnpm inventory`(add / list / show / classify / decompose / harvest / consent / observe / candidates / promote / outcomes / calibrate)                                             | P1     |
+| WI-08 | 収集①  | ヒアリングのシナリオカタログ化と `work_inventory` シナリオ、確定時の棚卸し記録への受け渡し                                                                                         | P1     |
+| WI-09 | 改善   | 昇格(mission / pipeline)と実績計測、校正、組織学習キューへの信号                                                                                                                   | P1     |
+| WI-10 | 登録   | 標準意図 `inventory-work` と intent-outcome パターン、保存領域の保持期間登録、knowledge 文書                                                                                       | P2     |
+| WI-11 | 画面   | 相棒「進み具合」に候補一覧と同意状態を出す                                                                                                                                         | P2     |
+| WI-12 | ゲート | 各波の型検査・テスト・`pnpm check -- --scope pr`                                                                                                                                   | 並走   |
 
 ## 4. 波と担当
 
@@ -169,7 +169,7 @@ WorkInventoryEntry(業務 1 件)
 | ID    | 状態   | 備考                                                                                                                                                                                                                                                                                 |
 | ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | WI-01 | DONE   | `work-inventory-taxonomy.json`(7 段・12 行為・5 手段・規則 7 本・行為/効果のキーワード・順位の既定値)と entry / taxonomy スキーマ。カタログ整合性チェックに登録                                                                                                                      |
-| WI-02 | DONE   | `libs/core/work-inventory.ts`。規則は先勝ち、`money` / `irreversible` / `approval` は常に人間。`human_override` は保持、提案との食い違いは理由に両方残す                                                                                                                             |
+| WI-02 | DONE   | `libs/core/workforce/work-inventory.ts`。規則は先勝ち、`money` / `irreversible` / `approval` は常に人間。`human_override` は保持、提案との食い違いは理由に両方残す                                                                                                                   |
 | WI-03 | DONE   | `work-inventory-harvest.ts`。スパン名・時刻・状態・所要時間だけを読む。テナント間・個人スコープへの混入なし。`schedule` 宣言のあるパイプラインは `origin: scheduled` として候補提案から除外                                                                                          |
 | WI-04 | DONE   | `work-inventory-decompose.ts`。モデル提案 → 規則で再判定。モデル不在・不正応答・時間切れは決定的なキーワード分解に落ちる                                                                                                                                                             |
 | WI-05 | DONE   | `work-inventory-consent.ts` / `work-inventory-observation.ts`。同意は本人のみ・90 日以内・クリップボードと画面フレームは不可。要約は許可リスト方式(アプリ名・ホスト名・操作種別・回数)で本人の personal 層に保存し、本人確認後にだけテナントの業務へ。付与・撤回・取り込みは監査ログ |
@@ -221,12 +221,12 @@ PR #761 のマージ後、§8 の既知の残件を片付ける。調査で分�
 | WI-16 | 保持 | 保持期間カタログに状態つき規則を追加し、janitor が「確認されないまま 30 日を過ぎた要約」と「破棄後 30 日を過ぎた要約」を監査つきで削除する                                                                               | P2     |
 | WI-17 | 移行 | 既存の業務記録で、行為の既定候補と一致する結び付けに `inferred` 印を付ける移行(`pnpm inventory migrate`、空実行つき)                                                                                                     | P2     |
 
-| Wave | 項目          | 担当モデル | ファイル所有権                                                                                |
-| ---- | ------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| 1    | WI-13 + WI-17 | sonnet     | `libs/core/src/trace.ts`・env registry・`work-inventory-harvest.ts`・`work-inventory.ts`・CLI |
-| 1    | WI-14         | sonnet     | `libs/core/secure-io.ts` と呼び出し側の型                                                     |
-| 1    | WI-15         | sonnet     | `presence/displays/concierge/**`・語彙                                                        |
-| 1    | WI-16         | sonnet     | `storage-janitor.ts`・保持期間カタログとスキーマ                                              |
+| Wave | 項目          | 担当モデル | ファイル所有権                                                                                     |
+| ---- | ------------- | ---------- | -------------------------------------------------------------------------------------------------- |
+| 1    | WI-13 + WI-17 | sonnet     | `libs/core/analysis/trace.ts`・env registry・`work-inventory-harvest.ts`・`work-inventory.ts`・CLI |
+| 1    | WI-14         | sonnet     | `libs/core/secure-io.ts` と呼び出し側の型                                                          |
+| 1    | WI-15         | sonnet     | `presence/displays/concierge/**`・語彙                                                             |
+| 1    | WI-16         | sonnet     | `storage-janitor.ts`・保持期間カタログとスキーマ                                                   |
 
 受入条件:
 

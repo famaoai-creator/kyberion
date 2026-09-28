@@ -8,7 +8,7 @@ import {
   approvalRequestLogicalPath,
   decideApprovalRequest,
   loadApprovalRequest,
-} from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store';
 import {
   safeExistsSync,
   safeMkdir,
@@ -17,13 +17,13 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { auditChain, type AuditEntry } from '@agent/core/audit-chain';
-import { activatePlugin, resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
+import { auditChain, type AuditEntry } from '@agent/core/governance/audit-chain';
+import { activatePlugin, resetPluginLifecycleForTests } from '@agent/core/plugin/plugin-lifecycle';
 import {
   createPluginHost,
   disposePluginHost,
   getOrCreatePluginHost,
-} from '@agent/core/plugin-host';
+} from '@agent/core/plugin/plugin-host';
 
 const state = vi.hoisted(() => ({
   managedRoot: '',
@@ -46,9 +46,9 @@ vi.mock('../../../../../lib/viewer-context', async () => {
   };
 });
 
-vi.mock('@agent/core/plugin-managed-install', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/plugin-managed-install')>(
-    '@agent/core/plugin-managed-install'
+vi.mock('@agent/core/plugin/plugin-managed-install', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/plugin/plugin-managed-install')>(
+    '@agent/core/plugin/plugin-managed-install'
   );
   return {
     ...actual,
@@ -66,7 +66,7 @@ import {
   installPluginManaged,
   refreshManagedPluginActivation,
   type ManagedPluginRecord,
-} from '@agent/core/plugin-managed-install';
+} from '@agent/core/plugin/plugin-managed-install';
 import { GET, POST } from './route';
 
 const FIXTURE_DIR = pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture');
