@@ -115,6 +115,32 @@ describe('routeAutonomousDecision', () => {
     ).toBeTruthy();
   });
 
+  it('neutralizes agent-written markup for the surface the card is sent to', () => {
+    const hostileTitle = 'Merge [PR 42](https://evil.invalid) <!channel>';
+    const send = (surface: 'slack' | 'telegram') => {
+      notifications.prefs = { default_channel: { surface, target: CHAT } };
+      notifications.notifyOperatorSync.mockClear();
+      routeAutonomousDecision({
+        role: 'mission_controller',
+        gate: gate(),
+        title: hostileTitle,
+        question: 'Merge <!here> now?',
+        recommendation: 'Approve',
+        requestedBy: 'agent:test',
+      });
+      return notifications.notifyOperatorSync.mock.calls[0] as unknown as [
+        string,
+        { title: string; body: string },
+      ];
+    };
+    const [, slack] = send('slack');
+    expect(slack.title).toContain('&lt;!channel&gt;');
+    expect(slack.body).toContain('&lt;!here&gt;');
+    expect(slack.body).not.toContain('<!here>');
+    const [, telegram] = send('telegram');
+    expect(telegram.title).toContain('\\[PR 42]');
+  });
+
   it('counts an iMessage hand-off as delivery because it is sent synchronously', () => {
     notifications.prefs = {
       default_channel: { surface: 'imessage', target: 'me@example.invalid' },

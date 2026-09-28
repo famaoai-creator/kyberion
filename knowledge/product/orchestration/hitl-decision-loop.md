@@ -44,10 +44,13 @@ in a fixed order so the operator learns where to look:
 6. **if you do nothing** — "stays paused until you decide", "proceeds at 14:00 unless you object", or "trial mode: nothing runs"
 7. evidence links, then the reply vocabulary
 
-Telegram and Slack show four buttons (approve / request changes / reject / ask why; on a veto
-card they read "proceed now" and "object"). Card text is sent without markup, so agent-written
-reasons cannot add links. Every chat surface also accepts text replies — `appr:<id>:…` tokens,
-or a bare word when exactly one card is pending in the chat:
+Cards a bridge posts itself (secret and mission-plan approvals) get four buttons on Telegram and
+Slack (approve / request changes / reject / ask why; on a veto card "proceed now" and "object")
+and are sent without markup. Autonomy cards go through the notification outbox as text without
+buttons; `routeAutonomousDecision()` neutralizes link and mention syntax for the target surface
+(`neutralizeSurfaceMarkup`), so agent-written text cannot plant a disguised link. Every chat
+surface, Slack included, accepts text replies — `appr:<id>:…` tokens, or a bare word when exactly
+one card is pending in the chat:
 
 | Reply                              | Effect                                                                                                                                                              |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -1,6 +1,7 @@
 import type { GovernedArtifactRole } from './artifact-store.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
+  neutralizeSurfaceMarkup,
   renderDecisionCardText,
   resolveInterventionLevel,
   resolveInterventionTiming,
@@ -173,9 +174,11 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   let card = viewDecisionCard(record, { now, locale: input.locale });
   let notified = false;
   if (timing === 'immediate') {
+    const surface = deliveredVia?.surface;
+    const safe = (text: string) => (surface ? neutralizeSurfaceMarkup(text, surface) : text);
     notified = notifyOperatorSync('approval_required', {
-      title: input.title,
-      body: renderDecisionCardText(card, input.locale),
+      title: safe(input.title),
+      body: safe(renderDecisionCardText(card, input.locale)),
       correlation_id: approvalDeliveryCorrelationId(record),
     });
     // iMessage is sent synchronously, so a handed-off card is a delivered one;
