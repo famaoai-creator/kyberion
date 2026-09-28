@@ -46,6 +46,7 @@ import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degra
 import { loadLlmSelectionPreferences } from '../llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from '../actuator/adapter-default-selection.js';
 import type { OpenAiCompatibleBackendOverrides } from '../provider/openai-compatible-backend.js';
+import { modeHasPlaceholderFallback } from '../provider/provider-binary-map.js';
 import { buildOpenAiCompatibleProviderBundle } from './reasoning-openai-compatible-provider.js';
 import { buildCliProviderBundle } from './reasoning-cli-provider.js';
 import { buildApiProviderBundle } from './reasoning-api-provider.js';
@@ -286,7 +287,7 @@ function filterChainByProviderCapability(
       // A cached negative snapshot can describe the pnpm placeholder even
       // after the runtime shell probe selected a real fallback binary. Keep
       // the runtime-verified Claude candidate instead of waiting for TTL.
-      if (provider === 'claude' && candidate.mode === 'claude-cli') {
+      if (modeHasPlaceholderFallback(candidate.mode)) {
         logger.warn(
           `[reasoning-bootstrap] retaining candidate mode=${candidate.mode} provider=${provider}: runtime shell probe selected a fallback binary while the capability snapshot reports binary_found=false (probed_at=${capability.probed_at})`
         );
@@ -685,7 +686,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
     if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;
-    if (provider === 'claude' && candidate.mode === 'claude-cli') return true;
+    if (modeHasPlaceholderFallback(candidate.mode)) return true;
     return healthyProviders.has(provider);
   });
   if (!chainUsable && kyberionEnv('KYBERION_ALLOW_STUB_FALLBACK') !== '1') {
