@@ -8,12 +8,59 @@ on:
     branches: [main, develop]
 
 jobs:
-  test:
+  gates:
+    name: pr-gates
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Build @agent/core
+        run: pnpm --filter '@agent/core' build
+      - name: Build project
+        run: pnpm run build
+      - name: Run manifest-driven PR checks
+        run: pnpm run check -- --scope pr
 
+  static:
+    name: static-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Build @agent/core
+        run: pnpm --filter '@agent/core' build
+      - name: Build project
+        run: pnpm run build
+      - name: Check PR title
+        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
+      - name: Type check
+        run: pnpm run typecheck
+      - name: Lint check
+        run: pnpm run lint
+      - name: Format check
+        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
+
+  test-core:
+    name: core-tests (shard ${{ matrix.shard }}/${{ matrix.total }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+        total: [4]
     steps:
       - uses: actions/checkout@v4
 
@@ -39,33 +86,32 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-
       - name: Build @agent/core
         run: pnpm --filter '@agent/core' build
-
-      - name: Check PR title
-        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
-
       - name: Build project
         run: pnpm run build
 
-      - name: Run manifest-driven PR checks
-        run: pnpm run check -- --scope pr
-
-      - name: Type check
-        run: pnpm run typecheck
-
-      - name: Lint check
-        run: pnpm run lint
-
-      - name: Format check
-        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
-
-      - name: Run core tests
+      - name: Run core tests (shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        run: pnpm test -- --suite core
+        run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
+
+  test-extra:
+    name: actuator/boundary/security tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Build @agent/core
+        run: pnpm --filter '@agent/core' build
+      - name: Build project
+        run: pnpm run build
 
       - name: Run actuator tests
         run: pnpm test -- --suite actuators
@@ -76,6 +122,23 @@ jobs:
       - name: Security scan
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
+
+  vital:
+    name: vital-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Build @agent/core
+        run: pnpm --filter '@agent/core' build
+      - name: Build project
+        run: pnpm run build
 
       - name: Vital check
         id: build-size
