@@ -455,9 +455,13 @@ export function buildOrganizationLearningCandidate(
   };
   assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationLearningCandidate(record)) {
-    throw new Error(
-      `Invalid organization learning candidate: ${validationErrors(validatorFor(LEARNING_SCHEMA_PATH))}`
-    );
+    const details = validationErrors(validatorFor(LEARNING_SCHEMA_PATH));
+    const enumHint =
+      details.includes('source_type') || details.includes('target_kind')
+        ? ' (source_type must be one of incident_review|routine_exception|project_closure|governance_decision; ' +
+          'target_kind must be one of pattern|sop_candidate|knowledge_hint|report_template)'
+        : '';
+    throw new Error(`Invalid organization learning candidate: ${details}${enumHint}`);
   }
   return record;
 }
