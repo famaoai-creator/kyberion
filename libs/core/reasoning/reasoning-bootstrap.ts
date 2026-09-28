@@ -46,7 +46,10 @@ import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degra
 import { loadLlmSelectionPreferences } from '../llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from '../actuator/adapter-default-selection.js';
 import type { OpenAiCompatibleBackendOverrides } from '../provider/openai-compatible-backend.js';
-import { modeHasPlaceholderFallback } from '../provider/provider-binary-map.js';
+import {
+  CHAIN_GATING_EXEMPT_PROVIDERS,
+  modeHasPlaceholderFallback,
+} from '../provider/provider-binary-map.js';
 import { buildOpenAiCompatibleProviderBundle } from './reasoning-openai-compatible-provider.js';
 import { buildCliProviderBundle } from './reasoning-cli-provider.js';
 import { buildApiProviderBundle } from './reasoning-api-provider.js';
@@ -665,27 +668,25 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   // install time: every candidate is CLI-backed and none of those CLIs is
   // discovered healthy. The chain stays installed (runtime behavior is
   // unchanged and loud); only the health reporting changes.
+  const discoveredProviders = discoverProviders(false);
   const healthyProviders = new Set(
-    discoverProviders(false)
+    discoveredProviders
       .filter((provider) => provider.installed && provider.healthy)
       .map((provider) => provider.provider)
   );
-  // Only CLI-backed candidates can be probed via provider discovery; API-key /
-  // URL-backed candidates (anthropic, openrouter, local, nemotron) only enter
-  // the chain when their credential exists, so they count as usable.
-  const CLI_PROBED_PROVIDERS = new Set([
-    'claude',
-    'codex',
-    'gemini',
-    'agy',
-    'grok',
-    'copilot',
-    'cursor',
-    'opencode',
-  ]);
+  // Providers whose absence is probed by discovery gate chain usability —
+  // API-key / URL-backed candidates (anthropic, openrouter, local, nemotron)
+  // and explicitly exempt providers (CHAIN_GATING_EXEMPT_PROVIDERS) count as
+  // usable. Derived from the discovery list itself so a new probed provider
+  // gates automatically.
+  const gatingProviders = new Set(
+    discoveredProviders
+      .map((provider) => provider.provider)
+      .filter((provider) => !CHAIN_GATING_EXEMPT_PROVIDERS.has(provider))
+  );
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);
-    if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;
+    if (!provider || !gatingProviders.has(provider)) return true;
     if (modeHasPlaceholderFallback(candidate.mode)) return true;
     return healthyProviders.has(provider);
   });

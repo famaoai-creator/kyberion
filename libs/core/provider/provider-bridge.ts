@@ -52,55 +52,16 @@ export function buildProviderInvocationPlan(
   const payloadText =
     params.payload === undefined || params.payload === null ? '' : normalizePayload(params.payload);
 
-  if (capability.source.provider === 'gemini-cli') {
-    if (name === 'prompt') {
-      if (!payloadText) {
-        throw new Error(
-          `[PROVIDER_BRIDGE] Gemini prompt requires payload: ${capability.capability_id}`
-        );
-      }
-      return {
-        bin,
-        args: ['-p', payloadText, '-o', 'json', '-y', ...extraArgs],
-      };
+  // Invocation recipes are declarative per (provider, capability name): a new
+  // CLI provider is one table row instead of another provider == 'x' chain.
+  const recipe = PROVIDER_INVOCATION_RECIPES[capability.source.provider]?.[name];
+  if (recipe) {
+    if (recipe.requiresPayload && !payloadText) {
+      throw new Error(
+        `[PROVIDER_BRIDGE] ${capability.source.provider} ${name} requires payload: ${capability.capability_id}`
+      );
     }
-
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
-  }
-
-  if (capability.source.provider === 'codex-cli') {
-    if (name === 'exec') {
-      if (!payloadText) {
-        throw new Error(
-          `[PROVIDER_BRIDGE] Codex exec requires payload: ${capability.capability_id}`
-        );
-      }
-      return {
-        bin,
-        args: ['exec', '--json', payloadText, ...extraArgs],
-      };
-    }
-
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
-  }
-
-  if (capability.source.provider === 'gh') {
-    if (name === 'run-workflow') {
-      return {
-        bin,
-        args: ['workflow', 'run', ...extraArgs],
-      };
-    }
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
+    return { bin, args: [...recipe.args(payloadText), ...extraArgs] };
   }
 
   return {
@@ -108,6 +69,32 @@ export function buildProviderInvocationPlan(
     args: [name, ...extraArgs],
   };
 }
+
+interface InvocationRecipe {
+  /** Build the argv prefix for this capability name. */
+  args: (payloadText: string) => string[];
+  requiresPayload?: boolean;
+}
+
+const PROVIDER_INVOCATION_RECIPES: Record<string, Record<string, InvocationRecipe>> = {
+  'gemini-cli': {
+    prompt: {
+      args: (payload) => ['-p', payload, '-o', 'json', '-y'],
+      requiresPayload: true,
+    },
+  },
+  'codex-cli': {
+    exec: {
+      args: (payload) => ['exec', '--json', payload],
+      requiresPayload: true,
+    },
+  },
+  gh: {
+    'run-workflow': {
+      args: () => ['workflow', 'run'],
+    },
+  },
+};
 
 /**
  * Universal Provider Bridge — invokes host-native or provider-native CLI tools
