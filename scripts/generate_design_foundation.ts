@@ -9,7 +9,7 @@ import { readDesignTokenTextFile } from './generate_design_tokens.js';
  * KDS v2: emit the standalone `kyberion-ds.css` (--kds-* primitives, per-style
  * scopes and composition grid classes) from kyberion-foundation.json.
  */
-export const KYBERION_DS_CSS_PATH = path.join(
+export const FOUNDATION_STYLESHEET_FILE = path.join(
   pathResolver.rootDir(),
   'knowledge/public/design-patterns/web/kyberion-ds.css'
 );
@@ -19,17 +19,17 @@ function render(): GeneratedFile[] {
   if (!foundation) throw new Error('kyberion-foundation.json is missing or unreadable');
   const content = renderFoundationStylesheet(foundation);
   if (
-    safeExistsSync(KYBERION_DS_CSS_PATH) &&
-    readDesignTokenTextFile(KYBERION_DS_CSS_PATH) === content
+    safeExistsSync(FOUNDATION_STYLESHEET_FILE) &&
+    readDesignTokenTextFile(FOUNDATION_STYLESHEET_FILE) === content
   ) {
     return [];
   }
-  return [{ path: KYBERION_DS_CSS_PATH, content }];
+  return [{ path: FOUNDATION_STYLESHEET_FILE, content }];
 }
 
 export const runGenerateDesignFoundation = defineGenerator({
   id: 'design-foundation',
-  outputs: [KYBERION_DS_CSS_PATH],
+  outputs: [FOUNDATION_STYLESHEET_FILE],
   render,
 });
 
