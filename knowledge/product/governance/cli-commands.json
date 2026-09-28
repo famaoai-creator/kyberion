@@ -2229,6 +2229,14 @@
       "noun": "codex",
       "verb": "profile",
       "audience": "operator"
+    },
+    {
+      "id": "script.check.dep-cycles",
+      "script": "check:dep-cycles",
+      "command": "check dep-cycles",
+      "noun": "check",
+      "verb": "dep-cycles",
+      "audience": "dev"
     }
   ]
 }
