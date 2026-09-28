@@ -1266,7 +1266,7 @@ async function mainImpl(
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   // Journal-only actions never delegate; skip their probe cost.
-  if (!shouldSkipReasoningBootstrap(requestedAction)) {
+  if (!shouldSkipReasoningBootstrap(earlyPositionalArgs[0] ?? 'help')) {
     const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
     installReasoningBackends();
     // Import side effects: the canonical A2A route (without it every

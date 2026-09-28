@@ -259,22 +259,25 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (explicit) {
     return probeExplicitReasoningBackend(explicit, process.env);
   }
-  if (binaryAvailable('codex', ['--version'])) {
-    return { available: true };
+  // CLI probes are `spawnSync` (~100-800ms each on this host). They only gate
+  // on availability — which binary answered first does not change the result,
+  // so they race in parallel and short-circuit on the first hit.
+  const cliProbes: Array<Promise<boolean>> = [
+    Promise.resolve().then(() => binaryAvailable('codex', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('gemini', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('agy', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('grok', ['--version'])),
+    Promise.resolve().then(() => binaryAvailable('devin', ['--version'])),
+  ];
+  for (const probe of cliProbes) {
+    if (await probe) {
+      return { available: true };
+    }
   }
-  if (binaryAvailable('gemini', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('agy', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('grok', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('devin', ['--version'])) {
-    return { available: true };
-  }
-  if (kyberionEnv('CLAUDE_API_KEY') || probeShellClaudeCliAvailability().available) {
+  if (
+    kyberionEnv('CLAUDE_API_KEY') ||
+    (await Promise.resolve().then(() => probeShellClaudeCliAvailability())).available
+  ) {
     return { available: true };
   }
   if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {
