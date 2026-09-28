@@ -85,6 +85,15 @@ describe('MO-11 alignment gate end-to-end', () => {
     const opened = openAlignmentApproval(MISSION_ID);
     expect(opened.created).toBe(true);
     expect(opened.requestId).toBeTruthy();
+    const openedRecord = withExecutionContext('surface_runtime', () =>
+      listApprovalRequests({ storageChannels: ['brief'] }).find((r) => r.id === opened.requestId)
+    );
+    expect(openedRecord?.decisionCard).toMatchObject({
+      riskTier: 'approve',
+      evidence: [
+        { ref: path.relative(pathResolver.rootDir(), BRIEF_PATH).split(path.sep).join('/') },
+      ],
+    });
 
     // 3. Still pending -> still closed.
     expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({

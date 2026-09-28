@@ -36,7 +36,8 @@ export type OperatorEvent =
   | 'mission_completed'
   | 'mission_failed'
   | 'deliverable_ready'
-  | 'ops_alert';
+  | 'ops_alert'
+  | 'decision_digest';
 
 export interface NotificationChannelTarget {
   surface: 'slack' | 'imessage' | 'telegram' | 'discord' | 'inbox';
@@ -76,6 +77,7 @@ const OPERATOR_EVENTS = new Set<OperatorEvent>([
   'mission_failed',
   'deliverable_ready',
   'ops_alert',
+  'decision_digest',
 ]);
 
 function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
@@ -221,6 +223,8 @@ const EVENT_LABEL: Record<OperatorEvent, string> = {
   mission_failed: '❌ ミッション失敗',
   deliverable_ready: '📦 成果物',
   ops_alert: '🚨 運用アラート',
+  // The digest title is localized by the digest itself.
+  decision_digest: '🗂',
 };
 
 function formatNotificationText(
