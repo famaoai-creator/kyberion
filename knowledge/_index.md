@@ -225,6 +225,7 @@
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
 - [Multi-Provider Co-Execution Contract](./product/governance/multi-provider-coexecution-contract.md) (public | Unknown)
 - [Operational Hints](./product/governance/HINTS.md) (public | Unknown)
+- [Organization Lifecycle Verification Playbook](./product/governance/organization-lifecycle-verification-playbook.md) (public | Unknown)
 - [Organization Operations Runbook](./product/governance/organization-operations-runbook.md) (public | Unknown)
 - [PR前CI準備チェックリスト](./product/governance/pre-pr-ci-readiness-checklist.ja.md) (public | Codex)
 - [Running and Probing Tenant-Bound Pipelines Without Policy Violations](./product/governance/tenant-bound-runtime-probing.md) (public | Unknown)

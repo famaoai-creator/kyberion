@@ -189,4 +189,38 @@ describe('organization record_run params', () => {
       recordOrganizationOperationRunWithDefaults(parseOrganizationRecordRunParams(baseParams))
     ).toThrow(/Organization operation not found/);
   });
+
+  it('tells operators to pass --evidence-ref when a succeeded run has none', () => {
+    expect(() =>
+      recordOrganizationOperationRun({
+        organizationId: 'org-run',
+        tier: 'confidential',
+        tenantSlug: 'tenant-run',
+        operationId: 'ringi-approval',
+        runId: 'no-evidence-run',
+        runStatus: 'succeeded',
+        resultSummary: 'done',
+        apply: false,
+      })
+    ).toThrow(/requires an evidence ref.*--evidence-ref/);
+  });
+
+  it('lists allowed scope prefixes and the definition-vs-evidence split for out-of-scope refs', () => {
+    expect(() =>
+      recordOrganizationOperationRun({
+        organizationId: 'org-run',
+        tier: 'confidential',
+        tenantSlug: 'tenant-run',
+        operationId: 'ringi-approval',
+        runId: 'scope-run',
+        runStatus: 'succeeded',
+        resultSummary: 'done',
+        evidenceRefs: [EVIDENCE],
+        executionRef: 'pipelines/baseline-check.json',
+        apply: false,
+      })
+    ).toThrow(
+      /Allowed prefixes.*knowledge\/confidential\/tenant-run.*operation definition's.*trace or report file/s
+    );
+  });
 });

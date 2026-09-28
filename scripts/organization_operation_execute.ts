@@ -47,7 +47,10 @@ function assertSelectedOrganizationScope(
     (selected.organization_id && selected.organization_id !== organizationId)
   ) {
     throw new Error(
-      'Select the matching tier, tenant, and organization with pnpm scope use before executing an organization operation.'
+      `Select the matching tier, tenant, and organization with pnpm scope use before executing an organization operation. ` +
+        `Expected tier=${tier} tenant=${tenantSlug || '(none)'} organization=${organizationId}, ` +
+        `but the current scope is tier=${selected.tier} tenant=${selected.tenant_slug || '(none)'} organization=${selected.organization_id || '(none)'}. ` +
+        `Run: pnpm scope use --tier ${tier} --tenant ${tenantSlug || '<slug>'} --organization ${organizationId}`
     );
   }
 }
