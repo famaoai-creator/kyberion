@@ -118,6 +118,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/history-search-index.ts#rebuildMissionHistorySearchIndex",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -621,6 +626,11 @@
     },
     {
       "site": "libs/core/surface/surface-approval-ui.ts#createSurfaceApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1351,6 +1361,21 @@
     {
       "site": "scripts/apply_dependency_patch.ts#main",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_inbox.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_inbox.ts#collectDecisionDigest",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -3068,21 +3093,11 @@
         },
         "surface_runtime": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/discord-bridge/src/index.ts#<module>",
+            "satellites/discord-bridge/src/index.ts#main",
+            "satellites/discord-bridge/src/index.ts#drainDiscordOutbox",
+            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
+            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
           ]
         }
       },
@@ -3286,20 +3301,11 @@
         },
         "surface_runtime": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#drainIMessageOutbox",
+            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
+            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
           ]
         }
       },
@@ -4210,18 +4216,9 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/slack-bridge/src/index.ts#processSlackOutbox",
+            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
+            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
           ]
         }
       },
@@ -4658,21 +4655,10 @@
         },
         "surface_runtime": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/telegram-bridge/src/index.ts#<module>",
+            "satellites/telegram-bridge/src/index.ts#main",
+            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
+            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
           ]
         }
       },

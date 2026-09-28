@@ -127,9 +127,18 @@ function registerSchema(
   return schema;
 }
 
+// One shared validator instance for callers that do not pass their own. Schema
+// registration is keyed by file:// URI, so compiling N catalogs from the same
+// schema costs one compile total instead of N Ajv instances each recompiling.
+let sharedDefaultValidator: AjvLike | null = null;
+function defaultValidator(): AjvLike {
+  if (!sharedDefaultValidator) sharedDefaultValidator = createAjv();
+  return sharedDefaultValidator;
+}
+
 export function compileSchema<T = unknown>(
   schemaPath: string,
-  validator: AjvLike = createAjv()
+  validator: AjvLike = defaultValidator()
 ): ValidateFunction<T> {
   const normalized = path.resolve(schemaPath);
   const schemaId = pathToFileURL(normalized).href;
