@@ -485,7 +485,7 @@ export async function main(
         res.writeHead(500);
         // Return a generic 500 — exception details stay in the server log
         // (stack-trace-exposure / xss-through-exception hardening).
-        console.error(`[server:daily-desk] request failed:`, e);
+        print(`[server:daily-desk] request failed: ${e instanceof Error ? e.message : String(e)}`);
         res.end('internal server error');
       }
     }

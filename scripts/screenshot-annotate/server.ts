@@ -401,7 +401,9 @@ export function createScreenshotAnnotateRequestHandler(
         res.writeHead(500);
         // Return a generic 500 — exception details stay in the server log
         // (stack-trace-exposure / xss-through-exception hardening).
-        console.error(`[server:screenshot-annotate] request failed:`, e);
+        print(
+          `[server:screenshot-annotate] request failed: ${e instanceof Error ? e.message : String(e)}`
+        );
         res.end('internal server error');
       }
     }

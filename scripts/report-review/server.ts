@@ -286,7 +286,9 @@ export function createReportReviewRequestHandler(
               res.writeHead(500);
               // Return a generic 500 — exception details stay in the server log
               // (stack-trace-exposure / xss-through-exception hardening).
-              console.error(`[server:report-review] request failed:`, e);
+              print(
+                `[server:report-review] request failed: ${e instanceof Error ? e.message : String(e)}`
+              );
               res.end('internal server error');
             }
             print(`[save] ${e instanceof Error ? e.message : String(e)}`);
@@ -303,7 +305,9 @@ export function createReportReviewRequestHandler(
         res.writeHead(500);
         // Return a generic 500 — exception details stay in the server log
         // (stack-trace-exposure / xss-through-exception hardening).
-        console.error(`[server:report-review] request failed:`, e);
+        print(
+          `[server:report-review] request failed: ${e instanceof Error ? e.message : String(e)}`
+        );
         res.end('internal server error');
       }
     }

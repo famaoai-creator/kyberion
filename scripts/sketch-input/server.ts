@@ -297,7 +297,9 @@ export function createSketchInputRequestHandler(
               res.writeHead(500);
               // Return a generic 500 — exception details stay in the server log
               // (stack-trace-exposure / xss-through-exception hardening).
-              console.error(`[server:sketch-input] request failed:`, e);
+              print(
+                `[server:sketch-input] request failed: ${e instanceof Error ? e.message : String(e)}`
+              );
               res.end('internal server error');
             }
             print(`[export] ${e instanceof Error ? e.message : String(e)}`);
@@ -314,7 +316,9 @@ export function createSketchInputRequestHandler(
         res.writeHead(500);
         // Return a generic 500 — exception details stay in the server log
         // (stack-trace-exposure / xss-through-exception hardening).
-        console.error(`[server:sketch-input] request failed:`, e);
+        print(
+          `[server:sketch-input] request failed: ${e instanceof Error ? e.message : String(e)}`
+        );
         res.end('internal server error');
       }
     }
