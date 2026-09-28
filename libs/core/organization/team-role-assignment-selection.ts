@@ -47,6 +47,18 @@ export interface AgentProfileRecord {
   };
   provider_strategy?: 'strict' | 'preferred' | 'adaptive';
   fallback_providers?: string[];
+  /**
+   * Declared NHI scale-out: how many instances of this identity may exist.
+   * The index expands `instance_count > 1` into `<id>-2..-N` clones that share
+   * every field except instance metadata — each clone is its own accountable
+   * NHI, so the existing busy/load-penalty machinery spreads work across them
+   * unchanged. See AGENT_INSTANCE_POOL_PLAN.
+   */
+  instance_count?: number;
+  /** Set on synthesized instances — the base profile they were cloned from. */
+  instance_of?: string;
+  /** Set on synthesized instances — 1-based ordinal inside the pool. */
+  instance_index?: number;
 }
 
 /**
@@ -79,6 +91,9 @@ export interface MissionTeamAssignment {
    */
   role_sources?: Array<'structural' | 'obligation' | 'template' | 'restaff'>;
   agent_id: string | null;
+  /** When the selected agent is a cloned NHI instance: the base profile id. */
+  instance_of?: string;
+  instance_index?: number;
   actor_type?: 'agent' | 'human' | 'service';
   resource?: import('../mission/mission-team-binding.js').WorkforceResourceRef;
   accountable_human_id?: string | null;
@@ -110,6 +125,7 @@ export interface MissionTeamAssignment {
 }
 
 interface SelectionCandidate {
+  profile: AgentProfileRecord;
   agentId: string;
   authorityRole: string;
   authorityRecord: AuthorityRoleRecord;
@@ -291,6 +307,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         return [
           {
             agentId,
+            profile,
             authorityRole,
             authorityRecord,
             resolvedTarget,
@@ -316,6 +333,12 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       required: true,
       status: 'assigned',
       agent_id: winner.agentId,
+      ...(winner.profile.instance_of
+        ? {
+            instance_of: winner.profile.instance_of,
+            instance_index: winner.profile.instance_index,
+          }
+        : {}),
       // NI-01: canonical durable-identity name for the selected agent
       // (kyberion://agent/<org>/<slug>). Pure derivation — the provisioned
       // ledger record is ensured downstream at staffing/spawn time.
