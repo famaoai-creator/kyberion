@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APPROVAL_CHANGE_INSTRUCTION_MAX } from './approval-store.js';
+import { APPROVAL_CHANGE_INSTRUCTION_MAX } from '../governance/approval-store.js';
 import {
   buildSlackApprovalBlocks,
   buildSlackChangeRequestModal,

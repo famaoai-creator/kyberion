@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selectAgentForTeamRole } from './team-role-assignment-selection.js';
+import type { WorkforceLoadIndex } from '../workforce/workforce-load.js';
 
 describe('team-role assignment selection', () => {
   it('prefers a capability-matching preferred agent', () => {
@@ -175,5 +176,80 @@ describe('team-role assignment selection', () => {
     expect(assignment.agent_id).toBe('relationship-curator');
     expect(assignment.provider).toBeTruthy();
     expect(assignment.modelId).toBeTruthy();
+  });
+});
+
+describe('agent instance pools (NHI scale-out)', () => {
+  const baseProfile = {
+    authority_roles: ['mission_controller'],
+    team_roles: ['planner'],
+    capabilities: ['planning'],
+    selection_hints: {
+      preferred_provider: 'gemini',
+      preferred_modelId: 'auto-gemini-3',
+    },
+    provider_strategy: 'strict' as const,
+  };
+
+  const input = (loadIndex?: WorkforceLoadIndex) => ({
+    teamRole: 'planner',
+    teamRoleRecord: {
+      description: 'Planner role',
+      required_capabilities: ['planning'],
+      compatible_authority_roles: ['mission_controller'],
+      allowed_delegate_team_roles: [],
+      escalation_parent_team_role: null,
+      required_scope_classes: ['mission_state'],
+      ownership_scope: 'Plans the mission.',
+      autonomy_level: 'high',
+    },
+    authorityRoles: {
+      mission_controller: {
+        description: 'Mission controller',
+        write_scopes: ['mission_state.write'],
+        scope_classes: ['mission_state'],
+        allowed_actuators: [],
+        tier_access: ['public'],
+      },
+    },
+    agents: {
+      'planner-agent': { ...baseProfile, instance_of: 'planner-agent', instance_index: 1 },
+      'planner-agent-2': { ...baseProfile, instance_of: 'planner-agent', instance_index: 2 },
+    },
+    ...(loadIndex ? { loadIndex } : {}),
+  });
+
+  it('picks a free instance when the sibling is saturated by observed load', () => {
+    const loadIndex: WorkforceLoadIndex = new Map([
+      [
+        'planner-agent',
+        {
+          resource_id: 'planner-agent',
+          status: 'busy',
+          active_work_items: 3,
+          queued_work_items: 8,
+          active_leases: 1,
+          leased_scopes: [],
+          observed_at: '2026-09-28T00:00:00.000Z',
+        },
+      ],
+    ]);
+
+    const assignment = selectAgentForTeamRole(input(loadIndex));
+
+    expect(assignment.status).toBe('assigned');
+    expect(assignment.agent_id).toBe('planner-agent-2');
+    expect(assignment.instance_of).toBe('planner-agent');
+    expect(assignment.instance_index).toBe(2);
+    // Each clone is its own canonical NHI.
+    expect(assignment.runtime_identity).toMatch(
+      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/planner-agent-2$/
+    );
+  });
+
+  it('prefers the base id on a tie when no load exists', () => {
+    const assignment = selectAgentForTeamRole(input());
+    expect(assignment.agent_id).toBe('planner-agent');
+    expect(assignment.instance_of).toBe('planner-agent');
   });
 });

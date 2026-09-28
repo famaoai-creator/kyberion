@@ -187,10 +187,34 @@ export function loadTeamRoleIndex(rootDir?: string): Record<string, TeamRoleReco
   return loadTeamRoleDirectory(rootDir) || loadTeamRoleSnapshot(rootDir);
 }
 
+/**
+ * Expand `instance_count > 1` profiles into NHI instances (`<id>-2..-N`).
+ * Every clone shares the base profile's fields except instance metadata —
+ * each is a distinct accountable NHI, so `selectAgentForTeamRole` scores them
+ * independently and the load penalty distributes work across free instances.
+ */
+export function expandAgentProfileInstances(
+  profiles: Record<string, AgentProfileRecord>
+): Record<string, AgentProfileRecord> {
+  const expanded: Record<string, AgentProfileRecord> = {};
+  for (const [agentId, profile] of Object.entries(profiles)) {
+    const count = Math.max(1, Math.min(8, Math.floor(profile.instance_count ?? 1)));
+    expanded[agentId] = { ...profile, instance_of: agentId, instance_index: 1 };
+    for (let index = 2; index <= count; index += 1) {
+      expanded[`${agentId}-${index}`] = {
+        ...profile,
+        instance_of: agentId,
+        instance_index: index,
+      };
+    }
+  }
+  return expanded;
+}
+
 export function loadAgentProfileIndex(rootDir?: string): Record<string, AgentProfileRecord> {
   const directoryProfiles = loadAgentProfileDirectory(rootDir);
-  if (directoryProfiles) return directoryProfiles;
-  return loadAgentProfileSnapshot(rootDir);
+  if (directoryProfiles) return expandAgentProfileInstances(directoryProfiles);
+  return expandAgentProfileInstances(loadAgentProfileSnapshot(rootDir));
 }
 
 export function loadMissionTeamTemplates(
