@@ -6,11 +6,12 @@
  * current environment.
  */
 
+import path from 'node:path';
 import { logger } from '../core.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExec, safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
+import { safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
 import {
   loadActuatorManifest,
   loadActuatorManifestCatalog,
@@ -78,13 +79,36 @@ function compareActuatorCatalogOrder(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
-function hasBinary(binary: string): boolean {
-  try {
-    safeExec('which', [binary], { timeoutMs: 3000 });
-    return true;
-  } catch {
-    return false;
+// `which` costs one spawned process per call; scanning PATH entries with stat
+// checks is milliseconds for the whole manifest set. PATHEXT covers Windows
+// .cmd/.exe shims just like `where`.
+const binaryPresenceCache = new Map<string, boolean>();
+let pathDirsCache: string[] | null = null;
+const PATHEXT_EXTENSIONS =
+  process.platform === 'win32'
+    ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').toLowerCase().split(';')
+    : [''];
+
+function binarySearchDirs(): string[] {
+  if (!pathDirsCache) {
+    pathDirsCache = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   }
+  return pathDirsCache;
+}
+
+function hasBinary(binary: string): boolean {
+  const cached = binaryPresenceCache.get(binary);
+  if (cached !== undefined) return cached;
+  const lower = binary.toLowerCase();
+  const variants =
+    PATHEXT_EXTENSIONS.some((ext) => lower.endsWith(ext)) && process.platform === 'win32'
+      ? [binary]
+      : PATHEXT_EXTENSIONS.map((ext) => binary + ext);
+  const present = binarySearchDirs().some((dir) =>
+    variants.some((name) => safeExistsSync(path.join(dir, name)))
+  );
+  binaryPresenceCache.set(binary, present);
+  return present;
 }
 
 function envRequirementMet(name: string): boolean {
@@ -235,20 +259,22 @@ export async function checkAllActuatorCapabilities(
         allowMissingLeaf: true,
       })
     : assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
-  const results: ActuatorStatus[] = [];
-
   const catalog = loadActuatorManifestCatalog(dir);
-  for (const entry of catalog) {
-    try {
-      const status = await checkActuatorCapabilities(
-        entry.n,
-        assertSafeRepositoryPath(pathResolver.rootResolve(entry.manifest_path))
-      );
-      results.push(status);
-    } catch (e: any) {
-      logger.error(`Failed to check ${entry.n}: ${e.message}`);
-    }
-  }
+  const results: ActuatorStatus[] = (
+    await Promise.all(
+      catalog.map(async (entry) => {
+        try {
+          return await checkActuatorCapabilities(
+            entry.n,
+            assertSafeRepositoryPath(pathResolver.rootResolve(entry.manifest_path))
+          );
+        } catch (e: any) {
+          logger.error(`Failed to check ${entry.n}: ${e.message}`);
+          return null;
+        }
+      })
+    )
+  ).filter((status): status is ActuatorStatus => status !== null);
 
   return results.sort((left, right) =>
     compareActuatorCatalogOrder(left.actuatorId, right.actuatorId)
