@@ -4,7 +4,7 @@
     {
       "mode": "grok-api",
       "provider": "grok-api",
-      "module": "./reasoning-api-provider",
+      "module": "./reasoning/reasoning-api-provider",
       "capabilities": {
         "reasoning": true,
         "structured_output": true,

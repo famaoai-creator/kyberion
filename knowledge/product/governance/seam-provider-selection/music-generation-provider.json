@@ -15,7 +15,7 @@
           "traits": { "quality": 0.5, "speed": 0.5 },
           "trait_basis": { "quality": "declared", "speed": "declared" },
           "evidence": [
-            "libs/core/music-generation-bridge.ts (LocalMusicGenMlxGenerationProvider: local_only, self_hosted, Apple Silicon only, wav, max duration from KYBERION_MUSICGEN_MAX_DURATION_SEC, default 30s)",
+            "libs/core/media/music-generation-bridge.ts (LocalMusicGenMlxGenerationProvider: local_only, self_hosted, Apple Silicon only, wav, max duration from KYBERION_MUSICGEN_MAX_DURATION_SEC, default 30s)",
             "Neutral declared values: no comparison with stable_audio_3 exists yet. Differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
           ]
         },
@@ -23,7 +23,7 @@
           "traits": { "quality": 0.5, "speed": 0.5 },
           "trait_basis": { "quality": "declared", "speed": "declared" },
           "evidence": [
-            "libs/core/music-generation-bridge.ts (LocalStableAudioGenerationProvider: local_only, self_hosted, any platform, wav, max duration from KYBERION_STABLE_AUDIO_MAX_DURATION_SEC, default 120s)",
+            "libs/core/media/music-generation-bridge.ts (LocalStableAudioGenerationProvider: local_only, self_hosted, any platform, wav, max duration from KYBERION_STABLE_AUDIO_MAX_DURATION_SEC, default 120s)",
             "Neutral declared values: no comparison with musicgen_mlx exists yet. Differentiate with `pnpm kyberion seam select calibrate --seam music-generation-provider` and record the result (rules set / apply-measurements)."
           ]
         }

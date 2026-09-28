@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertReadableOfficeBytes, readDocument } from '@agent/core/document-reader';
+import { assertReadableOfficeBytes, readDocument } from '@agent/core/media/document-reader';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,

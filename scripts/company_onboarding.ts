@@ -9,7 +9,7 @@ import {
   readTenantProfile,
   tenantProfilePath,
   writeTenantProfile,
-} from '@agent/core/tenant-registry';
+} from '@agent/core/organization/tenant-registry';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -19,8 +19,8 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { applyOnboardingContextBinding } from '@agent/core/onboarding-context';
-import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
+import { applyOnboardingContextBinding } from '@agent/core/organization/onboarding-context';
+import { loadOrganizationProfileAtPath } from '@agent/core/organization/organization-profile';
 import {
   getRegisteredEnvText,
   nowIso,

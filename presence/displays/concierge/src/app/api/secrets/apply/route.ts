@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { applySecretIntroduction } from '@agent/core/secret-introduction';
+import { applySecretIntroduction } from '@agent/core/secret/secret-introduction';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';

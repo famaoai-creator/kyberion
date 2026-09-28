@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { generateNativePptx, generateNativeXlsx } from '@agent/core/media-contracts';
+import { generateNativePptx, generateNativeXlsx } from '@agent/core/media/media-contracts';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync } from '@agent/core/secure-io';
-import type { PptxDesignProtocol, XlsxDesignProtocol } from '@agent/core/media-contracts';
+import type { PptxDesignProtocol, XlsxDesignProtocol } from '@agent/core/media/media-contracts';
 import { extract } from './extraction-engine.js';
 
 function createTestPptxProtocol(): PptxDesignProtocol {

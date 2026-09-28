@@ -10,7 +10,7 @@ import {
 import { metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,

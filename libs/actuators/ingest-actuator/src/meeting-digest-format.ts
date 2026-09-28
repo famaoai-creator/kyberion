@@ -56,6 +56,7 @@ export interface MeetingDigestFrontmatter {
   summary_status: MeetingDigestSummaryStatus;
 }
 
+// i18n-exempt: JA meeting-digest output labels (product language)
 export const NONE_JA = 'なし';
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -230,6 +231,7 @@ export function parseMarkdownDoc(markdown: string): ParsedMarkdownDoc {
 // ---------------------------------------------------------------------------
 
 function tableCell(value: string): string {
+  // i18n-exempt: JA meeting-digest output labels (product language)
   return oneLine(value).replace(/\|/g, '｜') || '記載なし';
 }
 
@@ -239,6 +241,7 @@ function bulletSection(heading: string, items: string[]): string {
 }
 
 /** Blockquote under the H1 of a provisional digest (matches the backfill files). */
+// i18n-exempt: JA meeting-digest output labels (product language)
 export const PROVISIONAL_NOTE = '> 暫定版。ページは編集中のため内容が変わる可能性がある。';
 /** Suffix of a provisional digest's one-line index entry. */
 export const PROVISIONAL_SUFFIX = '（暫定版）';
@@ -272,6 +275,7 @@ export function renderDigestBody(
   const reviews =
     summary.reviews.length > 0
       ? [
+          // i18n-exempt: JA meeting-digest output labels (product language)
           '| 区分 | チケット | 件名 | 結果 |',
           '| --- | --- | --- | --- |',
           ...summary.reviews.map(
@@ -283,12 +287,15 @@ export function renderDigestBody(
   return [
     heading,
     bulletSection('要旨', summary.gist.slice(0, 3)),
+    // i18n-exempt: JA meeting-digest output labels (product language)
     `## 新規インシデント\n${incidents}`,
     `## 申請審査\n${reviews}`,
     bulletSection('新規検討事項', summary.new_topics),
     bulletSection('継続検討事項', summary.ongoing_topics),
     bulletSection('決定事項', summary.decisions),
+    // i18n-exempt: JA meeting-digest output labels (product language)
     bulletSection('アクション', summary.actions),
+    // i18n-exempt: JA meeting-digest output labels (product language)
     bulletSection('委員会(月次)への上程候補', summary.committee_candidates),
   ].join('\n\n');
 }
@@ -313,8 +320,10 @@ export interface MeetingIndexRow {
   file?: string;
 }
 
+// i18n-exempt: JA meeting-digest output labels (product language)
 export const OPEN_ISSUES_HEADING = '継続中の論点';
 export const INDEX_HEADING = '索引';
+// i18n-exempt: JA meeting-digest output labels (product language)
 const INDEX_HEADER = '| 日付 | 要旨(一行) | インシデント | ファイル |';
 const INDEX_SEPARATOR = '| --- | --- | --- | --- |';
 
@@ -322,6 +331,7 @@ export function incidentCell(summary: MeetingDigestSummary): string {
   if (summary.incidents.length === 0) return NONE_JA;
   const first = summary.incidents[0].headline;
   const short = first.length > 40 ? `${first.slice(0, 40)}…` : first;
+  // i18n-exempt: JA meeting-digest output labels (product language)
   return summary.incidents.length > 1 ? `${short} ほか${summary.incidents.length - 1}件` : short;
 }
 

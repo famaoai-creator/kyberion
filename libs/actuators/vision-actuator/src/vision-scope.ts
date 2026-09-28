@@ -1,7 +1,10 @@
 import * as path from 'node:path';
 import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
-import { inferImagePayloadTier, type PayloadTier } from '@agent/core/image-description-bridge';
-import { tenantOfPath } from '@agent/core/video-ingest';
+import {
+  inferImagePayloadTier,
+  type PayloadTier,
+} from '@agent/core/media/image-description-bridge';
+import { tenantOfPath } from '@agent/core/video/ingest';
 
 /**
  * Tier and scope for perception ops that write derived artifacts (crops,

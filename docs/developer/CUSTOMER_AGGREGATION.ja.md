@@ -128,12 +128,12 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 - [x] onboarding wizard 統合
 - [x] 移行ヘルパ
 - [ ] 各 caller のオーバーレイ対応
-  - [x] connections consumer (`libs/core/service-engine.ts`)
-  - [x] policy consumer (`libs/core/approval-policy.ts`)
-  - [x] mission seeds consumer (`libs/core/mission-seed-registry.ts`)
-  - [x] voice profile registry consumer (`libs/core/voice-profile-registry.ts`)
+  - [x] connections consumer (`libs/core/service/service-engine.ts`)
+  - [x] policy consumer (`libs/core/governance/approval-policy.ts`)
+  - [x] mission seeds consumer (`libs/core/mission/mission-seed-registry.ts`)
+  - [x] voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)
   - [x] vital check consumer (`scripts/vital_check.ts`)
   - [x] baseline check consumer (`scripts/run_baseline_check.ts`)
 - [x] onboarding apply consumer (`scripts/onboarding_apply.ts`)
-- [x] slack onboarding consumer (`libs/core/slack-onboarding.ts`)
+- [x] slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)
   - [x] mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)

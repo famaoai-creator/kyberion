@@ -96,7 +96,7 @@ PR #603 の CI は tracked な `pipelines/meeting-minutes-generator.json` に残
 
 以下のローカル変更はこの計画の成果物ではなく、引き続き commit へ含めない。
 
-- `libs/core/src/types/meeting-operations-profile.ts`
+- `libs/core/contracts/meeting-operations-profile.ts`
 - `pipelines/meeting-minutes-generator.json`
 - `pipelines/notion-oauth-test.json`
 - `evidence/` および `knowledge/product/evolution/` の未追跡ファイル

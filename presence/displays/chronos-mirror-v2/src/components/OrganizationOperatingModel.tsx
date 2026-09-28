@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import type { KbFlowProps, KbStatus, KbTone } from '@agent/core/a2ui-catalog';
+import type { KbFlowProps, KbStatus, KbTone } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
   Button,

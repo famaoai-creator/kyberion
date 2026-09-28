@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readTenantProfile, listTenantProfileSlugs } from './tenant-registry.js';
+import { readTenantProfile, listTenantProfileSlugs } from './organization/tenant-registry.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { logger } from './core.js';
 

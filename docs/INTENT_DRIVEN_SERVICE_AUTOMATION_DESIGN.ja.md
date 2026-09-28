@@ -173,7 +173,7 @@ pnpm kyberion service recording promote --recording <path> --procedure-id <id> -
   ```
 - **取得方法**：現在は `ServiceRecordingSession` に明示的な `service_recording_session_id` を渡した `service:preset` 呼び出しと、fixtureを受け取る `service_recording capture` CLIを実装済み。audit-chain/traceからの自動正規化は残課題。
 - **redaction**：`params` は固定値・`{{input.*}}`・`{{channel.*}}`・`{{secret.*}}` のいずれかとして保存する。raw secretは保存せず、結果もshape（kind/keys/array_length）のみ保存する。
-- **対象ファイル**：`libs/core/service-recording.ts`, `libs/core/service-recording-session.ts`, `libs/core/service-recording-compiler.ts`, `libs/core/service-distill-candidate.ts`, `scripts/service_recording.ts`, `knowledge/product/schemas/service-recording.schema.json`
+- **対象ファイル**：`libs/core/service/service-recording.ts`, `libs/core/service/service-recording-session.ts`, `libs/core/service/service-recording-compiler.ts`, `libs/core/service/service-distill-candidate.ts`, `scripts/service_recording.ts`, `knowledge/product/schemas/service-recording.schema.json`
 - **受入条件**：未定義 actionは記録できず、secret binding・入力不足・channel順序不整合はwarning/validationで昇格を止める。token/clientSecret等がrecording/traceに残らず、produces/consumesがADFへ連結される。
 
 ---
@@ -210,19 +210,19 @@ pnpm kyberion service recording promote --recording <path> --procedure-id <id> -
 ### Layer③ コンパイラ（録画→draft pipeline、**簡素版**）
 
 - **要件**：`service-recording.v1` を `service:preset` ステップ列の draft pipeline へ変換。**ref→selector 解決は不要**（service の最大の利点）。
-- **実装**：`libs/core/service-recording-compiler.ts`。`scripts/service_recording.ts compile` がADF/guardrail preflightを実行する。
+- **実装**：`libs/core/service/service-recording-compiler.ts`。`scripts/service_recording.ts compile` がADF/guardrail preflightを実行する。
   - `kind:input` → `{{input.*}}`、`kind:template` → 既存出力チャネル参照（`consumes`）、`kind:secret` → `auth:"secret-guard"` ＋ `required_secrets`。
   - `produces`/`consumes` を pipeline の channel に落とす（既存 pipeline の `produces.channel`/`consumes` 規約に準拠）。
   - **dry-run**：副作用なしで確認するため、各 action の `parameters.required` を service harnessのoperation契約と突合する。external-effectは試走せず、ADFには `core:await_decision` を前置する。
   - `extractGoldenScenario`：各 step の `output_mapping`（例 jira `create_issue` → `issue_key`）を成功表明として §6.4 形式で同梱。
-- **対象ファイル**：`libs/core/service-recording-compiler.ts`, `scripts/service_recording.ts`, `pipelines/service/*.json`（promotion時に生成）。専用templateは未作成。
+- **対象ファイル**：`libs/core/service/service-recording-compiler.ts`, `scripts/service_recording.ts`, `pipelines/service/*.json`（promotion時に生成）。専用templateは未作成。
 - **受入条件**：全stepのactionがpresetに存在し、required param不足はwarningになる。external-effectをdry-runで発火させず、draftは `_draft:true` のままレビューまで昇格しない。promotion後は `_draft` を除去し、実行ADFには承認gateを残す。
 
 ### Layer C 実行アダプタ — **既存 `service:preset` を再利用**
 
 - **要件**：`ProcedureResolution(matched)` を受け、step 列を `service:preset` で順に実行。
-- **実装**：`libs/core/procedure-dispatcher.ts` は録画のschema/semantic validation、review、service allowlist、approval gateを実行する。ADF直接実行側には `core:await_decision` を追加し、`service:preset` へ到達する前に停止する。
-- **対象ファイル**：`libs/core/procedure-dispatcher.ts`, `libs/actuators/service-actuator/src/service-actuator-helpers.ts`, `libs/core/service-procedure-executor.ts`
+- **実装**：`libs/core/knowledge/procedure-dispatcher.ts` は録画のschema/semantic validation、review、service allowlist、approval gateを実行する。ADF直接実行側には `core:await_decision` を追加し、`service:preset` へ到達する前に停止する。
+- **対象ファイル**：`libs/core/knowledge/procedure-dispatcher.ts`, `libs/actuators/service-actuator/src/service-actuator-helpers.ts`, `libs/core/service/service-procedure-executor.ts`
 - **受入済み**：未承認のexternal-effectはprocedure/ADFの両経路でブロック。produces/consumesとsecret placeholderを検証する。3サービス実サービスE2Eとgrant失効からの再開は未検証。
 
 ### Layer⑤ 認証ゲート（ブラウザ MFA 中継に相当）— **既存 `secret-guard` を再利用**
@@ -262,13 +262,13 @@ service アダプタは browser とファイルが分離されるので、**brow
 
 現在の実装ファイルと残課題の対応は次のとおり。
 
-| 領域               | 現在の実装                                                                                                   | 状態                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| Recorder           | `libs/core/service-recording-session.ts`, `scripts/service_recording.ts`, service actuatorの明示session hook | 実装済み。audit/trace自動取り込みは未実装   |
-| Compiler/Promotion | `libs/core/service-recording-compiler.ts`, `libs/core/service-procedure-promotion.ts`                        | 実装済み。承認gate付きADFを生成             |
-| Dispatcher/Risk    | `libs/core/procedure-dispatcher.ts`, `service:external_effect`, `core:await_decision`                        | 実装済み                                    |
-| Distill/Repair     | `libs/core/service-distill-candidate.ts`, `libs/core/distill-candidate-registry.ts`                          | 候補評価・生成は実装済み。delta修復は未実装 |
-| Auth relay         | `secret-guard` placeholder拒否                                                                               | grant承認中継・再開は未実装                 |
+| 領域               | 現在の実装                                                                                                           | 状態                                        |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Recorder           | `libs/core/service/service-recording-session.ts`, `scripts/service_recording.ts`, service actuatorの明示session hook | 実装済み。audit/trace自動取り込みは未実装   |
+| Compiler/Promotion | `libs/core/service/service-recording-compiler.ts`, `libs/core/service/service-procedure-promotion.ts`                | 実装済み。承認gate付きADFを生成             |
+| Dispatcher/Risk    | `libs/core/knowledge/procedure-dispatcher.ts`, `service:external_effect`, `core:await_decision`                      | 実装済み                                    |
+| Distill/Repair     | `libs/core/service/service-distill-candidate.ts`, `libs/core/knowledge/distill-candidate-registry.ts`                | 候補評価・生成は実装済み。delta修復は未実装 |
+| Auth relay         | `secret-guard` placeholder拒否                                                                                       | grant承認中継・再開は未実装                 |
 
 > Layer①/④ 本体は browser チーム（Agent-A/D）が実装する共有層。service チームは**その上に乗るアダプタだけ**を作る。`procedure-dispatcher.ts` は browser(Agent-C) と service(Agent-S3) が触るため、**substrate 分岐で関数を分け、同一ブロックを編集しない**こと（衝突回避はマスター §9 に従う）。
 

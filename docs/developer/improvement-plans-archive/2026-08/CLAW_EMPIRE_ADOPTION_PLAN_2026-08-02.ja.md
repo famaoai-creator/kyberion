@@ -67,7 +67,7 @@ claw-empire は自己ホスト型の「AI エージェント会社シミュレ�
 
 **claw-empire の設計**: 単一 WS チャネルに 15 イベント種。サーバ hub が**種別ごとのバッチ窓**(`cli_output` 250ms、`subtask_update` 150ms。初発は即時、キュー上限 60 で最古 shed)を持つ。クライアントは `on(type, handler)` の宣言的購読。
 
-**kyberion の現状**: 発生源は揃っている — `WorkerEventStream`(`libs/core/worker-event-stream.ts`、zod 検証済み 20 種イベント + JSONL recorder)、agent-collaboration-event v1 + 決定的 projection、mission-control イベントログ、heartbeats、run graphs。しかし **WorkerEventStream はプロセスローカル**(`Symbol.for` のプロセスグローバル)で別プロセスの UI は購読できず、全 UI がディスク上の JSONL ポーリングへ縮退している。UX-07 Phase 3 で `/api/collaboration/stream`(SSE)は**明示的に先送りされたまま未実装**。
+**kyberion の現状**: 発生源は揃っている — `WorkerEventStream`(`libs/core/workforce/worker-event-stream.ts`、zod 検証済み 20 種イベント + JSONL recorder)、agent-collaboration-event v1 + 決定的 projection、mission-control イベントログ、heartbeats、run graphs。しかし **WorkerEventStream はプロセスローカル**(`Symbol.for` のプロセスグローバル)で別プロセスの UI は購読できず、全 UI がディスク上の JSONL ポーリングへ縮退している。UX-07 Phase 3 で `/api/collaboration/stream`(SSE)は**明示的に先送りされたまま未実装**。
 
 **実装**(= UX-07 の先送り分の実装を、claw-empire の hub 仕様で行う):
 

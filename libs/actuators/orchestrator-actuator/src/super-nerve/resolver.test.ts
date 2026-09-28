@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveIntentToSteps } from './resolver.js';
-import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 
 describe('super-nerve resolver stop-service flow', () => {
   it('lists running services when no target service is specified', async () => {

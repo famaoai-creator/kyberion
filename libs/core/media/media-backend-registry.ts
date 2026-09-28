@@ -1,0 +1,518 @@
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { clamp } from '../foundation/text.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  loadRegistryDirectory,
+  resolveRegistryDirectory,
+  type RegistryDirectoryOptions,
+} from '../registry-directory.js';
+import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
+import { probeServiceRuntime } from '../service/service-runtime-registry.js';
+import { probeAppleImageGeneration } from '../apple-intelligence-bridge.js';
+import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
+import {
+  getVoiceEngineRegistry,
+  resolveVoiceEngineForPlatform,
+  type VoiceEngineRecord,
+} from '../voice/voice-engine-registry.js';
+
+export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
+export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
+export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local' | 'agent_tool';
+export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
+export type MediaBackendProbeKind =
+  'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
+
+export interface MediaBackendRecord {
+  backend_id: string;
+  modality: MediaBackendModality;
+  display_name: string;
+  kind: MediaBackendKind;
+  provider: string;
+  status: MediaBackendStatus;
+  platforms: MediaBackendPlatform[];
+  supports: {
+    artifact_formats?: string[];
+    async?: boolean;
+    playback?: boolean;
+    mux_audio?: boolean;
+  };
+  service_id?: string;
+  action?: string;
+  model?: string;
+  api_key_env?: string;
+  endpoint_env?: string;
+  command?: string;
+  args?: string[];
+  fallback_backend_id?: string;
+  cost_tier?: 'free' | 'paid' | 'self_hosted' | 'environment';
+  data_policy?: 'training_eligible' | 'zero_retention' | 'local_only';
+  execution_locality?: 'local' | 'remote' | 'hybrid';
+  notes?: string;
+}
+
+export interface MediaBackendRegistry {
+  version: string;
+  default_backend_ids: Record<MediaBackendModality, string>;
+  backends: MediaBackendRecord[];
+}
+
+export interface MediaBackendAvailability {
+  backend_id: string;
+  modality: MediaBackendModality;
+  available: boolean;
+  probe_kind: MediaBackendProbeKind;
+  reason: string;
+  probe_id: string;
+  probed_at: string;
+  cache_expires_at: string;
+  cache_hit: boolean;
+}
+
+export interface MediaBackendProbeOptions {
+  force?: boolean;
+  ttl_ms?: number;
+}
+
+type UncachedMediaBackendAvailability = Omit<
+  MediaBackendAvailability,
+  'probe_id' | 'probed_at' | 'cache_expires_at' | 'cache_hit'
+>;
+
+interface MediaBackendProbeCacheEntry {
+  value: MediaBackendAvailability;
+  expires_at_ms: number;
+  in_flight?: Promise<MediaBackendAvailability>;
+}
+
+const mediaBackendProbeCache = new Map<string, MediaBackendProbeCacheEntry>();
+let mediaBackendProbeSequence = 0;
+
+export function resetMediaBackendAvailabilityCache(): void {
+  mediaBackendProbeCache.clear();
+}
+
+export function _resetMediaBackendAvailabilityCacheForTests(): void {
+  resetMediaBackendAvailabilityCache();
+}
+
+function defaultMediaBackendProbeTtlMs(): number {
+  const configured = Number(getRegisteredEnvText('KYBERION_MEDIA_BACKEND_PROBE_TTL_MS') || 30_000);
+  return Number.isFinite(configured) ? clamp(configured, 1_000, 300_000) : 30_000;
+}
+
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/media-backends');
+const MEDIA_BACKEND_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/media-backend-registry.schema.json'
+);
+let cachedRegistryKey: string | null = null;
+let cachedRegistry: MediaBackendRegistry | null = null;
+
+const mediaBackendDirectoryOptions: RegistryDirectoryOptions = {
+  id: 'media-backend-registry',
+  dirPath: DEFAULT_REGISTRY_DIR,
+  schemaPath: MEDIA_BACKEND_REGISTRY_SCHEMA_PATH,
+  arrayKey: 'backends',
+  idKey: 'backend_id',
+  envDirVar: 'KYBERION_MEDIA_BACKEND_REGISTRY_DIR',
+  envPathVar: 'KYBERION_MEDIA_BACKEND_REGISTRY_PATH',
+};
+
+function inferVoiceBackendRecords(): MediaBackendRecord[] {
+  return getVoiceEngineRegistry().engines.map((engine) => mapVoiceEngineToBackend(engine));
+}
+
+function mapVoiceEngineToBackend(engine: VoiceEngineRecord): MediaBackendRecord {
+  return {
+    backend_id: `voice.${engine.engine_id}`,
+    modality: 'voice',
+    display_name: engine.display_name,
+    kind: engine.kind === 'voice_clone_service' ? 'api' : 'local',
+    provider: engine.provider,
+    status: engine.status,
+    platforms: engine.platforms,
+    supports: {
+      playback: engine.supports.playback,
+      artifact_formats: engine.supports.artifact_formats,
+    },
+    fallback_backend_id: engine.fallback_engine_id
+      ? `voice.${engine.fallback_engine_id}`
+      : undefined,
+    notes: engine.notes,
+  };
+}
+
+function mergeVoiceBackends(backends: MediaBackendRecord[]): MediaBackendRecord[] {
+  const voiceBackends = inferVoiceBackendRecords();
+  const existing = new Set(backends.map((backend) => backend.backend_id));
+  const merged = [...backends];
+  for (const backend of voiceBackends) {
+    if (!existing.has(backend.backend_id)) {
+      merged.push(backend);
+    }
+  }
+  return merged;
+}
+
+function resolveVoiceBackendRecord(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  const engine = resolveVoiceEngineForPlatform(
+    backendId?.replace(/^voice\./u, '') || undefined,
+    platform
+  );
+  return mapVoiceEngineToBackend(engine);
+}
+
+function getRegistry(): MediaBackendRegistry {
+  const { dir, singleFile } = resolveRegistryDirectory(mediaBackendDirectoryOptions);
+  const registryKey = singleFile || (dir as string);
+  if (cachedRegistryKey === registryKey && cachedRegistry) return cachedRegistry;
+  const { headers, items } = loadRegistryDirectory<MediaBackendRecord>(
+    mediaBackendDirectoryOptions
+  );
+  cachedRegistryKey = registryKey;
+  cachedRegistry = {
+    version: String(headers['version'] ?? '1.0.0'),
+    default_backend_ids: headers['default_backend_ids'] as Record<MediaBackendModality, string>,
+    backends: mergeVoiceBackends(items),
+  };
+  return cachedRegistry;
+}
+
+export function getMediaBackendRegistry(): MediaBackendRegistry {
+  return getRegistry();
+}
+
+export function resetMediaBackendRegistryCache(): void {
+  cachedRegistryKey = null;
+  cachedRegistry = null;
+}
+
+export function listMediaBackends(modality?: MediaBackendModality): MediaBackendRecord[] {
+  const registry = getRegistry();
+  const backends = registry.backends.length > 0 ? registry.backends : mergeVoiceBackends([]);
+  return modality ? backends.filter((backend) => backend.modality === modality) : backends;
+}
+
+export function getMediaBackendRecord(
+  backendId?: string,
+  modality?: MediaBackendModality
+): MediaBackendRecord {
+  const registry = getRegistry();
+  const configuredDefault =
+    modality && modality !== 'voice' ? getAdapterDefault(`media.${modality}`) : undefined;
+  const defaultBackendId = modality
+    ? configuredDefault || registry.default_backend_ids[modality]
+    : undefined;
+  const resolvedId = backendId || defaultBackendId || registry.default_backend_ids.image;
+  const aliasId =
+    modality === 'video' && resolvedId === 'media-generation.comfyui'
+      ? 'media-generation.comfyui.video'
+      : modality === 'music' && resolvedId === 'media-generation.comfyui'
+        ? 'media-generation.comfyui.music'
+        : modality === 'image' && resolvedId === 'local_flux'
+          ? 'media-generation.local_flux'
+          : modality === 'image' && resolvedId === 'apple_playground'
+            ? 'media-generation.apple_playground'
+            : modality === 'music' &&
+                (resolvedId === 'musicgen_mlx' || resolvedId === 'media-generation.musicgen_mlx')
+              ? 'media-generation.musicgen_mlx'
+              : modality === 'music' &&
+                  (resolvedId === 'stable_audio_3' ||
+                    resolvedId === 'stable_audio_3_small_music' ||
+                    resolvedId === 'media-generation.stable_audio_3_small_music')
+                ? 'media-generation.stable_audio_3_small_music'
+                : resolvedId;
+
+  const voiceBackendMatch =
+    aliasId.startsWith('voice.') &&
+    !registry.backends.find((backend) => backend.backend_id === aliasId);
+  if (voiceBackendMatch || modality === 'voice') {
+    return resolveVoiceBackendRecord(aliasId);
+  }
+
+  return (
+    registry.backends.find(
+      (backend) => backend.backend_id === aliasId && (!modality || backend.modality === modality)
+    ) ||
+    registry.backends.find((backend) =>
+      modality ? backend.modality === modality && backend.backend_id === defaultBackendId : false
+    ) ||
+    (modality
+      ? registry.backends.find((backend) => backend.modality === modality)
+      : registry.backends[0])
+  );
+}
+
+function isSupportedPlatform(backend: MediaBackendRecord, platform: NodeJS.Platform): boolean {
+  return (
+    backend.platforms.includes('any') ||
+    backend.platforms.includes(platform as MediaBackendPlatform)
+  );
+}
+
+/**
+ * One availability contract for media backends. The registry remains the
+ * source of truth for identity and modality; governed runtime registries are
+ * the source of truth for live service/tool probes.
+ */
+async function probeMediaBackendAvailabilityUncached(
+  backend: MediaBackendRecord,
+  platform: NodeJS.Platform
+): Promise<UncachedMediaBackendAvailability> {
+  if (backend.status !== 'active') {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `backend status is ${backend.status}`,
+    };
+  }
+  if (!isSupportedPlatform(backend, platform)) {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `backend is not supported on platform ${platform}`,
+    };
+  }
+
+  if (backend.provider === 'comfyui') {
+    const resolution = await probeServiceRuntime('comfyui', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.available,
+      probe_kind: 'service_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'mflux') {
+    const resolution = probeToolRuntime('mflux', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'musicgen_mlx') {
+    const resolution = probeToolRuntime('musicgen_mlx', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'stable_audio_3') {
+    const resolution = probeToolRuntime('stable_audio_3', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'apple_image_playground') {
+    const resolution = await probeAppleImageGeneration();
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.available,
+      probe_kind: 'native_bridge',
+      reason: resolution.reason || 'Image Playground probe completed',
+    };
+  }
+
+  const credentialNames =
+    backend.api_key_env
+      ?.split('|')
+      .map((name) => name.trim())
+      .filter(Boolean) || [];
+  if (
+    credentialNames.length > 0 &&
+    !credentialNames.some((name) => getRegisteredEnvText(name)?.trim())
+  ) {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `required credential ${credentialNames.join(' or ')} is not configured`,
+    };
+  }
+
+  return {
+    backend_id: backend.backend_id,
+    modality: backend.modality,
+    available: true,
+    probe_kind: 'registry',
+    reason: 'no live probe is registered; active registry record is usable',
+  };
+}
+
+export async function probeMediaBackendAvailability(
+  backendId?: string,
+  modality?: MediaBackendModality,
+  platform: NodeJS.Platform = process.platform,
+  options: MediaBackendProbeOptions = {}
+): Promise<MediaBackendAvailability> {
+  const backend = getMediaBackendRecord(backendId, modality);
+  const key = `${backend.backend_id}:${backend.modality}:${platform}`;
+  const now = Date.now();
+  const cached = mediaBackendProbeCache.get(key);
+  if (!options.force && cached?.in_flight) return cached.in_flight;
+  if (!options.force && cached && cached.expires_at_ms > now) {
+    return { ...cached.value, cache_hit: true };
+  }
+
+  const ttlMs = Number.isFinite(options.ttl_ms)
+    ? clamp(Number(options.ttl_ms), 1_000, 300_000)
+    : defaultMediaBackendProbeTtlMs();
+  const probedAt = new Date(now).toISOString();
+  const expiresAt = new Date(now + ttlMs).toISOString();
+  const probeId = `media-probe-${++mediaBackendProbeSequence}`;
+  const probe = probeMediaBackendAvailabilityUncached(backend, platform)
+    .then((value) => {
+      const result: MediaBackendAvailability = {
+        ...value,
+        probe_id: probeId,
+        probed_at: probedAt,
+        cache_expires_at: expiresAt,
+        cache_hit: false,
+      };
+      mediaBackendProbeCache.set(key, { value: result, expires_at_ms: now + ttlMs });
+      return result;
+    })
+    .catch((error: unknown) => {
+      const current = mediaBackendProbeCache.get(key);
+      if (current?.value.probe_id === probeId) mediaBackendProbeCache.delete(key);
+      throw error;
+    });
+  mediaBackendProbeCache.set(key, {
+    value: {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: 'availability probe in flight',
+      probe_id: probeId,
+      probed_at: probedAt,
+      cache_expires_at: expiresAt,
+      cache_hit: false,
+    },
+    expires_at_ms: now + ttlMs,
+    in_flight: probe,
+  });
+  return probe;
+}
+
+/**
+ * Resolve an execution candidate using the same explicit-fallback policy as
+ * the synchronous resolver, while consulting live availability probes.
+ * An unavailable backend without a governed fallback is returned as-is so
+ * the caller can preserve provider-specific error semantics.
+ */
+export async function resolveMediaBackendWithAvailability(
+  modality: MediaBackendModality,
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): Promise<{
+  backend: MediaBackendRecord;
+  availability: MediaBackendAvailability;
+  fallback_used: boolean;
+}> {
+  const visited = new Set<string>();
+  let current = getMediaBackendRecord(backendId, modality);
+  let fallbackUsed = false;
+  while (!visited.has(current.backend_id)) {
+    visited.add(current.backend_id);
+    const availability = await probeMediaBackendAvailability(
+      current.backend_id,
+      modality,
+      platform
+    );
+    if (availability.available) {
+      return { backend: current, availability, fallback_used: fallbackUsed };
+    }
+    if (!current.fallback_backend_id) {
+      return { backend: current, availability, fallback_used: fallbackUsed };
+    }
+    current = getMediaBackendRecord(current.fallback_backend_id, modality);
+    fallbackUsed = true;
+  }
+  const backend = getMediaBackendRecord(backendId, modality);
+  const availability = await probeMediaBackendAvailability(backend.backend_id, modality, platform);
+  return { backend, availability, fallback_used: fallbackUsed };
+}
+
+export function resolveMediaBackendForPlatform(
+  modality: MediaBackendModality,
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  const registry = getRegistry();
+  const configuredDefault =
+    modality !== 'voice' ? getAdapterDefault(`media.${modality}`) : undefined;
+  const defaultBackendId = configuredDefault || registry.default_backend_ids[modality];
+  const visited = new Set<string>();
+  let current = getMediaBackendRecord(backendId || defaultBackendId, modality);
+
+  while (current) {
+    if (visited.has(current.backend_id)) break;
+    visited.add(current.backend_id);
+    if (current.status === 'active' && isSupportedPlatform(current, platform)) {
+      return current;
+    }
+    if (current.fallback_backend_id) {
+      current = getMediaBackendRecord(current.fallback_backend_id, modality);
+      continue;
+    }
+    break;
+  }
+
+  const defaultBackend = getMediaBackendRecord(defaultBackendId, modality);
+  if (defaultBackend.status === 'active' && isSupportedPlatform(defaultBackend, platform)) {
+    return defaultBackend;
+  }
+
+  throw new Error(
+    `No compatible active media backend found for modality=${modality} on platform ${platform}`
+  );
+}
+
+export function resolveImageBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  return resolveMediaBackendForPlatform('image', backendId, platform);
+}
+
+export function resolveVoiceBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  return resolveMediaBackendForPlatform('voice', backendId, platform);
+}
+
+export function resolveVideoBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  return resolveMediaBackendForPlatform('video', backendId, platform);
+}
+
+export function resolveMusicBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  return resolveMediaBackendForPlatform('music', backendId, platform);
+}

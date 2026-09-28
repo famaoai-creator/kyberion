@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
-import { previewPipeline } from './src/pipeline-preview.js';
+import { previewPipeline } from './pipeline/pipeline-preview.js';
 import {
   buildProductivityTaskPlan,
   validateProductivityTaskPlan,
 } from './productivity-task-plan.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { resolveIntentResolutionPacket } from './intent/intent-resolution.js';
 
 const Ajv = AjvModule;
 

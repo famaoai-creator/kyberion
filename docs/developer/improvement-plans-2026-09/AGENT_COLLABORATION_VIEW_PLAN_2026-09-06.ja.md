@@ -15,13 +15,13 @@ status: active
 
 利用者の要望は「hedr のように、各エージェントが連携して動作していく様を把握できる形」。2026-09-06 の read-only 監査の結論は次のとおり。
 
-- **正規化イベントストリームは既にある。** `libs/core/worker-event-stream.ts` が `subagent_begin/end/unavailable`・`approval_request/response`・`mission_event`・`phase_*`・`gate_evaluated` を単一 envelope(`type, ts, seq, source{mission_id,task_id,agent_id,...}, payload`)で `active/shared/logs/worker-events/` に日次 JSONL 記録している。
-- **グラフ投影も既にある。** `libs/core/agent-collaboration-projection.ts` が worker-events + `observability/mission-control/{task,orchestration,agent-runtime-supervisor}-events.jsonl` を `nodes / edges / overview / attention` に合成し、Chronos(`AgentCollaborationBoard`)と terminal-hud(パネル 5)の両方が読んでいる。
+- **正規化イベントストリームは既にある。** `libs/core/workforce/worker-event-stream.ts` が `subagent_begin/end/unavailable`・`approval_request/response`・`mission_event`・`phase_*`・`gate_evaluated` を単一 envelope(`type, ts, seq, source{mission_id,task_id,agent_id,...}, payload`)で `active/shared/logs/worker-events/` に日次 JSONL 記録している。
+- **グラフ投影も既にある。** `libs/core/agent/agent-collaboration-projection.ts` が worker-events + `observability/mission-control/{task,orchestration,agent-runtime-supervisor}-events.jsonl` を `nodes / edges / overview / attention` に合成し、Chronos(`AgentCollaborationBoard`)と terminal-hud(パネル 5)の両方が読んでいる。
 - **したがって新しいイベント源も新しい投影も作らない。** 欠けているのは次の 4 点であり、本計画はその 4 点だけを埋める。
 
 | #   | ギャップ                                | 事実(2026-09-06 実測)                                                                                                                                                                                                                                                            |
 | --- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G1  | 委譲イベントに相関鍵がない              | 記録済み `subagent_begin` は `{dispatcher, profile}` のみ。`subagent_end` と対応付ける ID も、`source.mission_id` も、親 agent もない(`libs/core/agent-dispatch.ts:399-415`、`worker-events-2026-08-15.jsonl` 実サンプル)                                                        |
+| G1  | 委譲イベントに相関鍵がない              | 記録済み `subagent_begin` は `{dispatcher, profile}` のみ。`subagent_end` と対応付ける ID も、`source.mission_id` も、親 agent もない(`libs/core/agent/agent-dispatch.ts:399-415`、`worker-events-2026-08-15.jsonl` 実サンプル)                                                  |
 | G2  | agent→agent エッジが redaction で落ちる | `a2a-bridge.ts:422-435` は `sender / receiver / performative / intent` を emit するが、`agent-collaboration-events.ts` の `SHARED_METADATA_KEYS` に含まれないため disk に残らない。投影のエッジは `mission→task`・`task→agent` のみ(`agent-collaboration-projection.ts:520-533`) |
 | G3  | 投影の読み込みが無制限                  | `readJsonl` は byte 上限なしの全読み。`agent-runtime-supervisor-events.jsonl` は 29MB / 26.6 万行、worker-events は 7.9MB(step イベント 4.4 万件)。HUD パネル 5 はこれを 10 秒ごとに同期実行している                                                                             |
 | G4  | HUD の表示が薄い                        | パネル 5 は `attention.slice(0,5)` を文字列化した 5 行 + overview 1 行のみ。ツリーも drill-down もなく、監視パスに worker-events / mission-control が入っていないので更新は interval 頼み。Chronos の board も統計 + 注意項目のリストでグラフは描いていない                      |
@@ -41,7 +41,7 @@ status: active
 
 ### AC-01: 委譲イベントの相関付け(G1)
 
-`libs/core/agent-dispatch.ts` の `HarnessSubagentDispatcher` と `ProcessSpawnDispatcher` が emit する `subagent_begin / subagent_end / subagent_unavailable` に次を付ける。
+`libs/core/agent/agent-dispatch.ts` の `HarnessSubagentDispatcher` と `ProcessSpawnDispatcher` が emit する `subagent_begin / subagent_end / subagent_unavailable` に次を付ける。
 
 - payload: `delegation_id`(begin で採番し end/unavailable に同じ値)、`parent_agent_id`(delegation chain 末尾 actor、無ければ `requested_by` 相当、無ければ省略)、`agent_id`(子の識別子。native の `thread_id` があればそれ、なければ `${profile}:${delegation_id 先頭 8 桁}`)、`team_role`(= profile)、`provider`、`instruction_summary`(先頭 120 文字、`redactCollaborationSummary` 経由)、`elapsed_ms`(end のみ)。
 - source: `mission_id / task_id` を ambient(delegation chain・現在の mission focus・`options.context`)から埋める。
@@ -67,7 +67,7 @@ status: active
 
 ### AC-04: 連携ツリーの合成(純関数)
 
-新規 `libs/core/agent-collaboration-tree.ts`:
+新規 `libs/core/agent/agent-collaboration-tree.ts`:
 
 ```ts
 export type CollaborationWaitReason =
@@ -139,9 +139,9 @@ export function composeCollaborationTree(
 
 | Wave | 項目          | 担当モデル | ファイル所有権                                                                                                                                                     | ゲート                                                                  |
 | ---- | ------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| 0    | AC-01         | sonnet     | `libs/core/agent-dispatch.ts`, `agent-dispatch.test.ts`                                                                                                            | `vitest libs/core/agent-dispatch*`                                      |
-| 0    | AC-02 + AC-03 | sonnet     | `libs/core/agent-collaboration-events.ts`, `agent-collaboration-projection.ts`, `event-vocabulary.ts`, それぞれの test                                             | `vitest libs/core/agent-collaboration* event-vocabulary*`               |
-| 1    | AC-04         | opus       | `libs/core/agent-collaboration-tree.ts` + test, `index-part-09.ts`, `libs/core/package.json`                                                                       | `tests/core-runtime-import-contract.test.ts`, `check_module_boundaries` |
+| 0    | AC-01         | sonnet     | `libs/core/agent/agent-dispatch.ts`, `agent-dispatch.test.ts`                                                                                                      | `vitest libs/core/agent-dispatch*`                                      |
+| 0    | AC-02 + AC-03 | sonnet     | `libs/core/agent/agent-collaboration-events.ts`, `agent-collaboration-projection.ts`, `event-vocabulary.ts`, それぞれの test                                       | `vitest libs/core/agent-collaboration* event-vocabulary*`               |
+| 1    | AC-04         | opus       | `libs/core/agent/agent-collaboration-tree.ts` + test, `index-part-09.ts`, `libs/core/package.json`                                                                 | `tests/core-runtime-import-contract.test.ts`, `check_module_boundaries` |
 | 2    | AC-05         | sonnet     | `presence/displays/terminal-hud/**`, `user-facing-vocabulary.json`(`tui` domain のみ), `vocabulary-keys.generated.ts`(生成), (root `package.json` は触らない)      | `pnpm test -- --suite tui`, `pnpm check -- --only vocabulary-types`     |
 | 2    | AC-06         | sonnet     | `presence/displays/chronos-mirror-v2/src/app/api/collaboration/**`, `components/AgentCollaborationBoard.tsx`, `user-facing-vocabulary.json`(`chronos` domain のみ) | `tests/chronos-ux-vocabulary-contract.test.ts`                          |
 | 3    | AC-07         | haiku      | docs / knowledge                                                                                                                                                   | `check_improvement_plan_metadata`, link checker                         |
@@ -177,7 +177,7 @@ Wave ごとに orchestrator(Fable)が diff をレビューし、typecheck + 該�
 - 投影 `CollaborationAttentionItem` に `code: 'blocked' | 'waiting_human' | 'review_pending' | 'failure'` を追加。`title` / `next_action` は開発者向け英語の固定文に置き換え(core は user-facing 文言を持たない)、`reason` は従来どおり event summary。
 - `agent-activity-board.ts` の blocker `reason` を英語の固定文 + 構造化フィールド(`dependency_ids?: string[]`)に置き換え、`'(未割当)'` は定数 `UNASSIGNED_AGENT_ID = 'unassigned'` に。
 - surface: terminal-hud(`store/coordination.ts` の attention 行、`store/agent-graph.ts` の detail)と Chronos(`AgentCollaborationBoard.tsx` の attention、`api/agent-activity` の消費者)は `code` / `kind` から vocabulary(`tui_attention_<code>`、`chronos_ac_attention_<code>_title` / `_next`、`*_blocker_<kind>`、`*_unassigned`)で翻訳する。
-- 受入: `grep -n "[ぁ-んァ-ン一-龥]" libs/core/agent-collaboration-projection.ts libs/core/agent-activity-board.ts` が 0 件(コメント除く)。`L` でロケールを切り替えると attention 行が英語になる。
+- 受入: `grep -n "[ぁ-んァ-ン一-龥]" libs/core/agent/agent-collaboration-projection.ts libs/core/agent/agent-activity-board.ts` が 0 件(コメント除く)。`L` でロケールを切り替えると attention 行が英語になる。
 
 ### AC-10: supervisor イベントのローテーション
 
@@ -196,13 +196,13 @@ Wave ごとに orchestrator(Fable)が diff をレビューし、typecheck + 該�
 
 ### 第 2 期 Wave
 
-| Wave | 項目                                                                                                    | 担当   | 所有ファイル                                                                                                                                                          |
-| ---- | ------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A    | AC-08(primitive のみ)                                                                                   | sonnet | `libs/core/secure-io.ts`, その test, `presence/displays/terminal-hud/src/store/tail.ts` + test                                                                        |
-| A    | AC-10(writer・janitor・report-ops/retrospective の読み手・metric スロットル)                            | sonnet | `libs/core/agent-runtime-events.ts`, `storage-janitor.ts`, `report-ops.ts`, `mission-retrospective.ts`, `a2a-bridge.ts`(metric 発行箇所のみ), 各 test, retention 設定 |
-| A    | AC-11(core helper のみ)                                                                                 | sonnet | `libs/core/peer-conversation.ts` + test                                                                                                                               |
-| B    | 投影統合(AC-08 の `readJsonlBounded` 置換、AC-10 の dated 読み、AC-11 の peer source)+ AC-09 の core 側 | opus   | `agent-collaboration-projection.ts`, `agent-activity-board.ts`, 各 test, schema                                                                                       |
-| B    | AC-09 / AC-11 の surface 側                                                                             | sonnet | terminal-hud `store/coordination.ts` `store/agent-graph.ts` + tests、Chronos board / agent-activity route、vocabulary(tui / chronos)                                  |
+| Wave | 項目                                                                                                    | 担当   | 所有ファイル                                                                                                                                                                |
+| ---- | ------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A    | AC-08(primitive のみ)                                                                                   | sonnet | `libs/core/secure-io.ts`, その test, `presence/displays/terminal-hud/src/store/tail.ts` + test                                                                              |
+| A    | AC-10(writer・janitor・report-ops/retrospective の読み手・metric スロットル)                            | sonnet | `libs/core/agent/agent-runtime-events.ts`, `storage-janitor.ts`, `report-ops.ts`, `mission-retrospective.ts`, `a2a-bridge.ts`(metric 発行箇所のみ), 各 test, retention 設定 |
+| A    | AC-11(core helper のみ)                                                                                 | sonnet | `libs/core/mesh/peer-conversation.ts` + test                                                                                                                                |
+| B    | 投影統合(AC-08 の `readJsonlBounded` 置換、AC-10 の dated 読み、AC-11 の peer source)+ AC-09 の core 側 | opus   | `agent-collaboration-projection.ts`, `agent-activity-board.ts`, 各 test, schema                                                                                             |
+| B    | AC-09 / AC-11 の surface 側                                                                             | sonnet | terminal-hud `store/coordination.ts` `store/agent-graph.ts` + tests、Chronos board / agent-activity route、vocabulary(tui / chronos)                                        |
 
 ## 6. 実装状況
 

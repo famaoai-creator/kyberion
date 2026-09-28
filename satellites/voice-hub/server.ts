@@ -21,34 +21,37 @@ import {
   createPresenceVoiceStimulus,
   estimateSpeechDurationMs,
 } from '@agent/core/presence-surface';
-import { getSurfaceAgentCatalogEntry } from '@agent/core/surface-agent-catalog';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
-import { getVoiceProfileRecord } from '@agent/core/voice-profile-registry';
+import { getSurfaceAgentCatalogEntry } from '@agent/core/surface/surface-agent-catalog';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceProfileRecord } from '@agent/core/voice/voice-profile-registry';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
   type VoiceEngineRecord,
-} from '@agent/core/voice-engine-registry';
-import { getVoiceSelectionSnapshot } from '@agent/core/voice-selection-preferences';
+} from '@agent/core/voice/voice-engine-registry';
+import { getVoiceSelectionSnapshot } from '@agent/core/voice/voice-selection-preferences';
 import {
   resolveVoiceSttAdapter,
   resolveVoiceTtsAdapter,
-} from '@agent/core/voice-provider-adapters';
-import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual-device-inventory-bridge';
+} from '@agent/core/voice/voice-provider-adapters';
+import { createVirtualDeviceInventoryBridge } from '@agent/core/virtual/virtual-device-inventory-bridge';
 import {
   parseVoiceSttBackend,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
   type VoiceSttAvailability,
-} from '@agent/core/voice-stt';
-import { ShellSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
-import { formatChannelTurnText } from '@agent/core/channel-adapter';
+  type VoiceSttBackend,
+} from '@agent/core/voice/voice-stt';
+import { formatChannelTurnText } from '@agent/core/surface/channel-adapter';
 import { t } from '@agent/core/t';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract';
-import { runSurfaceConversation, runSurfaceMessageConversation } from '@agent/core/channel-surface';
+} from '@agent/core/intent/intent-resolution-contract';
+import {
+  runSurfaceConversation,
+  runSurfaceMessageConversation,
+} from '@agent/core/surface/channel-surface';
 import {
   assertSafeRepositoryPath,
   buildSafeExecEnv,
@@ -58,20 +61,21 @@ import {
   safeMkdir,
   safeRmSync,
 } from '@agent/core/secure-io';
-import { resolveManagedToolPythonBin, probeToolRuntime } from '@agent/core/tool-runtime-registry';
-import { listenNativeSpeech } from '@agent/core/native-speech-listen-bridge';
-import { buildNativeTtsCommand } from '@agent/core/native-tts';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
+import { listenNativeSpeech } from '@agent/core/media/native-speech-listen-bridge';
+import { buildNativeTtsCommand } from '@agent/core/media/native-tts';
 import { normalizeEventScope } from '@agent/core/event-scope';
-import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
+import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
 import { logger } from '@agent/core/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
 import {
   parseVoiceBridgeResponse,
-  parseVoiceTranscriptionResponse,
+  resolveRegularRepositoryFile,
   readVoiceHubEventScope,
   readVoiceHubRequestObject,
 } from './request-input.js';
+import { STT_ADAPTER_BEHAVIORS } from './voice-stt-transcribe.js';
 import {
   createVoiceHubSpeechSynthesizeHandler,
   estimateHostSpeechMs,
@@ -147,14 +151,6 @@ const conversationMemory = new Map<string, ConversationTurn[]>();
 let activeSpeechProcess: ChildProcess | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
 let recentSpeechGuardState: RecentSpeechGuardState = {};
-
-function resolveRegularRepositoryFile(filePath: string, label: string): string {
-  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
-    throw new Error(`${label} must be an existing regular file: ${filePath}`);
-  }
-  return safePath;
-}
 
 function normalizeSpeechEchoText(text: string): string {
   return text
@@ -309,207 +305,6 @@ async function convertWavForWhisper(inputPath: string, outputPath: string): Prom
   });
 }
 
-function parseWhisperText(raw: string): string {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .filter((line) => !line.startsWith('whisper_'))
-    .filter((line) => !line.startsWith('ggml_'))
-    .filter((line) => !line.startsWith('system_info:'))
-    .filter((line) => !line.startsWith('main: processing'))
-    .join(' ')
-    .trim();
-}
-
-async function transcribeWithWhisperCpp(
-  inputPath: string,
-  locale: string,
-  adapter: ReturnType<typeof resolveVoiceSttAdapter>
-): Promise<{ ok: boolean; text?: string; error?: string }> {
-  if (!adapter.cli_path || !adapter.model_path) {
-    return { ok: false, error: 'whisper_cpp_paths_not_configured' };
-  }
-  const cliPath = resolveRegularRepositoryFile(
-    pathResolver.resolve(adapter.cli_path),
-    'Whisper CLI'
-  );
-  const modelPath = resolveRegularRepositoryFile(
-    pathResolver.resolve(adapter.model_path),
-    'Whisper model'
-  );
-  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
-  const workingDirectory = path.dirname(cliPath);
-  return new Promise((resolve, reject) => {
-    const lang = locale.toLowerCase().startsWith('ja') ? 'ja' : 'auto';
-    const child = spawn(
-      cliPath,
-      [
-        '-m',
-        modelPath,
-        '-f',
-        safeInputPath,
-        '-l',
-        lang,
-        '--no-timestamps',
-        '--suppress-nst',
-        '-nth',
-        '0.8',
-        '-bs',
-        '8',
-      ],
-      {
-        cwd: workingDirectory,
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      const text = parseWhisperText(`${stdout}\n${stderr}`);
-      if (code === 0) {
-        return resolve({ ok: true, text });
-      }
-      reject(new Error(text || stderr.trim() || stdout.trim() || `whisper_cli_failed_${code}`));
-    });
-  });
-}
-
-async function transcribeWithManagedPythonBridge(
-  inputPath: string,
-  locale: string,
-  adapter: ReturnType<typeof resolveVoiceSttAdapter>
-): Promise<{ ok: boolean; text?: string; error?: string }> {
-  const pythonBin = adapter.runtime_id ? resolveManagedToolPythonBin(adapter.runtime_id) : null;
-  if (!pythonBin)
-    return { ok: false, error: `${adapter.runtime_id || 'managed'}_runtime_not_installed` };
-  if (!adapter.bridge_script) return { ok: false, error: 'managed_stt_bridge_not_configured' };
-  const bridgeScript = resolveRegularRepositoryFile(
-    pathResolver.rootResolve(adapter.bridge_script),
-    'STT bridge script'
-  );
-  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
-  return new Promise((resolve) => {
-    const child = spawn(pythonBin, [bridgeScript], {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-      if (stdout.length > 2_000_000) child.kill('SIGTERM');
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk).slice(0, 200_000);
-    });
-    child.on('error', (error) => resolve({ ok: false, error: error.message }));
-    child.on('close', (code) => {
-      const lines = stdout.trim().split(/\n+/).filter(Boolean);
-      let payload: ReturnType<typeof parseVoiceBridgeResponse>;
-      try {
-        payload = lines.length
-          ? parseVoiceBridgeResponse(
-              parseSafeJsonInput(lines[lines.length - 1], 'voice bridge response')
-            )
-          : undefined;
-      } catch {
-        payload = undefined;
-      }
-      const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
-      if (code === 0 && payload?.status === 'success' && text) {
-        resolve({ ok: true, text });
-        return;
-      }
-      resolve({
-        ok: false,
-        error:
-          (typeof payload?.error === 'string' ? payload.error : undefined) ||
-          stderr.trim().slice(0, 500) ||
-          `${adapter.backend}_failed_${code ?? 'unknown'}`,
-      });
-    });
-    child.stdin.end(
-      JSON.stringify({
-        action: 'transcribe',
-        params: {
-          audio_path: safeInputPath,
-          language: locale.toLowerCase().startsWith('ja') ? 'ja' : undefined,
-        },
-      })
-    );
-  });
-}
-
-async function transcribeWithOpenAiCompatibleServer(
-  inputPath: string,
-  locale: string
-): Promise<{ ok: boolean; text?: string; error?: string; backend: string }> {
-  const serverConfig = resolveVoiceSttServerConfig(process.env);
-  if (!serverConfig) {
-    return {
-      ok: false,
-      error: 'stt_server_not_configured',
-      backend: 'openai_compatible_server',
-    };
-  }
-
-  const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
-  const audio = safeReadFile(safeInputPath, { encoding: null }) as Buffer;
-  const audioBytes = new Uint8Array(audio);
-  const form = new FormData();
-  form.append('file', new Blob([audioBytes], { type: 'audio/wav' }), path.basename(safeInputPath));
-  form.append('model', serverConfig.model);
-  if (locale.toLowerCase().startsWith('ja')) {
-    form.append('language', 'ja');
-  }
-
-  const headers: Record<string, string> = {};
-  if (serverConfig.apiKey) {
-    headers.Authorization = `Bearer ${serverConfig.apiKey}`;
-  }
-
-  const response = await fetch(`${serverConfig.baseUrl}/v1/audio/transcriptions`, {
-    method: 'POST',
-    headers,
-    body: form,
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      error: `stt_server_http_${response.status}`,
-      backend: serverConfig.provider,
-    };
-  }
-
-  const payload = parseVoiceTranscriptionResponse(await response.json());
-  if (!payload) {
-    return {
-      ok: false,
-      error: 'stt_server_invalid_response',
-      backend: serverConfig.provider,
-    };
-  }
-  const text = payload.text.trim();
-  return {
-    ok: text.length > 0,
-    text,
-    error: text.length > 0 ? undefined : 'empty_transcript',
-    backend: serverConfig.provider,
-  };
-}
-
 function getAvailableSttBackends() {
   const availability: VoiceSttAvailability = {
     server: false,
@@ -519,72 +314,22 @@ function getAvailableSttBackends() {
     whisperCpp: false,
     nativeSpeech: false,
   };
-  for (const backend of [
-    'server',
-    'fluid_audio',
-    'faster_whisper',
-    'mlx_whisper',
-    'whisper_cpp',
-    'native_speech',
-  ] as const) {
+  const probes: Array<[keyof VoiceSttAvailability, VoiceSttBackend]> = [
+    ['server', 'server'],
+    ['fluidAudio', 'fluid_audio'],
+    ['fasterWhisper', 'faster_whisper'],
+    ['mlxWhisper', 'mlx_whisper'],
+    ['whisperCpp', 'whisper_cpp'],
+    ['nativeSpeech', 'native_speech'],
+  ];
+  for (const [key, backend] of probes) {
     const adapter = resolveVoiceSttAdapter(backend);
-    if (adapter.adapter_id === 'openai_compatible_server') {
-      availability.server = resolveVoiceSttServerConfig(process.env) !== null;
-    } else if (adapter.adapter_id === 'fluid_audio_native') {
-      availability.fluidAudio = Boolean(
-        process.platform === 'darwin' &&
-        getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-      );
-    } else if (adapter.adapter_id === 'faster_whisper_python' && adapter.runtime_id) {
-      availability.fasterWhisper = Boolean(
-        process.platform === 'win32' &&
-        (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
-          getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim()) &&
-        probeToolRuntime(adapter.runtime_id, 'installed').installed
-      );
-    } else if (adapter.adapter_id === 'managed_python_bridge' && adapter.runtime_id) {
-      availability.mlxWhisper = probeToolRuntime(adapter.runtime_id, 'installed').installed;
-    } else if (adapter.adapter_id === 'whisper_cpp_cli') {
-      availability.whisperCpp = Boolean(
-        adapter.cli_path &&
-        adapter.model_path &&
-        safeExistsSync(pathResolver.resolve(adapter.cli_path)) &&
-        safeExistsSync(pathResolver.resolve(adapter.model_path))
-      );
-    } else if (adapter.adapter_id === 'native_speech') {
-      availability.nativeSpeech = safeExistsSync(
-        pathResolver.resolve('satellites/voice-hub/native-stt.swift')
-      );
-    }
+    const probe = STT_ADAPTER_BEHAVIORS[adapter.adapter_id]?.probe;
+    availability[key] = probe ? probe(adapter) : false;
   }
   return {
     ...availability,
   };
-}
-
-async function transcribeWithFluidAudio(
-  inputPath: string,
-  locale: string
-): Promise<{ ok: boolean; text?: string; error?: string }> {
-  const command = getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
-  if (!command) return { ok: false, error: 'fluid_audio_command_not_configured' };
-
-  const bridge = new ShellSpeechToTextBridge({
-    name: 'fluid-audio-parakeet',
-    command,
-    structuredOutput: true,
-    timeoutMs: Number(getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS')) || undefined,
-  });
-  const transcriptPath = `${inputPath}.transcript.txt`;
-  try {
-    const result = await bridge.transcribe({ audioPath: inputPath, language: locale });
-    const text = result.text.trim();
-    return text ? { ok: true, text } : { ok: false, error: 'empty_transcript' };
-  } catch (error: any) {
-    return { ok: false, error: error?.message || String(error) };
-  } finally {
-    if (safeExistsSync(transcriptPath)) safeRmSync(transcriptPath, { force: true });
-  }
 }
 
 async function transcribeRecordedAudio(
@@ -595,37 +340,13 @@ async function transcribeRecordedAudio(
   let lastError = 'no_stt_backend_available';
   for (const backend of backendOrder) {
     try {
-      const adapter = resolveVoiceSttAdapter(parseVoiceSttBackend(backend));
-      if (adapter.adapter_id === 'openai_compatible_server') {
-        const result = await transcribeWithOpenAiCompatibleServer(inputPath, locale);
-        if (result.ok) return result;
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (adapter.adapter_id === 'fluid_audio_native') {
-        const result = await transcribeWithFluidAudio(inputPath, locale);
-        if (result.ok) return { ...result, backend: 'fluid_audio' };
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (
-        adapter.adapter_id === 'managed_python_bridge' ||
-        adapter.adapter_id === 'faster_whisper_python'
-      ) {
-        const result = await transcribeWithManagedPythonBridge(inputPath, locale, adapter);
-        if (result.ok) return { ...result, backend: parseVoiceSttBackend(backend) };
-        lastError = result.error || lastError;
-        continue;
-      }
-
-      if (adapter.adapter_id === 'whisper_cpp_cli') {
-        const result = await transcribeWithWhisperCpp(inputPath, locale, adapter);
-        if (result.ok) return { ...result, backend: 'whisper_cpp' };
-        lastError = result.error || lastError;
-        continue;
-      }
+      const parsedBackend = parseVoiceSttBackend(backend);
+      const adapter = resolveVoiceSttAdapter(parsedBackend);
+      const behavior = STT_ADAPTER_BEHAVIORS[adapter.adapter_id];
+      if (!behavior?.transcribe) continue;
+      const result = await behavior.transcribe(inputPath, locale, adapter, parsedBackend);
+      if (result.ok) return result;
+      lastError = result.error || lastError;
     } catch (error: any) {
       lastError = error?.message || String(error);
     }
@@ -814,7 +535,26 @@ async function speakWithVoiceEngine(
 ): Promise<void> {
   const adapter = resolveVoiceTtsAdapter(engine);
   const languageProfile = getVoiceTtsLanguageConfig(language);
-  if (adapter.adapter_id === 'python_bridge') {
+  const behavior = TTS_ADAPTER_BEHAVIORS[adapter.adapter_id];
+  if (!behavior) {
+    throw new Error(
+      `TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`
+    );
+  }
+  return behavior(engine, text, language, profile, languageProfile);
+}
+
+const TTS_ADAPTER_BEHAVIORS: Record<
+  string,
+  (
+    engine: VoiceEngineRecord,
+    text: string,
+    language: string,
+    profile: any,
+    languageProfile: { voice?: string; rate?: number }
+  ) => Promise<void>
+> = {
+  python_bridge: async (engine, text, language, profile, languageProfile) => {
     const artifactPath = await runVoiceTtsPythonBridge(
       engine,
       text,
@@ -828,9 +568,8 @@ async function speakWithVoiceEngine(
     } finally {
       if (safeExistsSync(artifactPath)) safeRmSync(artifactPath, { force: true });
     }
-    return;
-  }
-  if (adapter.adapter_id === 'native_tts') {
+  },
+  native_tts: async (engine, text, _language, _profile, languageProfile) => {
     const command = buildNativeTtsCommand(text, {
       voice: languageProfile.voice,
       rate: languageProfile.rate,
@@ -866,10 +605,8 @@ async function speakWithVoiceEngine(
         reject(new Error(stderr.trim() || `native_tts_failed_${code || signal || 'unknown'}`));
       });
     });
-    return;
-  }
-  throw new Error(`TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`);
-}
+  },
+};
 
 function resolvePreferredTtsEngine(): VoiceEngineRecord {
   const selection = getVoiceSelectionSnapshot();
@@ -1217,6 +954,7 @@ function normalizeTextForTts(text: string, language: SupportedLocale): string {
     .replace(/\s+/g, ' ')
     .replace(
       /REQ-[A-Z0-9-]+/g,
+      // i18n-exempt: bilingual inline label (JA branch intentional)
       profile.requestIdToken || (language === 'ja' ? 'リクエストID' : 'request id')
     )
     .replace(/https?:\/\/\S+/g, profile.urlToken || (language === 'ja' ? 'URL' : 'link'))

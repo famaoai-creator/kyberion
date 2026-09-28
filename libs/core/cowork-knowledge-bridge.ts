@@ -41,8 +41,8 @@ import {
   listMemoryPromotionCandidates,
   type MemoryCandidateTier,
   type MemoryCandidateKind,
-} from './memory-promotion-queue.js';
-import type { MemoryScopeEnvelope } from './memory-scope.js';
+} from './knowledge/memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
 import { scopeContextKey, type ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { deliverToCowork } from './cowork-surface.js';

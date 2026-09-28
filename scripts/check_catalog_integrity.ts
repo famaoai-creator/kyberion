@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { extractPlaceholderNames } from '@agent/core/message-format';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { compileSchema, readTextFile } from '@agent/core/foundation';

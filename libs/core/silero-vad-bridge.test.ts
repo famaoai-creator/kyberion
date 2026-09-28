@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { probeSileroVad, SileroVad } from './silero-vad-bridge.js';
-import type { AudioChunk } from './meeting-session-types.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 
 /**
  * Fake bridge process speaking the NDJSON protocol: decodes the PCM,

@@ -1,22 +1,22 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { loadStandardIntentCatalog } from './intent-resolution.js';
+import { loadStandardIntentCatalog } from './intent/intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
 import {
   assessContextualClarification,
   type ContextualClarificationExecutionShape,
 } from './contextual-intent-clarification-policy.js';
-import { getMeetingBriefQuestions } from './meeting-operations-profile.js';
-import { notifyOperator } from './operator-notifications.js';
-import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
+import { getMeetingBriefQuestions } from './meeting/meeting-operations-profile.js';
+import { notifyOperator } from './surface/operator-notifications.js';
+import { getNarratedVideoBriefQuestions } from './video/narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
 import { clamp, slugify } from './foundation/text.js';
-import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
-import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
-import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
-import type { NarratedVideoPreferenceProfile } from './src/types/narrated-video-preference-profile.js';
+import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
+import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
+import type { MeetingOperationsProfile } from './contracts/meeting-operations-profile.js';
+import type { NarratedVideoPreferenceProfile } from './contracts/narrated-video-preference-profile.js';
 import { logger } from './core.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
@@ -159,7 +159,7 @@ function localizeContextualReason(
 ): string {
   if (locale !== 'ja') return reason;
   if (reason.startsWith('Missing inputs remain above the clarification threshold')) {
-    return `不足している入力は確認しきい値を超えています${reason.match(/\(([^)]+)\)/)?.[0] || ''}`;
+    return `不足している入力は確認しきい値を超えています${reason.slice(reason.indexOf('('), reason.lastIndexOf(')') + 1) || ''}`;
   }
   if (reason.startsWith('Missing critical inputs:')) {
     return `重要な不足入力があります: ${reason.replace(/^Missing critical inputs:\s*/u, '').replace(/\.$/u, '。')}`;
@@ -174,7 +174,7 @@ function localizeContextualReason(
     return '不足入力はポリシーの既定値で補完できます。';
   }
   if (reason.startsWith('The request can proceed with policy defaults because confidence is')) {
-    return `confidence ${reason.match(/([0-9.]+)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
+    return `confidence ${reason.match(/(\d+(?:\.\d+)*)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
   }
   return fallback;
 }

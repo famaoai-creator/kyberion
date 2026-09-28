@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { registerWorkspace, releaseWorkspace } from '@agent/core/workspace-ledger';
+import { registerWorkspace, releaseWorkspace } from '@agent/core/workforce/workspace-ledger';
 import { ScriptExitError } from './lib/harness.js';
 import {
   runWorkspaceLedgerCli,

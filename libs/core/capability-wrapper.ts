@@ -6,7 +6,7 @@ import {
   runSkillCli,
   wrapSkill,
   wrapSkillAsync,
-} from './skill-wrapper.js';
+} from './plugin/skill-wrapper.js';
 
 export const wrapCapability = wrapSkill;
 export const wrapCapabilityAsync = wrapSkillAsync;

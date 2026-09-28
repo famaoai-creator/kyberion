@@ -9,8 +9,8 @@ import {
   PROCESS_WATCH_COLLABORATION_KIND,
   OPERATOR_EVENT_COLLABORATION_KIND,
 } from './event-vocabulary.js';
-import { WORKER_EVENT_TYPES } from './worker-event-stream.js';
-import { collaborationKindFromEventType } from './agent-collaboration-events.js';
+import { WORKER_EVENT_TYPES } from './workforce/worker-event-stream.js';
+import { collaborationKindFromEventType } from './agent/agent-collaboration-events.js';
 
 /**
  * EV-07: the mapping used to be a chain of `String.includes` guesses, so it was
@@ -69,7 +69,7 @@ describe('event-vocabulary', () => {
   });
 
   it('agent-runtime-events.jsonl の MISSION_* イベント名を分類する(AC-02)', () => {
-    // These come from libs/core/agent-runtime-events.jsonl (`event` key) and
+    // These come from libs/core/agent/agent-runtime-events.jsonl (`event` key) and
     // were an orphaned, unclassified source before AC-02 wired readSourceEvents
     // to read them.
     expect(resolveCollaborationKind('MISSION_PAUSED')).toBe('waiting');

@@ -21,7 +21,7 @@ import {
   grantVoiceConsent as grantVoiceConsentRecord,
   readVoiceConsent,
   revokeVoiceConsent as revokeVoiceConsentRecord,
-} from '@agent/core/voice-consent';
+} from '@agent/core/voice/voice-consent';
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';

@@ -58,7 +58,7 @@ const riskyApprovalOverrideSeam = createSeam<RiskyApprovalOverride>({
 
 const OVERRIDE_METADATA: SeamProviderMetadata = {
   provenance: 'builtin',
-  source: 'libs/core/scenario-interceptor.ts',
+  source: 'libs/core/scenario/scenario-interceptor.ts',
   reason: 'scenario runner approval decisions (never registered in production processes)',
 };
 

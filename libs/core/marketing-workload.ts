@@ -3,8 +3,11 @@ import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
-import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
-import { evaluateArtifactReviews } from './artifact-review.js';
+import {
+  computeApprovalPayloadHash,
+  type ApprovalRequestRecord,
+} from './governance/approval-store.js';
+import { evaluateArtifactReviews } from './workforce/artifact-review.js';
 
 export type MarketingRiskLevel = 0 | 1 | 2 | 3 | 4;
 export type MarketingGateId = 'G0' | 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6';

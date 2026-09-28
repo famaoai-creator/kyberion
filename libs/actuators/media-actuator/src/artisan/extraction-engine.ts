@@ -5,7 +5,7 @@ import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile, safeUnlink } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import AdmZip from 'adm-zip';
-import { distillPdfDesign, distillPptxDesign } from '@agent/core/media-contracts';
+import { distillPdfDesign, distillPptxDesign } from '@agent/core/media/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 
 /**
@@ -14,6 +14,13 @@ import { distillExcelDesign } from '@agent/shared-media';
  */
 
 export type ExtractionMode = 'content' | 'aesthetic' | 'metadata' | 'raw' | 'all';
+
+export type ExtractionLayer = 'content' | 'aesthetic' | 'metadata';
+
+/** DS-06: mode → layer filtering, single source of truth ('all' admits every layer). */
+export function wantsLayer(mode: ExtractionMode, layer: ExtractionLayer): boolean {
+  return mode === 'all' || mode === layer;
+}
 
 export interface ExtractionOptions {
   preserveRaw?: boolean;
@@ -99,12 +106,12 @@ export async function extract(
 
 async function processPDF(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   // Delegate to shared pdf-utils for content/metadata extraction
-  if (mode === 'content' || mode === 'metadata' || mode === 'all') {
+  if (wantsLayer(mode, 'content') || wantsLayer(mode, 'metadata')) {
     const parser = new PDFParse({ data: buffer });
     try {
       const data = await parser.getText();
-      if (mode === 'content' || mode === 'all') result.layers.content = data.text;
-      if (mode === 'metadata' || mode === 'all') {
+      if (wantsLayer(mode, 'content')) result.layers.content = data.text;
+      if (wantsLayer(mode, 'metadata')) {
         result.layers.metadata = {
           total: data.total,
           pages: Array.isArray(data.pages) ? data.pages.length : undefined,
@@ -116,7 +123,7 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   }
 
   // Aesthetic uses shared pdf-utils layout analysis (via pdfjs-dist)
-  if (mode === 'aesthetic' || mode === 'all') {
+  if (wantsLayer(mode, 'aesthetic')) {
     try {
       // Use a governed temp path so extraction stays within Kyberion's write policy.
       const tmpPath = pathResolver.sharedTmp(
@@ -168,7 +175,7 @@ type MammothWithMarkdown = typeof mammoth & {
 };
 
 async function processDocx(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
-  if (mode === 'content' || mode === 'all') {
+  if (wantsLayer(mode, 'content')) {
     try {
       const data = await (mammoth as MammothWithMarkdown).convertToMarkdown({ buffer });
       result.layers.content = data.value;
@@ -177,10 +184,10 @@ async function processDocx(buffer: Buffer, mode: ExtractionMode, result: Extract
       result.layers.content = data.value;
     }
   }
-  if (mode === 'metadata' || mode === 'all') {
+  if (wantsLayer(mode, 'metadata')) {
     result.layers.metadata = { type: 'Word Document', extension: 'docx' };
   }
-  if (mode === 'aesthetic' || mode === 'all') {
+  if (wantsLayer(mode, 'aesthetic')) {
     result.layers.aesthetic = {
       layout: 'single-column',
       branding: { logo_presence: false },
@@ -200,7 +207,7 @@ async function processXlsx(
     result.layers.raw = protocol;
   }
 
-  if (mode === 'content' || mode === 'all') {
+  if (wantsLayer(mode, 'content')) {
     let content = '';
     for (const sheet of protocol.sheets) {
       content += `### Sheet: ${sheet.name}\n\n`;
@@ -222,7 +229,7 @@ async function processXlsx(
     result.layers.content = content.trimEnd();
   }
 
-  if (mode === 'metadata' || mode === 'all') {
+  if (wantsLayer(mode, 'metadata')) {
     result.layers.metadata = {
       sheets: protocol.sheets.map((sheet) => ({
         name: sheet.name,
@@ -235,7 +242,7 @@ async function processXlsx(
     };
   }
 
-  if (mode === 'aesthetic' || mode === 'all') {
+  if (wantsLayer(mode, 'aesthetic')) {
     result.layers.aesthetic = {
       layout: 'grid',
       branding: { logo_presence: false, tone: 'technical' },
@@ -259,7 +266,7 @@ async function processPptx(
       result.layers.raw = await distillPptxDesign(filePath);
     }
 
-    if (mode === 'content' || mode === 'all') {
+    if (wantsLayer(mode, 'content')) {
       let content = '';
       const slides = zip
         .getEntries()
@@ -274,7 +281,7 @@ async function processPptx(
       result.layers.content = content.trim() || 'No text content found in PowerPoint.';
     }
 
-    if (mode === 'metadata' || mode === 'all') {
+    if (wantsLayer(mode, 'metadata')) {
       const presEntry = zip.getEntry('ppt/presentation.xml');
       let slideCount = 0;
       if (presEntry) {
@@ -285,7 +292,7 @@ async function processPptx(
       result.layers.metadata = { type: 'PowerPoint', slides: slideCount };
     }
 
-    if (mode === 'aesthetic' || mode === 'all') {
+    if (wantsLayer(mode, 'aesthetic')) {
       const tableStyles = new Set<string>();
 
       const tableStylesEntry = zip.getEntry('ppt/tableStyles.xml');
@@ -321,13 +328,13 @@ async function processPptx(
   }
 }
 async function processImage(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
-  if (mode === 'content' || mode === 'all') {
+  if (wantsLayer(mode, 'content')) {
     const {
       data: { text },
     } = await Tesseract.recognize(buffer, 'eng+jpn');
     result.layers.content = text;
   }
-  if (mode === 'aesthetic' || mode === 'all') {
+  if (wantsLayer(mode, 'aesthetic')) {
     result.layers.aesthetic = { colors: [], branding: { logo_presence: true } };
   }
 }

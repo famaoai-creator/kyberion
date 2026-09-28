@@ -3,24 +3,24 @@ import { buildCompanyVisionRef, resolveCompany } from '@agent/core/company';
 import {
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
-} from '@agent/core/approval-audit';
+} from '@agent/core/governance/approval-audit';
 import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-} from '@agent/core/agent-runtime-supervisor';
-import { listSurfaceOutboxMessages } from '@agent/core/surface-coordination-store';
-import { discoverProviders } from '@agent/core/provider-discovery';
-import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+} from '@agent/core/agent/agent-runtime-supervisor';
+import { listSurfaceOutboxMessages } from '@agent/core/surface/surface-coordination-store';
+import { discoverProviders } from '@agent/core/provider/provider-discovery';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
 import {
   loadProviderCapabilitySnapshotAtPath,
   type ProviderCapabilitySnapshot,
-} from '@agent/core/provider-capability-overview';
+} from '@agent/core/provider/provider-capability-overview';
 import {
   loadOnboardingStateAtPath,
   type OnboardingProfileState as OnboardingState,
-} from '@agent/core/onboarding-state';
+} from '@agent/core/organization/onboarding-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -33,12 +33,12 @@ import { formatDateTime, resolveTimeZone } from '@agent/core/format';
 import {
   isServiceConnectionReady,
   loadServiceConnectionReadinessConfig,
-} from '@agent/core/service-connection-readiness';
-import { loadServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
+} from '@agent/core/service/service-connection-readiness';
+import { loadServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import { loadPersistedTrustLedger } from '@agent/core/trust-engine';
-import { loadSkillIndex } from '@agent/core/skill-index';
-import { loadStateAtPath } from '@agent/core/mission-state';
-import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
+import { loadSkillIndex } from '@agent/core/plugin/skill-index';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
+import { readCanonicalWorkGraph } from '@agent/core/workforce/work-graph-projection';
 import {
   parseDashboardOrchestrationLine,
   parseDashboardOwnerSummaryLine,
@@ -47,7 +47,7 @@ import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import {
   parsePersonalSovereignIdentity,
   loadPersonalIdentityAtPath,

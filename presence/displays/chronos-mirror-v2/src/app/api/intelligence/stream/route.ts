@@ -21,12 +21,12 @@ import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-} from '@agent/core/agent-runtime-supervisor';
+} from '@agent/core/agent/agent-runtime-supervisor';
 import {
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
-} from '@agent/core/surface-runtime';
+} from '@agent/core/surface/surface-runtime';
 import { deriveProviderPressure } from '@agent/core/ce-adoption';
 import * as intelligenceData from '../intelligence-observation-data';
 
@@ -53,7 +53,7 @@ function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
 }
 
 async function collectManagedRuntimeTopology(tierAccess?: readonly string[]) {
-  const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
+  const runtimeSupervisorClient = await import('@agent/core/agent/agent-runtime-supervisor-client');
   const runtimeSnapshots = listAgentRuntimeSnapshots();
   const runtimeLeases = listAgentRuntimeLeaseSummaries();
   let managedRuntimes: Array<{

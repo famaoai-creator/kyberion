@@ -11,7 +11,7 @@ import {
 } from './secure-io.js';
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
-import type { SlackSurfaceArtifact } from './channel-surface-types.js';
+import type { SlackSurfaceArtifact } from './surface/channel-surface-types.js';
 import type { SensorStimulus } from './sensor-engine.js';
 
 const logger = createLogger('stimuli-journal');

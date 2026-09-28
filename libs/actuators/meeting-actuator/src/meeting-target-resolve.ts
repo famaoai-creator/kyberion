@@ -85,11 +85,11 @@ function cleanUrl(raw: string): string {
 
 function stripMarkup(text: string): string {
   return text
-    .replace(/<[^>]*>/gu, ' ')
+    .replace(/<[^<>]*>/gu, ' ')
     .replace(/&nbsp;/gu, ' ')
-    .replace(/&amp;/gu, '&')
     .replace(/&lt;/gu, '<')
-    .replace(/&gt;/gu, '>');
+    .replace(/&gt;/gu, '>')
+    .replace(/&amp;/gu, '&');
 }
 
 /** First known meeting URL in `location`, then `description`. */

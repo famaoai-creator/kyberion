@@ -1,7 +1,7 @@
 import type { Request } from 'express';
-import { SurfaceViewerScopeError } from '@agent/core/surface-mutation-guard';
-import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import { SurfaceViewerScopeError } from '@agent/core/surface/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type ComputerSurfaceRequest = Pick<Request, 'headers' | 'socket'>;

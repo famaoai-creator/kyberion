@@ -19,7 +19,7 @@ import type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
-} from './reasoning-backend.js';
+} from './reasoning/reasoning-backend.js';
 
 /**
  * Canonical, backend-agnostic structured-reasoning specs.

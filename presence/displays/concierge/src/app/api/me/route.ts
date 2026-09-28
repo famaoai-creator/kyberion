@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
-import { ensureOwnerMember } from '@agent/core/member-registry';
-import { getBrowserOnboardingState } from '@agent/core/browser-onboarding';
+import { ensureOwnerMember } from '@agent/core/organization/member-registry';
+import { getBrowserOnboardingState } from '@agent/core/browser/browser-onboarding';
 import { conciergeAvailableOperations } from '../../../lib/headless-projections';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 

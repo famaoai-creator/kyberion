@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
-import type { ManualDriveExecutionResult } from '@agent/core/agent-runtime-manual-drive';
+import type { ManualDriveExecutionResult } from '@agent/core/agent/agent-runtime-manual-drive';
 
 const viewer = {
   context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
@@ -31,7 +31,7 @@ vi.mock('../../../lib/viewer-context', () => ({
   ),
 }));
 
-vi.mock('@agent/core/agent-runtime-manual-drive', () => manualDriveMock);
+vi.mock('@agent/core/agent/agent-runtime-manual-drive', () => manualDriveMock);
 
 import { DELETE, POST } from './route';
 

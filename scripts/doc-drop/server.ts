@@ -19,7 +19,7 @@ import {
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import {
   LOCAL_PAD_COMMON_FLAGS,
   LocalPadRequestBodyTooLargeError,
@@ -419,7 +419,10 @@ export async function main(
     } catch (e: unknown) {
       if (!res.headersSent) {
         res.writeHead(500);
-        res.end(e instanceof Error ? e.message : String(e));
+        // Return a generic 500 — exception details stay in the server log
+        // (stack-trace-exposure / xss-through-exception hardening).
+        print(`[server:doc-drop] request failed: ${e instanceof Error ? e.message : String(e)}`);
+        res.end('internal server error');
       }
     }
   });

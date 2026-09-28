@@ -2,7 +2,7 @@ import { evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { isRecord } from '@agent/core/foundation';
-import type { AdfRunResult, AdfStep } from '@agent/core/adf-engine';
+import type { AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   removeVirtualPasskeyAuthenticator,

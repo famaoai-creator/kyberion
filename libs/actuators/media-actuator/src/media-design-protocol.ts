@@ -3,17 +3,17 @@ import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from '@agent/core
 import { currentScope } from '@agent/core/scope-context';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { defineCatalog, isRecord } from '@agent/core/foundation';
-import { loadProjectRecord } from '@agent/core/project-registry';
-import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
-import type { TenantDesignOverride } from '@agent/core/tenant-design-override';
+import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { loadServiceBindingRecord } from '@agent/core/service/service-binding-registry';
+import type { TenantDesignOverride } from '@agent/core/organization/tenant-design-override';
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-} from '@agent/core/media-theme-role-policy';
+} from '@agent/core/media/media-theme-role-policy';
 import {
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-} from '@agent/core/document-inference-policy';
+} from '@agent/core/media/document-inference-policy';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import {
   createMediaDocumentPipelineHelpers,

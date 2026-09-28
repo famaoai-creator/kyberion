@@ -1,16 +1,9 @@
-import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
+import { readTextFile } from '@agent/core/foundation/text';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
-import {
-  createApprovalRequest,
-  isApprovalRequestExpired,
-  loadApprovalRequest,
-} from '@agent/core/approval-store';
 import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
 import { compactStepOutputContext } from '@agent/core/output-artifacts';
 import {
@@ -21,25 +14,25 @@ import {
   type AdfStep,
   type AdfStepHandlers,
   type AdfStepHooks,
-} from '@agent/core/adf-engine';
+} from '@agent/core/pipeline/adf-engine';
 import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
 } from '@agent/core/lifecycle-hook-engine';
-import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import {
   withActuatorForwardingPort,
   type ActuatorForwardRequest,
   type ActuatorForwardingPort,
-} from '@agent/core/actuator-forwarding-port';
-import { runToolCallBatch } from '@agent/core/tool-call-scheduler';
-import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/op-input-contracts';
+} from '@agent/core/actuator/actuator-forwarding-port';
+import { runToolCallBatch } from '@agent/core/tool/tool-call-scheduler';
+import { resolveOpAccessClaims, type OpInputDomain } from '@agent/core/pipeline/op-input-contracts';
 import {
   hashPipelineOutput,
   pipelineJournalChannelSnapshot,
-} from '@agent/core/pipeline-run-journal';
+} from '@agent/core/pipeline/pipeline-run-journal';
 import { deriveExecutionGraph } from '@agent/core/graph-scheduler';
-import type { ResourceClaim } from '@agent/core/tool-call-scheduler';
+import type { ResourceClaim } from '@agent/core/tool/tool-call-scheduler';
 import {
   createGraphRunArtifact,
   persistGraphRunArtifact,
@@ -47,8 +40,7 @@ import {
   type GraphRunArtifact,
 } from '@agent/core/graph-run-artifact';
 
-import { z } from 'zod';
-import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { formatPipelineFailure } from './pipeline-result-reporting.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
@@ -80,6 +72,15 @@ import {
   findStepByIdRecursive,
   hasBoundApproval,
 } from './pipeline-execution-part-control.js';
+
+/** Install on first use so a step that actually judges does not depend on the eager pre-pass. */
+async function structuredReasoning() {
+  const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
+  const { delegateStructured, getReasoningBackend } =
+    await import('@agent/core/reasoning/reasoning-backend');
+  installReasoningBackends();
+  return { delegateStructured, backend: getReasoningBackend() };
+}
 
 export function readPipelineIncludeTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -118,9 +119,11 @@ export async function runWithRepair(
             `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
           );
           logger.info(
+            // i18n-exempt: JA operator log (product language)
             `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
           );
         }
+        const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
         const repaired = await attemptAutonomousRepair({
           step: { op: step.op, id: step.id, params: step.params },
           failure,
@@ -253,270 +256,27 @@ export async function runStepsInternal(
     const params = (rawParams || {}) as Record<string, any>;
     const currentStep = stepRefStack[stepRefStack.length - 1];
 
-    if (action === 'judge_route') {
-      const judge = (params.judge || {}) as Record<string, unknown>;
-      const exportKey = String(
-        params.export_as ||
-          (currentStep?.produces
-            ? typeof currentStep.produces === 'string'
-              ? currentStep.produces
-              : currentStep.produces.channel
-            : 'judge_route')
-      );
-      const verdictKey = String(params.verdict_as || 'judge_verdict');
-      const fixtureVerdict =
-        params.fixture === true && params.verdict && typeof params.verdict === 'object'
-          ? (resolveVars(params.verdict, ctx) as Record<string, unknown>)
-          : undefined;
-      const schemaRef = String(judge.schema_ref || params.schema_ref || 'judge_route_verdict');
-      const verdict = fixtureVerdict
-        ? fixtureVerdict
-        : await delegateStructured(
-            getReasoningBackend(),
-            [
-              String(
-                resolveVars(
-                  judge.prompt ||
-                    judge.instruction_ref ||
-                    params.prompt ||
-                    'Classify the current pipeline context.',
-                  ctx
-                )
-              ),
-              `Return a route verdict compatible with schema_ref=${schemaRef}.`,
-              `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
-            ].join('\n\n'),
-            z
-              .object({
-                label: z.string().min(1),
-                reason: z.string().optional(),
-                value: z.unknown().optional(),
-              })
-              .passthrough(),
-            { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
-          );
-      const routes = Array.isArray(params.routes)
-        ? (params.routes as Array<{
-            when?: Record<string, unknown>;
-            next: string;
-            reason?: string;
-          }>)
-        : [];
-      const decision = selectJudgeRoute(
-        verdict as Record<string, unknown>,
-        routes,
-        (params.on_no_match as 'abort' | 'complete' | 'continue' | undefined) || 'abort'
-      );
-      opts.trace?.addEvent('judge.route_selected', {
-        step_id: currentStep?.id || rawOp,
-        route_index: decision.selection.route_index,
-        next: decision.selection.next,
-        matched: decision.selection.matched,
-        reason: decision.selection.reason,
-        schema_ref: schemaRef,
-        source: fixtureVerdict ? 'fixture' : 'reasoning_backend',
-      });
-      if (decision.selection.next === 'ABORT') {
-        throw new Error(`[JUDGE_ROUTE_ABORT] ${decision.selection.reason}`);
-      }
-      const history = Array.isArray(ctx.__judge_route_history)
-        ? [...ctx.__judge_route_history.map(String)]
-        : [];
-      if (decision.selection.next !== 'COMPLETE' && decision.selection.next !== 'CONTINUE') {
-        const next = decision.selection.next;
-        const currentIndex = currentStep?.id
-          ? steps.findIndex((candidate) => candidate.id === currentStep.id)
-          : -1;
-        const targetIndex = steps.findIndex((candidate) => candidate.id === next);
-        if (currentIndex >= 0 && targetIndex >= 0 && targetIndex <= currentIndex) {
-          throw new Error(
-            `[JUDGE_ROUTE_BACK_EDGE_UNSUPPORTED] route from '${currentStep?.id}' to '${next}' would rewind a linear pipeline`
-          );
-        }
-        const nextHistory = [...history, next];
-        const cycle = detectRouteCycle(
-          nextHistory,
-          resolveMaxRouteHops(totalTopLevelSteps, params.max_route_hops)
-        );
-        if (cycle.detected) {
-          throw new Error(`[JUDGE_ROUTE_LOOP] ${cycle.reason}`);
-        }
-        return {
-          ...ctx,
-          [verdictKey]: verdict,
-          [exportKey]: decision.selection,
-          __judge_route_history: nextHistory,
-          __pipeline_route_next: next,
-        };
-      }
-      const nextContext = {
-        ...ctx,
-        [verdictKey]: verdict,
-        [exportKey]: decision.selection,
-        __judge_route_history: history,
-      };
-      if (decision.selection.next === 'COMPLETE') {
-        return { ...nextContext, __adf_terminal: true };
-      }
-      return nextContext;
-    }
-
-    if (action === 'await_decision') {
-      const approval = (params.approval || {}) as Record<string, unknown>;
-      const stepId = currentStep?.id;
-      if (!stepId) throw new Error('core:await_decision requires a step id for durable resume');
-      const targetStepId =
-        typeof params.approval_for === 'string' && params.approval_for.trim()
-          ? params.approval_for.trim()
-          : undefined;
-      const storageChannel = String(params.storage_channel || 'pipeline-approval');
-      const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
-        params.on_timeout as 'abort' | 'deny' | 'escalate'
-      )
-        ? (params.on_timeout as 'abort' | 'deny' | 'escalate')
-        : 'abort';
-      const suspended = opts.resumeState?.suspended;
-      if (suspended && suspended.step_id === stepId) {
-        const existing = loadApprovalRequest(
-          suspended.storage_channel,
-          suspended.approval_request_id
-        );
-        if (existing?.status === 'approved' || existing?.status === 'applied') {
-          return {
-            ...ctx,
-            [String(params.export_as || 'decision')]: {
-              status: 'approved',
-              approval_request_id: existing.id,
-              storage_channel: suspended.storage_channel,
-              step_id: existing.requestedByContext?.stepId || stepId,
-              ...(existing.requestedByContext?.targetStepId
-                ? { target_step_id: existing.requestedByContext.targetStepId }
-                : {}),
-              decided_by: existing.decidedBy,
-            },
-          };
-        }
-        if (existing?.status === 'rejected' || existing?.status === 'cancelled') {
-          throw new Error(
-            `[AWAIT_DECISION_DENIED] approval ${suspended.approval_request_id} is ${existing.status}`
-          );
-        }
-        const expired = suspended.timeout_at && Date.parse(suspended.timeout_at) <= Date.now();
-        if (
-          expired ||
-          existing?.status === 'expired' ||
-          (existing && isApprovalRequestExpired(existing))
-        ) {
-          if (suspended.on_timeout === 'deny') {
-            return {
-              ...ctx,
-              [String(params.export_as || 'decision')]: {
-                status: 'denied',
-                timed_out: true,
-                approval_request_id: suspended.approval_request_id,
-              },
-            };
-          }
-          if (suspended.on_timeout === 'escalate') {
-            const escalationTimeoutMs = coercePositiveInt(params.escalation_timeout_ms, 86_400_000);
-            const escalation = createApprovalRequest('mission_controller', {
-              channel: suspended.storage_channel,
-              threadTs: String(params.thread_ts || `${stepId}:escalation`),
-              correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}:escalation`,
-              requestedBy: `pipeline:${opts.runId || 'pending'}`,
-              kind: 'mission_gate',
-              expiresAt: new Date(Date.now() + escalationTimeoutMs).toISOString(),
-              requestedByContext: {
-                surface: 'system',
-                actorId: `pipeline:${opts.runId || 'pending'}`,
-                actorRole: 'pipeline',
-                stepId,
-                ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
-                ...(existing?.requestedByContext?.targetStepId
-                  ? { targetStepId: existing.requestedByContext.targetStepId }
-                  : {}),
-                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-              },
-              source: {
-                ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-                agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
-              },
-              draft: {
-                title: `Escalated pipeline decision: ${stepId}`,
-                summary: `The original decision ${suspended.approval_request_id} timed out and requires escalation.`,
-                severity: 'high',
-              },
-              justification: {
-                reason: 'TAKT await_decision timeout escalation',
-                impactSummary: `Original approval ${suspended.approval_request_id} expired without a decision.`,
-              },
-            });
-            throw new PipelineSuspendedError({
-              step_id: stepId,
-              approval_request_id: escalation.id,
-              storage_channel: suspended.storage_channel,
-              on_timeout: 'abort',
-              timeout_at: escalation.expiresAt,
-              reason: `escalated from expired approval ${suspended.approval_request_id}`,
-            });
-          }
-          throw new Error(`[AWAIT_DECISION_TIMEOUT] on_timeout=${suspended.on_timeout}`);
-        }
-        throw new PipelineSuspendedError(suspended);
-      }
-      if (registeredEnv('KYBERION_NON_INTERACTIVE') === '1' && params.non_interactive !== 'allow') {
-        throw new Error('[AWAIT_DECISION_DENIED] non-interactive execution defaults to deny');
-      }
-      const timeoutMs = coercePositiveInt(params.timeout_ms ?? params.timeout, 86_400_000);
-      const timeoutAt = new Date(Date.now() + timeoutMs).toISOString();
-      const record = createApprovalRequest('mission_controller', {
-        channel: storageChannel,
-        threadTs: String(params.thread_ts || stepId),
-        correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}`,
-        requestedBy: `pipeline:${opts.runId || 'pending'}`,
-        kind: 'mission_gate',
-        expiresAt: timeoutAt,
-        requestedByContext: {
-          surface: 'system',
-          actorId: `pipeline:${opts.runId || 'pending'}`,
-          actorRole: 'pipeline',
-          stepId,
-          ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
-          ...(targetStepId ? { targetStepId } : {}),
-          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-        },
-        source: {
-          ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
-          agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
-        },
-        draft: {
-          title: String(approval.title || `Pipeline decision: ${stepId}`),
-          summary: String(
-            approval.summary || params.summary || 'Pipeline execution requires a human decision.'
-          ),
-          details: typeof approval.details === 'string' ? approval.details : undefined,
-          severity:
-            approval.severity === 'high' ? 'high' : approval.severity === 'low' ? 'low' : 'medium',
-        },
-        justification: {
-          reason: 'TAKT await_decision control stage',
-          impactSummary: String(
-            approval.summary ||
-              params.summary ||
-              'Pipeline execution is suspended until a decision arrives.'
-          ),
-        },
-      });
-      throw new PipelineSuspendedError({
-        step_id: stepId,
-        approval_request_id: record.id,
-        storage_channel: storageChannel,
-        on_timeout: onTimeout,
-        timeout_at: timeoutAt,
-        reason: String(approval.summary || params.summary || 'human decision required'),
-      });
-    }
-
+    type ControlOpDispatchContext = {
+      rawOp: string;
+      normalizedOp: string;
+      action: string;
+      params: Record<string, any>;
+      ctx: Record<string, unknown>;
+      runNestedSteps: (
+        nested: AdfStep[],
+        seedCtx?: Record<string, unknown>
+      ) => Promise<AdfRunResult<Record<string, unknown>>>;
+      currentStep: PipelineAdfStep | undefined;
+    };
+    const dctx: ControlOpDispatchContext = {
+      rawOp,
+      normalizedOp,
+      action,
+      params,
+      ctx,
+      runNestedSteps,
+      currentStep,
+    };
     const runBody = async (
       body: PipelineAdfStep[],
       seedCtx: Record<string, unknown>,
@@ -528,37 +288,10 @@ export async function runStepsInternal(
       }
       return nested;
     };
-
-    if (action === 'if') {
-      const conditionResult = evaluateCondition(params.condition, ctx);
-      const branch = conditionResult ? params.then : params.else;
-      if (Array.isArray(branch)) {
-        const nested = await runBody(branch, ctx, 'core:if branch failed');
-        return nested.context;
-      }
-      if (!conditionResult) {
-        return skipAdfStep(
-          ctx,
-          'core:if condition evaluated to false and no else branch was provided'
-        );
-      }
-      return ctx;
-    }
-
-    if (action === 'switch') {
-      const cases = Array.isArray(params.cases) ? params.cases : [];
-      const selected = cases.find((entry: any) =>
-        evaluateCondition(entry.when ?? entry.condition, ctx)
-      );
-      const branch = selected?.steps ?? selected?.pipeline ?? selected?.then ?? params.default;
-      if (Array.isArray(branch)) {
-        const nested = await runBody(branch, ctx, 'core:switch branch failed');
-        return nested.context;
-      }
-      return skipAdfStep(ctx, 'core:switch selected no case and no default branch');
-    }
-
-    if (action === 'while' || action === 'loop_until' || action === 'retry_until_quality') {
+    const runLoopBody: (
+      dctx: ControlOpDispatchContext
+    ) => Promise<Record<string, unknown> | AdfSkippedStep> = async (dctx) => {
+      const { rawOp, action, params, ctx } = dctx;
       const body = Array.isArray(params.pipeline)
         ? (params.pipeline as PipelineAdfStep[])
         : undefined;
@@ -603,396 +336,742 @@ export async function runStepsInternal(
         ...workingCtx,
         [exportKey]: { iterations: loopCount, history: iterations, final_context: workingCtx },
       };
-    }
+    };
 
-    if (action === 'foreach') {
-      const items = resolveVars(params.items, ctx);
-      const subSteps = params.do as PipelineAdfStep[];
-      if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
-      const itemName = (params.as as string) || 'item';
-      const originalItemValue = (ctx as any)[itemName];
-      let workingCtx = ctx;
-      for (const item of items) {
-        const loopCtx = { ...workingCtx, [itemName]: item };
-        const nested = await runBody(subSteps, loopCtx, 'core:foreach item failed');
-        workingCtx = { ...nested.context };
-        if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
-        else (workingCtx as any)[itemName] = originalItemValue;
-      }
-      return workingCtx;
-    }
-
-    if (action === 'parallel_foreach') {
-      const itemsFrom = params.items_from as Record<string, unknown> | undefined;
-      let items = resolveVars(params.items, ctx);
-      if (itemsFrom && !Array.isArray(items)) {
-        const poolRef = typeof itemsFrom.pool_ref === 'string' ? itemsFrom.pool_ref : undefined;
-        const pool = poolRef ? (resolveVars(`{{${poolRef}}}`, ctx) as unknown) : undefined;
-        if (!Array.isArray(pool)) {
-          throw new Error('[PARALLEL_POOL_INVALID] items_from.pool_ref must resolve to an array');
+    const CONTROL_OP_HANDLERS: Record<
+      string,
+      (dctx: {
+        rawOp: string;
+        normalizedOp: string;
+        action: string;
+        params: Record<string, any>;
+        ctx: Record<string, unknown>;
+        runNestedSteps: (
+          nested: AdfStep[],
+          seedCtx?: Record<string, unknown>
+        ) => Promise<AdfRunResult<Record<string, unknown>>>;
+        currentStep: PipelineAdfStep | undefined;
+      }) => Promise<Record<string, unknown> | AdfSkippedStep>
+    > = {
+      while: runLoopBody,
+      loop_until: runLoopBody,
+      retry_until_quality: runLoopBody,
+      judge_route: async (dctx) => {
+        const { rawOp, params, ctx, currentStep } = dctx;
+        const judge = (params.judge || {}) as Record<string, unknown>;
+        const exportKey = String(
+          params.export_as ||
+            (currentStep?.produces
+              ? typeof currentStep.produces === 'string'
+                ? currentStep.produces
+                : currentStep.produces.channel
+              : 'judge_route')
+        );
+        const verdictKey = String(params.verdict_as || 'judge_verdict');
+        const fixtureVerdict =
+          params.fixture === true && params.verdict && typeof params.verdict === 'object'
+            ? (resolveVars(params.verdict, ctx) as Record<string, unknown>)
+            : undefined;
+        const schemaRef = String(judge.schema_ref || params.schema_ref || 'judge_route_verdict');
+        const verdict = fixtureVerdict
+          ? fixtureVerdict
+          : await (async () => {
+              const { delegateStructured, backend } = await structuredReasoning();
+              const { z } = await import('zod');
+              return delegateStructured(
+                backend,
+                [
+                  String(
+                    resolveVars(
+                      judge.prompt ||
+                        judge.instruction_ref ||
+                        params.prompt ||
+                        'Classify the current pipeline context.',
+                      ctx
+                    )
+                  ),
+                  `Return a route verdict compatible with schema_ref=${schemaRef}.`,
+                  `Inputs:\n${JSON.stringify(resolveVars(judge.inputs ?? ctx, ctx))}`,
+                ].join('\n\n'),
+                z
+                  .object({
+                    label: z.string().min(1),
+                    reason: z.string().optional(),
+                    value: z.unknown().optional(),
+                  })
+                  .passthrough(),
+                { context: `pipeline:judge_route:${currentStep?.id || exportKey}`, maxRetries: 2 }
+              );
+            })();
+        const routes = Array.isArray(params.routes)
+          ? (params.routes as Array<{
+              when?: Record<string, unknown>;
+              next: string;
+              reason?: string;
+            }>)
+          : [];
+        const decision = selectJudgeRoute(
+          verdict as Record<string, unknown>,
+          routes,
+          (params.on_no_match as 'abort' | 'complete' | 'continue' | undefined) || 'abort'
+        );
+        opts.trace?.addEvent('judge.route_selected', {
+          step_id: currentStep?.id || rawOp,
+          route_index: decision.selection.route_index,
+          next: decision.selection.next,
+          matched: decision.selection.matched,
+          reason: decision.selection.reason,
+          schema_ref: schemaRef,
+          source: fixtureVerdict ? 'fixture' : 'reasoning_backend',
+        });
+        if (decision.selection.next === 'ABORT') {
+          throw new Error(`[JUDGE_ROUTE_ABORT] ${decision.selection.reason}`);
         }
-        const selection = itemsFrom.selection as Record<string, unknown> | undefined;
-        const fixture = selection?.fixture;
-        if (Array.isArray(fixture)) {
-          const indices = fixture.map((entry) => Number(entry));
-          items = indices.every(
-            (index) => Number.isInteger(index) && index >= 0 && index < pool.length
-          )
-            ? indices.map((index) => pool[index])
-            : fixture;
-        } else if (selection?.judge && typeof selection.judge === 'object') {
-          const judge = selection.judge as Record<string, unknown>;
-          const selected = await delegateStructured(
-            getReasoningBackend(),
-            [
-              String(judge.prompt || 'Select the pool items that satisfy the current task.'),
-              `Pool:\n${JSON.stringify(pool)}`,
-              'Return zero-based selected_indices only; do not invent indices.',
-            ].join('\n\n'),
-            z.object({ selected_indices: z.array(z.number().int().nonnegative()) }).strict(),
-            {
-              context: `pipeline:parallel_foreach:selection:${currentStep?.id || rawOp}`,
-              maxRetries: 2,
-            }
-          );
-          const indices = selected.selected_indices;
-          if (
-            new Set(indices).size !== indices.length ||
-            indices.some((index) => index < 0 || index >= pool.length)
-          ) {
+        const history = Array.isArray(ctx.__judge_route_history)
+          ? [...ctx.__judge_route_history.map(String)]
+          : [];
+        if (decision.selection.next !== 'COMPLETE' && decision.selection.next !== 'CONTINUE') {
+          const next = decision.selection.next;
+          const currentIndex = currentStep?.id
+            ? steps.findIndex((candidate) => candidate.id === currentStep.id)
+            : -1;
+          const targetIndex = steps.findIndex((candidate) => candidate.id === next);
+          if (currentIndex >= 0 && targetIndex >= 0 && targetIndex <= currentIndex) {
             throw new Error(
-              '[PARALLEL_SELECTION_INVALID] judge selected an out-of-range or duplicate pool index'
+              `[JUDGE_ROUTE_BACK_EDGE_UNSUPPORTED] route from '${currentStep?.id}' to '${next}' would rewind a linear pipeline`
             );
           }
-          items = indices.map((index) => pool[index]);
-        } else {
-          items = pool;
+          const nextHistory = [...history, next];
+          const cycle = detectRouteCycle(
+            nextHistory,
+            resolveMaxRouteHops(totalTopLevelSteps, params.max_route_hops)
+          );
+          if (cycle.detected) {
+            throw new Error(`[JUDGE_ROUTE_LOOP] ${cycle.reason}`);
+          }
+          return {
+            ...ctx,
+            [verdictKey]: verdict,
+            [exportKey]: decision.selection,
+            __judge_route_history: nextHistory,
+            __pipeline_route_next: next,
+          };
         }
-      }
-      const subSteps = params.do as PipelineAdfStep[];
-      if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
-      const itemName = (params.as as string) || 'item';
-      const concurrency = coercePositiveInt(params.concurrency ?? params.parallelism, 2);
-      const exportKey = resolveExportKey(
-        { op: rawOp, params } as PipelineAdfStep,
-        'last_parallel_foreach'
-      );
-      const mergePolicy =
-        params.merge === 'last' || params.merge === 'namespace' || params.merge === 'collect'
-          ? params.merge
-          : 'collect';
-      const originalItemValue = (ctx as any)[itemName];
-      const originalSharedCtx = { ...ctx };
-      const preparedBody = prepareEngineSteps(subSteps);
-      const perItemContexts: Array<Record<string, unknown>> = [];
-      const perItemOutputs: Array<{
-        index: number;
-        item: unknown;
-        context: Record<string, unknown>;
-        results: RunStepResult[];
-      }> = [];
-      await runParallelBatches(items, concurrency, async (item, index) => {
-        const loopCtx = { ...originalSharedCtx, [itemName]: item };
-        const nested = await runNestedSteps(preparedBody, loopCtx);
-        if (nested.status === 'failed') {
-          throw new Error(
-            `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+        const nextContext = {
+          ...ctx,
+          [verdictKey]: verdict,
+          [exportKey]: decision.selection,
+          __judge_route_history: history,
+        };
+        if (decision.selection.next === 'COMPLETE') {
+          return { ...nextContext, __adf_terminal: true };
+        }
+        return nextContext;
+      },
+      await_decision: async (dctx) => {
+        const { createApprovalRequest, isApprovalRequestExpired, loadApprovalRequest } =
+          await import('@agent/core/governance/approval-store');
+        const { params, ctx, currentStep } = dctx;
+        const approval = (params.approval || {}) as Record<string, unknown>;
+        const stepId = currentStep?.id;
+        if (!stepId) throw new Error('core:await_decision requires a step id for durable resume');
+        const targetStepId =
+          typeof params.approval_for === 'string' && params.approval_for.trim()
+            ? params.approval_for.trim()
+            : undefined;
+        const storageChannel = String(params.storage_channel || 'pipeline-approval');
+        const onTimeout = (['abort', 'deny', 'escalate'] as const).includes(
+          params.on_timeout as 'abort' | 'deny' | 'escalate'
+        )
+          ? (params.on_timeout as 'abort' | 'deny' | 'escalate')
+          : 'abort';
+        const suspended = opts.resumeState?.suspended;
+        if (suspended && suspended.step_id === stepId) {
+          const existing = loadApprovalRequest(
+            suspended.storage_channel,
+            suspended.approval_request_id
+          );
+          if (existing?.status === 'approved' || existing?.status === 'applied') {
+            return {
+              ...ctx,
+              [String(params.export_as || 'decision')]: {
+                status: 'approved',
+                approval_request_id: existing.id,
+                storage_channel: suspended.storage_channel,
+                step_id: existing.requestedByContext?.stepId || stepId,
+                ...(existing.requestedByContext?.targetStepId
+                  ? { target_step_id: existing.requestedByContext.targetStepId }
+                  : {}),
+                decided_by: existing.decidedBy,
+              },
+            };
+          }
+          if (existing?.status === 'rejected' || existing?.status === 'cancelled') {
+            throw new Error(
+              `[AWAIT_DECISION_DENIED] approval ${suspended.approval_request_id} is ${existing.status}`
+            );
+          }
+          const expired = suspended.timeout_at && Date.parse(suspended.timeout_at) <= Date.now();
+          if (
+            expired ||
+            existing?.status === 'expired' ||
+            (existing && isApprovalRequestExpired(existing))
+          ) {
+            if (suspended.on_timeout === 'deny') {
+              return {
+                ...ctx,
+                [String(params.export_as || 'decision')]: {
+                  status: 'denied',
+                  timed_out: true,
+                  approval_request_id: suspended.approval_request_id,
+                },
+              };
+            }
+            if (suspended.on_timeout === 'escalate') {
+              const escalationTimeoutMs = coercePositiveInt(
+                params.escalation_timeout_ms,
+                86_400_000
+              );
+              const escalation = createApprovalRequest('mission_controller', {
+                channel: suspended.storage_channel,
+                threadTs: String(params.thread_ts || `${stepId}:escalation`),
+                correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}:escalation`,
+                requestedBy: `pipeline:${opts.runId || 'pending'}`,
+                kind: 'mission_gate',
+                expiresAt: new Date(Date.now() + escalationTimeoutMs).toISOString(),
+                requestedByContext: {
+                  surface: 'system',
+                  actorId: `pipeline:${opts.runId || 'pending'}`,
+                  actorRole: 'pipeline',
+                  stepId,
+                  ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
+                  ...(existing?.requestedByContext?.targetStepId
+                    ? { targetStepId: existing.requestedByContext.targetStepId }
+                    : {}),
+                  ...(registeredEnv('MISSION_ID')
+                    ? { missionId: registeredEnv('MISSION_ID') }
+                    : {}),
+                },
+                source: {
+                  ...(registeredEnv('MISSION_ID')
+                    ? { missionId: registeredEnv('MISSION_ID') }
+                    : {}),
+                  agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+                },
+                draft: {
+                  title: `Escalated pipeline decision: ${stepId}`,
+                  summary: `The original decision ${suspended.approval_request_id} timed out and requires escalation.`,
+                  severity: 'high',
+                },
+                justification: {
+                  reason: 'TAKT await_decision timeout escalation',
+                  impactSummary: `Original approval ${suspended.approval_request_id} expired without a decision.`,
+                },
+              });
+              throw new PipelineSuspendedError({
+                step_id: stepId,
+                approval_request_id: escalation.id,
+                storage_channel: suspended.storage_channel,
+                on_timeout: 'abort',
+                timeout_at: escalation.expiresAt,
+                reason: `escalated from expired approval ${suspended.approval_request_id}`,
+              });
+            }
+            throw new Error(`[AWAIT_DECISION_TIMEOUT] on_timeout=${suspended.on_timeout}`);
+          }
+          throw new PipelineSuspendedError(suspended);
+        }
+        if (
+          registeredEnv('KYBERION_NON_INTERACTIVE') === '1' &&
+          params.non_interactive !== 'allow'
+        ) {
+          throw new Error('[AWAIT_DECISION_DENIED] non-interactive execution defaults to deny');
+        }
+        const timeoutMs = coercePositiveInt(params.timeout_ms ?? params.timeout, 86_400_000);
+        const timeoutAt = new Date(Date.now() + timeoutMs).toISOString();
+        const record = createApprovalRequest('mission_controller', {
+          channel: storageChannel,
+          threadTs: String(params.thread_ts || stepId),
+          correlationId: `pipeline:${opts.runId || 'pending'}:${stepId}`,
+          requestedBy: `pipeline:${opts.runId || 'pending'}`,
+          kind: 'mission_gate',
+          expiresAt: timeoutAt,
+          requestedByContext: {
+            surface: 'system',
+            actorId: `pipeline:${opts.runId || 'pending'}`,
+            actorRole: 'pipeline',
+            stepId,
+            ...(opts.runId ? { pipelineRunId: opts.runId } : {}),
+            ...(targetStepId ? { targetStepId } : {}),
+            ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
+          },
+          source: {
+            ...(registeredEnv('MISSION_ID') ? { missionId: registeredEnv('MISSION_ID') } : {}),
+            agentId: registeredEnv('KYBERION_AGENT_ID') || 'pipeline-orchestrator',
+          },
+          draft: {
+            title: String(approval.title || `Pipeline decision: ${stepId}`),
+            summary: String(
+              approval.summary || params.summary || 'Pipeline execution requires a human decision.'
+            ),
+            details: typeof approval.details === 'string' ? approval.details : undefined,
+            severity:
+              approval.severity === 'high'
+                ? 'high'
+                : approval.severity === 'low'
+                  ? 'low'
+                  : 'medium',
+          },
+          justification: {
+            reason: 'TAKT await_decision control stage',
+            impactSummary: String(
+              approval.summary ||
+                params.summary ||
+                'Pipeline execution is suspended until a decision arrives.'
+            ),
+          },
+        });
+        throw new PipelineSuspendedError({
+          step_id: stepId,
+          approval_request_id: record.id,
+          storage_channel: storageChannel,
+          on_timeout: onTimeout,
+          timeout_at: timeoutAt,
+          reason: String(approval.summary || params.summary || 'human decision required'),
+        });
+      },
+      if: async (dctx) => {
+        const { params, ctx } = dctx;
+        const conditionResult = evaluateCondition(params.condition, ctx);
+        const branch = conditionResult ? params.then : params.else;
+        if (Array.isArray(branch)) {
+          const nested = await runBody(branch, ctx, 'core:if branch failed');
+          return nested.context;
+        }
+        if (!conditionResult) {
+          return skipAdfStep(
+            ctx,
+            'core:if condition evaluated to false and no else branch was provided'
           );
         }
-        perItemContexts[index] = nested.context;
-        perItemOutputs[index] = {
-          index,
-          item,
-          context: nested.context,
-          results: nested.results as RunStepResult[],
-        };
-      });
-      let workingCtx: Record<string, unknown> = { ...ctx, [exportKey]: perItemOutputs };
-      if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
-      else (workingCtx as any)[itemName] = originalItemValue;
-      if (mergePolicy === 'namespace') {
-        workingCtx = {
-          ...workingCtx,
-          [exportKey]: Object.fromEntries(
-            perItemContexts.map((itemContext, index) => [String(index), itemContext])
-          ),
-        };
-      } else if (mergePolicy === 'last' && perItemContexts.length > 0) {
-        workingCtx = { ...workingCtx, ...perItemContexts[perItemContexts.length - 1] };
-      }
-      return workingCtx;
-    }
-
-    if (action === 'team_lead') {
-      const subSteps = params.do as PipelineAdfStep[];
-      if (!Array.isArray(subSteps)) {
-        throw new Error('[TEAM_LEAD_INVALID] team_lead requires params.do');
-      }
-      let tasks = resolveVars(params.tasks, ctx);
-      if (!Array.isArray(tasks)) {
-        const fixtureTasks = params.fixture_tasks;
-        if (Array.isArray(fixtureTasks)) tasks = fixtureTasks;
-        else {
-          const plan = await delegateStructured(
-            getReasoningBackend(),
-            String(
-              params.instruction || 'Decompose the current context into bounded parallel tasks.'
-            ) + `\nContext:\n${JSON.stringify(params.context || ctx)}`,
-            z.object({ tasks: z.array(z.record(z.string(), z.unknown())).min(1) }),
-            { context: `pipeline:team_lead:${currentStep?.id || rawOp}`, maxRetries: 2 }
-          );
-          tasks = plan.tasks;
-        }
-      }
-      const itemName = typeof params.as === 'string' ? params.as : 'task';
-      const concurrency = Math.min(
-        coercePositiveInt(params.max_concurrency ?? params.concurrency, 2),
-        3
-      );
-      const exportKey = resolveExportKey(
-        { op: rawOp, params } as PipelineAdfStep,
-        'last_team_lead'
-      );
-      const outputs: Array<{
-        index: number;
-        item: unknown;
-        context: Record<string, unknown>;
-        results: RunStepResult[];
-      }> = [];
-      await runParallelBatches(tasks, concurrency, async (task, index) => {
-        const nested = await runBody(
-          subSteps,
-          { ...ctx, [itemName]: task },
-          'core:team_lead worker failed'
+        return ctx;
+      },
+      switch: async (dctx) => {
+        const { params, ctx } = dctx;
+        const cases = Array.isArray(params.cases) ? params.cases : [];
+        const selected = cases.find((entry: any) =>
+          evaluateCondition(entry.when ?? entry.condition, ctx)
         );
-        if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
-        outputs[index] = {
-          index,
-          item: task,
-          context: nested.context,
-          results: nested.results as RunStepResult[],
-        };
-      });
-      return { ...ctx, [exportKey]: { tasks, outputs, max_concurrency: concurrency } };
-    }
-
-    if (action === 'parallel_calls') {
-      // KD-07: resource-claim declaring tool-call scheduler, wired here as
-      // the adf-engine batch-execution path for a single step that fans out
-      // into several heterogeneous tool/op calls. Different layer than
-      // `core:parallel_foreach` above: parallel_foreach runs ONE fixed body
-      // over N data items; parallel_calls runs N (possibly different) ops
-      // once each, parallelizing only the ones whose declared resource
-      // claims never conflict (see tool-call-scheduler.ts). An op with no
-      // `accesses` declaration is conservative — `{kind:'all'}` — which
-      // degrades the WHOLE batch to today's fully-serial behavior.
-      const callSteps = params.calls as PipelineAdfStep[];
-      if (!Array.isArray(callSteps) || callSteps.length === 0) return ctx;
-      const preparedCalls = prepareEngineSteps(callSteps);
-      const exportKey = resolveExportKey(
-        { op: rawOp, params } as PipelineAdfStep,
-        'last_parallel_calls'
-      );
-
-      const scheduled = preparedCalls.map((step, index) => {
-        const normalizedOp = normalizePipelineOp(step.op);
-        const [domain, opAction] = normalizedOp.split(':');
-        let resolvedParams: Record<string, unknown> = (step.params || {}) as Record<
-          string,
-          unknown
-        >;
-        try {
-          resolvedParams = resolveVars(step.params, ctx) as Record<string, unknown>;
-        } catch {
-          /* unresolvable templates — resolve claims from the raw params instead */
+        const branch = selected?.steps ?? selected?.pipeline ?? selected?.then ?? params.default;
+        if (Array.isArray(branch)) {
+          const nested = await runBody(branch, ctx, 'core:switch branch failed');
+          return nested.context;
         }
-        // Control ops (nested core:if/core:while/... ) have no filesystem
-        // footprint of their own to declare — stay conservative for them.
-        const claims: ResourceClaim[] =
-          domain === 'core'
-            ? [{ kind: 'all' }]
-            : resolveOpAccessClaims(domain as OpInputDomain, opAction, resolvedParams);
-        return {
-          claims,
-          run: async (): Promise<Record<string, unknown>> => {
-            const nested = await runNestedSteps([step], ctx);
-            if (nested.status === 'failed') {
+        return skipAdfStep(ctx, 'core:switch selected no case and no default branch');
+      },
+
+      foreach: async (dctx) => {
+        const { params, ctx } = dctx;
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
+        const itemName = (params.as as string) || 'item';
+        const originalItemValue = (ctx as any)[itemName];
+        let workingCtx = ctx;
+        for (const item of items) {
+          const loopCtx = { ...workingCtx, [itemName]: item };
+          const nested = await runBody(subSteps, loopCtx, 'core:foreach item failed');
+          workingCtx = { ...nested.context };
+          if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
+          else (workingCtx as any)[itemName] = originalItemValue;
+        }
+        return workingCtx;
+      },
+      parallel_foreach: async (dctx) => {
+        const { rawOp, params, ctx, runNestedSteps, currentStep } = dctx;
+        const itemsFrom = params.items_from as Record<string, unknown> | undefined;
+        let items = resolveVars(params.items, ctx);
+        if (itemsFrom && !Array.isArray(items)) {
+          const poolRef = typeof itemsFrom.pool_ref === 'string' ? itemsFrom.pool_ref : undefined;
+          const pool = poolRef ? (resolveVars(`{{${poolRef}}}`, ctx) as unknown) : undefined;
+          if (!Array.isArray(pool)) {
+            throw new Error('[PARALLEL_POOL_INVALID] items_from.pool_ref must resolve to an array');
+          }
+          const selection = itemsFrom.selection as Record<string, unknown> | undefined;
+          const fixture = selection?.fixture;
+          if (Array.isArray(fixture)) {
+            const indices = fixture.map((entry) => Number(entry));
+            items = indices.every(
+              (index) => Number.isInteger(index) && index >= 0 && index < pool.length
+            )
+              ? indices.map((index) => pool[index])
+              : fixture;
+          } else if (selection?.judge && typeof selection.judge === 'object') {
+            const judge = selection.judge as Record<string, unknown>;
+            const { delegateStructured, backend } = await structuredReasoning();
+            const { z } = await import('zod');
+            const selected = await delegateStructured(
+              backend,
+              [
+                String(judge.prompt || 'Select the pool items that satisfy the current task.'),
+                `Pool:\n${JSON.stringify(pool)}`,
+                'Return zero-based selected_indices only; do not invent indices.',
+              ].join('\n\n'),
+              z.object({ selected_indices: z.array(z.number().int().nonnegative()) }).strict(),
+              {
+                context: `pipeline:parallel_foreach:selection:${currentStep?.id || rawOp}`,
+                maxRetries: 2,
+              }
+            );
+            const indices = selected.selected_indices;
+            if (
+              new Set(indices).size !== indices.length ||
+              indices.some((index) => index < 0 || index >= pool.length)
+            ) {
               throw new Error(
-                nested.results.find((r) => r.status === 'failed')?.error ||
-                  `core:parallel_calls call ${index + 1} (${step.op}) failed`
+                '[PARALLEL_SELECTION_INVALID] judge selected an out-of-range or duplicate pool index'
               );
             }
-            return nested.context;
-          },
-        };
-      });
-
-      const settled = await runToolCallBatch(scheduled);
-      const perCallResults = settled.map((entry, index) => ({
-        index,
-        op: preparedCalls[index].op,
-        status: entry.status,
-        ...(entry.status === 'rejected'
-          ? { error: entry.reason instanceof Error ? entry.reason.message : String(entry.reason) }
-          : {}),
-      }));
-      const firstFailure = settled.find((entry) => entry.status === 'rejected');
-      if (firstFailure && firstFailure.status === 'rejected') {
-        throw new Error(
-          firstFailure.reason instanceof Error
-            ? firstFailure.reason.message
-            : String(firstFailure.reason)
-        );
-      }
-      // Merge each call's context contribution in REQUEST order (later calls
-      // win on key collisions), exactly like sequential execution would —
-      // regardless of which call actually finished first in wall-clock time.
-      let mergedCtx: Record<string, unknown> = { ...ctx };
-      for (const entry of settled) {
-        if (entry.status === 'fulfilled') {
-          mergedCtx = { ...mergedCtx, ...(entry.value as Record<string, unknown>) };
-        }
-      }
-      return { ...mergedCtx, [exportKey]: perCallResults };
-    }
-
-    if (action === 'accumulate') {
-      const items = resolveVars(params.items, ctx);
-      const subSteps = params.do as PipelineAdfStep[];
-      if (!Array.isArray(items)) throw new Error('core:accumulate requires "items" to be an array');
-      if (!Array.isArray(subSteps)) throw new Error('core:accumulate requires "do" pipeline steps');
-      const itemName = (params.as as string) || 'item';
-      const collectKey = String(params.collect_as || params.export_as || 'result');
-      const exportKey = resolveExportKey(
-        { op: rawOp, params } as PipelineAdfStep,
-        'last_accumulate'
-      );
-      const originalItemValue = (ctx as any)[itemName];
-      const originalSharedCtx = { ...ctx };
-      const targetCount = coercePositiveInt(
-        params.target_count ?? params.targetCount,
-        items.length
-      );
-      const maxIterations = coercePositiveInt(
-        params.max_iterations ?? params.maxIterations,
-        items.length
-      );
-      const dryStreakLimit = coercePositiveInt(params.dry_streak_limit ?? params.dryStreakLimit, 2);
-      const seen = new Set<string>();
-      const collected: Array<{
-        index: number;
-        item: unknown;
-        value: unknown;
-        context: Record<string, unknown>;
-        results: RunStepResult[];
-      }> = [];
-      let dryStreak = 0;
-      let loopCount = 0;
-      for (const [index, item] of items.entries()) {
-        if (loopCount >= maxIterations) break;
-        if (collected.length >= targetCount) break;
-        const loopCtx = { ...originalSharedCtx, [itemName]: item };
-        const nested = await runBody(subSteps, loopCtx, `accumulate item ${index + 1} failed`);
-        const candidateValue = (nested.context as any)[collectKey] ?? nested.context ?? item;
-        const fingerprint = (() => {
-          try {
-            return JSON.stringify(candidateValue);
-          } catch {
-            return String(candidateValue);
+            items = indices.map((index) => pool[index]);
+          } else {
+            items = pool;
           }
-        })();
-        loopCount += 1;
-        if (!seen.has(fingerprint)) {
-          seen.add(fingerprint);
-          collected.push({
+        }
+        const subSteps = params.do as PipelineAdfStep[];
+        if (!Array.isArray(items) || !Array.isArray(subSteps)) return ctx;
+        const itemName = (params.as as string) || 'item';
+        const concurrency = coercePositiveInt(params.concurrency ?? params.parallelism, 2);
+        const exportKey = resolveExportKey(
+          { op: rawOp, params } as PipelineAdfStep,
+          'last_parallel_foreach'
+        );
+        const mergePolicy =
+          params.merge === 'last' || params.merge === 'namespace' || params.merge === 'collect'
+            ? params.merge
+            : 'collect';
+        const originalItemValue = (ctx as any)[itemName];
+        const originalSharedCtx = { ...ctx };
+        const preparedBody = prepareEngineSteps(subSteps);
+        const perItemContexts: Array<Record<string, unknown>> = [];
+        const perItemOutputs: Array<{
+          index: number;
+          item: unknown;
+          context: Record<string, unknown>;
+          results: RunStepResult[];
+        }> = [];
+        await runParallelBatches(items, concurrency, async (item, index) => {
+          const loopCtx = { ...originalSharedCtx, [itemName]: item };
+          const nested = await runNestedSteps(preparedBody, loopCtx);
+          if (nested.status === 'failed') {
+            throw new Error(
+              `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+            );
+          }
+          perItemContexts[index] = nested.context;
+          perItemOutputs[index] = {
             index,
             item,
-            value: candidateValue,
             context: nested.context,
             results: nested.results as RunStepResult[],
-          });
-          dryStreak = 0;
-        } else {
-          dryStreak += 1;
+          };
+        });
+        let workingCtx: Record<string, unknown> = { ...ctx, [exportKey]: perItemOutputs };
+        if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
+        else (workingCtx as any)[itemName] = originalItemValue;
+        if (mergePolicy === 'namespace') {
+          workingCtx = {
+            ...workingCtx,
+            [exportKey]: Object.fromEntries(
+              perItemContexts.map((itemContext, index) => [String(index), itemContext])
+            ),
+          };
+        } else if (mergePolicy === 'last' && perItemContexts.length > 0) {
+          workingCtx = { ...workingCtx, ...perItemContexts[perItemContexts.length - 1] };
         }
-        if (dryStreak >= dryStreakLimit) break;
-      }
-      let workingCtx: Record<string, unknown> = {
-        ...ctx,
-        [exportKey]: {
-          collected,
-          iterations: loopCount,
-          dry_streak: dryStreak,
-          target_count: targetCount,
-          final_context: ctx,
-        },
-      };
-      if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
-      else (workingCtx as any)[itemName] = originalItemValue;
-      return workingCtx;
-    }
-
-    if (action === 'include') {
-      const fragmentRef = String(resolveVars(params.fragment || '', ctx));
-      if (!fragmentRef) throw new Error('core:include requires "fragment" param');
-      const fragmentPath = resolveFragmentPath(fragmentRef);
-      if (!safeExistsSync(fragmentPath)) {
-        throw new Error(
-          `core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`
+        return workingCtx;
+      },
+      team_lead: async (dctx) => {
+        const { rawOp, params, ctx, currentStep } = dctx;
+        const subSteps = params.do as PipelineAdfStep[];
+        if (!Array.isArray(subSteps)) {
+          throw new Error('[TEAM_LEAD_INVALID] team_lead requires params.do');
+        }
+        let tasks = resolveVars(params.tasks, ctx);
+        if (!Array.isArray(tasks)) {
+          const fixtureTasks = params.fixture_tasks;
+          if (Array.isArray(fixtureTasks)) tasks = fixtureTasks;
+          else {
+            const { delegateStructured, backend } = await structuredReasoning();
+            const { z } = await import('zod');
+            const plan = await delegateStructured(
+              backend,
+              String(
+                params.instruction || 'Decompose the current context into bounded parallel tasks.'
+              ) + `\nContext:\n${JSON.stringify(params.context || ctx)}`,
+              z.object({ tasks: z.array(z.record(z.string(), z.unknown())).min(1) }),
+              { context: `pipeline:team_lead:${currentStep?.id || rawOp}`, maxRetries: 2 }
+            );
+            tasks = plan.tasks;
+          }
+        }
+        const itemName = typeof params.as === 'string' ? params.as : 'task';
+        const concurrency = Math.min(
+          coercePositiveInt(params.max_concurrency ?? params.concurrency, 2),
+          3
         );
-      }
-      if (includeStack.has(fragmentPath)) {
-        throw new Error(
-          `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
+        const exportKey = resolveExportKey(
+          { op: rawOp, params } as PipelineAdfStep,
+          'last_team_lead'
         );
-      }
-      const fragmentRaw = readPipelineIncludeTextFile(fragmentPath);
-      const fragmentJson = parseFragmentJson(fragmentRaw, fragmentRef);
-      const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
-        ...s,
-        params: s.params || {},
-      }));
-      const fragmentContext: Record<string, unknown> =
-        fragmentJson.context && typeof fragmentJson.context === 'object'
-          ? Object.fromEntries(
-              Object.entries(fragmentJson.context as Record<string, unknown>).map(([k, v]) => [
-                k,
-                typeof v === 'string' ? resolveVars(v, ctx) : v,
-              ])
-            )
-          : {};
-      const inlineCtx: Record<string, unknown> =
-        params.context && typeof params.context === 'object'
-          ? Object.fromEntries(
-              Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
-                k,
-                typeof v === 'string' ? resolveVars(v, ctx) : v,
-              ])
-            )
-          : {};
-      const previousStack = includeStack;
-      includeStack = new Set([...previousStack, fragmentPath]);
-      try {
-        const nested = await runBody(
-          fragmentSteps,
-          { ...fragmentContext, ...ctx, ...inlineCtx },
-          `core:include fragment failed: ${fragmentRef}`
-        );
-        const exportKey =
-          typeof params.export_as === 'string' && params.export_as ? params.export_as : undefined;
-        if (!exportKey) return nested.context;
-        return {
-          ...nested.context,
-          [exportKey]: {
-            status: nested.status,
-            results: nested.results,
+        const outputs: Array<{
+          index: number;
+          item: unknown;
+          context: Record<string, unknown>;
+          results: RunStepResult[];
+        }> = [];
+        await runParallelBatches(tasks, concurrency, async (task, index) => {
+          const nested = await runBody(
+            subSteps,
+            { ...ctx, [itemName]: task },
+            'core:team_lead worker failed'
+          );
+          if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
+          outputs[index] = {
+            index,
+            item: task,
             context: nested.context,
+            results: nested.results as RunStepResult[],
+          };
+        });
+        return { ...ctx, [exportKey]: { tasks, outputs, max_concurrency: concurrency } };
+      },
+      parallel_calls: async (dctx) => {
+        const { rawOp, params, ctx, runNestedSteps } = dctx;
+        // KD-07: resource-claim declaring tool-call scheduler, wired here as
+        // the adf-engine batch-execution path for a single step that fans out
+        // into several heterogeneous tool/op calls. Different layer than
+        // `core:parallel_foreach` above: parallel_foreach runs ONE fixed body
+        // over N data items; parallel_calls runs N (possibly different) ops
+        // once each, parallelizing only the ones whose declared resource
+        // claims never conflict (see tool-call-scheduler.ts). An op with no
+        // `accesses` declaration is conservative — `{kind:'all'}` — which
+        // degrades the WHOLE batch to today's fully-serial behavior.
+        const callSteps = params.calls as PipelineAdfStep[];
+        if (!Array.isArray(callSteps) || callSteps.length === 0) return ctx;
+        const preparedCalls = prepareEngineSteps(callSteps);
+        const exportKey = resolveExportKey(
+          { op: rawOp, params } as PipelineAdfStep,
+          'last_parallel_calls'
+        );
+
+        const scheduled = preparedCalls.map((step, index) => {
+          const normalizedOp = normalizePipelineOp(step.op);
+          const [domain, opAction] = normalizedOp.split(':');
+          let resolvedParams: Record<string, unknown> = (step.params || {}) as Record<
+            string,
+            unknown
+          >;
+          try {
+            resolvedParams = resolveVars(step.params, ctx) as Record<string, unknown>;
+          } catch {
+            /* unresolvable templates — resolve claims from the raw params instead */
+          }
+          // Control ops (nested core:if/core:while/... ) have no filesystem
+          // footprint of their own to declare — stay conservative for them.
+          const claims: ResourceClaim[] =
+            domain === 'core'
+              ? [{ kind: 'all' }]
+              : resolveOpAccessClaims(domain as OpInputDomain, opAction, resolvedParams);
+          return {
+            claims,
+            run: async (): Promise<Record<string, unknown>> => {
+              const nested = await runNestedSteps([step], ctx);
+              if (nested.status === 'failed') {
+                throw new Error(
+                  nested.results.find((r) => r.status === 'failed')?.error ||
+                    `core:parallel_calls call ${index + 1} (${step.op}) failed`
+                );
+              }
+              return nested.context;
+            },
+          };
+        });
+
+        const settled = await runToolCallBatch(scheduled);
+        const perCallResults = settled.map((entry, index) => ({
+          index,
+          op: preparedCalls[index].op,
+          status: entry.status,
+          ...(entry.status === 'rejected'
+            ? { error: entry.reason instanceof Error ? entry.reason.message : String(entry.reason) }
+            : {}),
+        }));
+        const firstFailure = settled.find((entry) => entry.status === 'rejected');
+        if (firstFailure && firstFailure.status === 'rejected') {
+          throw new Error(
+            firstFailure.reason instanceof Error
+              ? firstFailure.reason.message
+              : String(firstFailure.reason)
+          );
+        }
+        // Merge each call's context contribution in REQUEST order (later calls
+        // win on key collisions), exactly like sequential execution would —
+        // regardless of which call actually finished first in wall-clock time.
+        let mergedCtx: Record<string, unknown> = { ...ctx };
+        for (const entry of settled) {
+          if (entry.status === 'fulfilled') {
+            mergedCtx = { ...mergedCtx, ...(entry.value as Record<string, unknown>) };
+          }
+        }
+        return { ...mergedCtx, [exportKey]: perCallResults };
+      },
+      accumulate: async (dctx) => {
+        const { rawOp, params, ctx } = dctx;
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (!Array.isArray(items))
+          throw new Error('core:accumulate requires "items" to be an array');
+        if (!Array.isArray(subSteps))
+          throw new Error('core:accumulate requires "do" pipeline steps');
+        const itemName = (params.as as string) || 'item';
+        const collectKey = String(params.collect_as || params.export_as || 'result');
+        const exportKey = resolveExportKey(
+          { op: rawOp, params } as PipelineAdfStep,
+          'last_accumulate'
+        );
+        const originalItemValue = (ctx as any)[itemName];
+        const originalSharedCtx = { ...ctx };
+        const targetCount = coercePositiveInt(
+          params.target_count ?? params.targetCount,
+          items.length
+        );
+        const maxIterations = coercePositiveInt(
+          params.max_iterations ?? params.maxIterations,
+          items.length
+        );
+        const dryStreakLimit = coercePositiveInt(
+          params.dry_streak_limit ?? params.dryStreakLimit,
+          2
+        );
+        const seen = new Set<string>();
+        const collected: Array<{
+          index: number;
+          item: unknown;
+          value: unknown;
+          context: Record<string, unknown>;
+          results: RunStepResult[];
+        }> = [];
+        let dryStreak = 0;
+        let loopCount = 0;
+        for (const [index, item] of items.entries()) {
+          if (loopCount >= maxIterations) break;
+          if (collected.length >= targetCount) break;
+          const loopCtx = { ...originalSharedCtx, [itemName]: item };
+          const nested = await runBody(subSteps, loopCtx, `accumulate item ${index + 1} failed`);
+          const candidateValue = (nested.context as any)[collectKey] ?? nested.context ?? item;
+          const fingerprint = (() => {
+            try {
+              return JSON.stringify(candidateValue);
+            } catch {
+              return String(candidateValue);
+            }
+          })();
+          loopCount += 1;
+          if (!seen.has(fingerprint)) {
+            seen.add(fingerprint);
+            collected.push({
+              index,
+              item,
+              value: candidateValue,
+              context: nested.context,
+              results: nested.results as RunStepResult[],
+            });
+            dryStreak = 0;
+          } else {
+            dryStreak += 1;
+          }
+          if (dryStreak >= dryStreakLimit) break;
+        }
+        let workingCtx: Record<string, unknown> = {
+          ...ctx,
+          [exportKey]: {
+            collected,
+            iterations: loopCount,
+            dry_streak: dryStreak,
+            target_count: targetCount,
+            final_context: ctx,
           },
         };
-      } finally {
-        includeStack = previousStack;
-      }
-    }
+        if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
+        else (workingCtx as any)[itemName] = originalItemValue;
+        return workingCtx;
+      },
+      include: async (dctx) => {
+        const { params, ctx } = dctx;
+        const fragmentRef = String(resolveVars(params.fragment || '', ctx));
+        if (!fragmentRef) throw new Error('core:include requires "fragment" param');
+        const fragmentPath = resolveFragmentPath(fragmentRef);
+        if (!safeExistsSync(fragmentPath)) {
+          throw new Error(
+            `core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`
+          );
+        }
+        if (includeStack.has(fragmentPath)) {
+          throw new Error(
+            `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
+          );
+        }
+        const fragmentRaw = readPipelineIncludeTextFile(fragmentPath);
+        const fragmentJson = parseFragmentJson(fragmentRaw, fragmentRef);
+        const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
+          ...s,
+          params: s.params || {},
+        }));
+        const fragmentContext: Record<string, unknown> =
+          fragmentJson.context && typeof fragmentJson.context === 'object'
+            ? Object.fromEntries(
+                Object.entries(fragmentJson.context as Record<string, unknown>).map(([k, v]) => [
+                  k,
+                  typeof v === 'string' ? resolveVars(v, ctx) : v,
+                ])
+              )
+            : {};
+        const inlineCtx: Record<string, unknown> =
+          params.context && typeof params.context === 'object'
+            ? Object.fromEntries(
+                Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
+                  k,
+                  typeof v === 'string' ? resolveVars(v, ctx) : v,
+                ])
+              )
+            : {};
+        const previousStack = includeStack;
+        includeStack = new Set([...previousStack, fragmentPath]);
+        try {
+          const nested = await runBody(
+            fragmentSteps,
+            { ...fragmentContext, ...ctx, ...inlineCtx },
+            `core:include fragment failed: ${fragmentRef}`
+          );
+          const exportKey =
+            typeof params.export_as === 'string' && params.export_as ? params.export_as : undefined;
+          if (!exportKey) return nested.context;
+          return {
+            ...nested.context,
+            [exportKey]: {
+              status: nested.status,
+              results: nested.results,
+              context: nested.context,
+            },
+          };
+        } finally {
+          includeStack = previousStack;
+        }
+      },
+    };
+
+    const handler = CONTROL_OP_HANDLERS[action];
+    if (handler) return handler(dctx);
 
     throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${rawOp}`);
   };

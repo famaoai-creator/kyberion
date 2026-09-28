@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composeCeoSurfaceSummary } from './ceo-surface-summary.js';
-import type { OperatorHomeSummary } from './operator-home-summary.js';
+import type { OperatorHomeSummary } from './surface/operator-home-summary.js';
 
 function makeHomeSummary(): OperatorHomeSummary {
   return {

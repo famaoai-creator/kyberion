@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
-import { createDistillCandidateRecord } from './distill-candidate-registry.js';
+import { createDistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
 import {
   buildPromotedMemoryRecord,
   savePromotedMemoryRecord,
@@ -15,7 +15,7 @@ import {
 import { safeReadFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { buildOrganizationWorkLoopSummary } from './work-design.js';
+import { buildOrganizationWorkLoopSummary } from './workforce/work-design.js';
 import { safeWriteFile } from './secure-io.js';
 
 // Files written during a single test run; cleaned up in afterEach so the

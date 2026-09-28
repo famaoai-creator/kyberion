@@ -41,13 +41,13 @@ status: archived
 
 ### LC-01: 決定論修復の復権(修復カスケードの「決定論→LLM」順序化) — P1 / S
 
-- **問題**: 決定論 JSON 修復(`tryRepairJson`)を持つ `validateAndRepairAdf`(`libs/core/adf-repair-agent.ts:33-95`)は**本番呼び出し元がゼロ**(テストのみ)。実行時修復 `attemptAutonomousRepair` は最初から LLM に投げるため、括弧欠落・カンマ等の機械的破損にもトークンを使い、stub 環境では修復不能になる。
+- **問題**: 決定論 JSON 修復(`tryRepairJson`)を持つ `validateAndRepairAdf`(`libs/core/pipeline/adf-repair-agent.ts:33-95`)は**本番呼び出し元がゼロ**(テストのみ)。実行時修復 `attemptAutonomousRepair` は最初から LLM に投げるため、括弧欠落・カンマ等の機械的破損にもトークンを使い、stub 環境では修復不能になる。
 - **実装**: `attemptAutonomousRepair` の前段に `tryRepairJson` → 再 validate の決定論カスケードを挿入(adf-repair-agent の既存実装を共有化)。LLM 委譲は決定論修復で解決しない場合のみ。
 - **受入**: 構文破損 ADF が LLM 呼び出しゼロで修復されるテスト / 意味的破損は従来どおり LLM に到達するテスト。担当: sonnet。
 
 ### LC-02: 成功ランの pipeline 昇格ツール(`pipeline:promote`) — **P0(本計画の中核)** / M
 
-- **問題**: 成功した一回きりの実行を `pipelines/*.json` に昇格する経路が**完全手動**。トレース→text hint(`libs/core/src/feedback-loop.ts`)と記憶蒸留(review.md → HINTS.md)はあるが、**トレース→pipeline の蒸留は概念のみ**(`kyberion-concept-map.md:82` の "Generated Pipeline" に実装なし)。昇格が高コストだと「再改殮(re-improvising)」が既定になり、AGENTS.md §2 が絵に描いた餅になる。
+- **問題**: 成功した一回きりの実行を `pipelines/*.json` に昇格する経路が**完全手動**。トレース→text hint(`libs/core/knowledge/feedback-loop.ts`)と記憶蒸留(review.md → HINTS.md)はあるが、**トレース→pipeline の蒸留は概念のみ**(`kyberion-concept-map.md:82` の "Generated Pipeline" に実装なし)。昇格が高コストだと「再改殮(re-improvising)」が既定になり、AGENTS.md §2 が絵に描いた餅になる。
 - **実装**:
   1. `pnpm pipeline:promote --trace <traceId|last>`: 成功トレース/実行済み ADF から、(a) 実行された step 列と解決済みパラメータを抽出、(b) 入力値をプレースホルダ化(`{{...}}`)、(c) LLM ワンショットで「凍結してよい決定論 step」と「毎回判断が要る semantic brief(AR-07 op)」に分類、(d) preflight を通した上で `pipelines/` に書き出し + `pipelines/README.md` カタログ行を生成。
   2. 昇格判断の提案: `run_pipeline` 終了時、同型実行の反復を検出したら(intent-contract-memory の同型 intent 数 ≥3)「昇格候補」として operator packet に1行提示(強制しない)。
@@ -157,7 +157,7 @@ android/terminal への `llm_decide` 展開、蒸留ヘルパの system/network 
 
 ## 4.9 実装状況(2026-07-13, Wave 1 完了)
 
-- **LC-08 実装済み**: `libs/core/reasoning-degradation.ts`(マーカー write/read/clear)+ bootstrap の残留 stub 経路で marker + `notifyOperator('ops_alert')`(`KYBERION_ALLOW_STUB_FALLBACK=1` で旧挙動)+ baseline-check が marker を読んで `needs_attention` 降格 + report に `reasoning_degraded` を出力。テスト4本緑。
+- **LC-08 実装済み**: `libs/core/reasoning/reasoning-degradation.ts`(マーカー write/read/clear)+ bootstrap の残留 stub 経路で marker + `notifyOperator('ops_alert')`(`KYBERION_ALLOW_STUB_FALLBACK=1` で旧挙動)+ baseline-check が marker を読んで `needs_attention` 降格 + report に `reasoning_degraded` を出力。テスト4本緑。
 - **LC-07 実装済み**: stub 全11メソッドの呼び出しを process-wide に記録(`getStubServedOps` / `resetStubServedOps` / `stubExplicitlyRequested`)。`reconcileCompletionStructurally`(task-session close と mission finish の共通路)が taint 検出時に `satisfied=false` + `reasoning_stub_served` gap + confidence≤0.2 を強制。明示 stub モードは免除。テスト6本緑。
 - **LC-10 実装済み(一部残)**: 共有語彙 `rejection-reason.ts`(5カテゴリ+正規化)。承認却下の note + reason_category がイベント JSONL に載るよう修正(従来は nested workflow record 止まり)。deliverable review の entry / v2 clone metadata / inbox verdict に reason_category 貫通。chronos レビュー UI にスキップ可能な ask-why 1問(コメント空の reject / request-changes 時のみ表示)。approval-actuator は `reasonCategory` param を受理。**残**: CLI・会話ブリッジ面の ask-why(構造は API/store 側で受理済みのため、各 surface の1問 UI 追加のみ)。
 - 検証: 対象スイート(approval 4ファイル34本 + 新規3ファイル12本 + reconciliation/task-session)緑、chronos-mirror-v2 Next.js ビルド成功。

@@ -18,9 +18,9 @@ import {
   registerBrowserAutomationRuntimeBridge,
   type BrowserAutomationLaunchPersistentContextOptions,
   type BrowserAutomationRuntimeCapabilities,
-} from '@agent/core/browser-automation-runtime-bridge';
+} from '@agent/core/browser/browser-automation-runtime-bridge';
 import { safeSpawn } from '@agent/core/secure-io';
-import { resolveLightpandaBin } from '@agent/core/tool-binary-resolvers';
+import { resolveLightpandaBin } from '@agent/core/tool/tool-binary-resolvers';
 
 export const LIGHTPANDA_BRIDGE_ID = 'lightpanda';
 

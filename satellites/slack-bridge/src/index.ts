@@ -6,36 +6,39 @@ import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
 import { logger } from '@agent/core/core';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { appendStimulus } from '@agent/core/stimuli-journal';
 import {
   emitChannelSurfaceEvent,
   recordSlackDelivery,
   recordSlackSurfaceArtifact,
-} from '@agent/core/surface-artifact-store';
-import { resolveServiceBinding } from '@agent/core/service-binding';
+} from '@agent/core/surface/surface-artifact-store';
+import { resolveServiceBinding } from '@agent/core/service/service-binding';
 import {
   prepareSlackSurfaceArtifact,
   runSurfaceMessageConversation,
-} from '@agent/core/channel-surface';
+} from '@agent/core/surface/channel-surface';
 import {
   formatChannelThreadContext,
   runChannelTurn,
   type ChannelAdapter,
   type ChannelTypingHandle,
   type RunChannelTurnOptions,
-} from '@agent/core/channel-adapter';
-import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
+} from '@agent/core/surface/channel-adapter';
+import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface-types';
 import { recordSlackKnowledgeReaction } from '@agent/core/knowledge-feedback-loop';
-import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
-import { deriveSlackDelegationReceiver } from '@agent/core/surface-runtime-router';
+import {
+  createSurfaceOutboxDrainGuard,
+  drainSurfaceOutbox,
+} from '@agent/core/surface/surface-delivery';
+import { deriveSlackDelegationReceiver } from '@agent/core/surface/surface-runtime-router';
 import {
   buildSlackOnboardingBlocks,
   buildSlackOnboardingModal,
   handleSlackOnboardingTurn,
   isEnvironmentInitialized,
   parseSlackOnboardingAction,
-} from '@agent/core/slack-onboarding';
+} from '@agent/core/integrations/slack-onboarding';
 import {
   buildMissionIssuanceReply,
   clearSlackMissionProposalState,
@@ -44,7 +47,7 @@ import {
   isSlackMissionRejection,
   issueSlackMissionFromProposal,
   saveSlackMissionProposalState,
-} from '@agent/core/surface-mission-proposals';
+} from '@agent/core/surface/surface-mission-proposals';
 import {
   buildSlackApprovalAskWhyBlocks,
   buildSlackApprovalBlocks,
@@ -52,21 +55,23 @@ import {
   createSlackApprovalRequest,
   parseSlackApprovalAction,
   parseSlackAskWhyAction,
-  parseSlackCardAction,
-  parseSlackChangeRequestSubmission,
-  SLACK_CHANGE_REQUEST_BLOCK_ID,
-  SLACK_CHANGE_REQUEST_CALLBACK_ID,
-} from '@agent/core/slack-approval-ui';
+} from '@agent/core/integrations/slack-approval-ui';
 import {
   applySurfaceApprovalDecision,
   resolveSurfaceApprovalAskWhy,
   resolveSurfaceApprovalReply,
-} from '@agent/core/surface-approval-ui';
+} from '@agent/core/surface/surface-approval-ui';
+import {
+  parseSlackCardAction,
+  parseSlackChangeRequestSubmission,
+  SLACK_CHANGE_REQUEST_BLOCK_ID,
+  SLACK_CHANGE_REQUEST_CALLBACK_ID,
+} from '@agent/core/integrations/slack-approval-ui';
 import {
   buildSlackMissionProposalBlocks,
   parseSlackMissionProposalAction,
   slackMissionProposalFallbackText,
-} from '@agent/core/slack-mission-proposal-ui';
+} from '@agent/core/integrations/slack-mission-proposal-ui';
 import { dispatchPresenceFrame } from '@agent/core/presence-bridge';
 import {
   buildBridgeEmptyReplyText,
@@ -76,8 +81,8 @@ import {
 } from '@agent/core/bridge-error-reply';
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
-import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
-import { renderIntentAuthorityLabel } from '@agent/core/intent-resolution-contract';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface/surface-access-policy';
+import { renderIntentAuthorityLabel } from '@agent/core/intent/intent-resolution-contract';
 import {
   buildAutomationSlackModal,
   extractAutomationSlackFormValues,
@@ -364,7 +369,7 @@ async function postApprovalRequest(
       severity?: 'low' | 'medium' | 'high';
     };
     sourceText?: string;
-    intentResolution?: import('@agent/core/intent-resolution-contract').IntentResolutionContract;
+    intentResolution?: import('@agent/core/intent/intent-resolution-contract').IntentResolutionContract;
   }
 ) {
   const record = createSlackApprovalRequest(params);

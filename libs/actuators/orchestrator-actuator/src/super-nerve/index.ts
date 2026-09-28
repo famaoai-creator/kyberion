@@ -1,21 +1,21 @@
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
-import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
-import { determineActuatorStepType } from '@agent/core/actuator-op-registry';
+import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
+import { determineActuatorStepType } from '@agent/core/actuator/actuator-op-registry';
 import { evaluateCondition, resolveVars } from '@agent/core/logic-utils';
-import { skipAdfStep } from '@agent/core/adf-engine';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { skipAdfStep } from '@agent/core/pipeline/adf-engine';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertProjectTrustApproval } from '@agent/core/project-trust';
+import { assertProjectTrustApproval } from '@agent/core/project/project-trust';
 import { safeExistsSync, safeExec, safeLstat } from '@agent/core/secure-io';
-import { suggestClosestStrings } from '@agent/core/op-suggestions';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { suggestClosestStrings } from '@agent/core/pipeline/op-suggestions';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
 import {
   getRegisteredEnvText,
@@ -23,7 +23,7 @@ import {
   parseSafeJsonObjectValue,
   readJson,
 } from '@agent/core/foundation';
-import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline/pipeline-contract';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 

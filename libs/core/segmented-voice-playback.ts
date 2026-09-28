@@ -13,8 +13,8 @@
  * backend-agnostic and hermetic to test.
  */
 
-import { playAudioFile, type PlaybackHandle } from './audio-playback.js';
-import { splitVoiceTextIntoChunks } from './voice-text-chunking.js';
+import { playAudioFile, type PlaybackHandle } from './voice/audio-playback.js';
+import { splitVoiceTextIntoChunks } from './voice/voice-text-chunking.js';
 import {
   createPlaybackPauseGate,
   type PausablePlaybackHandle,

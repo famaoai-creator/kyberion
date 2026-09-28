@@ -10,9 +10,9 @@ import {
   safeExistsSync,
   safeMkdir,
 } from '@agent/core/secure-io';
-import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { createVoiceActuatorServeClient } from '@agent/core/actuator-serve-client';
+import { createVoiceActuatorServeClient } from '@agent/core/actuator/actuator-serve-client';
 import {
   createRealtimeFirstPhraseCache,
   ensureRealtimeVoiceConversationSession,
@@ -21,42 +21,42 @@ import {
   recordRealtimeVoiceConversationExchange,
   runRealtimeVoiceConversationTurn,
   synthesizeRealtimeVoice,
-} from '@agent/core/realtime-voice-conversation';
-import { loadRealtimeVoiceConversationPreferences } from '@agent/core/realtime-voice-preferences';
+} from '@agent/core/voice/realtime-voice-conversation';
+import { loadRealtimeVoiceConversationPreferences } from '@agent/core/voice/realtime-voice-preferences';
 import type {
   RealtimeVoiceReasoningEffort,
   RealtimeVoiceReasoningTier,
-} from '@agent/core/realtime-voice-preferences';
-import type { PlaybackHandle } from '@agent/core/audio-playback';
-import type { AudioChunk } from '@agent/core/meeting-session-types';
+} from '@agent/core/voice/realtime-voice-preferences';
+import type { PlaybackHandle } from '@agent/core/voice/audio-playback';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 import {
   getSpeechToTextBridge,
   installAvailableSpeechToTextBridges,
   resolveSpeechToTextBridge,
   type SpeechToTextBridge,
-} from '@agent/core/speech-to-text-bridge';
-import { selectStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
-import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
+} from '@agent/core/voice/speech-to-text-bridge';
+import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
 import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
 import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
-} from '@agent/core/shell-streaming-stt-bridge';
+} from '@agent/core/shell/shell-streaming-stt-bridge';
 import {
   getInstalledReasoningMode,
   installReasoningBackends,
-} from '@agent/core/reasoning-bootstrap';
-import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
+} from '@agent/core/reasoning/reasoning-bootstrap';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
 import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeAudioPlayback } from '@agent/core/audio-playback';
+import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
 import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
 import { probeMicCapture } from '@agent/core/mic-capture';
-import { recordVadTurn, type VadTurnState } from '@agent/core/vad-turn-recorder';
-import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
-import { resolveVadBackend } from '@agent/core/vad-registry';
+import { recordVadTurn, type VadTurnState } from '@agent/core/voice/vad-turn-recorder';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
+import { resolveVadBackend } from '@agent/core/voice/vad-registry';
 import {
   costTierForReasoningMode,
   describeRealtimeVoiceLoopEvent,
@@ -67,9 +67,9 @@ import {
   type RealtimeVoiceBargeInMode,
   type VoiceCostTier,
   type VoicePowerSource,
-} from '@agent/core/realtime-voice-loop';
-import type { StreamingSpeechToTextBridge } from '@agent/core/streaming-stt-bridge';
-import type { StreamingTextToSpeechBridge } from '@agent/core/streaming-tts-bridge';
+} from '@agent/core/voice/realtime-voice-loop';
+import type { StreamingSpeechToTextBridge } from '@agent/core/voice/streaming-stt-bridge';
+import type { StreamingTextToSpeechBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { parseSafeJsonInput } from './lib/json-input.js';
 import {
@@ -350,12 +350,16 @@ function buildRecordOutputDir(sessionId: string): string {
 function describeVadState(state: VadTurnState): string {
   switch (state) {
     case 'calibrating':
+      // i18n-exempt: JA voice demo script output
       return '🎚  ノイズフロア較正中… (静かにしてください)';
     case 'listening':
+      // i18n-exempt: JA voice demo script output
       return '🎤 聞き取り待機中… (話し始めてください)';
     case 'recording':
+      // i18n-exempt: JA voice demo script output
       return '🔴 録音中… (話し終えると自動で区切ります)';
     case 'finalizing':
+      // i18n-exempt: JA voice demo script output
       return '⏹  発話終了を検出、文字起こしへ回します';
   }
 }
@@ -721,6 +725,7 @@ export async function runRealtimeVoiceConversationLoop(
       `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
   if (bargeInMode !== 'off') {
+    // i18n-exempt: JA voice demo script output
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
@@ -1111,6 +1116,7 @@ export async function main(
       type: 'boolean',
       default: true,
       describe:
+        // i18n-exempt: JA voice demo script output
         'Hold utterances that trail off (て/けど/えーと…, and/but…) and join them with the next one, up to 1.5s',
     })
     .option('respond-gate', {

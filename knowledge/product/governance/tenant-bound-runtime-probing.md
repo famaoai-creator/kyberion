@@ -116,4 +116,4 @@ build:actuators`), and `@agent/core/*` imports in any throwaway probe
   `knowledge/product/governance/authority-roles/chronos_tenant_runner.json`.
 - Tenant egress overlay: `libs/core/egress-policy.ts`
   (`KYBERION_TENANT_EGRESS_POLICY_PATH`).
-- Kill switch / trust: `libs/core/kill-switch.ts`, `libs/core/trust-engine.ts`.
+- Kill switch / trust: `libs/core/governance/kill-switch.ts`, `libs/core/trust-engine.ts`.

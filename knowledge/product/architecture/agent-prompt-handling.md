@@ -11,11 +11,11 @@ run, "Do you want to make this edit?" mid-turn, a sign-in. From outside,
 such an agent looks idle or `blocked`, and its question used to be returned
 as its answer. Three layers now handle it.
 
-| Layer  | Where                                                     | What                                                                                                                                                                                                   |
-| ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Detect | `libs/core/agent-runtime-readiness.ts`                    | Classifies the pane screen: `ready` / `awaiting_human` (with signature) / `starting` / `unavailable`. herdr `blocked` also counts.                                                                     |
-| Decide | `libs/core/agent-prompt-response.ts`                      | Picks one of: auto-answer (allowlist rule), escalate (approval request), human_only.                                                                                                                   |
-| Act    | `libs/core/agent-pane-runtime-herdr.ts` (`settlePrompts`) | Sends keys, relays a person's approval, or fails with `[AGENT_RUNTIME_AWAITING_HUMAN]` / `[AGENT_RUNTIME_PROMPT_DECLINED]`. The routing ledger records both as `not_attempted`, not as model failures. |
+| Layer  | Where                                                           | What                                                                                                                                                                                                   |
+| ------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Detect | `libs/core/agent/agent-runtime-readiness.ts`                    | Classifies the pane screen: `ready` / `awaiting_human` (with signature) / `starting` / `unavailable`. herdr `blocked` also counts.                                                                     |
+| Decide | `libs/core/agent/agent-prompt-response.ts`                      | Picks one of: auto-answer (allowlist rule), escalate (approval request), human_only.                                                                                                                   |
+| Act    | `libs/core/agent/agent-pane-runtime-herdr.ts` (`settlePrompts`) | Sends keys, relays a person's approval, or fails with `[AGENT_RUNTIME_AWAITING_HUMAN]` / `[AGENT_RUNTIME_PROMPT_DECLINED]`. The routing ledger records both as `not_attempted`, not as model failures. |
 
 ## Policy and customization
 

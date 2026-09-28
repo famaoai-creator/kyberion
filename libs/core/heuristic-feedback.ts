@@ -25,7 +25,7 @@ import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   type MemoryCandidate,
-} from './memory-promotion-queue.js';
+} from './knowledge/memory-promotion-queue.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
 const HEURISTIC_SCHEMA_PATH = assertSafeRepositoryPath(

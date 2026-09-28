@@ -4,7 +4,7 @@
     {
       "mode": "local",
       "provider": "local",
-      "module": "./reasoning-openai-compatible-provider",
+      "module": "./reasoning/reasoning-openai-compatible-provider",
       "capabilities": {
         "reasoning": true,
         "structured_output": true,

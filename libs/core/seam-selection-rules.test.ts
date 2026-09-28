@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const record = vi.hoisted(() => vi.fn());
-vi.mock('./audit-chain.js', () => ({ auditChain: { record } }));
+vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record } }));
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import {

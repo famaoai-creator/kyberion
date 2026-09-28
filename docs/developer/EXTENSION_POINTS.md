@@ -128,7 +128,7 @@ See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
 
 ### 2.7 Trace Format — **Beta** (will be lifted to v1 after Phase B-1)
 
-`Trace`, `TraceSpan`, `TraceEvent`, `TraceArtifact` types in `libs/core/src/trace.ts`.
+`Trace`, `TraceSpan`, `TraceEvent`, `TraceArtifact` types in `libs/core/analysis/trace.ts`.
 
 **Beta** until Phase B-1 (cross-actuator integration) completes:
 

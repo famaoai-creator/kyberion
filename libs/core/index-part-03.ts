@@ -4,37 +4,34 @@ export {
   buildWorkCoordinationPeerCommandEnvelope,
   createWorkCoordinationPeerResponder,
   processWorkCoordinationPeerCommand,
-} from './work-coordination-peer.js';
+} from './workforce/work-coordination-peer.js';
 
 export {
   importGitHubIssue,
   importGitHubIssueWithEvent,
   normalizeGitHubIssue,
-} from './work-integrations/github-issues.js';
+} from './integrations/github-issues.js';
 
 export type {
   GitHubIssueLike,
   GitHubIssueNormalizationResult,
-} from './work-integrations/github-issues.js';
+} from './integrations/github-issues.js';
 
 export {
   importJiraIssue,
   importJiraIssueWithEvent,
   normalizeJiraIssue,
-} from './work-integrations/jira-issues.js';
+} from './integrations/jira-issues.js';
 
-export type {
-  JiraIssueLike,
-  JiraIssueNormalizationResult,
-} from './work-integrations/jira-issues.js';
+export type { JiraIssueLike, JiraIssueNormalizationResult } from './integrations/jira-issues.js';
 
 export {
   getWorkCoordinationImportCatalogEntryByCommand,
   listWorkCoordinationImportCatalogEntries,
   loadWorkCoordinationImportCatalog,
-} from './work-coordination-import-catalog.js';
+} from './workforce/work-coordination-import-catalog.js';
 
-export type { WorkCoordinationImportCatalogEntry } from './work-coordination-import-catalog.js';
+export type { WorkCoordinationImportCatalogEntry } from './workforce/work-coordination-import-catalog.js';
 
 export {
   getServiceBootstrapCatalogEntryByServiceId,
@@ -42,45 +39,45 @@ export {
   getDefaultServiceIdForSurface,
   loadServiceBootstrapCatalog,
   listServiceBootstrapCatalogEntries,
-} from './service-bootstrap-catalog.js';
+} from './service/service-bootstrap-catalog.js';
 
-export type { ServiceBootstrapCatalogEntry } from './service-bootstrap-catalog.js';
+export type { ServiceBootstrapCatalogEntry } from './service/service-bootstrap-catalog.js';
 
 export {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
-} from './actuator-dependency-bundles.js';
+} from './actuator/actuator-dependency-bundles.js';
 
-export type { ActuatorDependencyBundleEntry } from './actuator-dependency-bundles.js';
+export type { ActuatorDependencyBundleEntry } from './actuator/actuator-dependency-bundles.js';
 
 export {
   findSkillInstallPackageMapEntry,
   loadSkillInstallPackageMap,
-} from './skill-install-package-map.js';
+} from './plugin/skill-install-package-map.js';
 
-export type { SkillInstallPackageMapEntry } from './skill-install-package-map.js';
+export type { SkillInstallPackageMapEntry } from './plugin/skill-install-package-map.js';
 
 export {
   getServiceAuthorities,
   listServiceAuthorityMapEntries,
   loadServiceAuthorityMap,
-} from './service-authority-map.js';
+} from './service/service-authority-map.js';
 
-export type { ServiceAuthorityMapEntry } from './service-authority-map.js';
+export type { ServiceAuthorityMapEntry } from './service/service-authority-map.js';
 
-export { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
+export { getSurfaceCoordinationRole } from './surface/surface-coordination-role-map.js';
 
-export { distillPdfDesign } from './src/pdf-utils.js';
+export { distillPdfDesign } from './media/pdf-utils.js';
 
-export { distillPptxDesign } from './src/pptx-utils.js';
+export { distillPptxDesign } from './media/pptx-utils.js';
 
-export { distillXlsxDesign } from './src/xlsx-utils.js';
+export { distillXlsxDesign } from './media/xlsx-utils.js';
 
-export { distillDocxDesign } from './src/docx-utils.js';
+export { distillDocxDesign } from './media/docx-utils.js';
 
-export { generateNativePdf } from './src/native-pdf-engine/engine.js';
+export { generateNativePdf } from './media/native-pdf-engine/engine.js';
 
-export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
+export { generateNativePptx, patchPptxText } from './media/native-pptx-engine/engine.js';
 
 export {
   applyPptxDesignDefaults,
@@ -89,7 +86,7 @@ export {
   resolvePptxSurfaceDesign,
   type PptxDesignDefaults,
   type PptxDesignDefaultsInput,
-} from './src/native-pptx-engine/design-cascade.js';
+} from './media/native-pptx-engine/design-cascade.js';
 
 export {
   fitTextToBox,
@@ -100,7 +97,7 @@ export {
   type LayoutFitRequest,
   type LayoutFitResult,
   type TextMeasurement,
-} from './src/native-pptx-engine/text-metrics.js';
+} from './media/native-pptx-engine/text-metrics.js';
 
 export {
   PPTX_PALETTE,
@@ -111,13 +108,13 @@ export {
   footerElements,
   type SectionHeaderOptions,
   type FooterOptions,
-} from './src/native-pptx-engine/layout-primitives.js';
+} from './media/native-pptx-engine/layout-primitives.js';
 
-export type { PptxDesignProtocol, PptxElement, PptxSlide } from './src/types/pptx-protocol.js';
+export type { PptxDesignProtocol, PptxElement, PptxSlide } from './contracts/pptx-protocol.js';
 
-export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
+export { generateNativeXlsx } from './media/native-xlsx-engine/engine.js';
 
-export { generateNativeDocx } from './src/native-docx-engine/engine.js';
+export { generateNativeDocx } from './media/native-docx-engine/engine.js';
 
 export {
   protocolToMarkdown,
@@ -126,7 +123,7 @@ export {
   xlsxToMarkdown,
   pptxToMarkdown,
   extractTablesFromPage,
-} from './src/protocol-to-markdown.js';
+} from './media/protocol-to-markdown.js';
 
 export type {
   XlsxCell,
@@ -138,14 +135,14 @@ export type {
   XlsxDxfStyle,
   XlsxMergeCell,
   XlsxWorksheet,
-} from './src/types/xlsx-protocol.js';
+} from './contracts/xlsx-protocol.js';
 
 export type {
   PdfDesignProtocol,
   PdfAesthetic,
   PdfLayoutElement,
   PdfPage,
-} from './src/types/pdf-protocol.js';
+} from './contracts/pdf-protocol.js';
 
 // Document Design Protocol (Generic Base)
 
@@ -155,13 +152,13 @@ export type {
   TransformStep,
   DesignDelta,
   SemanticOf,
-} from './src/types/document-protocol.js';
+} from './contracts/document-protocol.js';
 
 export {
   diffDesign,
   wrapAsPptxDocument,
   wrapAsXlsxDocument,
-} from './src/types/document-protocol.js';
+} from './contracts/document-protocol.js';
 
 // Evidence Chain (Query & Summary)
 
@@ -171,9 +168,9 @@ export type { EvidenceQuery, EvidenceEntry } from './evidence-chain.js';
 
 // Cron Utilities
 
-export { matchCronField, getZonedDateParts, matchesCron } from './src/cron-utils.js';
+export { matchCronField, getZonedDateParts, matchesCron } from './pipeline/cron-utils.js';
 
-export type { ZonedDateParts } from './src/cron-utils.js';
+export type { ZonedDateParts } from './pipeline/cron-utils.js';
 
 // Intent Compiler
 
@@ -181,17 +178,17 @@ export {
   compileIntent,
   buildPipelineGenerationPrompt,
   resolveIntentToSteps,
-} from './src/intent-compiler.js';
+} from './intent/intent-compiler.js';
 
-export type { CompiledIntent } from './src/intent-compiler.js';
+export type { CompiledIntent } from './intent/intent-compiler.js';
 
-export * from './intent-contract.js';
+export * from './intent/intent-contract.js';
 
-export * from './intent-use-case-scenario.js';
+export * from './intent/intent-use-case-scenario.js';
 
 export * from './execution-feedback.js';
 
-export * from './intent-contract-learning.js';
+export * from './intent/intent-contract-learning.js';
 
 export * from './contextual-intent-frame.js';
 
@@ -203,15 +200,15 @@ export * from './contextual-intent-learning.js';
 
 export * from './execution-brief.js';
 
-export * from './tool-actuator-routing.js';
+export * from './tool/tool-actuator-routing.js';
 
-export * from './delegation-request.js';
+export * from './mission/delegation-request.js';
 
 export * from './assistant-compiler-request.js';
 
-export * from './intent-contract.js';
+export * from './intent/intent-contract.js';
 
-export * from './delegation-request.js';
+export * from './mission/delegation-request.js';
 
 export * from './assistant-compiler-request.js';
 
@@ -242,30 +239,30 @@ export * as transformer from './transformer.js';
 
 export { transform, getValueByPath } from './transformer.js';
 
-export * as serviceEngine from './service-engine.js';
+export * as serviceEngine from './service/service-engine.js';
 
-export { executeServicePreset, executeMcp } from './service-engine.js';
+export { executeServicePreset, executeMcp } from './service/service-engine.js';
 
-export * from './service-preset-registry.js';
+export * from './service/service-preset-registry.js';
 
-export * from './service-preset-policy.js';
+export * from './service/service-preset-policy.js';
 
-export * from './service-harness.js';
+export * from './service/service-harness.js';
 
 export {
   getServiceEndpointRecord,
   loadServiceEndpointsCatalog,
   resolveServiceBinding,
-} from './service-binding.js';
+} from './service/service-binding.js';
 
-export { compileMusicGenerationADF } from './music-workflow-compiler.js';
+export { compileMusicGenerationADF } from './media/music-workflow-compiler.js';
 
 export {
   compileImageGenerationADF,
   compileVideoGenerationADF,
 } from './visual-workflow-compiler.js';
 
-export * as secretGuard from './secret-guard.js';
+export * as secretGuard from './secret/secret-guard.js';
 
 export {
   getSecret,
@@ -273,19 +270,19 @@ export {
   grantAccess,
   grantAccessGuarded,
   isSecretPath,
-} from './secret-guard.js';
+} from './secret/secret-guard.js';
 
-export * from './shell-command-policy.js';
+export * from './shell/shell-command-policy.js';
 
 export * from './sensitive-path-policy.js';
 
 export * from './output-artifacts.js';
 
-export * from './worker-context-compaction.js';
+export * from './workforce/worker-context-compaction.js';
 
 export * from './completion-token-budget.js';
 
-export * from './worker-event-stream.js';
+export * from './workforce/worker-event-stream.js';
 
 export * from './ce-adoption.js';
 
@@ -297,43 +294,43 @@ export * from './external-hook-bridge.js';
 
 export * from './external-hook-discovery.js';
 
-export * from './agent-input-queue.js';
+export * from './agent/agent-input-queue.js';
 
 export * from './writer-lease.js';
 
 export * from './invariants.js';
 
-export * from './plugin-contributions.js';
+export * from './plugin/plugin-contributions.js';
 
 export * from './dynamic-injection.js';
 
-export * from './prompt-cache-discipline.js';
+export * from './reasoning/prompt-cache-discipline.js';
 
 export * from './context-rewind.js';
 
-export * from './worker-goal.js';
+export * from './workforce/worker-goal.js';
 
-export * from './worker-goal-driver.js';
+export * from './workforce/worker-goal-driver.js';
 
-export * from './agent-runtime-manual-drive.js';
+export * from './agent/agent-runtime-manual-drive.js';
 
-export * from './worker-state-journal.js';
+export * from './workforce/worker-state-journal.js';
 // SO-02: durable conversation-thread <-> mission-ownership binding (own
 // event-sourcing kernel; see the module docstring for the KD-03 lineage).
 
-export * from './orchestrator-session.js';
+export * from './mission/orchestrator-session.js';
 // NI-01: durable NHI registry for agent identities (journal-backed, SO-02
 // pattern); AL-01 retention catalog is the storage-lifecycle counterpart.
 
-export * from './agent-identity.js';
+export * from './agent/agent-identity.js';
 
 export * from './nhi-lifecycle-governance.js';
 
 export * from './storage-retention-catalog.js';
 
-export * from './surface-steering-authority.js';
+export * from './surface/surface-steering-authority.js';
 
-export * from './adf-guardrails.js';
+export * from './pipeline/adf-guardrails.js';
 
 export * from './reconcile-ops.js';
 
@@ -341,32 +338,35 @@ export * from './report-ops.js';
 
 export * from './execution-bounds.js';
 
-export * from './intent-handoff.js';
+export * from './intent/intent-handoff.js';
 
-export * from './mesh-message-broker.js';
+export * from './mesh/mesh-message-broker.js';
 
-export * from './mesh-delivery-driver.js';
+export * from './mesh/mesh-delivery-driver.js';
 
 export * from './egress-policy.js';
 
-export * from './governance-status.js';
+export * from './governance/governance-status.js';
 
-export { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
+export {
+  composeMissionTeamBrief,
+  writeMissionTeamBrief,
+} from './mission/mission-team-brief-composer.js';
 
 // Domain Engines (excel distiller moved to @agent/shared-media)
 
-export * as pptxUtils from './src/pptx-utils.js';
+export * as pptxUtils from './media/pptx-utils.js';
 
-export * as xlsxUtils from './src/xlsx-utils.js';
+export * as xlsxUtils from './media/xlsx-utils.js';
 
-export * as docxUtils from './src/docx-utils.js';
+export * as docxUtils from './media/docx-utils.js';
 // export * as finance from './finance.js';
 // export * as mcpClient from './mcp-client-engine.js';
 
 // Voice & Presentation
 
-export { say, speak } from './voice-synth.js';
+export { say, speak } from './voice/voice-synth.js';
 
-export * from './voice-stt.js';
+export * from './voice/voice-stt.js';
 
-export * from './voice-provider-adapters.js';
+export * from './voice/voice-provider-adapters.js';

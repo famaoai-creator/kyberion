@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 import { CoreAudioDeviceInventoryBridge } from './coreaudio-device-inventory.js';
-import type { AudioDeviceDescriptor } from './audio-route.js';
+import type { AudioDeviceDescriptor } from './voice/audio-route.js';
 
 const originalPlatform = process.platform;
 const format = {

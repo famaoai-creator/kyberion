@@ -11,7 +11,7 @@ status: archived
 
 ## 背景と課題
 
-システムの言語契約が**反転**している: オペレータの既定言語は日本語(`onboarding_wizard.ts:227` の identity 既定 `language: 'Japanese'`、surface-ux-contract のテストは日本語運用文言を要求 `libs/core/surface-ux-contract.test.ts:5-53`)なのに、ターミナル・UI の実文言はほぼ英語ハードコード。一方で局所的に日本語ハードコードが英語ロケール利用者に出る箇所もある。ローカライズ機構(`t()`、`user-facing-vocabulary.json` の en/ja ペア)は存在するが、配線されているのは約15語のみ。
+システムの言語契約が**反転**している: オペレータの既定言語は日本語(`onboarding_wizard.ts:227` の identity 既定 `language: 'Japanese'`、surface-ux-contract のテストは日本語運用文言を要求 `libs/core/surface/surface-ux-contract.test.ts:5-53`)なのに、ターミナル・UI の実文言はほぼ英語ハードコード。一方で局所的に日本語ハードコードが英語ロケール利用者に出る箇所もある。ローカライズ機構(`t()`、`user-facing-vocabulary.json` の en/ja ペア)は存在するが、配線されているのは約15語のみ。
 
 ### 代表的な証拠
 

@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TraceContext } from '@agent/core';
-import { registerPluginActuatorOperation } from '@agent/core/actuator-op-registry';
-import { registerOpGuard } from '@agent/core/op-preflight';
-import { evaluateFinalCheck } from '@agent/core/scenario-final-checks';
-import { parseScenarioDefinition, type ScenarioDefinition } from '@agent/core/scenario-definition';
-import { installScenarioInterceptor } from '@agent/core/scenario-interceptor';
-import { createScenarioRunContext } from '@agent/core/scenario-run-context';
+import { registerPluginActuatorOperation } from '@agent/core/actuator/actuator-op-registry';
+import { registerOpGuard } from '@agent/core/pipeline/op-preflight';
+import { evaluateFinalCheck } from '@agent/core/scenario/scenario-final-checks';
+import {
+  parseScenarioDefinition,
+  type ScenarioDefinition,
+} from '@agent/core/scenario/scenario-definition';
+import { installScenarioInterceptor } from '@agent/core/scenario/scenario-interceptor';
+import { createScenarioRunContext } from '@agent/core/scenario/scenario-run-context';
 import { safeRmSync } from '@agent/core/secure-io';
 
 // Load through the same specifier the pipeline entry uses so the test shares

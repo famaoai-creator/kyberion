@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   collectMissionHygieneReport: vi.fn(),
 }));
 
-vi.mock('@agent/core/mission-hygiene', () => ({
+vi.mock('@agent/core/mission/mission-hygiene', () => ({
   collectMissionHygieneReport: mocks.collectMissionHygieneReport,
 }));
 
@@ -17,7 +17,7 @@ vi.mock('@agent/core/secure-io', () => ({
   withSensitivePathMediation: (fn: () => unknown) => fn(),
 }));
 
-vi.mock('@agent/core/mission-state', () => ({
+vi.mock('@agent/core/mission/mission-state', () => ({
   loadState: () => null,
 }));
 

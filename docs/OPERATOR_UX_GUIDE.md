@@ -323,7 +323,7 @@ Use this when you want the shortest path from inbox triage to a sent reply.
 
 #### Notes
 
-- Shared logic lives in `libs/core/email-workflow.ts`.
+- Shared logic lives in `libs/core/integrations/email-workflow.ts`.
 - Web and CLI both use the same email workflow core.
 - Sending should always happen after a visible confirmation step.
 

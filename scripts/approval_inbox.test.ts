@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ApprovalRequestRecord } from '@agent/core/approval-store';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import { formatVetoTick, runApprovalInbox } from './approval_inbox.js';
 
 function record(id: string, title: string): ApprovalRequestRecord {

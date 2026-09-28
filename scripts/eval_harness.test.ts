@@ -8,7 +8,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { createScenarioSideEffectLog } from '@agent/core/scenario-side-effect-log';
+import { createScenarioSideEffectLog } from '@agent/core/scenario/scenario-side-effect-log';
 import {
   createEvalHarnessFixtureExecutor,
   loadEvalHarnessTable,

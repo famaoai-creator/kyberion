@@ -1,6 +1,9 @@
-import { runModelRoleFitnessProbes } from '@agent/core/model-role-fitness-runner';
-import { listRoleFitnessProbes, resolveModelRoleFitness } from '@agent/core/model-role-fitness';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { runModelRoleFitnessProbes } from '@agent/core/reasoning/model-role-fitness-runner';
+import {
+  listRoleFitnessProbes,
+  resolveModelRoleFitness,
+} from '@agent/core/reasoning/model-role-fitness';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**

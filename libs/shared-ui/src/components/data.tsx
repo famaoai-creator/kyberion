@@ -19,7 +19,7 @@ import type {
   KbTableStatusCell,
   KbTableTitleCell,
   KbTextProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { defaultNavigate, useA2UIActions } from '../actions.js';
 import { isKbStatus } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';

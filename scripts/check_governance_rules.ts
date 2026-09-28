@@ -1,8 +1,8 @@
 import * as path from 'node:path';
-import { readModelRegistryDirectory } from '@agent/core/model-registry-directory';
+import { readModelRegistryDirectory } from '@agent/core/reasoning/model-registry-directory';
 import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { compileSchema, defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -412,25 +412,15 @@ function readSplitRegistryDirectory(
   return { ...(headers || {}), [arrayKey]: items };
 }
 
-function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const data = check.dataDir
-    ? readSplitRegistryDirectory(check, violations)
-    : readSafeJsonFile<Record<string, unknown>>(
-        pathResolver.rootResolve(check.dataPath),
-        `governance catalog ${check.dataPath}`
-      );
-  if (!data) return;
-  const validate = compileSchema(check.schemaPath);
-  const ok = validate(data);
-  if (!ok) {
-    for (const error of validate.errors || []) {
-      violations.push(
-        `${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-      );
-    }
-  }
+type RuleCheckHandler = (
+  data: Record<string, unknown>,
+  violations: string[],
+  check: GovernanceRuleCheck,
+  validate: ReturnType<typeof compileSchema>
+) => void;
 
-  if (check.id === 'work-policy') {
+const RULE_CHECK_HANDLERS: Record<string, RuleCheckHandler> = {
+  'work-policy': (data, violations, check) => {
     const typed = data as {
       specialist_routing?: { rules?: unknown[]; fallback_specialist_id?: string };
       profile_routing?: {
@@ -470,9 +460,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.design_rules?.intent_label_rules || []).length) {
       violations.push('work-policy: design_rules.intent_label_rules must not be empty');
     }
-  }
-
-  if (check.id === 'intent-policy') {
+  },
+  'intent-policy': (data, violations, check) => {
     const typed = data as {
       delivery?: { rules?: Array<{ mode?: string }> };
       compiler?: {
@@ -497,9 +486,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.compiler?.work_loop_rules || []).length) {
       violations.push('intent-policy: compiler.work_loop_rules must not be empty');
     }
-  }
-
-  if (check.id === 'intent-resolution-policy') {
+  },
+  'intent-resolution-policy': (data, violations, check) => {
     const typed = data as {
       catalog_scoring?: {
         selected_confidence_threshold?: number;
@@ -530,9 +518,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         );
       }
     }
-  }
-
-  if (check.id === 'task-session-policy') {
+  },
+  'task-session-policy': (data, violations, check) => {
     const typed = data as {
       intents?: Array<{
         id?: string;
@@ -563,9 +550,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         );
       }
     }
-  }
-
-  if (check.id === 'mission-classification-policy') {
+  },
+  'mission-classification-policy': (data, violations, check) => {
     const typed = data as {
       stage_progression?: string[];
       mission_class_rules?: unknown[];
@@ -588,9 +574,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.stage_rules || []).length) {
       violations.push('mission-classification-policy: stage_rules must not be empty');
     }
-  }
-
-  if (check.id === 'mission-workflow-catalog') {
+  },
+  'mission-workflow-catalog': (data, violations, check) => {
     const typed = data as {
       patterns?: Record<string, unknown>;
       templates?: unknown[];
@@ -605,9 +590,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.templates || []).length) {
       violations.push('mission-workflow-catalog: templates must not be empty');
     }
-  }
-
-  if (check.id === 'mission-review-gate-registry') {
+  },
+  'mission-review-gate-registry': (data, violations, check) => {
     const typed = data as {
       defaults?: { review_mode?: string };
       gates?: unknown[];
@@ -622,9 +606,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.mode_rules || []).length) {
       violations.push('mission-review-gate-registry: mode_rules must not be empty');
     }
-  }
-
-  if (check.id === 'path-scope-policy') {
+  },
+  'path-scope-policy': (data, violations, check) => {
     const typed = data as {
       defaults?: { unknown_scope_behavior?: string };
       scope_classes?: Record<string, { allow_prefixes?: unknown[] }>;
@@ -641,9 +624,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`path-scope-policy: ${scopeClass} must define allow_prefixes`);
       }
     }
-  }
-
-  if (check.id === 'mission-orchestration-scenario-pack') {
+  },
+  'mission-orchestration-scenario-pack': (data, violations, check) => {
     const typed = data as {
       scenarios?: Array<{ scenario_id?: string; scenario_class?: string }>;
     };
@@ -667,28 +649,83 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`mission-orchestration-scenario-pack: ${id} has invalid scenario_class`);
       }
     }
-  }
-
-  if (check.id === 'surface-provider-manifest-catalog') {
+  },
+  'surface-provider-manifest-catalog': (data, violations, check) => {
     validateSurfaceProviderCatalogDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'service-endpoints') {
+  },
+  'service-endpoints': (data, violations, check) => {
     validateServiceEndpointsDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'voice-engine-registry') {
+  },
+  'voice-engine-registry': (data, violations, check) => {
     validateVoiceEngineDirectoryConsistency(violations);
-  }
 
-  if (check.id === 'specialist-catalog') {
+    const typed = data as {
+      default_engine_id?: string;
+      engines?: Array<{
+        engine_id?: string;
+        status?: string;
+        fallback_engine_id?: string;
+        supports?: { playback?: boolean; artifact_formats?: string[] };
+      }>;
+    };
+    if (!(typed.engines || []).length) {
+      violations.push('voice-engine-registry: engines must not be empty');
+      return;
+    }
+    const engineIds = new Set<string>();
+    for (const engine of typed.engines || []) {
+      const engineId = String(engine.engine_id || '');
+      if (!engineId) {
+        violations.push('voice-engine-registry: every engine must define engine_id');
+        continue;
+      }
+      if (engineIds.has(engineId)) {
+        violations.push(`voice-engine-registry: duplicate engine_id detected (${engineId})`);
+      }
+      engineIds.add(engineId);
+      if (
+        engine.supports?.playback === false &&
+        (engine.supports?.artifact_formats || []).length === 0
+      ) {
+        violations.push(
+          `voice-engine-registry: ${engineId} must support playback or at least one artifact format`
+        );
+      }
+    }
+    if (!String(typed.default_engine_id || '')) {
+      violations.push('voice-engine-registry: default_engine_id must not be empty');
+      return;
+    }
+    if (!engineIds.has(String(typed.default_engine_id || ''))) {
+      violations.push(
+        'voice-engine-registry: default_engine_id must reference an existing engine_id'
+      );
+    }
+    if (!(typed.engines || []).some((engine) => engine.status === 'active')) {
+      violations.push('voice-engine-registry: at least one active engine is required');
+    }
+    for (const engine of typed.engines || []) {
+      const engineId = String(engine.engine_id || '');
+      const fallbackId = String(engine.fallback_engine_id || '');
+      if (fallbackId && !engineIds.has(fallbackId)) {
+        violations.push(
+          `voice-engine-registry: ${engineId} references unknown fallback_engine_id (${fallbackId})`
+        );
+      }
+      if (fallbackId && fallbackId === engineId) {
+        violations.push(
+          `voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`
+        );
+      }
+    }
+  },
+  'specialist-catalog': (data, violations, check) => {
     validateSpecialistCatalogDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'agent-profile-index') {
+  },
+  'agent-profile-index': (data, violations, check) => {
     validateAgentProfileDirectoryConsistency(violations);
-  }
-  if (check.id === 'standard-intents') {
+  },
+  'standard-intents': (data, violations, check) => {
     const typed = data as {
       intents?: Array<{
         id?: string;
@@ -724,9 +761,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         );
       }
     }
-  }
-
-  if (check.id === 'intent-domain-ontology') {
+  },
+  'intent-domain-ontology': (data, violations, check) => {
     const typed = data as {
       intents?: Array<{ intent_id?: string; legacy_category?: string; category?: string }>;
     };
@@ -751,9 +787,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`intent-domain-ontology: ${intentId} must define category`);
       }
     }
-  }
-
-  if (check.id === 'active-surfaces') {
+  },
+  'active-surfaces': (data, violations, check, validate) => {
     const typed = data as { surfaces?: Array<{ id?: string; enabled?: boolean }> };
     if (!(typed.surfaces || []).length) {
       violations.push('active-surfaces: surfaces must not be empty');
@@ -809,9 +844,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         );
       }
     }
-  }
-
-  if (check.id === 'model-registry') {
+  },
+  'model-registry': (data, violations, check, validate) => {
     const typed = data as {
       default_model_id?: string;
       models?: Array<{ model_id?: string; status?: string }>;
@@ -916,9 +950,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     ) {
       violations.push('model-registry: snapshot and canonical directory model IDs diverge');
     }
-  }
-
-  if (check.id === 'model-adaptation-policy') {
+  },
+  'model-adaptation-policy': (data, violations, check) => {
     const typed = data as {
       lifecycle?: { steps?: string[] };
       benchmark_suites?: Array<{ id?: string }>;
@@ -968,9 +1001,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if ((typed.rollback?.min_signal_count || 0) < 1) {
       violations.push('model-adaptation-policy: rollback.min_signal_count must be >= 1');
     }
-  }
-
-  if (check.id === 'harness-capability-registry') {
+  },
+  'harness-capability-registry': (data, violations, check) => {
     const typed = data as {
       capabilities?: Array<{
         capability_id?: string;
@@ -1009,9 +1041,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.capabilities || []).some((capability) => capability.status === 'active')) {
       violations.push('harness-capability-registry: at least one active capability is required');
     }
-  }
-
-  if (check.id === 'harness-adapter-registry') {
+  },
+  'harness-adapter-registry': (data, violations, check) => {
     const typed = data as {
       profiles?: Array<{
         adapter_id?: string;
@@ -1048,9 +1079,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.profiles || []).some((profile) => profile.enabled)) {
       violations.push('harness-adapter-registry: at least one enabled profile is required');
     }
-  }
-
-  if (check.id === 'provider-capability-scan-policy') {
+  },
+  'provider-capability-scan-policy': (data, violations, check) => {
     const typed = data as {
       providers?: Array<{
         provider?: string;
@@ -1100,9 +1130,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         }
       }
     }
-  }
-
-  if (check.id === 'execution-receipt-policy') {
+  },
+  'execution-receipt-policy': (data, violations, check) => {
     const typed = data as {
       required_sections?: string[];
       clarification?: {
@@ -1164,9 +1193,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         'execution-receipt-policy: routing_binding.allowed_routing must not be empty'
       );
     }
-  }
-
-  if (check.id === 'voice-profile-registry') {
+  },
+  'voice-profile-registry': (data, violations, check) => {
     const typed = data as {
       default_profile_id?: string;
       profiles?: Array<{
@@ -1229,9 +1257,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       }
     }
     validateVoiceProfileDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'authority-role-index') {
+  },
+  'authority-role-index': (data, violations, check) => {
     const typed = data as {
       authority_roles?: Record<string, unknown>;
     };
@@ -1240,13 +1267,11 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       return;
     }
     validateAuthorityRoleDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'team-role-index') {
+  },
+  'team-role-index': (data, violations, check) => {
     validateTeamRoleDirectoryConsistency(violations);
-  }
-
-  if (check.id === 'voice-runtime-policy') {
+  },
+  'voice-runtime-policy': (data, violations, check) => {
     const typed = data as {
       queue?: { concurrency?: number; cancellation?: string };
       chunking?: {
@@ -1288,71 +1313,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         'voice-runtime-policy: routing.enforce_clone_engine_for_personal_tier must be defined'
       );
     }
-  }
-
-  if (check.id === 'voice-engine-registry') {
-    const typed = data as {
-      default_engine_id?: string;
-      engines?: Array<{
-        engine_id?: string;
-        status?: string;
-        fallback_engine_id?: string;
-        supports?: { playback?: boolean; artifact_formats?: string[] };
-      }>;
-    };
-    if (!(typed.engines || []).length) {
-      violations.push('voice-engine-registry: engines must not be empty');
-      return;
-    }
-    const engineIds = new Set<string>();
-    for (const engine of typed.engines || []) {
-      const engineId = String(engine.engine_id || '');
-      if (!engineId) {
-        violations.push('voice-engine-registry: every engine must define engine_id');
-        continue;
-      }
-      if (engineIds.has(engineId)) {
-        violations.push(`voice-engine-registry: duplicate engine_id detected (${engineId})`);
-      }
-      engineIds.add(engineId);
-      if (
-        engine.supports?.playback === false &&
-        (engine.supports?.artifact_formats || []).length === 0
-      ) {
-        violations.push(
-          `voice-engine-registry: ${engineId} must support playback or at least one artifact format`
-        );
-      }
-    }
-    if (!String(typed.default_engine_id || '')) {
-      violations.push('voice-engine-registry: default_engine_id must not be empty');
-      return;
-    }
-    if (!engineIds.has(String(typed.default_engine_id || ''))) {
-      violations.push(
-        'voice-engine-registry: default_engine_id must reference an existing engine_id'
-      );
-    }
-    if (!(typed.engines || []).some((engine) => engine.status === 'active')) {
-      violations.push('voice-engine-registry: at least one active engine is required');
-    }
-    for (const engine of typed.engines || []) {
-      const engineId = String(engine.engine_id || '');
-      const fallbackId = String(engine.fallback_engine_id || '');
-      if (fallbackId && !engineIds.has(fallbackId)) {
-        violations.push(
-          `voice-engine-registry: ${engineId} references unknown fallback_engine_id (${fallbackId})`
-        );
-      }
-      if (fallbackId && fallbackId === engineId) {
-        violations.push(
-          `voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`
-        );
-      }
-    }
-  }
-
-  if (check.id === 'voice-sample-ingestion-policy') {
+  },
+  'voice-sample-ingestion-policy': (data, violations, check) => {
     const typed = data as {
       sample_limits?: {
         min_samples?: number;
@@ -1407,9 +1369,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         'voice-sample-ingestion-policy: profile_rules.require_language_coverage must be defined'
       );
     }
-  }
-
-  if (check.id === 'video-composition-template-registry') {
+  },
+  'video-composition-template-registry': (data, violations, check) => {
     const typed = data as {
       default_template_id?: string;
       templates?: Array<{
@@ -1469,9 +1430,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         'video-composition-template-registry: at least one active template is required'
       );
     }
-  }
-
-  if (check.id === 'video-render-runtime-policy') {
+  },
+  'video-render-runtime-policy': (data, violations, check) => {
     const typed = data as {
       queue?: { concurrency?: number };
       progress?: { throttle_ms?: number; min_percent_delta?: number };
@@ -1513,7 +1473,28 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if ((typed.render?.command_timeout_ms || 0) < 1000) {
       violations.push('video-render-runtime-policy: render.command_timeout_ms must be >= 1000');
     }
+  },
+};
+
+function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
+  const data = check.dataDir
+    ? readSplitRegistryDirectory(check, violations)
+    : readSafeJsonFile<Record<string, unknown>>(
+        pathResolver.rootResolve(check.dataPath),
+        `governance catalog ${check.dataPath}`
+      );
+  if (!data) return;
+  const validate = compileSchema(check.schemaPath);
+  const ok = validate(data);
+  if (!ok) {
+    for (const error of validate.errors || []) {
+      violations.push(
+        `${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+      );
+    }
   }
+
+  RULE_CHECK_HANDLERS[check.id]?.(data, violations, check, validate);
 }
 
 // ── (c) Machine-absolute path lint ────────────────────────────────────────

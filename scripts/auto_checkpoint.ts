@@ -1,6 +1,6 @@
 import { logger } from '@agent/core/core';
 import { safeExec } from '@agent/core/secure-io';
-import { evaluateAutonomousOpsAction } from '@agent/core/autonomous-ops-gate';
+import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { createCheckpoint } from './refactor/mission-maintenance.js';
 import { listActiveMissions, loadState } from './refactor/mission-state.js';

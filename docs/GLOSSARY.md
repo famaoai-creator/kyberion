@@ -161,7 +161,7 @@ The mission lifecycle controller referenced in the charter. It handles mission s
 
 ### OrchestratorSession
 
-A durable, journaled binding between a conversation thread (`surface`/`channel`/`thread`) and the mission it owns (SO-02, `libs/core/orchestrator-session.ts`). At most one active session exists per mission at a time, enforced across processes by claiming a `mission-ownership:<MISSION_ID>` work-item lease alongside the journal entry (SO-03) — not just an in-process check. Creating a session is the explicit ceremony that promotes a conversation thread from "issued this mission" to "owns and may steer this mission"; releasing it (handoff / finish / explicit) ends that authority. See [SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md) and the [multi-provider co-execution contract](../knowledge/product/governance/multi-provider-coexecution-contract.md#surface-orchestrator-sessions).
+A durable, journaled binding between a conversation thread (`surface`/`channel`/`thread`) and the mission it owns (SO-02, `libs/core/mission/orchestrator-session.ts`). At most one active session exists per mission at a time, enforced across processes by claiming a `mission-ownership:<MISSION_ID>` work-item lease alongside the journal entry (SO-03) — not just an in-process check. Creating a session is the explicit ceremony that promotes a conversation thread from "issued this mission" to "owns and may steer this mission"; releasing it (handoff / finish / explicit) ends that authority. See [SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md) and the [multi-provider co-execution contract](../knowledge/product/governance/multi-provider-coexecution-contract.md#surface-orchestrator-sessions).
 
 ### Surface Orchestrator
 
@@ -169,15 +169,15 @@ A conversation thread (Slack / Telegram / Discord / iMessage / terminal / web) t
 
 ### NHI (Non-Human Identity)
 
-An agent or service acting in the system as a first-class, durable identity rather than an ad-hoc string. Kyberion's canonical record is `AgentIdentityRecord` (NI-01, `libs/core/agent-identity.ts`): a journal-backed `nhi_id` (`kyberion://agent/<org>/<slug>`) with an accountable human owner, a scope affiliation (organization / project / mission / task), and a lifecycle state. The older representations — in-memory `agentId`, role strings, persona, `peer_id`, `resource_id`, provider — are attributes or projections of this record, never identities of their own (provider and model are hints, per AO-05). Retirement is terminal and enforced at use time: with `KYBERION_NHI_ACTOR=enforce`, a retired identity's claims and dispatches are refused. See [NHI_IDENTITY_MAPPING](./developer/NHI_IDENTITY_MAPPING.md).
+An agent or service acting in the system as a first-class, durable identity rather than an ad-hoc string. Kyberion's canonical record is `AgentIdentityRecord` (NI-01, `libs/core/agent/agent-identity.ts`): a journal-backed `nhi_id` (`kyberion://agent/<org>/<slug>`) with an accountable human owner, a scope affiliation (organization / project / mission / task), and a lifecycle state. The older representations — in-memory `agentId`, role strings, persona, `peer_id`, `resource_id`, provider — are attributes or projections of this record, never identities of their own (provider and model are hints, per AO-05). Retirement is terminal and enforced at use time: with `KYBERION_NHI_ACTOR=enforce`, a retired identity's claims and dispatches are refused. See [NHI_IDENTITY_MAPPING](./developer/NHI_IDENTITY_MAPPING.md).
 
 ### Delegation chain
 
-The ordered record of who acted on whose behalf across a delegation (NI-03, `libs/core/delegation-chain.ts`): `user:<id> → orchestrator → worker → sub-worker`, one element appended per hop, each carrying the scope granted at that hop. Attenuation is fail-closed — a child's `granted_scope` may never exceed its parent's — and the chain is stamped into the execution ledger, traces and audit chain so a full chain can be reconstructed from audit alone. Same shape as RFC 8693's nested `act` claim.
+The ordered record of who acted on whose behalf across a delegation (NI-03, `libs/core/mission/delegation-chain.ts`): `user:<id> → orchestrator → worker → sub-worker`, one element appended per hop, each carrying the scope granted at that hop. Attenuation is fail-closed — a child's `granted_scope` may never exceed its parent's — and the chain is stamped into the execution ledger, traces and audit chain so a full chain can be reconstructed from audit alone. Same shape as RFC 8693's nested `act` claim.
 
 ### Task-scoped grant
 
-A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `libs/core/task-scoped-grants.ts`): `{grantee_nhi_id, scope, audience: {mission_id, task_id?}, expires_at}`. It is served only inside its declared mission/task, expires within 24h at the latest, and is revoked when the task finishes — so least privilege comes from grants that die, not from standing permissions. The internal analogue of RFC 8707 audience restriction.
+A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `libs/core/task/task-scoped-grants.ts`): `{grantee_nhi_id, scope, audience: {mission_id, task_id?}, expires_at}`. It is served only inside its declared mission/task, expires within 24h at the latest, and is revoked when the task finishes — so least privilege comes from grants that die, not from standing permissions. The internal analogue of RFC 8707 audience restriction.
 
 ### NHI offboarding
 
@@ -401,7 +401,7 @@ The actuator class for local short-lived shell, OS, and file-control operations.
 
 ### Organization Operating Model
 
-The control plane for running an organization beyond individual missions: purpose, operational state, domains, capabilities, services, routine operations, incidents, cadences, decisions, and learning candidates, stored under `active/organizations/{tier}/{tenant}/{organization}/state/` and mutated only via the `pnpm organization` facade (`libs/core/organization-operating-model.ts`).
+The control plane for running an organization beyond individual missions: purpose, operational state, domains, capabilities, services, routine operations, incidents, cadences, decisions, and learning candidates, stored under `active/organizations/{tier}/{tenant}/{organization}/state/` and mutated only via the `pnpm organization` facade (`libs/core/organization/organization-operating-model.ts`).
 
 ### Work Shape
 
@@ -415,7 +415,7 @@ These are orthogonal axes: changing the operating mode does not by itself choose
 
 ### WorkItem
 
-The canonical unit of executable work shared by all views and surfaces (`libs/core/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
+The canonical unit of executable work shared by all views and surfaces (`libs/core/workforce/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
 
 ### WorkItem Context
 
@@ -423,7 +423,7 @@ The typed identity chain on a work item: `tenant_slug → organization_id → pr
 
 ### Work Visibility Scope
 
-One of six projections over the same work items, each answering a different operator question: `organization`, `home`, `work_items`, `operations`, `missions`, `governance` (`libs/core/work-visibility.ts`). Combined with a view filter (`all` / `actionable` / `active` / `history`) and the viewer's allowed tenant set.
+One of six projections over the same work items, each answering a different operator question: `organization`, `home`, `work_items`, `operations`, `missions`, `governance` (`libs/core/workforce/work-visibility.ts`). Combined with a view filter (`all` / `actionable` / `active` / `history`) and the viewer's allowed tenant set.
 
 ### Managed Project
 
@@ -435,7 +435,7 @@ An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,
 
 ### Tenant Registry
 
-The single source of tenant definitions (`libs/core/tenant-registry.ts`; profiles under `knowledge/personal/tenants/`). Unregistered tenants cannot be silently operated on; CI guards drift via `check:tenant-registry`.
+The single source of tenant definitions (`libs/core/organization/tenant-registry.ts`; profiles under `knowledge/personal/tenants/`). Unregistered tenants cannot be silently operated on; CI guards drift via `check:tenant-registry`.
 
 ### Tenant Group
 
@@ -461,7 +461,7 @@ Zero-LLM full-text search over conversation, mission, and trace history on SQLit
 
 ### Knowledge Slice
 
-A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `knowledge/product/schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
+A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `knowledge/product/schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
 
 ### Knowledge Card
 

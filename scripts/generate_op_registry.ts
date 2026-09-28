@@ -1,11 +1,14 @@
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
-import type { ActuatorOpDescription } from '@agent/core/actuator-sdk';
-import { loadActuatorOpRegistry, type PipelineStepType } from '@agent/core/actuator-op-registry';
+import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
+import {
+  loadActuatorOpRegistry,
+  type PipelineStepType,
+} from '@agent/core/actuator/actuator-op-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
-import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { getOpInputContract } from '@agent/core/pipeline/op-input-contracts';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defineGenerator, isDirectScript } from './lib/harness.js';

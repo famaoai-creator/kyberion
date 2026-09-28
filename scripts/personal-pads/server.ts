@@ -3,9 +3,9 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
-import { narrowSurfaceViewerTier } from '@agent/core/surface-mutation-guard';
-import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { narrowSurfaceViewerTier } from '@agent/core/surface/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import {
   createLocalPadContext,
   isLocalPadOriginAllowed,
@@ -19,8 +19,8 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
-import type { PluginHost } from '@agent/core/plugin-host';
-import { PluginViewError, pluginViewErrorStatus } from '@agent/core/plugin-view-contract';
+import type { PluginHost } from '@agent/core/plugin/plugin-host';
+import { PluginViewError, pluginViewErrorStatus } from '@agent/core/plugin/plugin-view-contract';
 import type { VocabularyKey } from '@agent/core/t';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';

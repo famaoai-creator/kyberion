@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGapRecorder, GAP_PHASES, isKnownGapPhase, sanitizeGapSamples } from './gap-phase.js';
-import { delegateTaskWithUntrustedData } from './reasoning-backend.js';
+import { delegateTaskWithUntrustedData } from './reasoning/reasoning-backend.js';
 
 describe('gap-phase (QM-09)', () => {
   it('vocabulary accepts base phases and tool_body.* only', () => {

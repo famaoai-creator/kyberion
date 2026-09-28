@@ -1,4 +1,4 @@
-import { generateNativePptx } from '@agent/core/media-contracts';
+import { generateNativePptx } from '@agent/core/media/media-contracts';
 import {
   PPTX_PALETTE as C,
   textElement as txt,
@@ -6,7 +6,7 @@ import {
   lineElement as line,
   sectionHeaderElements,
   footerElements,
-} from '@agent/core/layout-primitives';
+} from '@agent/core/media/native-pptx-engine/layout-primitives';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
 import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -112,6 +112,7 @@ const slide2: PptxSlide = {
       { fontSize: 15, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       'Kyberion OSは、企業の機密・監査要件を満たしたままで、AIエージェント自律群がドキュメント生成やミーティング調整、ビジネスプロセスの自動化を行う統合基盤です。\n\n本システムにおけるPowerPoint生成エンジンは、テンプレート依存の制約から脱却し、純粋なOOXML要素の継承構造を読み解いて100%忠実なスライド構築を実現します。',
       { x: 0.8, y: 2.3, w: 3.6, h: 4.0 },
       { fontSize: 12, color: C.gray800, lineSpacing: 1.3 }
@@ -124,11 +125,13 @@ const slide2: PptxSlide = {
       lineWidth: 1,
     }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '01. 徹底したセキュリティとガバナンス',
       { x: 5.2, y: 1.8, w: 4.1, h: 0.3 },
       { fontSize: 13, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       'データ、アイデンティティ、実行レベル（L0〜L5）の監査証跡をすべてブロックチェーンやセキュアストレージに永続化します。',
       { x: 5.2, y: 2.15, w: 4.1, h: 0.8 },
       { fontSize: 11, color: C.gray800 }
@@ -140,11 +143,13 @@ const slide2: PptxSlide = {
       lineWidth: 1,
     }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '02. 完全なネイティブファイル制御',
       { x: 5.2, y: 3.5, w: 4.1, h: 0.3 },
       { fontSize: 13, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '中間生成ライブラリを介さず、Microsoft-specificな拡張要素（p14/p15）やSmartArt/チャートを含んだXMLブロックを直接構築します。',
       { x: 5.2, y: 3.85, w: 4.1, h: 0.8 },
       { fontSize: 11, color: C.gray800 }
@@ -156,11 +161,13 @@ const slide2: PptxSlide = {
       lineWidth: 1,
     }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '03. 役割（ロール）に基づく協調体制',
       { x: 5.2, y: 5.15, w: 4.1, h: 0.3 },
       { fontSize: 13, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '人間管理者（PJオーナー）および多様なAI専門エージェントが、共通のデータ領域において自律的にタスクを分散解決します。',
       { x: 5.2, y: 5.5, w: 4.1, h: 0.9 },
       { fontSize: 11, color: C.gray800 }
@@ -206,6 +213,7 @@ const slide3: PptxSlide = {
     ),
     line({ x: 1.0, y: 3.7, w: 3.3, h: 0 }, { line: C.gray200, lineWidth: 1 }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '■ Core Expertise:\n・Enterprise Architectures\n・Autonomous Agent Swarm Orchestration\n・High-Fidelity Document Pipelines (OOXML)\n\n■ Mission Focus:\nKyberion OS全体のシステムガバナンスと、人間とのインターフェース、エージェント協調の最適化にコミットしています。',
       { x: 0.8, y: 3.85, w: 3.7, h: 2.6 },
       { fontSize: 10.5, color: C.gray800, lineSpacing: 1.25 }
@@ -235,6 +243,7 @@ const slide3: PptxSlide = {
     ),
     line({ x: 5.7, y: 3.7, w: 3.3, h: 0 }, { line: C.gray200, lineWidth: 1 }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '■ Core Expertise:\n・Native XML Injection & Synthesis\n・Real-time Presentation Composition\n・Automated Layout Pattern Verification\n\n■ Mission Focus:\n人間からの抽象的なプロンプト（指示）を、高精度な座標位置、スタイル、フォントアトリビュートを伴うPPTX構造へ自律翻訳して出力します。',
       { x: 5.5, y: 3.85, w: 3.7, h: 2.6 },
       { fontSize: 10.5, color: C.gray800, lineSpacing: 1.25 }
@@ -374,6 +383,7 @@ const slide4: PptxSlide = {
       { fontSize: 12, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '全ドキュメント生成履歴の暗号署名、およびブロックチェーン（監査用）アンカー処理を完全稼働。',
       { x: 0.7, y: 4.8, w: 2.4, h: 1.7 },
       { fontSize: 9.5, color: C.gray600, lineSpacing: 1.2 }
@@ -390,6 +400,7 @@ const slide4: PptxSlide = {
       { fontSize: 12, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '複数エージェントによるタスク競合防止のための分散ロック機構（分散リース）の検証完了。',
       { x: 3.8, y: 4.8, w: 2.4, h: 1.7 },
       { fontSize: 9.5, color: C.gray600, lineSpacing: 1.2 }
@@ -406,6 +417,7 @@ const slide4: PptxSlide = {
       { fontSize: 12, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '外部ネットワーク非依存、ローカルの機密推論環境下のみで100%整合性を維持するデプロイメントの成立。',
       { x: 6.9, y: 4.8, w: 2.4, h: 1.7 },
       { fontSize: 9.5, color: C.gray600, lineSpacing: 1.2 }
@@ -617,6 +629,7 @@ const slide6: PptxSlide = {
       { fontSize: 11, bold: true, color: C.navy }
     ),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '・直線の幾何学的な結線座標（x, y, w, h）を自動計算し、直感的なダイアグラム構成を実現します。\n・矢印の形状、太さ、色、およびダッシュパターン（破線・一点鎖線など）を個別スタイル定義としてフルサポート。',
       { x: 0.7, y: 5.75, w: 8.6, h: 0.7 },
       { fontSize: 10.5, color: C.gray700, lineSpacing: 1.25 }
@@ -703,32 +716,51 @@ const slide8: PptxSlide = {
       type: 'text',
       pos: { x: 0.5, y: 1.7, w: 9.0, h: 4.8 },
       textRuns: [
+        // i18n-exempt: JA demo deck content generator
         { text: '1. 単一のテキストボックス内に、独立した異なるスタイル属性を持つ「' },
         {
+          // i18n-exempt: JA demo deck content generator
           text: '複数のテキストラン（Text Runs）',
           options: { bold: true, color: C.blue, fontSize: 15 },
         },
+        // i18n-exempt: JA demo deck content generator
         { text: '」をシームレスに混在させてレイアウト可能です。\n\n' },
+        // i18n-exempt: JA demo deck content generator
         { text: '2. 例として：このランは「' },
+        // i18n-exempt: JA demo deck content generator
         { text: 'ボールド（太字）', options: { bold: true, color: C.navy } },
+        // i18n-exempt: JA demo deck content generator
         { text: '」であり、このランは「' },
+        // i18n-exempt: JA demo deck content generator
         { text: 'イタリック（斜体）', options: { italic: true, color: C.orange } },
+        // i18n-exempt: JA demo deck content generator
         { text: '」、このランには「' },
         { text: '下線（Underline）', options: { underline: true, color: C.green } },
+        // i18n-exempt: JA demo deck content generator
         { text: '」と「' },
+        // i18n-exempt: JA demo deck content generator
         { text: '打ち消し線（Strike）', options: { strike: true, color: C.red } },
+        // i18n-exempt: JA demo deck content generator
         { text: '」が同時に適用されています。\n\n' },
+        // i18n-exempt: JA demo deck content generator
         { text: '3. さらに、部分的なフォントサイズの変更（' },
+        // i18n-exempt: JA demo deck content generator
         { text: '18ptの大文字', options: { fontSize: 18, bold: true, color: C.purple } },
+        // i18n-exempt: JA demo deck content generator
         { text: ' など）や、背景色のマーカーハイライト（' },
+        // i18n-exempt: JA demo deck content generator
         { text: 'イエローのハイライト背景', options: { highlight: '#FFFF00', bold: true } },
+        // i18n-exempt: JA demo deck content generator
         { text: '）が自在に表現可能です。\n\n' },
         {
+          // i18n-exempt: JA demo deck content generator
           text: '4. 日本語（ダブルバイト文字）と英語のフォントファミリーの分離整合性も保たれます（例: ',
         },
         { text: 'MS-Gothic', options: { fontFamily: 'MS Gothic', bold: true } },
+        // i18n-exempt: JA demo deck content generator
         { text: ' や ' },
         { text: 'Times New Roman', options: { fontFamily: 'Times New Roman', italic: true } },
+        // i18n-exempt: JA demo deck content generator
         { text: ' などの混在環境でも文字化けやズレは一切発生しません）。' },
       ],
       style: {
@@ -1121,6 +1153,7 @@ const slide13: PptxSlide = {
     ),
     line({ x: 0.9, y: 3.3, w: 2.0, h: 0 }, { line: C.gray200, lineWidth: 1 }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '1,000回以上の連続パフォーマンステストにおいて、OOXMLパースエラーおよび座標衝突を完全回避。高度な自動リカバリ機構を実証。',
       { x: 0.7, y: 3.5, w: 2.4, h: 1.5 },
       { fontSize: 9.5, color: C.gray700, lineSpacing: 1.2 }
@@ -1144,6 +1177,7 @@ const slide13: PptxSlide = {
     ),
     line({ x: 4.0, y: 3.3, w: 2.0, h: 0 }, { line: C.gray200, lineWidth: 1 }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '機密度の高いパーソナルおよびConfidential層データを完全に分離制御。エージェント間通信を含め、すべてのI/Oへのリアルタイム監査を確立。',
       { x: 3.8, y: 3.5, w: 2.4, h: 1.5 },
       { fontSize: 9.5, color: C.gray700, lineSpacing: 1.2 }
@@ -1167,6 +1201,7 @@ const slide13: PptxSlide = {
     ),
     line({ x: 7.1, y: 3.3, w: 2.0, h: 0 }, { line: C.gray200, lineWidth: 1 }),
     txt(
+      // i18n-exempt: JA demo deck content generator
       '中間抽象化ライブラリのオーバーヘッドが一切ないため、15枚以上の高密度スライドであっても、1.2秒未満のミリ秒オーダーで即時合成を完了。',
       { x: 6.9, y: 3.5, w: 2.4, h: 1.5 },
       { fontSize: 9.5, color: C.gray700, lineSpacing: 1.2 }

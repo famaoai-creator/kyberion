@@ -9,12 +9,12 @@
     "libs/core/context-promotion-ledger.ts",
     "libs/core/contextual-intent-learning.ts",
     "libs/core/contextual-intent-memory.ts",
-    "libs/core/intent-contract-learning.ts",
-    "libs/core/memory-promotion-queue.ts",
-    "libs/core/src/knowledge-curation-report.ts",
-    "libs/core/src/knowledge-feedback-loop.ts",
-    "libs/core/src/knowledge-index.ts",
-    "libs/core/worker-context-compaction.ts",
-    "libs/core/knowledge-weight-recalculation.ts"
+    "libs/core/intent/intent-contract-learning.ts",
+    "libs/core/knowledge/memory-promotion-queue.ts",
+    "libs/core/knowledge/knowledge-curation-report.ts",
+    "libs/core/knowledge/knowledge-feedback-loop.ts",
+    "libs/core/knowledge/knowledge-index.ts",
+    "libs/core/workforce/worker-context-compaction.ts",
+    "libs/core/knowledge/knowledge-weight-recalculation.ts"
   ]
 }

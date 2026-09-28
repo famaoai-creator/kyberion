@@ -1,6 +1,6 @@
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { secretGuard } from '@agent/core/secret-guard';
+import { secretGuard } from '@agent/core/secret/secret-guard';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
 const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';

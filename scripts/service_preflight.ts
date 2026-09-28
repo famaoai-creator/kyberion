@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { probeServiceRuntime, getServiceRuntimeRecord } from '@agent/core/service-runtime-registry';
-import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
-import { inspectServiceAuth } from '@agent/core/service-validator';
+import {
+  probeServiceRuntime,
+  getServiceRuntimeRecord,
+} from '@agent/core/service/service-runtime-registry';
+import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
+import { inspectServiceAuth } from '@agent/core/service/service-validator';
 import { safeExecResult } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';

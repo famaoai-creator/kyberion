@@ -1,4 +1,4 @@
-import { dhashBuffer } from '@agent/core/image-dhash';
+import { dhashBuffer } from '@agent/core/media/image-dhash';
 import {
   MarkTargetError,
   isMarkTarget,

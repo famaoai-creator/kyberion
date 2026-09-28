@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveConciergeViewer: vi.fn(),
 }));
 
-vi.mock('@agent/core/surface-mutation-guard', () => ({
+vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: mocks.authorizeSurfaceMutation,
   extractSurfaceBearerToken: (authorization: string | null) =>
     authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '',

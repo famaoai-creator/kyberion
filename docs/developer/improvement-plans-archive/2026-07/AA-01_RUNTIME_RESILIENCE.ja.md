@@ -13,7 +13,7 @@ status: archived
 
 エージェント間通信の土台であるランタイム面(a2a-bridge → supervisor daemon → agent-lifecycle → ACP mediator → provider CLI 子プロセス)に、**故障を検知・回復する仕組みがほぼ無い**。
 
-- **子プロセスのクラッシュを検知しない**: `ACPMediator` は stdout/stderr のハンドラは持つが **`child.on('exit'|'close'|'error')` が一切無い**(`libs/core/acp-mediator.ts` 全体で確認済み)。provider CLI が死んでも `booted: true` のまま、次の `ask` はハングする。
+- **子プロセスのクラッシュを検知しない**: `ACPMediator` は stdout/stderr のハンドラは持つが **`child.on('exit'|'close'|'error')` が一切無い**(`libs/core/mesh/acp-mediator.ts` 全体で確認済み)。provider CLI が死んでも `booted: true` のまま、次の `ask` はハングする。
 - **healthCheck がスタブ**: `agentLifecycle.healthCheck`(`agent-lifecycle.ts:448-465`)はコメントに「子プロセス生存確認」と書きながら、実際は記録済み status を返すだけ。死んだ子も `ready` と報告される。
 - **`ask` にターンタイムアウトが無い**: `ACPMediator.ask`(`acp-mediator.ts:306-341`)は無期限待ち。上流のソケットタイムアウト 60 秒(`agent-runtime-supervisor-client.ts:66-70`)だけが命綱で、in-process フォールバック経路(`a2a-bridge.ts:155`)にはそれすら無い。boot 時の固定 `setTimeout(2000)`(`:283`)も雑。
 - **デーモンが transient エラーで全滅する**: `server.on('error')` が即 process 終了(`agent_runtime_supervisor_daemon.ts:278-281`)。EADDRINUSE 一発でホスト内通信面全体が落ちる。lock/socket 処理まわりに空 catch が約8箇所(`:233-272`)。observability 書き込みも全エラー黙殺(`agent-runtime-supervisor.ts:64-67`)。
@@ -34,7 +34,7 @@ status: archived
 - **完了(代表スライス)**: `ACPMediator` に `AgentRuntimeCrashedError` / `AgentTurnTimeoutError`、turn timeout(既定 60s、呼び出し側指定可)、pending `ask` の crash reject、recent log 添付、pid signal-0 の `isProcessAlive()` を追加。
 - **完了(代表スライス)**: `agentLifecycle.healthCheck()` が ACP mediator の pid liveness を確認し、死活不明の agent を `error` に落とすように変更。`askAgentRuntime()` と supervisor daemon の `ask` payload から `timeoutMs` を渡せるようにした。
 - **完了(代表スライス)**: supervisor event 書き込み失敗を初回のみ `logger.warn`、daemon の lock/socket cleanup の空 catch を warning 化し、`EADDRINUSE` は stale socket cleanup 後に 1 回 retry する。
-- **検証済み**: `pnpm exec vitest run libs/core/acp-mediator.test.ts tests/agent-runtime-observability.test.ts libs/core/agent-runtime-supervisor.test.ts`、`pnpm run validate`。
+- **検証済み**: `pnpm exec vitest run libs/core/mesh/acp-mediator.test.ts tests/agent-runtime-observability.test.ts libs/core/agent/agent-runtime-supervisor.test.ts`、`pnpm run validate`。
 - **完了(代表スライス拡張)**: `agentLifecycle.healthCheck()` から restart budget を見て ACP runtime を上限付きで自動再 spawn する経路を追加した(既定オフ、`restartPolicy` 指定時のみ)。`ACPMediator` の crash callback も残している。
 - **完了(代替検証)**: daemon IPC の unit test を TCP transport で追加し、`ensure` / `ask` / `health` / malformed JSON の 4 ケースを通した。実環境の既定 transport は従来どおり unix socket のまま維持している。
 - **完了**: exec adapter の子プロセス liveness を pid signal-0 で healthCheck に接続し、boot の固定 2 秒 sleep を ready signal + 上限待ちに置換した。

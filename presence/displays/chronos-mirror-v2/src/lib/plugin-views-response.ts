@@ -1,4 +1,7 @@
-import { listManagedPlugins, type ManagedPluginRecord } from '@agent/core/plugin-managed-install';
+import {
+  listManagedPlugins,
+  type ManagedPluginRecord,
+} from '@agent/core/plugin/plugin-managed-install';
 import {
   composePluginViewsA2UI,
   listPluginViewsForViewer,
@@ -8,16 +11,16 @@ import {
   type LoadedPluginView,
   type PluginViewFilter,
   type PluginViewViewer,
-} from '@agent/core/plugin-view-contract';
+} from '@agent/core/plugin/plugin-view-contract';
 import {
   dispatchPluginViewAction,
   executeApprovedPluginViewAction,
   listPluginViewActionRequests,
   type PluginViewActionOutcome,
   type PluginViewActionRequestSummary,
-} from '@agent/core/plugin-view-actions';
-import type { PluginHostStatus } from '@agent/core/plugin-host';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+} from '@agent/core/plugin/plugin-view-actions';
+import type { PluginHostStatus } from '@agent/core/plugin/plugin-host';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { toSurfaceAuthorizationContext, type ViewerContext } from './viewer-context';
 
 /**

@@ -34,7 +34,7 @@ status: archived
 
 ### 実装メモ
 
-- `libs/core/mission-gate-engine.ts` を追加し、`evidence_exists` / `schema_valid` / `command_succeeds` / `reviewer_approved` / `human_override` / `custom` の評価と JSON レコード永続化を共通化した。
+- `libs/core/mission/mission-gate-engine.ts` を追加し、`evidence_exists` / `schema_valid` / `command_succeeds` / `reviewer_approved` / `human_override` / `custom` の評価と JSON レコード永続化を共通化した。
 - `mission-orchestration-worker.ts` のタスク受入経路で、`task_result` スキーマ・証跡・acceptance criteria の突合を gate 化し、合格時のみ `completed` に進める。
 - `mission-orchestration-worker.ts` の planning 経路で、planning_packet のスキーマ検証と独立レビュー結果を `gates/` に記録するようにした。
 - `mission-orchestration-worker.ts` の planning gate record には planner / reviewer / review round / review verdict を埋めるようにした。
@@ -43,7 +43,7 @@ status: archived
 
 ### Task 1: ゲート評価エンジン — `claude-sonnet-4`
 
-1. `libs/core/mission-gate-engine.ts` を新設: ゲート定義(`{ id, checks: [{ kind: 'evidence_exists' | 'schema_valid' | 'command_succeeds' | 'reviewer_approved' | 'human_override', params }] }`)を評価し、`{ verdict: pass|fail, reasons[], evidence_path }` を返す。`command_succeeds` は secure-io/safeExec 経由でテスト・lint 等を実行する(`validateMissionQuality` の既存チェック実装を可能な限り再利用)。
+1. `libs/core/mission/mission-gate-engine.ts` を新設: ゲート定義(`{ id, checks: [{ kind: 'evidence_exists' | 'schema_valid' | 'command_succeeds' | 'reviewer_approved' | 'human_override', params }] }`)を評価し、`{ verdict: pass|fail, reasons[], evidence_path }` を返す。`command_succeeds` は secure-io/safeExec 経由でテスト・lint 等を実行する(`validateMissionQuality` の既存チェック実装を可能な限り再利用)。
 2. 判定結果は `missions/<id>/gates/<gate_id>-<ts>.json` に永続化し、`gatePass/gateFail` は同形式の override レコードを書く形に統一する。
 3. unit test: 各 check 種の pass/fail、override の監査記録。
 

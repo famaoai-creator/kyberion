@@ -1,4 +1,4 @@
-import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
+import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
 
 // AR-02: self-described op catalog replacing the hand-curated registry
 // entry, which listed ops this actuator never dispatched (list/read/log/
@@ -7,8 +7,8 @@ import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 // kind, so step-type inference is unchanged; the added ops were previously
 // unclassifiable (pipelines reach them via explicit role today).
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 const SERVICE_SCHEMA = {
   type: 'object',

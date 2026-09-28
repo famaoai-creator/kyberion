@@ -21,9 +21,9 @@
 
 import { logger } from './core.js';
 import { nowIso } from './foundation/time.js';
-import type { ToolDefinition } from './reasoning-backend.js';
-import type { WorkerContextMessage } from './worker-context-compaction.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import type { ToolDefinition } from './reasoning/reasoning-backend.js';
+import type { WorkerContextMessage } from './workforce/worker-context-compaction.js';
+import { getDefaultWorkerEventStream } from './workforce/worker-event-stream.js';
 
 export const MAX_REWIND_LESSON_CHARS = 2_000;
 
@@ -160,7 +160,7 @@ async function recordRewindObservability(
 ): Promise<void> {
   try {
     // Dynamic import: kill-switch drags in the agent-runtime plane.
-    const { recordGovernanceAction } = await import('./kill-switch.js');
+    const { recordGovernanceAction } = await import('./governance/kill-switch.js');
     recordGovernanceAction(
       'context-rewind',
       'context_rewind',

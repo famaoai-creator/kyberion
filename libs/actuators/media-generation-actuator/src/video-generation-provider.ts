@@ -4,7 +4,7 @@ import {
   listMediaBackends,
   probeMediaBackendAvailability,
   type MediaBackendRecord,
-} from '@agent/core/media-backend-registry';
+} from '@agent/core/media/media-backend-registry';
 import {
   explainSeamProviderDecision,
   listSeamSelectionPurposes,

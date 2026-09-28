@@ -6,8 +6,8 @@
  *   KYBERION_AGENT_RUNTIME_BACKEND=pane pnpm exec tsx scripts/smoke_agent_pane_runtime.ts
  */
 
-import { agentLifecycle } from '@agent/core/agent-lifecycle';
-import { isPaneRuntimeLaunchEnabled } from '@agent/core/agent-pane-runtime-bridge';
+import { agentLifecycle } from '@agent/core/agent/agent-lifecycle';
+import { isPaneRuntimeLaunchEnabled } from '@agent/core/agent/agent-pane-runtime-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 
 function setEnv(name: string, value: string): void {

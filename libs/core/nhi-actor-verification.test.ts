@@ -8,7 +8,7 @@ import {
   retireAgentIdentity,
   suspendAgentIdentity,
   resetAgentIdentityServiceForTests,
-} from './agent-identity.js';
+} from './agent/agent-identity.js';
 import {
   clearNhiActorVerificationCache,
   enforceNhiActorPolicy,
@@ -28,11 +28,11 @@ import {
   getWorkItem,
   handoffWorkItem,
   setWorkCoordinationNamespace,
-} from './work-coordination.js';
+} from './workforce/work-coordination.js';
 import {
   createOrchestratorSession,
   resetOrchestratorSessionServiceForTests,
-} from './orchestrator-session.js';
+} from './mission/orchestrator-session.js';
 
 /**
  * NI-02 tests. Hermetic: the agent-identity journal, the orchestrator-session

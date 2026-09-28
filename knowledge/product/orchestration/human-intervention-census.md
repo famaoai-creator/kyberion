@@ -25,7 +25,7 @@ The approval store is not the only record, and today it is not the main one:
 
 ## Traps in the approval store (2026-09)
 
-- **Test pollution.** Until 2026-09-27, test suites wrote into the production store. Since then, `approvalStoreRoots()` sends vitest runs to `active/shared/runtime/vitest-approvals/`. Any code that builds approval paths must call `approvalRequestLogicalPath` / `approvalEventLogicalPath` rather than hard-coding `coordination/channels/<ch>/approvals`. Old leftovers are matched by `isFixtureApproval` in `libs/core/approval-store-hygiene.ts`; the census and the cleanup share these rules. The rules match on:
+- **Test pollution.** Until 2026-09-27, test suites wrote into the production store. Since then, `approvalStoreRoots()` sends vitest runs to `active/shared/runtime/vitest-approvals/`. Any code that builds approval paths must call `approvalRequestLogicalPath` / `approvalEventLogicalPath` rather than hard-coding `coordination/channels/<ch>/approvals`. Old leftovers are matched by `isFixtureApproval` in `libs/core/governance/approval-store-hygiene.ts`; the census and the cleanup share these rules. The rules match on:
   - the token `test` or `fixture` (as a whole word) in the channel, requester, or decider;
   - channels starting with `qm<N>-`;
   - decider `U123` and requester `human:alice`;

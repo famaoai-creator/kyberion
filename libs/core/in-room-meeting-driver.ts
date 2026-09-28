@@ -16,7 +16,7 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
-import type { AudioBus } from './audio-bus.js';
+import type { AudioBus } from './voice/audio-bus.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
@@ -26,16 +26,16 @@ import {
   type MicCaptureOptions,
   type MicCaptureSession,
 } from './mic-capture.js';
-import type { MeetingJoinDriver } from './meeting-join-driver.js';
-import { registerMeetingJoinDriver } from './meeting-join-driver.js';
+import type { MeetingJoinDriver } from './meeting/meeting-join-driver.js';
+import { registerMeetingJoinDriver } from './meeting/meeting-join-driver.js';
 import type {
   AudioChunk,
   MeetingSession,
   MeetingSessionState,
   MeetingTarget,
-} from './meeting-session-types.js';
-import { abortableAudioChunks } from './meeting-session-types.js';
-import { resolveAudioPlaybackCommand } from './audio-playback.js';
+} from './meeting/meeting-session-types.js';
+import { abortableAudioChunks } from './meeting/meeting-session-types.js';
+import { resolveAudioPlaybackCommand } from './voice/audio-playback.js';
 
 export interface InRoomMeetingDriverOptions {
   mic?: MicCaptureOptions;

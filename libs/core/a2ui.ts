@@ -6,7 +6,7 @@ import {
   isKyberionBaseComponentType,
   validateA2UIComponentProps,
   type KyberionBaseComponentType,
-} from './a2ui-catalog.js';
+} from './surface/a2ui-catalog.js';
 
 /**
  * Kyberion A2UI (Agent-to-User Interface) Protocol v0.2.0

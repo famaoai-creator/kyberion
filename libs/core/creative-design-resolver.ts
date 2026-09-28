@@ -9,7 +9,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import {
   loadTenantDesignOverride,
   loadTenantDesignThemeOverlay,
-} from './tenant-design-override.js';
+} from './organization/tenant-design-override.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.

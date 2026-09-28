@@ -8,9 +8,9 @@
       "path": "knowledge/product/governance/mission-workflow-catalog.json",
       "execution_role": "runtime",
       "consumer_paths": [
-        "libs/core/mission-workflow-catalog.ts",
-        "libs/core/mission-process-planning.ts",
-        "libs/core/mission-creation.ts",
+        "libs/core/mission/mission-workflow-catalog.ts",
+        "libs/core/mission/mission-process-planning.ts",
+        "libs/core/mission/mission-creation.ts",
         "scripts/mission_controller.ts"
       ],
       "expected_counts": {
@@ -40,7 +40,7 @@
       "consumer_paths": [
         "scripts/check_contract_schemas.ts",
         "scripts/check_governance_rules.ts",
-        "libs/core/mission-task-classification-scenarios.test.ts"
+        "libs/core/mission/mission-task-classification-scenarios.test.ts"
       ],
       "expected_counts": {
         "scenarios": 26
@@ -74,8 +74,8 @@
       "consumer_paths": [
         "AGENTS.md",
         "knowledge/_index.md",
-        "libs/core/mission-lifecycle.ts",
-        "libs/core/mission-orchestration-worker.ts"
+        "libs/core/mission/mission-lifecycle.ts",
+        "libs/core/mission/mission-orchestration-worker.ts"
       ],
       "expected_entries": [
         "alignment.md",

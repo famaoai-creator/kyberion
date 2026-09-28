@@ -32,7 +32,7 @@ vi.mock('./path-resolver.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./policy-engine.js', () => ({
+vi.mock('./governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 

@@ -1,0 +1,473 @@
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { describe, expect, it, vi } from 'vitest';
+// Static JSON import (not secure-io) so this schema check stays independent
+// of the secure-io/path-resolver mocks below — mirrors the pattern in
+// theme-registry.test.ts.
+import providerCapabilityRegistrySchema from '../../../knowledge/product/schemas/provider-capability-registry.schema.json';
+import type { ProbeExecFn } from './provider-capability-registry.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+
+const mocks = vi.hoisted(() => ({
+  safeReadFile: vi.fn(),
+  safeWriteFile: vi.fn(),
+  safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(),
+  safeMkdir: vi.fn(),
+  safeExecResult: vi.fn(),
+  shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
+  schema: undefined as unknown,
+}));
+
+vi.mock('../secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
+  safeReadFile: mocks.safeReadFile,
+  safeLstat: mocks.safeLstat,
+  safeWriteFile: mocks.safeWriteFile,
+  safeExistsSync: mocks.safeExistsSync,
+  safeMkdir: mocks.safeMkdir,
+  safeExecResult: mocks.safeExecResult,
+}));
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: (filePath: string) =>
+    String(filePath).endsWith('provider-capability-registry.schema.json')
+      ? mocks.schema
+      : JSON.parse(String(mocks.safeReadFile(filePath))),
+}));
+
+vi.mock('../path-resolver.js', () => ({
+  pathResolver: {
+    rootDir: () => '/repo',
+    shared: mocks.shared,
+    knowledge: (relPath: string) => `/repo/knowledge/${relPath}`,
+    rootResolve: (relPath: string) => `/repo/${relPath}`,
+  },
+}));
+
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    exists: (filePath: string) => mocks.safeExistsSync(filePath),
+    stat: (filePath: string) => ({
+      mtimeMs: 1,
+      size: String(mocks.safeReadFile(filePath)).length,
+    }),
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
+// loadProviderCapabilityCatalog reads knowledge files via secure-io; with
+// safeReadFile mocked to reject below it falls back to an empty catalog,
+// which is fine — these tests do not assert on `models`.
+vi.mock('./provider-discovery.js', () => ({
+  loadProviderCapabilityCatalog: () => ({}),
+}));
+
+function resetMocks() {
+  mocks.schema = providerCapabilityRegistrySchema;
+  mocks.safeReadFile.mockReset();
+  mocks.safeWriteFile.mockReset();
+  mocks.safeExistsSync.mockReset();
+  mocks.safeLstat.mockReset();
+  mocks.safeMkdir.mockReset();
+  mocks.safeExecResult.mockReset();
+  mocks.safeReadFile.mockImplementation(() => {
+    throw new Error('ENOENT');
+  });
+  mocks.safeExistsSync.mockReturnValue(false);
+  mocks.safeLstat.mockReturnValue({ isFile: () => true });
+  mocks.safeMkdir.mockReturnValue(undefined);
+  mocks.safeWriteFile.mockReturnValue(undefined);
+}
+
+function fakeExec(ok: Record<string, boolean>, errors: Record<string, string> = {}): ProbeExecFn {
+  return (command, args) => {
+    const key = `${command} ${args.join(' ')}`;
+    const matched = Object.keys(ok).find((k) => key.startsWith(k));
+    return {
+      ok: matched ? ok[matched]! : false,
+      stdout: '',
+      stderr: matched ? (errors[matched] ?? '') : 'unmapped probe',
+    };
+  };
+}
+
+describe('provider-capability-registry', () => {
+  it('marks an unauthenticated provider correctly when its auth probe fails', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = fakeExec({
+      'gh copilot -- --help': true,
+      'gh auth status': false,
+    });
+
+    const results = probeProviderCapabilities({ providerIds: ['copilot'], exec });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      provider_id: 'copilot',
+      binary_found: true,
+      authenticated: false,
+    });
+    expect(results[0]!.probe_error).toBeTruthy();
+  });
+
+  it('reports Claude Code login state through its cheap auth probe', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = fakeExec({
+      'claude --version': true,
+      'claude auth status': true,
+    });
+    const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: true,
+    });
+  });
+
+  it('uses the real Claude fallback when the pnpm placeholder shadows the CLI', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const exec = fakeExec(
+      {
+        claude: false,
+        '/real/bin/claude --version': true,
+        '/real/bin/claude auth status': true,
+      },
+      { claude: 'claude native binary not installed' }
+    );
+    const results = probeProviderCapabilities({
+      providerIds: ['claude'],
+      exec,
+      resolveClaudeCliFallbackCandidates: () => ['/real/bin/claude'],
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: true,
+    });
+  });
+
+  it('marks Claude Code unauthenticated without hiding the installed CLI', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = fakeExec(
+      {
+        'claude --version': true,
+        'claude auth status': false,
+      },
+      { 'claude auth status': 'Not logged in' }
+    );
+    const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: false,
+    });
+    expect(results[0]!.probe_error).toBe('Not logged in');
+  });
+
+  it('uses Claude auth JSON when the command exits successfully', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec = ((command, args) => {
+      const key = `${command} ${args.join(' ')}`;
+      return {
+        ok: true,
+        stdout: key === 'claude auth status' ? JSON.stringify({ loggedIn: false }) : '1.0.0',
+        stderr: '',
+      };
+    }) satisfies ProbeExecFn;
+    const results = probeProviderCapabilities({ providerIds: ['claude'], exec });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'claude',
+      binary_found: true,
+      authenticated: false,
+    });
+  });
+
+  it('registers Grok as a headless structured-output provider', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const results = probeProviderCapabilities({
+      providerIds: ['grok'],
+      exec: fakeExec({ 'grok --version': true }),
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'grok',
+      binary_found: true,
+      authenticated: 'unknown',
+      headless: true,
+      structured_output: true,
+    });
+  });
+
+  it('uses the registered CLI binary override for Cursor capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--sandbox --mode', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['cursor'],
+      env: { KYBERION_CURSOR_CLI_BIN: '/custom/cursor-agent' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'cursor',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/cursor-agent' },
+    });
+    expect(calls).toEqual([
+      '/custom/cursor-agent --version',
+      '/custom/cursor-agent status',
+      '/custom/cursor-agent --help',
+    ]);
+  });
+
+  it('uses the registered CLI binary override for OpenCode capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--agent --format', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['opencode'],
+      env: { KYBERION_OPENCODE_CLI_BIN: '/custom/opencode' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'opencode',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/opencode' },
+    });
+    expect(calls).toEqual([
+      '/custom/opencode --version',
+      '/custom/opencode auth list',
+      '/custom/opencode --help',
+    ]);
+  });
+
+  it('does not replace an explicitly configured Claude binary with a fallback candidate', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: false, stdout: '', stderr: 'placeholder failure' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['claude'],
+      env: { KYBERION_CLAUDE_CLI_BIN: '/configured/claude' },
+      exec,
+      resolveClaudeCliFallbackCandidates: () => ['/fallback/claude'],
+    });
+
+    expect(results[0]).toMatchObject({ binary_found: false, authenticated: false });
+    expect(calls).toEqual(['/configured/claude --version']);
+  });
+
+  it('records help-flag sandbox evidence without claiming OS-level enforcement', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'gemini' && args[0] === '--version') {
+        return { ok: true, stdout: '0.46.0', stderr: '' };
+      }
+      return {
+        ok: true,
+        stdout: '--sandbox --approval-mode default|auto_edit|yolo|plan',
+        stderr: '',
+      };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['gemini'], exec });
+
+    expect(results[0]?.sandbox_probe).toEqual({
+      status: 'supported',
+      method: 'help-flag',
+      command: 'gemini',
+      args: ['--help'],
+      expected_flags: ['--sandbox', '--approval-mode'],
+      evidence: 'gemini help output advertises --sandbox, --approval-mode',
+    });
+  });
+
+  it('keeps missing sandbox flags explicitly unsupported', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'codex' && args[0] === '--help') {
+        return { ok: true, stdout: 'codex help without sandbox option', stderr: '' };
+      }
+      return { ok: true, stdout: 'codex 1.0.0', stderr: '' };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['codex'], exec });
+
+    expect(results[0]).toMatchObject({
+      binary_found: true,
+      sandbox_probe: {
+        status: 'unsupported',
+        evidence: 'missing advertised flags: --sandbox',
+      },
+    });
+  });
+
+  it('probe command failure marks the provider unavailable without throwing', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const throwingExec: ProbeExecFn = () => {
+      throw new Error('spawn EACCES');
+    };
+
+    expect(() =>
+      probeProviderCapabilities({ providerIds: ['codex'], exec: throwingExec })
+    ).not.toThrow();
+
+    const results = probeProviderCapabilities({ providerIds: ['codex'], exec: throwingExec });
+    expect(results[0]).toMatchObject({
+      provider_id: 'codex',
+      binary_found: false,
+      authenticated: false,
+    });
+    expect(results[0]!.probe_error).toContain('spawn EACCES');
+  });
+
+  it('peekProviderCapabilityRegistry returns null when no snapshot file exists', async () => {
+    resetMocks();
+    mocks.safeExistsSync.mockReturnValue(false);
+    const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    expect(peekProviderCapabilityRegistry()).toBeNull();
+  });
+
+  it('treats a schema-invalid snapshot as no opinion', async () => {
+    resetMocks();
+    const stored = {
+      computed_at: '2026-07-25T00:00:00.000Z',
+      ttl_ms: -1,
+      value: [],
+    };
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue(JSON.stringify(stored));
+    const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    expect(peekProviderCapabilityRegistry()).toBeNull();
+  });
+
+  it('loadProviderCapabilityRegistry re-probes on TTL expiry using an injectable clock', async () => {
+    resetMocks();
+    const { loadProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    const t0 = new Date('2026-07-25T00:00:00.000Z');
+    let stored: any = null;
+    mocks.safeExistsSync.mockImplementation(() => stored !== null);
+    mocks.safeReadFile.mockImplementation(() => {
+      if (stored === null) throw new Error('ENOENT');
+      return JSON.stringify(stored);
+    });
+    mocks.safeWriteFile.mockImplementation((_path: string, contents: string) => {
+      stored = JSON.parse(contents);
+    });
+
+    const execCallCounts: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      execCallCounts.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '', stderr: '' };
+    };
+
+    // First call: no cache yet → probes and persists.
+    loadProviderCapabilityRegistry({
+      providerIds: ['claude'],
+      exec,
+      maxAgeMs: 1000,
+      now: () => t0,
+    });
+    expect(execCallCounts.length).toBeGreaterThan(0);
+    const firstCallCount = execCallCounts.length;
+
+    // Second call, well within TTL: cache hit, no re-probe.
+    execCallCounts.length = 0;
+    loadProviderCapabilityRegistry({
+      providerIds: ['claude'],
+      exec,
+      maxAgeMs: 1000,
+      now: () => new Date(t0.getTime() + 500),
+    });
+    expect(execCallCounts.length).toBe(0);
+
+    // Third call, past the TTL: re-probes.
+    execCallCounts.length = 0;
+    loadProviderCapabilityRegistry({
+      providerIds: ['claude'],
+      exec,
+      maxAgeMs: 1000,
+      now: () => new Date(t0.getTime() + 5000),
+    });
+    expect(execCallCounts.length).toBe(firstCallCount);
+  });
+
+  it('does not persist a schema-invalid TTL envelope', async () => {
+    resetMocks();
+    const { loadProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    loadProviderCapabilityRegistry({
+      providerIds: ['codex'],
+      exec: () => ({ ok: true, stdout: '', stderr: '' }),
+      maxAgeMs: -1,
+      now: () => new Date('2026-07-25T00:00:00.000Z'),
+    });
+
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('the persisted envelope validates against provider-capability-registry.schema.json', async () => {
+    resetMocks();
+    let stored: any = null;
+    mocks.safeExistsSync.mockImplementation(() => stored !== null);
+    mocks.safeWriteFile.mockImplementation((_path: string, contents: string) => {
+      stored = JSON.parse(contents);
+    });
+
+    const { loadProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+    const exec: ProbeExecFn = () => ({ ok: true, stdout: '', stderr: '' });
+
+    loadProviderCapabilityRegistry({
+      exec,
+      now: () => new Date('2026-07-25T00:00:00.000Z'),
+    });
+
+    expect(stored).not.toBeNull();
+
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = ajv.compile(providerCapabilityRegistrySchema);
+
+    const valid = validate(stored);
+    expect(valid, JSON.stringify(validate.errors)).toBe(true);
+  });
+});

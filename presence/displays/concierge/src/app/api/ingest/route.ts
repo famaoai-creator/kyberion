@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

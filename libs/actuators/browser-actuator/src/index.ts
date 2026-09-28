@@ -1,11 +1,11 @@
-import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
+import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import {
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
-} from '@agent/core/browser-extension-bridge';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+} from '@agent/core/browser/browser-extension-bridge';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,

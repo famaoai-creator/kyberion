@@ -11,13 +11,13 @@ import {
   selectSpeechToTextBridges,
   SPEECH_TO_TEXT_SEAM,
   SpeechToTextSelectionError,
-} from '@agent/core/speech-to-text-bridge';
+} from '@agent/core/voice/speech-to-text-bridge';
 import { matchSeamSelectionRule } from '@agent/core/seam-selection-rules';
 import { logger } from '@agent/core/core';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { safeExecResult, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVoicePath } from '@agent/core/voice-path-policy';
+import { resolveVoicePath } from '@agent/core/voice/voice-path-policy';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { parseVoiceSttBridgeResponse, resolvePythonBin } from './voice-runtime-helpers.js';

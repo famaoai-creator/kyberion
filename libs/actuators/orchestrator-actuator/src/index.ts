@@ -2,13 +2,13 @@ import { isDirectEntry } from '@agent/core/direct-entry';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertProjectTrustApproval } from '@agent/core/project-trust';
+import { assertProjectTrustApproval } from '@agent/core/project/project-trust';
 import {
   isBuiltinPipelineResource,
   requiresProjectTrust,
 } from '@agent/core/trust-requiring-resources';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import * as path from 'node:path';
 import { executePipeline, type PipelineStep } from './orchestrator-helpers.js';
 import {
@@ -147,5 +147,5 @@ export const actuator = defineCatalogBackedActuator({
   describeOps,
   handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

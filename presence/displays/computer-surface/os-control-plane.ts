@@ -5,7 +5,7 @@ import {
   type CloudflareOsSurfaceAccess,
   type CloudflareOsSurfaceSnapshot,
 } from '@agent/core/cloudflare-os-surface';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 

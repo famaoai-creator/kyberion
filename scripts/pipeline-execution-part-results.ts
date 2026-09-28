@@ -1,33 +1,18 @@
-import {
-  getRegisteredEnvText,
-  nowIso,
-  parseSafeJsonObjectInput,
-  setRegisteredEnv,
-} from '@agent/core/foundation';
-import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
-import { runFeedbackLoop } from '@agent/core/feedback-loop';
-import { getSemanticDecideDegradations } from '@agent/core/semantic-decide';
-import { appendSemanticDegradationRun } from '@agent/core/semantic-degradation-log';
-import {
-  PROMOTION_CANDIDATE_MIN_RUNS,
-  recordAdhocPipelineRun,
-} from '@agent/core/promotion-candidates';
-import { killSwitch } from '@agent/core/kill-switch';
-import { resolveIdentityContext } from '@agent/core/authority';
-import { runAdfLifecycle } from '@agent/core/adf-lifecycle';
-import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import { pipelineBootstrapNeeds } from '@agent/core/reasoning/pipeline-bootstrap-needs';
+import { killSwitch } from '@agent/core/governance/kill-switch';
+import { runAdfLifecycle } from '@agent/core/pipeline/adf-lifecycle';
+import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
 } from '@agent/core/lifecycle-hook-engine';
-import {
-  withReasoningPayloadScope,
-  type ReasoningPayloadScope,
-} from '@agent/core/reasoning-egress-scope';
+import { type ReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
 import {
   createPipelineRunJournal,
   loadPipelineRunJournal,
@@ -35,14 +20,11 @@ import {
   openPipelineRunJournal,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
-} from '@agent/core/pipeline-run-journal';
-import { assessPipelineDryRun } from '@agent/core/pipeline-dry-run';
+} from '@agent/core/pipeline/pipeline-run-journal';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
 
-import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import { resetRouterSync } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import {
   formatPipelineFailure,
   logNextActionForPipelineFailure,
@@ -60,6 +42,7 @@ import {
   validateFlow,
   formatFlowValidationErrors,
   resolvePipelineHumanPresence,
+  normalizePipelineOp,
   PipelineSuspendedError,
 } from './pipeline-execution-part-bootstrap.js';
 import type { RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
@@ -92,6 +75,7 @@ export async function runValidatedSteps(
           opts.pipelinePath && !opts._adfRepairAttempted
             ? async (draft, failure) => {
                 opts._adfRepairAttempted = true;
+                const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
                 const repaired = await attemptAutonomousRepair({
                   failure: {
                     category:
@@ -137,6 +121,31 @@ export async function runValidatedSteps(
       context: { ...initialCtx },
     };
   }
+}
+
+async function installReasoningBackendsForSteps(
+  steps: readonly PipelineAdfStep[]
+): Promise<boolean> {
+  const needs = pipelineBootstrapNeeds(steps, normalizePipelineOp);
+  if (!needs.required) {
+    logger.info(
+      '[pipeline] reasoning bootstrap skipped; no step requires reasoning, speech, or secrets'
+    );
+    return false;
+  }
+  logger.info(`[pipeline] reasoning bootstrap required: ${needs.reasons.join(', ')}`);
+  const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
+  installReasoningBackends();
+  return true;
+}
+
+async function recordPipelineFeedback(
+  pipelineId: string,
+  status: 'succeeded' | 'failed',
+  trace: unknown
+): Promise<void> {
+  const { runFeedbackLoop } = await import('@agent/core/feedback-loop');
+  runFeedbackLoop(pipelineId, status, trace as Parameters<typeof runFeedbackLoop>[2]);
 }
 
 export interface ExecutePipelineFileOptions {
@@ -221,7 +230,7 @@ export async function executePipelineFile(
     });
   trace.addArtifact('file', inputPath, 'Pipeline ADF input');
   const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
-  installReasoningBackends();
+  await installReasoningBackendsForSteps(steps);
   const sessionStart = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_start', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,
@@ -286,7 +295,9 @@ export async function executePipelineFile(
   const result =
     effectivePayloadScope.tier === 'public'
       ? await run()
-      : await withReasoningPayloadScope(effectivePayloadScope, run);
+      : await (
+          await import('@agent/core/reasoning/reasoning-egress-scope')
+        ).withReasoningPayloadScope(effectivePayloadScope, run);
   const failed = result.results.some((entry) => entry.status === 'failed');
   const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
     matcher_value: pipelineId,
@@ -303,7 +314,7 @@ export async function executePipelineFile(
   result.context.trace_summary = persisted.trace.rootSpan.status;
   result.context.trace_persisted_path =
     nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
-  runFeedbackLoop(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
+  await recordPipelineFeedback(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
   return { ...result, trace, persistedPath: persisted.path };
 }
 
@@ -311,6 +322,7 @@ type Print = (value: unknown) => void;
 
 export async function main(args?: string[], print: Print = () => undefined) {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
+  const { resolveIdentityContext } = await import('@agent/core/authority');
   const identity = resolveIdentityContext();
   if (identity.role && !getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', identity.role);
@@ -379,6 +391,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
         trustResolved: effectiveTrustResolved,
         projectTrustApprovalId,
       });
+      const { assessPipelineDryRun } = await import('@agent/core/pipeline/pipeline-dry-run');
       const report = assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
       if (argv.json) {
         print(report);
@@ -417,9 +430,6 @@ export async function main(args?: string[], print: Print = () => undefined) {
     }
   }
 
-  // Bootstrap reasoning + voice backends before any actuator dispatch.
-  installReasoningBackends();
-  installPythonVoiceBridgeIfAvailable();
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
   // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
@@ -427,8 +437,12 @@ export async function main(args?: string[], print: Print = () => undefined) {
   // Without this, a user pressing Ctrl+C during a meeting join pipeline would
   // leave their system microphone locked to BlackHole.
   const cleanupAndExit = (code: number) => {
-    resetRouterSync();
-    exitProcess(code);
+    void import('@agent/core/blackhole-routing-guard')
+      .then(({ resetRouterSync }) => {
+        resetRouterSync();
+        exitProcess(code);
+      })
+      .catch(() => exitProcess(code));
   };
   process.once('SIGINT', () => cleanupAndExit(130));
   process.once('SIGTERM', () => cleanupAndExit(143));
@@ -532,6 +546,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
       ...step,
       params: step.params || {},
     }));
+    // Bootstrap reasoning before hooks and actuator dispatch, but only when a
+    // step can reach it. Volatile GC and other inert pipelines skip the CLI probes.
+    const reasoningRequired = await installReasoningBackendsForSteps(stepsToRun);
     const runId = resumeState?.run_id || newPipelineRunId();
     const activeRunJournal = resumeState
       ? openPipelineRunJournal(resumeState)
@@ -621,7 +638,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
     const result =
       payloadTier === 'public'
         ? await runSteps()
-        : await withReasoningPayloadScope(
+        : await (
+            await import('@agent/core/reasoning/reasoning-egress-scope')
+          ).withReasoningPayloadScope(
             {
               tier: payloadTier,
               tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
@@ -676,24 +695,30 @@ export async function main(args?: string[], print: Print = () => undefined) {
       { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
       { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
     );
-    runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
+    await recordPipelineFeedback(pipelineId, pipelineStatus, persisted.trace);
     // LC-09: surface semantic-decision degradations in the run summary —
     // a pipeline that "succeeded" on deterministic fallbacks every time is
     // otherwise indistinguishable from one whose LLM decisions worked.
-    const semanticDegradations = getSemanticDecideDegradations();
-    if (semanticDegradations.length > 0) {
-      const byReason = semanticDegradations.reduce<Record<string, number>>((acc, entry) => {
-        acc[entry.reason] = (acc[entry.reason] || 0) + 1;
-        return acc;
-      }, {});
-      appendSemanticDegradationRun(pipelineId, byReason);
-      logger.warn(
-        `   [PIPELINE] llm_decide degraded ${semanticDegradations.length}x (${Object.entries(
-          byReason
-        )
-          .map(([reason, count]) => `${reason}=${count}`)
-          .join(', ')}) — deterministic fallbacks were used.`
-      );
+    // Inert pipelines never called the decider, so the registry stays unloaded.
+    if (reasoningRequired) {
+      const { getSemanticDecideDegradations } = await import('@agent/core/semantic-decide');
+      const semanticDegradations = getSemanticDecideDegradations();
+      if (semanticDegradations.length > 0) {
+        const byReason = semanticDegradations.reduce<Record<string, number>>((acc, entry) => {
+          acc[entry.reason] = (acc[entry.reason] || 0) + 1;
+          return acc;
+        }, {});
+        const { appendSemanticDegradationRun } =
+          await import('@agent/core/semantic-degradation-log');
+        appendSemanticDegradationRun(pipelineId, byReason);
+        logger.warn(
+          `   [PIPELINE] llm_decide degraded ${semanticDegradations.length}x (${Object.entries(
+            byReason
+          )
+            .map(([reason, count]) => `${reason}=${count}`)
+            .join(', ')}) — deterministic fallbacks were used.`
+        );
+      }
     }
     if (result.status === 'succeeded' || recovered) {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
@@ -704,6 +729,8 @@ export async function main(args?: string[], print: Print = () => undefined) {
         .relative(pathResolver.rootDir(), nodePath.resolve(String(argv.input)))
         .replace(/\\/g, '/');
       if (!inputRelative.startsWith('pipelines/') && !inputRelative.startsWith('..')) {
+        const { PROMOTION_CANDIDATE_MIN_RUNS, recordAdhocPipelineRun } =
+          await import('@agent/core/promotion-candidates');
         const successCount = recordAdhocPipelineRun(inputRelative);
         if (successCount >= PROMOTION_CANDIDATE_MIN_RUNS) {
           logger.warn(
@@ -818,7 +845,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     );
     if (recovered) {
       const persisted = finalizePipelineTrace(trace, true);
-      runFeedbackLoop(pipelineId, 'succeeded', persisted.trace);
+      await recordPipelineFeedback(pipelineId, 'succeeded', persisted.trace);
       logger.info(
         `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
       );
@@ -836,7 +863,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
       });
     }
     const persisted = finalizeAndPersist(trace);
-    runFeedbackLoop(pipelineId, 'failed', persisted.trace);
+    await recordPipelineFeedback(pipelineId, 'failed', persisted.trace);
     logger.info(
       `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
     );

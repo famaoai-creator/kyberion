@@ -13,17 +13,17 @@ status: archived
 
 不変条件・ガバナンスゲート・課金経路という「壊れると最も痛い」モジュールほどテストが無い。
 
-| 対象                                                    | 規模    | 現状                                                                                                                 |
-| ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `libs/core/adf-repair-agent.ts`(`validateAndRepairAdf`) | —       | **テストゼロ**。AGENTS.md §1 が必須と定める ADF 修復カスケード(JSON修復→LLMサブエージェント→`safeWriteFile`)が未検証 |
-| `libs/core/anthropic-reasoning-backend.ts`              | 705行   | テストゼロ(実トークンを消費する経路)                                                                                 |
-| `libs/core/claude-agent-reasoning-backend.ts`           | 608行   | テストゼロ                                                                                                           |
-| `libs/core/codex-cli-reasoning-backend.ts`              | —       | テストゼロ                                                                                                           |
-| `scripts/check_contract_schemas.ts`                     | 4,969行 | **`validate` ゲートの一部なのにテストゼロ**                                                                          |
-| `scripts/run_baseline_check.ts`                         | —       | セッション開始ゲート、テストゼロ。設定破損を silent に既定値へ落とすバグあり(`:48-53`、IP-08 対象)                   |
-| `libs/core/surface-runtime-orchestrator.ts`             | 1,844行 | 部分テストのみ(delegation/fastpath)。リクエスト経路全体の配線に対する特性化テスト無し                                |
-| `libs/core/operator-learning.ts`                        | 1,100行 | テストゼロ                                                                                                           |
-| `libs/core/tier-guard.ts`                               | 549行   | 隣接テストのみ                                                                                                       |
+| 対象                                                             | 規模    | 現状                                                                                                                 |
+| ---------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| `libs/core/pipeline/adf-repair-agent.ts`(`validateAndRepairAdf`) | —       | **テストゼロ**。AGENTS.md §1 が必須と定める ADF 修復カスケード(JSON修復→LLMサブエージェント→`safeWriteFile`)が未検証 |
+| `libs/core/provider/anthropic-reasoning-backend.ts`              | 705行   | テストゼロ(実トークンを消費する経路)                                                                                 |
+| `libs/core/provider/claude-agent-reasoning-backend.ts`           | 608行   | テストゼロ                                                                                                           |
+| `libs/core/provider/codex-cli-reasoning-backend.ts`              | —       | テストゼロ                                                                                                           |
+| `scripts/check_contract_schemas.ts`                              | 4,969行 | **`validate` ゲートの一部なのにテストゼロ**                                                                          |
+| `scripts/run_baseline_check.ts`                                  | —       | セッション開始ゲート、テストゼロ。設定破損を silent に既定値へ落とすバグあり(`:48-53`、IP-08 対象)                   |
+| `libs/core/surface/surface-runtime-orchestrator.ts`              | 1,844行 | 部分テストのみ(delegation/fastpath)。リクエスト経路全体の配線に対する特性化テスト無し                                |
+| `libs/core/surface/operator-learning.ts`                         | 1,100行 | テストゼロ                                                                                                           |
+| `libs/core/tier-guard.ts`                                        | 549行   | 隣接テストのみ                                                                                                       |
 
 ## ゴール(受入条件)
 
@@ -35,7 +35,7 @@ status: archived
 
 ## 実装状況 (2026-07-05)
 
-- **完了(Task 1 / 受入1)**: `libs/core/adf-repair-agent.test.ts` — 有効素通し / JSON 軽量修復(LLM 不呼出)/ 委譲修復の schema 検証後採用 / 修復不能時の非書込 / guardrail 違反の非委譲リジェクト、の全分岐をカバー。
+- **完了(Task 1 / 受入1)**: `libs/core/pipeline/adf-repair-agent.test.ts` — 有効素通し / JSON 軽量修復(LLM 不呼出)/ 委譲修復の schema 検証後採用 / 修復不能時の非書込 / guardrail 違反の非委譲リジェクト、の全分岐をカバー。
 - **完了(Task 2 / 受入2)**: 3 アダプタすべてにトランスポートモックのテストが揃った — `anthropic-reasoning-backend.test.ts`(effort→thinking budget)、`codex-cli-reasoning-backend.test.ts`、**`claude-agent-reasoning-backend.test.ts`(2026-07-05 新設)**: リクエスト整形(model/system/user prompt)、status 正規化、delegateTask の既定(単発 query)と `KYBERION_CLAUDE_AGENT_TOOLS=1` の governed agentic 経路切替、トランスポートエラーの透過、prompt() エイリアス。
 - **完了(Task 3 / 受入3)**: `scripts/check_contract_schemas.test.ts`(golden: 現行 repo exit 0 / 壊した fixture で非0)、`scripts/run_baseline_check.test.ts` + `tests/run-baseline-contract.test.ts`。
 - **完了(Task 4/5 / 受入4)— 2026-07-12 再監査で確認**: 「残る主要経路」とされた3経路はすべて `.fastpath.test.ts` で特性化済みだった — 意図受領→mission 昇格(work-scope policy による task-session→mission 昇格)、pipeline 実行(hint 実行 + execution-receipt)、直接コマンド(knowledge-query / live-query 天気・位置・web検索の direct reply 3系統)。加えて task-session 作成、browser operator route、slot filling、channel/imessage コンテキスト貫通も網羅(計18本)。`.intent-context.test.ts`(IL-01)も存在。
@@ -51,13 +51,13 @@ status: archived
 
 ### Task 1: adf-repair-agent のテスト — `claude-sonnet-4`
 
-1. `libs/core/adf-repair-agent.ts` と `libs/core/validate.ts`・`json-repair.ts` を読み、修復カスケード(`:38-50`)の分岐を把握する。
-2. `libs/core/adf-repair-agent.test.ts` を新設し、`stubReasoningBackend`(`reasoning-backend.test.ts` の既存パターンを踏襲)で以下をテスト:
+1. `libs/core/pipeline/adf-repair-agent.ts` と `libs/core/validate.ts`・`json-repair.ts` を読み、修復カスケード(`:38-50`)の分岐を把握する。
+2. `libs/core/pipeline/adf-repair-agent.test.ts` を新設し、`stubReasoningBackend`(`reasoning-backend.test.ts` の既存パターンを踏襲)で以下をテスト:
    - 有効な ADF → 修復なしで素通り
    - 軽微な JSON 破損(末尾カンマ等)→ `json-repair` 層で修復され、LLM が**呼ばれない**こと
    - 構造破損 → スタブ LLM の修復結果が採用され `safeWriteFile` されること(書き込み先は一時 fixture)
    - スタブが修復不能な出力を返す → 失敗が分類されて返り、**壊れた契約が書き込まれない**こと
-3. 実行: `vitest run libs/core/adf-repair-agent.test.ts`。
+3. 実行: `vitest run libs/core/pipeline/adf-repair-agent.test.ts`。
 
 ### Task 2: 推論アダプタ 3 本のテスト — `claude-sonnet-4`(1 アダプタずつ順に)
 
@@ -72,7 +72,7 @@ status: archived
 
 ### Task 4: surface-runtime-orchestrator の特性化テスト設計 — `claude-opus`
 
-1. `libs/core/surface-runtime-orchestrator.ts`(1,844行、40+ モジュール import)を読み、外部から観測可能な主要経路(意図受領→mission team 組成→task session→delegation→応答)を 5〜8 本のシナリオとして定義する。
+1. `libs/core/surface/surface-runtime-orchestrator.ts`(1,844行、40+ モジュール import)を読み、外部から観測可能な主要経路(意図受領→mission team 組成→task session→delegation→応答)を 5〜8 本のシナリオとして定義する。
 2. 各シナリオについて「入力・スタブすべき境界・観測すべき出力/副作用」を表にした試験設計を本文書末尾に追記する。**実装はしない**(設計のみ)。
 
 ### Task 5: 特性化テストの実装 — `claude-sonnet-4`(Task 4 の設計表に従う)

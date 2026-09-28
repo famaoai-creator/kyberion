@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MusicGenerationProvider } from '@agent/core/music-generation-types';
+import type { MusicGenerationProvider } from '@agent/core/media/music-generation-types';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { registerSeamCalibrationAdapter, runSeamCalibration } from '@agent/core/seam-calibration';

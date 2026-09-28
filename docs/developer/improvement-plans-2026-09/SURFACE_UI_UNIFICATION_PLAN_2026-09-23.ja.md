@@ -72,7 +72,7 @@ mission: MSN-SURFACE-UI-UNIFY-20260923
 | 操作       | `ui:button`            | `label`, `variant`(primary / secondary / danger / ghost), `href` または `action`, `disabled?`                    |
 |            | `ui:disclosure`        | `summary`, `open?` — 開発者向け要素を畳むため                                                                    |
 
-- 正本: `knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json`(型ごとの props schema)+ `libs/core/a2ui-catalog.ts`(型・検証・catalog ID 定数)。
+- 正本: `knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json`(型ごとの props schema)+ `libs/core/surface/a2ui-catalog.ts`(型・検証・catalog ID 定数)。
 - `status-pill` の語彙は既存のダッシュボード状態語彙(ui-ux governance check が見ている語彙)に合わせ、日本語ラベルは i18n 辞書から引く。
 - `ui:page-header.role_badge` の文言は `surface-roles.json` の `role_ja` / `tagline_ja` を正とする。
 

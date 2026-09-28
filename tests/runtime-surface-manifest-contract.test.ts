@@ -2,17 +2,26 @@ import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
 import { safeReadFile, safeReaddir, safeExistsSync } from '@agent/core';
-import { loadSurfaceManifest, normalizeSurfaceDefinition, surfaceResourceId } from '@agent/core/surface-runtime';
+import {
+  loadSurfaceManifest,
+  normalizeSurfaceDefinition,
+  surfaceResourceId,
+} from '@agent/core/surface/surface-runtime';
 
 const rootDir = process.cwd();
 
 describe('Runtime surface manifest contract', () => {
   it('validates the canonical per-surface manifests and compatibility snapshot against schema', () => {
     const schema = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/product/schemas/runtime-surface-manifest.schema.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(
+        path.join(rootDir, 'knowledge/product/schemas/runtime-surface-manifest.schema.json'),
+        { encoding: 'utf8' }
+      ) as string
     );
     const snapshot = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'), {
+        encoding: 'utf8',
+      }) as string
     );
     const ajv = new Ajv({ allErrors: true });
     const validate = ajv.compile(schema);
@@ -22,12 +31,14 @@ describe('Runtime surface manifest contract', () => {
     const surfacesDir = path.join(rootDir, 'knowledge/product/governance/surfaces');
     expect(safeExistsSync(surfacesDir)).toBe(true);
 
-    const files = safeReaddir(surfacesDir).filter((entry) => entry.endsWith('.json')).sort();
+    const files = safeReaddir(surfacesDir)
+      .filter((entry) => entry.endsWith('.json'))
+      .sort();
     expect(files.length).toBeGreaterThan(0);
     const aggregated = { version: 1 as const, surfaces: [] as Array<Record<string, unknown>> };
     for (const file of files) {
       const fileManifest = JSON.parse(
-        safeReadFile(path.join(surfacesDir, file), { encoding: 'utf8' }) as string,
+        safeReadFile(path.join(surfacesDir, file), { encoding: 'utf8' }) as string
       );
       const validFile = validate(fileManifest);
       expect(validFile, ajv.errorsText(validate.errors)).toBe(true);
@@ -43,7 +54,9 @@ describe('Runtime surface manifest contract', () => {
   });
 
   it('covers standard background surfaces with explicit kinds', () => {
-    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'));
+    const manifest = loadSurfaceManifest(
+      path.join(rootDir, 'knowledge/product/governance/active-surfaces.json')
+    );
     const ids = new Set(manifest.surfaces.map((entry) => entry.id));
     expect(ids.has('slack-bridge')).toBe(true);
     expect(ids.has('imessage-bridge')).toBe(true);
@@ -55,9 +68,11 @@ describe('Runtime surface manifest contract', () => {
   });
 
   it('normalizes surfaces to explicit runtime metadata', () => {
-    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'));
+    const manifest = loadSurfaceManifest(
+      path.join(rootDir, 'knowledge/product/governance/active-surfaces.json')
+    );
     const chronos = normalizeSurfaceDefinition(
-      manifest.surfaces.find((entry) => entry.id === 'chronos-mirror-v2')!,
+      manifest.surfaces.find((entry) => entry.id === 'chronos-mirror-v2')!
     );
     expect(chronos.kind).toBe('ui');
     expect(chronos.startupMode).toBe('workspace-app');

@@ -1,7 +1,7 @@
 ---
 title: adf-replay-extension 統合レビュー 2026-08-10
 kind: review-report
-scope: tools/adf-replay-extension, scripts/browser_bridge_host.ts, libs/core/browser-extension-bridge.ts
+scope: tools/adf-replay-extension, scripts/browser_bridge_host.ts, libs/core/browser/browser-extension-bridge.ts
 status: active
 owner: ecosystem_architect
 reviewed_at: 2026-08-10

@@ -5,7 +5,10 @@ import {
 } from './embedding-backend.js';
 import { MlxEmbeddingBackend, isMlxAvailable } from './mlx-embedding-backend.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { GeminiEmbeddingBackend, isGeminiEmbeddingAvailable } from './gemini-embedding-backend.js';
+import {
+  GeminiEmbeddingBackend,
+  isGeminiEmbeddingAvailable,
+} from './provider/gemini-embedding-backend.js';
 import { logger } from './core.js';
 
 export function installEmbeddingBackendIfAvailable(): boolean {

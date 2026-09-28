@@ -3,7 +3,7 @@ import { isRecord } from '@agent/core/foundation';
 import { metrics } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
-import { validateTraceReplay } from '@agent/core/trace-schema';
+import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import { tailJsonl } from './tail.js';
 import { theme, statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';

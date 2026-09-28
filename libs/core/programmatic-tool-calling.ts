@@ -8,7 +8,7 @@ import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
-import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool-repeat-advisor.js';
+import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool/tool-repeat-advisor.js';
 
 export const PROGRAMMATIC_TOOL_SANDBOX_ALLOWLIST = [
   'system:read_file',

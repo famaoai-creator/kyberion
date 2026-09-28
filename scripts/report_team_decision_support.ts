@@ -1,7 +1,7 @@
 import {
   buildTeamDecisionSupportReport,
   formatTeamDecisionSupportReport,
-} from '@agent/core/team-decision-support-metrics';
+} from '@agent/core/organization/team-decision-support-metrics';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

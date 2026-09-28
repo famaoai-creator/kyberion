@@ -22,7 +22,10 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
-import { loadApprovalRequest, type ApprovalRequestRecord } from '@agent/core/approval-store';
+import {
+  loadApprovalRequest,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
 import { escapeHtml } from '@agent/core/text-escaping';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';

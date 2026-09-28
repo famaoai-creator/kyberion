@@ -12,8 +12,8 @@ import {
   safeLstat,
   safeWriteFile,
 } from './secure-io.js';
-import type { GenerationSchedule } from './src/types/generation-schedule.js';
-import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './src/cron-utils.js';
+import type { GenerationSchedule } from './contracts/generation-schedule.js';
+import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './pipeline/cron-utils.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContextAsync } from './authority.js';
 import {
@@ -29,7 +29,7 @@ import {
   type EventScopeInput,
 } from './event-scope.js';
 import { releaseGenerationQuota, reserveGenerationQuota } from './generation-quota.js';
-import { resolveTenant } from './tenant-registry.js';
+import { resolveTenant } from './organization/tenant-registry.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { settleGenerationProviderCost } from './generation-cost-settlement.js';
 

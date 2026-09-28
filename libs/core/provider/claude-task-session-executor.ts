@@ -1,0 +1,248 @@
+import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { nowIso } from '../foundation/time.js';
+import { pathResolver } from '../path-resolver.js';
+import { assertSafeRepositoryPath, safeWriteFile } from '../secure-io.js';
+import {
+  recordTaskSessionHistory,
+  updateTaskSession,
+  type TaskSession,
+} from '../task/task-session.js';
+import { truncateTextWithCount } from '../text-truncation.js';
+import {
+  runApprovedClaudeBrowserTask,
+  runApprovedClaudeDocumentTask,
+  type ClaudeTaskRunnerContext,
+} from './claude-task-runner.js';
+import type { DraftRefineInput } from '../draft-refine.js';
+
+export type ClaudeTaskSessionKind = 'browser' | 'document';
+
+/** Skip refine for short outputs: the rubric adds no signal and the extra pass is pure cost. */
+const DRAFT_REFINE_MIN_CHARS = 800;
+
+export interface TaskSessionRefineOutcome {
+  content: string;
+  refined: boolean;
+  passes: number;
+}
+
+/**
+ * MO-07 Task 4.2, task-session side of the #518 worker wiring: document
+ * task-session outputs get one rubric-driven refine pass before they are
+ * stored. Failure or a worse rewrite never loses the original draft.
+ */
+export async function maybeRefineDocumentOutput(input: {
+  kind: ClaudeTaskSessionKind;
+  output: string;
+  goalSummary?: string;
+  refine?: DraftRefineInput['refine'];
+}): Promise<TaskSessionRefineOutcome> {
+  const passthrough = { content: input.output, refined: false, passes: 0 };
+  if (input.kind !== 'document') return passthrough;
+  if (getRegisteredEnvText('KYBERION_DRAFT_REFINE') === '0') return passthrough;
+  if (input.output.trim().length < DRAFT_REFINE_MIN_CHARS) return passthrough;
+  try {
+    // Lazy import: draft-refine pulls the reasoning-backend graph, which
+    // consumers of this module (and their minimally-mocked tests) must not
+    // pay for unless a refine actually runs.
+    const { draftRefine } = await import('../draft-refine.js');
+    const outcome = await draftRefine({
+      kind: 'doc',
+      content: input.output,
+      goalSummary: input.goalSummary,
+      maxPasses: 1,
+      refine: input.refine,
+    });
+    if (outcome.improved) {
+      return { content: outcome.content, refined: true, passes: outcome.passes };
+    }
+    return passthrough;
+  } catch (error: any) {
+    logger.warn(
+      `[claude-task-session-executor] draft refine failed, keeping original output: ${error?.message || error}`
+    );
+    return passthrough;
+  }
+}
+
+export interface ExecuteApprovedClaudeTaskSessionParams {
+  session: TaskSession;
+  queryText: string;
+  agentId: string;
+  channel?: string;
+  correlationId?: string;
+  missionId?: string;
+}
+
+export interface ExecuteApprovedClaudeTaskSessionResult {
+  kind: ClaudeTaskSessionKind;
+  output: string;
+  outputPath: string;
+  session: TaskSession;
+}
+
+function resolveTaskKind(taskType: TaskSession['task_type']): ClaudeTaskSessionKind | null {
+  if (taskType === 'browser') return 'browser';
+  if (taskType === 'report_document' || taskType === 'document_generation') return 'document';
+  return null;
+}
+
+function buildTaskInstruction(params: ExecuteApprovedClaudeTaskSessionParams): string {
+  const lines = [
+    `Complete the governed ${params.session.task_type} task session.`,
+    `Session ID: ${params.session.session_id}`,
+    `Goal: ${params.session.goal.summary}`,
+    `Success condition: ${params.session.goal.success_condition}`,
+    params.missionId ? `Mission ID: ${params.missionId}` : '',
+    params.queryText.trim() ? `User request: ${params.queryText.trim()}` : '',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+function buildTaskContext(params: ExecuteApprovedClaudeTaskSessionParams): string {
+  return JSON.stringify(
+    {
+      session_id: params.session.session_id,
+      task_type: params.session.task_type,
+      surface: params.session.surface,
+      project_context: params.session.project_context ?? null,
+      requirements: params.session.requirements ?? null,
+      payload: params.session.payload ?? null,
+      mission_id: params.missionId ?? null,
+      query_text: params.queryText,
+    },
+    null,
+    2
+  );
+}
+
+function buildApprovalContext(
+  params: ExecuteApprovedClaudeTaskSessionParams
+): ClaudeTaskRunnerContext {
+  return {
+    agentId: params.agentId,
+    channel: params.channel ?? 'surface',
+    correlationId: params.correlationId,
+    payload: {
+      session_id: params.session.session_id,
+      task_type: params.session.task_type,
+      mission_id: params.missionId,
+      surface: params.session.surface,
+      query_text: params.queryText,
+    },
+    draft: {
+      title: `Claude ${params.session.task_type} task approval`,
+      summary: `Execute Claude-backed ${params.session.task_type} session ${params.session.session_id}.`,
+      severity: 'high',
+    },
+  };
+}
+
+function buildOutputPath(sessionId: string): string {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[CLAUDE_TASK_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`claude-task-sessions/${normalized}.txt`),
+    { allowMissingLeaf: true }
+  );
+}
+
+export async function executeApprovedClaudeTaskSession(
+  params: ExecuteApprovedClaudeTaskSessionParams
+): Promise<ExecuteApprovedClaudeTaskSessionResult> {
+  const kind = resolveTaskKind(params.session.task_type);
+  if (!kind) {
+    throw new Error(`Unsupported Claude task-session type: ${params.session.task_type}`);
+  }
+
+  const instruction = buildTaskInstruction(params);
+  const context = buildTaskContext(params);
+  const approvalContext = buildApprovalContext(params);
+
+  logger.info(
+    `[claude-task-session-executor] running ${kind} task session ${params.session.session_id} via approved Claude runner`
+  );
+
+  try {
+    const output =
+      kind === 'browser'
+        ? await runApprovedClaudeBrowserTask(
+            { instruction, context, maxTurns: 10 },
+            approvalContext
+          )
+        : await runApprovedClaudeDocumentTask(
+            { instruction, context, maxTurns: 15 },
+            approvalContext
+          );
+
+    const refineOutcome = await maybeRefineDocumentOutput({
+      kind,
+      output,
+      goalSummary: params.session.goal.summary,
+    });
+    const finalOutput = refineOutcome.content;
+
+    const outputPath = buildOutputPath(params.session.session_id);
+    safeWriteFile(outputPath, `${finalOutput.trim()}\n`, { mkdir: true, encoding: 'utf8' });
+
+    const updated = updateTaskSession(params.session.session_id, {
+      status: 'completed',
+      artifact: {
+        kind: `claude_${kind}_output`,
+        output_path: outputPath,
+        ...truncateTextWithCount(finalOutput, 500),
+        storage_class: 'tmp',
+      },
+    });
+
+    if (updated) {
+      const timestamp = nowIso();
+      recordTaskSessionHistory(updated.session_id, {
+        ts: timestamp,
+        type: 'execution',
+        text: `Claude ${kind} task executed via approval-gated runner.`,
+      });
+      recordTaskSessionHistory(updated.session_id, {
+        ts: timestamp,
+        type: 'artifact',
+        text: `Output stored at ${outputPath}.`,
+      });
+      if (refineOutcome.refined) {
+        recordTaskSessionHistory(updated.session_id, {
+          ts: timestamp,
+          type: 'execution',
+          text: `Draft refine improved the document output (${refineOutcome.passes} pass).`,
+        });
+      }
+    }
+
+    return {
+      kind,
+      output: finalOutput,
+      outputPath,
+      session: updated || params.session,
+    };
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    const blocked = updateTaskSession(params.session.session_id, {
+      status: 'blocked',
+      artifact: {
+        kind: `claude_${kind}_output`,
+        ...truncateTextWithCount(message, 500),
+        storage_class: 'tmp',
+      },
+    });
+    if (blocked) {
+      const timestamp = nowIso();
+      recordTaskSessionHistory(blocked.session_id, {
+        ts: timestamp,
+        type: 'error',
+        text: `Claude ${kind} task failed: ${message}`,
+      });
+    }
+    throw error;
+  }
+}

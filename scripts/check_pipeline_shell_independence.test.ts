@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadJson } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { resolveActuatorOperation } from '@agent/core/actuator-op-registry';
+import { resolveActuatorOperation } from '@agent/core/actuator/actuator-op-registry';
 import { scanPipelineShellIndependence } from './check_pipeline_shell_independence.js';
 
 const PROBE = pathResolver.sharedTmp('pipeline-shell-independence-probe.json');

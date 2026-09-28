@@ -1,5 +1,5 @@
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 
 export type AssetTier = 'personal' | 'confidential' | 'public';

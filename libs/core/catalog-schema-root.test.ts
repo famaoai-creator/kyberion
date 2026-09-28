@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { loadOutcomeCatalog } from './work-design.js';
+import { loadOutcomeCatalog } from './workforce/work-design.js';
 import { loadIntentRoutingMap } from './router-contract.js';
 import { classifyError } from './error-classifier.js';
 

@@ -18,7 +18,7 @@ import {
   unmountFromVault,
   cleanupVaultMounts,
   getVaultMountsDir,
-} from '@agent/core/vault-mount';
+} from '@agent/core/secret/vault-mount';
 
 export async function main(argv: string[], print: (msg: string) => void): Promise<void> {
   const normalizedArgs = argv.filter((arg) => arg !== '--');

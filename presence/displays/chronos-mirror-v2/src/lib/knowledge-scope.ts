@@ -1,7 +1,7 @@
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadState } from '@agent/core/mission-state';
-import { loadArtifactRecord } from '@agent/core/artifact-record';
-import type { MemoryCandidate } from '@agent/core/memory-promotion-queue';
+import { loadState } from '@agent/core/mission/mission-state';
+import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
+import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
 import type { ViewerContext } from './viewer-context';
 
 function readTenantState(missionId: string): string | undefined {

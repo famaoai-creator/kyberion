@@ -8,8 +8,8 @@ import {
   processUntrustedContent,
   parseInjectionScannerVerdict,
 } from './untrusted-content.js';
-import { evaluateShellCommandPolicy } from './shell-command-policy.js';
-import { resolveApprovalPolicy } from './approval-policy.js';
+import { evaluateShellCommandPolicy } from './shell/shell-command-policy.js';
+import { resolveApprovalPolicy } from './governance/approval-policy.js';
 import { getInjectionSignalPath, writeInjectionSignalAtPath } from './injection-signal.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile, safeRmSync } from './secure-io.js';

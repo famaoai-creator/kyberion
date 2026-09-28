@@ -18,14 +18,14 @@ import {
 } from '@agent/core/visual-raster';
 import { runVisualReviewLoop } from '@agent/core/visual-review-loop';
 import { loadVisualReviewRubric, formatVisualReviewReport } from '@agent/core/visual-review';
-import { evaluateArtifactVerification } from '@agent/core/artifact-verification';
+import { evaluateArtifactVerification } from '@agent/core/workforce/artifact-verification';
 import {
   lockMediaBrief,
   inferredDecisions,
   formatBriefForConfirmation,
-} from '@agent/core/media-brief-lock';
+} from '@agent/core/media/media-brief-lock';
 import { validateThemeContrast } from '@agent/core/design-qa';
-import { type PdfDesignProtocol } from '@agent/core/media-contracts';
+import { type PdfDesignProtocol } from '@agent/core/media/media-contracts';
 import {
   buildPptxProtocolFromPdfDesign as buildPptxProtocolFromPdfDesignHelper,
   buildXlsxProtocolFromPdfDesign as buildXlsxProtocolFromPdfDesignHelper,

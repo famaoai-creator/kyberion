@@ -5,7 +5,7 @@ vi.mock('./core.js', () => ({
 }));
 
 const recordGovernanceAction = vi.fn();
-vi.mock('./kill-switch.js', () => ({
+vi.mock('./governance/kill-switch.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
 }));
 
@@ -17,7 +17,7 @@ import {
 import {
   getDefaultWorkerEventStream,
   resetDefaultWorkerEventStream,
-} from './worker-event-stream.js';
+} from './workforce/worker-event-stream.js';
 
 beforeEach(() => {
   recordGovernanceAction.mockClear();

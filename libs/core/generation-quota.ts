@@ -11,7 +11,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
-import { withLockSync } from './src/lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 
 export const GENERATION_QUOTA_POLICY_REPO_PATH =
   'knowledge/product/governance/media-generation-quota-policy.json';

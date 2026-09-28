@@ -13,7 +13,7 @@ import {
   resolveMarkTarget,
   saveMarks,
 } from './mark-target-resolver.js';
-import { dhashFile } from './image-dhash.js';
+import { dhashFile } from './media/image-dhash.js';
 import { missionDir, pathResolver } from './path-resolver.js';
 import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SomMark } from './set-of-marks.js';

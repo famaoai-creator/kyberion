@@ -1,6 +1,6 @@
 import { createNextActionContract } from '@agent/core/next-action-contract';
 import { createOutcomeContract } from '@agent/core/outcome-contract';
-import { resolveIntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import { resolveIntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import { readGovernanceJson, type ContractCheck } from './check_contract_schemas_shared.js';
 
 export function createContractSchemaChecksPart1(): ContractCheck[] {
@@ -79,6 +79,7 @@ export function createContractSchemaChecksPart1(): ContractCheck[] {
     {
       id: 'intent-resolution',
       schemaPath: 'knowledge/product/schemas/intent-resolution.schema.json',
+      // i18n-exempt: JA test fixture
       validPayloads: [resolveIntentResolutionContract('今週の進捗レポートを作って')],
       invalidPayloads: [
         {
@@ -98,6 +99,7 @@ export function createContractSchemaChecksPart1(): ContractCheck[] {
       validPayloads: [
         {
           kind: 'intent_resolution_packet',
+          // i18n-exempt: JA test fixture
           utterance: '今週の進捗レポートを docx で作って',
           selected_intent_id: 'generate-report',
           selected_confidence: 0.87,

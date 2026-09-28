@@ -34,17 +34,17 @@ LLM プロバイダ CLI(Claude Code 等)で Kyberion を使うとき、CLI セ�
 
 ### 1.1 会話の前面は既に surface 中立(未解決なのは操縦ではなく所有)
 
-- `libs/core/surface-runtime-orchestrator.ts` — `runSurfaceConversation`(`:2140`)/ `runSurfaceMessageConversation`(`:2365`)。全メッセージングブリッジ(satellites/{slack,telegram,discord,imessage}-bridge)・voice-hub・terminal(`kyberion ask`)・concierge・chronos が同一入口を通る。曖昧な意図は `savePendingIntent`(correlationId キー)で永続化して clarification packet を返し、surface agent(`ensureSurfaceAgent` `:1769` → agent-runtime handle の `ask`)が応答を生成、UX 契約は `validateSurfaceUxContract` の単一チョークポイントで強制。
+- `libs/core/surface/surface-runtime-orchestrator.ts` — `runSurfaceConversation`(`:2140`)/ `runSurfaceMessageConversation`(`:2365`)。全メッセージングブリッジ(satellites/{slack,telegram,discord,imessage}-bridge)・voice-hub・terminal(`kyberion ask`)・concierge・chronos が同一入口を通る。曖昧な意図は `savePendingIntent`(correlationId キー)で永続化して clarification packet を返し、surface agent(`ensureSurfaceAgent` `:1769` → agent-runtime handle の `ask`)が応答を生成、UX 契約は `validateSurfaceUxContract` の単一チョークポイントで強制。
 - つまり「surface でユーザと会話する」は解決済み。**未解決なのは、その会話がミッションの所有者として振る舞えないこと。**
 
 ### 1.2 推論はホスト CLI 非依存(窓口と推論は分離済み)
 
-- `libs/core/reasoning-bootstrap.ts` — `installReasoningBackends`(`:705`)は `claude-agent` / `claude-cli` / `codex-cli` / `anthropic` / `openrouter` / ローカルランナー等から failover chain を構成する。「誰が推論するか」と「誰がユーザとの窓口か」は既に分離されており、surface オーケストレータのために推論層の新設は不要。
+- `libs/core/reasoning/reasoning-bootstrap.ts` — `installReasoningBackends`(`:705`)は `claude-agent` / `claude-cli` / `codex-cli` / `anthropic` / `openrouter` / ローカルランナー等から failover chain を構成する。「誰が推論するか」と「誰がユーザとの窓口か」は既に分離されており、surface オーケストレータのために推論層の新設は不要。
 
 ### 1.3 lifecycle 動詞はプログラマティック API が既に在るが、scripts 層に閉じている
 
 - `scripts/refactor/mission-system.ts` — `buildMissionSystem`(`:49`)が start / createCheckpoint / verifyMission / finishMission / staffMissionTeam / prewarmMissionTeam / distillMission / dispatchMissionWorkItems / pauseMission / resumeMission / cancelMission / recordEvidence 等を**既にプログラマティックに公開**している。`scripts/mission_controller.ts` はその CLI router に過ぎない。
-- しかし build 依存方向(libs → scripts は不可)により、surface 側(libs/core)から import できない。`issueMissionFromProposal`(`libs/core/surface-mission-proposals.ts:398`)は `dist/scripts/mission_controller.js start` への **shell out** + `withExecutionContext('mission_controller')` の enqueue で「発行」のみを実現しており、**操縦動詞(checkpoint / gate / finish …)への in-process 経路が無い**。
+- しかし build 依存方向(libs → scripts は不可)により、surface 側(libs/core)から import できない。`issueMissionFromProposal`(`libs/core/surface/surface-mission-proposals.ts:398`)は `dist/scripts/mission_controller.js start` への **shell out** + `withExecutionContext('mission_controller')` の enqueue で「発行」のみを実現しており、**操縦動詞(checkpoint / gate / finish …)への in-process 経路が無い**。
 
 ### 1.4 会話 ↔ ミッション所有の永続バインディングが無い
 
@@ -74,7 +74,7 @@ LLM プロバイダ CLI(Claude Code 等)で Kyberion を使うとき、CLI セ�
 
 > 優先度 P1 / 規模 M〜L / 依存: なし
 
-`mission-system` の中核を libs 側(`@agent/core` から import 可能な位置)へ移設し、`libs/core/mission-lifecycle-service.ts`(仮)が execution-context 検証付きの動詞サブセット(start / checkpoint / verify / finish / staff / prewarm / dispatch / gate / pause / resume / status)を公開する。`scripts/refactor/mission-system.ts` と `scripts/mission_controller.ts` は同一実装への thin router として**挙動不変**を保つ(移設 + re-export。CLI の argv 契約・出力・状態遷移に変更なし)。
+`mission-system` の中核を libs 側(`@agent/core` から import 可能な位置)へ移設し、`libs/core/mission/mission-lifecycle-service.ts`(仮)が execution-context 検証付きの動詞サブセット(start / checkpoint / verify / finish / staff / prewarm / dispatch / gate / pause / resume / status)を公開する。`scripts/refactor/mission-system.ts` と `scripts/mission_controller.ts` は同一実装への thin router として**挙動不変**を保つ(移設 + re-export。CLI の argv 契約・出力・状態遷移に変更なし)。
 
 **受入条件**
 
@@ -88,7 +88,7 @@ LLM プロバイダ CLI(Claude Code 等)で Kyberion を使うとき、CLI セ�
 
 > 優先度 P1 / 規模 M / 依存: SO-01
 
-`libs/core/orchestrator-session.ts` を新設する: surface / channel / thread(correlationId 系譜 = IL-02)↔ mission_id ↔ owner authority の永続レコード。governed storage(surface-coordination-store 系)に保存し、プロセス再起動後もスレッド発話からセッションを復元する(KD-03 / MO-06 と同型の journal 記録)。1 mission = 高々 1 active session(二重オーナーの構造的防止)。解放は handoff / finish / 明示 release のいずれかで行い、解放後の操縦は拒否される。
+`libs/core/mission/orchestrator-session.ts` を新設する: surface / channel / thread(correlationId 系譜 = IL-02)↔ mission_id ↔ owner authority の永続レコード。governed storage(surface-coordination-store 系)に保存し、プロセス再起動後もスレッド発話からセッションを復元する(KD-03 / MO-06 と同型の journal 記録)。1 mission = 高々 1 active session(二重オーナーの構造的防止)。解放は handoff / finish / 明示 release のいずれかで行い、解放後の操縦は拒否される。
 
 **受入条件**
 

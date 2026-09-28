@@ -31,8 +31,8 @@ vi.mock('@agent/core/autonomous-repair', () => ({
   attemptAutonomousRepair: attemptAutonomousRepairMock,
 }));
 
-vi.mock('@agent/core/pipeline-contract', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/pipeline-contract')>()),
+vi.mock('@agent/core/pipeline/pipeline-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline/pipeline-contract')>()),
   loadPipelineAdfAtPath: loadPipelineAdfAtPathMock,
 }));
 

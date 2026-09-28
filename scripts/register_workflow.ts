@@ -218,8 +218,10 @@ function buildTemplate(req: RegistrationRequest): Json {
     const suffix = ph.id.replace(/_/g, '-');
     const isReview = ph.kind === 'review';
     const fallbackDescription = isReview
-      ? `${ph.title}を実施し、レビュー結果と判定を記録する`
-      : `${ph.title}を実施し、${ph.deliverable ?? '成果物'}に記録する`;
+      ? // i18n-exempt: JA workflow phase text (product language)
+        `${ph.title}を実施し、レビュー結果と判定を記録する`
+      : // i18n-exempt: JA workflow phase text (product language)
+        `${ph.title}を実施し、${ph.deliverable ?? '成果物'}に記録する`;
     const task: Json = {
       task_id_suffix: suffix,
       team_role: ph.team_role ?? (isReview ? 'reviewer' : 'implementer'),
@@ -228,7 +230,8 @@ function buildTemplate(req: RegistrationRequest): Json {
       acceptance_criteria:
         ph.acceptance_criteria && ph.acceptance_criteria.length > 0
           ? ph.acceptance_criteria
-          : [`${ph.title} が完了している`],
+          : // i18n-exempt: JA workflow phase text (product language)
+            [`${ph.title} が完了している`],
       expected_output_format: isReview
         ? 'structured'
         : ph.deliverable_kind === 'doc'

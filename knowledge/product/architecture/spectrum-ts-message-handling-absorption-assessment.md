@@ -415,20 +415,20 @@ That gives Kyberion the conceptual clarity of `spectrum-ts` without sacrificing 
 
 ### Current implementation status
 
-- `libs/core/surface-interaction-model.ts` now exists as that compatibility layer
-- `libs/core/surface-coordination-store.ts` now isolates:
+- `libs/core/surface/surface-interaction-model.ts` now exists as that compatibility layer
+- `libs/core/surface/surface-coordination-store.ts` now isolates:
   - outbox messages
   - surface notifications
   - async surface requests
-- `libs/core/surface-ingress-contract.ts` now defines a normalized ingress envelope for:
+- `libs/core/surface/surface-ingress-contract.ts` now defines a normalized ingress envelope for:
   - Slack
   - Chronos
   - Presence
-- `libs/core/surface-provider-manifest.ts` now exposes explicit provider manifests for:
+- `libs/core/surface/surface-provider-manifest.ts` now exposes explicit provider manifests for:
   - default surface agent id
   - delivery mode
   - supported interaction capabilities
-- `libs/core/surface-provider-policy.ts` now resolves provider-specific routing from governed knowledge:
+- `libs/core/surface/surface-provider-policy.ts` now resolves provider-specific routing from governed knowledge:
   - `knowledge/product/governance/surface-provider-manifests.json`
   - `knowledge/product/schemas/surface-provider-manifests.schema.json`
 - Slack-specific intent/execution/delegation rules also now live in `surface-provider-manifests.json`
@@ -449,13 +449,13 @@ That gives Kyberion the conceptual clarity of `spectrum-ts` without sacrificing 
   - `satellites/voice-hub/server.ts`
 - `runSurfaceMessageConversation(...)` now provides a message-first API above `runSurfaceConversation(...)`
 - receiver routing is now provider-aware instead of being only one shared surface rule set
-- `libs/core/surface-runtime-router.ts` now owns routing-only policy resolution
-- `libs/core/surface-runtime-orchestrator.ts` now owns delegation execution and response synthesis
-- `libs/core/surface-response-blocks.ts` now owns surface response block parsing
-- `libs/core/surface-artifact-store.ts` now owns surface event emission and delivery/request artifact persistence
-- `libs/core/surface-mission-proposals.ts` now owns mission proposal persistence and issuance
-- `libs/core/slack-approval-ui.ts` now owns Slack approval card persistence and decision handling
-- `libs/core/slack-onboarding.ts` now owns Slack onboarding state, prompts, and modal flows
+- `libs/core/surface/surface-runtime-router.ts` now owns routing-only policy resolution
+- `libs/core/surface/surface-runtime-orchestrator.ts` now owns delegation execution and response synthesis
+- `libs/core/surface/surface-response-blocks.ts` now owns surface response block parsing
+- `libs/core/surface/surface-artifact-store.ts` now owns surface event emission and delivery/request artifact persistence
+- `libs/core/surface/surface-mission-proposals.ts` now owns mission proposal persistence and issuance
+- `libs/core/integrations/slack-approval-ui.ts` now owns Slack approval card persistence and decision handling
+- `libs/core/integrations/slack-onboarding.ts` now owns Slack onboarding state, prompts, and modal flows
 - `channel-surface` remains the legacy routing entrypoint, so migration can continue incrementally instead of as a rewrite
 
 ## Bottom Line

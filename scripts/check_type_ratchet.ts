@@ -51,7 +51,7 @@ function isGeneratedFile(repoRelativePath: string): boolean {
   const segments = repoRelativePath.split('/');
   return (
     /^libs\/core\/index-part-\d+\.ts$/u.test(repoRelativePath) ||
-    repoRelativePath === 'libs/core/vocabulary-keys.generated.ts' ||
+    repoRelativePath === 'libs/core/knowledge/vocabulary-keys.generated.ts' ||
     segments.some((segment) =>
       new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
     ) ||

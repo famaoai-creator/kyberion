@@ -7,7 +7,7 @@ import type {
   KbEmptyStateProps,
   KbSkeletonProps,
   KbStatusPillProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import { statusLabel } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { ActionRefButton, type ActionRefLike } from './controls.js';

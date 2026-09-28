@@ -24,12 +24,12 @@ import {
   safeMkdir,
 } from '@agent/core/secure-io';
 import { appendJsonLine, defineCatalog, nowIso } from '@agent/core/foundation';
-import type { ScenarioDefinition } from '@agent/core/scenario-definition';
-import { createScenarioFixtureBackend } from '@agent/core/scenario-model-fixtures';
+import type { ScenarioDefinition } from '@agent/core/scenario/scenario-definition';
+import { createScenarioFixtureBackend } from '@agent/core/scenario/scenario-model-fixtures';
 import {
   createScenarioSideEffectLog,
   type ScenarioSideEffectLog,
-} from '@agent/core/scenario-side-effect-log';
+} from '@agent/core/scenario/scenario-side-effect-log';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { evaluateResolvedFacetFixtures } from './eval_facets.js';
 

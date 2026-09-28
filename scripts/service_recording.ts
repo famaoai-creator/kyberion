@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-import { compileServiceRecording } from '@agent/core/service-recording-compiler';
-import { buildServiceProcedureCandidate } from '@agent/core/service-distill-candidate';
-import { promoteServiceProcedure } from '@agent/core/service-procedure-promotion';
-import { resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
+import { compileServiceRecording } from '@agent/core/service/service-recording-compiler';
+import { buildServiceProcedureCandidate } from '@agent/core/service/service-distill-candidate';
+import { promoteServiceProcedure } from '@agent/core/service/service-procedure-promotion';
+import { resolveAllowlistedRecordingRef } from '@agent/core/knowledge/procedure-registry';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   loadServiceRecordingAtPath,
   serviceRecordingContentHash,
   validateServiceRecording,
   type ServiceRecording,
-} from '@agent/core/service-recording';
-import { validatePipelineAdf } from '@agent/core/pipeline-contract';
-import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
-import { startServiceRecordingSession } from '@agent/core/service-recording-session';
+} from '@agent/core/service/service-recording';
+import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
+import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails';
+import { startServiceRecordingSession } from '@agent/core/service/service-recording-session';
 import { withExecutionContext } from '@agent/core/authority';
 import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';

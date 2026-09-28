@@ -9,12 +9,12 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
-import type { AdfEngineContext } from '@agent/core/adf-engine';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
+import { resolveDesktopLaunchAdapter } from '@agent/core/virtual/desktop-launch-adapter';
 import { getPathValue } from '@agent/core/logic-utils';
-import { createVoiceCapabilityBridge } from '@agent/core/voice-capability-bridge';
+import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
 import { retry } from '@agent/core/async-utils';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
@@ -34,8 +34,8 @@ import {
   quitApplication,
   systemNotify,
   clipboardWrite,
-} from '@agent/core/os-automation';
-import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+} from '@agent/core/virtual/os-automation';
+import { osAutomationBridge } from '@agent/core/virtual/os-automation-bridge';
 import { isMacOS } from '@agent/core/platform';
 import * as path from 'node:path';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';
@@ -197,7 +197,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       );
       break;
     case 'voice':
-      const { say } = await import('@agent/core/voice-synth');
+      const { say } = await import('@agent/core/voice/voice-synth');
       await say(resolve(params.text || '{{last_capture}}'));
       break;
     case 'native_tts_speak': {

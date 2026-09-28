@@ -29,7 +29,7 @@ describe('oauth callback surface', () => {
       })
     );
     expect(source).toContain(
-      "import { readSurfaceStringParam } from '@agent/core/surface-request-input'"
+      "import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input'"
     );
     expect(source.match(/readSurfaceStringParam\(req\.query\./gu)).toHaveLength(5);
     expect(source).not.toContain("typeof req.query.service === 'string'");

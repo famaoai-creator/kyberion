@@ -1,6 +1,6 @@
 import * as os from 'node:os';
 import { safeExec, safeExecShellScript } from './secure-io.js';
-import { resolveFfmpegBin, resolveFfprobeBin } from './tool-binary-resolvers.js';
+import { resolveFfmpegBin, resolveFfprobeBin } from './tool/tool-binary-resolvers.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('platform');

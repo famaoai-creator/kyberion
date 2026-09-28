@@ -44,15 +44,15 @@ work-item claim(リース・排他)          ノード排他の基盤として�
 
 ### 1.1 ADF エンジン: エッジなし・逐次のみ
 
-- `libs/core/adf-engine.ts:168` — 実行は `for (const step of steps)` の厳密な逐次ループ。最初の失敗で `break`(`:311`)。
-- ステップ契約(`libs/core/pipeline-contract.ts:51-113`、`knowledge/product/schemas/pipeline-adf.schema.json`)に `depends_on`/`next`/`edges` に相当するキーは存在しない。スキーマは step レベルで `additionalProperties: false` のため、エッジ追加は契約変更が必須。
+- `libs/core/pipeline/adf-engine.ts:168` — 実行は `for (const step of steps)` の厳密な逐次ループ。最初の失敗で `break`(`:311`)。
+- ステップ契約(`libs/core/pipeline/pipeline-contract.ts:51-113`、`knowledge/product/schemas/pipeline-adf.schema.json`)に `depends_on`/`next`/`edges` に相当するキーは存在しない。スキーマは step レベルで `additionalProperties: false` のため、エッジ追加は契約変更が必須。
 - `produces`/`consumes` はデータフローエッジ**ではない**: `validateFlow`(`scripts/run_pipeline.ts:327-354`)は「配列上で先に produce されたか」の存在検査のみで、並べ替え・並行化の根拠として使われていない。
 - 分岐は `core:if` のネスト木のみ(`run_pipeline.ts:1461`)。goto/switch/エッジ条件はない。
 - 制御原語の実使用(pipelines/ + pipeline-templates/ を grep): `core:include` 73、`core:if` 40、`core:foreach` 6、`core:transform` 6、`core:while` 1、**`core:parallel_foreach` 0、`core:parallel_calls` 0、`core:accumulate` 0、`core:retry_until_quality` 0**。HN-03 が作った並列/収束原語は死蔵されている。
 
 ### 1.2 条件評価の構造的欠陥(グラフルーティングの前提を欠く)
 
-`evaluateCondition`(`libs/core/src/logic-utils.ts:123`)は文字列条件を**コンテキストパス参照**として扱う。式は評価されない:
+`evaluateCondition`(`libs/core/pipeline/logic-utils.ts:123`)は文字列条件を**コンテキストパス参照**として扱う。式は評価されない:
 
 - `knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator.json:30` の `"condition": "ordered_visits.length > 0"` は `['ordered_visits', 'length > 0']` にトークナイズされ `undefined` → **常に false**。`core:while` は一度も回らず `skipped` になる(潜在バグ、無症状)。
 - 構造化形式 `{from, operator, value}` は存在するが、式に見える文字列を検出する lint がなく、黙って偽になる。条件付きエッジ(graph routing)を導入する前に、この評価系を安全化する必要がある。
@@ -64,21 +64,21 @@ work-item claim(リース・排他)          ノード排他の基盤として�
 ### 1.4 チェックポイント/再開の不在(pipeline 粒度)
 
 - `scripts/run_pipeline.ts` に resume/checkpoint/journal は**ゼロヒット**。失敗した run は step 0 から再実行。
-- Trace(`libs/core/src/trace.ts`)は観測用スパンであり、コンテキストスナップショットを持たないため replay 不能。
+- Trace(`libs/core/analysis/trace.ts`)は観測用スパンであり、コンテキストスナップショットを持たないため replay 不能。
 - 一方で再利用可能な基盤は既にある:
-  - `libs/core/worker-state-journal.ts`(756 行)— `EventSourcingKernel`: 純粋 reducer、バージョン付き envelope、migration、restore 中の副作用を構造的に禁止する `assertNotDuringRestore`。**リポジトリ内で最も完成度の高いチェックポイント基盤**だが worker goal 状態専用。
-  - `libs/core/mission-orchestration-journal.ts` — `loadMissionOrchestrationReplayPlan()` による L1 イベント粒度の durable resume(MO-06)。pipeline ステップ粒度には未接続。
+  - `libs/core/workforce/worker-state-journal.ts`(756 行)— `EventSourcingKernel`: 純粋 reducer、バージョン付き envelope、migration、restore 中の副作用を構造的に禁止する `assertNotDuringRestore`。**リポジトリ内で最も完成度の高いチェックポイント基盤**だが worker goal 状態専用。
+  - `libs/core/mission/mission-orchestration-journal.ts` — `loadMissionOrchestrationReplayPlan()` による L1 イベント粒度の durable resume(MO-06)。pipeline ステップ粒度には未接続。
 
 ### 1.5 ミッションワーカー: DAG を持ちながら wave 同期
 
-- `libs/core/mission-orchestration-worker.ts:4726-4978` — dispatch ループは ready タスクを最大 `max_parallel_members`(既定 3)束ねて **`Promise.all`(`:4949`)で全員待ち**。wave 内の最遅タスクが完了するまで、新たに ready になったタスクを開始できない。[ORCHESTRATION_HARNESS_MODEL](../../ORCHESTRATION_HARNESS_MODEL.ja.md) §3 が名指しした anti-pattern そのもの。
+- `libs/core/mission/mission-orchestration-worker.ts:4726-4978` — dispatch ループは ready タスクを最大 `max_parallel_members`(既定 3)束ねて **`Promise.all`(`:4949`)で全員待ち**。wave 内の最遅タスクが完了するまで、新たに ready になったタスクを開始できない。[ORCHESTRATION_HARNESS_MODEL](../../ORCHESTRATION_HARNESS_MODEL.ja.md) §3 が名指しした anti-pattern そのもの。
 - `PlannedNextTask.dependencies` は重複/欠損/循環(DFS)検証済み(`mission-orchestration-worker.ts:580-610`)— **契約は既にグラフ**。
 - `libs/actuators/orchestrator-actuator/src/task-plan-coordinator.ts:20-58` は Kahn のトポロジカルソートを実装済みだが、実行(`:181`)は直列 for-await。
 - L1(イベントチェーン)の followup↔reconciliation ループバック(`:5892-5955`)には反復上限がなく、収束はコメント上の単調減少論証のみ。L3 の再作業上限はマジックナンバー(acceptance rework `< 1`、review round `>= 2`)。
 
 ### 1.6 delegateTask にノード同一性がない
 
-- `ReasoningBackend.delegateTask`(`libs/core/reasoning-backend.ts:470-560`)は `(instruction, context?, options?) => Promise<string>`。**タスク ID なし・状態なし・join/cancel なし**。構造は返答テキストの JSON 再パースで復元している(`parseTaskResultResponse`)。
+- `ReasoningBackend.delegateTask`(`libs/core/reasoning/reasoning-backend.ts:470-560`)は `(instruction, context?, options?) => Promise<string>`。**タスク ID なし・状態なし・join/cancel なし**。構造は返答テキストの JSON 再パースで復元している(`parseTaskResultResponse`)。
 - 最も近い既存物は `DelegatedTaskRecord.delegation_id`(`libs/core/delegated-task-observability.ts`)だが観測専用。グラフランタイムがノードとして委譲を扱うには、アドレス可能なハンドルが必要。
 
 ### 1.7 guardrails のグラフ盲点

@@ -22,7 +22,7 @@ last_updated: 2026-06-05
 - **プロダクト化されたマルチテナント GUI** — テナント切替 UI、組織管理、hosted user management、課金と一体化したロールベース ACL。
   _理由_: OSS の主戦場はシングルユーザ／シングル組織で動くこと。なお、self-hosted / FDE の内部データ境界を守る server-side scope と operation 認可はこの非目標とは別であり、既存 surface の安全な運用基盤として実装する。
   _2026-09-13 追記_: hosted user management は非目標のまま。self-hosted の**最小メンバー登録簿**(ローカル自動 + オーナー発行トークン、役割 = オーナー / 承認者 / 閲覧、SSO・課金なし)と「見せる範囲を狭めるだけ」のテナント表示は内部認可の延長として [FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) で採用する。
-  _2026-09-13 追記(FD-07)_: この最小メンバー登録簿は `libs/core/member-registry.ts`(`knowledge/personal/members/{member_id}.json`)として実装済み。
+  _2026-09-13 追記(FD-07)_: この最小メンバー登録簿は `libs/core/organization/member-registry.ts`(`knowledge/personal/members/{member_id}.json`)として実装済み。
 - **公開 REST API / SDK** — 外部開発者が "Kyberion を組み込む" ためのもの。
   _理由_: そもそも内部のユーザー層がまだ薄い段階で、外向きの安定 API を背負うと内部進化が止まる。
 - **OAuth / SSO 連携 / Stripe 連携** — 上記の派生。
@@ -350,7 +350,7 @@ Hermes Agent の分析で見えた「Kyberion に取り込むと実際に効く�
 
 | 類別                | Hermes 側の知見                                                             | Kyberion の扱い                                                                                                                                                                     | 現状         |
 | ------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| 出力衛生            | ストリーミングの思考ブロックは state machine で除去し、surface へ漏らさない | `libs/core/surface-response-blocks.ts` に共通サニタイザを実装し、Slack / voice 系の最終出力に適用                                                                                   | 採用済み     |
+| 出力衛生            | ストリーミングの思考ブロックは state machine で除去し、surface へ漏らさない | `libs/core/surface/surface-response-blocks.ts` に共通サニタイザを実装し、Slack / voice 系の最終出力に適用                                                                           | 採用済み     |
 | 人間向け翻訳        | 委譲先や task の生出力は、そのまま返さず人間向けの最終文へ整形する          | `surface-runtime-orchestrator.ts` で `direct_reply` / `task_session` / delegated response を翻訳                                                                                    | 採用済み     |
 | STT 統合            | STT は provider/registry 分離で差し替え可能にする                           | Kyberion では [Adapter-First Extension Policy](../knowledge/product/governance/adapter-first-extension-policy.md) と `voice-stt.ts` / `voice-provider-adapters.ts` がこの境界を担う | 既存代替あり |
 | 失敗ループ制御      | repeated failure / no progress を明示的に止める                             | `src/feedback-loop.ts` が pipeline 健全性と反復失敗を管理する土台を提供                                                                                                             | 既存代替あり |
@@ -489,7 +489,7 @@ clone から 5 分以内に、ユーザが **声で話しかけ → Kyberion が
 - `presence/displays/presence-studio/`（ブラウザ surface、Web Speech API を呼ぶ frontend）
 - `satellites/voice-hub/`（音声入出力ハブ）
 - `libs/actuators/voice-actuator/`（Style-Bert-VITS2、ローカル TTS）— upgrade 用
-- `libs/core/anthropic-voice-bridge.ts`（Anthropic Voice 経由）— upgrade 用
+- `libs/core/provider/anthropic-voice-bridge.ts`（Anthropic Voice 経由）— upgrade 用
 - `scripts/run_realtime_voice_conversation.ts`（turn-based + interactive loop）
 
 #### A.3 三段構成（依存重量と OSS-friendly の両立）
@@ -532,7 +532,7 @@ A-5 のタスク完了条件に「30 秒以内の terminal cast + ブラウザ�
 
 - A-5.1: `npx kyberion init --voice` で段 0 経路（presence surface 起動 → ブラウザ自動 open → first win 質問提示）を 1 コマンドにまとめる
 - A-5.2: presence surface に Web Speech API 入力 UI を追加（既存ならば動作確認）
-- A-5.3: OS 標準 TTS の薄いラッパ `libs/core/native-tts.ts`（`say` / `espeak` / `SAPI` の差異を吸収）
+- A-5.3: OS 標準 TTS の薄いラッパ `libs/core/media/native-tts.ts`（`say` / `espeak` / `SAPI` の差異を吸収）
 - A-5.4: 段 0 用 e2e ADF `pipelines/voice-hello.json`（greeting → mission → reply、外部依存ゼロを宣言）
 - A-5.5: voice preflight（マイク権限、ブラウザ、TTS 経路）を `pipelines/vital-check.json` に統合
 - A-5.6: 失敗フォールバック（A.4）の実装

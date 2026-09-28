@@ -6,10 +6,13 @@ import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const required = [
-  { module: 'op-preflight', source: 'libs/core/op-preflight.ts' },
+  { module: 'op-preflight', source: 'libs/core/pipeline/op-preflight.ts' },
   { module: 'seam', source: 'libs/core/seam.ts' },
   { module: 'lifecycle-hook-engine', source: 'libs/core/lifecycle-hook-engine.ts' },
-  { module: 'reasoning-provider-registry', source: 'libs/core/reasoning-provider-registry.ts' },
+  {
+    module: 'reasoning-provider-registry',
+    source: 'libs/core/reasoning/reasoning-provider-registry.ts',
+  },
 ];
 
 export function readModuleInvariantTextFile(filePath: string): string {

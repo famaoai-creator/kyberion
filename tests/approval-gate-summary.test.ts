@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeApprovalGate } from '../libs/core/approval-gate-summary.js';
+import { summarizeApprovalGate } from '../libs/core/governance/approval-gate-summary.js';
 
 describe('approval gate summary', () => {
   it('renders approval-free results clearly', () => {
@@ -11,7 +11,7 @@ describe('approval gate summary', () => {
           requiredFor: [],
           defaultAction: 'draft-only',
         },
-      }),
+      })
     ).toBe(
       [
         'Task: email-triage',
@@ -25,7 +25,7 @@ describe('approval gate summary', () => {
         '',
         'Default action:',
         '- draft-only; no external delivery was performed',
-      ].join('\n'),
+      ].join('\n')
     );
   });
 
@@ -38,7 +38,7 @@ describe('approval gate summary', () => {
           requiredFor: ['external_sharing'],
           defaultAction: 'notify_only',
         },
-      }),
+      })
     ).toContain('- notify-only; no external delivery was performed');
   });
 
@@ -51,7 +51,7 @@ describe('approval gate summary', () => {
           requiredFor: ['send_to_customer'],
           defaultAction: 'requires-human-approval',
         },
-      }),
+      })
     ).toBe(
       [
         'Task: meeting-to-proposal-pptx',
@@ -65,7 +65,7 @@ describe('approval gate summary', () => {
         '',
         'Default action:',
         '- requires-human-approval; no external delivery was performed',
-      ].join('\n'),
+      ].join('\n')
     );
   });
 
@@ -74,7 +74,7 @@ describe('approval gate summary', () => {
       summarizeApprovalGate({
         taskId: 'draft-only-task',
         artifacts: [],
-      }),
+      })
     ).toContain('- No artifacts recorded');
   });
 });

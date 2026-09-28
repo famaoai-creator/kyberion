@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/scenario-trajectory.schema.json",
   "title": "Kyberion scenario trajectory",
-  "description": "Ordered op steps of one scenario run (kyberion-scenario-trajectory.v1), produced by libs/core/scenario-trajectory.ts. Content never appears: prompts, outputs, params and trace attributes are redacted and reduced to sha256 digests and lengths.",
+  "description": "Ordered op steps of one scenario run (kyberion-scenario-trajectory.v1), produced by libs/core/scenario/scenario-trajectory.ts. Content never appears: prompts, outputs, params and trace attributes are redacted and reduced to sha256 digests and lengths.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "scenario_id", "run_id", "evidence_class", "steps"],

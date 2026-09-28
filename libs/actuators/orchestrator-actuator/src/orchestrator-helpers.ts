@@ -20,16 +20,17 @@ import {
 } from '@agent/core/secure-io';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { pathResolver } from '@agent/core/path-resolver';
-import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
-import { registerTaskPlanCoordinator } from '@agent/core/task-plan-coordinator-port';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
+import { registerTaskPlanCoordinator } from '@agent/core/task/task-plan-coordinator-port';
 import { evaluateTaskPlanReadyGate } from '@agent/core/sdlc-artifact-store';
 import { buildCostReportFromHistory } from '@agent/core/cost-report';
 import { summarizeSemanticDegradations } from '@agent/core/semantic-degradation-log';
 import { listPromotionCandidates } from '@agent/core/promotion-candidates';
-import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
-import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/adf-engine.js';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
+import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/pipeline/adf-engine.js';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -124,10 +125,10 @@ function buildUnknownOrchestratorOpError(op: string): Error {
   return buildUnknownActuatorOpError('orchestrator', op);
 }
 
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: ORCHESTRATOR_MANIFEST_PATH,
-  defaults: DEFAULT_ORCHESTRATOR_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_ORCHESTRATOR_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 function resolveOrchestratorRepositoryPath(rootDir: string, value: unknown): string {
@@ -469,13 +470,17 @@ async function opTransform(op: string, params: any, ctx: any) {
       const targetMissionId = requestText.match(/MSN-[A-Z0-9-]+/i)?.[0] || null;
       const targetProjectId = requestText.match(/PRJ-[A-Z0-9-]+/i)?.[0] || null;
       const scope =
+        // i18n-exempt: JA input keyword matcher
         targetMissionId || lowered.includes('mission') || lowered.includes('ミッション')
           ? 'missions'
-          : targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト')
+          : // i18n-exempt: JA input keyword matcher
+            targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト')
             ? 'projects'
-            : lowered.includes('actuator') || lowered.includes('アクチュエータ')
+            : // i18n-exempt: JA input keyword matcher
+              lowered.includes('actuator') || lowered.includes('アクチュエータ')
               ? 'actuators'
               : lowered.includes('surface') ||
+                  // i18n-exempt: JA input keyword matcher
                   lowered.includes('サービス') ||
                   lowered.includes('稼働')
                 ? 'surfaces'

@@ -25,14 +25,14 @@ kyberion のメディア出力（HyperFrames 動画・PPTX）は「配管（ト�
 
 ### 1.1 動画（HyperFrames パス）
 
-現行フロー: `VideoContentBrief` → `compileVideoContentBriefToStoryboard()` → `NarratedVideoBrief` → `VideoCompositionADF` → `video-composition-compiler.ts` が HTML/CSS を出力 → `hyperframes` CLI でレンダリング（`libs/core/video-render-backend.ts:111-204`）。
+現行フロー: `VideoContentBrief` → `compileVideoContentBriefToStoryboard()` → `NarratedVideoBrief` → `VideoCompositionADF` → `video-composition-compiler.ts` が HTML/CSS を出力 → `hyperframes` CLI でレンダリング（`libs/core/video/video-render-backend.ts:111-204`）。
 
-| 問題                                 | 所在                                                                                            | 影響                                                                                                                                             |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| レイアウト・モーションが全て固定 CSS | `libs/core/video-composition-compiler.ts`（約1,387行、`@keyframes` とタイミングがハードコード） | LLM の裁量は「10種のパターンパックから ID を選ぶ＋テキスト充填」のみ。ストーリー固有のアートディレクションが構造的に不可能（DS-04 でも指摘済み） |
-| ストーリーボードがテンプレ流し込み   | `video-content-brief-contract.ts:119` の固定 `BeatPlanEntry` テーブル                           | ビート（尺・リズム・モーション意図）が内容と無関係に決まる                                                                                       |
-| 視覚レビュー工程なし                 | —                                                                                               | レンダリング結果を誰も視ない。破綻してもそのまま納品                                                                                             |
-| 低品質フォールバックが無言で発動     | `video-render-backend.ts:215`（静止画スライドショー）                                           | 品質劣化がユーザーに通知されない                                                                                                                 |
+| 問題                                 | 所在                                                                                                  | 影響                                                                                                                                             |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| レイアウト・モーションが全て固定 CSS | `libs/core/video/video-composition-compiler.ts`（約1,387行、`@keyframes` とタイミングがハードコード） | LLM の裁量は「10種のパターンパックから ID を選ぶ＋テキスト充填」のみ。ストーリー固有のアートディレクションが構造的に不可能（DS-04 でも指摘済み） |
+| ストーリーボードがテンプレ流し込み   | `video-content-brief-contract.ts:119` の固定 `BeatPlanEntry` テーブル                                 | ビート（尺・リズム・モーション意図）が内容と無関係に決まる                                                                                       |
+| 視覚レビュー工程なし                 | —                                                                                                     | レンダリング結果を誰も視ない。破綻してもそのまま納品                                                                                             |
+| 低品質フォールバックが無言で発動     | `video-render-backend.ts:215`（静止画スライドショー）                                                 | 品質劣化がユーザーに通知されない                                                                                                                 |
 
 ### 1.2 PPTX（native-pptx-engine パス）
 

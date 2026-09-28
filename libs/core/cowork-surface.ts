@@ -16,8 +16,11 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
-import { writeGovernedArtifactJson, ensureGovernedArtifactDir } from './artifact-store.js';
-import type { IntentResolutionContract } from './intent-resolution-contract.js';
+import {
+  writeGovernedArtifactJson,
+  ensureGovernedArtifactDir,
+} from './workforce/artifact-store.js';
+import type { IntentResolutionContract } from './intent/intent-resolution-contract.js';
 import {
   loadCoworkArtifactPacketAtPath,
   validateCoworkArtifactPacket,

@@ -161,7 +161,7 @@ while preserving flexibility:
 - runtime supervisor observability:
   - `active/shared/observability/mission-control/agent-runtime-supervisor-events.jsonl`
 - A2A runtime delegation:
-  - `libs/core/a2a-bridge.ts`
+  - `libs/core/mesh/a2a-bridge.ts`
 - generic surface outbox:
   - `active/shared/coordination/channels/<surface>/outbox/`
   - tenant-scoped records: `active/shared/coordination/channels/<surface>/tenants/<tenant>/outbox/`

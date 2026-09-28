@@ -9,7 +9,7 @@ import {
   readJson,
   readJsonLines,
 } from '@agent/core/foundation';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
@@ -25,7 +25,7 @@ import {
   formatChannelThreadContext,
   runChannelTurn,
   type ChannelAdapter,
-} from '@agent/core/channel-adapter';
+} from '@agent/core/surface/channel-adapter';
 import {
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
@@ -35,21 +35,24 @@ import {
 } from '@agent/core/bridge-error-reply';
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
-import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
-import { decisionCardActionLabel } from '@agent/core/approval-decision-card';
+import {
+  createSurfaceOutboxDrainGuard,
+  drainSurfaceOutbox,
+} from '@agent/core/surface/surface-delivery';
+import { decisionCardActionLabel } from '@agent/core/governance/approval-decision-card';
 import {
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
-} from '@agent/core/surface-mission-proposals';
+} from '@agent/core/surface/surface-mission-proposals';
 import {
   buildDecisionCardActions,
   buildSurfaceApprovalText,
   createSurfaceApprovalRequest,
   resolveSurfaceApprovalReply,
   runSurfaceMessageConversation,
-  type DecisionCardActionKind,
-} from '@agent/core/channel-surface';
-import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+} from '@agent/core/surface/channel-surface';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface/surface-access-policy';
+import type { DecisionCardActionKind } from '@agent/core/surface/channel-surface';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import * as path from 'node:path';
 
@@ -372,7 +375,9 @@ async function sendTelegramMessageSingle(
     };
   }
 
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   const parseMode = input.parseMode || options.parseMode || 'Markdown';
   let response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
     method: 'POST',
@@ -461,7 +466,9 @@ export async function sendTelegramTypingAction(
 ): Promise<void> {
   const token = resolveToken(options.token);
   if (options.dryRun || !token) return;
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   await fetch(`${apiBaseUrl}/bot${token}/sendChatAction`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -475,7 +482,9 @@ async function answerTelegramCallbackQuery(
 ): Promise<void> {
   const token = resolveToken(options.token);
   if (options.dryRun || !token) return;
-  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  let apiBaseUrl = options.apiBaseUrl || 'https://api.telegram.org';
+  // CodeQL-safe trailing-slash strip (avoids the ambiguous /+$/ pattern).
+  while (apiBaseUrl.endsWith('/')) apiBaseUrl = apiBaseUrl.slice(0, -1);
   await fetch(`${apiBaseUrl}/bot${token}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -975,7 +984,7 @@ async function main(args: string[] = []): Promise<void> {
       logger.error(`❌ [TelegramBridge] Request failed: ${errorDetail(error)}`);
       sendJson(res, 400, {
         ok: false,
-        error: errorDetail(error),
+        error: 'internal error',
       });
     }
   });

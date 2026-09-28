@@ -65,17 +65,17 @@ async function resolveDistiller(ext: DiffableExtension): Promise<Distiller> {
         (await distillDocxDesign(filePath)) as unknown as Record<string, unknown>;
     }
     case '.pptx': {
-      const { distillPptxDesign } = await import('@agent/core/media-contracts');
+      const { distillPptxDesign } = await import('@agent/core/media/media-contracts');
       return async (filePath) =>
         (await distillPptxDesign(filePath)) as unknown as Record<string, unknown>;
     }
     case '.xlsx': {
-      const { distillXlsxDesign } = await import('@agent/core/media-contracts');
+      const { distillXlsxDesign } = await import('@agent/core/media/media-contracts');
       return async (filePath) =>
         (await distillXlsxDesign(filePath)) as unknown as Record<string, unknown>;
     }
     case '.pdf': {
-      const { distillPdfDesign } = await import('@agent/core/media-contracts');
+      const { distillPdfDesign } = await import('@agent/core/media/media-contracts');
       return async (filePath) =>
         (await distillPdfDesign(filePath)) as unknown as Record<string, unknown>;
     }

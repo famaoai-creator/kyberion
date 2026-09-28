@@ -4,8 +4,8 @@
  * chunks; playback cancellation and transcript replay stay with the caller.
  */
 
-import type { AudioChunk } from './meeting-session-types.js';
-import { computeChunkDurationMs, EnergyVad } from './voice-activity-detector.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
+import { computeChunkDurationMs, EnergyVad } from './voice/voice-activity-detector.js';
 
 export interface BargeInControllerOptions {
   /** Baseline speech threshold before the multiplier is applied. */

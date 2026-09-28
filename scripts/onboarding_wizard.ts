@@ -2,23 +2,23 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { ensureDefaultTenantProfile } from '@agent/core/tenant-registry';
-import { listServiceOnboardingCatalogEntries } from '@agent/core/service-onboarding-catalog';
+import { ensureDefaultTenantProfile } from '@agent/core/organization/tenant-registry';
+import { listServiceOnboardingCatalogEntries } from '@agent/core/service/service-onboarding-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
   type LocalizedOnboardingText,
-} from '@agent/core/onboarding-flow-policy';
-import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
+} from '@agent/core/organization/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/organization/onboarding-summary-policy';
 import { resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
-import { isServiceConnectionReady } from '@agent/core/service-connection-readiness';
+import { isServiceConnectionReady } from '@agent/core/service/service-connection-readiness';
 import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
-import { writeServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
+import { writeServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -41,7 +41,7 @@ import {
   type OnboardingProfileState as OnboardingState,
   type OnboardingTenant as TenantDraft,
   type OnboardingTutorial as TutorialDraft,
-} from '@agent/core/onboarding-state';
+} from '@agent/core/organization/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
@@ -393,10 +393,12 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   setWizardLanguage(identity.language);
 
   identity.name = await ask(
+    // i18n-exempt: bilingual prompt pair (JA side intentional)
     t(`How should I call you? [${identity.name}]: `, `お名前(呼び方)は? [${identity.name}]: `),
     identity.name
   );
   identity.language = await ask(
+    // i18n-exempt: bilingual prompt pair (JA side intentional)
     t(`Preferred language? [${identity.language}]: `, `希望する言語は? [${identity.language}]: `),
     identity.language
   );
@@ -404,6 +406,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   const styleInput = await ask(
     t(
       `Interaction style (Senior Partner / Concierge / Minimalist) [${identity.interaction_style}]: `,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `対話スタイル(Senior Partner / Concierge / Minimalist)[${identity.interaction_style}]: `
     ),
     identity.interaction_style
@@ -412,6 +415,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   identity.primary_domain = await ask(
     t(
       `Primary domain? [${identity.primary_domain}]: `,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `主な活動ドメインは? [${identity.primary_domain}]: `
     ),
     identity.primary_domain
@@ -419,6 +423,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   identity.vision = await ask(
     t(
       `Core vision for this environment? [${identity.vision}]: `,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `この環境のコアビジョンは? [${identity.vision}]: `
     ),
     identity.vision
@@ -426,6 +431,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   identity.agent_id =
     (
       await ask(
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(`Agent ID? [${identity.agent_id}]: `, `エージェント ID は? [${identity.agent_id}]: `),
         identity.agent_id
       )
@@ -437,6 +443,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
     await ask(
       t(
         `Default persona for later operations? [${identity.persona}]: `,
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         `後続操作で使う既定 persona は? [${identity.persona}]: `
       ),
       identity.persona
@@ -456,6 +463,7 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
   print(
     t(
       `Persisted default persona ${identity.persona} to ${personaEnvPath}`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `既定 persona ${identity.persona} を ${personaEnvPath} に永続化しました`
     )
   );
@@ -506,10 +514,12 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
 }
 
 async function runReasoningPhase(state: OnboardingState, print: Print): Promise<void> {
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
   print(t('\nReasoning Backend\n', '\n推論バックエンド\n'));
   let reasoning = await evaluateReasoningBackend();
   if (reasoning.available) {
     print(
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       chalk.green(t('Real reasoning backend detected.', '実働する推論バックエンドを検出しました。'))
     );
   } else if (reasoning.mode === 'stub_explicit') {
@@ -517,6 +527,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       chalk.yellow(
         t(
           'KYBERION_REASONING_BACKEND=stub is explicitly selected.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           'KYBERION_REASONING_BACKEND=stub が明示的に選択されています。'
         )
       )
@@ -525,6 +536,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       chalk.yellow(
         t(
           'Real work will use deterministic placeholder responses until reconfigured.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           '再設定するまで、実作業は決定論的なプレースホルダ応答になります。'
         )
       )
@@ -534,6 +546,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       chalk.red(
         t(
           'No real reasoning backend was detected.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           '実働する推論バックエンドが見つかりませんでした。'
         )
       )
@@ -542,12 +555,14 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       reasoning.reason ??
         t(
           'Run `pnpm reasoning:setup` to configure one.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           '`pnpm reasoning:setup` を実行して設定してください。'
         )
     );
     print(
       t(
         '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, OpenRouter, or a local backend.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・OpenRouter・ローカルバックエンドを設定できます。'
       )
     );
@@ -556,6 +571,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
         await ask(
           t(
             'Continue onboarding in stub-only mode? Real work will not be usable. (y/N): ',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             'スタブのみのモードでオンボーディングを続けますか?実作業は使用できません。(y/N): '
           ),
           'n'
@@ -565,6 +581,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
         print(
           t(
             'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboard` を再実行してください。'
           )
         );
@@ -586,6 +603,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
     print(
       t(
         'Select the reasoning backend to persist as KYBERION_REASONING_BACKEND:',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '永続化する推論バックエンド(KYBERION_REASONING_BACKEND)を選択してください:'
       )
     );
@@ -593,11 +611,13 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       print(`  ${line}`);
     }
     if (persisted) {
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       print(t(`Currently set: ${persisted}`, `現在の設定: ${persisted}`));
     }
     const answer = await ask(
       t(
         `Backend [1-${choices.length}, name, or enter to skip]: `,
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         `バックエンド [1-${choices.length}・名前・Enter でスキップ]: `
       ),
       ''
@@ -610,6 +630,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
           await ask(
             t(
               `Overwrite KYBERION_REASONING_BACKEND (${persisted} -> ${selection})? (y/N): `,
+              // i18n-exempt: bilingual prompt pair (JA side intentional)
               `KYBERION_REASONING_BACKEND を上書きしますか (${persisted} -> ${selection})? (y/N): `
             ),
             'n'
@@ -623,6 +644,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
         print(
           t(
             `Persisted KYBERION_REASONING_BACKEND=${selection} to ${envLocal}`,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             `KYBERION_REASONING_BACKEND=${selection} を ${envLocal} に永続化しました`
           )
         );
@@ -749,6 +771,7 @@ async function runServicesPhase(
         await ask(
           t(
             'Capture service connection candidates now? (y/N): ',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             'サービス接続候補を今すぐ登録しますか? (y/N): '
           ),
           'n'
@@ -863,6 +886,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
     'ecosystem_architect'
   );
   const wantsTenantSetup = isAffirmative(
+    // i18n-exempt: bilingual prompt pair (JA side intentional)
     await ask(t('Register a tenant now? (y/N): ', 'テナントを今すぐ登録しますか? (y/N): '), 'n')
   );
   const tenantDirPath = tenantDir();
@@ -883,6 +907,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
     let tenantSlug = '';
     while (!tenantSlug) {
       const slugInput = await ask(
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         t('Tenant slug [e.g. acme-co]: ', 'テナント slug [例: acme-co]: '),
         ''
       );
@@ -893,6 +918,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
       }
     }
     const displayName = await ask(
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       t('Tenant display name [required]: ', 'テナント表示名 [必須]: '),
       tenantSlug
     );
@@ -956,6 +982,7 @@ async function runTutorialPhase(state: OnboardingState, print: Print): Promise<v
       : await ask(
           t(
             'Describe the first tutorial mission in one sentence: ',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             '最初のチュートリアル・ミッションを一文で説明してください: '
           ),
           pt(flowPolicy.tutorial_default_summary)
@@ -1007,11 +1034,13 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
   print(`Summary written to: ${summaryPath()}`);
   print(`Runbook skill written to: ${runbookSkill.skillPath}`);
   print(`State written to: ${statePath()}`);
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
   print(t('\nNext steps:', '\n次のステップ:'));
   if (state.reasoning && !state.reasoning.available) {
     print(
       t(
         '0. Configure a real reasoning backend with `pnpm reasoning:setup` before real work.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '0. 実運用の前に `pnpm reasoning:setup` で実際の推論バックエンドを設定してください。'
       )
     );
@@ -1019,24 +1048,28 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
   print(
     t(
       `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `1. \`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
     )
   );
   print(
     t(
       `2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `2. \`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
     )
   );
   print(
     t(
       '3. If the tutorial should become real work, create a mission explicitly after review.',
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       '3. チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
     )
   );
   print(
     t(
       '4. Re-run `pnpm surfaces reconcile` after the workspace is ready.',
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       '4. ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
     )
   );
@@ -1092,6 +1125,7 @@ export async function runOnboarding(
       chalk.red(
         t(
           '\n❌ Refusing to run interactive onboarding without a TTY.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           '\n❌ TTY が無いため対話式オンボーディングの実行を拒否します。'
         )
       )
@@ -1099,12 +1133,14 @@ export async function runOnboarding(
     print(
       t(
         '  This wizard would otherwise silently apply default values for every prompt,',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '  このまま実行すると、すべての質問に既定値が黙って適用され、'
       )
     );
     print(
       t(
         "  producing an identity that does not reflect the Sovereign's intent.",
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '  Sovereign の意図を反映しないアイデンティティが作られてしまいます。'
       )
     );
@@ -1112,6 +1148,7 @@ export async function runOnboarding(
     print(
       t(
         '    1. Run from a real terminal: pnpm onboard',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '    1. 実ターミナルから実行する: pnpm onboard'
       )
     );
@@ -1132,20 +1169,24 @@ export async function runOnboarding(
   print(
     t(
       '\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n',
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       '\n🌟 Kyberion Sovereign Awakening へようこそ 🌟\n'
     )
   );
   print(
     t(
       'This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n',
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       'このフローでは、アイデンティティ、サービスの準備状態、テナントのスコープ、安全な最初のチュートリアルを設定します。\n'
     )
   );
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
   print(t('Estimated time: 5-10 minutes.', '所要時間の目安: 5〜10分。'));
   if (expressMode) {
     print(
       t(
         'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboard`.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         'Express モード: 安全な既定値で開始し、後から `pnpm onboard` でアイデンティティと接続を調整します。'
       )
     );
@@ -1153,6 +1194,7 @@ export async function runOnboarding(
   print(
     t(
       'You can stop with Ctrl-C at any point and resume later.\n',
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       'Ctrl-C でいつでも中断でき、後から再開できます。\n'
     )
   );
@@ -1293,6 +1335,7 @@ export async function runOnboarding(
     const resume = await ask(
       t(
         `Resume onboarding from phase "${state.current_phase}"? (Y/n): `,
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n): `
       ),
       'y'
@@ -1306,6 +1349,7 @@ export async function runOnboarding(
   for (const phase of PHASES) {
     if (state.completed_phases.includes(phase) && phase !== 'summary') {
       if (onboardingArtifactsMissing(state, phase)) {
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         print(`completed 扱いだが成果物がありません。再実行します: ${phase}`);
       } else {
         continue;
@@ -1326,6 +1370,7 @@ export async function runOnboarding(
     }
   }
 
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
   print(t('\nWelcome aboard.', '\nようこそ。'));
   print(`Workspace root: ${rootDir}`);
   rl.close();

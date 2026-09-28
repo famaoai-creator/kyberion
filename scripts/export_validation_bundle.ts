@@ -55,7 +55,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/audit-chain';
+import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/governance/audit-chain';
 
 interface BundleManifest {
   mission_id: string;

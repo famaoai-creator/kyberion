@@ -19,7 +19,7 @@
  *   4. re-validate the result, write pipelines/<slug>.json, and append a
  *      catalog row to pipelines/README.md ("Promoted" section)
  */
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -41,8 +41,8 @@ import {
   validatePipelineAdf,
   type PipelineAdf,
   type PipelineAdfStep,
-} from '@agent/core/pipeline-contract';
-import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
+} from '@agent/core/pipeline/pipeline-contract';
+import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails';
 import { withExecutionContext } from '@agent/core/governance';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -134,6 +134,10 @@ function setParamPath(params: Record<string, unknown>, paramPath: string, value:
   }
   const leaf = segments[segments.length - 1];
   const leafKey: string | number = /^\d+$/.test(leaf) ? Number(leaf) : leaf;
+  // Prototype-pollution guard: never write into prototype-chain keys.
+  if (leafKey === '__proto__' || leafKey === 'constructor' || leafKey === 'prototype') {
+    return false;
+  }
   if (cursor == null || typeof cursor !== 'object' || !(leafKey in cursor)) return false;
   cursor[leafKey] = value;
   return true;

@@ -6,7 +6,7 @@ import {
   resolveMemberByPrincipal,
   type MemberMembership,
   type MemberProfile,
-} from '@agent/core/member-registry';
+} from '@agent/core/organization/member-registry';
 import type { ConciergeViewerContext } from './viewer-context';
 
 export type ConciergeDecidedByRole = 'owner' | 'approver' | 'viewer';

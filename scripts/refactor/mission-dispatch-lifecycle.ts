@@ -1,6 +1,6 @@
 /**
- * Thin re-export shim: the implementation moved to `libs/core/mission-dispatch-lifecycle.ts`
+ * Thin re-export shim: the implementation moved to `libs/core/mission/mission-dispatch-lifecycle.ts`
  * (SO-01, @agent/core/mission-dispatch-lifecycle). This file exists only to keep existing
  * scripts/-relative importers working unchanged. Do not add logic here.
  */
-export * from '@agent/core/mission-dispatch-lifecycle';
+export * from '@agent/core/mission/mission-dispatch-lifecycle';

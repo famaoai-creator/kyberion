@@ -4,7 +4,7 @@ import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-executio
 import {
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
-} from '@agent/core/intent-resolution';
+} from '@agent/core/intent/intent-resolution';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.

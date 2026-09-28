@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { evaluateDeliverableQuality } from './deliverable-quality.js';
-import { evaluateDeliverableQualityGate } from './mission-review-gates.js';
+import { evaluateDeliverableQualityGate } from './mission/mission-review-gates.js';
 
 describe('deliverable-quality', () => {
   it('scores a structured document as ok', () => {

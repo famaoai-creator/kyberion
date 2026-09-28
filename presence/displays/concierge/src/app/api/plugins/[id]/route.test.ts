@@ -23,11 +23,11 @@ vi.mock('../../../../lib/front-desk-member', () => ({
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
 }));
-vi.mock('@agent/core/plugin-managed-install', () => ({
+vi.mock('@agent/core/plugin/plugin-managed-install', () => ({
   listManagedPlugins: mocks.listManagedPlugins,
   refreshManagedPluginActivation: mocks.refreshManagedPluginActivation,
 }));
-vi.mock('@agent/core/approval-store', () => ({
+vi.mock('@agent/core/governance/approval-store', () => ({
   decideApprovalRequest: mocks.decideApprovalRequest,
   loadApprovalRequest: mocks.loadApprovalRequest,
 }));

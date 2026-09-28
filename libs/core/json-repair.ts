@@ -152,7 +152,7 @@ function quoteUnquotedKeys(input: string): string {
 
 function replaceSingleQuotedStrings(input: string): string {
   return input.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, body: string) => {
-    return `"${body.replace(/"/g, '\\"')}"`;
+    return `"${body.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   });
 }
 

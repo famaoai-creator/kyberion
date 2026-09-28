@@ -2,29 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 
 const TARGETS = [
-  'libs/core/operator-learning.ts',
+  'libs/core/surface/operator-learning.ts',
   'libs/core/report-contract.ts',
-  'libs/core/desktop-pipeline.ts',
-  'libs/core/desktop-recording.ts',
-  'libs/core/mission-classification.ts',
-  'libs/core/task-session.ts',
+  'libs/core/virtual/desktop-pipeline.ts',
+  'libs/core/virtual/desktop-recording.ts',
+  'libs/core/mission/mission-classification.ts',
+  'libs/core/task/task-session.ts',
   'libs/core/source-analysis.ts',
-  'libs/core/onboarding-context.ts',
+  'libs/core/organization/onboarding-context.ts',
   'scripts/onboarding_apply.ts',
   'scripts/onboarding_wizard.ts',
-  'libs/core/browser-extension-bridge.ts',
-  'libs/core/browser-conversation-session.ts',
-  'libs/core/pipeline-contract.ts',
-  'libs/core/organization-operating-model-persistence.ts',
+  'libs/core/browser/browser-extension-bridge.ts',
+  'libs/core/browser/browser-conversation-session.ts',
+  'libs/core/pipeline/pipeline-contract.ts',
+  'libs/core/organization/organization-operating-model-persistence.ts',
 ] as const;
 
 const CLEANUP_TARGETS = [
-  'libs/core/organization-operating-model-management.ts',
-  'libs/core/organization-operating-model-operations.ts',
+  'libs/core/organization/organization-operating-model-management.ts',
+  'libs/core/organization/organization-operating-model-operations.ts',
 ] as const;
 
 const SHARED_AJV_TARGETS = [
-  'libs/core/actuator-sdk.ts',
+  'libs/core/actuator/actuator-sdk.ts',
   'scripts/check_pipeline_op_schema_coverage.ts',
 ] as const;
 

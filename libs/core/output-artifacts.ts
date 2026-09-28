@@ -1,6 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import { writeScopedArtifact } from './artifact-store.js';
+import { writeScopedArtifact } from './workforce/artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
 
@@ -28,7 +28,8 @@ function slug(value: string, fallback: string): string {
     String(value || '')
       .trim()
       .replace(/[^a-zA-Z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || fallback
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || fallback
   );
 }
 

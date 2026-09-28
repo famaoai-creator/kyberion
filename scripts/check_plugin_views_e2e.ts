@@ -40,12 +40,12 @@ import { createServer } from 'node:net';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { approvalRequestLogicalPath } from '@agent/core/approval-store';
+import { approvalRequestLogicalPath } from '@agent/core/governance/approval-store';
 import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { getRegisteredEnvText, readJson, readJsonLines } from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
-import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
+import { pluginViewFrameResponseHeaders } from '@agent/core/plugin/plugin-view-frame';
 import {
   buildSafeExecEnv,
   safeCopyFileSync,
@@ -57,8 +57,8 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { writeTenantProfile } from '@agent/core/tenant-registry';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const PLUGIN_ID = 'plugin-view-e2e-fixture';

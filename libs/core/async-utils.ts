@@ -1,4 +1,4 @@
-import { withRetry } from './src/retry-utils.js';
+import { withRetry } from './pipeline/retry-utils.js';
 
 interface RetryOptions {
   maxRetries?: number;

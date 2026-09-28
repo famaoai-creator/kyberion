@@ -23,7 +23,7 @@
  * any node:fs-touching import so it can be pulled into a client bundle.
  */
 import type { ChronosAccessRole } from './chronos-access-registry.js';
-import type { SurfacePermission } from './surface-authorization.js';
+import type { SurfacePermission } from './surface/surface-authorization.js';
 
 export type FrontDeskHumanRole = 'owner' | 'approver' | 'operator' | 'viewer';
 

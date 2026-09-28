@@ -2,8 +2,8 @@ import * as path from 'node:path';
 import {
   loadIntentContractMemorySnapshot,
   selectContractCandidates,
-} from '@agent/core/intent-contract-learning';
-import { listTaskSessions, type TaskSession } from '@agent/core/task-session';
+} from '@agent/core/intent/intent-contract-learning';
+import { listTaskSessions, type TaskSession } from '@agent/core/task/task-session';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { renderStatus } from '@agent/core/ux-vocabulary';
@@ -14,9 +14,9 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { traceLogDir } from '@agent/core/trace';
-import { validateTraceReplay } from '@agent/core/trace-schema';
-import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
-import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
+import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
+import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
+import { loadMissionOrchestrationJournal } from '@agent/core/mission/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { isRecord, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';

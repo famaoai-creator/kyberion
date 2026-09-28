@@ -1,15 +1,15 @@
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeLstat, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { loadPipelineAdfAtPath } from './pipeline-contract.js';
-import { validatePipelineGuardrails } from './adf-guardrails.js';
+import { loadPipelineAdfAtPath } from './pipeline/pipeline-contract.js';
+import { validatePipelineGuardrails } from './pipeline/adf-guardrails.js';
 import {
   registerScheduledPipeline,
   type PipelineSchedulerOptions,
   type ScheduledPipeline,
-} from './src/pipeline-scheduler.js';
+} from './pipeline/pipeline-scheduler.js';
 import { validateChronosDeliveryTarget } from './chronos-delivery.js';
-import type { PipelineAdf, PipelineSchedule } from './pipeline-contract.js';
+import type { PipelineAdf, PipelineSchedule } from './pipeline/pipeline-contract.js';
 import type {
   BlueprintBindingRequirement,
   CloudflareOsControlPlane,

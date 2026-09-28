@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
-import { loadAuthorityRoleIndex, loadTeamRoleIndex } from './mission-team-index.js';
+import { loadAuthorityRoleIndex, loadTeamRoleIndex } from './mission/mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import type { TeamRoleRecord } from './team-role-assignment-selection.js';
+import type { TeamRoleRecord } from './organization/team-role-assignment-selection.js';
 
 export interface OrganizationOrgChartDomain {
   domain_id: string;

@@ -1,4 +1,4 @@
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 
 export interface HearingScenarioRequirement {

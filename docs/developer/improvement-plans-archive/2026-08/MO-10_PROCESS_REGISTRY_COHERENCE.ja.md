@@ -65,7 +65,7 @@ resolveIntentResolutionPacket → resolveMissionClassification
 - `knowledge/product/governance/mission-process-registry.json` を新設: 各アーティファクトの `path` / `layer` / `consumed_by`(runtime loader or test)/ `validated_by` を列挙。schema + `check_governance_rules.ts` 登録。
 - 両 scenario pack JSON に `"purpose"` フィールドを追加(`"regression-fixture"`)し、それぞれの schema を minor bump。
 - `docs/GLOSSARY.md` に「プロセスレジストリ(3層)」の項を追加。`knowledge/product/architecture/` に 3 層モデルの解説 doc を追加(mission dispatch の context pack に載る形で)。
-- 検証: `pnpm vitest run libs/core/governance-contracts.test.ts` + `node dist/scripts/check_governance_rules.js`。
+- 検証: `pnpm vitest run libs/core/governance/governance-contracts.test.ts` + `node dist/scripts/check_governance_rules.js`。
 
 ### Phase 2 — バインディング checker(`check_mission_process_bindings.ts` 新設)
 
@@ -78,7 +78,7 @@ resolveIntentResolutionPacket → resolveMissionClassification
 
 ### Phase 3 — orchestration scenario pack の golden 昇格
 
-- `libs/core/mission-orchestration-scenario-pack.test.ts` を新設。golden: `prompt` → intent 解決 → 分類 → workflow 解決を実行し、`mission_class` / `delivery_shape` / `workflow_pattern` を assert。`expected_signals`(`contract_valid` 等)は gate 語彙へのマッピング表を介して、解決された required gates に包含されることを assert。controlled-failure: `error-classifier-rules.json` による分類結果を assert。
+- `libs/core/mission/mission-orchestration-scenario-pack.test.ts` を新設。golden: `prompt` → intent 解決 → 分類 → workflow 解決を実行し、`mission_class` / `delivery_shape` / `workflow_pattern` を assert。`expected_signals`(`contract_valid` 等)は gate 語彙へのマッピング表を介して、解決された required gates に包含されることを assert。controlled-failure: `error-classifier-rules.json` による分類結果を assert。
 - **乖離時の手順**: 期待値と現実装が食い違ったら「シナリオが正か、実装が正か」を 1 件ずつ判定し、片方だけを修正(working philosophy: 一変更一検証)。判定根拠はテスト PR に記録。
 - これにより pack は「schema lint 対象」から classification scenarios と同格の **V層 golden ハーネス**になる。
 
@@ -111,8 +111,8 @@ pnpm build
 node dist/scripts/check_governance_rules.js
 node dist/scripts/check_workflow_catalog_refs.js
 node dist/scripts/check_mission_process_bindings.js   # Phase 2 で新設
-pnpm vitest run libs/core/mission-task-classification-scenarios.test.ts
-pnpm vitest run libs/core/mission-orchestration-scenario-pack.test.ts  # Phase 3 で新設
+pnpm vitest run libs/core/mission/mission-task-classification-scenarios.test.ts
+pnpm vitest run libs/core/mission/mission-orchestration-scenario-pack.test.ts  # Phase 3 で新設
 pnpm vitest run tests/scenario-coverage-contract.test.ts
 ```
 

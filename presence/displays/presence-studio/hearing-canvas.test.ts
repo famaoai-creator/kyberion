@@ -8,7 +8,7 @@ import {
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-} from '@agent/core/reasoning-backend';
+} from '@agent/core/reasoning/reasoning-backend';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import {
   buildHearingCanvasBrief,

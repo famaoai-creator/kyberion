@@ -12,8 +12,8 @@ import {
   applySecretIntroduction,
   describeIntroductionReadiness,
   proposeSecretIntroduction,
-} from '@agent/core/secret-introduction';
-import { resolveSecretIdentity } from '@agent/core/secret-identity';
+} from '@agent/core/secret/secret-introduction';
+import { resolveSecretIdentity } from '@agent/core/secret/secret-identity';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

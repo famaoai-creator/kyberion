@@ -1,10 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  createGovernedRetryOptionsBuilder,
-  loadRecoveryPolicy as loadRecoveryPolicyFromManifest,
-} from '@agent/core/recovery-policy';
+import { loadRecoveryPolicy as loadRecoveryPolicyFromManifest } from '@agent/core/recovery-policy';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { waitForJob } from '@agent/core/job-lifecycle';
-import { VideoRenderRuntime } from '@agent/core/video-render-runtime';
+import { VideoRenderRuntime } from '@agent/core/video/video-render-runtime';
 import { compileSchema } from '@agent/core/foundation';
 
 export const videoCompositionActionValidate = compileSchema(
@@ -56,15 +54,15 @@ export function loadRecoveryPolicy(): Record<string, any> {
   return loadRecoveryPolicyFromManifest(VIDEO_MANIFEST_PATH);
 }
 
-export const buildVideoRetryOptions = createGovernedRetryOptionsBuilder({
+export const { buildRetryOptions: buildVideoRetryOptions } = defineActuatorPipelineBase({
   manifestPath: VIDEO_MANIFEST_PATH,
-  defaults: DEFAULT_VIDEO_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+  retryDefaults: DEFAULT_VIDEO_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 export function deepResolve(val: any, ctx: any): any {
   if (typeof val === 'string') {
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
+    return val.replace(/{{([^{}]*)}}/g, (_, p) => {
       const key = String(p).split('|')[0].trim();
       const parts = key.split('.');
       let current = ctx;

@@ -23,7 +23,7 @@ status: archived
 
 ## 方針
 
-1. 画像生成は `libs/core/image-generation-bridge.ts` の provider routing に寄せる。
+1. 画像生成は `libs/core/media/image-generation-bridge.ts` の provider routing に寄せる。
 2. `codex` / `agy` / `host_agent` は同じ bridge 契約の別可用性として扱う。
 3. avatar onboarding は `pipelines/fragments/avatar-onboarding.json` に切り出して、呼び出し側は入力だけ渡す。
 4. 具体ファイル名や profile 値は pipeline context で差し替え可能にする。
@@ -38,7 +38,7 @@ status: archived
 
 ## 実装対象
 
-- `libs/core/image-generation-bridge.ts`
+- `libs/core/media/image-generation-bridge.ts`
 - `scripts/generate_avatar.ts`
 - `scripts/register_avatar.ts`
 - `pipelines/fragments/avatar-onboarding.json`

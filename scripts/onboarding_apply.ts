@@ -5,8 +5,8 @@ import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
-} from '@agent/core/onboarding-flow-policy';
-import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
+} from '@agent/core/organization/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/organization/onboarding-summary-policy';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -16,13 +16,13 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { withLock } from '@agent/core/lock-utils';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
   loadOnboardingApplyInputAtPath,
   validateOnboardingApplyInput,
   type OnboardingApplyInput,
-} from '@agent/core/onboarding-apply-input';
+} from '@agent/core/organization/onboarding-apply-input';
 import {
   compileSchema,
   isRecord,

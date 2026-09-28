@@ -12,8 +12,8 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { logger } from './core.js';
-import { notifyOperator } from './operator-notifications.js';
-import { writeIntentGoalHandoff } from './intent-handoff.js';
+import { notifyOperator } from './surface/operator-notifications.js';
+import { writeIntentGoalHandoff } from './intent/intent-handoff.js';
 import { readDealRequirementsCapture } from './customer-conversation-modes.js';
 import { saveRequirementsDraft } from './requirements-draft-store.js';
 import { isValidTenantSlug } from './entity-scope.js';

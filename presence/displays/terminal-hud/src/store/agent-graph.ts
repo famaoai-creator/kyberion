@@ -1,19 +1,22 @@
-import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { buildAgentCollaborationProjection } from '@agent/core/agent/agent-collaboration-projection';
 import {
   buildAgentActivityBoard,
   UNASSIGNED_AGENT_ID,
   type AgentActivityBoard,
   type AgentActivityBlocker,
-} from '@agent/core/agent-activity-board';
+} from '@agent/core/agent/agent-activity-board';
 import {
   composeCollaborationTree,
   flattenCollaborationTree,
   type CollaborationTree,
   type CollaborationTreeNode,
   type CollaborationWaitReason,
-} from '@agent/core/agent-collaboration-tree';
-import type { AgentCollaborationEvent } from '@agent/core/agent-collaboration-events';
-import { collectPeerTranscriptTails, type PeerTranscriptTail } from '@agent/core/peer-conversation';
+} from '@agent/core/agent/agent-collaboration-tree';
+import type { AgentCollaborationEvent } from '@agent/core/agent/agent-collaboration-events';
+import {
+  collectPeerTranscriptTails,
+  type PeerTranscriptTail,
+} from '@agent/core/mesh/peer-conversation';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor, theme } from '../theme.js';

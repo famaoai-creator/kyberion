@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
-import { authorSceneCompositions } from '@agent/core/video-scene-composition';
-import { generateVideoMotionDirection } from '@agent/core/video-motion-direction';
-import { generateVideoVisualDirection } from '@agent/core/video-visual-direction';
+import { authorSceneCompositions } from '@agent/core/video/video-scene-composition';
+import { generateVideoMotionDirection } from '@agent/core/video/video-motion-direction';
+import { generateVideoVisualDirection } from '@agent/core/video/video-visual-direction';
 import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -14,29 +14,32 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
-import { compileNarratedVideoBriefToCompositionADF } from '@agent/core/narrated-video-brief-compiler';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
+import { compileNarratedVideoBriefToCompositionADF } from '@agent/core/video/narrated-video-brief-compiler';
 import {
   compileVideoCompositionADF,
   writeVideoCompositionBundle,
-} from '@agent/core/video-composition-compiler';
+} from '@agent/core/video/video-composition-compiler';
 import {
   compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief,
-} from '@agent/core/video-content-brief-contract';
-import { formatVideoLintReport, lintVideoComposition } from '@agent/core/video-composition-lint';
-import { getVideoCompositionTemplateRegistry } from '@agent/core/video-composition-template-registry';
-import { getVideoRenderRuntimePolicy } from '@agent/core/video-render-runtime-policy';
+} from '@agent/core/video/video-content-brief-contract';
+import {
+  formatVideoLintReport,
+  lintVideoComposition,
+} from '@agent/core/video/video-composition-lint';
+import { getVideoCompositionTemplateRegistry } from '@agent/core/video/video-composition-template-registry';
+import { getVideoRenderRuntimePolicy } from '@agent/core/video/video-render-runtime-policy';
 import {
   renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync,
-} from '@agent/core/video-render-backend';
+} from '@agent/core/video/video-render-backend';
 import { spawnManagedProcess } from '@agent/core/managed-process';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflightSync } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflightSync } from '@agent/core/pipeline/op-preflight';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { VideoCompositionADF } from '@agent/core/video-composition-contract';
+import type { VideoCompositionADF } from '@agent/core/video/video-composition-contract';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';

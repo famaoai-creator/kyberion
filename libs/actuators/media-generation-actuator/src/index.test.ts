@@ -57,13 +57,13 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/service-engine', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/service-engine')>()),
+vi.mock('@agent/core/service/service-engine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/service/service-engine')>()),
   executeServicePreset: mocks.executeServicePreset,
 }));
 
-vi.mock('@agent/core/music-workflow-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/music-workflow-compiler')>()),
+vi.mock('@agent/core/media/music-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/music-workflow-compiler')>()),
   compileMusicGenerationADF: mocks.compileMusicGenerationADF,
 }));
 
@@ -73,19 +73,19 @@ vi.mock('@agent/core/visual-workflow-compiler', async (importOriginal) => ({
   compileVideoGenerationADF: mocks.compileVideoGenerationADF,
 }));
 
-vi.mock('@agent/core/image-generation-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/image-generation-bridge')>()),
+vi.mock('@agent/core/media/image-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/image-generation-bridge')>()),
   generateImage: mocks.generateImage,
 }));
 
-vi.mock('@agent/core/music-generation-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/music-generation-bridge')>()),
+vi.mock('@agent/core/media/music-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/music-generation-bridge')>()),
   generateMusic: mocks.generateMusic,
 }));
 
 const selectionRecord = vi.hoisted(() => vi.fn());
-vi.mock('@agent/core/audit-chain', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/audit-chain')>();
+vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/governance/audit-chain')>();
   // Keep the real chain for everything else; capture provider-selection records.
   const auditChain = Object.create(actual.auditChain) as typeof actual.auditChain;
   auditChain.record = ((entry: Parameters<typeof actual.auditChain.record>[0]) => {
@@ -100,8 +100,8 @@ vi.mock('@agent/core/network', async (importOriginal) => ({
   secureFetch: mocks.secureFetch,
 }));
 
-vi.mock('@agent/core/media-backend-registry', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/media-backend-registry')>()),
+vi.mock('@agent/core/media/media-backend-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/media-backend-registry')>()),
   resolveMediaBackendForPlatform: (modality: 'image' | 'video' | 'music', backendId?: string) => {
     const resolvedId = backendId || `media-generation.comfyui.${modality}`;
     if (
@@ -670,7 +670,7 @@ describe('media-generation-actuator', () => {
     vi.stubEnv('KYBERION_OPENAI_VIDEO_API_KEY', 'test-key');
     vi.stubEnv('MISSION_ID', '');
     const { resetMediaBackendAvailabilityCache } =
-      await import('@agent/core/media-backend-registry');
+      await import('@agent/core/media/media-backend-registry');
     resetMediaBackendAvailabilityCache();
     // The governed selection policy is read from disk.
     const actualIo =

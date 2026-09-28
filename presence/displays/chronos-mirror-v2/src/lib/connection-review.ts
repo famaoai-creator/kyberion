@@ -10,7 +10,7 @@ import { nowIso } from '@agent/core/foundation';
 import {
   listServiceBindingRecords,
   type ServiceBindingRecord,
-} from '@agent/core/service-binding-registry';
+} from '@agent/core/service/service-binding-registry';
 
 const REVIEW_DIR = 'active/shared/coordination/connection-reviews';
 const REVIEW_LOG = `${REVIEW_DIR}/reviews.jsonl`;

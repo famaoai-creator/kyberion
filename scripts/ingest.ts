@@ -34,7 +34,7 @@ import {
 import { proposeTierPlacement } from '@agent/core/ingest-tier-gate';
 import { scanContent } from '@agent/core/pii-scrubber';
 import { pathResolver } from '@agent/core/path-resolver';
-import { tenantProfilePath } from '@agent/core/tenant-registry';
+import { tenantProfilePath } from '@agent/core/organization/tenant-registry';
 import { validateReadPermission } from '@agent/core/tier-guard';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';

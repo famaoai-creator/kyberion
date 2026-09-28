@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { executeServicePreset } from '@agent/core/service-engine';
-import { assertServiceCaptureOperation } from '@agent/core/service-harness';
+import { executeServicePreset } from '@agent/core/service/service-engine';
+import { assertServiceCaptureOperation } from '@agent/core/service/service-harness';
 import { formatWireError } from '@agent/core/wire-error';
 
 type GovernedToolRegistrar<C> = (

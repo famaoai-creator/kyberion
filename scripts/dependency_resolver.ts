@@ -26,14 +26,14 @@ import {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
   type ActuatorDependencyBundleEntry,
-} from '@agent/core/actuator-dependency-bundles';
+} from '@agent/core/actuator/actuator-dependency-bundles';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
 import { isLinux, isMacOS, isWindows } from '@agent/core/platform';
-import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -74,6 +74,14 @@ export interface ResolutionResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const SAFE_BINARY_PATTERN = /^[\w.+-]+$/u;
+
+function assertSafeProbeBinary(binary: string): void {
+  if (!SAFE_BINARY_PATTERN.test(binary)) {
+    throw new Error(`[DEPENDENCY_RESOLVER] unsafe probe binary name: ${binary}`);
+  }
+}
+
 function tryExec(cmd: string): { ok: boolean; stdout: string } {
   try {
     const stdout = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -84,6 +92,7 @@ function tryExec(cmd: string): { ok: boolean; stdout: string } {
 }
 
 function checkBinary(binary: string): { ok: boolean; version?: string } {
+  assertSafeProbeBinary(binary);
   const result = tryExec(`${binary} --version`);
   if (result.ok) return { ok: true, version: result.stdout.split('\n')[0] };
   const which = tryExec(`which ${binary}`);

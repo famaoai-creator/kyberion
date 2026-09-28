@@ -265,7 +265,7 @@ Supporting runtime components:
 
 - ingress gateway: `satellites/slack-bridge`
 - delivery actuator: `libs/actuators/presence-actuator`
-- service binding: `libs/core/service-binding.ts`
+- service binding: `libs/core/service/service-binding.ts`
 
 ### 6.2 Chronos Mirror v2
 

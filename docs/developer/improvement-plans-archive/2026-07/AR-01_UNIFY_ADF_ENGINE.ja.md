@@ -9,7 +9,7 @@ status: archived
 
 > 優先度: **P0**(AR 系の土台) / 規模: L(段階分割必須) / 依存: なし / 関連: IP-05(CLI runner)、MO-03/HN-03(並列 op)、IP-12(実行モード)
 > **検証(2026-07-03, Fable)**: 3エンジンの実在を確認 — `scripts/run_pipeline.ts`(`runSteps`)、`libs/actuators/orchestrator-actuator/src/super-nerve/index.ts`(`handleCoreAction`)、`libs/actuators/*/…-pipeline-helpers.ts`(`executePipeline`)。
-> **進捗(2026-07-07)**: `libs/core/src/pipeline-engine.ts` に汎用 `executeAdfSteps` を追加し、`file-actuator` と `network-actuator` の pipeline ループをそこへ委譲し始めた。共通 runner のパイロットとして nested control と context 解決の回帰テストを追加済み。
+> **進捗(2026-07-07)**: `libs/core/pipeline/pipeline-engine.ts` に汎用 `executeAdfSteps` を追加し、`file-actuator` と `network-actuator` の pipeline ループをそこへ委譲し始めた。共通 runner のパイロットとして nested control と context 解決の回帰テストを追加済み。
 
 ## 背景と課題
 
@@ -38,7 +38,7 @@ status: archived
 
 ### Task 1: 正準エンジンの抽出と契約定義 — `claude-opus`(設計)
 
-1. `runSteps`(`run_pipeline.ts:321`)を `libs/core/adf-engine.ts` として抽出し、`executeAdfSteps(steps, { opHandlers, resolveVars, evaluateCondition, bounds })` の形にする。制御 op・vars・condition は canonical `logic-utils` を単一ソースに。
+1. `runSteps`(`run_pipeline.ts:321`)を `libs/core/pipeline/adf-engine.ts` として抽出し、`executeAdfSteps(steps, { opHandlers, resolveVars, evaluateCondition, bounds })` の形にする。制御 op・vars・condition は canonical `logic-utils` を単一ソースに。
 2. super-nerve と per-actuator の現状挙動差(制御 op・subprocess・repair)を洗い、**互換のための移行表**を本文書末尾に作る。while/parallel を正準に含めるか(HN-03 と協調)を決定。
 3. 段階移行計画(どのランナーから薄アダプタ化するか、golden での回帰確認点)を定義。
 
@@ -58,7 +58,7 @@ status: archived
 
 ## 実装状況 (2026-07-06)
 
-- **進行中(Task 2/3 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
+- **進行中(Task 2/3 の土台)**: `libs/core/pipeline/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
 - **横展開1件目(2026-07-11)**: `network-actuator` の私製ループを `executeAdfSteps` へ移行(file-actuator パターン踏襲)。意味論統一に伴う意図的変更1点: 旧ループはネスト制御(`if`/`while` 配下)の失敗を握りつぶして `res.context` を採用していたが、正準化で fail-propagate に統一(AR-06 の no-silent-failure 準拠)。actuators 全46ファイル/553テスト緑。**横展開2件目(同日)**: `code-actuator` も移行。traceCtx の per-step span はアダプタ側の handler ラップで維持(エンジン非改変、`code:<type>:<op>` の命名互換)。実装時の学び: capture/transform/apply handler は 4引数 `(op, params, ctx, resolve)` で runSteps を取らない(5引数で書くと resolve が undefined になり静かに壊れる — テストが検出)。**残りの私製ループ**: modeling / system / wisdom / browser の4アクチュエータ。
 - **横展開完了(2026-07-12)**: 残り4件(modeling / system / wisdom / browser)+ 棚卸しから漏れていた5件目の **media** を移行し、**アクチュエータ側の私製 step ループは全廃**。移行に必要だったエンジン拡張2点:
   - **`on_error` 回復のエンジン内蔵**: browser / media が個別に持っていた `handleStepError`(skip / abort / fallback)呼び出しを `executeAdfSteps` の catch パスへ移設。fallback サブパイプラインも同エンジンで実行されるため、失敗は伝播し(AR-06)、step budget にも計上される。`PipelineStepResult` に `'recovered'` ステータスを追加(`derivePipelineStatus` は failed のみ見るため互換)。
@@ -81,7 +81,7 @@ status: archived
     1. 全6制御 op がネスト/item失敗時に**例外伝播に統一**。旧コードは accumulate/parallel_foreach のみ throw、if/while/foreach は握りつぶして自身は `success` 表示(失敗エントリは flatten 済み results に埋もれるのみ)という不整合があった。新コードは失敗を正しく親ステップの `failed` として報告する(`derivePipelineStatus` の最終判定自体は元々どちらでも同じ — 唯一の変更点は制御ステップ自身のエントリの status)。
     2. `core:include` は「ネスト失敗時のみ repair をスキップする」特殊な `early_return` を廃し、他の制御 op と同じ通常の例外伝播にした(現在は on_error 無し限定で repair 経路に乗る、あるいは on_error 付きならエンジン native 経路)。
     3. run_pipeline 独自のログ行(`[step X/N] …`)の `N` は元々ネストレベルごとの配列長だったが、新コードは最上位ステップ配列長に固定(エンジンの `stepNumber` はネスト込みのフラット連番のため、レベルごとの分母が取得不能)。コスメティックのみ・テスト非依存。
-  - **検証**: `scripts/run_pipeline.test.ts` 38本(既存36本 + core:include 正常系/循環検出の新設2本、全て正準エンジン経由の in-process 実行)+ `libs/core/adf-engine.test.ts` 12本(既存10本 + apply-skip の新設1本)全緑。`pnpm run build`(全ワークスペース)・`pnpm run build:actuators` 緑。`pnpm check -- --scope full --only golden`(2パイプライン)緑。file/network/code/modeling/system/wisdom/browser/media 全アクチュエータ 301本緑(共有エンジンの後方互換性を確認)。`node dist/scripts/run_pipeline.js --input pipelines/vital-check.json` と `--input pipelines/reconcile-config-fallbacks.json`(core:if 分岐含む)を実 CLI で実行し回帰なしを確認(ログにネスト flatten が正しく現れることも目視確認: `[step 5/6] system:log success` → `[step 5/6] core:if success`)。
+  - **検証**: `scripts/run_pipeline.test.ts` 38本(既存36本 + core:include 正常系/循環検出の新設2本、全て正準エンジン経由の in-process 実行)+ `libs/core/pipeline/adf-engine.test.ts` 12本(既存10本 + apply-skip の新設1本)全緑。`pnpm run build`(全ワークスペース)・`pnpm run build:actuators` 緑。`pnpm check -- --scope full --only golden`(2パイプライン)緑。file/network/code/modeling/system/wisdom/browser/media 全アクチュエータ 301本緑(共有エンジンの後方互換性を確認)。`node dist/scripts/run_pipeline.js --input pipelines/vital-check.json` と `--input pipelines/reconcile-config-fallbacks.json`(core:if 分岐含む)を実 CLI で実行し回帰なしを確認(ログにネスト flatten が正しく現れることも目視確認: `[step 5/6] system:log success` → `[step 5/6] core:if success`)。
   - **AR-01 は全受入条件充足で完了**。残る「run_pipeline のログ行の N がネストレベルでなく最上位固定になった」というコスメティック差分のみ、将来 hooks に level-local カウンタを持たせれば解消可能(優先度低・別増分)。
 
 ## リスクと注意

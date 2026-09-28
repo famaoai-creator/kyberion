@@ -5,7 +5,7 @@ vi.mock('./core.js', () => ({
 }));
 
 const recordGovernanceAction = vi.fn();
-vi.mock('./governance-action-recorder.js', () => ({
+vi.mock('./governance/governance-action-recorder.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
 }));
 
@@ -26,7 +26,7 @@ vi.mock('./secure-io.js', () => ({
   safeMkdir: vi.fn(),
 }));
 
-import { executeAdfSteps } from './adf-engine.js';
+import { executeAdfSteps } from './pipeline/adf-engine.js';
 import {
   LifecycleHookEngine,
   fireLifecycleHooks,
@@ -37,7 +37,7 @@ import { registerExternalLifecycleHooks } from './external-hook-bridge.js';
 import {
   getDefaultWorkerEventStream,
   resetDefaultWorkerEventStream,
-} from './worker-event-stream.js';
+} from './workforce/worker-event-stream.js';
 
 beforeEach(() => {
   recordGovernanceAction.mockClear();

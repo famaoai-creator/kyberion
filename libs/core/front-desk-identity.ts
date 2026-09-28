@@ -12,19 +12,22 @@
 
 import { getRegisteredEnvText } from './foundation/env.js';
 import { currentScope } from './scope-context.js';
-import { resolveOperatorDisplayName } from './operator-identity.js';
+import { resolveOperatorDisplayName } from './surface/operator-identity.js';
 import {
   listTenantProfileSlugs,
   readTenantProfile,
   type TenantProfile,
   type TenantRegistryPathOptions,
-} from './tenant-registry.js';
+} from './organization/tenant-registry.js';
 import {
   memberBindingDenied,
   resolveMemberByPrincipal,
   type MemberRegistryPathOptions,
-} from './member-registry.js';
-import { narrowSurfaceViewerTenant, type SurfaceViewerScope } from './surface-mutation-guard.js';
+} from './organization/member-registry.js';
+import {
+  narrowSurfaceViewerTenant,
+  type SurfaceViewerScope,
+} from './surface/surface-mutation-guard.js';
 
 /** Human-facing role union (plan §2.3). `approver` arrives with FD-07. */
 export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';

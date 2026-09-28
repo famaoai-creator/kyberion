@@ -179,7 +179,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('decrypts an encrypted-at-rest registry under the reader role (persona worker)', async () => {
     const { authority, registry } = await loadModules();
-    const encryption = await import('./secret-encryption.js');
+    const encryption = await import('./secret/secret-encryption.js');
     const registryPath = path.join(root, REGISTRY_RELATIVE);
     const plaintext = fs.readFileSync(registryPath, 'utf8');
     encryption.overrideSecretEncryptionKeyForTests(randomBytes(32));
@@ -228,7 +228,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
     try {
       const authority = await import('./authority.js');
       authority.resetRoleAssumptionPolicyCache();
-      const { resolveAuthnSurfaceViewerScope } = await import('./surface-authn.js');
+      const { resolveAuthnSurfaceViewerScope } = await import('./surface/surface-authn.js');
       // No `registrations` key: the registry-token provider reads the registry.
       const { scope, principal } = resolveAuthnSurfaceViewerScope({
         token: issued.token,

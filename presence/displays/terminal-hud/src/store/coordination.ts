@@ -1,20 +1,20 @@
-import { discoverProviders } from '@agent/core/provider-discovery';
-import { listDemotedProviders } from '@agent/core/provider-health-view';
-import { listAgentRuntimesViaDaemon } from '@agent/core/agent-runtime-supervisor-client';
+import { discoverProviders } from '@agent/core/provider/provider-discovery';
+import { listDemotedProviders } from '@agent/core/provider/provider-health-view';
+import { listAgentRuntimesViaDaemon } from '@agent/core/agent/agent-runtime-supervisor-client';
 import { listDaemonHeartbeatStatuses } from '@agent/core/daemon-heartbeat';
 import {
   listSurfaceOutboxMessages,
   listSurfaceDeadLetters,
-} from '@agent/core/surface-coordination-store';
+} from '@agent/core/surface/surface-coordination-store';
 import {
   buildAgentCollaborationProjection,
   type CollaborationAttentionCode,
   type CollaborationAttentionItem,
-} from '@agent/core/agent-collaboration-projection';
+} from '@agent/core/agent/agent-collaboration-projection';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { AgentRuntimeSupervisorSnapshot } from '@agent/core/agent-runtime-supervisor-client';
-import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import type { AgentRuntimeSupervisorSnapshot } from '@agent/core/agent/agent-runtime-supervisor-client';
+import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import type { VocabularyKey } from '@agent/core/t';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';

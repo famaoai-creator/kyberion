@@ -30,7 +30,7 @@ status: archived
 | Phase 0: Alignment(要求・設計)    | ✅ **op 完備**                     | `wisdom:extract_requirements` / `extract_design_spec`(`decision-ops.ts:147,223`)+ `schemas/requirements-draft.schema.json` / `design-spec.schema.json`                                                 |
 | タスク分解(WBS/DAG)               | ✅ op 完備                         | `decomposeIntoTasks`(3 reasoning backend 全対応、IP-07 でテスト済み)+ `schemas/task-plan.schema.json`                                                                                                  |
 | Phase 1: Execution(実装)          | ✅ 骨格あり                        | mission micro-repo + チーム dispatch + 並列 DAG(MO-03)+ 協調往復(E2E-03 計画)+ `code-actuator`(解析/refactor/semgrep)                                                                                  |
-| Phase 2: Verification(テスト計画) | ✅ op あり / **実行系が Web のみ** | `extractTestPlan` → `test-case-adf`(`libs/core/src/types/test-case-adf.ts`)→ **browser pipeline 変換のみ**(`modeling-pipeline-helpers.ts:398-412` `test_inventory_to_browser_pipeline`)                |
+| Phase 2: Verification(テスト計画) | ✅ op あり / **実行系が Web のみ** | `extractTestPlan` → `test-case-adf`(`libs/core/contracts/test-case-adf.ts`)→ **browser pipeline 変換のみ**(`modeling-pipeline-helpers.ts:398-412` `test_inventory_to_browser_pipeline`)                |
 | Phase 3: Review(品質保証)         | ✅ 計画済み                        | E2E-03(review 往復・best-of-N)+ MO-02(ゲート・circuit breaker、Codex 実装中)+ planning reviewer 実装済み                                                                                               |
 | Phase 4: Ops(デプロイ・保守)      | △ 契約のみ                         | `deployment-adapter.ts`(approval-gate 経由の deploy 契約 + config 駆動、AC-03)— **モバイル用アダプタ無し**                                                                                             |
 | デバイス操作(実機/シミュレータ)   | ✅ **強い**                        | ios: boot/shutdown/install_app/launch_app/deep_link/capture_screen(`ios-runtime-helpers.ts:273-383`)/ android: ADB + UI tree 抽出 + tap/swipe/input + login form(`android-runtime-helpers.ts:266-595`) |
@@ -106,7 +106,7 @@ status: archived
 
 ### Task 6: モバイル配布アダプタ — `claude-sonnet-4` 相当
 
-1. `libs/core/deployment-adapters/mobile-beta.ts` を新設(`deployment-adapter.ts` の契約実装)。実体は **fastlane への委譲のみ**: `fastlane ios beta` / `fastlane android beta`(Fastfile はアプリ repo 側の責務。無ければ actionable エラー)。prerequisites に `fastlane` を宣言。
+1. `libs/core/actuator/deployment-adapters/mobile-beta.ts` を新設(`deployment-adapter.ts` の契約実装)。実体は **fastlane への委譲のみ**: `fastlane ios beta` / `fastlane android beta`(Fastfile はアプリ repo 側の責務。無ければ actionable エラー)。prerequisites に `fastlane` を宣言。
 2. 既存の approval-gate 経由フロー(`deployment-adapter.ts:13` の Safety 規約)をそのまま通す。署名 secret(keystore パス/AppStore Connect API key)は vault から名前参照のみ(値をログ・trace に出さない — SA 系規約)。
 3. deployment-adapter-config(personal knowledge 駆動、AC-03 実装済み)に `adapter: 'mobile-beta'` を選べるよう登録。
 4. **検証**: unit test(fastlane 呼び出しをモック、approval 未承認で実行されない)/ 実配布はスコープ外(手動 runbook を doc に1節)。
@@ -142,7 +142,7 @@ Task 1〜7 実装済み(実機ツールチェーン実走の記録のみ未取�
 - **Task 3**: `knowledge/product/scaffolds/{ios-swiftui-minimal,android-compose-minimal}/`(プレースホルダ置換、XcodeGen project.yml 方式)。**逸脱**: gradle-wrapper の jar(バイナリ)はコミットせず — `./gradlew` 不在時は build-actuator が `gradle` にフォールバック(scaffold README に明記)。
 - **Task 4**: `pipelines/sdlc-cycle.json`(intent → extract_requirements → extract_design_spec → decompose_into_tasks → **task_plan_to_next_tasks**(新規 wisdom op、worker 契約へ決定論変換 — reviewer/tester の role 尊重、依存無し reviewer は implementer に降格)→ extract_test_plan)。`tests/sdlc-cycle-contract.test.ts`。
 - **Task 5**: modeling-actuator `test_inventory_to_device_pipeline` op(`compileTestInventoryToDevicePipeline`)。android: find/tap/input + wait_for_ui_text + 各 case スクリーンショット。ios: deep link + capture_screen のみ(**残余: iOS の UI 操作 op 拡充** — tap 系 op が薄いため)。
-- **Task 6**: `libs/core/deployment-adapters/mobile-beta.ts`(fastlane 委譲のみ、Fastfile はアプリ repo 責務、secret は名前参照のみ)。deployment-adapter-config schema に `adapter: 'mobile-beta'` を追加し AC-03 の config 駆動で選択可能。unit test 4件。
+- **Task 6**: `libs/core/actuator/deployment-adapters/mobile-beta.ts`(fastlane 委譲のみ、Fastfile はアプリ repo 責務、secret は名前参照のみ)。deployment-adapter-config schema に `adapter: 'mobile-beta'` を追加し AC-03 の config 駆動で選択可能。unit test 4件。
 - **Task 7**: `tests/app-lifecycle-e2e.test.ts`(モック契約分は常時実行、実走は `KYBERION_MOBILE_TOOLCHAIN=1` で opt-in)。OPERATOR_UX_GUIDE §11 に手順を追記。
 
 ### 残余

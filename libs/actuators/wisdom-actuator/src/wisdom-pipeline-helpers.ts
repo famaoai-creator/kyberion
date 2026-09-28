@@ -1,5 +1,5 @@
 import { isRecord, nowIso } from '@agent/core/foundation';
-import type { AdfRunResult, AdfStep } from '@agent/core/adf-engine';
+import type { AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -11,15 +11,18 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { classifyError } from '@agent/core/error-classifier';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import {
   rebuildPublicHistorySearchIndexFromLocalSources,
   searchHistory,
@@ -27,7 +30,7 @@ import {
 import {
   loadSkillResourceDescriptor,
   readSkillResourceForModel,
-} from '@agent/core/skill-resource-loader';
+} from '@agent/core/plugin/skill-resource-loader';
 import type { ScopeContext } from '@agent/core/scope-context';
 import type { TierLevel } from '@agent/core/types';
 import * as path from 'node:path';
@@ -55,9 +58,6 @@ import {
   readWisdomJsonAtPath,
 } from './wisdom-persisted-json.js';
 
-const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/wisdom-actuator/manifest.json'
-);
 const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
 const DEFAULT_WISDOM_RETRY = {
   maxRetries: 2,
@@ -101,10 +101,10 @@ function assertWisdomReconcileSteps(steps: PipelineStep[]): void {
   }
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: WISDOM_MANIFEST_PATH,
-  defaults: DEFAULT_WISDOM_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+const { buildRetryOptions } = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json'),
+  retryDefaults: DEFAULT_WISDOM_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 
 export async function runWithOperationRetry<T>(op: string, task: () => Promise<T>): Promise<T> {

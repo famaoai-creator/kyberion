@@ -1,9 +1,26 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import Ajv2020Module from 'ajv/dist/2020.js';
-import * as addFormatsModule from 'ajv-formats';
+import type { ValidateFunction } from 'ajv';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from './json.js';
+
+// ajv and ajv-formats are CommonJS and together ~90 modules. They load on the
+// first compile instead of at import, so an entry point that reads no governed
+// catalog before its first step never pays for them.
+const requireAjv = createRequire(import.meta.url);
+let ajvModules: { AjvModule: unknown; Ajv2020Module: unknown; addFormatsModule: unknown } | null =
+  null;
+
+function loadAjvModules() {
+  if (!ajvModules) {
+    ajvModules = {
+      AjvModule: requireAjv('ajv'),
+      Ajv2020Module: requireAjv('ajv/dist/2020.js'),
+      addFormatsModule: requireAjv('ajv-formats'),
+    };
+  }
+  return ajvModules;
+}
 
 function readSchema<T>(schemaPath: string): T {
   return readJson<T>(schemaPath);
@@ -40,11 +57,11 @@ function resolveAddFormats(moduleValue: unknown): AddFormats {
 // re-registering a format is an idempotent assignment, re-adding a keyword is
 // not.
 function withFormats(validator: AjvInstance): AjvInstance {
-  return resolveAddFormats(addFormatsModule)(validator, { keywords: false });
+  return resolveAddFormats(loadAjvModules().addFormatsModule)(validator, { keywords: false });
 }
 
 export function createAjv(options: Record<string, unknown> = {}): AjvInstance {
-  const AjvConstructor = resolveConstructor(AjvModule);
+  const AjvConstructor = resolveConstructor(loadAjvModules().AjvModule);
   return withFormats(
     new AjvConstructor({
       allErrors: true,
@@ -57,7 +74,7 @@ export function createAjv(options: Record<string, unknown> = {}): AjvInstance {
 }
 
 export function createAjv2020(options: Record<string, unknown> = {}): AjvInstance {
-  const Ajv2020Constructor = resolveConstructor(Ajv2020Module);
+  const Ajv2020Constructor = resolveConstructor(loadAjvModules().Ajv2020Module);
   return withFormats(
     new Ajv2020Constructor({
       allErrors: true,
@@ -110,9 +127,18 @@ function registerSchema(
   return schema;
 }
 
+// One shared validator instance for callers that do not pass their own. Schema
+// registration is keyed by file:// URI, so compiling N catalogs from the same
+// schema costs one compile total instead of N Ajv instances each recompiling.
+let sharedDefaultValidator: AjvLike | null = null;
+function defaultValidator(): AjvLike {
+  if (!sharedDefaultValidator) sharedDefaultValidator = createAjv();
+  return sharedDefaultValidator;
+}
+
 export function compileSchema<T = unknown>(
   schemaPath: string,
-  validator: AjvLike = createAjv()
+  validator: AjvLike = defaultValidator()
 ): ValidateFunction<T> {
   const normalized = path.resolve(schemaPath);
   const schemaId = pathToFileURL(normalized).href;

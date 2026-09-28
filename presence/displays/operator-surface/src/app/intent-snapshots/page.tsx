@@ -8,13 +8,13 @@ import {
   Section,
   StatusPill,
 } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
   resolveIntentResolutionContract,
   type IntentResolutionContract,
-} from '@agent/core/intent-resolution-contract';
+} from '@agent/core/intent/intent-resolution-contract';
 import { emitMosRead } from '@/lib/audit-mos';
 import { getTenantScope, listIntentSnapshotRows } from '@/lib/data';
 import { operatorTranslator, type OperatorLocale, type OperatorTranslate } from '@/lib/i18n';

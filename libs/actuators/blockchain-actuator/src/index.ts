@@ -1,10 +1,10 @@
 import { logger } from '@agent/core/core';
 import { safeMkdir, safeExistsSync } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { retry } from '@agent/core/async-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import * as path from 'node:path';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { createHash } from 'node:crypto';
@@ -14,6 +14,7 @@ import {
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -57,10 +58,10 @@ interface BlockchainAction {
   };
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: BLOCKCHAIN_MANIFEST_PATH,
-  defaults: DEFAULT_BLOCKCHAIN_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_BLOCKCHAIN_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 async function handleAction(input: BlockchainAction) {
@@ -209,5 +210,5 @@ export const actuator = defineCatalogBackedActuator({
   describeOps,
   handleAction: (input) => handleAction(input as unknown as Parameters<typeof handleAction>[0]),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

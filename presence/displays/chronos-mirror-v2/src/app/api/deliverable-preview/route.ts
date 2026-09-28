@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadArtifactRecord } from '@agent/core/artifact-record';
-import { listProjectRecords } from '@agent/core/project-registry';
+import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
+import { listProjectRecords } from '@agent/core/project/project-registry';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import { loadState } from '@agent/core/mission-state';
+import { loadState } from '@agent/core/mission/mission-state';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {

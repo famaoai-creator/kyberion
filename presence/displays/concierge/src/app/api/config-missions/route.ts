@@ -5,7 +5,7 @@ import {
   loadConfigMissionBriefAtPath,
   loadConfigMissionPresetAtPath,
 } from '@agent/core/config-mission';
-import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

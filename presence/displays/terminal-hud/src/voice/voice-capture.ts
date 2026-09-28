@@ -5,7 +5,7 @@ import {
   getSpeechToTextBridge,
   installAvailableSpeechToTextBridges,
   type TranscribeResult,
-} from '@agent/core/speech-to-text-bridge';
+} from '@agent/core/voice/speech-to-text-bridge';
 import { pcmToWav } from '@agent/core/pcm-wav';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { MicCaptureOptions } from '@agent/core/mic-capture';

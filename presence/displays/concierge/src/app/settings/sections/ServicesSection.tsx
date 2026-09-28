@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Button, Callout, IntegrationItem, SettingsGroup, Switch } from '@agent/shared-ui';
-import type { KbActionRef } from '@agent/core/a2ui-catalog';
+import type { KbActionRef } from '@agent/core/surface/a2ui-catalog';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';

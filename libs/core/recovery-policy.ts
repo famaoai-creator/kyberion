@@ -1,7 +1,7 @@
 import { classifyError } from './error-classifier.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import type { RetryOptions } from './src/retry-utils.js';
+import type { RetryOptions } from './pipeline/retry-utils.js';
 
 export type RecoveryPolicy = Record<string, any>;
 

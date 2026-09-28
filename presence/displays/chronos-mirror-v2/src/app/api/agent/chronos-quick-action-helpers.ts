@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
-import type { MissionState } from '@agent/core/mission-types';
+import type { MissionState } from '@agent/core/mission/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
 import { recordField } from '../../../lib/json-record';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadAgentProfileIndex, loadTeamRoleIndex } from './mission-team-index.js';
+import { loadAgentProfileIndex, loadTeamRoleIndex } from './mission/mission-team-index.js';
 import {
   buildStaffingCoverageReport,
   buildTemplateReachabilityReport,

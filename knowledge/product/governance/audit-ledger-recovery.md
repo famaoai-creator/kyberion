@@ -20,7 +20,7 @@ The audit-chain writer had already moved to the shared runtime log location,
 while older operator documentation and the legacy tree still presented
 `active/audit/` as the live source. EG-03 makes the runtime location explicit:
 
-- `libs/core/audit-chain.ts` writes only to `active/shared/logs/audit/`.
+- `libs/core/governance/audit-chain.ts` writes only to `active/shared/logs/audit/`.
 - `run_baseline_check` evaluates the newest valid JSONL timestamp in that
   directory and reports the result as the audit-ledger freshness layer.
 - A missing or stale ledger is `needs_attention`; it cannot be hidden by a

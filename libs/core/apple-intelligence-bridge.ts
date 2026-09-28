@@ -13,7 +13,7 @@ import {
   type SpeechToTextCapabilities,
   type TranscribeInput,
   type TranscribeResult,
-} from './speech-to-text-bridge.js';
+} from './voice/speech-to-text-bridge.js';
 import { rootResolve } from './path-resolver.js';
 import { isAppleSilicon } from './platform.js';
 import { safeWriteFile } from './secure-io.js';
@@ -285,9 +285,12 @@ export async function classifyLocallyWithAppleFm(
   if (categories.length === 0) return null;
   const response = await appleFmPrompt(
     [
+      // i18n-exempt: JA LLM prompt (model input)
       `次のテキストを分類してください。カテゴリ: ${categories.join(' / ')}。`,
+      // i18n-exempt: JA LLM prompt (model input)
       'カテゴリ名のみを返答してください。',
       '',
+      // i18n-exempt: JA LLM prompt (model input)
       `テキスト: ${text.slice(0, 2000)}`,
     ].join('\n'),
     { timeoutMs: options.timeoutMs ?? 20_000 }
@@ -644,7 +647,8 @@ export async function summarizeLocallyWithAppleFm(
   return appleFmPrompt(
     [
       language === 'ja'
-        ? `次のテキストを日本語で${maxSentences}文に要約してください。要約文のみを返してください。`
+        ? // i18n-exempt: JA LLM prompt (model input)
+          `次のテキストを日本語で${maxSentences}文に要約してください。要約文のみを返してください。`
         : `Summarize the following text in at most ${maxSentences} sentence(s), in ${language}. Return only the summary.`,
       '',
       '---',

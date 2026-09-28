@@ -1,12 +1,11 @@
 import {
   nowIso,
   parsePersistedPipelineStrategy,
-  getRegisteredEnv,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
   readJson,
 } from '@agent/core/foundation';
-import type { AdfEngineContext } from '@agent/core/adf-engine';
+import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -17,7 +16,10 @@ import {
   safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -27,19 +29,18 @@ import * as pathResolver from '@agent/core/path-resolver';
 import {
   loadCapabilityRegistry,
   scanProviderCapabilities,
-} from '@agent/core/provider-capability-scanner';
+} from '@agent/core/provider/provider-capability-scanner';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+
 import { runGovernedCommand, runGovernedShellScript } from '@agent/core/command-runner';
-import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 
-const CODE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/code-actuator/manifest.json');
 const DEFAULT_CODE_RETRY = {
   maxRetries: 2,
   initialDelayMs: 150,
@@ -72,10 +73,15 @@ function readCodeJson(filePath: string, label: string): unknown {
   return readJson(filePath);
 }
 
-export const buildRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: CODE_MANIFEST_PATH,
-  defaults: DEFAULT_CODE_RETRY,
-  fallbackCategories: ['resource_unavailable', 'timeout'],
+const {
+  buildRetryOptions,
+  assertUnsafeShellAllowed,
+  gates: { assertUnsafeJsAllowed },
+} = defineActuatorPipelineBase({
+  manifestPath: pathResolver.rootResolve('libs/actuators/code-actuator/manifest.json'),
+  retryDefaults: DEFAULT_CODE_RETRY,
+  retryFallbackCategories: ['resource_unavailable', 'timeout'],
+  unsafeGates: { assertUnsafeJsAllowed: { env: 'KYBERION_ALLOW_UNSAFE_JS', label: 'JS' } },
 });
 
 /**
@@ -83,26 +89,6 @@ export const buildRetryOptions = createGovernedRetryOptionsBuilder({
  * Strictly compliant with Layer 2 (Shield).
  * Generic data pipeline engine for source code analysis with Control Flow and Safety Guards.
  */
-const ALLOW_UNSAFE_SHELL =
-  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
-const ALLOW_UNSAFE_JS =
-  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_JS', { defaultValue: false }) === true;
-
-function assertUnsafeShellAllowed() {
-  if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error(
-      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
-    );
-  }
-}
-
-function assertUnsafeJsAllowed() {
-  if (!ALLOW_UNSAFE_JS) {
-    throw new Error(
-      '[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.'
-    );
-  }
-}
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -610,7 +596,7 @@ export async function impactAnalysisOp(input: {
     .slice(0, 400)
     .map((file) => path.relative(repoPath, file));
 
-  const { getReasoningBackend } = await import('@agent/core/reasoning-backend');
+  const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
   const prompt = [
     'You are performing an impact analysis for a change request against an existing codebase.',
     'Return JSON only, exactly this shape:',

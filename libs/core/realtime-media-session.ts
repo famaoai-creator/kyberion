@@ -7,7 +7,7 @@
  * to replaceable adapters.
  */
 
-import type { AudioChunk, AudioFormat, TranscriptChunk } from './meeting-session-types.js';
+import type { AudioChunk, AudioFormat, TranscriptChunk } from './meeting/meeting-session-types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
 export const MEDIA_SESSION_MODES = [

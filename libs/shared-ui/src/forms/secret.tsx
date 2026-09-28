@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { KbSecretFieldProps } from '@agent/core/a2ui-catalog';
+import type { KbSecretFieldProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import {
   KB_FORM_MESSAGE_KEYS,

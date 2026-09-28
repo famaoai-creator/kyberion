@@ -11,7 +11,7 @@ import {
   foldCapture,
   normalizeMemoryFact,
   planConsolidation,
-} from '@agent/core/memory-notebook';
+} from '@agent/core/knowledge/memory-notebook';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface MemoryBenchmarkReport {

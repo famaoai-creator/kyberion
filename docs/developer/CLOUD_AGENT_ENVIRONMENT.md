@@ -43,7 +43,7 @@ Linux has no OS keychain path in `secret-actuator`. Capabilities show **red** (`
 export KYBERION_ALLOW_FILE_SECRETS=1
 ```
 
-That writes `vault/secrets/file-secrets.json` at `chmod 0600` (directory `0700`). It is **never** the silent default on darwin/win32 keychain. See `libs/core/secret-bridge.ts` (`FileSecretProvider`).
+That writes `vault/secrets/file-secrets.json` at `chmod 0600` (directory `0700`). It is **never** the silent default on darwin/win32 keychain. See `libs/core/secret/secret-bridge.ts` (`FileSecretProvider`).
 
 ## Related
 

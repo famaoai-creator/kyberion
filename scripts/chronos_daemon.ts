@@ -22,7 +22,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
   registerScheduledPipeline,
@@ -37,12 +37,12 @@ import {
 } from '@agent/core/chronos-delivery';
 import { createTriggerRunner, withTriggerLeaderLease } from '@agent/core/trigger-runner';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { assertSafeRepositoryPath, safeExecResultAsync, safeReadFile } from '@agent/core/secure-io';
-import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
-import { loadReasoningBackendPolicy } from '@agent/core/reasoning-backend-policy';
-import { findValidProjectTrustApproval } from '@agent/core/project-trust';
+import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
+import { loadReasoningBackendPolicy } from '@agent/core/reasoning/reasoning-backend-policy';
+import { findValidProjectTrustApproval } from '@agent/core/project/project-trust';
 import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';

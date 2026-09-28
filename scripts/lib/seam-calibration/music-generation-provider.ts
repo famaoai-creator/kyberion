@@ -11,8 +11,8 @@ import * as path from 'node:path';
 import {
   getMusicGenerationProvider,
   listMusicGenerationCandidates,
-} from '@agent/core/music-generation-bridge';
-import type { MusicGenerationProvider } from '@agent/core/music-generation-types';
+} from '@agent/core/media/music-generation-bridge';
+import type { MusicGenerationProvider } from '@agent/core/media/music-generation-types';
 import type { SeamCalibrationAdapter } from '@agent/core/seam-calibration';
 import type { SeamProviderCandidate } from '@agent/core/seam-provider-selection';
 import { safeExistsSync, safeStat } from '@agent/core/secure-io';

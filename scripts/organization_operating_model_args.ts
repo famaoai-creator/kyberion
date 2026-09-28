@@ -7,7 +7,7 @@ import type {
   OrganizationOperationType,
   OrganizationPurposeRecord,
   OrganizationServiceState,
-} from '@agent/core/organization-operating-model';
+} from '@agent/core/organization/organization-operating-model';
 
 /** Argument parsing and help text for `pnpm organization` (scripts/organization_operating_model.ts). */
 export type ParsedArgs = {
@@ -117,334 +117,115 @@ export function parseArgs(args: string[]): ParsedArgs {
     options: [],
     followUpRefs: [],
   };
+  type FlagSpec =
+    | { kind: 'flag'; field: keyof ParsedArgs }
+    | { kind: 'value'; field: keyof ParsedArgs; asNumber?: boolean }
+    | { kind: 'push'; field: keyof ParsedArgs }
+    | { kind: 'set-command'; command: string };
+
+  const FLAG_SPECS: Record<string, FlagSpec> = {
+    '--json': { kind: 'flag', field: 'json' },
+    '--health': { kind: 'flag', field: 'health' },
+    '--dry-run': { kind: 'flag', field: 'dryRun' },
+    '--apply': { kind: 'flag', field: 'apply' },
+    '--organization-id': { kind: 'value', field: 'organizationId' },
+    '--org': { kind: 'value', field: 'organizationId' },
+    '--tier': { kind: 'value', field: 'tier' },
+    '--status': { kind: 'value', field: 'status' },
+    '--intent': { kind: 'value', field: 'intent' },
+    '--learning-id': { kind: 'value', field: 'learningId' },
+    '--source-type': { kind: 'value', field: 'sourceType' },
+    '--source-ref': { kind: 'value', field: 'sourceRef' },
+    '--title': { kind: 'value', field: 'title' },
+    '--summary': { kind: 'value', field: 'summary' },
+    '--target-kind': { kind: 'value', field: 'targetKind' },
+    '--evidence-ref': { kind: 'push', field: 'evidenceRefs' },
+    '--tenant-slug': { kind: 'value', field: 'tenantSlug' },
+    '--tenant': { kind: 'value', field: 'tenantSlug' },
+    '--name': { kind: 'value', field: 'name' },
+    '--purpose': { kind: 'value', field: 'purposeText' },
+    '--owner-role': { kind: 'value', field: 'ownerRole' },
+    '--principle': { kind: 'push', field: 'principles' },
+    '--approval-state': { kind: 'value', field: 'approvalState' },
+    '--objective-id': { kind: 'value', field: 'objectiveId' },
+    '--description': { kind: 'value', field: 'description' },
+    '--horizon': { kind: 'value', field: 'horizon' },
+    '--domain-id': { kind: 'value', field: 'domainId' },
+    '--service-id': { kind: 'value', field: 'serviceId' },
+    '--outcome': { kind: 'value', field: 'outcome' },
+    '--cadence-id': { kind: 'value', field: 'cadenceId' },
+    '--cadence-type': { kind: 'value', field: 'cadenceType' },
+    '--schedule': { kind: 'value', field: 'schedule' },
+    '--decision-id': { kind: 'value', field: 'decisionId' },
+    '--incident-id': { kind: 'value', field: 'incidentId' },
+    '--severity': { kind: 'value', field: 'severity' },
+    '--impact-summary': { kind: 'value', field: 'impactSummary' },
+    '--mitigation-mission-id': { kind: 'value', field: 'mitigationMissionId' },
+    '--post-incident-review-ref': { kind: 'value', field: 'postIncidentReviewRef' },
+    '--approval-ref': { kind: 'value', field: 'approvalRef' },
+    '--decision-type': { kind: 'value', field: 'decisionType' },
+    '--decision-owner': { kind: 'value', field: 'decisionOwner' },
+    '--due-at': { kind: 'value', field: 'dueAt' },
+    '--option': { kind: 'push', field: 'options' },
+    '--chosen-option': { kind: 'value', field: 'chosenOption' },
+    '--rationale': { kind: 'value', field: 'rationale' },
+    '--requested-by': { kind: 'value', field: 'requestedBy' },
+    '--follow-up-ref': { kind: 'push', field: 'followUpRefs' },
+    '--health-status': { kind: 'value', field: 'healthStatus' },
+    '--reconcile-status': { kind: 'value', field: 'reconcileStatus' },
+    '--freshness-seconds': { kind: 'value', field: 'freshnessSeconds', asNumber: true },
+    '--confidence': { kind: 'value', field: 'confidence', asNumber: true },
+    '--source-timestamp': { kind: 'value', field: 'sourceTimestamp' },
+    '--consumer': { kind: 'push', field: 'consumers' },
+    '--slo-target': { kind: 'value', field: 'sloTarget' },
+    '--slo-window': { kind: 'value', field: 'sloWindow' },
+    '--operation-id': { kind: 'value', field: 'operationId' },
+    '--run-id': { kind: 'value', field: 'runId' },
+    '--run-status': { kind: 'value', field: 'runStatus' },
+    '--result-summary': { kind: 'value', field: 'resultSummary' },
+    '--started-at': { kind: 'value', field: 'startedAt' },
+    '--completed-at': { kind: 'value', field: 'completedAt' },
+    '--exception-ref': { kind: 'push', field: 'exceptionRefs' },
+    '--operation-type': { kind: 'value', field: 'operationType' },
+    '--trigger-kind': { kind: 'value', field: 'triggerKind' },
+    '--trigger-expression': { kind: 'value', field: 'triggerExpression' },
+    '--deadline-business-day': { kind: 'value', field: 'deadlineBusinessDay', asNumber: true },
+    '--deadline-time': { kind: 'value', field: 'deadlineTime' },
+    '--timezone': { kind: 'value', field: 'triggerTimezone' },
+    '--execution-kind': { kind: 'value', field: 'executionKind' },
+    '--execution-ref': { kind: 'value', field: 'executionRef' },
+    '--allowed-action': { kind: 'push', field: 'allowedActions' },
+    '--approval-required-action': { kind: 'push', field: 'approvalRequiredActions' },
+    '--forbidden-action': { kind: 'push', field: 'forbiddenActions' },
+    '--operation-source-ref': { kind: 'push', field: 'operationSourceRefs' },
+    '--project-id': { kind: 'value', field: 'projectId' },
+    '--record-status': { kind: 'value', field: 'recordStatus' },
+    '--kind': { kind: 'value', field: 'recordKind' },
+    '--record-id': { kind: 'value', field: 'recordId' },
+    '--reason': { kind: 'value', field: 'reason' },
+    '--parent-organization-id': { kind: 'value', field: 'parentOrganizationId' },
+    '--clear': { kind: 'flag', field: 'clearParent' },
+    '--runbook-ref': { kind: 'push', field: 'runbookRefs' },
+    '--evidence-output': { kind: 'push', field: 'evidenceOutputs' },
+    '--help': { kind: 'set-command', command: 'help' },
+    '-h': { kind: 'set-command', command: 'help' },
+  };
+
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === '--json') {
-      parsed.json = true;
-      continue;
-    }
-    if (arg === '--health') {
-      parsed.health = true;
-      continue;
-    }
-    if (arg === '--dry-run') {
-      parsed.dryRun = true;
-      continue;
-    }
-    if (arg === '--apply') {
-      parsed.apply = true;
-      continue;
-    }
-    if (arg === '--organization-id' || arg === '--org') {
-      parsed.organizationId = args[++index];
-      continue;
-    }
-    if (arg === '--tier') {
-      parsed.tier = args[++index] as ParsedArgs['tier'];
-      continue;
-    }
-    if (arg === '--status') {
-      parsed.status = args[++index];
-      continue;
-    }
-    if (arg === '--intent') {
-      parsed.intent = args[++index];
-      continue;
-    }
-    if (arg === '--learning-id') {
-      parsed.learningId = args[++index];
-      continue;
-    }
-    if (arg === '--source-type') {
-      parsed.sourceType = args[++index] as ParsedArgs['sourceType'];
-      continue;
-    }
-    if (arg === '--source-ref') {
-      parsed.sourceRef = args[++index];
-      continue;
-    }
-    if (arg === '--title') {
-      parsed.title = args[++index];
-      continue;
-    }
-    if (arg === '--summary') {
-      parsed.summary = args[++index];
-      continue;
-    }
-    if (arg === '--target-kind') {
-      parsed.targetKind = args[++index] as ParsedArgs['targetKind'];
-      continue;
-    }
-    if (arg === '--evidence-ref') {
-      parsed.evidenceRefs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--tenant-slug' || arg === '--tenant') {
-      parsed.tenantSlug = args[++index];
-      continue;
-    }
-    if (arg === '--name') {
-      parsed.name = args[++index];
-      continue;
-    }
-    if (arg === '--purpose') {
-      parsed.purposeText = args[++index];
-      continue;
-    }
-    if (arg === '--owner-role') {
-      parsed.ownerRole = args[++index];
-      continue;
-    }
-    if (arg === '--principle') {
-      parsed.principles.push(args[++index]);
-      continue;
-    }
-    if (arg === '--approval-state') {
-      parsed.approvalState = args[++index] as ParsedArgs['approvalState'];
-      continue;
-    }
-    if (arg === '--objective-id') {
-      parsed.objectiveId = args[++index];
-      continue;
-    }
-    if (arg === '--description') {
-      parsed.description = args[++index];
-      continue;
-    }
-    if (arg === '--horizon') {
-      parsed.horizon = args[++index];
-      continue;
-    }
-    if (arg === '--domain-id') {
-      parsed.domainId = args[++index];
-      continue;
-    }
-    if (arg === '--service-id') {
-      parsed.serviceId = args[++index];
-      continue;
-    }
-    if (arg === '--outcome') {
-      parsed.outcome = args[++index];
-      continue;
-    }
-    if (arg === '--cadence-id') {
-      parsed.cadenceId = args[++index];
-      continue;
-    }
-    if (arg === '--cadence-type') {
-      parsed.cadenceType = args[++index] as OrganizationCadenceRecord['cadence_type'];
-      continue;
-    }
-    if (arg === '--schedule') {
-      parsed.schedule = args[++index];
-      continue;
-    }
-    if (arg === '--decision-id') {
-      parsed.decisionId = args[++index];
-      continue;
-    }
-    if (arg === '--incident-id') {
-      parsed.incidentId = args[++index];
-      continue;
-    }
-    if (arg === '--severity') {
-      parsed.severity = args[++index] as OrganizationIncidentRecord['severity'];
-      continue;
-    }
-    if (arg === '--impact-summary') {
-      parsed.impactSummary = args[++index];
-      continue;
-    }
-    if (arg === '--mitigation-mission-id') {
-      parsed.mitigationMissionId = args[++index];
-      continue;
-    }
-    if (arg === '--post-incident-review-ref') {
-      parsed.postIncidentReviewRef = args[++index];
-      continue;
-    }
-    if (arg === '--approval-ref') {
-      parsed.approvalRef = args[++index];
-      continue;
-    }
-    if (arg === '--decision-type') {
-      parsed.decisionType = args[++index] as OrganizationDecisionRecord['decision_type'];
-      continue;
-    }
-    if (arg === '--decision-owner') {
-      parsed.decisionOwner = args[++index];
-      continue;
-    }
-    if (arg === '--due-at') {
-      parsed.dueAt = args[++index];
-      continue;
-    }
-    if (arg === '--option') {
-      parsed.options.push(args[++index]);
-      continue;
-    }
-    if (arg === '--chosen-option') {
-      parsed.chosenOption = args[++index];
-      continue;
-    }
-    if (arg === '--rationale') {
-      parsed.rationale = args[++index];
-      continue;
-    }
-    if (arg === '--requested-by') {
-      parsed.requestedBy = args[++index];
-      continue;
-    }
-    if (arg === '--follow-up-ref') {
-      parsed.followUpRefs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--health-status') {
-      parsed.healthStatus = args[++index] as OrganizationServiceState['health'];
-      continue;
-    }
-    if (arg === '--reconcile-status') {
-      parsed.reconcileStatus = args[++index] as OrganizationServiceState['reconcile_status'];
-      continue;
-    }
-    if (arg === '--freshness-seconds') {
-      parsed.freshnessSeconds = Number(args[++index]);
-      continue;
-    }
-    if (arg === '--confidence') {
-      parsed.confidence = Number(args[++index]);
-      continue;
-    }
-    if (arg === '--source-timestamp') {
-      parsed.sourceTimestamp = args[++index];
-      continue;
-    }
-    if (arg === '--consumer') {
-      parsed.consumers.push(args[++index]);
-      continue;
-    }
-    if (arg === '--slo-target') {
-      parsed.sloTarget = args[++index];
-      continue;
-    }
-    if (arg === '--slo-window') {
-      parsed.sloWindow = args[++index];
-      continue;
-    }
-    if (arg === '--operation-id') {
-      parsed.operationId = args[++index];
-      continue;
-    }
-    if (arg === '--run-id') {
-      parsed.runId = args[++index];
-      continue;
-    }
-    if (arg === '--run-status') {
-      parsed.runStatus = args[++index] as OrganizationOperationRun['status'];
-      continue;
-    }
-    if (arg === '--result-summary') {
-      parsed.resultSummary = args[++index];
-      continue;
-    }
-    if (arg === '--started-at') {
-      parsed.startedAt = args[++index];
-      continue;
-    }
-    if (arg === '--completed-at') {
-      parsed.completedAt = args[++index];
-      continue;
-    }
-    if (arg === '--exception-ref') {
-      parsed.exceptionRefs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--operation-type') {
-      parsed.operationType = args[++index] as ParsedArgs['operationType'];
-      continue;
-    }
-    if (arg === '--trigger-kind') {
-      parsed.triggerKind = args[++index] as ParsedArgs['triggerKind'];
-      continue;
-    }
-    if (arg === '--trigger-expression') {
-      parsed.triggerExpression = args[++index];
-      continue;
-    }
-    if (arg === '--deadline-business-day') {
-      parsed.deadlineBusinessDay = Number(args[++index]);
-      continue;
-    }
-    if (arg === '--deadline-time') {
-      parsed.deadlineTime = args[++index];
-      continue;
-    }
-    if (arg === '--timezone') {
-      parsed.triggerTimezone = args[++index];
-      continue;
-    }
-    if (arg === '--execution-kind') {
-      parsed.executionKind = args[++index] as ParsedArgs['executionKind'];
-      continue;
-    }
-    if (arg === '--execution-ref') {
-      parsed.executionRef = args[++index];
-      continue;
-    }
-    if (arg === '--allowed-action') {
-      parsed.allowedActions.push(args[++index]);
-      continue;
-    }
-    if (arg === '--approval-required-action') {
-      parsed.approvalRequiredActions.push(args[++index]);
-      continue;
-    }
-    if (arg === '--forbidden-action') {
-      parsed.forbiddenActions.push(args[++index]);
-      continue;
-    }
-    if (arg === '--operation-source-ref') {
-      parsed.operationSourceRefs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--project-id') {
-      parsed.projectId = args[++index];
-      continue;
-    }
-    if (arg === '--record-status') {
-      parsed.recordStatus = args[++index];
-      continue;
-    }
-    if (arg === '--kind') {
-      parsed.recordKind = args[++index] as ParsedArgs['recordKind'];
-      continue;
-    }
-    if (arg === '--record-id') {
-      parsed.recordId = args[++index];
-      continue;
-    }
-    if (arg === '--reason') {
-      parsed.reason = args[++index];
-      continue;
-    }
-    if (arg === '--parent-organization-id') {
-      parsed.parentOrganizationId = args[++index];
-      continue;
-    }
-    if (arg === '--clear') {
-      parsed.clearParent = true;
-      continue;
-    }
-    if (arg === '--runbook-ref') {
-      parsed.runbookRefs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--evidence-output') {
-      parsed.evidenceOutputs.push(args[++index]);
-      continue;
-    }
-    if (arg === '--help' || arg === '-h') {
-      parsed.command = 'help';
+    const spec = FLAG_SPECS[arg];
+    if (spec) {
+      if (spec.kind === 'set-command') {
+        parsed.command = spec.command;
+      } else if (spec.kind === 'flag') {
+        (parsed as Record<string, unknown>)[spec.field] = true;
+      } else if (spec.kind === 'push') {
+        (parsed[spec.field] as string[]).push(args[++index]);
+      } else {
+        (parsed as Record<string, unknown>)[spec.field] = spec.asNumber
+          ? Number(args[++index])
+          : args[++index];
+      }
       continue;
     }
     positional.push(arg);

@@ -3,7 +3,7 @@ import {
   TRACE_EXTENSION_SPAN_NAMES,
   TRACE_EXTENSION_SPAN_PREFIXES,
   TRACE_SPAN_DEFINITIONS,
-} from '@agent/core/trace-schema';
+} from '@agent/core/analysis/trace-schema';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const outputPath = pathResolver.rootResolve('docs/developer/TRACE_SCHEMA.md');
@@ -12,7 +12,7 @@ function render(): string {
   const lines = [
     '# Kyberion Trace Schema',
     '',
-    '> Generated from `libs/core/trace-schema.ts`; edit the schema source, not this file.',
+    '> Generated from `libs/core/analysis/trace-schema.ts`; edit the schema source, not this file.',
     '',
     '| Span kind | Allowed parents | Status error condition |',
     '| --- | --- | --- |',

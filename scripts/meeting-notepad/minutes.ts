@@ -3,8 +3,8 @@
  * Mirrors Presence Studio's /api/voice/minutes prompt shape so downstream
  * consumers see the same structured keys.
  */
-import { extractFirstJsonBlock } from '@agent/core/email-workflow';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { extractFirstJsonBlock } from '@agent/core/integrations/email-workflow';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 
 export interface MeetingMinutesArtifact {
   title: string;

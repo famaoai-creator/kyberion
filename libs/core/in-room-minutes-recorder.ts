@@ -12,13 +12,13 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
-import { checkMeetingParticipationConsent } from './meeting-participation-coordinator.js';
+import { checkMeetingParticipationConsent } from './meeting/meeting-participation-coordinator.js';
 import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from './mic-capture.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { readTextFile } from './foundation/text.js';
 import { wavHeader } from './pcm-wav.js';
-import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
+import { getSpeechToTextBridge } from './voice/speech-to-text-bridge.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -26,8 +26,8 @@ import {
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
-import { EnergyVad, type EnergyVadOptions } from './voice-activity-detector.js';
-import type { AudioChunk } from './meeting-session-types.js';
+import { EnergyVad, type EnergyVadOptions } from './voice/voice-activity-detector.js';
+import type { AudioChunk } from './meeting/meeting-session-types.js';
 import { resolveLocale } from './locale.js';
 
 export interface InRoomMinutesOptions {

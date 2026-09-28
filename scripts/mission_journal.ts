@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { formatDateTime, resolveTimeZone } from '@agent/core/format';
-import { resolveMissionJournalPolicy } from '@agent/core/mission-journal-policy';
-import { loadStateAtPath } from '@agent/core/mission-state';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveMissionJournalPolicy } from '@agent/core/mission/mission-journal-policy';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

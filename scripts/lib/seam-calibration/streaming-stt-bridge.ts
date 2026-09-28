@@ -16,12 +16,12 @@ import {
   getStreamingSttBridgeCapabilities,
   listStreamingSttCandidates,
   listStreamingSttBridges,
-} from '@agent/core/streaming-stt-bridge';
+} from '@agent/core/voice/streaming-stt-bridge';
 import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
-} from '@agent/core/shell-streaming-stt-bridge';
-import type { AudioChunk, AudioFormat } from '@agent/core/meeting-session-types';
+} from '@agent/core/shell/shell-streaming-stt-bridge';
+import type { AudioChunk, AudioFormat } from '@agent/core/meeting/meeting-session-types';
 import { safeReadFile } from '@agent/core/secure-io';
 import type {
   SeamCalibrationAdapter,

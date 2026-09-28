@@ -10,7 +10,7 @@ import {
   runMeshDeliveryPass,
   formatMeshDeliveryPassReport,
   type MeshDeliveryPassReport,
-} from '@agent/core/mesh-delivery-driver';
+} from '@agent/core/mesh/mesh-delivery-driver';
 import { acquireLock, releaseLock } from '@agent/core/lock-utils';
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';

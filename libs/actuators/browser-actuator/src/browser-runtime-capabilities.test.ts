@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES } from '@agent/core/browser-automation-runtime-bridge';
+import { FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES } from '@agent/core/browser/browser-automation-runtime-bridge';
 import {
   formatBrowserRuntimePreflightError,
   preflightBrowserRuntimePipeline,

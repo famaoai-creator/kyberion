@@ -22,7 +22,7 @@ vi.mock('@agent/core/environment-capability-probes', () => ({
   installCoreEnvironmentProbes: vi.fn(),
 }));
 
-vi.mock('@agent/core/tool-runtime-registry', () => ({
+vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   listToolRuntimeInventory: mocks.listToolRuntimeInventory,
 }));
 

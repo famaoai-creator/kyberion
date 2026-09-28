@@ -16,8 +16,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeLstat: mocks.safeLstat,
 }));
 
-vi.mock('@agent/core/video-ingest', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video-ingest')>()),
+vi.mock('@agent/core/video/ingest', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video/ingest')>()),
   buildVideoBrief: mocks.buildVideoBrief,
 }));
 

@@ -14,7 +14,7 @@ import {
   A2UI_BASE_COMPONENT_TYPES,
   isKyberionBaseComponentType,
   validateA2UIComponentProps,
-} from '@agent/core/a2ui-catalog';
+} from '@agent/core/surface/a2ui-catalog';
 import {
   SHARED_UI_MESSAGES_ROUTE,
   SHARED_UI_MODULE_ROUTE,

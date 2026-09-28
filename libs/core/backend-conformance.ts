@@ -14,12 +14,16 @@ import {
   BACKEND_CAPABILITY_PROFILES,
   type BackendCapabilityProfile,
 } from './backend-capability-profile.js';
-import { requireSandboxEnforcement, resolveSandboxPolicy } from './sandbox-policy.js';
-import { resolveProviderPermissionArgs, type ProviderId } from './provider-permission-profiles.js';
+import { requireSandboxEnforcement, resolveSandboxPolicy } from './shell/sandbox-policy.js';
+import {
+  resolveProviderPermissionArgs,
+  type ProviderId,
+} from './provider/provider-permission-profiles.js';
+import { providerCliBinary } from './provider/provider-binary-map.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
-import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
 
 const CLI_MODES = [
   'claude-cli',
@@ -33,17 +37,9 @@ const CLI_MODES = [
   'copilot',
 ] as const satisfies readonly ReasoningBackendMode[];
 
-const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = {
-  'claude-cli': 'claude',
-  'codex-cli': 'codex',
-  'gemini-cli': 'gemini',
-  'agy-cli': 'agy',
-  'grok-cli': 'grok',
-  'cursor-cli': 'cursor-agent',
-  'opencode-cli': 'opencode',
-  'devin-cli': 'devin',
-  copilot: 'copilot',
-};
+const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = Object.fromEntries(
+  CLI_MODES.map((mode) => [mode, providerCliBinary(mode)])
+) as Record<(typeof CLI_MODES)[number], string>;
 
 const BOOLEAN_CAPABILITIES = [
   'structured_output',

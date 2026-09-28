@@ -127,7 +127,9 @@ export function resolveCapabilityBundlesForUtterance(utterance: string): Capabil
       'retro text',
       'audio visualizer',
       'character art',
+      // i18n-exempt: JA keyword candidate list
       '文字アート',
+      // i18n-exempt: JA keyword candidate list
       'テキストアート',
       '端末',
     ])

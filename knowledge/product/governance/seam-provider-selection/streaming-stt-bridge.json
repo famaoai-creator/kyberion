@@ -24,7 +24,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/streaming-stt-bridge.ts (StubStreamingSpeechToTextBridge emits synthetic 'stub-utterance-<n>' text; eligible only when synthetic output is allowed)"
+            "libs/core/voice/streaming-stt-bridge.ts (StubStreamingSpeechToTextBridge emits synthetic 'stub-utterance-<n>' text; eligible only when synthetic output is allowed)"
           ]
         },
         "shell": {
@@ -39,7 +39,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/shell-streaming-stt-bridge.ts (operator command from KYBERION_STT_COMMAND; may be a cloud CLI such as deepgram, so local_only is not declared)"
+            "libs/core/shell/shell-streaming-stt-bridge.ts (operator command from KYBERION_STT_COMMAND; may be a cloud CLI such as deepgram, so local_only is not declared)"
           ]
         },
         "managed_mlx_whisper": {

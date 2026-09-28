@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import type { OrganizationProfile } from './organization-profile.js';
+import type { OrganizationProfile } from './organization/organization-profile.js';
 import { resolveVision, type ResolvedVision } from './vision-resolver.js';
 import { resolveOrganizationOrgChart, type OrganizationOrgChart } from './org-chart.js';
 import { resolveDecisionRightsMatrix, type DecisionRightsMatrix } from './decision-rights.js';
@@ -10,7 +10,7 @@ import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as customerResolver from './customer-resolver.js';
-import { loadOrganizationProfileAtPath } from './organization-profile.js';
+import { loadOrganizationProfileAtPath } from './organization/organization-profile.js';
 
 export interface CompanyComponentRef<T = unknown> {
   path: string;

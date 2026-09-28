@@ -36,8 +36,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core/agent-runtime-supervisor', async () => {
-  const actual = await vi.importActual<any>('@agent/core/agent-runtime-supervisor');
+vi.mock('@agent/core/agent/agent-runtime-supervisor', async () => {
+  const actual = await vi.importActual<any>('@agent/core/agent/agent-runtime-supervisor');
   return {
     ...actual,
     ensureAgentRuntime: mocks.ensureAgentRuntime,
@@ -64,8 +64,8 @@ vi.mock('@agent/core/delegated-task-observability', async () => {
   };
 });
 
-vi.mock('@agent/core/agent-runtime-events', async () => {
-  const actual = await vi.importActual<any>('@agent/core/agent-runtime-events');
+vi.mock('@agent/core/agent/agent-runtime-events', async () => {
+  const actual = await vi.importActual<any>('@agent/core/agent/agent-runtime-events');
   return {
     ...actual,
     appendSupervisorEvent: mocks.appendSupervisorEvent,
@@ -80,8 +80,8 @@ vi.mock('@agent/core/daemon-heartbeat', async () => {
   };
 });
 
-vi.mock('@agent/core/runtime-supervisor', async () => {
-  const actual = await vi.importActual<any>('@agent/core/runtime-supervisor');
+vi.mock('@agent/core/tool/runtime-supervisor', async () => {
+  const actual = await vi.importActual<any>('@agent/core/tool/runtime-supervisor');
   return {
     ...actual,
     runtimeSupervisor: mocks.runtimeSupervisor,

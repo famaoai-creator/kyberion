@@ -1,12 +1,12 @@
-import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
+import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
 
 // AR-02: self-described op catalog — mirrors this actuator's action
 // dispatch (if/else style handleAction). None of these ops appear in the
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 const MEETING_SCHEMA = {
   type: 'object',

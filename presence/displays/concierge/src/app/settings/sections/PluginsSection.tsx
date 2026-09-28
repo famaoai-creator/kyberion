@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Button, EmptyState, SettingRow, SettingsGroup, StatusPill } from '@agent/shared-ui';
-import type { KbStatus } from '@agent/core/a2ui-catalog';
+import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
 import type { PluginEntry } from '../../../lib/settings-types';

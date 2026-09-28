@@ -1,0 +1,1423 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  appendArtifactOwnershipRecord,
+  artifactOwnershipRegistryPath,
+  createArtifactOwnershipRecord,
+} from '../workforce/artifact-registry.js';
+import {
+  buildMissionContextPack,
+  loadKnowledgeHintsIfPossible,
+  renderMissionContextPack,
+  saveMissionContextPack,
+  SCOPE_KNOWLEDGE_BUDGETS,
+  type MissionContextPack,
+  type MissionStateSummary,
+} from './mission-context-pack.js';
+import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
+import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
+import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { projectRecordPath, saveProjectRecord } from '../project/project-registry.js';
+
+vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
+  findRelevantDistilledKnowledge: vi.fn(async () => []),
+}));
+
+const missionId = 'MSN-CONTEXT-PACK-TEST-001';
+const missionPath = pathResolver.sharedTmp(`mission-context-pack/${missionId}`);
+const artifactRegistryPath = artifactOwnershipRegistryPath();
+const registryProjectId = 'PRJ-CONTEXT-PACK-REGISTRY-001';
+const registryProjectPath = projectRecordPath(registryProjectId);
+let originalArtifactRegistryRaw: string | null = null;
+let originalRegistryProjectRaw: string | null = null;
+
+if (safeExistsSync(artifactRegistryPath)) {
+  originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
+}
+if (safeExistsSync(registryProjectPath)) {
+  originalRegistryProjectRaw = safeReadFile(registryProjectPath, { encoding: 'utf8' }) as string;
+}
+
+afterEach(() => {
+  safeRmSync(missionPath, { recursive: true, force: true });
+  if (originalArtifactRegistryRaw !== null) {
+    safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);
+  } else if (safeExistsSync(artifactRegistryPath)) {
+    safeRmSync(artifactRegistryPath);
+  }
+  if (originalRegistryProjectRaw !== null) {
+    safeWriteFile(registryProjectPath, originalRegistryProjectRaw);
+  } else if (safeExistsSync(registryProjectPath)) {
+    safeRmSync(registryProjectPath);
+  }
+});
+
+function seedContextPackArtifacts(projectId: string): void {
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-BASE',
+      project_id: projectId,
+      mission_id: 'MSN-CONTEXT-PACK-BASE',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-base.md',
+      created_at: '2026-06-04T00:00:00.000Z',
+      metadata: { quality_score: 20, quality_verdict: 'warn' },
+    })
+  );
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-REVISION',
+      project_id: projectId,
+      mission_id: 'MSN-CONTEXT-PACK-REVISION',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-revision.md',
+      created_at: '2026-06-05T00:00:00.000Z',
+      evidence_refs: ['mission:MSN-CONTEXT-PACK-REVISION'],
+      metadata: { quality_score: 95, quality_verdict: 'ready' },
+    })
+  );
+}
+
+function seedPriorWorkItemDispatchManifest(): void {
+  const evidenceDir = `${missionPath}/evidence`;
+  if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
+  safeWriteFile(
+    `${evidenceDir}/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`,
+    JSON.stringify(
+      {
+        task_result: {
+          summary: 'Prior slice completed and published a reusable artifact.',
+          artifacts: [
+            {
+              path: 'knowledge/product/architecture/prior-slice.md',
+              kind: 'markdown',
+            },
+          ],
+        },
+      },
+      null,
+      2
+    )
+  );
+  safeWriteFile(
+    `${evidenceDir}/workitem-dispatch-manifest.json`,
+    JSON.stringify(
+      {
+        mission_id: missionId,
+        records: [
+          {
+            item_id: 'WIT-CONTEXT-PACK-PRIOR-001',
+            title: 'Prior implementation slice',
+            team_role: 'implementer',
+            status: 'updated',
+            response_path: `${evidenceDir}/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`,
+            reflection_path: `${evidenceDir}/workitem-reply-WIT-CONTEXT-PACK-PRIOR-001.json`,
+            response_excerpt: 'Prior slice completed with a concrete artifact path.',
+            reflected_at: '2026-06-05T01:00:00.000Z',
+            written_at: '2026-06-05T01:00:00.000Z',
+          },
+        ],
+      },
+      null,
+      2
+    )
+  );
+}
+
+function seedRegistryProject(): void {
+  saveProjectRecord({
+    project_id: registryProjectId,
+    name: 'Context pack registry project',
+    summary: 'Project registry fallback fixture.',
+    status: 'active',
+    tier: 'confidential',
+    organization_id: 'ORG-CONTEXT-PACK-REGISTRY-001',
+    tenant_slug: 'acme',
+  });
+}
+
+function makePack(): MissionContextPack {
+  seedContextPackArtifacts('PRJ-CONTEXT-PACK-001');
+  return buildMissionContextPack({
+    contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-ABC12345',
+    missionPath,
+    missionState: {
+      mission_id: missionId,
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      assigned_persona: 'worker',
+      tenant_slug: 'acme',
+      execution_mode: 'delegated',
+      priority: 3,
+      confidence_score: 1,
+      git: {
+        branch: 'mission/context-pack-test',
+        start_commit: 'start-commit',
+        latest_commit: 'latest-commit',
+        checkpoints: [
+          {
+            task_id: 'task-1',
+            commit_hash: 'commit-1',
+            ts: '2026-06-05T00:00:00.000Z',
+          },
+        ],
+      },
+      history: [
+        {
+          ts: '2026-06-05T00:00:00.000Z',
+          event: 'create',
+          note: 'Mission created for context pack validation',
+        },
+      ],
+      vision_ref: 'vision://context-pack',
+      relationships: {
+        project: {
+          project_id: 'PRJ-CONTEXT-PACK-001',
+          organization_id: 'ORG-CONTEXT-PACK-001',
+          project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-001/project-os',
+          relationship_type: 'supports',
+          affected_artifacts: ['knowledge/product/architecture/mission-context-injection-model.md'],
+          gate_impact: 'informational',
+          traceability_refs: ['trace:mission:context-pack'],
+          note: 'Context pack test project',
+        },
+        track: {
+          track_id: 'TRK-CONTEXT-PACK-001',
+          track_name: 'Context Pack Track',
+          track_type: 'delivery',
+          lifecycle_model: 'sdlc',
+          relationship_type: 'belongs_to',
+          traceability_refs: ['trace:track:context-pack'],
+          note: 'Context pack test track',
+        },
+      },
+      context: {
+        last_action: 'record-task',
+        next_step: 'dispatch-workitems',
+        routing_decision_summary: 'scope minimal context to implementer only',
+      },
+      outcome_contract: {
+        outcome_id: 'outcome-context-pack',
+        requested_result: 'Scoped mission context pack',
+        deliverable_kind: 'architecture-doc',
+        success_criteria: ['pack is role-scoped', 'pack is traceable'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
+      },
+    },
+    teamRole: 'implementer',
+    recipientKind: 'agent',
+    assigneePeerId: 'implementation-architect',
+    projectState: {
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      name: 'Context Pack Project',
+      summary: 'A project used to validate scoped mission context injection.',
+      status: 'active',
+      tier: 'public',
+      tenant_slug: 'acme',
+      project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-001',
+      current_phase: 'design',
+      active_track_ids: ['TRK-CONTEXT-PACK-001'],
+      active_mission_ids: [missionId],
+      active_task_session_ids: ['TSK-CONTEXT-PACK-001'],
+      source_refs: ['mission:MSN-CONTEXT-PACK-TEST-001'],
+      distill_targets: ['knowledge/product/evolution'],
+      knowledge_refs: ['knowledge/product/architecture/mission-context-injection-model.md'],
+      last_distilled_at: '2026-06-05T00:00:00.000Z',
+    },
+    trackRecord: {
+      track_id: 'TRK-CONTEXT-PACK-001',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      name: 'Context Pack Track',
+      summary: 'Tracks context injection work.',
+      status: 'active',
+      track_type: 'delivery',
+      lifecycle_model: 'sdlc',
+      tier: 'public',
+      active_mission_ids: [missionId],
+      required_artifacts: ['mission-context-pack.schema.json'],
+    },
+    taskSession: {
+      session_id: 'TSK-CONTEXT-PACK-001',
+      surface: 'presence',
+      task_type: 'analysis',
+      status: 'executing',
+      mode: 'delegated',
+      goal: {
+        summary: 'Validate mission context packing',
+        success_condition: 'pack can be rendered and saved',
+      },
+      project_context: {
+        project_id: 'PRJ-CONTEXT-PACK-001',
+        project_name: 'Context Pack Project',
+        track_id: 'TRK-CONTEXT-PACK-001',
+        track_name: 'Context Pack Track',
+        tier: 'public',
+        locale: 'ja-JP',
+      },
+      requirements: {
+        missing: [],
+        collected: {
+          context_pack: true,
+        },
+      },
+      artifact: {
+        kind: 'markdown',
+        output_path: 'deliverables/context-pack.md',
+      },
+      control: {
+        interruptible: true,
+        requires_approval: false,
+        awaiting_user_input: false,
+      },
+      outcome_contract: {
+        outcome_id: 'outcome-context-pack-session',
+        requested_result: 'mission context pack',
+        deliverable_kind: 'artifact',
+        success_criteria: ['context pack is scoped'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
+      },
+      updated_at: '2026-06-05T00:00:00.000Z',
+    },
+    workItem: {
+      item_id: 'WIT-CONTEXT-PACK-001',
+      title: 'Implement context pack injection',
+      description:
+        'Build the scoped mission context pack and use it in the work item dispatch prompt.',
+      status: 'ready',
+      priority: 'high',
+      source: 'local',
+      source_ref: `mission:${missionId}:task-1`,
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      assignee_peer_id: 'implementation-architect',
+      labels: [`mission:${missionId}`, 'team_role:implementer'],
+      dependencies: [],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'knowledge/product/architecture/mission-context-injection-model.md',
+        target_path: 'knowledge/product/architecture/mission-context-injection-model.md',
+        acceptance_criteria: [
+          'context pack should include work item criteria',
+          'dispatch prompt should stay scoped',
+        ],
+      },
+    },
+    missionTeamAssignment: {
+      team_role: 'implementer',
+      required: true,
+      status: 'assigned',
+      agent_id: 'implementation-architect',
+      authority_role: 'implementation-architect',
+      delegation_contract: {
+        ownership_scope: 'mission-context-pack',
+        allowed_delegate_team_roles: ['reviewer'],
+        escalation_parent_team_role: null,
+        required_scope_classes: ['mission', 'task'],
+        resolved_scope_classes: ['mission', 'task'],
+        allowed_write_scopes: ['active/missions/public'],
+      },
+      provider: 'anthropic',
+      modelId: 'claude-4',
+      required_capabilities: ['architecture', 'typescript'],
+      notes: 'test assignment',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    },
+    knowledgeHints: [
+      {
+        path: 'knowledge/product/architecture/context-precedence-protocol.md',
+        title: 'Context Precedence Protocol',
+        excerpt: 'Kyberion reads context in tiers.',
+        tags: ['context', 'tier'],
+        score: 0.91,
+        category: 'architecture',
+        source_mission: 'MSN-REFERENCE-001',
+        last_updated: '2026-06-01T00:00:00.000Z',
+      },
+    ],
+  });
+}
+
+function makePrunablePack(): MissionContextPack {
+  seedContextPackArtifacts('PRJ-CONTEXT-PACK-PRUNED');
+  return buildMissionContextPack({
+    contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-PRUNED-ABC12345',
+    contextBudgetChars: 900,
+    missionPath,
+    missionState: {
+      mission_id: `${missionId}-PRUNED`,
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      assigned_persona: 'worker',
+      tenant_slug: 'acme',
+      execution_mode: 'delegated',
+      priority: 3,
+      confidence_score: 1,
+      git: {
+        branch: 'mission/context-pack-test',
+        start_commit: 'start-commit',
+        latest_commit: 'latest-commit',
+        checkpoints: [],
+      },
+      history: [
+        {
+          ts: '2026-06-05T00:00:00.000Z',
+          event: 'create',
+          note: 'Mission created for pruning validation',
+        },
+      ],
+      vision_ref: 'vision://context-pack',
+      relationships: {
+        project: {
+          project_id: 'PRJ-CONTEXT-PACK-PRUNED',
+          project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-PRUNED/project-os',
+          relationship_type: 'supports',
+          affected_artifacts: ['knowledge/product/architecture/mission-context-injection-model.md'],
+          gate_impact: 'informational',
+          traceability_refs: ['trace:mission:context-pack'],
+          note: 'Context pack pruning project',
+        },
+        track: {
+          track_id: 'TRK-CONTEXT-PACK-PRUNED',
+          track_name: 'Context Pack Track',
+          track_type: 'delivery',
+          lifecycle_model: 'sdlc',
+          relationship_type: 'belongs_to',
+          traceability_refs: ['trace:track:context-pack'],
+          note: 'Context pack pruning track',
+        },
+      },
+      context: {
+        last_action: 'record-task',
+        next_step: 'dispatch-workitems',
+        routing_decision_summary: 'scope minimal context to implementer only',
+      },
+      outcome_contract: {
+        outcome_id: 'outcome-context-pack',
+        requested_result: 'Scoped mission context pack',
+        deliverable_kind: 'architecture-doc',
+        success_criteria: ['pack is role-scoped', 'pack is traceable'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
+      },
+    },
+    teamRole: 'implementer',
+    recipientKind: 'agent',
+    assigneePeerId: 'implementation-architect',
+    projectState: {
+      project_id: 'PRJ-CONTEXT-PACK-PRUNED',
+      name: 'Context Pack Project',
+      summary: 'A project used to validate scoped mission context injection with pruning. '.repeat(
+        10
+      ),
+      status: 'active',
+      tier: 'public',
+      tenant_slug: 'acme',
+      project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-PRUNED',
+      current_phase: 'design',
+      active_track_ids: ['TRK-CONTEXT-PACK-PRUNED'],
+      active_mission_ids: [`${missionId}-PRUNED`],
+      active_task_session_ids: ['TSK-CONTEXT-PACK-PRUNED'],
+      source_refs: ['mission:MSN-CONTEXT-PACK-TEST-PRUNED'],
+      distill_targets: ['knowledge/product/evolution'],
+      knowledge_refs: ['knowledge/product/architecture/mission-context-injection-model.md'],
+      last_distilled_at: '2026-06-05T00:00:00.000Z',
+    },
+    trackRecord: {
+      track_id: 'TRK-CONTEXT-PACK-PRUNED',
+      project_id: 'PRJ-CONTEXT-PACK-PRUNED',
+      name: 'Context Pack Track',
+      summary: 'Tracks context injection work and pruning rollups. '.repeat(10),
+      status: 'active',
+      track_type: 'delivery',
+      lifecycle_model: 'sdlc',
+      tier: 'public',
+      active_mission_ids: [`${missionId}-PRUNED`],
+      required_artifacts: ['mission-context-pack.schema.json'],
+    },
+    taskSession: {
+      session_id: 'TSK-CONTEXT-PACK-PRUNED',
+      surface: 'presence',
+      task_type: 'analysis',
+      status: 'executing',
+      mode: 'delegated',
+      goal: {
+        summary: 'Validate mission context packing with pruning and rollup generation. '.repeat(8),
+        success_condition: 'pack can be rendered and saved',
+      },
+      project_context: {
+        project_id: 'PRJ-CONTEXT-PACK-PRUNED',
+        project_name: 'Context Pack Project',
+        track_id: 'TRK-CONTEXT-PACK-PRUNED',
+        track_name: 'Context Pack Track',
+        tier: 'public',
+        locale: 'ja-JP',
+      },
+      requirements: {
+        missing: [],
+        collected: {
+          context_pack: true,
+        },
+      },
+      artifact: {
+        kind: 'markdown',
+        output_path: 'deliverables/context-pack.md',
+      },
+      control: {
+        interruptible: true,
+        requires_approval: false,
+        awaiting_user_input: false,
+      },
+      outcome_contract: {
+        outcome_id: 'outcome-context-pack-session',
+        requested_result: 'mission context pack',
+        deliverable_kind: 'artifact',
+        success_criteria: ['context pack is scoped'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+      },
+      updated_at: '2026-06-05T00:00:00.000Z',
+    },
+    workItem: {
+      item_id: 'WIT-CONTEXT-PACK-PRUNED',
+      title: 'Implement context pack pruning',
+      description:
+        'Build the scoped mission context pack and use it in the work item dispatch prompt. '.repeat(
+          12
+        ),
+      status: 'ready',
+      priority: 'high',
+      source: 'local',
+      source_ref: `mission:${missionId}-PRUNED:task-1`,
+      project_id: 'PRJ-CONTEXT-PACK-PRUNED',
+      assignee_peer_id: 'implementation-architect',
+      labels: [`mission:${missionId}-PRUNED`, 'team_role:implementer'],
+      dependencies: [],
+      metadata: {
+        mission_id: `${missionId}-PRUNED`,
+        team_role: 'implementer',
+        deliverable: 'knowledge/product/architecture/mission-context-injection-model.md',
+        target_path: 'knowledge/product/architecture/mission-context-injection-model.md',
+      },
+    },
+    missionTeamAssignment: {
+      team_role: 'implementer',
+      required: true,
+      status: 'assigned',
+      agent_id: 'implementation-architect',
+      authority_role: 'implementation-architect',
+      delegation_contract: {
+        ownership_scope: 'mission-context-pack',
+        allowed_delegate_team_roles: ['reviewer'],
+        escalation_parent_team_role: null,
+        required_scope_classes: ['mission', 'task'],
+        resolved_scope_classes: ['mission', 'task'],
+        allowed_write_scopes: ['active/missions/public'],
+      },
+      provider: 'anthropic',
+      modelId: 'claude-4',
+      required_capabilities: ['architecture', 'typescript'],
+      notes: 'test assignment',
+    },
+    knowledgeHints: Array.from({ length: 6 }, (_, index) => ({
+      path: `knowledge/product/architecture/context-precedence-protocol-${index}.md`,
+      title: `Context Precedence Protocol ${index}`,
+      excerpt: 'Kyberion reads context in tiers. '.repeat(30),
+      tags: ['context', 'tier'],
+      score: 0.91 - index * 0.01,
+      category: 'architecture',
+      source_mission: 'MSN-REFERENCE-001',
+      last_updated: '2026-06-01T00:00:00.000Z',
+    })),
+  });
+}
+
+describe('mission-context-pack', () => {
+  it('adds a metadata-only progressive skill index without exposing the body', () => {
+    const skillDir = `${missionPath}/skills/demo-skill`;
+    safeMkdir(skillDir, { recursive: true });
+    safeWriteFile(
+      `${skillDir}/SKILL.md`,
+      [
+        '---',
+        'name: demo-context-skill',
+        'description: A context-pack skill descriptor',
+        'disable-model-invocation: true',
+        'allowed-tools: Read',
+        '---',
+        '',
+        '# Secret skill body',
+      ].join('\n')
+    );
+    const pack = buildMissionContextPack({
+      missionPath,
+      skillPaths: [skillDir],
+      missionState: {
+        mission_id: `${missionId}-SKILL`,
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        execution_mode: 'local',
+        priority: 3,
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      },
+    });
+
+    expect(pack.skill_resources).toHaveLength(1);
+    expect(pack.skill_resources?.[0]?.frontmatter.allowed_tools).toEqual(['Read']);
+    const rendered = renderMissionContextPack(pack);
+    expect(rendered).toContain('<skill name="demo-context-skill"');
+    expect(rendered).not.toContain('Secret skill body');
+  });
+
+  it('propagates the pre-trust boundary to project-local skill paths', () => {
+    expect(() =>
+      buildMissionContextPack({
+        missionPath,
+        skillPaths: ['skills/project-local'],
+        trustResolved: false,
+        missionState: {
+          mission_id: `${missionId}-SKILL-PRETRUST`,
+          tier: 'public',
+          status: 'active',
+          assigned_persona: 'worker',
+          execution_mode: 'local',
+          priority: 3,
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+          history: [],
+        },
+      })
+    ).toThrow('[TRUST_REQUIRED]');
+  });
+
+  it('omits restricted skills from the model-visible context-pack index', () => {
+    const allowedDir = `${missionPath}/skills/allowed-skill`;
+    const restrictedDir = `${missionPath}/skills/restricted-skill`;
+    safeMkdir(allowedDir, { recursive: true });
+    safeMkdir(restrictedDir, { recursive: true });
+    safeWriteFile(
+      `${allowedDir}/SKILL.md`,
+      [
+        '---',
+        'name: allowed-context-skill',
+        'description: Allowed fixture',
+        '---',
+        '',
+        'Body',
+      ].join('\n')
+    );
+    safeWriteFile(
+      `${restrictedDir}/SKILL.md`,
+      [
+        '---',
+        'name: mock-malicious-skill',
+        'description: Restricted fixture',
+        '---',
+        '',
+        'Must not be indexed',
+      ].join('\n')
+    );
+
+    const pack = buildMissionContextPack({
+      missionPath,
+      skillPaths: [allowedDir, restrictedDir],
+      missionState: {
+        mission_id: `${missionId}-RESTRICTED-SKILL`,
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        execution_mode: 'local',
+        priority: 3,
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      },
+    });
+
+    expect(pack.skill_resources?.map((resource) => resource.name)).toEqual([
+      'allowed-context-skill',
+    ]);
+    expect(renderMissionContextPack(pack)).not.toContain('mock-malicious-skill');
+  });
+
+  it('builds a scoped role-specific pack with traceable sources', () => {
+    const pack = makePack();
+
+    expect(pack).toMatchObject({
+      context_pack_id: 'CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-ABC12345',
+      version: '1',
+    });
+    expect(pack.scope).toMatchObject({
+      mission_id: missionId,
+      tier: 'public',
+      tenant_slug: 'acme',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      track_id: 'TRK-CONTEXT-PACK-001',
+      task_session_id: 'TSK-CONTEXT-PACK-001',
+      work_item_id: 'WIT-CONTEXT-PACK-001',
+    });
+    expect(pack.recipient).toMatchObject({
+      kind: 'agent',
+      team_role: 'implementer',
+      agent_id: 'implementation-architect',
+      authority_role: 'implementation-architect',
+    });
+    expect(pack.project?.project_id).toBe('PRJ-CONTEXT-PACK-001');
+    expect(pack.track?.track_id).toBe('TRK-CONTEXT-PACK-001');
+    expect(pack.task_session?.session_id).toBe('TSK-CONTEXT-PACK-001');
+    expect(pack.work_item?.item_id).toBe('WIT-CONTEXT-PACK-001');
+    expect(pack.knowledge_hints).toHaveLength(1);
+    expect(pack.task_guidance?.seed).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Reference artifact: ART-CONTEXT-PACK-REVISION'),
+      ])
+    );
+    expect(pack.task_guidance?.acceptance_criteria).toEqual(
+      expect.arrayContaining([
+        'context pack should include work item criteria',
+        'dispatch prompt should stay scoped',
+      ])
+    );
+    expect(pack.mission.outcome_contract?.vision_ref).toMatchObject({
+      raw: 'company://acme/vision',
+      kind: 'company',
+      tenant_slug: 'acme',
+      path: 'vision',
+      query: null,
+    });
+    expect(pack.sources.map((entry) => entry.kind)).toEqual(
+      expect.arrayContaining([
+        'mission_state',
+        'mission_team',
+        'project_state',
+        'project_track',
+        'task_session',
+        'work_item',
+        'knowledge_hint',
+      ])
+    );
+    expect(pack.security_scope).toEqual({
+      tenant_slug: 'acme',
+      tenant_id: 'acme',
+      organization_id: 'ORG-CONTEXT-PACK-001',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      mission_id: missionId,
+      participant_id: 'implementation-architect',
+      read_tiers: ['public'],
+      write_tier: 'public',
+      purpose: 'implementer',
+      external_egress: 'allow',
+    });
+
+    const rendered = renderMissionContextPack(pack);
+    expect(rendered).toContain('Mission context pack (scoped, minimal, role-specific).');
+    expect(rendered).toContain('organization=ORG-CONTEXT-PACK-001');
+    expect(rendered).toContain('Use only the facts in this pack');
+    expect(rendered).toContain('Fast-lane guidance: model_tier=fast');
+    expect(rendered).toContain('schema-forced result');
+    expect(rendered).toContain('Implement context pack injection');
+  });
+
+  it('derives a stable uppercase context pack id when one is not supplied', () => {
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: missionId,
+        mission_type: 'product_development',
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-test',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {},
+        outcome_contract: {
+          outcome_id: 'outcome-context-pack-generated',
+          requested_result: 'mission context pack',
+          deliverable_kind: 'artifact',
+          success_criteria: ['context pack is scoped'],
+          evidence_required: true,
+          expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+          verification_method: 'self_check',
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.context_pack_id).toMatch(/^CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-[A-Z0-9]{8}$/);
+  });
+
+  it('derives organization scope from the canonical project registry when the mission relation omits it', () => {
+    seedRegistryProject();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-REGISTRY-SCOPE`,
+        tier: 'confidential',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-registry-scope',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: { project_id: registryProjectId, relationship_type: 'supports' },
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.security_scope).toMatchObject({
+      tenant_slug: 'acme',
+      organization_id: 'ORG-CONTEXT-PACK-REGISTRY-001',
+      project_id: registryProjectId,
+    });
+  });
+
+  it('does not let a stale mission relation override the scoped project registry', () => {
+    seedRegistryProject();
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: `${missionId}-REGISTRY-PRECEDENCE`,
+        tier: 'confidential',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-registry-precedence',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: {
+            project_id: registryProjectId,
+            organization_id: 'ORG-STALE-RELATION',
+            relationship_type: 'supports',
+          },
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.security_scope.organization_id).toBe('ORG-CONTEXT-PACK-REGISTRY-001');
+  });
+
+  it('saves the pack in mission-local coordination storage', () => {
+    const pack = makePack();
+    const filePath = saveMissionContextPack(missionPath, pack);
+
+    expect(filePath.replaceAll('\\', '/')).toContain('/coordination/context-packs/');
+    expect(safeExistsSync(filePath)).toBe(true);
+
+    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw) as MissionContextPack & { context_pack_path?: string };
+    expect(parsed).toMatchObject({
+      context_pack_id: pack.context_pack_id,
+      context_pack_path: filePath,
+      mission: {
+        mission_id: missionId,
+      },
+    });
+
+    const receiptPath = `${missionPath}/coordination/provisioned-entries.jsonl`;
+    const receipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }) || '')
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { phase: string; target_path: string });
+    expect(receipts).toContainEqual(
+      expect.objectContaining({
+        phase: 'verified',
+        target_path: `coordination/context-packs/${pack.context_pack_id}.json`,
+      })
+    );
+  });
+
+  it('rejects symlinked mission roots before reading or writing context artifacts', () => {
+    const boundaryRoot = pathResolver.sharedTmp('mission-context-pack-boundary');
+    const targetPath = `${boundaryRoot}/target`;
+    const linkedPath = `${boundaryRoot}/linked-mission`;
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.symlinkSync(targetPath, linkedPath, 'dir');
+
+    try {
+      expect(() =>
+        buildMissionContextPack({
+          missionPath: linkedPath,
+          missionState: {
+            mission_id: `${missionId}-SYMLINK`,
+            tier: 'public',
+            status: 'active',
+            assigned_persona: 'worker',
+            execution_mode: 'local',
+            priority: 3,
+            confidence_score: 1,
+            git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+            history: [],
+          },
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+
+      const pack = makePack();
+      expect(() => saveMissionContextPack(linkedPath, pack)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(linkedPath, { force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('injects reusable artifact hints without binding the artifact to the mission', () => {
+    const pack = makePack();
+    expect(pack.artifact_hints?.[0]?.artifact_id).toBe('ART-CONTEXT-PACK-REVISION');
+    expect(pack.artifact_hints?.[0]?.reuse_reason).toContain('Reusable project artifact');
+    expect(pack.artifact_hints?.every((hint) => hint.project_id === 'PRJ-CONTEXT-PACK-001')).toBe(
+      true
+    );
+  });
+
+  it('seeds fast-lane context with prior work item outputs from the same mission', () => {
+    seedPriorWorkItemDispatchManifest();
+
+    expect(
+      loadMissionWorkItemDispatchManifestAtPath(
+        `${missionPath}/evidence/workitem-dispatch-manifest.json`
+      ).mission_id
+    ).toBe(missionId);
+
+    const pack = makePack();
+
+    expect(pack.task_guidance?.seed).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Prior work item response:'),
+        expect.stringContaining('Prior reflection:'),
+        expect.stringContaining('Prior work item: Prior implementation slice'),
+        expect.stringContaining('Prior artifact: knowledge/product/architecture/prior-slice.md'),
+      ])
+    );
+  });
+
+  it('rejects a malformed dispatch manifest before context projection', () => {
+    const evidenceDir = `${missionPath}/evidence`;
+    safeMkdir(evidenceDir, { recursive: true });
+    const manifestPath = `${evidenceDir}/workitem-dispatch-manifest.json`;
+    safeWriteFile(
+      manifestPath,
+      JSON.stringify({ mission_id: missionId, records: [], unknown: true })
+    );
+
+    expect(() => loadMissionWorkItemDispatchManifestAtPath(manifestPath)).toThrow(
+      'Invalid catalog mission-workitem-dispatch-manifest'
+    );
+  });
+
+  it('rejects a dispatch manifest directory before schema loading', () => {
+    const manifestPath = `${missionPath}/evidence/workitem-dispatch-manifest.json`;
+    safeMkdir(manifestPath, { recursive: true });
+
+    expect(() => loadMissionWorkItemDispatchManifestAtPath(manifestPath)).toThrow(
+      'manifest must be a regular file'
+    );
+  });
+
+  it('does not expose an external prior response path through the context seed', () => {
+    seedPriorWorkItemDispatchManifest();
+    const manifestPath = `${missionPath}/evidence/workitem-dispatch-manifest.json`;
+    const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
+      records: Array<Record<string, unknown>>;
+    };
+    manifest.records[0].response_path = pathResolver.rootResolve('../external-response.json');
+    safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const pack = makePack();
+
+    expect(
+      pack.task_guidance?.seed?.some((entry) => entry.includes('Prior work item response:'))
+    ).toBe(false);
+  });
+
+  it('does not project external artifact hints from a prior response', () => {
+    seedPriorWorkItemDispatchManifest();
+    const responsePath = `${missionPath}/evidence/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`;
+    safeWriteFile(
+      responsePath,
+      JSON.stringify({
+        task_result: {
+          summary: 'valid summary',
+          artifacts: [
+            { path: '../external-artifact.md', kind: 'markdown' },
+            { path: 'knowledge/product/architecture/valid-artifact.md', kind: 'markdown' },
+          ],
+        },
+      })
+    );
+
+    const pack = makePack();
+    expect(pack.task_guidance?.seed).toContain('Prior task summary: valid summary');
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('external-artifact'))).toBe(
+      false
+    );
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('valid-artifact'))).toBe(true);
+  });
+
+  it('ignores a schema-invalid prior response projection', () => {
+    seedPriorWorkItemDispatchManifest();
+    const responsePath = `${missionPath}/evidence/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`;
+    safeWriteFile(
+      responsePath,
+      JSON.stringify({
+        task_result: {
+          summary: 'must not be projected',
+          unexpected: true,
+        },
+      })
+    );
+
+    const pack = makePack();
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('must not be projected'))).toBe(
+      false
+    );
+  });
+
+  it('prefers higher quality reusable artifacts over newer lower quality ones', () => {
+    seedContextPackArtifacts('PRJ-CONTEXT-PACK-QUALITY');
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-CONTEXT-PACK-LATEST-BUT-LOW',
+        project_id: 'PRJ-CONTEXT-PACK-QUALITY',
+        mission_id: 'MSN-CONTEXT-PACK-LOW',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/context-pack-low.md',
+        created_at: '2026-06-06T00:00:00.000Z',
+        metadata: { quality_score: 10, quality_verdict: 'poor' },
+      })
+    );
+
+    const pack = buildMissionContextPack({
+      contextPackId: 'CPK-MSN-CONTEXT-PACK-QUALITY',
+      missionPath,
+      missionState: {
+        mission_id: missionId,
+        mission_type: 'product_development',
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-test',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: {
+            project_id: 'PRJ-CONTEXT-PACK-QUALITY',
+            project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-QUALITY/project-os',
+            relationship_type: 'supports',
+          },
+        },
+        assigned_persona: 'worker',
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.artifact_hints?.[0]?.artifact_id).toBe('ART-CONTEXT-PACK-REVISION');
+  });
+
+  it('prunes oversized context packs and writes a mission-local rollup', () => {
+    const pack = makePrunablePack();
+
+    expect(pack.pruning).toMatchObject({
+      budget_chars: 900,
+    });
+    expect(pack.pruning?.pruned_sections.length).toBeGreaterThan(0);
+    expect(pack.pruning?.rollup_summary).toContain('Pruned sections');
+    expect(pack.pruning?.rollup_path?.replaceAll('\\', '/')).toContain(
+      '/coordination/context-rollups/'
+    );
+    expect(pack.knowledge_hints?.length).toBeLessThanOrEqual(3);
+    expect(pack.artifact_hints?.length ?? 0).toBeLessThanOrEqual(2);
+
+    const rollupPath = pack.pruning?.rollup_path;
+    expect(rollupPath).toBeDefined();
+    expect(safeExistsSync(String(rollupPath))).toBe(true);
+    const rollup = safeReadFile(String(rollupPath), { encoding: 'utf8' }) as string;
+    expect(rollup).toContain('Mission context rollup');
+    expect(rollup).toContain('Pruned sections');
+
+    const rendered = renderMissionContextPack(pack);
+    expect(rendered).toContain('Context pruning:');
+    expect(rendered).toContain('Rollup:');
+  });
+});
+
+describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
+  const slicesDir = pathResolver.sharedTmp('knowledge-slices-mcp-test');
+
+  function writeSlices(name: string, content: unknown): string {
+    if (!safeExistsSync(slicesDir)) safeMkdir(slicesDir, { recursive: true });
+    const p = `${slicesDir}/${name}`;
+    safeWriteFile(p, JSON.stringify(content, null, 2));
+    return p;
+  }
+
+  function baseMissionState(missionType = 'product_development'): MissionStateSummary {
+    return {
+      mission_id: 'MSN-KP03-HINTS-TEST',
+      mission_type: missionType,
+      tier: 'public',
+      status: 'active',
+      assigned_persona: 'worker',
+      git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
+      history: [],
+    };
+  }
+
+  afterEach(() => {
+    _resetKnowledgeSlicesCacheForTests();
+    if (safeExistsSync(slicesDir)) safeRmSync(slicesDir, { recursive: true, force: true });
+    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  });
+
+  it('(a) delivers the pinned working-philosophy doc as the first hint for implementer/execution', async () => {
+    const slicesPath = writeSlices('implementer-execution.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'implementer-execution',
+          match: { team_role: 'implementer', phase: 'execution' },
+          pinned: ['knowledge/product/governance/working-philosophy.md'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      phase: 'execution',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints.length).toBeGreaterThan(0);
+    expect(hints[0].path).toBe('knowledge/product/governance/working-philosophy.md');
+    expect(hints[0].title).toContain('Working Philosophy');
+  });
+
+  it('drops pinned paths that escape the knowledge root', async () => {
+    const slicesPath = writeSlices('escape-pinned.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'escape-pinned',
+          match: { team_role: 'implementer', phase: 'execution' },
+          pinned: ['knowledge/../package.json'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      phase: 'execution',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints).toEqual([]);
+  });
+
+  it('drops pinned paths whose knowledge resource is a directory', async () => {
+    const knowledgeRoot = pathResolver.sharedTmp('knowledge-pinned-directory-test');
+    const originalRootResolve = pathResolver.rootResolve;
+    const knowledgeSpy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((subPath = '') => path.join(knowledgeRoot, subPath));
+    const rootResolveSpy = vi
+      .spyOn(pathResolver, 'rootResolve')
+      .mockImplementation((input) =>
+        input.startsWith('knowledge/')
+          ? path.join(knowledgeRoot, input)
+          : originalRootResolve(input)
+      );
+    try {
+      const relativePath = 'knowledge/product/architecture/pinned-directory-' + process.pid + '.md';
+      const absolutePath = rootResolveSpy(relativePath);
+      safeMkdir(absolutePath, { recursive: true });
+      const slicesPath = writeSlices('directory-pinned.json', {
+        version: '0.1.0',
+        slices: [
+          {
+            id: 'directory-pinned',
+            match: { team_role: 'implementer', phase: 'execution' },
+            pinned: [relativePath],
+          },
+        ],
+      });
+      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+      const hints = await loadKnowledgeHintsIfPossible({
+        missionState: baseMissionState(),
+        teamRole: 'implementer',
+        phase: 'execution',
+        knowledgeSlicesPath: slicesPath,
+      });
+
+      expect(hints).toEqual([]);
+    } finally {
+      safeRmSync(knowledgeRoot, { recursive: true, force: true });
+      rootResolveSpy.mockRestore();
+      knowledgeSpy.mockRestore();
+    }
+  });
+
+  it('(b) excludes distill_* results even when the search returns them', async () => {
+    const slicesPath = writeSlices('exclude-distills.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'default-exclude',
+          match: { team_role: '*', phase: '*', mission_type: '*' },
+          exclude: ['knowledge/product/evolution/distill_*.md'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([
+      {
+        path: 'knowledge/product/evolution/distill_should_be_excluded.md',
+        title: 'Excluded distill',
+        excerpt: 'excerpt',
+        tags: [],
+      },
+      {
+        path: 'knowledge/product/architecture/kept.md',
+        title: 'Kept doc',
+        excerpt: 'excerpt',
+        tags: [],
+      },
+    ] as any);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints.some((h) => h.path.includes('distill_should_be_excluded'))).toBe(false);
+    expect(hints.some((h) => h.path === 'knowledge/product/architecture/kept.md')).toBe(true);
+  });
+
+  it('(c) matches pre-KP-03 behavior exactly when no slice matches / manifest missing', async () => {
+    const searchResult = [
+      {
+        path: 'knowledge/product/architecture/a.md',
+        title: 'A',
+        excerpt: 'ex-a',
+        tags: ['x'],
+        score: 0.5,
+      },
+    ];
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: `${slicesDir}/does-not-exist.json`,
+    });
+
+    expect(hints).toEqual([
+      {
+        path: 'knowledge/product/architecture/a.md',
+        title: 'A',
+        excerpt: 'ex-a',
+        tags: ['x'],
+        score: 0.5,
+      },
+    ]);
+    expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 3, minScore: 0.08 })
+    );
+  });
+
+  it('(e) fails open (search-only, no throw) when the slices manifest is schema-invalid', async () => {
+    const slicesPath = writeSlices('invalid.json', {
+      version: '0.1.0',
+      // A slice must declare at least one of pinned/search_roots/exclude — this fails schema validation.
+      slices: [{ match: { team_role: 'implementer' } }],
+    });
+    const searchResult = [
+      { path: 'knowledge/product/architecture/a.md', title: 'A', excerpt: 'ex-a', tags: [] },
+    ];
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints).toHaveLength(1);
+    expect(hints[0].path).toBe('knowledge/product/architecture/a.md');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+// KP-04: hint count + pack char budget scale with the task's estimated_scope
+// (SCOPE_KNOWLEDGE_BUDGETS). `M` must stay byte-identical to the pre-KP-04
+// defaults (hint limit 3, prune budget 6000) — the `(c)` test above already
+// pins that default via an omitted `estimatedScope`.
+describe('KP-04 scope-linked budgets', () => {
+  const kp04SlicesDir = pathResolver.sharedTmp('knowledge-slices-kp04-test');
+
+  function baseMissionState(): MissionStateSummary {
+    return {
+      mission_id: 'MSN-KP04-BUDGETS-TEST',
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 3,
+      confidence_score: 1,
+      assigned_persona: 'worker',
+      git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
+      history: [],
+    };
+  }
+
+  afterEach(() => {
+    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  });
+
+  it('(a) hint count scales with estimated_scope: S=2, M=3, L=5', async () => {
+    const searchResult = Array.from({ length: 6 }, (_, index) => ({
+      path: `knowledge/product/architecture/kp04-scope-${index}.md`,
+      title: `KP-04 scope hint ${index}`,
+      excerpt: `excerpt ${index}`,
+      tags: [],
+      score: 0.9 - index * 0.01,
+    }));
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+
+    for (const scope of ['S', 'M', 'L'] as const) {
+      vi.mocked(findRelevantDistilledKnowledge).mockClear();
+      const expectedLimit = SCOPE_KNOWLEDGE_BUDGETS[scope].hintLimit;
+
+      const hints = await loadKnowledgeHintsIfPossible({
+        missionState: baseMissionState(),
+        teamRole: 'implementer',
+        knowledgeSlicesPath: `${kp04SlicesDir}/does-not-exist-kp04.json`,
+        estimatedScope: scope,
+      });
+
+      expect(hints).toHaveLength(expectedLimit);
+      expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: expectedLimit, minScore: 0.08 })
+      );
+    }
+  });
+
+  it('(b) pack char budget scales with estimated_scope when contextBudgetChars is not explicit: S=4000, M=6000, L=9000', () => {
+    for (const scope of ['S', 'M', 'L'] as const) {
+      const pack = buildMissionContextPack({
+        missionPath,
+        missionState: baseMissionState(),
+        estimatedScope: scope,
+        teamRole: 'implementer',
+        recipientKind: 'agent',
+      });
+
+      expect(pack.pruning?.budget_chars).toBe(SCOPE_KNOWLEDGE_BUDGETS[scope].contextBudgetChars);
+    }
+  });
+
+  it('(c) an explicit contextBudgetChars still wins over estimated_scope', () => {
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: baseMissionState(),
+      estimatedScope: 'L',
+      contextBudgetChars: 1234,
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.pruning?.budget_chars).toBe(1234);
+  });
+});

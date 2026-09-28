@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
-import { composeCollaborationTree } from '@agent/core/agent-collaboration-tree';
+import { buildAgentCollaborationProjection } from '@agent/core/agent/agent-collaboration-projection';
+import { composeCollaborationTree } from '@agent/core/agent/agent-collaboration-tree';
 import { normalizeCollaborationLimit } from '../../../lib/collaboration-limit';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {

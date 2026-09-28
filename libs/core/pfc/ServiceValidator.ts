@@ -1,0 +1,296 @@
+import { createRequire } from 'node:module';
+import { validatePhysicalDependencies } from './PhysicalLayer.js';
+import { loadServiceEndpointsCatalog } from '../service/service-binding.js';
+import {
+  collectServicePresetAlternatives,
+  collectServicePresetCliFallbacks,
+  getServicePresetPolicy,
+} from '../service/service-preset-policy.js';
+import { loadServicePresetAtPath } from '../service/service-preset-registry.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeExec } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { secretGuard } from '../secret/secret-guard.js';
+
+const require = createRequire(import.meta.url);
+
+export interface ServiceRequirements {
+  serviceName: string;
+  cliBins?: string[];
+  sdkModules?: string[];
+  authCheck?: () => Promise<boolean>;
+}
+
+export type Tier = 'L0_CLI' | 'L1_SDK' | 'L5_API';
+
+export interface ServiceValidationResult {
+  valid: boolean;
+  failedTiers: Tier[];
+  details: {
+    cliMissing: string[];
+    sdkMissing: string[];
+  };
+}
+
+export interface ServiceAuthInspection {
+  serviceId: string;
+  presetPath?: string;
+  authStrategy: string;
+  valid: boolean;
+  reason?: string;
+  requiredSecrets: string[];
+  foundSecrets: string[];
+  missingSecrets: string[];
+  cliFallbacks: string[];
+  oauthAvailable?: boolean;
+  setupHint: string;
+}
+
+/**
+ * Validates a service across its 3 Tiers (CLI, SDK, API).
+ */
+export async function validateService(req: ServiceRequirements): Promise<ServiceValidationResult> {
+  const failedTiers: Tier[] = [];
+  const details = {
+    cliMissing: [] as string[],
+    sdkMissing: [] as string[],
+  };
+
+  // 1. L0 (CLI Layer)
+  if (req.cliBins && req.cliBins.length > 0) {
+    const cliRes = validatePhysicalDependencies(req.cliBins);
+    if (!cliRes.valid) {
+      failedTiers.push('L0_CLI');
+      details.cliMissing = cliRes.missing;
+    }
+  }
+
+  // 2. L1 (SDK Layer)
+  if (req.sdkModules && req.sdkModules.length > 0) {
+    for (const mod of req.sdkModules) {
+      if (!checkModule(mod)) {
+        details.sdkMissing.push(mod);
+      }
+    }
+    if (details.sdkMissing.length > 0) {
+      failedTiers.push('L1_SDK');
+    }
+  }
+
+  // 3. L5 (API/Auth Layer)
+  if (req.authCheck) {
+    try {
+      const isAuthValid = await req.authCheck();
+      if (!isAuthValid) {
+        failedTiers.push('L5_API');
+      }
+    } catch (err) {
+      failedTiers.push('L5_API');
+    }
+  }
+
+  return {
+    valid: failedTiers.length === 0,
+    failedTiers,
+    details,
+  };
+}
+
+function checkModule(moduleName: string): boolean {
+  try {
+    require.resolve(moduleName, { paths: [pathResolver.rootDir()] });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * High-level validation for services based on preset definitions.
+ * Checks both API tokens in Vault and CLI-based authentication health.
+ */
+export async function validateServiceAuth(
+  serviceId: string,
+  presetPath?: string
+): Promise<{ valid: boolean; reason?: string }> {
+  const inspection = inspectServiceAuth(serviceId, presetPath);
+  return inspection.valid ? { valid: true } : { valid: false, reason: inspection.reason };
+}
+
+export function inspectServiceAuth(serviceId: string, presetPath?: string): ServiceAuthInspection {
+  let resolvedPresetPath: string | undefined;
+  if (presetPath) {
+    try {
+      resolvedPresetPath = assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      return {
+        serviceId,
+        presetPath,
+        authStrategy: 'unknown',
+        valid: false,
+        reason: 'Preset path must remain inside the repository and cannot traverse symlinks.',
+        requiredSecrets: [],
+        foundSecrets: [],
+        missingSecrets: [],
+        cliFallbacks: [],
+        oauthAvailable: false,
+        setupHint: 'Use a repository-relative service preset path.',
+      };
+    }
+  }
+  if (!resolvedPresetPath || !safeExistsSync(resolvedPresetPath)) {
+    return {
+      serviceId,
+      presetPath,
+      authStrategy: 'none',
+      valid: true,
+      requiredSecrets: [],
+      foundSecrets: [],
+      missingSecrets: [],
+      cliFallbacks: [],
+      oauthAvailable: false,
+      setupHint: 'No preset found; this surface is host-managed or uses a non-service auth path.',
+    };
+  }
+
+  try {
+    const preset = loadServicePresetAtPath(resolvedPresetPath, serviceId);
+    const presetPolicy = getServicePresetPolicy(preset);
+    const oauthAvailable = Boolean(preset.oauth && typeof preset.oauth === 'object');
+    const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();
+    const presetSetupHint =
+      typeof presetPolicy.setup_hint === 'string' && presetPolicy.setup_hint.trim().length > 0
+        ? presetPolicy.setup_hint.trim()
+        : undefined;
+    const endpoint = loadServiceEndpointsCatalog().services[serviceId];
+    const suffixes = endpoint?.credential_suffixes || {};
+    const requiredSecretNames = unique(
+      strategy === 'bearer'
+        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
+        : strategy === 'basic'
+          ? [
+              ...(suffixes.clientId || ['CLIENT_ID']),
+              ...(suffixes.clientSecret || ['CLIENT_SECRET']),
+              ...(suffixes.accessToken || ['ACCESS_TOKEN']),
+            ]
+          : [
+              ...(suffixes.accessToken || []),
+              ...(suffixes.appToken || []),
+              ...(suffixes.refreshToken || []),
+              ...(suffixes.clientId || []),
+              ...(suffixes.clientSecret || []),
+              ...(suffixes.redirectUri || []),
+            ]
+    ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
+    const foundSecrets = requiredSecretNames.filter((envName) =>
+      Boolean(secretGuard.getSecret(envName))
+    );
+    const missingSecrets = requiredSecretNames.filter((envName) => !foundSecrets.includes(envName));
+    const cliFallbacks = collectServicePresetCliFallbacks(preset);
+
+    if (strategy === 'none') {
+      return {
+        serviceId,
+        presetPath: resolvedPresetPath,
+        authStrategy: strategy,
+        valid: true,
+        requiredSecrets: [],
+        foundSecrets: [],
+        missingSecrets: [],
+        cliFallbacks,
+        oauthAvailable,
+        setupHint:
+          presetSetupHint ||
+          (cliFallbacks.length > 0
+            ? `No secrets needed; CLI fallback available: ${cliFallbacks.join(', ')}`
+            : 'No secrets needed for this preset.'),
+      };
+    }
+
+    // 1. Secret-backed auth check
+    if ((strategy === 'bearer' || strategy === 'basic') && foundSecrets.length > 0) {
+      return {
+        serviceId,
+        presetPath: resolvedPresetPath,
+        authStrategy: strategy,
+        valid: true,
+        requiredSecrets: requiredSecretNames,
+        foundSecrets,
+        missingSecrets,
+        cliFallbacks,
+        oauthAvailable,
+        setupHint: `Ready. Detected secrets: ${foundSecrets.join(', ')}`,
+      };
+    }
+
+    // 2. CLI Auth fallback check via health_check commands.
+    // Alternatives may be declared per-operation or at the preset top level
+    // (auth-level fallback that is not tied to a single operation).
+    for (const alternative of collectServicePresetAlternatives(preset)) {
+      if (alternative.type !== 'cli' || !alternative.health_check) continue;
+      try {
+        const parts = String(alternative.health_check).trim().split(/\s+/);
+        const bin = parts[0];
+        const args = parts.slice(1);
+        safeExec(bin, args);
+        return {
+          serviceId,
+          presetPath: resolvedPresetPath,
+          authStrategy: strategy,
+          valid: true,
+          requiredSecrets: requiredSecretNames,
+          foundSecrets,
+          missingSecrets,
+          cliFallbacks,
+          oauthAvailable,
+          setupHint: `CLI fallback available via ${bin}.`,
+        };
+      } catch (err) {
+        /* this strategy failed: try the next auth fallback */
+      }
+    }
+
+    return {
+      serviceId,
+      presetPath: resolvedPresetPath,
+      authStrategy: strategy,
+      valid: false,
+      reason: `Missing credentials for strategy: ${strategy} and no valid CLI fallback found for service ${serviceId}`,
+      requiredSecrets: requiredSecretNames,
+      foundSecrets,
+      missingSecrets,
+      cliFallbacks,
+      oauthAvailable,
+      setupHint:
+        presetSetupHint ||
+        (requiredSecretNames.length > 0
+          ? `Set one of: ${requiredSecretNames.join(', ')}`
+          : 'Add a service preset with either bearer/basic credentials or a CLI fallback.'),
+    };
+  } catch (err: any) {
+    return {
+      serviceId,
+      presetPath: resolvedPresetPath,
+      authStrategy: 'unknown',
+      valid: false,
+      reason: `Failed to validate auth for ${serviceId}: ${err.message}`,
+      requiredSecrets: [],
+      foundSecrets: [],
+      missingSecrets: [],
+      cliFallbacks: [],
+      oauthAvailable: false,
+      setupHint: 'Check the preset path and service endpoint catalog.',
+    };
+  }
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+// Legacy class export for compatibility if needed, but functions are preferred
+export const ServiceValidator = {
+  validate: validateService,
+  validateAuth: validateServiceAuth,
+};

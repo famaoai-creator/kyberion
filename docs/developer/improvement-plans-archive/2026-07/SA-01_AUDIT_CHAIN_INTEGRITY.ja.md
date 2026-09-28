@@ -13,7 +13,7 @@ status: archived
 
 ## 背景と課題
 
-ハッシュチェーン型の監査台帳が 2 系統ある(`libs/core/audit-chain.ts` の AUD-\*、`libs/core/ledger.ts` の system/per-mission)。どちらも SHA-256 で append-only だが、**改ざん耐性を実際には持たない**。
+ハッシュチェーン型の監査台帳が 2 系統ある(`libs/core/governance/audit-chain.ts` の AUD-\*、`libs/core/ledger.ts` の system/per-mission)。どちらも SHA-256 で append-only だが、**改ざん耐性を実際には持たない**。
 
 1. **鍵なしチェーン → 書き込み権限者に対して改ざん検知できない**(HIGH): ハッシュは公開内容の素の SHA-256 で、秘密鍵/HMAC も外部アンカリングも無い(`audit-chain.ts:71-72`、`ledger.ts:70`)。`.jsonl` に書ける者はエントリを編集/削除し**チェーンを前方に再計算**でき、`verify()` は通ってしまう。ヘッダは "tamper-evident" を謳う(`audit-chain.ts:11`)が過大主張。
 2. **`lastHash` がメモリ内 → 再起動と日次ローテで継続が壊れる**(HIGH): `lastHash` は genesis で初期化され、永続化された最終エントリから seed されない(`audit-chain.ts:41`)。ファイルは日次分割(`audit-${date}.jsonl`)。結果、(a) 再起動後の最初のエントリの `previousHash` が genesis になる、(b) `verify()` は当日ファイルしか読まず(`:191-201`)、日跨ぎの最初のエントリを**誤って corrupt 判定**(`:158-160`)、(c) **過去日ファイルの丸ごと削除は検知不能**。

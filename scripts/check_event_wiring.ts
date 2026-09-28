@@ -132,7 +132,7 @@ export function checkTriggerSourceWiring(sources: EventWiringSources): string[] 
  * fiction, and consumers cannot tell absence from breakage.
  */
 export function checkWorkerEventTypeEmitters(sources: EventWiringSources): string[] {
-  const declaringFile = 'libs/core/worker-event-stream.ts';
+  const declaringFile = 'libs/core/workforce/worker-event-stream.ts';
   const source = sources.files[declaringFile];
   if (!source) return [`${declaringFile}: missing — worker event vocabulary has no source`];
 

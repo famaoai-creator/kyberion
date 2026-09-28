@@ -33,23 +33,23 @@ import {
   persistBrowserExtensionObservation,
   loadBrowserExtensionObservations,
   loadBrowserExtensionRecordingAtPath,
-} from '@agent/core/browser-extension-bridge';
+} from '@agent/core/browser/browser-extension-bridge';
 import {
   applyProcedureDelta,
   classifyFailure,
   createProcedureDelta,
   loadProcedureDelta,
   saveProcedureDelta,
-} from '@agent/core/procedure-self-repair';
-import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
-import { promoteBrowserProcedure } from '@agent/core/browser-procedure-promotion';
-import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
-import { collectProcedureUserInputs } from '@agent/core/procedure-inputs';
+} from '@agent/core/knowledge/procedure-self-repair';
+import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
+import { promoteBrowserProcedure } from '@agent/core/browser/browser-procedure-promotion';
+import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
+import { collectProcedureUserInputs } from '@agent/core/knowledge/procedure-inputs';
 import {
   loadProcedures,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-} from '@agent/core/procedure-registry';
+} from '@agent/core/knowledge/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -58,19 +58,22 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { auditChain } from '@agent/core/audit-chain';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   createDistillCandidateRecord,
   saveDistillCandidateRecord,
-} from '@agent/core/distill-candidate-registry';
+} from '@agent/core/knowledge/distill-candidate-registry';
 import { withExecutionContext } from '@agent/core/authority';
-import { getReasoningBackend, delegateTaskWithUntrustedData } from '@agent/core/reasoning-backend';
+import {
+  getReasoningBackend,
+  delegateTaskWithUntrustedData,
+} from '@agent/core/reasoning/reasoning-backend';
 import type {
   BrowserExtensionRecording,
   BrowserExtensionLease,
   BrowserExtensionSessionRequest,
-} from '@agent/core/browser-extension-bridge';
-import type { ProcedureEntry } from '@agent/core/procedure-types';
+} from '@agent/core/browser/browser-extension-bridge';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { nowIso } from '@agent/core/foundation';
 import { formatWireError } from '@agent/core/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
@@ -798,7 +801,8 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   const question =
     typeof message.question === 'string' && message.question.trim()
       ? message.question.trim().slice(0, 1000)
-      : '抽出されたデータの要点を整理し、変化・傾向・注目点を日本語で簡潔にレポートしてください。';
+      : // i18n-exempt: JA LLM prompt (model input)
+        '抽出されたデータの要点を整理し、変化・傾向・注目点を日本語で簡潔にレポートしてください。';
   const limit =
     Number.isInteger(message.limit) && message.limit > 0 ? Math.min(message.limit, 20) : 20;
 
@@ -810,6 +814,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   if (observations.length === 0) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: `手順「${procedureId}」の観測データがまだありません。実行して抽出データを集めてください。`,
     };
   }
@@ -845,6 +850,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: formatWireError(err, '分析バックエンドの実行に失敗しました'),
     };
   }
@@ -895,6 +901,7 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   } catch (err) {
     return {
       ok: false,
+      // i18n-exempt: JA LLM prompt (model input)
       error: formatWireError(err, 'レポートの保存に失敗しました'),
     };
   }

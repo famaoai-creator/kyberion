@@ -7,9 +7,9 @@ import {
   loadOnboardingFirstWorkRecord,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
-} from '@agent/core/onboarding-context';
+} from '@agent/core/organization/onboarding-context';
 import * as customerResolver from '@agent/core/customer-resolver';
-import type { OrganizationTier } from '@agent/core/organization-operating-model';
+import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

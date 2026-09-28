@@ -12,7 +12,10 @@ import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
-import { memberBindingDenied, resolveMemberByPrincipal } from '@agent/core/member-registry';
+import {
+  memberBindingDenied,
+  resolveMemberByPrincipal,
+} from '@agent/core/organization/member-registry';
 import {
   FRONT_DESK_HELP_LINK,
   frontDeskRoleFromViewer,
@@ -30,23 +33,23 @@ import {
   applyBrowserOnboarding,
   getBrowserOnboardingState,
   previewBrowserOnboarding,
-} from '@agent/core/browser-onboarding';
-import { listApprovalRequests } from '@agent/core/approval-store';
-import { listArtifactRecords } from '@agent/core/artifact-record';
+} from '@agent/core/browser/browser-onboarding';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
   markInboxEntry,
 } from '@agent/core/deliverable-inbox';
-import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
-import { readSurfaceStringParam } from '@agent/core/surface-request-input';
-import { listTaskSessions } from '@agent/core/task-session';
+import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
+import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
+import { listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeMicCapture } from '@agent/core/mic-capture';
-import { isSimpleGreetingText } from '@agent/core/intent-contract';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
-import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
-import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
+import { isSimpleGreetingText } from '@agent/core/intent/intent-contract';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
+import { checkAndRepairSurfaceUxContract } from '@agent/core/surface/surface-ux-contract';
+import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
 import {
   PresenceStudioViewerError,
   presenceStudioConversationSchema,

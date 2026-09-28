@@ -19,7 +19,7 @@
 //     source of truth either side validates against.
 //   - the `--decided-by` id grammar (`user:<member-id>`) from
 //     `scripts/lib/decided-by-args.ts`, and the mission id grammar from
-//     `libs/core/mission-creation.ts`'s `assertValidMissionId` — both are
+//     `libs/core/mission/mission-creation.ts`'s `assertValidMissionId` — both are
 //     narrow, stable regexes duplicated here for the same boundary reason.
 import { createHash } from 'node:crypto';
 import { defineCatalog } from '@agent/core/foundation';
@@ -96,7 +96,7 @@ export function validateHearingMissionBrief(brief: MissionBrief): MissionBrief {
 
 // -- Mission id ---------------------------------------------------------
 
-// Mirrors `libs/core/mission-creation.ts`'s `MISSION_ID_PATTERN` (see module
+// Mirrors `libs/core/mission/mission-creation.ts`'s `MISSION_ID_PATTERN` (see module
 // doc for why this is a duplicate, not an import).
 const MISSION_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/;
 

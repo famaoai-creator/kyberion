@@ -93,18 +93,18 @@ Every task must be implemented as a separate step, verified with focused unit te
 ### Task 2: Implement Policy Merge Logic
 
 - **Target Files**:
-  - `libs/core/intent-track-resolver.ts` (Create)
-  - `libs/core/intent-track-resolver.test.ts` (Create)
+  - `libs/core/intent/intent-track-resolver.ts` (Create)
+  - `libs/core/intent/intent-track-resolver.test.ts` (Create)
   - Export public functions in `libs/core/index.ts`.
 - **Required APIs**:
   - `resolveIntentToTrackPolicy(intentId: string, tenantId?: string): Promise<TrackPolicy>`
   - It must resolve `intentId` to the track mapping, fetch the global policy, load tenant override files if they exist, deep-merge them, and validate the final merged object against the schema.
-- **Verification**: Run `pnpm exec vitest run libs/core/intent-track-resolver.test.ts`.
+- **Verification**: Run `pnpm exec vitest run libs/core/intent/intent-track-resolver.test.ts`.
 
 ### Task 3: Implement Confidence & Autostart Gates
 
 - **Target Files**:
-  - Extend `libs/core/intent-track-resolver.ts`.
+  - Extend `libs/core/intent/intent-track-resolver.ts`.
   - Add unit tests for confidence logic.
 - **Required Logic**:
   - If the resolved intent's confidence is `< min_confidence_to_autostart`, return a result shape denoting `{ status: "escalation_required", reason: "low_confidence", confidence: X }`.

@@ -17,14 +17,14 @@ AGENTS.md §1 は「ファイル I/O は `@agent/core/secure-io` 経由のみ」
 
 **libs/core 内(最優先):**
 
-| ファイル                                                      | 違反箇所                                                                |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `libs/core/src/native-pdf-engine/engine.ts`                   | `:17` import、読み `:250`,`:508`、**書き `:1344` (`fs.writeFileSync`)** |
-| `libs/core/src/native-docx-engine/engine.ts`                  | `:7` import、`:681`                                                     |
-| `libs/core/src/native-pptx-engine/engine.ts`                  | `:2` import、`:334`,`:402`(画像読み込み+zip)                            |
-| `libs/core/src/native-xlsx-engine/engine.ts`                  | `:7` import                                                             |
-| `libs/core/mlx-embedding-backend.ts`                          | `:15` import                                                            |
-| `libs/core/src/native-docx-engine/examples/roundtrip_docx.ts` | `:8`(example スクリプト)                                                |
+| ファイル                                                        | 違反箇所                                                                |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `libs/core/media/native-pdf-engine/engine.ts`                   | `:17` import、読み `:250`,`:508`、**書き `:1344` (`fs.writeFileSync`)** |
+| `libs/core/media/native-docx-engine/engine.ts`                  | `:7` import、`:681`                                                     |
+| `libs/core/media/native-pptx-engine/engine.ts`                  | `:2` import、`:334`,`:402`(画像読み込み+zip)                            |
+| `libs/core/media/native-xlsx-engine/engine.ts`                  | `:7` import                                                             |
+| `libs/core/mlx-embedding-backend.ts`                            | `:15` import                                                            |
+| `libs/core/media/native-docx-engine/examples/roundtrip_docx.ts` | `:8`(example スクリプト)                                                |
 
 **scripts 内(次点):**
 

@@ -17,22 +17,22 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
-import { derivePipelineStatus } from '@agent/core/pipeline-contract';
-import { resolveServiceBinding } from '@agent/core/service-binding';
+import { derivePipelineStatus } from '@agent/core/pipeline/pipeline-contract';
+import { resolveServiceBinding } from '@agent/core/service/service-binding';
 import * as pathResolver from '@agent/core/path-resolver';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
-import { executeServicePreset, executeMcp } from '@agent/core/service-engine';
+import { executeServicePreset, executeMcp } from '@agent/core/service/service-engine';
 import {
   beginServiceOAuth,
   exchangeServiceOAuthCode,
   refreshServiceOAuthToken,
 } from '@agent/core/oauth-broker';
-import { validateServiceAuth } from '@agent/core/service-validator';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
-import { getServicePresetRecord } from '@agent/core/service-preset-registry';
+import { validateServiceAuth } from '@agent/core/service/service-validator';
+
+import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
+import { getServicePresetRecord } from '@agent/core/service/service-preset-registry';
 import {
   CloudflareOsControlPlane,
   type IntroductionMode,
@@ -47,17 +47,21 @@ import {
   createServiceExecutionReceipt,
   persistServiceExecutionReceipt,
   type ServiceExecutionReceipt,
-} from '@agent/core/service-harness';
-import { recordServiceCall } from '@agent/core/service-recording-session';
+} from '@agent/core/service/service-harness';
+import { recordServiceCall } from '@agent/core/service/service-recording-session';
 import {
   validateContextSecurityScope,
   type ContextSecurityScope,
 } from '@agent/core/context-security-scope';
 import { capabilityEntry } from '@agent/core/path-resolver';
-import { parseServicePidRegistry, type ServicePidRegistry } from '@agent/core/service-pid-registry';
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import {
+  parseServicePidRegistry,
+  type ServicePidRegistry,
+} from '@agent/core/service/service-pid-registry';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { secureFetch } from '@agent/core/network';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
@@ -242,10 +246,10 @@ function emitRecoveryStimulus(serviceId: string) {
   appendJsonLine(STIMULI_PATH, stimulus);
 }
 
-const buildPipelineRetryPolicy = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildPipelineRetryPolicy } = defineActuatorPipelineBase({
   manifestPath: SERVICE_ACTUATOR_MANIFEST_PATH,
-  defaults: DEFAULT_PIPELINE_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_PIPELINE_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 function resolveServiceBaseUrl(serviceId: string): string {

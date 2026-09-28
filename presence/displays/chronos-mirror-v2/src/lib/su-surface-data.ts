@@ -5,12 +5,12 @@ import {
   type GenerationCostSettlement,
 } from '@agent/core/generation-cost-settlement';
 import { resolveScopeForRecord } from '@agent/core/scope-migration';
-import { listApprovalRequests } from '@agent/core/approval-store';
-import { listArtifactRecords } from '@agent/core/artifact-record';
-import { loadMissionManagementConfig } from '@agent/core/mission-management-config';
-import { loadState, loadStateAtPath } from '@agent/core/mission-state';
-import type { ApprovalRequestRecord } from '@agent/core/approval-store';
-import type { ArtifactRecord } from '@agent/core/artifact-record';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
+import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
+import { loadMissionManagementConfig } from '@agent/core/mission/mission-management-config';
+import { loadState, loadStateAtPath } from '@agent/core/mission/mission-state';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
+import type { ArtifactRecord } from '@agent/core/workforce/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findMissionPath } from '@agent/core/path-resolver';
 import {

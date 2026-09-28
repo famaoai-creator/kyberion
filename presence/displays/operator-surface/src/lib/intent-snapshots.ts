@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { clamp, readJsonLines as readFoundationJsonLines, isRecord } from '@agent/core/foundation';
-import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
+import type { IntentDelta, IntentSnapshot } from '@agent/core/intent/intent-delta';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,

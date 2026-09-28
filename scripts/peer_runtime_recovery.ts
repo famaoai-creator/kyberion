@@ -3,7 +3,7 @@ import { getRegisteredEnv } from '@agent/core/foundation/env';
 import {
   createPeerRuntimeRecoveryApprovalRequest,
   resumePeerRuntimeFromQuarantine,
-} from '@agent/core/peer-runtime-recovery';
+} from '@agent/core/mesh/peer-runtime-recovery';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main(args: string[] = []) {

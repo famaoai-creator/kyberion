@@ -1,7 +1,7 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
-import { registerPeerNetworkPeer, type PeerNetworkExposure } from '@agent/core/peer-messaging';
+import { registerPeerNetworkPeer, type PeerNetworkExposure } from '@agent/core/mesh/peer-messaging';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 

@@ -8,11 +8,11 @@ import {
   SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
   type SurfaceViewerScope,
-} from '@agent/core/surface-mutation-guard';
-import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+} from '@agent/core/surface/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import type { EventScopeInput } from '@agent/core/event-scope';
 export {
   parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,

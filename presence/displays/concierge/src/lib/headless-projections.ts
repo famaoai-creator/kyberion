@@ -7,7 +7,7 @@ import {
   type HeadlessResourceDescriptor,
 } from '@agent/core/headless-surface-contract';
 import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
-import type { OperatorHomeScopeFilter } from '@agent/core/operator-home-summary';
+import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {
   conciergeHeadlessScope,
@@ -17,7 +17,7 @@ import {
   type ConciergeViewerContext,
 } from './viewer-context';
 import { ConciergeViewerError } from './viewer-context';
-import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {

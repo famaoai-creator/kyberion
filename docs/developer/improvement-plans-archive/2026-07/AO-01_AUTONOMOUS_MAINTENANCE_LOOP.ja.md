@@ -22,7 +22,7 @@ status: archived
 ## 実装状況 (2026-07-05)
 
 - **完了済み(Task 1)**: `pipeline-scheduler.ts` に missed-run catch-up と per-pipeline run-lock を実装し、`chronos_daemon.ts` が claim/complete 経由で tick を回すようになった。
-- **完了済み(Task 2)**: `knowledge/product/governance/autonomous-ops-policy.json` を追加し、`libs/core/autonomous-ops-gate.ts` で maintenance action を `auto | notify | approve` に振り分けられるようにした。fail-closed(未知 action / 不正ポリシーは承認)を確認済み。
+- **完了済み(Task 2)**: `knowledge/product/governance/autonomous-ops-policy.json` を追加し、`libs/core/governance/autonomous-ops-gate.ts` で maintenance action を `auto | notify | approve` に振り分けられるようにした。fail-closed(未知 action / 不正ポリシーは承認)を確認済み。
 - **完了済み(Task 3)**: `baseline-check` の hourly schedule、`tenant-drift-watch` の daily pipeline、`auto-checkpoint` の daily pipeline を追加し、定期メンテ配線を実装した。
 
 ## ゴール(受入条件)
@@ -42,7 +42,7 @@ status: archived
 ### Task 2: 保守ポリシーと振り分けエンジン — `claude-sonnet-4`
 
 1. `knowledge/product/governance/autonomous-ops-policy.json` を新設(判断基準文書 §2 の表を機械可読化: アクション → 4 軸 → 既定 auto/notify/approve)。テナント override 可。
-2. `libs/core/autonomous-ops-gate.ts`: 保守アクションを受け、ポリシーで自動/通知/承認を判定して返す(SA-05 の承認ゲート・OP-01 の予算・判断基準 §1 を統合)。fail-closed(判定不能は承認へ)。
+2. `libs/core/governance/autonomous-ops-gate.ts`: 保守アクションを受け、ポリシーで自動/通知/承認を判定して返す(SA-05 の承認ゲート・OP-01 の予算・判断基準 §1 を統合)。fail-closed(判定不能は承認へ)。
 3. unit test: 各アクションの振り分け、fail-closed。
 
 ### Task 3: 定期メンテパイプラインの配線 — `claude-sonnet-4`

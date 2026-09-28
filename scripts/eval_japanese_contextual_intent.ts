@@ -1,8 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog } from '@agent/core/foundation';
 import { buildContextualIntentFrame } from '@agent/core/contextual-intent-frame';
-import { compileUserIntentFlow } from '@agent/core/intent-contract';
-import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
+import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type CorpusItem = {

@@ -1,5 +1,5 @@
 import { isRecord, nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
-import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/adf-engine';
+import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -20,14 +20,15 @@ import {
   resolveWriteArtifactSpec,
 } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
-import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
+import {
+  runAdfActuatorPipeline,
+  defineActuatorPipelineBase,
+} from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-import { getRegisteredEnv } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 
@@ -35,49 +36,23 @@ import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
  * Network-Actuator v2.2.0 [A2A TRANSPORT ENABLED]
  * Pure ADF-driven engine for all network and A2A interactions.
  */
-const ALLOW_UNSAFE_SHELL =
-  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
-const NETWORK_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/network-actuator/manifest.json'
-);
-const DEFAULT_RETRY_POLICY = {
-  maxRetries: 3,
-  initialDelayMs: 1000,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
-
-function assertUnsafeShellAllowed() {
-  if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error(
-      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
-    );
-  }
-}
-
-const buildNetworkRetryOptions = createGovernedRetryOptionsBuilder({
-  manifestPath: NETWORK_MANIFEST_PATH,
-  defaults: DEFAULT_RETRY_POLICY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-});
+const { buildStepRetryOptions: buildRetryOptions, assertUnsafeShellAllowed } =
+  defineActuatorPipelineBase({
+    manifestPath: pathResolver.rootResolve('libs/actuators/network-actuator/manifest.json'),
+    retryDefaults: {
+      maxRetries: 3,
+      initialDelayMs: 1000,
+      maxDelayMs: 10000,
+      factor: 2,
+      jitter: true,
+    },
+    retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 
 type NetworkPipelineParams = Record<string, unknown>;
 type NetworkPipelineContext = AdfEngineContext;
 type NetworkPipelineOptions = { max_steps?: number; timeout_ms?: number };
 type NetworkPipelineStep = Omit<AdfStep, 'params'> & { params: NetworkPipelineParams };
-
-function buildRetryOptions(stepParams: NetworkPipelineParams) {
-  const explicitRetry =
-    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
-      ? { ...(stepParams.retry as Record<string, unknown>) }
-      : ({} satisfies Record<string, unknown>);
-  if (stepParams?.max_retries !== undefined)
-    explicitRetry.maxRetries = Number(stepParams.max_retries);
-  if (stepParams?.retry_delay_ms !== undefined)
-    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildNetworkRetryOptions(explicitRetry);
-}
 
 function buildUnknownNetworkOpError(op: string): Error {
   return buildUnknownActuatorOpError('network', op);

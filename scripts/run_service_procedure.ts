@@ -15,11 +15,14 @@
  *     [--mission-id MSN-123]
  */
 
-import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
+import { loadServiceRecordingAtPath } from '@agent/core/service/service-recording';
 import { withExecutionContext } from '@agent/core/authority';
-import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
+import {
+  loadProcedures,
+  resolveAllowlistedRecordingRef,
+} from '@agent/core/knowledge/procedure-registry';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 

@@ -16,7 +16,7 @@ import {
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import {
   LOCAL_PAD_COMMON_FLAGS,
   LocalPadRequestBodyTooLargeError,
@@ -390,7 +390,7 @@ export async function main(
           const tooLarge = error instanceof LocalPadRequestBodyTooLargeError;
           jsonResponse(res, tooLarge ? 413 : 400, {
             ok: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: 'internal error',
           });
         }
       })();

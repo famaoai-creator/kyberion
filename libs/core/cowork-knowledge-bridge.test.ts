@@ -81,7 +81,7 @@ vi.mock('./path-resolver.js', () => ({
   },
 }));
 
-vi.mock('./memory-promotion-queue.js', () => ({
+vi.mock('./knowledge/memory-promotion-queue.js', () => ({
   createMemoryPromotionCandidate: mockCreateCandidate,
   enqueueMemoryPromotionCandidate: mockEnqueueCandidate,
   listMemoryPromotionCandidates: mockListCandidates,

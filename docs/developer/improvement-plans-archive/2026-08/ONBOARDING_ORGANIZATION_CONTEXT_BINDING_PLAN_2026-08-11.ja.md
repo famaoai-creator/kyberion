@@ -53,7 +53,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 
 ### P1: Onboarding Context Facade
 
-- `libs/core/onboarding-context.ts` を追加する。
+- `libs/core/organization/onboarding-context.ts` を追加する。
 - `resolveOnboardingContext`、`applyOnboardingContextBinding`、`loadOnboardingContextBinding` を提供する。
 - 既存 binding と一致する場合は再利用し、重複 organization / project を作らない。
 - organization state が存在しなければ `buildOrganizationScaffold` と保存 facade で初期化する。

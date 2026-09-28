@@ -58,7 +58,7 @@ status: archived
 
 ## 実装結果
 
-- `libs/core/handoff-packet.ts` / `dist/libs/core/handoff-packet.js` に自己完結パケット生成を追加した。
+- `libs/core/mesh/handoff-packet.ts` / `dist/libs/core/mesh/handoff-packet.js` に自己完結パケット生成を追加した。
 - `handoffWorkItem` は release/claim の両方に `handoff_packet` を添付し、release 側の summary に退出サマリを残すようにした。
 - `mission:handoff` は persona 交換に加えて `handoff_packet` を history に記録するようにした。
 - `enforceApprovalGate` は `summarizeApprovalGate` ベースの rich draft を使い、Cowork 承認一覧にも `details` を流すようにした。

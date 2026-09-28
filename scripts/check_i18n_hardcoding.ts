@@ -92,7 +92,7 @@ export function isGeneratedFileText(text: string): boolean {
 }
 
 // Plan §2.7: sample code and dev-only tooling are explicitly out of scope.
-const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/src\/native-[^/]+-engine\/examples\//u];
+const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/media\/native-[^/]+-engine\/examples\//u];
 
 export function readI18nHardcodingTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -238,7 +238,7 @@ export function scanHtmlForKanaLiterals(text: string, repoRelativePath: string):
   const originalLines = text.split('\n');
   let markup = text.replace(/<!--[\s\S]*?-->/gu, blankOut);
   markup = markup.replace(
-    /(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/giu,
+    /(<script\b[^<>]*>)([\s\S]*?)(<\/script\s*>)/giu,
     (_match, open: string, body: string, close: string) => {
       const result = scanFileForKanaLiterals(body, `${repoRelativePath}.inline.js`);
       count += result.count;

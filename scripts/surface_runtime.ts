@@ -20,20 +20,22 @@ import {
   surfaceStatePath,
   type SurfaceRuntimeDefinition,
   type SurfaceRuntimeKind,
-} from '@agent/core/surface-runtime';
+} from '@agent/core/surface/surface-runtime';
 import { logger } from '@agent/core/core';
 import { isLinux, isMacOS } from '@agent/core/platform';
 import { pathResolver } from '@agent/core/path-resolver';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { safeOpenAppendFile } from '@agent/core/secure-io';
 import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { spawnManagedProcess } from '@agent/core/managed-process';
-import { inspectServiceAuth } from '@agent/core/service-validator';
-import { auditChain } from '@agent/core/audit-chain';
+import { inspectServiceAuth } from '@agent/core/service/service-validator';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =

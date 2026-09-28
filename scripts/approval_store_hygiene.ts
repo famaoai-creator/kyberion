@@ -7,8 +7,8 @@ import {
   type ApprovalSweepResult,
   type ExpirablePendingApproval,
   type FixtureApprovalRecord,
-} from '@agent/core/approval-store-hygiene';
-import { listApprovalRequests } from '@agent/core/approval-store';
+} from '@agent/core/governance/approval-store-hygiene';
+import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

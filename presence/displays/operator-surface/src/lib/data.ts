@@ -20,12 +20,12 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import {
   loadCapabilityBundleRegistry,
   type CapabilityBundleEntry,
 } from '@agent/core/capability-bundle-registry';
-import { scanProviderCapabilities } from '@agent/core/provider-capability-scanner';
+import { scanProviderCapabilities } from '@agent/core/provider/provider-capability-scanner';
 import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
 import {
   CloudflareOsSurface,
@@ -43,7 +43,7 @@ import {
   type SurfaceDirectorySummary,
   type SurfaceScenarioGuide,
   type SurfaceLauncherRecommendation,
-} from '@agent/core/surface-ux';
+} from '@agent/core/surface/surface-ux';
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 

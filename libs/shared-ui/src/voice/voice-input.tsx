@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
-import type { KbVoiceInputProps } from '@agent/core/a2ui-catalog';
+import type { KbVoiceInputProps } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import { useFormDispatch, type KbFormComponentId } from '../forms/shared.js';
 import {

@@ -58,8 +58,8 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   retry: mocks.retry,
 }));
 
-vi.mock('@agent/core/pipeline-contract', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/pipeline-contract')>()),
+vi.mock('@agent/core/pipeline/pipeline-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline/pipeline-contract')>()),
   derivePipelineStatus: mocks.derivePipelineStatus,
 }));
 
@@ -68,8 +68,8 @@ vi.mock('@agent/core/cost-report', async (importOriginal) => ({
   buildCostReportFromHistory: mocks.buildCostReportFromHistory,
 }));
 
-vi.mock('@agent/core/mission-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/mission-state')>()),
+vi.mock('@agent/core/mission/mission-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mission/mission-state')>()),
   loadStateAtPath: mocks.loadStateAtPath,
 }));
 

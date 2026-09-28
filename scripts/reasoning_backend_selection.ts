@@ -4,7 +4,7 @@
  * (LC-04c / LC-05).
  *
  * Single source of truth for the backend catalog: the reasoning-backend
- * policy (`libs/core/reasoning-backend-policy.ts` +
+ * policy (`libs/core/reasoning/reasoning-backend-policy.ts` +
  * `knowledge/product/governance/reasoning-backend-policy.json`,
  * `allowed_modes` / `mode_aliases`). Never hardcode a second list here or in
  * any caller — docs (docs/INITIALIZATION.md, AGENTS.md §2) mirror that policy.
@@ -13,7 +13,7 @@ import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModePolicy,
   type ReasoningBackendMode,
-} from '@agent/core/reasoning-backend-policy';
+} from '@agent/core/reasoning/reasoning-backend-policy';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';

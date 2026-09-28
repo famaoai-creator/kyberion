@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pluginViewFrameResponseHeaders } from '@agent/core/plugin-view-frame';
+import { pluginViewFrameResponseHeaders } from '@agent/core/plugin/plugin-view-frame';
 import { guardRequest, requireChronosAccess } from '../../../../../../lib/api-guard';
 import {
   authorizeHeadlessOperation,

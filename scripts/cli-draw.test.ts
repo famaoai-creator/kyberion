@@ -9,7 +9,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
-import type { ImageGenerationRequest } from '@agent/core/image-generation-types';
+import type { ImageGenerationRequest } from '@agent/core/media/image-generation-types';
 import {
   DRAW_HANDOFF_EXIT_CODE,
   DRAW_USAGE,

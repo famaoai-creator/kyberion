@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScriptExitError } from './lib/harness.js';
 import { main } from './run_browser_procedure.js';
-import type { BrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
-import type { ProcedureEntry } from '@agent/core/procedure-types';
+import type { BrowserExtensionRecording } from '@agent/core/browser/browser-extension-bridge';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 
 const HEX64 = 'a'.repeat(64);
 

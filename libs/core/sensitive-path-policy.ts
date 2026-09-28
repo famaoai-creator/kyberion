@@ -19,12 +19,53 @@ export interface SensitivePathMatch {
   matchedRoot: string;
 }
 
+/**
+ * Resolved credential roots for one HOME / KYBERION_ROOT / cwd combination.
+ * `run-gc` calls this check once per directory entry, and each rule used to
+ * re-read the environment registry and re-resolve the same roots. The snapshot
+ * is rebuilt only when one of those three inputs changes, which tests do
+ * between cases via `setRegisteredEnv`.
+ */
+interface RootSnapshot {
+  stamp: string;
+  home: string;
+  project: string;
+  roots: readonly (readonly string[])[];
+}
+
+let rootSnapshot: RootSnapshot | null = null;
+/** Set while `resolveRoots` runs, so those closures read the snapshot being built. */
+let pendingRoots: { home: string; project: string } | null = null;
+
+function currentRootSnapshot(): RootSnapshot {
+  const homeKey = getRegisteredEnvText('HOME')?.trim() ?? '';
+  const projectKey = getRegisteredEnvText('KYBERION_ROOT')?.trim() ?? '';
+  const cwd = process.cwd();
+  const stamp = `${homeKey}\0${projectKey}\0${cwd}`;
+  if (rootSnapshot?.stamp === stamp) return rootSnapshot;
+
+  const home = path.resolve(homeKey || os.homedir());
+  const project = path.resolve(projectKey || cwd);
+  pendingRoots = { home, project };
+  try {
+    const roots = SENSITIVE_PATH_RULES.map((rule) =>
+      rule.resolveRoots().map((root) => path.resolve(root))
+    );
+    rootSnapshot = { stamp, home, project, roots };
+    return rootSnapshot;
+  } finally {
+    pendingRoots = null;
+  }
+}
+
 function homeRoot(): string {
-  return path.resolve(getRegisteredEnvText('HOME')?.trim() || os.homedir());
+  if (pendingRoots) return pendingRoots.home;
+  return currentRootSnapshot().home;
 }
 
 function projectRoot(): string {
-  return path.resolve(getRegisteredEnvText('KYBERION_ROOT')?.trim() || process.cwd());
+  if (pendingRoots) return pendingRoots.project;
+  return currentRootSnapshot().project;
 }
 
 function descendantRoot(root: string, child: string): string {
@@ -82,9 +123,7 @@ function normalizeCandidate(candidate: string): string {
   return path.resolve(expanded);
 }
 
-function isPathWithin(candidate: string, root: string): boolean {
-  const normalizedCandidate = normalizeCandidate(candidate);
-  const normalizedRoot = normalizeCandidate(root);
+function isNormalizedPathWithin(normalizedCandidate: string, normalizedRoot: string): boolean {
   const relative = path.relative(normalizedRoot, normalizedCandidate);
   // On Windows, path.relative() returns an absolute path when the two paths
   // are on different drives. That absolute result is not a descendant of the
@@ -97,10 +136,14 @@ function isPathWithin(candidate: string, root: string): boolean {
 
 export function findSensitivePathMatch(candidate: string): SensitivePathMatch | null {
   if (!candidate || typeof candidate !== 'string') return null;
-  for (const rule of SENSITIVE_PATH_RULES) {
-    for (const root of rule.resolveRoots()) {
-      if (isPathWithin(candidate, root)) {
-        return { ruleId: rule.id, description: rule.description, matchedRoot: root };
+  const snapshot = currentRootSnapshot();
+  const normalizedCandidate = normalizeCandidate(candidate);
+  for (let index = 0; index < SENSITIVE_PATH_RULES.length; index += 1) {
+    const rule = SENSITIVE_PATH_RULES[index];
+    const roots = snapshot.roots[index];
+    for (let rootIndex = 0; rootIndex < roots.length; rootIndex += 1) {
+      if (isNormalizedPathWithin(normalizedCandidate, roots[rootIndex])) {
+        return { ruleId: rule.id, description: rule.description, matchedRoot: roots[rootIndex] };
       }
     }
   }

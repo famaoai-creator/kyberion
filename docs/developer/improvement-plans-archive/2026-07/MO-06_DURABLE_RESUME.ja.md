@@ -13,7 +13,7 @@ status: archived
 
 ## 背景と課題
 
-- **調整バスがメモリ内のみ**: `MissionCoordinationBus` はプレーン配列にメッセージを保持(`libs/core/mission-coordination-bus.ts:31`)。プロセス終了で inbox/handoff/review が消える。設計文書は append-only JSONL を要求している(`agent-mission-control-model.md:214-224`)のに反する。※耐久なのは別系統の `mission-task-events.ts` JSONL と work-coordination JSONL のみ。
+- **調整バスがメモリ内のみ**: `MissionCoordinationBus` はプレーン配列にメッセージを保持(`libs/core/mission/mission-coordination-bus.ts:31`)。プロセス終了で inbox/handoff/review が消える。設計文書は append-only JSONL を要求している(`agent-mission-control-model.md:214-224`)のに反する。※耐久なのは別系統の `mission-task-events.ts` JSONL と work-coordination JSONL のみ。
 - **レジュームが儀式的**: `resume` は git branch の checkout + focus 再設定 + RESUME 履歴追記(60 秒の冪等窓、`mission-maintenance.ts:232-300,213-230`)までで、**orchestration イベント連鎖は再構築されない**。flight recorder(`LATEST_TASK.json`)は「物理状態を確認して続けよ」という人間向け警告(`:270-273`)。worker の `resume` は `mission_controller start` を叩き直すだけ(`mission-orchestration-worker.ts:855-856`)。
 - 24h+ 走行・中断耐性は製品の中核主張(per-mission Git はそのためにある)なのに、**プロセス再起動でオーケストレーション状態が落ちる**のは主張と実装の乖離。
 

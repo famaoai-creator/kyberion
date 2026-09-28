@@ -2,15 +2,15 @@
 import { currentScope } from '@agent/core/scope-context';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
-import { knowledgeWritePathFor } from '@agent/core/knowledge-scope';
+import { knowledgeWritePathFor } from '@agent/core/knowledge/knowledge-scope';
 import {
   applyKnowledgeRankingWeightProposal,
   loadKnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
-} from '@agent/core/knowledge-weight-recalculation';
+} from '@agent/core/knowledge/knowledge-weight-recalculation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
-import { resolveTenant } from '@agent/core/tenant-registry';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { nowIso } from '@agent/core/foundation';

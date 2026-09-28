@@ -188,7 +188,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 **実装**:
 
-1. `libs/core/channel-adapter.ts`: `ChannelAdapter { send, sendApproval, typing, threadContext, actorId }` + `runChannelTurn(adapter, msg)` + `drainSurfaceOutbox(surface, send)` + 共通 thread 履歴。4 bridge を移行し `SurfaceAsyncChannel` を manifest 由来 union に戻す。Slack 専用 `buildSlack*` fork は generic 版へ寄せる。
+1. `libs/core/surface/channel-adapter.ts`: `ChannelAdapter { send, sendApproval, typing, threadContext, actorId }` + `runChannelTurn(adapter, msg)` + `drainSurfaceOutbox(surface, send)` + 共通 thread 履歴。4 bridge を移行し `SurfaceAsyncChannel` を manifest 由来 union に戻す。Slack 専用 `buildSlack*` fork は generic 版へ寄せる。
 2. `resolveSurfaceViewer(req)`(loopback / bearer / token registry / tenant-org-project narrowing)を core に 1 つ。4 fork 削除。
 3. vocabulary は `libs/core/t.ts` の browser-safe build 1 つに。chronos `ux-vocabulary.ts`(216 行)/ concierge `i18n.ts` 削除、operator-surface を catalog 化。
 4. read-model は文言でなく vocabulary key + params を返す。`statusLabel` / `nextAction.title` / `status_ja` / `summary_ja` を key 化。
@@ -203,7 +203,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 **実装**:
 
-1. `libs/core/actuator-sdk.ts`: `defineActuator({ id, ops: { [op]: { kind, input, handler } } })` — manifest path / retry policy / preflight / unknown-op error / control flow / result envelope / `describeOps` を id から導出。AR-09 の共通 recovery policy をこの上に載せる。
+1. `libs/core/actuator/actuator-sdk.ts`: `defineActuator({ id, ops: { [op]: { kind, input, handler } } })` — manifest path / retry policy / preflight / unknown-op error / control flow / result envelope / `describeOps` を id から導出。AR-09 の共通 recovery policy をこの上に載せる。
 2. `create_actuator.ts` を SDK 出力に変更、`generate_op_registry.ts` は `libs/actuators/*/src/op-catalog.ts` の glob へ。`dispatchDecisionOp` 分岐と legacy direct-action fallback を `run_pipeline.ts` から削除(文字列判別の廃止)。
 3. `executePipelineFile(path, opts)` を export し、27 spawn 箇所を置換。`full-health-report.json` 等の shell 経由 sub-pipeline は `core:include` に。
 4. op 入力 schema を op-catalog 側に置き、`describeOps` の戻り型を共有型に(wisdom の `owner/idempotency/execution_kind` を共通化)。目標カバレッジ 100%。
@@ -371,7 +371,7 @@ R6 時点の受入境界に記録された数値には、その後の実装で�
 
 - 30 actuator の `op-catalog.ts` に複製されていた `OpSpecKind` 定義を削除し、共有 `PipelineStepType` (`capture | transform | apply | control`) を利用するように統一した。型専用 import のため、実行時の依存グラフや dispatch 挙動は変わらない。
 - `scripts/generate_op_registry.ts` の `PipelineOpKind`、descriptor/discovery の匿名オブジェクト型も `ActuatorOpDescription` / `PipelineStepType` に統合した。generator の source map が全 self-described catalog を共有型で受けるため、個別 catalog と生成器の契約が型レベルで同一になる。
-- `libs/core/actuator-sdk.ts` の `ActuatorOpDescription` に optional `examples` を追加し、生成済み discovery の既存 schema/examples は再生成せず保持した。
+- `libs/core/actuator/actuator-sdk.ts` の `ActuatorOpDescription` に optional `examples` を追加し、生成済み discovery の既存 schema/examples は再生成せず保持した。
 - 全 31 actuator catalog の `describeOps()` に `ActuatorOpDescription[]` の共有戻り値型を明示し、generator の受け側とカタログ側の契約を型レベルで一致させた。
 - 検証: `pnpm run typecheck`、`pnpm run lint`、`pnpm run build:packages`、`pnpm exec vitest run scripts/generate_op_registry.test.ts` (3 tests)、`pnpm run generate:op-registry -- --check`、`pnpm run check -- --scope pr` (31/31) が green。
 
@@ -430,8 +430,8 @@ transform 3件、apply 31件を登録し、`determineActuatorStepType('core', ..
 4 bridge が共有する text-only delivery の固定文言を、surface ごとの複製ではなく catalog の
 同一キーで検査・追加できる。
 
-検証: `pnpm exec vitest run libs/core/channel-adapter.test.ts libs/core/t.test.ts
-libs/core/vocabulary-catalog.test.ts`（3 files / 26 tests）、`pnpm generate:vocabulary-types`。
+検証: `pnpm exec vitest run libs/core/surface/channel-adapter.test.ts libs/core/t.test.ts
+libs/core/knowledge/vocabulary-catalog.test.ts`（3 files / 26 tests）、`pnpm generate:vocabulary-types`。
 
 ## 13. 2026-08-28 Chronos tenant scope の語彙移行
 
@@ -440,13 +440,13 @@ Chronos の tenant / organization / project scope selector に残っていた表
 `uxText` で解決するようにした。scope query key、認可境界、選択状態のリセット規則は
 変更していない。`qps-ploc` を含む生成済み vocabulary key union も再生成した。
 
-検証: `pnpm exec vitest run libs/core/channel-adapter.test.ts
+検証: `pnpm exec vitest run libs/core/surface/channel-adapter.test.ts
 presence/displays/chronos-mirror-v2/src/lib/ux-locale.test.ts`（2 files / 20 tests）、
 `pnpm generate:vocabulary-types`、`git diff --check`。
 
 ## 14. 2026-08-28 生成済み vocabulary 型の type-ratchet 境界
 
-`generate:vocabulary-types` が更新する `libs/core/vocabulary-keys.generated.ts` は、語彙
+`generate:vocabulary-types` が更新する `libs/core/knowledge/vocabulary-keys.generated.ts` は、語彙
 追加に比例して行数が増える生成物である。type-ratchet の source 最大行数に含めると、正当な
 catalog 拡張だけで `src.max_lines` が増加し、実装コードの肥大化と区別できない。生成物を
 ratchet の走査対象外へ明示し、実装ファイルの最大行数と `max-file-lines` の検査は維持した。
@@ -480,7 +480,7 @@ Slack/iMessage package build、`pnpm run typecheck`、`pnpm run lint`、
 
 ## 17. 2026-08-28 viewer scope materialization の正本化
 
-`libs/core/surface-mutation-guard.ts` に `resolveSurfaceViewerScope` を追加し、登録 token、
+`libs/core/surface/surface-mutation-guard.ts` に `resolveSurfaceViewerScope` を追加し、登録 token、
 設定 token、loopback compatibility、server-owned tenant binding、principal、role tier policy
 を一つの core 境界へ集約した。Chronos / Concierge / Presence Studio / Computer Surface の
 viewer context resolver はこの materializer を利用する。Next/Express の peer 判定、rate limit、
@@ -528,13 +528,13 @@ golden snapshot に反映した。
 ## 21. 2026-08-29 actuator pipeline preflight 境界の共通化
 
 SX-10/SX-11 の残存 `executePipeline` のうち、ingest と email actuator が持っていた
-`resolve → preflight → execute → context更新` の loop を `libs/core/actuator-sdk.ts` の
+`resolve → preflight → execute → context更新` の loop を `libs/core/actuator/actuator-sdk.ts` の
 `runActuatorPipeline` へ移行した。domain handler、placeholder 解決、email の preflight 前後の
 順序は各 actuator 側に残し、preflight の actuator scope、repair 済み input、block/ask の
 fail-closed error、step 順序は共通 helper が担う。core SDK の契約テストで context 引き継ぎと
 block 時の handler 非実行を固定した。
 
-検証: `./node_modules/.bin/vitest run libs/core/actuator-sdk.test.ts
+検証: `./node_modules/.bin/vitest run libs/core/actuator/actuator-sdk.test.ts
 libs/actuators/ingest-actuator/src/index.test.ts libs/actuators/email-actuator/src/index.test.ts`
 （3 files / 15 tests）、
 `pnpm run typecheck`、`pnpm run check -- --scope pr`（31/31）が green。
@@ -1215,7 +1215,7 @@ scripts **129 files / 781 tests** を実行して green を確認した。
 lifecycle、voice setup / upgrade / consent、environment manifest、i18n report、customer overlay、
 generation schedule、model registry、OAuth、portal inbox、reconciliation、vocabulary generation
 などの entrypoint を canonical public subpath へ移した。`service-validator` は既存の `src/pfc` 配置を
-外部へ漏らさない `libs/core/service-validator.ts` facade を追加し、Vitest の package-subpath alias
+外部へ漏らさない `libs/core/service/service-validator.ts` facade を追加し、Vitest の package-subpath alias
 と実 package export の両方を同じ境界へ揃えた。
 
 移行後に root barrel mock が direct subpath import を差し替えないテストをレビューで検出した。
@@ -1526,7 +1526,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/autonomous-repair.test.ts libs/core/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: 3 files / 24 tests passed。
+- `pnpm exec vitest run libs/core/autonomous-repair.test.ts libs/core/pipeline/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: 3 files / 24 tests passed。
 - `pnpm run typecheck`: passed。
 
 ### 残存リスク
@@ -1599,7 +1599,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run libs/core/video/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **2 files / 10 tests passed**。
 - invalid override の fallback 回帰テストを追加。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -1618,7 +1618,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/tool-runtime-policy.test.ts libs/core/voice-sample-ingestion-policy.test.ts libs/core/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **4 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/tool/tool-runtime-policy.test.ts libs/core/voice/voice-sample-ingestion-policy.test.ts libs/core/video/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **4 files / 17 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 gates passed**。
@@ -1638,7 +1638,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/video-composition-template-registry.test.ts libs/core/video-render-runtime-policy.test.ts libs/core/tool-runtime-policy.test.ts libs/core/voice-sample-ingestion-policy.test.ts libs/core/foundation/index.test.ts`: **5 files / 19 tests passed**。
+- `pnpm exec vitest run libs/core/video/video-composition-template-registry.test.ts libs/core/video/video-render-runtime-policy.test.ts libs/core/tool/tool-runtime-policy.test.ts libs/core/voice/voice-sample-ingestion-policy.test.ts libs/core/foundation/index.test.ts`: **5 files / 19 tests passed**。
 - invalid schema fallback の回帰テストを追加。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -1659,7 +1659,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/provider-egress-gate.test.ts libs/core/foundation/index.test.ts`: **2 files / 31 tests passed**。
+- `pnpm exec vitest run libs/core/provider/provider-egress-gate.test.ts libs/core/foundation/index.test.ts`: **2 files / 31 tests passed**。
 
 ### 残存リスク
 
@@ -1675,7 +1675,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/provider-capability-registry.test.ts`: **1 file / 10 tests passed**。
+- `pnpm exec vitest run libs/core/provider/provider-capability-registry.test.ts`: **1 file / 10 tests passed**。
 
 ### 残存リスク
 
@@ -1711,7 +1711,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/project-track-registry.test.ts`: **2 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/project/project-registry.test.ts libs/core/project/project-track-registry.test.ts`: **2 files / 7 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 gates passed**。
@@ -1731,7 +1731,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/service-runtime-registry.test.ts`: **1 file / 3 tests passed**。
+- `pnpm exec vitest run libs/core/service/service-runtime-registry.test.ts`: **1 file / 3 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 gates passed**。
@@ -1771,7 +1771,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/src/pipeline-scheduler.test.ts`: **1 file / 11 tests passed**。
+- `pnpm exec vitest run libs/core/pipeline/pipeline-scheduler.test.ts`: **1 file / 11 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 gates passed**。
@@ -1811,7 +1811,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/provider-discovery.test.ts libs/core/provider-capability-catalog.test.ts libs/core/provider-capability-catalog-writer.test.ts`: **3 files / 8 tests passed**。
+- `pnpm exec vitest run libs/core/provider/provider-discovery.test.ts libs/core/provider/provider-capability-catalog.test.ts libs/core/provider/provider-capability-catalog-writer.test.ts`: **3 files / 8 tests passed**。
 - foundation reader を導入したテスト double の不足を修正し、knowledge catalog の present / malformed / malformed-entry fallback と probe merge の union / discovery 反映を再確認した。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
 
@@ -1847,7 +1847,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/artifact-record.test.ts libs/core/data-vault.test.ts libs/core/relationship-graph-store.test.ts libs/core/project-registry.test.ts`: **4 files / 35 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/artifact-record.test.ts libs/core/data-vault.test.ts libs/core/relationship-graph-store.test.ts libs/core/project/project-registry.test.ts`: **4 files / 35 tests passed**。
 - foundation reader を導入した data-vault test double を補完し、cache hit / persisted entry / listing / expired entry の既存挙動を再確認した。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
 
@@ -1864,7 +1864,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/intent-flow-cache.test.ts`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-flow-cache.test.ts`: **1 file / 5 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
 
 ### 残存リスク
@@ -1881,7 +1881,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/delegated-task-observability.test.ts libs/core/distill-candidate-registry.test.ts`: **2 files / 20 tests passed**。
+- `pnpm exec vitest run libs/core/delegated-task-observability.test.ts libs/core/knowledge/distill-candidate-registry.test.ts`: **2 files / 20 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
 
 ### 残存リスク
@@ -1899,9 +1899,9 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/company.test.ts libs/core/browser-conversation-session.test.ts libs/core/intent-handoff.test.ts`: **3 files / 14 tests passed**。
-- `pnpm exec vitest run libs/core/peer-conversation.test.ts libs/core/task-session.test.ts`: **2 files / 22 tests passed**。
-- `pnpm exec vitest run libs/core/project-operational-state-registry.test.ts`: **1 file / 3 tests passed**。
+- `pnpm exec vitest run libs/core/company.test.ts libs/core/browser/browser-conversation-session.test.ts libs/core/intent/intent-handoff.test.ts`: **3 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/peer-conversation.test.ts libs/core/task/task-session.test.ts`: **2 files / 22 tests passed**。
+- `pnpm exec vitest run libs/core/project/project-operational-state-registry.test.ts`: **1 file / 3 tests passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -1922,8 +1922,8 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/mission-seed-registry.test.ts libs/core/mission-seed-registry.overlay.test.ts`: **2 files / 4 tests passed**。
-- `pnpm exec vitest run libs/core/procedure-registry.test.ts`: **1 file / 25 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-seed-registry.test.ts libs/core/mission/mission-seed-registry.overlay.test.ts`: **2 files / 4 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/procedure-registry.test.ts`: **1 file / 25 tests passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -1944,8 +1944,8 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/peer-messaging.test.ts libs/core/mesh-hub-peer-messaging-adapter.test.ts libs/core/evidence-chain.test.ts`: **3 files / 23 tests passed**。
-- `pnpm exec vitest run libs/core/src/feedback-loop.test.ts`: **1 file / 7 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/peer-messaging.test.ts libs/core/mesh/mesh-hub-peer-messaging-adapter.test.ts libs/core/evidence-chain.test.ts`: **3 files / 23 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/feedback-loop.test.ts`: **1 file / 7 tests passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -1968,16 +1968,16 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/src/pfc/PfcController.test.ts libs/core/procedure-self-repair.test.ts`: **2 files / 26 tests passed**。
-- `pnpm exec vitest run libs/core/plugin-managed-install.test.ts`: **1 file / 6 tests passed**。
-- `pnpm exec vitest run libs/core/external-hook-discovery.test.ts libs/core/surface-access-policy.test.ts`: **2 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/pfc/PfcController.test.ts libs/core/knowledge/procedure-self-repair.test.ts`: **2 files / 26 tests passed**。
+- `pnpm exec vitest run libs/core/plugin/plugin-managed-install.test.ts`: **1 file / 6 tests passed**。
+- `pnpm exec vitest run libs/core/external-hook-discovery.test.ts libs/core/surface/surface-access-policy.test.ts`: **2 files / 7 tests passed**。
 - `pnpm exec vitest run libs/core/untrusted-content.test.ts`: **1 file / 16 tests passed**。
-- `pnpm exec vitest run libs/core/knowledge-slices.test.ts libs/core/src/knowledge-index.test.ts libs/core/src/knowledge-feedback-loop.test.ts libs/core/src/pipeline-engine.test.ts`: **4 files / 46 tests passed**。
-- `pnpm exec vitest run libs/core/delegation-concurrency.test.ts libs/core/storage-janitor.test.ts`: **2 files / 59 tests passed**。
-- `pnpm exec vitest run libs/core/presence-avatar.test.ts libs/core/voice-tts-config.test.ts`: **2 files / 4 tests passed**。
-- `pnpm exec vitest run libs/core/voice-profile-registry.test.ts`: **1 file / 6 tests passed**。
-- `pnpm exec vitest run libs/core/src/intent-compiler.test.ts`: **1 file / 8 tests passed**。
-- `pnpm exec vitest run libs/core/src/autonomous-ops-gate.test.ts libs/core/media-backend-registry.test.ts`: **2 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-slices.test.ts libs/core/knowledge/knowledge-index.test.ts libs/core/knowledge/knowledge-feedback-loop.test.ts libs/core/pipeline/pipeline-engine.test.ts`: **4 files / 46 tests passed**。
+- `pnpm exec vitest run libs/core/mission/delegation-concurrency.test.ts libs/core/storage-janitor.test.ts`: **2 files / 59 tests passed**。
+- `pnpm exec vitest run libs/core/presence-avatar.test.ts libs/core/voice/voice-tts-config.test.ts`: **2 files / 4 tests passed**。
+- `pnpm exec vitest run libs/core/voice/voice-profile-registry.test.ts`: **1 file / 6 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-compiler.test.ts`: **1 file / 8 tests passed**。
+- `pnpm exec vitest run libs/core/governance/autonomous-ops-gate.test.ts libs/core/media/media-backend-registry.test.ts`: **2 files / 14 tests passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -2000,7 +2000,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 ### 実測 evidence
 
 - `pnpm exec vitest run scripts/run_baseline_check.test.ts`: **1 file / 28 tests passed**。
-- `pnpm exec vitest run libs/core/cowork-surface.test.ts libs/core/worker-state-journal.test.ts`: **2 files / 26 tests passed**。
+- `pnpm exec vitest run libs/core/cowork-surface.test.ts libs/core/workforce/worker-state-journal.test.ts`: **2 files / 26 tests passed**。
 - `pnpm exec vitest run scripts/refactor/adf-input.test.ts scripts/check_ci_gate_parity.test.ts`: **2 files / 13 tests passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
 - `pnpm run typecheck`: passed。
@@ -2023,8 +2023,8 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts`: **2 files / 21 tests passed**。
-- `pnpm exec vitest run libs/core/knowledge-provider.test.ts libs/core/src/pipeline-preview.test.ts scripts/check_documentation_source_map.test.ts`: **3 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/pipeline/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts`: **2 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-provider.test.ts libs/core/pipeline/pipeline-preview.test.ts scripts/check_documentation_source_map.test.ts`: **3 files / 17 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
@@ -2047,9 +2047,9 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/mission-orchestration-events.test.ts libs/core/mission-task-recovery.test.ts libs/core/mission-process-planning.test.ts libs/core/organization-operating-model.test.ts`: **4 files / 34 tests passed**。
-- `pnpm exec vitest run libs/core/mission-hygiene.test.ts libs/core/pending-intent-store.test.ts libs/core/mission-lifecycle.test.ts libs/core/mission-orchestration-scenario-pack.test.ts libs/core/organization-profile.test.ts libs/core/mission-team-composer.test.ts`: **6 files / 54 tests passed**。
-- `pnpm exec vitest run libs/core/model-registry-directory.test.ts libs/core/analysis-contract.test.ts libs/core/capability-bundle-registry.test.ts`: **3 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-orchestration-events.test.ts libs/core/mission/mission-task-recovery.test.ts libs/core/mission/mission-process-planning.test.ts libs/core/organization/organization-operating-model.test.ts`: **4 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-hygiene.test.ts libs/core/pending-intent-store.test.ts libs/core/mission/mission-lifecycle.test.ts libs/core/mission/mission-orchestration-scenario-pack.test.ts libs/core/organization/organization-profile.test.ts libs/core/mission/mission-team-composer.test.ts`: **6 files / 54 tests passed**。
+- `pnpm exec vitest run libs/core/reasoning/model-registry-directory.test.ts libs/core/analysis/analysis-contract.test.ts libs/core/capability-bundle-registry.test.ts`: **3 files / 14 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
 
 ### 残存リスク
@@ -2068,7 +2068,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/agent-activity-board.test.ts libs/core/artifact-bundle.test.ts libs/core/capability-broker.test.ts libs/core/execution-feedback.test.ts libs/core/operator-home-summary.test.ts libs/core/surface-ux-contract.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/trigger-runner.test.ts`: **8 files / 54 tests passed**。
+- `pnpm exec vitest run libs/core/agent/agent-activity-board.test.ts libs/core/workforce/artifact-bundle.test.ts libs/core/capability-broker.test.ts libs/core/execution-feedback.test.ts libs/core/surface/operator-home-summary.test.ts libs/core/surface/surface-ux-contract.test.ts libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/trigger-runner.test.ts`: **8 files / 54 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
 
 ### 残存リスク
@@ -2086,7 +2086,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/worker-event-stream.test.ts libs/core/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/workforce/worker-event-stream.test.ts libs/core/mesh/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
 
 ### 残存リスク
@@ -2104,7 +2104,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/worker-event-stream.test.ts libs/core/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/workforce/worker-event-stream.test.ts libs/core/mesh/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
 
 ### 残存リスク
@@ -2140,7 +2140,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/prompt-visibility-ledger.test.ts`: **2 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/reasoning/prompt-visibility-ledger.test.ts`: **2 files / 7 tests passed**。
 - `pnpm exec vitest run libs/core/deliverable-inbox.test.ts libs/core/foundation/json.test.ts`: **2 files / 6 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
 
@@ -2160,7 +2160,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/mesh-peer-directory.test.ts libs/core/agent-input-queue.test.ts libs/core/mission-graph-run-journal.test.ts libs/core/foundation/json.test.ts`: **4 files / 20 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/mesh-peer-directory.test.ts libs/core/agent/agent-input-queue.test.ts libs/core/mission/mission-graph-run-journal.test.ts libs/core/foundation/json.test.ts`: **4 files / 20 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed（直前の foundation／JSONL 移行後の gate 実測）。
 
 ### 残存リスク
@@ -2178,7 +2178,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/artifact-registry.test.ts libs/core/artifact-store.test.ts libs/core/agent-collaboration-projection.test.ts libs/core/graph-run-artifact.test.ts libs/core/foundation/json.test.ts`: **5 files / 29 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/artifact-registry.test.ts libs/core/workforce/artifact-store.test.ts libs/core/agent/agent-collaboration-projection.test.ts libs/core/graph-run-artifact.test.ts libs/core/foundation/json.test.ts`: **5 files / 29 tests passed**。
 
 ### 残存リスク
 
@@ -2195,7 +2195,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/model-performance-index.test.ts libs/core/intent-snapshot-store.test.ts libs/core/runtime-health-history.test.ts libs/core/agent-collaboration-projection.test.ts libs/core/artifact-registry.test.ts libs/core/artifact-store.test.ts libs/core/src/knowledge-feedback-loop.test.ts libs/core/memory-promotion-queue.test.ts libs/core/foundation/json.test.ts`: **9 files / 66 tests passed**。
+- `pnpm exec vitest run libs/core/reasoning/model-performance-index.test.ts libs/core/intent/intent-snapshot-store.test.ts libs/core/tool/runtime-health-history.test.ts libs/core/agent/agent-collaboration-projection.test.ts libs/core/workforce/artifact-registry.test.ts libs/core/workforce/artifact-store.test.ts libs/core/knowledge/knowledge-feedback-loop.test.ts libs/core/knowledge/memory-promotion-queue.test.ts libs/core/foundation/json.test.ts`: **9 files / 66 tests passed**。
 
 ### 残存リスク
 
@@ -2212,7 +2212,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/work-coordination.test.ts libs/core/action-item-store.test.ts libs/core/foundation/json.test.ts`: **3 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/work-coordination.test.ts libs/core/action-item-store.test.ts libs/core/foundation/json.test.ts`: **3 files / 34 tests passed**。
 
 ### 残存リスク
 
@@ -2229,7 +2229,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/peer-messaging.test.ts libs/core/peer-messaging-peer.test.ts libs/core/delegation-notifications.test.ts libs/core/foundation/json.test.ts --reporter=dot`: **3 files / 24 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/peer-messaging.test.ts libs/core/peer-messaging-peer.test.ts libs/core/mission/delegation-notifications.test.ts libs/core/foundation/json.test.ts --reporter=dot`: **3 files / 24 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed（途中で検出された未使用 import を削除後に再実行）。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: **OK**。
@@ -2313,7 +2313,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 ### 実測 evidence
 
 - `pnpm generate:env-registry`: generated `env.example`／`CONFIGURATION.md` を更新。
-- `pnpm exec vitest run libs/core/openai-compatible-backend.test.ts libs/core/reasoning-bootstrap.test.ts libs/core/reasoning-endpoint-discovery.test.ts libs/core/reasoning-backend-policy.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **5 files / 61 tests passed**。
+- `pnpm exec vitest run libs/core/provider/openai-compatible-backend.test.ts libs/core/reasoning/reasoning-bootstrap.test.ts libs/core/reasoning/reasoning-endpoint-discovery.test.ts libs/core/reasoning/reasoning-backend-policy.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **5 files / 61 tests passed**。
 - `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
 - 現行 registry 集計: **412 entries / documented 113 / undocumented 299 / empty descriptions 298 / undocumented secret 0 / undocumented flag 0**。
 
@@ -2333,7 +2333,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 ### 実測 evidence
 
 - `pnpm generate:env-registry`: generated `env.example`／`CONFIGURATION.md` を更新。
-- `pnpm exec vitest run libs/core/reasoning-route-resolver.test.ts libs/core/reasoning-model-routing.test.ts libs/core/intent-contract.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **4 files / 60 tests passed**。
+- `pnpm exec vitest run libs/core/reasoning/reasoning-route-resolver.test.ts libs/core/reasoning/reasoning-model-routing.test.ts libs/core/intent/intent-contract.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **4 files / 60 tests passed**。
 - `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
 - 現行 registry 集計: **412 entries / documented 133 / undocumented 279 / empty descriptions 278 / undocumented secret 0 / undocumented flag 0 / undocumented provider 23**。
 
@@ -2352,7 +2352,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**。
+- `pnpm exec vitest run libs/core/tool/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`: **OK**。
@@ -2377,8 +2377,8 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/provider-capability-scanner.test.ts libs/core/organization-operating-model.test.ts libs/core/mission-workflow-catalog.test.ts libs/core/mission-orchestration-scenario-pack.test.ts libs/core/mission-classification.test.ts libs/core/mission-classification-contract.test.ts libs/core/mission-task-classification-scenarios.test.ts libs/core/capability-bundle-registry.test.ts libs/core/intent-execution-profile-registry.test.ts`: **9 files / 67 tests passed**。
-- `pnpm exec vitest run libs/core/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**（前回の同対象 migration regression）。
+- `pnpm exec vitest run libs/core/provider/provider-capability-scanner.test.ts libs/core/organization/organization-operating-model.test.ts libs/core/mission/mission-workflow-catalog.test.ts libs/core/mission/mission-orchestration-scenario-pack.test.ts libs/core/mission/mission-classification.test.ts libs/core/mission/mission-classification-contract.test.ts libs/core/mission/mission-task-classification-scenarios.test.ts libs/core/capability-bundle-registry.test.ts libs/core/intent/intent-execution-profile-registry.test.ts`: **9 files / 67 tests passed**。
+- `pnpm exec vitest run libs/core/tool/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**（前回の同対象 migration regression）。
 - 変更後の全体 gate: `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope full --only catalogs`、`pnpm check -- --scope pr` (**31/31**)、strict env registry、module boundary、`git diff --check` がすべて passed。
 
 ### 残存リスク
@@ -2396,7 +2396,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/adf-guardrails.test.ts libs/core/reasoning-provider-registry.test.ts`: **2 files / 23 tests passed**。
+- `pnpm exec vitest run libs/core/pipeline/adf-guardrails.test.ts libs/core/reasoning/reasoning-provider-registry.test.ts`: **2 files / 23 tests passed**。
 - `pnpm generate:knowledge-index`: knowledge index／integrity manifest updated successfully。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -2530,14 +2530,14 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 判定
 
-- `libs/core/intent-contract.ts` の intent policy／work policy と `libs/core/question-resolver.ts` の question-resolution policy を、個別 `readJson + compileSchema` から `defineCatalog<T>()` へ移行した。
+- `libs/core/intent/intent-contract.ts` の intent policy／work policy と `libs/core/question-resolver.ts` の question-resolution policy を、個別 `readJson + compileSchema` から `defineCatalog<T>()` へ移行した。
 - 3 policy は固定 governance artifact と専用 schema を持つため、missing／invalid は fallback を設定せず fail-closed のまま、`$schema` metadata の扱いと validation error の共通境界だけを統合した。
 - 動的 tenant／customer path、directory merge、runtime state、quota／security policy の loader は別契約のため今回の一括移行対象から外した。
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/question-resolver.test.ts libs/core/intent-contract.test.ts`: **2 files / 30 tests passed**。
-- `pnpm exec vitest run libs/core/intent-contract.test.ts libs/core/intent-resolution.test.ts libs/core/work-design.test.ts`: **3 files / 64 tests passed**。
+- `pnpm exec vitest run libs/core/question-resolver.test.ts libs/core/intent/intent-contract.test.ts`: **2 files / 30 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-contract.test.ts libs/core/intent/intent-resolution.test.ts libs/core/workforce/work-design.test.ts`: **3 files / 64 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm check -- --scope full --only catalogs`: passed。
 - `git diff --check`: passed。
@@ -2573,13 +2573,13 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 判定
 
-- `libs/core/work-scope-decision.ts` の固定 `work-scope-policy` を、個別 `readJson + compileSchema` から `defineCatalog<WorkScopePolicy>()` へ移行した。
+- `libs/core/workforce/work-scope-decision.ts` の固定 `work-scope-policy` を、個別 `readJson + compileSchema` から `defineCatalog<WorkScopePolicy>()` へ移行した。
 - missing／invalid catalog は fallback を設定せず、従来どおり fail-closed とした。mandatory／accumulation trigger の判定ロジックは変更していない。
 - 既存テストが内部 `readJson` の mock に依存していたため、共通 loader の一時 invalid fixture による schema failure 検証へ更新した。これは production の validation boundary を弱めない。
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/work-scope-decision.test.ts libs/core/work-design.test.ts`: **2 files / 25 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/work-scope-decision.test.ts libs/core/workforce/work-design.test.ts`: **2 files / 25 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope full --only catalogs`: passed。
@@ -2718,7 +2718,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/intent-resolution.test.ts libs/core/router-contract.test.ts libs/core/intent-resolution-contract.test.ts`: **3 files / 39 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-resolution.test.ts libs/core/router-contract.test.ts libs/core/intent/intent-resolution-contract.test.ts`: **3 files / 39 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - 現行の intent resolution 経路は `defineCatalog` の共通 validation／cache 境界を利用している。domain-specific な dynamic loader と、残る全 governance catalog の根統合は継続課題である。
@@ -2738,7 +2738,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run libs/core/work-design.test.ts libs/core/work-scope-decision.test.ts libs/core/intent-resolution.test.ts`: **3 files / 52 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/work-design.test.ts libs/core/workforce/work-scope-decision.test.ts libs/core/intent/intent-resolution.test.ts`: **3 files / 52 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - 固定 catalog の schema 検証と specialist directory merge の runtime path を通過した。dynamic profile loader と domain-specific fallback の全件統合は継続課題である。
@@ -2771,7 +2771,7 @@ R7 の最終レビューを現行計画へ反映し、受入基準を満たし�
 
 検証:
 
-- `pnpm exec vitest run libs/core/analysis-contract.test.ts libs/core/intent-outcome-patterns.test.ts libs/core/intent-coverage-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 8 tests passed**。
+- `pnpm exec vitest run libs/core/analysis/analysis-contract.test.ts libs/core/intent/intent-outcome-patterns.test.ts libs/core/intent/intent-coverage-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 8 tests passed**。
 - `pnpm run generate:knowledge-index`: passed。
 - `pnpm check -- --scope full --only catalogs`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**。
@@ -2787,7 +2787,7 @@ R7 の最終レビューを現行計画へ反映し、受入基準を満たし�
 
 検証:
 
-- `pnpm exec vitest run libs/core/media-semantic-map.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 178 tests passed**。
+- `pnpm exec vitest run libs/core/media/media-semantic-map.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 178 tests passed**。
 - `pnpm run check -- --scope full --only catalogs`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -2802,7 +2802,7 @@ R7 の最終レビューを現行計画へ反映し、受入基準を満たし�
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/autonomous-ops-gate.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+- `pnpm exec vitest run libs/core/governance/autonomous-ops-gate.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
 - `pnpm run generate:knowledge-index`: passed。
 - `pnpm check -- --scope full --only catalogs`: passed。
 - `pnpm run typecheck`: passed。
@@ -2834,7 +2834,7 @@ directory は index・個別 item・snapshot projection の複合契約であり
 
 検証:
 
-- `pnpm exec vitest run libs/core/reasoning-model-routing.test.ts libs/core/intent-flow-cache.test.ts libs/core/model-registry-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/reasoning/reasoning-model-routing.test.ts libs/core/intent/intent-flow-cache.test.ts libs/core/reasoning/model-registry-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2862,7 +2862,7 @@ directory は index・個別 item・snapshot projection の複合契約であり
 
 検証:
 
-- `pnpm exec vitest run libs/core/tool-actuator-routing.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 179 tests passed**。
+- `pnpm exec vitest run libs/core/tool/tool-actuator-routing.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 179 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2876,7 +2876,7 @@ directory は複数ファイルの merge と staged rollout の fallback を持�
 
 検証:
 
-- `pnpm exec vitest run libs/core/service-binding.test.ts libs/core/service-engine-connectors.test.ts libs/core/service-engine.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 220 tests passed**。
+- `pnpm exec vitest run libs/core/service/service-binding.test.ts libs/core/service/service-engine-connectors.test.ts libs/core/service/service-engine.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 220 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2890,7 +2890,7 @@ surface の channel directory／provider manifest 解決は従来の catalog API
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-provider-manifest-catalog.test.ts libs/core/channel-directory.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 187 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-provider-manifest-catalog.test.ts libs/core/surface/channel-directory.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 187 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2905,7 +2905,7 @@ surface の channel directory／provider manifest 解決は従来の catalog API
 検証:
 
 - `pnpm run generate:knowledge-index`: passed。
-- `pnpm exec vitest run libs/core/model-registry-directory.test.ts libs/core/reasoning-model-routing.test.ts libs/core/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/reasoning/model-registry-directory.test.ts libs/core/reasoning/reasoning-model-routing.test.ts libs/core/intent/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2919,7 +2919,7 @@ snapshot 全体は既存の registry catalog、directory の各 envelope は ent
 
 検証:
 
-- `pnpm exec vitest run libs/core/voice-engine-registry.test.ts libs/core/realtime-voice-conversation.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 16 tests passed**。
+- `pnpm exec vitest run libs/core/voice/voice-engine-registry.test.ts libs/core/voice/realtime-voice-conversation.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 16 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2933,7 +2933,7 @@ OAuth の既存 suite は secure I/O 全体を mock するため、preset loader
 
 検証:
 
-- `pnpm exec vitest run libs/core/service-preset-registry.test.ts libs/core/service-harness.test.ts libs/core/service-engine-connectors.test.ts libs/core/oauth-broker.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 41 tests passed**。
+- `pnpm exec vitest run libs/core/service/service-preset-registry.test.ts libs/core/service/service-harness.test.ts libs/core/service/service-engine-connectors.test.ts libs/core/oauth-broker.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 41 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2948,7 +2948,7 @@ schema は language ごとの voice／positive rate を検証し、TTS actuator 
 検証:
 
 - `pnpm run generate:knowledge-index`: passed。
-- `pnpm exec vitest run libs/core/voice-tts-config.test.ts libs/core/voice-stt.test.ts libs/actuators/voice-actuator/src/index.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 28 tests passed**。
+- `pnpm exec vitest run libs/core/voice/voice-tts-config.test.ts libs/core/voice/voice-stt.test.ts libs/actuators/voice-actuator/src/index.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 28 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2963,7 +2963,7 @@ schema は language ごとの voice／positive rate を検証し、TTS actuator 
 検証:
 
 - `pnpm run generate:knowledge-index`: passed。
-- `pnpm exec vitest run libs/core/sdlc-gate-readiness.test.ts libs/core/mission-gate-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
+- `pnpm exec vitest run libs/core/sdlc-gate-readiness.test.ts libs/core/mission/mission-gate-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -2977,7 +2977,7 @@ missing／invalid registry の built-in fallback、voice engine からの backen
 
 検証:
 
-- `pnpm exec vitest run libs/core/media-backend-registry.test.ts libs/core/adapter-default-selection.test.ts libs/core/image-generation-bridge.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 36 tests passed**。
+- `pnpm exec vitest run libs/core/media/media-backend-registry.test.ts libs/core/actuator/adapter-default-selection.test.ts libs/core/media/image-generation-bridge.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 36 tests passed**。
 - `pnpm run generate:knowledge-index`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -2992,7 +2992,7 @@ missing／invalid registry の built-in fallback、voice engine からの backen
 
 検証:
 
-- `pnpm exec vitest run libs/core/provider-capability-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+- `pnpm exec vitest run libs/core/provider/provider-capability-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
 
 残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
 
@@ -3004,7 +3004,7 @@ runtime state は canonical catalog ではないため fallback を設定せず�
 
 検証:
 
-- `pnpm exec vitest run libs/core/provider-health-registry.test.ts libs/core/provider-health-view.test.ts libs/core/provider-backend-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 24 tests passed**（指定した `provider-health-view.test.ts` は存在せず、Vitest は実在する 2 file を実行）。
+- `pnpm exec vitest run libs/core/provider/provider-health-registry.test.ts libs/core/provider-health-view.test.ts libs/core/provider/provider-backend-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 24 tests passed**（指定した `provider-health-view.test.ts` は存在せず、Vitest は実在する 2 file を実行）。
 - `pnpm run generate:knowledge-index`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -3019,7 +3019,7 @@ record は runtime の個別 state であり、registry 全体の fallback や t
 
 検証:
 
-- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/service-binding.test.ts libs/actuators/media-actuator/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 62 tests passed / 11 skipped**。
+- `pnpm exec vitest run libs/core/project/project-registry.test.ts libs/core/service/service-binding.test.ts libs/actuators/media-actuator/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 62 tests passed / 11 skipped**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3033,7 +3033,7 @@ project track は runtime の個別 record であり、registry-wide fallback �
 
 検証:
 
-- `pnpm exec vitest run libs/core/project-track-registry.test.ts libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts libs/core/project-operational-state-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 15 tests passed**。
+- `pnpm exec vitest run libs/core/project/project-track-registry.test.ts libs/core/project/project-management.test.ts libs/core/mission/mission-project-reassignment.test.ts libs/core/project/project-operational-state-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 15 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3047,7 +3047,7 @@ project record の `tier`／`tenant_slug`／organization chain は domain schema
 
 検証:
 
-- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/project-management.test.ts libs/core/mission-context-pack.test.ts libs/core/onboarding-context.test.ts libs/core/analysis-intent-support.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 47 tests passed**。
+- `pnpm exec vitest run libs/core/project/project-registry.test.ts libs/core/project/project-management.test.ts libs/core/mission/mission-context-pack.test.ts libs/core/organization/onboarding-context.test.ts libs/core/analysis/analysis-intent-support.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 47 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3061,7 +3061,7 @@ project record の `tier`／`tenant_slug`／organization chain は domain schema
 
 検証:
 
-- `pnpm exec vitest run libs/core/distill-candidate-registry.test.ts libs/core/background-review-curator.test.ts libs/core/background-review-runner.test.ts libs/core/memory-promotion-workflow.test.ts libs/core/service-distill-candidate.test.ts libs/core/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/distill-candidate-registry.test.ts libs/core/workforce/background-review-curator.test.ts libs/core/workforce/background-review-runner.test.ts libs/core/knowledge/memory-promotion-workflow.test.ts libs/core/service/service-distill-candidate.test.ts libs/core/workforce/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 34 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3075,7 +3075,7 @@ customer path の解決と overlay 優先順位は既存の customer resolver／
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-seed-registry.test.ts libs/core/mission-seed-registry.overlay.test.ts libs/core/mission-seed-assessment.test.ts libs/core/project-management.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-seed-registry.test.ts libs/core/mission/mission-seed-registry.overlay.test.ts libs/core/mission/mission-seed-assessment.test.ts libs/core/project/project-management.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 13 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3089,7 +3089,7 @@ customer path の解決と overlay 優先順位は既存の customer resolver／
 
 検証:
 
-- `pnpm exec vitest run libs/core/project-operational-state-registry.test.ts libs/core/project-state-sync.test.ts libs/core/project-management.test.ts libs/core/mission-context-pack.test.ts libs/core/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
+- `pnpm exec vitest run libs/core/project/project-operational-state-registry.test.ts libs/core/project/project-state-sync.test.ts libs/core/project/project-management.test.ts libs/core/mission/mission-context-pack.test.ts libs/core/mission/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3103,7 +3103,7 @@ voice profile は personal／confidential／public のデータ tier と custome
 
 検証:
 
-- `pnpm exec vitest run libs/core/voice-profile-registry.test.ts libs/core/voice-profile-promotion.test.ts libs/core/voice-engine-registry.test.ts libs/core/realtime-voice-conversation.test.ts libs/core/realtime-voice-loop.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 29 tests passed**。
+- `pnpm exec vitest run libs/core/voice/voice-profile-registry.test.ts libs/core/voice/voice-profile-promotion.test.ts libs/core/voice/voice-engine-registry.test.ts libs/core/voice/realtime-voice-conversation.test.ts libs/core/voice/realtime-voice-loop.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 29 tests passed**。
 - `pnpm run generate:knowledge-index`: passed。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -3159,7 +3159,7 @@ correlation、surface、source、tier、candidate promotion の意味は既存 d
 
 検証:
 
-- `pnpm exec vitest run libs/core/execution-feedback.test.ts libs/core/distill-candidate-registry.test.ts libs/core/background-review-curator.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/execution-feedback.test.ts libs/core/knowledge/distill-candidate-registry.test.ts libs/core/workforce/background-review-curator.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 7 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**。
@@ -3180,7 +3180,7 @@ redacted request/source text の保存は既存のまま維持した。
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。併走した intent contract suite では既存の trace metadata test が 10 秒 timeout となったため、cache 単独 suite で切り分けた。
+- `pnpm exec vitest run libs/core/intent/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。併走した intent contract suite では既存の trace metadata test が 10 秒 timeout となったため、cache 単独 suite で切り分けた。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**。
@@ -3201,7 +3201,7 @@ tenant mismatch、peer dispatch、handoff／close の lifecycle と transport au
 
 検証:
 
-- `pnpm exec vitest run libs/core/peer-conversation.test.ts libs/core/peer-messaging.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/peer-conversation.test.ts libs/core/mesh/peer-messaging.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3220,7 +3220,7 @@ schema invalid は従来の invalid manifest error として扱い、JSON parse 
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-runtime.test.ts libs/core/surface/surface-runtime-orchestrator.approval-contract.test.ts libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3239,7 +3239,7 @@ schema validation のみを shared foundation に寄せ、knowledge delivery の
 
 検証:
 
-- `pnpm exec vitest run libs/core/knowledge-slices.test.ts libs/core/mission-context-pack.test.ts libs/core/mission-context-pack.tenant.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 50 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-slices.test.ts libs/core/mission/mission-context-pack.test.ts libs/core/mission/mission-context-pack.tenant.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 50 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3253,8 +3253,8 @@ schema validation のみを shared foundation に寄せ、knowledge delivery の
 
 検証:
 
-- `pnpm exec vitest run libs/core/egress-policy.test.ts libs/core/egress-policy-tier.test.ts libs/core/reasoning-egress-scope.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 33 tests passed**。
-- `pnpm exec vitest run libs/core/mission-state.test.ts libs/core/mission-lifecycle.test.ts libs/core/mission-distill.test.ts libs/core/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 30 tests passed**。
+- `pnpm exec vitest run libs/core/egress-policy.test.ts libs/core/egress-policy-tier.test.ts libs/core/reasoning/reasoning-egress-scope.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 33 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-state.test.ts libs/core/mission/mission-lifecycle.test.ts libs/core/mission/mission-distill.test.ts libs/core/mission/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 30 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3268,7 +3268,7 @@ schema validation のみを shared foundation に寄せ、knowledge delivery の
 
 検証:
 
-- `pnpm exec vitest run libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
+- `pnpm exec vitest run libs/core/task/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3280,7 +3280,7 @@ candidate resolution、confirmation、browser actuator の実行、snapshot の 
 
 検証:
 
-- `pnpm exec vitest run libs/core/browser-conversation-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+- `pnpm exec vitest run libs/core/browser/browser-conversation-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3292,7 +3292,7 @@ payload 本体は任意の event-specific object のため envelope catalog の 
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-orchestration-events.test.ts libs/core/mission-orchestration-worker.resume.test.ts libs/core/mission-orchestration-journal.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 15 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-orchestration-events.test.ts libs/core/mission/mission-orchestration-worker.resume.test.ts libs/core/mission/mission-orchestration-journal.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 15 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 
@@ -3358,7 +3358,7 @@ policy 全体の受入契約を catalog に寄せ、実行時の regex matching 
 
 検証:
 
-- `pnpm exec vitest run libs/core/restricted-action-policy.test.ts libs/core/meeting-facilitator-policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/restricted-action-policy.test.ts libs/core/meeting/meeting-facilitator-policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 14 tests passed**。
 
 ## 186. 2026-08-29 SX-04 tenant rate-limit policy／state の schema 統合
 
@@ -3373,7 +3373,7 @@ timestamp を検証する。state write 前にも同じ schema を通すため�
 
 検証:
 
-- `pnpm exec vitest run libs/core/tenant-rate-limiter.test.ts libs/core/operation-policy-gate.test.ts libs/core/provider-health-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 24 tests passed**。
+- `pnpm exec vitest run libs/core/organization/tenant-rate-limiter.test.ts libs/core/operation-policy-gate.test.ts libs/core/provider/provider-health-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 24 tests passed**。
 
 ## 187. 2026-08-29 SX-04 external service registry／provider catalog の schema 統合
 
@@ -3424,7 +3424,7 @@ domain gate を schema validation に置き換えていない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/voice-profile-promotion.test.ts libs/core/voice-profile-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 11 tests passed**。
+- `pnpm exec vitest run libs/core/voice/voice-profile-promotion.test.ts libs/core/voice/voice-profile-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 11 tests passed**。
 
 ## 191. 2026-08-29 SX-04 marketing risk policy の governed 化
 
@@ -3449,7 +3449,7 @@ allowlist、risk gate の意味は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/service-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 8 tests passed**。
+- `pnpm exec vitest run libs/core/service/service-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 8 tests passed**。
 
 ## 193. 2026-08-29 SX-04 intent contract learning の governed catalog 統合
 
@@ -3457,7 +3457,7 @@ allowlist、risk gate の意味は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-contract-learning.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-contract-learning.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
 
 ## 194. 2026-08-29 SX-04 work-design profile の専用 schema 統合
 
@@ -3470,7 +3470,7 @@ domain logic に残した。
 
 検証:
 
-- `pnpm exec vitest run libs/core/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 15 tests passed**。
+- `pnpm exec vitest run libs/core/workforce/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 15 tests passed**。
 
 ## 195. 2026-08-29 SX-04 semantic degradation runtime log の governed 化
 
@@ -3505,7 +3505,7 @@ promotion では catalog validation を pipeline／catalog の書き込み前に
 
 検証:
 
-- `pnpm exec vitest run libs/core/procedure-registry.test.ts libs/core/service-procedure-promotion.test.ts libs/core/browser-procedure-promotion.test.ts libs/core/desktop-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 43 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/procedure-registry.test.ts libs/core/service/service-procedure-promotion.test.ts libs/core/browser/browser-procedure-promotion.test.ts libs/core/virtual/desktop-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 43 tests passed**。
 
 ## 198. 2026-08-29 SX-04 observation registry の governed catalog 統合
 
@@ -3531,7 +3531,7 @@ repo 外 absolute path／空 path は従来どおり明示拒否とした。save
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/pipeline-scheduler.test.ts libs/core/src/feedback-loop.test.ts libs/core/automation-blueprint.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/pipeline/pipeline-scheduler.test.ts libs/core/knowledge/feedback-loop.test.ts libs/core/automation-blueprint.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 34 tests passed**。
 - `pnpm run generate:knowledge-index`: passed。
 
 ## 200. 2026-08-29 SX-04 actuator manifest の governed loader 統合
@@ -3545,8 +3545,8 @@ capability count／operation 集計、schema 外の将来拡張属性を許容�
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/actuator-capability.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 188 tests passed**。
-- `pnpm exec vitest run libs/core/src/actuator-capability.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+- `pnpm exec vitest run libs/core/actuator/actuator-capability.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 188 tests passed**。
+- `pnpm exec vitest run libs/core/actuator/actuator-capability.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
 
 ## 201. 2026-08-29 SX-04 knowledge curation／index loader の境界統合
 
@@ -3559,8 +3559,8 @@ deterministic output は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/knowledge-curation-report.test.ts libs/core/src/knowledge-curation-tenant-ingest.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
-- `pnpm exec vitest run libs/core/src/knowledge-index.test.ts libs/core/src/knowledge-cache-budget.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-curation-report.test.ts libs/core/knowledge/knowledge-curation-tenant-ingest.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-index.test.ts libs/core/knowledge/knowledge-cache-budget.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
 
 ## 202. 2026-08-29 SX-03 PFC service preset loader の foundation 移行
 
@@ -3570,7 +3570,7 @@ suffix の判定、CLI fallback と setup hint の生成、secret value をロ�
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/pfc/ServiceValidator.test.ts libs/core/src/pfc/PfcController.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run libs/core/pfc/ServiceValidator.test.ts libs/core/pfc/PfcController.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
 
 ## 203. 2026-08-29 SX-09 channel adapter の日本語契約重複判定修正
 
@@ -3583,7 +3583,7 @@ suffix の判定、CLI fallback と setup hint の生成、secret value をロ�
 
 検証:
 
-- `pnpm exec vitest run libs/core/channel-adapter.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 30 tests passed**。
+- `pnpm exec vitest run libs/core/surface/channel-adapter.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 30 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`: **31/31 passed**。
 - `pnpm exec tsx scripts/check_foundation_adoption.ts`、`git diff --check`: passed。
 
@@ -3611,7 +3611,7 @@ reset するようにした。
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-query.test.ts libs/core/surface-runtime.test.ts libs/core/surface-runtime-router.test.ts libs/core/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-query.test.ts libs/core/surface/surface-runtime.test.ts libs/core/surface/surface-runtime-router.test.ts libs/core/surface/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 17 tests passed**。
 
 ## 206. 2026-08-29 SX-04 OKR tracker overlay の governed 化
 
@@ -3688,7 +3688,7 @@ snapshot fallback、organization／tenant overlay の merge 順序は変更し�
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission-team-composer.test.ts libs/core/mission-team-binding.test.ts libs/core/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission/mission-team-composer.test.ts libs/core/mission/mission-team-binding.test.ts libs/core/organization/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`pnpm check -- --scope pr`: passed。
 
 ## 212. 2026-08-29 SX-04 organization profile の governed loader 統合
@@ -3701,7 +3701,7 @@ snapshot fallback、organization／tenant overlay の merge 順序は変更し�
 
 検証:
 
-- `pnpm exec vitest run libs/core/organization-profile.test.ts libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
+- `pnpm exec vitest run libs/core/organization/organization-profile.test.ts libs/core/mission/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`git diff --check`: passed。
 
 ## 213. 2026-08-29 SX-04 tenant registry の governed validation 統合
@@ -3714,7 +3714,7 @@ normalization と既存の fail-closed 挙動は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/tenant-registry.test.ts libs/core/tier-guard-tenant.test.ts libs/core/tenant-activation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 38 tests passed**。
+- `pnpm exec vitest run libs/core/organization/tenant-registry.test.ts libs/core/tier-guard-tenant.test.ts libs/core/organization/tenant-activation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 38 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`: passed。
 
 ## 214. 2026-08-29 SX-04 org chart の governed loader 統合
@@ -3728,7 +3728,7 @@ index の governed loader を root fixture にも適用し、既存の directory
 
 検証:
 
-- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission-team-composer.test.ts libs/core/mission-team-binding.test.ts libs/core/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 39 tests passed**。
+- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission/mission-team-composer.test.ts libs/core/mission/mission-team-binding.test.ts libs/core/organization/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 39 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
 
 ## 215. 2026-08-29 review cycle: org chart の scope／source 判定を補強
@@ -3740,7 +3740,7 @@ index の governed loader を root fixture にも適用し、既存の directory
 
 検証:
 
-- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 5 tests passed**。
+- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 5 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
 
 ## 216. 2026-08-29 SX-04 price book の governed loader 統合
@@ -3767,7 +3767,7 @@ tenant slug は `isValidTenantSlug` を通して、価格 catalog の path trave
 
 検証:
 
-- `pnpm exec vitest run libs/core/video-visual-direction.test.ts libs/core/deal-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run libs/core/video/video-visual-direction.test.ts libs/core/deal-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
 
 ## 218. 2026-08-29 SX-04 restricted-skills policy の fail-closed schema 化
@@ -3780,7 +3780,7 @@ policy は例外を許可側へ流さず deny とし、tenant／organization／p
 
 検証:
 
-- `pnpm exec vitest run libs/core/skill-plugin-loader.test.ts libs/core/skill-resource-loader.test.ts libs/core/skill-wrapper.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 26 tests passed**。
+- `pnpm exec vitest run libs/core/plugin/skill-plugin-loader.test.ts libs/core/plugin/skill-resource-loader.test.ts libs/core/plugin/skill-wrapper.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 26 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
 
 ## 219. 2026-08-30 SX-04 restricted-capabilities の実行 gate 接続
@@ -3794,7 +3794,7 @@ policy の missing／malformed は fail-closed とし、`allow_override` を暗�
 
 検証:
 
-- `pnpm exec vitest run libs/core/capability-restriction-policy.test.ts libs/core/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/capability-restriction-policy.test.ts libs/core/actuator/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 21 tests passed**。
 - `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
 
 ## 220. 2026-08-30 review cycle: 専用 governance schema の catalog gate 互換性
@@ -3807,7 +3807,7 @@ schema の実在性へ拡張し、専用 schema へ移行中も既存の契約 t
 
 検証:
 
-- `pnpm exec vitest run scripts/check_catalog_integrity.test.ts libs/core/capability-restriction-policy.test.ts libs/core/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
+- `pnpm exec vitest run scripts/check_catalog_integrity.test.ts libs/core/capability-restriction-policy.test.ts libs/core/actuator/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
 - `pnpm run validate`: **full 67/67 gates passed**（build／typecheck を含む）。
 - `pnpm check -- --scope pr`: **31/31 passed**、`pnpm lint`、`git diff --check`: passed。
 
@@ -3824,8 +3824,8 @@ packet を注入した契約が生文の別解釈へ戻らず、`bootstrap-proje
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
-- `pnpm exec vitest run libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run libs/core/task/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**。
 
@@ -3843,8 +3843,8 @@ canonical packet を正とする現在の契約に合わせて更新した。
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **1 file / 24 tests passed**。
-- `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts libs/core/router-contract.test.ts libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: passed。
+- `pnpm exec vitest run libs/core/intent/intent-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **1 file / 24 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-resolution-contract.test.ts libs/core/router-contract.test.ts libs/core/task/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: passed。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**。
 
@@ -3860,8 +3860,8 @@ router の packet 注入境界と、surface compile 判定の packet 再利用�
 
 検証:
 
-- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
-- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
+- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-runtime.test.ts libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: passed。
 
 ## 224. 2026-08-30 SX-08B router／orchestrator の共有 packet 境界を実装
@@ -3878,8 +3878,8 @@ router の packet 注入、compile 判定の packet 注入、surface runtime の
 
 検証:
 
-- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
-- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
+- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-runtime.test.ts libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: passed。
 
 ## 225. 2026-08-30 SX-08B task route／live-query の packet 再利用を拡張
@@ -3893,7 +3893,7 @@ governed execution hint が同じ選択結果を使うようにした。packet �
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-query.test.ts libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **6 files / 53 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-query.test.ts libs/core/router-contract.test.ts libs/core/surface/surface-runtime-router.test.ts libs/core/surface/surface-runtime.test.ts libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **6 files / 53 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: passed。
 
 ## 226. 2026-08-30 SX-08B approval／mission proposal envelope の契約描画を補完
@@ -3910,7 +3910,7 @@ Telegram／Discord／iMessage の確認文へ既存の contract を optional に
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-approval-ui.test.ts libs/core/slack-approval-ui.test.ts libs/core/slack-mission-proposal-ui.test.ts libs/core/surface-mission-proposals.confirmation.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **8 files / 35 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-approval-ui.test.ts libs/core/integrations/slack-approval-ui.test.ts libs/core/integrations/slack-mission-proposal-ui.test.ts libs/core/surface/surface-mission-proposals.confirmation.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **8 files / 35 tests passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
 - `pnpm check -- --scope pr`: **31/31 passed**、baseline pipeline が green。
 
@@ -3928,7 +3928,7 @@ Telegram／Discord／iMessage の確認文へ既存の contract を optional に
 
 検証:
 
-- `pnpm exec vitest run libs/core/ranking-signals.test.ts libs/core/knowledge-weight-recalculation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+- `pnpm exec vitest run libs/core/ranking-signals.test.ts libs/core/knowledge/knowledge-weight-recalculation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
 - `pnpm check -- --scope full --only catalogs`: **passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
 
@@ -3985,7 +3985,7 @@ review、outcome、deliverable、tenant／tier の判定責務は変更してい
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 tests passed**。
 - `pnpm check -- --scope full --only catalogs`: **passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
 
@@ -3999,7 +3999,7 @@ regime shift、kill 判定の閾値と termination wiring は変更していな�
 
 検証:
 
-- `pnpm exec vitest run libs/core/trust-engine.test.ts libs/core/kill-switch.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 tests passed**。
+- `pnpm exec vitest run libs/core/trust-engine.test.ts libs/core/governance/kill-switch.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 tests passed**。
 - `pnpm check -- --scope full --only catalogs`: **passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
 
@@ -4043,7 +4043,7 @@ schema validation を統合し、policy 欠損／不正時の fail-closed、assi
 
 検証:
 
-- `pnpm exec vitest run libs/core/delegation-preflight.test.ts`: **3 tests passed**。
+- `pnpm exec vitest run libs/core/mission/delegation-preflight.test.ts`: **3 tests passed**。
 - `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
@@ -4057,7 +4057,7 @@ restart threshold、finance signal の評価責務は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/runtime-health-history.test.ts`: **18 tests passed**。
+- `pnpm exec vitest run libs/core/service/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/tool/runtime-health-history.test.ts`: **18 tests passed**。
 - `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
@@ -4071,7 +4071,7 @@ intent resolution、requirements／payload の生成、session 本体の validat
 
 検証:
 
-- `pnpm exec vitest run libs/core/task-session.test.ts`: **21 tests passed**。
+- `pnpm exec vitest run libs/core/task/task-session.test.ts`: **21 tests passed**。
 - `pnpm run typecheck`: **passed**。
 
 ## 238. 2026-08-30 SX-04 Mesh Hub policy の governed 化
@@ -4084,7 +4084,7 @@ operator gate、fan-out 上限、request kind と recipient acceptance の責務
 
 検証:
 
-- `pnpm exec vitest run libs/core/mesh-router.test.ts libs/core/mesh-topic-registry.test.ts`: **8 tests passed**。
+- `pnpm exec vitest run libs/core/mesh/mesh-router.test.ts libs/core/mesh/mesh-topic-registry.test.ts`: **8 tests passed**。
 - `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
 
@@ -4099,7 +4099,7 @@ operator gate、fan-out 上限、request kind と recipient acceptance の責務
 
 検証:
 
-- `pnpm exec vitest run scripts/apply_dependency_patch.test.ts scripts/help_entrypoints.test.ts libs/core/ingest-quota.test.ts libs/core/generation-quota.test.ts libs/core/delegation-preflight.test.ts libs/core/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/runtime-health.test.ts libs/core/task-session.test.ts libs/core/mesh-router.test.ts libs/core/mesh-topic-registry.test.ts`: **74 tests passed**。
+- `pnpm exec vitest run scripts/apply_dependency_patch.test.ts scripts/help_entrypoints.test.ts libs/core/ingest-quota.test.ts libs/core/generation-quota.test.ts libs/core/mission/delegation-preflight.test.ts libs/core/service/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/runtime-health.test.ts libs/core/task/task-session.test.ts libs/core/mesh/mesh-router.test.ts libs/core/mesh/mesh-topic-registry.test.ts`: **74 tests passed**。
 - `pnpm exec tsx scripts/history_search.ts --help`、`pnpm exec tsx scripts/apply_dependency_patch.ts --help`: **passed**。
 - `pnpm run check -- --scope pr --only script-integrity`: **passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`pnpm exec tsx scripts/check_catalog_integrity.ts`、`git diff --check`: **passed**。
@@ -4116,7 +4116,7 @@ operator gate、fan-out 上限、request kind と recipient acceptance の責務
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-maintenance.purge.test.ts`: **6 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-maintenance.purge.test.ts`: **6 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
 ## 241. 2026-08-30 SX-04 storage retention catalog の schema 実行化
@@ -4157,7 +4157,7 @@ baseline 緩和は行わず、実測方向違反を **4 件から 3 件**へ減�
 検証:
 
 - `node --import ./scripts/ts-loader.mjs --input-type=module -e "import {checkModuleBoundaries} from './scripts/check_module_boundaries.ts'; const r=checkModuleBoundaries(); if (r.violations.length) throw new Error(r.violations.join('\\n')); console.log(JSON.stringify({cycles:r.cycles.length,directionViolations:r.directionViolations.length,maxRuntimeSccSize:r.maxRuntimeSccSize,dynamicImports:r.dynamicImportEdges.length}));"`: **3 direction violations**。
-- `pnpm exec vitest run libs/core/agent-runtime-supervisor.test.ts libs/core/channel-surface-routing.test.ts libs/core/channel-surface-supervisor.test.ts`: **22 tests passed**。
+- `pnpm exec vitest run libs/core/agent/agent-runtime-supervisor.test.ts libs/core/surface/channel-surface-routing.test.ts libs/core/surface/channel-surface-supervisor.test.ts`: **22 tests passed**。
 
 ## 244. 2026-08-30 SX-04 security posture の正本 catalog 化
 
@@ -4170,7 +4170,7 @@ floor の責務は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/security-screen.test.ts libs/core/approval-policy.test.ts libs/core/egress-policy.test.ts libs/core/tier-guard-policy-corruption.test.ts`: **39 tests passed**。
+- `pnpm exec vitest run libs/core/security-screen.test.ts libs/core/governance/approval-policy.test.ts libs/core/egress-policy.test.ts libs/core/tier-guard-policy-corruption.test.ts`: **39 tests passed**。
 - `pnpm run typecheck`: **passed**。
 - catalog integrity は index／manifest 更新後に再確認する。
 
@@ -4189,7 +4189,7 @@ service endpoint／preset 参照を既存の schema 検証済み registry へ寄
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-team-index.test.ts libs/core/trigger-runner.test.ts libs/core/service-binding.test.ts libs/core/service-preset-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 25 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-team-index.test.ts libs/core/trigger-runner.test.ts libs/core/service/service-binding.test.ts libs/core/service/service-preset-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 25 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
 ## 246. 2026-08-30 SX-04 intent compiler の standard-intents loader 統合
@@ -4202,7 +4202,7 @@ service endpoint／preset 参照を既存の schema 検証済み registry へ寄
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/intent-compiler.test.ts libs/core/intent-resolution.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=10000`: **2 files / 35 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-compiler.test.ts libs/core/intent/intent-resolution.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=10000`: **2 files / 35 tests passed**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
 ## 247. 2026-08-30 SX-04 agentic source review rule pack の schema 統合
@@ -4216,7 +4216,7 @@ rule category／match 条件／stages の構造検証を共通境界へ移し、
 
 検証:
 
-- `pnpm exec vitest run libs/core/agentic-source-review.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 tests passed**。
+- `pnpm exec vitest run libs/core/agent/agentic-source-review.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 tests passed**。
 - `pnpm run typecheck`、`pnpm exec tsx scripts/check_catalog_integrity.ts`、`git diff --check`: **passed**。
 
 ## 248. 2026-08-30 SX-04 visual review rubric の governed catalog 化
@@ -4241,7 +4241,7 @@ default の補完、duration／offset の clamp、未知の model selection の 
 
 検証:
 
-- `pnpm exec vitest run libs/core/video-motion-direction.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 17 tests passed**。
+- `pnpm exec vitest run libs/core/video/video-motion-direction.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 17 tests passed**。
 
 ## 250. 2026-08-30 SX-04 intent routing map の重複 reader 除去
 
@@ -4253,7 +4253,7 @@ tenant override の merge と persistence は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
 
 ## 251. 2026-08-30 SX-04 track creation policy の専用 schema 化
 
@@ -4266,7 +4266,7 @@ gate、project track record の生成結果は変更していない。
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-track-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
 
 ## 252. 2026-08-30 SX-04 intent routing の track mapping schema 補強
 
@@ -4277,7 +4277,7 @@ routing と intent-to-track provisioning が同じ map を schema 上も検証�
 
 検証:
 
-- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
+- `pnpm exec vitest run libs/core/intent/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
 
 ## 253. 2026-08-30 SX-03 meeting facilitator policy の registered env accessor 化
 
@@ -4288,7 +4288,7 @@ routing と intent-to-track provisioning が同じ map を schema 上も検証�
 
 検証:
 
-- `pnpm exec vitest run libs/core/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/meeting/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
 
 ## 254. 2026-08-30 SX-04 dynamic permission policy の fail-closed catalog 化
 
@@ -4300,7 +4300,7 @@ routing と intent-to-track provisioning が同じ map を schema 上も検証�
 
 検証:
 
-- `pnpm exec vitest run libs/core/dynamic-permission-guard.test.ts libs/core/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/dynamic-permission-guard.test.ts libs/core/meeting/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
 
 ## 255. 2026-08-30 SX-04 model cost registry の schema/loader 統合
 
@@ -4313,7 +4313,7 @@ fallback merge、壊れた一方を無視して他方を利用する挙動、料
 
 検証:
 
-- `pnpm exec vitest run libs/core/metrics-cost.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+- `pnpm exec vitest run libs/core/analysis/metrics-cost.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
 
 ## 256. 2026-08-30 SX-04 mission template catalog の governed 化
 
@@ -4327,7 +4327,7 @@ mission type の選択、tier auto-elevation、placeholder 展開、既存 missi
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-template-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-template-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
 
 ## 257. 2026-08-30 SX-04 wisdom policy の governed loader 統合
 
@@ -4339,7 +4339,7 @@ LLM profile の選択、tier ごとの output directory、prompt／wisdom の生
 
 検証:
 
-- `pnpm exec vitest run libs/core/wisdom-policy-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm exec vitest run libs/core/reasoning/wisdom-policy-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
 
 ## 258. 2026-08-30 SX-04 persisted trust ledger の governed 化
 
@@ -4352,7 +4352,7 @@ fail-closed の委譲境界、trust policy の scoring／decay／propagation は
 
 検証:
 
-- `pnpm exec vitest run libs/core/trust-ledger-catalog.test.ts libs/core/trust-engine.test.ts libs/core/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 10 tests passed**。
+- `pnpm exec vitest run libs/core/trust-ledger-catalog.test.ts libs/core/trust-engine.test.ts libs/core/mission/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 10 tests passed**。
 
 ## 259. 2026-08-30 SX-04 company organization profile の loader 重複除去
 
@@ -4376,7 +4376,7 @@ root-aware な governed loader を追加し、3 箇所を同じ validated snapsh
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-management-config.test.ts libs/core/mission-seal.test.ts libs/core/mission-state.test.ts libs/core/operator-home-summary.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 10 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-management-config.test.ts libs/core/mission/mission-seal.test.ts libs/core/mission/mission-state.test.ts libs/core/surface/operator-home-summary.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 10 tests passed**。
 
 ## 261. 2026-08-30 SX-04 Chronos mission history の config reader 統合
 
@@ -4400,7 +4400,7 @@ layout、tenant path、tier の検索順は維持している。
 
 検証:
 
-- `pnpm exec vitest run libs/core/path-resolver.test.ts libs/core/mission-management-config.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/path-resolver.test.ts libs/core/mission/mission-management-config.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
 
 ## 263. 2026-08-30 SX-03 mission reader の foundation 統合
 
@@ -4411,7 +4411,7 @@ repair 用の permissive read、mission state の schema-validated 通常 read �
 
 検証:
 
-- `pnpm exec vitest run libs/core/mission-llm.test.ts libs/core/mission-governance.test.ts libs/core/mission-state.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/mission/mission-llm.test.ts libs/core/mission/mission-governance.test.ts libs/core/mission/mission-state.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
 
 ## 264. 2026-08-30 SX-08/SX-09 bridge のユーザー向け語彙統合
 
@@ -4423,7 +4423,7 @@ repair 用の permissive read、mission state の schema-validated 通常 read �
 
 検証:
 
-- `pnpm exec vitest run satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts libs/core/surface-approval-ui.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 26 tests passed**。
+- `pnpm exec vitest run satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts libs/core/surface/surface-approval-ui.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 26 tests passed**。
 - `pnpm run typecheck`、`pnpm exec tsx scripts/check_i18n_hardcoding.ts --update-baseline`、catalog／knowledge index regeneration: passed。
 
 ## 265. 2026-08-30 SX-08 intent packet 選択後の service target 保持
@@ -4447,7 +4447,7 @@ repair 用の permissive read、mission state の schema-validated 通常 read �
 
 検証:
 
-- `pnpm exec vitest run libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 30 tests passed**。
+- `pnpm exec vitest run libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/intent/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 30 tests passed**。
 
 ## 267. 2026-08-30 SX-04 contract-schema checker の実装状況再突合
 
@@ -4502,7 +4502,7 @@ contract-schema checker に valid／invalid fixture と、通常値・テナン�
 
 検証:
 
-- `pnpm exec vitest run libs/core/src/knowledge-feedback-loop.test.ts scripts/check_contract_schemas.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge/knowledge-feedback-loop.test.ts scripts/check_contract_schemas.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
 - `pnpm exec tsx scripts/check_contract_schemas.ts`: **OK**。
 - `pnpm run typecheck`、`pnpm run lint`: passed。
 
@@ -4655,7 +4655,7 @@ Sovereign Dashboard や readiness predicate が利用する core の schema 付�
 
 検証:
 
-- `pnpm exec vitest run libs/core/skill-index.test.ts scripts/sovereign_dashboard.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
+- `pnpm exec vitest run libs/core/plugin/skill-index.test.ts scripts/sovereign_dashboard.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
 ## 283. 2026-08-30 SX-04 UX contract checker の surface role loader 統合
@@ -4754,7 +4754,7 @@ governed loader、manifest は `defineCatalog` の schema 検証へ統合し、o
 
 検証:
 
-- `pnpm exec vitest run scripts/generate_op_registry.test.ts libs/core/actuator-op-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+- `pnpm exec vitest run scripts/generate_op_registry.test.ts libs/core/actuator/actuator-op-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm run build:packages`: passed。
 - `pnpm generate:op-registry`: **changed=[]**。
@@ -4862,7 +4862,7 @@ foundation の汎用 JSON reader と checker-local 型で catalog を再解釈�
 
 検証:
 
-- `pnpm exec vitest run scripts/check_workflow_catalog_refs.contract.test.ts libs/core/mission-workflow-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
+- `pnpm exec vitest run scripts/check_workflow_catalog_refs.contract.test.ts libs/core/mission/mission-workflow-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_workflow_catalog_refs.ts`: passed。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
@@ -4876,7 +4876,7 @@ foundation の汎用 JSON reader と checker-local 型で catalog を再解釈�
 
 検証:
 
-- `pnpm exec vitest run scripts/org.test.ts scripts/org-role-loaders.contract.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 6 tests passed**。
+- `pnpm exec vitest run scripts/org.test.ts scripts/org-role-loaders.contract.test.ts libs/core/mission/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 6 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
 ## 300. 2026-08-30 SX-04 governance directory consistency の snapshot loader 統合
@@ -4989,7 +4989,7 @@ operating model persistence が file-backed schema の検証時に個別 Ajv／l
 
 検証:
 
-- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/browser-extension-bridge.test.ts libs/core/browser-conversation-session.test.ts libs/core/pipeline-adf.test.ts libs/core/chronos-delivery.test.ts libs/core/organization-operating-model.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 67 tests passed**。
+- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/browser/browser-extension-bridge.test.ts libs/core/browser/browser-conversation-session.test.ts libs/core/pipeline/pipeline-adf.test.ts libs/core/chronos-delivery.test.ts libs/core/organization/organization-operating-model.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 67 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm check -- --scope full`: **67/67 passed**。
 
@@ -5022,7 +5022,7 @@ render と出力宣言を既存 `defineGenerator` に統合し、global actuator
 - `node --import ./scripts/ts-loader.mjs scripts/sync_component_inventory.ts`: **5 outputs generated; 3 stale outputs synchronized**。
 - `node --import ./scripts/ts-loader.mjs scripts/sync_component_inventory.ts --check`: **changed=[]**。
 - `node --import ./scripts/ts-loader.mjs scripts/sync_authority_roles.ts --check`、`node --import ./scripts/ts-loader.mjs scripts/sync_team_roles.ts --check`: **両方 changed=[]**。
-- `pnpm exec vitest run scripts/sync_authority_roles.test.ts scripts/sync_team_roles.test.ts scripts/sync_component_inventory.contract.test.ts scripts/lib/harness.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 12 tests passed**。
+- `pnpm exec vitest run scripts/sync_authority_roles.test.ts scripts/sync_team_roles.test.ts scripts/sync_component_inventory.contract.test.ts scripts/lib/harness.test.ts libs/core/mission/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 12 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm check -- --scope full`: **67/67 passed**。
 
@@ -5038,7 +5038,7 @@ directory 優先の読み込み、非空 directory の bootstrap 拒否、model 
 検証:
 
 - `node --import ./scripts/ts-loader.mjs scripts/sync_model_registry.ts --check`: **changed=[]**。
-- `pnpm exec vitest run scripts/sync_model_registry.test.ts libs/core/model-registry-directory.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 184 tests passed**。
+- `pnpm exec vitest run scripts/sync_model_registry.test.ts libs/core/reasoning/model-registry-directory.test.ts libs/core/governance/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 184 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
 ## 311. 2026-08-30 SX-06 provider CLI report generator の harness 統合
@@ -5069,7 +5069,7 @@ catalog schema と pipeline の format 検証、placeholder 解決、既存の�
 
 検証:
 
-- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/actuator-sdk.test.ts scripts/check_pipeline_op_schema_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/actuator/actuator-sdk.test.ts scripts/check_pipeline_op_schema_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_pipeline_op_schema_coverage.ts`: **678 schema-bound steps / 1,562 steps checked; OK**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm check -- --scope full`: **67/67 passed**。
@@ -5088,7 +5088,7 @@ tier-guard` と、runtime authority の facade 内部責務は別波として継
 検証:
 
 - `node --import ./scripts/ts-loader.mjs --input-type=module -e "import {checkModuleBoundaries} from './scripts/check_module_boundaries.ts'; const r=checkModuleBoundaries(); console.log(JSON.stringify({cycles:r.cycles.length,directionViolations:r.directionViolations.length,maxRuntimeSccSize:r.maxRuntimeSccSize,dynamicImports:r.dynamicImportEdges.length,violations:r.directionViolations}));"`: **0 cycles / 2 direction violations / max runtime SCC 33 / 81 dynamic imports**。
-- `pnpm exec vitest run scripts/check_module_boundaries.test.ts libs/core/agent-runtime-supervisor.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
+- `pnpm exec vitest run scripts/check_module_boundaries.test.ts libs/core/agent/agent-runtime-supervisor.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
 
 ## 314. 2026-08-30 SX-06 lifecycle check／reconciliation shell の harness 統合
 
@@ -5495,7 +5495,7 @@ source 契約を回帰テストで固定した。module boundary manifest は、
 
 検証:
 
-- `pnpm exec vitest run libs/core/media-style-policy.test.ts scripts/lib/harness.test.ts`: **2 files / 9 tests passed**。
+- `pnpm exec vitest run libs/core/media/media-style-policy.test.ts scripts/lib/harness.test.ts`: **2 files / 9 tests passed**。
 - `pnpm run typecheck`: **passed**。
 - `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
 
@@ -5747,7 +5747,7 @@ provider discovery／capability snapshot、mission team の organization context
 
 検証:
 
-- `pnpm exec vitest run scripts/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
+- `pnpm exec vitest run scripts/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/compose_mission_team.ts --help`: **exit 0、mission 必須検証／binding write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
@@ -6317,7 +6317,7 @@ artifact、dependency pair を検証し、map が壊れている場合は不完�
 ### 検証
 
 - `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts tests/mesh-two-peer-e2e.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 5 tests passed。
-- `pnpm exec vitest run tests/mesh-two-peer-e2e.test.ts libs/core/mesh-peer-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 11 tests passed。
+- `pnpm exec vitest run tests/mesh-two-peer-e2e.test.ts libs/core/mesh/mesh-peer-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 11 tests passed。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm pipeline --input pipelines/baseline-check.json --json` — baseline pipeline completed successfully。
 
@@ -6519,7 +6519,7 @@ interactive dashboard、MCP tool catalog／server の custom protocol output、�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/core/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/core/mesh/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
 - `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm pipeline --input pipelines/baseline-check.json` — baseline check success。
 - `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
@@ -6615,7 +6615,7 @@ context が overlay 前の値になる残存を検出した。契約 resolver、
 の intent lookup を `loadResolvedStandardIntentCatalog` に揃え、`overlayPaths` を契約 options に追加した。
 personal／tenant 用 catalog を使う injected packet の回帰テストも追加した。
 
-検証: `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000` — **1 file / 8 tests passed**。
+検証: `pnpm exec vitest run libs/core/intent/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000` — **1 file / 8 tests passed**。
 
 ## 419. 2026-08-30 レビュー修正: surface intent contract の表示投影を補完
 
@@ -7095,7 +7095,7 @@ harness 移行、voice provider の実機依存部分、細粒度 command regist
 
 ## 458. 2026-08-31 レビュー修正: module layer の残存方向違反を分類整合
 
-SX-02 の実測を再確認し、`libs/core/src/lock-utils.ts` は logger／path resolver だけに依存する低レベル排他 helper
+SX-02 の実測を再確認し、`libs/core/foundation/lock-utils.ts` は logger／path resolver だけに依存する低レベル排他 helper
 であり foundation 層、`bindings` とそれを検査・生成する script は seam catalog を構成する orchestration 層であるのに、
 manifest の分類が default `domain` のままになっていた残存を検出した。実体に合わせて層宣言を補正し、checker の方向違反を
 **4 件から2件**へ減らした。残る2件は `secure-io` が audit chain／tier guard を bootstrap する意図的な依存であり、
@@ -16774,25 +16774,25 @@ SX-04 の writer lease metrics loaderを再監査し、lease本体とは異な�
 
 SX-03／SX-04 の mission dispatch loaderを再監査し、`mission-retrospective.ts` と `mission-ticket-dispatch.ts` に残っていた `NEXT_TASKS.json`／ticket dispatch manifest の汎用 JSON 読み込みを修正した。既存の mission-boundary task loaderを retrospective と再 dispatchで共有し、ticket manifestには専用 `mission-ticket-dispatch-manifest.schema.json` と regular-file／schema validation loaderを追加した。壊れた task／manifest は従来の空集合・既存 manifest 無視という fail-closed semanticsを維持し、task role集計、ticket failure集計、再 dispatchの動作は変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-retrospective.test.ts libs/core/mission-ticket-dispatch-manifest.test.ts libs/core/mission-ticket-dispatch.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-retrospective.test.ts libs/core/mission/mission-ticket-dispatch-manifest.test.ts libs/core/mission/mission-ticket-dispatch.test.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 948
 
 SX-03／SX-04 の project ledger loaderを再監査し、`mission-project-ledger.ts` が既存 `project-mission-ledger.schema.json` を使わず `readJsonFileSafe` と手作業の `entries` shape mutationで JSON ledgerを読み書きする残存を修正した。専用 loader／writerを既存 schemaと `defineCatalog` に接続し、破損 ledgerは従来同様に新規初期化へ閉じる。Markdown ledger、mission rowの置換 semantics、project scopeの保存は変更していない。
 
-検証: `pnpm exec vitest run libs/core/project-mission-ledger.test.ts libs/core/mission-project-ledger.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/project/project-mission-ledger.test.ts libs/core/mission/mission-project-ledger.ts`、root typecheck、root lint、`pnpm run validate`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 949
 
 SX-03／SX-04 の work-item ticket reflection loaderを再監査し、`mission-workitem-dispatch-ticket.ts` が ticket manifest と `NEXT_TASKS.json` を `mission-dispatch-io` の汎用 readerで読み、未検証の配列／recordを mutation projectionへ渡す残存を修正した。既存の ticket manifest loader と mission-boundary task loaderを reflection、manifest update、status reflectionで共有し、malformed artifactは従来同様に反映を中止する。ticket reply、GitHub／Jira reflection、status rank、provisioned artifactの書き込み semanticsは変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-workitem-dispatch.test.ts libs/core/mission-ticket-dispatch.test.ts libs/core/mission-retrospective.test.ts libs/core/project-mission-ledger.test.ts libs/core/mission-ticket-dispatch-manifest.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-workitem-dispatch.test.ts libs/core/mission/mission-ticket-dispatch.test.ts libs/core/mission/mission-retrospective.test.ts libs/core/project/project-mission-ledger.test.ts libs/core/mission/mission-ticket-dispatch-manifest.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 950
 
 SX-03／SX-04 の work-item artifact review projectionを再監査し、`mission-workitem-dispatch-review.ts` が review target／acceptance criteriaの解決と review receipt反映時の `NEXT_TASKS.json` を `mission-dispatch-io` の汎用 readerで読む残存を修正した。既存の mission-boundary task loaderを共有し、malformed task boardは review context／receipt reflectionを空結果または反映なしへ閉じる。review target、acceptance evidence、artifact receipt、task statusの既存 semanticsは変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-workitem-dispatch.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-workitem-dispatch.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 951
 
@@ -16804,25 +16804,25 @@ SX-04 の finance controller cost report loaderを再監査し、`finance-contro
 
 SX-04 の external ticket artifact loaderを再監査し、`mission-workitem-dispatch-ticket.ts` が GitHub／Jira payloadを汎用 JSON readerと未検証の `Record` castで reflection mutationへ渡す残存を修正した。provider別 schemaとregular-file境界を持つ共通 loaderを追加し、GitHubのissue state／Jiraのfieldsを検証してから更新する。外部APIの追加フィールドは保持し、ticket state、comment、close／reopen、Jira statusの既存 semanticsは変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-ticket-provider-artifact.test.ts libs/core/mission-workitem-dispatch.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-ticket-provider-artifact.test.ts libs/core/mission/mission-workitem-dispatch.test.ts`、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 953
 
 SX-03 の adopt-or-delete 棚卸しで、`readJsonFileSafe` は production consumerがなく、project ledgerの governed loader移行後に `mission-state.ts` と単独テストだけへ残る orphan compatibility APIだったため削除した。mission state本体と focus pointerの governed loader、secure path境界、公開された mission state loading APIは変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-state.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-state.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 954
 
 SX-03 の adopt-or-delete 棚卸しで、`readDispatchRecord` は production consumerがなく、dispatch artifactの書き込み・イベント追記を担う `mission-dispatch-lifecycle.ts` に残る orphan compatibility APIだったため削除した。dispatch artifactのmission boundary、provisioned journal、writer lease、イベント追記の実行経路は変更していない。
 
-検証: `pnpm exec vitest run libs/core/mission-dispatch-lifecycle.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-dispatch-lifecycle.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 955
 
 SX-03 の adopt-or-delete 棚卸しで、`mission-dispatch-io.ts` に残っていた汎用 `readJsonFile`／`writeJsonFile` は production consumerがなく、現在の dispatch 経路が利用する directory／JSONL helperとは別の orphan compatibility APIだったため削除した。`ensureDirectory`、word count、dispatch JSONL追記とその secure path／実行コンテキスト境界は維持している。
 
-検証: `pnpm exec vitest run libs/core/mission-dispatch-lifecycle.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+検証: `pnpm exec vitest run libs/core/mission/mission-dispatch-lifecycle.test.ts`、repo内参照検索、root typecheck、root lint、`pnpm run check -- --scope full`。SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 2026-09-04 再レビュー修正 956
 
@@ -20248,9 +20248,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/mission-maintenance.test.ts libs/core/mission-maintenance.purge.test.ts`
+- `pnpm exec vitest run libs/core/mission/mission-maintenance.test.ts libs/core/mission/mission-maintenance.purge.test.ts`
 - `pnpm --filter @agent/core run typecheck`
-- `pnpm exec eslint --max-warnings 0 libs/core/mission-maintenance.ts`
+- `pnpm exec eslint --max-warnings 0 libs/core/mission/mission-maintenance.ts`
 - `git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
 
@@ -20267,9 +20267,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/mission-work-reconciliation.test.ts`
+- `pnpm exec vitest run libs/core/mission/mission-work-reconciliation.test.ts`
 - `pnpm --filter @agent/core run typecheck`
-- `pnpm exec eslint --max-warnings 0 libs/core/mission-work-reconciliation.ts`
+- `pnpm exec eslint --max-warnings 0 libs/core/mission/mission-work-reconciliation.ts`
 - `git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
 
@@ -20286,9 +20286,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/mission-template-catalog.test.ts libs/core/entity-governance.test.ts`
+- `pnpm exec vitest run libs/core/mission/mission-template-catalog.test.ts libs/core/entity-governance.test.ts`
 - `pnpm --filter @agent/core run typecheck`
-- `pnpm exec eslint --max-warnings 0 libs/core/mission-creation.ts`
+- `pnpm exec eslint --max-warnings 0 libs/core/mission/mission-creation.ts`
 - `git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
 
@@ -20324,9 +20324,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/surface-agent-catalog.test.ts`
+- `pnpm exec vitest run libs/core/surface/surface-agent-catalog.test.ts`
 - `pnpm --filter @agent/core run typecheck`
-- `pnpm exec eslint --max-warnings 0 libs/core/surface-agent-catalog.ts`
+- `pnpm exec eslint --max-warnings 0 libs/core/surface/surface-agent-catalog.ts`
 - `git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
 
@@ -20524,7 +20524,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/agent-dispatch.test.ts`
+- `pnpm exec vitest run libs/core/agent/agent-dispatch.test.ts`
 - `pnpm --filter @agent/core run typecheck`
 - 対象ESLint、`git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
@@ -20560,7 +20560,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ### 検証
 
-- `pnpm exec vitest run libs/core/speech-to-text-bridge.test.ts`
+- `pnpm exec vitest run libs/core/voice/speech-to-text-bridge.test.ts`
 - `pnpm --filter @agent/core run typecheck`
 - 対象ESLint、`git diff --check`
 - フル `pnpm run validate` は変更反映後に実行。
@@ -20631,7 +20631,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1239
 
-- **対象**: `libs/core/capability-broker.ts`、`libs/core/secret-guard.ts`、`libs/core/mission-lifecycle-service.ts`、`libs/core/reasoning-bootstrap.ts`、`libs/core/trigger-runner.ts`
+- **対象**: `libs/core/capability-broker.ts`、`libs/core/secret/secret-guard.ts`、`libs/core/mission/mission-lifecycle-service.ts`、`libs/core/reasoning/reasoning-bootstrap.ts`、`libs/core/trigger-runner.ts`
 - **変更**: core本番コードの `MISSION_ROLE` 読み取りを登録済みenv accessorへ統一した。authority本体のprocess環境境界とテスト用の明示的な環境設定は変更せず、周辺domainがraw process環境へ直接依存しないようにした。
 - **検証**: 各domainの既存テストとfull validateで、role fallback・trigger gate・secret audit・reasoning bootstrapの挙動を確認する。
 
@@ -20727,7 +20727,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1255
 
-- **対象**: `libs/core/secret-guard.ts`
+- **対象**: `libs/core/secret/secret-guard.ts`
 - **変更**: secret-guardのTIBA scope判定と接続文書監査記録に残っていた `MISSION_ID`／`AUTHORIZED_SCOPE` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。temporal grant、scope prefix、secret resolver、暗号化接続文書、監査ledgerの既存 semanticsは変更していない。
 - **検証**: secret guard／branch／bridge **3 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
@@ -20739,13 +20739,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1257
 
-- **対象**: `libs/core/reasoning-backend.ts`
+- **対象**: `libs/core/reasoning/reasoning-backend.ts`
 - **変更**: reasoning-backendのambient prompt visibilityが参照する `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示prompt visibility優先、mission path存在確認、task／context pack／knowledge refsの収集、provider failoverの既存 semanticsは変更していない。
 - **検証**: reasoning／summary retry／failover／prompt visibility **4 files / 42 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
 ## 2026-09-05 再レビュー修正 1258
 
-- **対象**: `libs/core/pipeline-run-journal.ts`
+- **対象**: `libs/core/pipeline/pipeline-run-journal.ts`
 - **変更**: pipeline-run-journalの再開候補探索に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。mission journalの候補発見、path boundary、JSONL event復元、approval resumeの既存 semanticsは変更していない。
 - **検証**: journal／mission graph／approval resume **3 files / 17 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
@@ -20757,7 +20757,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1260
 
-- **対象**: `libs/core/audit-chain.ts`
+- **対象**: `libs/core/governance/audit-chain.ts`
 - **変更**: audit-chainのcurrent tenant解決でmission stateを探索する際に残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。tenant mirror、scope解析、chain integrity、監査entryの既存 semanticsは変更していない。
 - **検証**: tenant audit／parser／forwarder／approval **4 files / 36 tests passed**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
@@ -20769,7 +20769,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1262
 
-- **対象**: `libs/core/anthropic-reasoning-backend.ts`
+- **対象**: `libs/core/provider/anthropic-reasoning-backend.ts`
 - **変更**: Anthropic SDK usage meteringのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。provider usage／cache statsの記録、best-effort metering、既存のreasoning semanticsは変更していない。
 - **検証**: Anthropic backend **1 file / 9 tests passed（1 skipped）**、対象ESLint、Prettier、`git diff --check`、フル `pnpm run validate`（69 gates / 0 failures）。
 
@@ -20847,13 +20847,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1275
 
-- **対象**: `libs/core/deployment-adapter.ts`
+- **対象**: `libs/core/actuator/deployment-adapter.ts`
 - **変更**: deployment adapterのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示shell option優先、`/bin/sh` fallback、command／timeout／cwd／env merge、deployment resultと既存のapproval境界は変更していない。
 - **検証**: deployment adapter **2 files / 11 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
 ## 2026-09-05 再レビュー修正 1276
 
-- **対象**: `libs/core/pty-engine.ts`
+- **対象**: `libs/core/shell/pty-engine.ts`
 - **変更**: PTY engineの非Windows shell fallbackに残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示shell引数優先、WindowsのPowerShell fallback、PTY／child processのsession・環境引き渡しは変更していない。
 - **検証**: PTY engine **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20865,7 +20865,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1278
 
-- **対象**: `libs/core/secret-resolver.ts`、`libs/core/audit-forwarder.ts`
+- **対象**: `libs/core/secret/secret-resolver.ts`、`libs/core/governance/audit-forwarder.ts`
 - **変更**: secret resolver／audit forwarderのshell実行に残っていた `SHELL` の環境直読を、登録済み `getRegisteredEnvText` へ統一した。明示shell option優先、`/bin/sh` fallback、secret／auditのredaction、resolver／forwarder failure semanticsは変更していない。
 - **検証**: secret resolver／audit forwarder **2 files / 24 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20901,7 +20901,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1284
 
-- **対象**: `libs/core/src/trace.ts`
+- **対象**: `libs/core/analysis/trace.ts`
 - **変更**: traceのOTLP exporterに残っていた `OTEL_EXPORTER_OTLP_ENDPOINT`／`OTEL_EXPORTER_OTLP_HEADERS` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。OTLP opt-in、endpoint補完、egress policy、header parsing、export failureの非干渉性は変更していない。
 - **検証**: trace OTLP bridge **1 file / 4 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20925,7 +20925,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1288
 
-- **対象**: `libs/core/agy-sdk-adapter.ts`、`libs/core/agy-sdk-adapter.test.ts`
+- **対象**: `libs/core/provider/agy-sdk-adapter.ts`、`libs/core/provider/agy-sdk-adapter.test.ts`
 - **変更**: AGY SDK bridgeのcredential注入に残っていた `GEMINI_API_KEY`／`GOOGLE_API_KEY` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。Gemini互換keyの優先順位、provider child env、SDK unavailable／shutdown semanticsは変更していない。
 - **検証**: AGY SDK adapter **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20943,19 +20943,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1291
 
-- **対象**: `libs/core/agent-adapter.ts`、`libs/core/grok-adapter.test.ts`
+- **対象**: `libs/core/agent/agent-adapter.ts`、`libs/core/provider/grok-adapter.test.ts`
 - **変更**: Grok adapterのnative subagent有効／無効判定に残っていた `GROK_SUBAGENTS` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。`GROK_SUBAGENTS=0` のfail-closed、runtime capability表示、ACPの観測・完了証跡とpermission modeは変更していない。
 - **検証**: Grok adapter **1 file / 7 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
 ## 2026-09-05 再レビュー修正 1292
 
-- **対象**: `libs/core/reasoning-route-doctor.ts`、`libs/core/reasoning-route-doctor.test.ts`
+- **対象**: `libs/core/reasoning/reasoning-route-doctor.ts`、`libs/core/reasoning/reasoning-route-doctor.test.ts`
 - **変更**: reasoning route doctorのAnthropic availability判定に残っていた `ANTHROPIC_API_KEY` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。未設定時のnot_configured、secret valueを出さないreason、他provider probeとroute fallbackは変更していない。
 - **検証**: reasoning route doctor boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
 ## 2026-09-05 再レビュー修正 1293
 
-- **対象**: `libs/core/video-render-backend.ts`、`libs/core/video-render-backend.test.ts`
+- **対象**: `libs/core/video/video-render-backend.ts`、`libs/core/video/video-render-backend.test.ts`
 - **変更**: video render backendのHyperframes child process用 `NODE_OPTIONS` fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ移行した。既存のNode preload付与、明示的なcommand／timeout／cwd／safe exec環境、render fallbackは変更していない。
 - **検証**: video render backend **1 file / 6 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20997,13 +20997,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1300
 
-- **対象**: `libs/core/agy-cli-backend.ts`、`libs/core/memory-promotion-queue.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/provider/agy-cli-backend.ts`、`libs/core/knowledge/memory-promotion-queue.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: AGY CLI backend と memory promotion queue に残っていた `NODE_ENV` の直接参照を、登録済み `getRegisteredEnvText` へ移行した。AGYの live／test model argv、memory promotion auditの test guardと通常時の監査記録 semanticsは変更していない。共通 environment boundary test に対象を追加した。
 - **検証**: AGY CLI／memory queue／environment boundary **3 files / 41 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る provider／test-only guard と外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1301
 
-- **対象**: `libs/core/mission-work-reconciliation.ts`、`scripts/generate_avatar.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/mission/mission-work-reconciliation.ts`、`scripts/generate_avatar.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: mission-work reconciliation の GitHub branch／commit metadata と avatar generator の provider detection に残っていた直接環境参照を、登録済み `getRegisteredEnvText` へ移行した。GitHub metadataの優先順位、local git fallback、Codex／AGY bridgeの自動選択、既存の安全なartifact path境界は変更していない。
 - **検証**: avatar／mission reconciliation／environment boundary **4 files / 30 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck、foundation adoption check。残る test-only guard、未移行の個別設定、外部provider実機確認は継続課題とする。
 
@@ -21033,7 +21033,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1306
 
-- **対象**: `libs/core/worker-context-compaction.ts`、`libs/core/media-backend-registry.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/workforce/worker-context-compaction.ts`、`libs/core/media/media-backend-registry.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: worker context compactionのtoken設定とmedia backendのcredential probeに残っていた動的環境直読を、登録済み `getRegisteredEnvText` へ統一した。tokenの数値検証・既定値、credentialのOR判定、media probeのavailabilityとsecret非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 - **検証**: worker context／media backend／environment boundary **4 files / 30 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
@@ -21045,7 +21045,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1308
 
-- **対象**: `libs/core/src/actuator-capability.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/actuator/actuator-capability.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: actuator manifestのenv prerequisite評価に残っていた動的環境直読を、登録済み `getRegisteredEnvText` へ統一した。manifestのenv／binary／platform prerequisite、未設定時のavailability理由とinstall hintの既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 - **検証**: actuator capability／environment boundary **2 files / 15 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
@@ -21069,7 +21069,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1312
 
-- **対象**: `libs/core/secret-guard.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/secret/secret-guard.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: secret-guardのupstream／personal vault fallbackに残っていた環境secretの動的raw参照を、登録済み `getRegisteredEnvText` へ統一した。upstream KMS、scope／temporal grant検証、personal vault fallback、secret maskingとsecret非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 - **検証**: secret-guard／environment boundary **3 files / 19 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
@@ -21081,115 +21081,115 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1314
 
-- **対象**: `libs/core/secret-bridge.ts`、`libs/core/environment-access-boundary.test.ts`
+- **対象**: `libs/core/secret/secret-bridge.ts`、`libs/core/environment-access-boundary.test.ts`
 - **変更**: secret providerの環境-backed実装に残っていた動的な環境読み書きを、登録済み `getRegisteredEnvText`／`setRegisteredEnv` へ統一した。secretのサービス／アカウントキー生成、registryの追加／削除、未設定時の `null` 応答とsecret値非出力の既存semanticsは変更していない。共通environment boundary testに対象を追加した。
 - **検証**: secret-bridge／environment boundary **2 files / 7 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残る未移行の個別設定と外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1315
 
-- **対象**: `libs/core/service-runtime-policy.ts`、`libs/core/service-runtime-policy.test.ts`
+- **対象**: `libs/core/service/service-runtime-policy.ts`、`libs/core/service/service-runtime-policy.test.ts`
 - **変更**: service runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。managed root、trial／installed mode、provision／pin approvalの既存設定とpath scope検証は変更していない。
 - **検証**: service-runtime-policy **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1316
 
-- **対象**: `libs/core/voice-runtime-policy.ts`、`libs/core/voice-runtime-policy.test.ts`
+- **対象**: `libs/core/voice/voice-runtime-policy.ts`、`libs/core/voice/voice-runtime-policy.test.ts`
 - **変更**: voice runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。queue、chunking、progress、delivery、personal-tier routingの既存設定は変更していない。
 - **検証**: voice-runtime-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1317
 
-- **対象**: `libs/core/tool-runtime-policy.ts`、`libs/core/tool-runtime-policy.test.ts`
+- **対象**: `libs/core/tool/tool-runtime-policy.ts`、`libs/core/tool/tool-runtime-policy.test.ts`
 - **変更**: tool runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorをそのまま返すfail-closed境界へ統一した。profile overlayの選択、managed root、runtime mode、install／pin approvalの既存設定は変更していない。policy path cacheも読み込み成功後に明示的に固定した。
 - **検証**: tool-runtime-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1318
 
-- **対象**: `libs/core/tool-actuator-routing.ts`、`libs/core/tool-actuator-routing.test.ts`
+- **対象**: `libs/core/tool/tool-actuator-routing.ts`、`libs/core/tool/tool-actuator-routing.test.ts`
 - **変更**: tool-actuator routing policyの設定障害時fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合はfail-closedとした。未知toolに対する通常の `llm_reasoning`／`orchestrator-actuator` fallback routeは仕様として維持し、policy matchと設定障害の区別を明確化した。
 - **検証**: tool-actuator-routing **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1319
 
-- **対象**: `libs/core/voice-sample-ingestion-policy.ts`、`libs/core/voice-sample-ingestion-policy.test.ts`
+- **対象**: `libs/core/voice/voice-sample-ingestion-policy.ts`、`libs/core/voice/voice-sample-ingestion-policy.test.ts`
 - **変更**: voice sample ingestion policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。sample limits、許可tier、重複path、言語coverage、personal voiceの厳格性は変更していない。
 - **検証**: voice-sample-ingestion-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1320
 
-- **対象**: `libs/core/service-runtime-registry.ts`、`libs/core/service-runtime-registry.test.ts`
+- **対象**: `libs/core/service/service-runtime-registry.ts`、`libs/core/service/service-runtime-registry.test.ts`
 - **変更**: service runtime registryに残っていたコード内catalog fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。ComfyUIのruntime record、platform／mode選択、managed path、probeとstateの既存semanticsは変更していない。
 - **検証**: service-runtime-registry **1 file / 9 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1321
 
-- **対象**: `libs/core/video-render-runtime-policy.ts`、`libs/core/video-render-runtime-policy.test.ts`
+- **対象**: `libs/core/video/video-render-runtime-policy.ts`、`libs/core/video/video-render-runtime-policy.test.ts`
 - **変更**: video render runtime policyに残っていたコード内fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。queue、progress、bundle、render backendと出力形式の既存設定は変更していない。
 - **検証**: video-render-runtime-policy **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1322
 
-- **対象**: `libs/core/video-composition-template-registry.ts`、`libs/core/video-composition-template-registry.test.ts`
+- **対象**: `libs/core/video/video-composition-template-registry.ts`、`libs/core/video/video-composition-template-registry.test.ts`
 - **変更**: video composition template registryに残っていたコード内catalog fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。templateのrenderer、role、content field、output formatの選択と未知template時のregistry内先頭template fallbackは変更していない。
 - **検証**: video-composition-template-registry **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1323
 
-- **対象**: `libs/core/media-backend-registry.ts`、`libs/core/media-backend-registry.test.ts`
+- **対象**: `libs/core/media/media-backend-registry.ts`、`libs/core/media/media-backend-registry.test.ts`
 - **変更**: media backend registryに残っていたコード内catalog fallbackを削除し、正本のgovernance JSONが欠損・不正、または安全でないoverrideを持つ場合は `defineCatalog` のmissing／validation／path errorを返すfail-closed境界へ統一した。voice engineの動的backend統合、modality alias、availability probe、backend固有の実行fallbackは変更していない。
 - **検証**: media-backend-registry **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1324
 
-- **対象**: `libs/core/autonomous-ops-gate.ts`、`libs/core/src/autonomous-ops-gate.test.ts`
+- **対象**: `libs/core/governance/autonomous-ops-gate.ts`、`libs/core/governance/autonomous-ops-gate.test.ts`
 - **変更**: autonomous ops gateに残っていたコード内policy fallbackを削除し、正本policyの欠損・不正・unsafe overrideを評価境界で構造化されたapprove／deny結果へ変換するfail-closed経路へ統一した。action score、tenant override、budget cap、dry-run判定と、人手承認を要求する既存semanticsは変更していない。
 - **検証**: autonomous-ops-gate **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1325
 
-- **対象**: `libs/core/voice-engine-registry.ts`、`libs/core/voice-engine-registry.test.ts`
+- **対象**: `libs/core/voice/voice-engine-registry.ts`、`libs/core/voice/voice-engine-registry.test.ts`
 - **変更**: voice engine registryに残っていたコード内registry fallbackを削除し、正本snapshotの欠損・不正・unsafe overrideと、canonical directoryの読み込み障害をfail-closedで返す経路へ統一した。未知engine IDのregistry内default／先頭engine解決、platform fallback、directory／snapshotの既存優先順位は変更していない。
 - **検証**: voice-engine-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1326
 
-- **対象**: `libs/core/voice-task-profile-catalog.ts`、`libs/core/voice-task-profile-catalog.test.ts`
+- **対象**: `libs/core/voice/voice-task-profile-catalog.ts`、`libs/core/voice/voice-task-profile-catalog.test.ts`
 - **変更**: voice task profile catalogに残っていた空配列fallbackを削除し、必須のgovernance catalogが欠損・不正な場合は `defineCatalog` のmissing／validation errorを返すfail-closed境界へ統一した。profileのtask type／operation scoringとdistill target解決は変更していない。
 - **検証**: voice-task-profile-catalog **1 file / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1327
 
-- **対象**: `libs/core/actuator-op-registry.ts`、`libs/core/actuator-op-registry.test.ts`
+- **対象**: `libs/core/actuator/actuator-op-registry.ts`、`libs/core/actuator/actuator-op-registry.test.ts`
 - **変更**: actuator op registryに残っていた空registry fallbackとconfig fallback記録経路を削除し、必須のgovernance registryが欠損・不正な場合は `defineCatalog` のmissing／validation errorを実行解決へ伝播するfail-closed境界へ統一した。plugin operation登録、built-in control op、manifest／capability検証、未知opのsuggestionは変更していない。
 - **検証**: actuator-op-registry **1 file / 13 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1328
 
-- **対象**: `libs/core/service-bootstrap-catalog.ts`、`libs/core/service-onboarding-catalog.ts`
+- **対象**: `libs/core/service/service-bootstrap-catalog.ts`、`libs/core/service/service-onboarding-catalog.ts`
 - **変更**: service bootstrapのpublic正本とservice onboarding catalogに残っていた空配列fallbackを削除し、必須のgovernance catalogが欠損・不正な場合はmissing／validation errorを返すfail-closed境界へ統一した。未配置が許容されたpersonal bootstrap overlay、サービス選択・utterance matching・onboarding metadataの既存semanticsは変更していない。
 - **検証**: service-bootstrap／service-onboarding **2 files / 8 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1329
 
-- **対象**: `libs/core/tool-runtime-registry.ts`、`libs/core/tool-runtime-registry.test.ts`
+- **対象**: `libs/core/tool/tool-runtime-registry.ts`、`libs/core/tool/tool-runtime-registry.test.ts`
 - **変更**: tool runtime registryに残っていた大規模なコード内registry fallbackとinvalid／path errorのfallback復旧を削除し、正本governance registryの欠損・不正・unsafe overrideをそのまま返すfail-closed境界へ統一した。platform別install backend、runtime stateの検証・保存、probe／inventoryの既存semanticsは変更していない。
 - **検証**: tool-runtime-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1330
 
-- **対象**: `libs/core/approval-policy.ts`、`libs/core/approval-policy.test.ts`
+- **対象**: `libs/core/governance/approval-policy.ts`、`libs/core/governance/approval-policy.test.ts`
 - **変更**: approval policyの欠損・schema不正時に「承認不要」の空policyへ落ちる復旧経路を削除し、customer／governance正本のload errorをfail-closedで返す境界へ統一した。strict posture、injection suspected override、危険操作のhard-coded safety ruleと通常のpolicy rule解決は変更していない。
 - **検証**: approval-policy **1 file / 5 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1331
 
-- **対象**: `libs/core/provider-config.ts`、`libs/core/provider-config.test.ts`
+- **対象**: `libs/core/provider/provider-config.ts`、`libs/core/provider/provider-config.test.ts`
 - **変更**: provider configに残っていた大規模なコード内default catalogとfallback記録経路を削除し、必須のgovernance configの欠損・不正をそのまま返すfail-closed境界へ統一した。provider role対応表によるmodel解決、lifecycle／obsolete provider metadataの既存semanticsは変更していない。
 - **検証**: provider-config **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1332
 
-- **対象**: `libs/core/reasoning-backend-policy.ts`、`libs/core/reasoning-backend-policy.test.ts`
+- **対象**: `libs/core/reasoning/reasoning-backend-policy.ts`、`libs/core/reasoning/reasoning-backend-policy.test.ts`
 - **変更**: reasoning backend policyに残っていたコード内全provider／default mode fallbackを削除し、正本policyの欠損・不正をそのまま返すfail-closed境界へ統一した。alias、env priority、provider fallback order、scope overrideのpolicy内解決は変更していない。
 - **検証**: reasoning-backend-policy **1 file / 8 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21213,55 +21213,55 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1336
 
-- **対象**: `libs/core/service-endpoint-registry.ts`、`libs/core/service-endpoint-registry.test.ts`
+- **対象**: `libs/core/service/service-endpoint-registry.ts`、`libs/core/service/service-endpoint-registry.test.ts`
 - **変更**: service endpoint registryのcanonical directory読み込み障害を互換snapshotへ黙って戻す経路と、空services fallbackを削除した。正本snapshot／directoryのschema・service ID・version／default pattern整合、path scope、endpoint／credential metadataの既存semanticsは変更していない。
 - **検証**: service-endpoint-registry／sync **2 files / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1337
 
-- **対象**: `libs/core/voice-tts-config.ts`、`libs/core/voice-tts-config.test.ts`
+- **対象**: `libs/core/voice/voice-tts-config.ts`、`libs/core/voice/voice-tts-config.test.ts`
 - **変更**: voice TTS registryのunsafe path／invalid catalog時の組み込み英語fallbackと、正本languagesへの組み込み設定混在を削除した。検証済みregistry内のdefault language解決、voice／rate／token metadata、cache resetの既存semanticsは変更していない。空languagesは明示的にエラーとする。
 - **検証**: voice-tts-config **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1338
 
-- **対象**: `libs/core/voice-profile-registry.ts`、`libs/core/voice-profile-registry.test.ts`
+- **対象**: `libs/core/voice/voice-profile-registry.ts`、`libs/core/voice/voice-profile-registry.test.ts`
 - **変更**: voice profile registryの基底registry欠損・schema不正時に組み込み英語profileへ戻る経路を削除し、正本snapshot／canonical directoryの読み込み障害をfail-closedで返す境界へ統一した。personal／customer overlayの任意性、profile ID・tier・sample refs検証、directory優先順位は変更していない。
 - **検証**: voice-profile-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1339
 
-- **対象**: `libs/core/media-aws-icon-rules.ts`、`libs/core/media-aws-icon-rules.test.ts`
+- **対象**: `libs/core/media/media-aws-icon-rules.ts`、`libs/core/media/media-aws-icon-rules.test.ts`
 - **変更**: AWS icon rule catalogに残っていた正本JSONと重複する大規模な組み込みrules／exact resource fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。resource typeのexact優先、starts_with／contains rule解決、未知resourceの空候補という表示側の既存semanticsは変更していない。
 - **検証**: media-aws-icon-rules **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1340
 
-- **対象**: `libs/core/media-semantic-map.ts`、`libs/core/media-semantic-map.test.ts`
+- **対象**: `libs/core/media/media-semantic-map.ts`、`libs/core/media/media-semantic-map.test.ts`
 - **変更**: media semantic mapに残っていた正本JSONと重複するlayout／media／proposal rule fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。semantic typeの未一致時`content`、proposal evidence／keywordの未一致時空値という表示側の既存semanticsは変更していない。
 - **検証**: media-semantic-map **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1341
 
-- **対象**: `libs/core/media-drawio-policy.ts`、`libs/core/media-drawio-policy.test.ts`
+- **対象**: `libs/core/media/media-drawio-policy.ts`、`libs/core/media/media-drawio-policy.test.ts`
 - **変更**: media drawio policyに残っていた正本JSONと重複するboundary palette／node size fallbackとfallback telemetryを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。boundary override、catalog内のboundary／type優先順位、未一致時の呼び出し側paletteおよびnode size空値という表示側の既存semanticsは変更していない。
 - **検証**: media-drawio-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1342
 
-- **対象**: `libs/core/shell-command-policy.ts`、`libs/core/shell-command-policy.test.ts`
+- **対象**: `libs/core/shell/shell-command-policy.ts`、`libs/core/shell/shell-command-policy.test.ts`
 - **変更**: shell command policyの欠損時に空allow／deny policyへ落ちるfallbackを削除し、正本policyの読み込み障害をfail-closedで返す境界へ統一した。危険コマンドdeny、allowlist、wrapper／obfuscation検査、uncompilable deny ruleのapproval要求は変更していない。
 - **検証**: shell-command-policy **1 file / 30 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1343
 
-- **対象**: `libs/core/media-tone-style-map.ts`、`libs/core/media-tone-style-map.test.ts`
+- **対象**: `libs/core/media/media-tone-style-map.ts`、`libs/core/media/media-tone-style-map.test.ts`
 - **変更**: media tone style mapに残っていた正本JSONと重複するtone map fallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。未知または空toneを`info`へ収束させる表示側の安全な既定値は維持した。
 - **検証**: media-tone-style-map **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1344
 
-- **対象**: `libs/core/src/pipeline-scheduler.ts`、`libs/core/src/pipeline-scheduler.test.ts`
+- **対象**: `libs/core/pipeline/pipeline-scheduler.ts`、`libs/core/pipeline/pipeline-scheduler.test.ts`
 - **変更**: pipeline schedulerの存在するschedule registryがschema不正時に空registryへ戻るfallbackを削除し、永続化されたscheduleの読み込み障害をfail-closedで返す境界へ統一した。registryファイル自体が未作成の場合の空schedule、pipeline pathのrepo-relative検証、run lock／catch-upの既存semanticsは変更していない。
 - **検証**: pipeline-scheduler **1 file / 15 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21273,19 +21273,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1346
 
-- **対象**: `libs/core/surface-query.ts`、`libs/core/surface-query.test.ts`
+- **対象**: `libs/core/surface/surface-query.ts`、`libs/core/surface/surface-query.test.ts`
 - **変更**: surface query provider configのschema不正・unsafe path・overlay読み込み障害を空objectへ収束させるfallback／catchを削除し、正本base／overlayの読み込み障害をfail-closedで返す境界へ統一した。base config未配置時のquery機能無効化、tenant／entity／phase／role／personal overlayの任意性、intent分類とquery抽出は変更していない。
 - **検証**: surface-query **1 file / 10 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1347
 
-- **対象**: `libs/core/adf-guardrails.ts`、`libs/core/adf-guardrails.test.ts`
+- **対象**: `libs/core/pipeline/adf-guardrails.ts`、`libs/core/pipeline/adf-guardrails.test.ts`
 - **変更**: ADF execution policyの欠損・schema不正時に空objectへ落ちるcatalog fallbackを削除し、実行guardrail policyの読み込み障害をfail-closedで返す境界へ統一した。policyで未指定の個別値に対する既存の安全な上限補完、shell／egress／sandbox検査、script wrapper・git co-execution mutation検出は変更していない。
 - **検証**: adf-guardrails **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1348
 
-- **対象**: `libs/core/analysis-config.ts`、`libs/core/analysis-config.test.ts`
+- **対象**: `libs/core/analysis/analysis-config.ts`、`libs/core/analysis/analysis-config.test.ts`
 - **変更**: analysis configに残っていた正本JSONと重複する大規模な組み込みdefault configと、欠損・schema不正時のfallbackを削除し、canonical catalogのschema検証結果のみを利用する境界へ統一した。analysis configのschema-validなロード、repository path境界、呼び出し側の分析アルゴリズム解決は変更していない。
 - **検証**: analysis-config **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21309,7 +21309,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1352
 
-- **対象**: `libs/core/operator-learning.ts`、`libs/core/operator-learning-dispatch-registry.test.ts`
+- **対象**: `libs/core/surface/operator-learning.ts`、`libs/core/surface/operator-learning-dispatch-registry.test.ts`
 - **変更**: operator learning dispatch registryに残っていた正本ルールの組み込みfallbackと、欠損・schema不正をfallbackへ収束させる外側のcatchを削除し、正本base／存在するoverlayの読み込み障害をfail-closedで返す境界へ統一した。個人・confidential overlayの任意性、confidential→personalの優先順位、dispatch ruleのマッチングと学習昇格semanticsは変更していない。
 - **検証**: operator-learning-dispatch-registry **1 file / 6 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21327,7 +21327,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1355
 
-- **対象**: `libs/core/service-bootstrap-catalog.ts`、`libs/core/work-coordination-import-catalog.ts`、各対象テスト
+- **対象**: `libs/core/service/service-bootstrap-catalog.ts`、`libs/core/workforce/work-coordination-import-catalog.ts`、各対象テスト
 - **変更**: service bootstrapとwork coordination importの任意overlayについて、未作成時の空overlayをcatalog fallbackへ依存せず呼び出し側で明示する形へ整理した。public catalogの必須読み込み、personal overlayの任意性、id単位のoverlay優先順位とutterance／command解決は変更していない。
 - **検証**: service-bootstrap-catalog **1 file / 5 tests passed**、work-coordination-import-catalog **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21339,19 +21339,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1357
 
-- **対象**: `libs/core/src/knowledge-feedback-loop.ts`、`libs/core/src/knowledge-feedback-loop.test.ts`
+- **対象**: `libs/core/knowledge/knowledge-feedback-loop.ts`、`libs/core/knowledge/knowledge-feedback-loop.test.ts`
 - **変更**: knowledge feedback policyの既存policyがschema不正のときに組み込みcapへ戻るcatalog fallbackを削除し、使用量上限policyの読み込み障害をfail-closedで返す境界へ統一した。policy未配置時の明示的な初期cap、tenant override、usage aggregateの保存・上限処理は変更していない。
 - **検証**: knowledge-feedback-loop **1 file / 12 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1358
 
-- **対象**: `libs/core/voice-profile-promotion.ts`、`libs/core/voice-profile-promotion.test.ts`
+- **対象**: `libs/core/voice/voice-profile-promotion.ts`、`libs/core/voice/voice-profile-promotion.test.ts`
 - **変更**: voice profile promotionの未作成registry初期化をcatalog fallbackから呼び出し側の明示的な空registry生成へ移し、既存registryのschema不正を空registryへ置換しない境界へ統一した。pending receipt検証、personal／public registry選択、sample移送とpromotion receipt生成は変更していない。
 - **検証**: voice-profile-promotion **1 file / 4 tests passed**、voice-profile-registry **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
 ## 2026-09-05 再レビュー修正 1359
 
-- **対象**: `libs/core/service-endpoint-registry.ts`、`libs/core/service-endpoint-registry.test.ts`
+- **対象**: `libs/core/service/service-endpoint-registry.ts`、`libs/core/service/service-endpoint-registry.test.ts`
 - **変更**: service endpointの分割directory loaderで、schema上任意のversionが各JSONにない場合をserviceなしと誤判定していたため、実際のservice件数を空判定に使い、directory versionは`1.0.0`へ収束する修正を追加した。分割fileのservice id／filename一致、default pattern整合性、schema検証とfail-closed境界は維持している。
 - **検証**: service-endpoint-registry **1 file / 4 tests passed**、operator-surface surface-directory **1 file / 4 tests passed**、core build、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21363,7 +21363,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1361
 
-- **対象**: `libs/core/video-motion-direction.ts`、`libs/core/video-motion-direction.test.ts`
+- **対象**: `libs/core/video/video-motion-direction.ts`、`libs/core/video/video-motion-direction.test.ts`
 - **変更**: video motion patternの大規模な組み込みcatalogと、正本catalogの欠損・schema不正をbuilt-inへ収束させるfallback／catchを削除し、必須のmotion catalogを正本からのみ解決する境界へ統一した。LLM draftの未知patternをrole defaultへ補正する既存semantics、`_meta`除去、duration／easeの決定的補正は維持している。
 - **検証**: video-motion-direction **1 file / 18 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。残るcatalog fallbackと外部provider実機確認は継続課題とする。
 
@@ -21381,24 +21381,24 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 参照
 
-- 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
+- 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/pipeline/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
 - 先行計画: [AR-09](../improvement-plans-archive/2026-07/AR-09_ACTUATOR_COMMONIZATION.ja.md)(actuator 共通実行境界 — SX-10 はその上に SDK を載せる)、[ENTITY_GOVERNANCE_UNIFICATION](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(SX-04 の scope 二重定義解消と整合)、[MISSION_GATE_COHERENCE MG-08](../improvement-plans-archive/2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md)(SX-13 の語彙衝突の文書側)、[REGISTRY_SPLIT_PLAN](../REGISTRY_SPLIT_PLAN.md)(SX-04 の互換 snapshot 期限)
 
 ## 2026-09-05 再レビュー修正 1364
 
-- **対象**: `libs/core/presentation-preference-registry.ts`、`libs/core/presentation-preference-registry.test.ts`、`libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`、`libs/core/reasoning-provider-registry.ts`
+- **対象**: `libs/core/presentation-preference-registry.ts`、`libs/core/presentation-preference-registry.test.ts`、`libs/core/organization/tenant-rate-limiter.ts`、`libs/core/organization/tenant-rate-limiter.test.ts`、`libs/core/reasoning/reasoning-provider-registry.ts`
 - **変更**: presentation preference registryの組み込みfallbackと、正本registryの欠損・schema不正をfallbackへ収束させるcatchを削除し、表示設定の正本読み込み障害をfail-closedで返す境界へ統一した。personal overlayの任意性、profile merge、default profile選択と、書き込み時のschema検証は維持・明示化している。tenant rate-limit policyを必須catalogへ変更し、quota stateは未作成時だけ明示的な空stateから開始し、既存stateのschema不正をリセットしないようにした。推論provider registryは欠損fallbackを削除し、未知・不正なprovider entryを無視せず明示エラーにした。
 - **検証**: presentation-preference-registry／tenant-rate-limiter／reasoning-provider-registry **3 files / 17 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateはこの変更群反映後に再実行する。
 
 ## 2026-09-06 再レビュー修正 1365
 
-- **対象**: `libs/core/src/knowledge-curation-report.ts`、`libs/core/src/knowledge-curation-report.test.ts`
+- **対象**: `libs/core/knowledge/knowledge-curation-report.ts`、`libs/core/knowledge/knowledge-curation-report.test.ts`
 - **変更**: knowledge curation SLOのcatalog fallbackを削除し、SLO config未作成時は呼び出し側の明示的な保守的既定値から開始し、存在するconfigのschema不正はそのまま拒否する境界へ整理した。freshness／low-yield判定、tenant ingest advisory、archive historyの既存semanticsは変更していない。
 - **検証**: knowledge-curation-report **1 file / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
 
 ## 2026-09-06 再レビュー修正 1366
 
-- **対象**: `libs/core/video-visual-direction.ts`、`libs/core/video-visual-direction.test.ts`
+- **対象**: `libs/core/video/video-visual-direction.ts`、`libs/core/video/video-visual-direction.test.ts`
 - **変更**: video visual patternの組み込みcatalogと、正本catalogの欠損・schema不正を組み込み値へ戻すfallbackを削除し、正本pattern packの読み込み障害をfail-closedで返す境界へ統一した。LLM出力の未知patternをcatalog先頭へ補正するrender継続／degraded表示、visual directionの無効入力に対する決定的補正は維持している。
 - **検証**: video-visual-direction **1 file / 9 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
 
@@ -21416,13 +21416,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1369
 
-- **対象**: `libs/core/media-style-policy.ts`、`libs/core/media-style-policy.test.ts`
+- **対象**: `libs/core/media/media-style-policy.ts`、`libs/core/media/media-style-policy.test.ts`
 - **変更**: media style policyの空policy fallbackとconfig fallback telemetryを削除し、正本style catalogの欠損・schema不正をfail-closedで返す境界へ統一した。未指定toneの数値既定値、tone rank／border key sideの正本解決と既存のCSS設計入力は変更していない。
 - **検証**: media-style-policy **1 file / 2 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
 
 ## 2026-09-06 再レビュー修正 1370
 
-- **対象**: `libs/core/tenant-design-resolver.ts`、`libs/core/tenant-design-resolver.test.ts`
+- **対象**: `libs/core/organization/tenant-design-resolver.ts`、`libs/core/organization/tenant-design-resolver.test.ts`
 - **変更**: tenant design override indexについて、未配置時は呼び出し側の明示的な空indexから開始し、存在するconfidential tenant indexのschema不正を空indexへ戻すfallbackを削除した。tenant path containment、symlink拒否、customer／confidential overrideの優先順位とpublic defaultへの解決は変更していない。
 - **検証**: tenant-design-resolver **1 file / 14 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは全体ゲート再実行時に確認する。
 
@@ -21500,37 +21500,37 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1383
 
-- **対象**: Cursor CLI reasoning backendとprovider governance／runtime integration、`libs/core/provider-capability-registry.test.ts`、`libs/actuators/media-actuator/src/media-design-protocol.ts`
+- **対象**: Cursor CLI reasoning backendとprovider governance／runtime integration、`libs/core/provider/provider-capability-registry.test.ts`、`libs/actuators/media-actuator/src/media-design-protocol.ts`
 - **変更**: Cursor Agent CLIをprovider permission、route policy、provider discovery、capability probe、runtime model、sandbox／egress境界へ接続し、構造化応答のenvelope検証、timeout、abort、credential分離、permission profileの型境界を追加した。Cursor CLIの利用可能性と実行引数を実際のspawn seamで検証し、provider capability cacheのgoverned catalog mockを正規ファイル境界へ揃えた。未作成のoptional theme scopeは明示的な型付き空catalogへ固定した。
 - **検証**: Cursor／egress／provider config／permission／route／capability registry **8 files / 78 tests passed**、core／actuator build、typecheck、対象ESLint、Prettier、`git diff --check`、canonical check **68/69 gates passed**。残る1 gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandboxで`EPERM`となる実行環境制約。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1384
 
-- **対象**: `libs/core/cursor-cli-reasoning-backend.ts`、`libs/core/cursor-cli-reasoning-backend.test.ts`
+- **対象**: `libs/core/provider/cursor-cli-reasoning-backend.ts`、`libs/core/provider/cursor-cli-reasoning-backend.test.ts`
 - **変更**: Cursor CLIの追加引数が`--force`／`--mode`／`--sandbox`などのpolicy引数を後勝ちで上書きできる残存を修正し、governed execution flagを`extraArgs`から拒否するようにした。通常の追加引数、permission profile、timeout、egress、credential分離は維持している。
 - **検証**: Cursor CLI **1 file / 11 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。canonical full gateは直前sliceで69/69 gates passed。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1385
 
-- **対象**: `knowledge/product/governance/reasoning-backend-policy.json`、`libs/core/reasoning-backend-policy.test.ts`、`libs/core/reasoning-bootstrap.ts`
+- **対象**: `knowledge/product/governance/reasoning-backend-policy.json`、`libs/core/reasoning/reasoning-backend-policy.test.ts`、`libs/core/reasoning/reasoning-bootstrap.ts`
 - **変更**: Cursor CLIを明示指定だけでなく、既定のreasoning provider failover chainにも登録した。provider capability routingによるbinary／authentication判定、既存providerの順序、Cursorの明示routeは維持している。
 - **検証**: reasoning-backend-policy／reasoning-bootstrap **2 files / 1 test passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1386
 
-- **対象**: `libs/core/provider-discovery.ts`、`libs/core/provider-discovery.test.ts`
+- **対象**: `libs/core/provider/provider-discovery.ts`、`libs/core/provider/provider-discovery.test.ts`
 - **変更**: Cursor CLIのprovider discoveryが`KYBERION_CURSOR_CLI_BIN`を無視して`cursor-agent`を固定実行していた残存を修正し、backend probeと同じ登録済みbinary overrideを使うようにした。未指定時のPATH discovery、version health判定、capability cacheとfailover routingは維持している。
 - **検証**: provider-discovery **1 file / 3 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1388
 
-- **対象**: `libs/core/reasoning-provider-registry.ts`、`libs/core/reasoning-provider-registry.test.ts`、`knowledge/product/schemas/reasoning-provider-registry.schema.json`
+- **対象**: `libs/core/reasoning/reasoning-provider-registry.ts`、`libs/core/reasoning/reasoning-provider-registry.test.ts`、`knowledge/product/schemas/reasoning-provider-registry.schema.json`
 - **変更**: reasoning provider descriptorのcapability／input modality／env keyを必須メタデータへ変更した。欠損・型不正・text modalityなしのdescriptorを保守的既定値へ補正せず拒否し、schemaとruntime parserを一致させた。
 - **検証**: reasoning-provider-registry **1 file / 4 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`、knowledge index更新後のcanonical full gate **69/69 passed**。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1389
 
-- **対象**: `libs/core/provider-discovery.ts`、`libs/core/provider-capability-catalog.test.ts`、`knowledge/product/orchestration/provider-capabilities.fallback.json`
+- **対象**: `libs/core/provider/provider-discovery.ts`、`libs/core/provider/provider-capability-catalog.test.ts`、`knowledge/product/orchestration/provider-capabilities.fallback.json`
 - **変更**: 未参照のprovider capability fallback catalogを削除し、primary catalogの欠損時だけ明示的空viewを使うようにした。配置済みcatalogのJSON／schema不正と、probe書込み時の既存catalog不正を黙って空catalogへ置換せず fail-closed とした。
 - **検証**: provider-capability-catalog／provider-discovery／provider-capability-registry **3 files / 22 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
@@ -21560,31 +21560,31 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1394
 
-- **対象**: `libs/core/mission-retrospective.ts`、`libs/core/mission-retrospective.test.ts`
+- **対象**: `libs/core/mission/mission-retrospective.ts`、`libs/core/mission/mission-retrospective.test.ts`
 - **変更**: process-improvement queueのJSONL reader／writerにoperation-timeのsymlink traversal・regular-file境界を追加し、queueの読み込み障害を空配列へ隠す経路を削除した。未作成queueの初期化、malformed proposal entryのskip、operator ratification／apply lifecycleは維持した。
 - **検証**: mission-retrospective **1 file / 13 tests passed**、対象ESLint、Prettier、`git diff --check`。全体typecheckは別作業の未追跡OpenCode実装にあるZod型エラーで未完了。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1395
 
-- **対象**: `libs/core/mesh-topic-registry.ts`、`libs/core/mesh-topic-registry.test.ts`
+- **対象**: `libs/core/mesh/mesh-topic-registry.ts`、`libs/core/mesh/mesh-topic-registry.test.ts`
 - **変更**: mesh topic registryのsubscriptions JSONL readerにoperation-timeの`assertSafeRepositoryPath`／`safeLstat` regular-file境界を追加した。未作成subscriptionsの空配列、governed artifact writer、tenant／namespaceの既存検証は維持し、symlink経由の外部scope readを拒否する回帰テストを追加した。
 - **検証**: mesh-topic-registry **1 file / 5 tests passed**、対象ESLint、Prettier、`git diff --check`。全体typecheckは別作業の未追跡OpenCode実装にあるZod型エラーで未完了。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1396
 
-- **対象**: `libs/core/memory-promotion-queue.ts`、`libs/core/memory-promotion-queue.test.ts`
+- **対象**: `libs/core/knowledge/memory-promotion-queue.ts`、`libs/core/knowledge/memory-promotion-queue.test.ts`
 - **変更**: memory promotion queueのcandidate discovery／status updateに共通のoperation-time readerを導入し、queue pathのsymlink traversalと非regular fileをJSONL read前に拒否するようにした。scopeごとのqueue列挙、legacy queue、重複統合、ratification semanticsは維持している。
 - **検証**: memory-promotion-queue **1 file / 13 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1397
 
-- **対象**: `libs/core/mesh-peer-directory.ts`、`libs/core/mesh-peer-directory.test.ts`
+- **対象**: `libs/core/mesh/mesh-peer-directory.ts`、`libs/core/mesh/mesh-peer-directory.test.ts`
 - **変更**: mesh peer directoryのregistrations／presence／capabilities JSONL readerにoperation-timeのregular-file検査を追加した。tenant pathの既存symlink境界、missing fileの空配列、governed writerとpeer eligibility semanticsは維持し、peer record leaf symlinkを拒否する回帰テストを追加した。
 - **検証**: mesh-peer-directory **1 file / 10 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1398
 
-- **対象**: `libs/core/mission-graph-run-journal.ts`、`libs/core/mission-graph-run-journal.test.ts`
+- **対象**: `libs/core/mission/mission-graph-run-journal.ts`、`libs/core/mission/mission-graph-run-journal.test.ts`
 - **変更**: mission graph run journalのresume readとfenced appendへ共通のoperation-time regular-file検査を導入した。既存mission／coordination pathのsymlink境界、missing journalの作成、sequence／schema検証は維持し、既存journal fileのsymlink置換をappend前に拒否する回帰テストを追加した。
 - **検証**: mission-graph-run-journal **1 file / 7 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
@@ -21596,13 +21596,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1400
 
-- **対象**: `libs/core/src/trace.ts`、`libs/core/src/trace.test.ts`
+- **対象**: `libs/core/analysis/trace.ts`、`libs/core/analysis/trace.test.ts`
 - **変更**: trace JSONL persistenceのdirectory／日次fileを共通の`assertSafeRepositoryPath`とoperation-timeのregular-file／directory検査へ接続した。既定のshared／customer trace root、日次 rotation、trace schema検証、OTLP export semanticsは維持し、symlink経由のtrace log rootを拒否する回帰テストを追加した。
 - **検証**: trace **1 file / 5 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1401
 
-- **対象**: `libs/core/mission-dispatch-io.ts`、`libs/core/mission-dispatch-lifecycle.test.ts`
+- **対象**: `libs/core/mission/mission-dispatch-io.ts`、`libs/core/mission/mission-dispatch-lifecycle.test.ts`
 - **変更**: mission dispatch event appendの共通I/O helperへoperation-timeのregular-file検査を追加した。repository path検証、mission writer context、既存dispatch artifact leaseとpayload semanticsは維持し、leaf symlinkへのevent appendを拒否する回帰テストを追加した。
 - **検証**: mission-dispatch-lifecycle **1 file / 3 tests passed**、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果と未監査direct loader全件inventoryは継続課題とする。
 
@@ -21644,19 +21644,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1387
 
-- **対象**: `libs/core/provider-capability-registry.ts`、`libs/core/provider-capability-registry.test.ts`
+- **対象**: `libs/core/provider/provider-capability-registry.ts`、`libs/core/provider/provider-capability-registry.test.ts`
 - **変更**: provider capability probeがprovider discovery／実行backendと異なりCLI binary overrideを無視していた残存を修正し、登録済みのClaude／Codex／AGY／Grok／Cursor／Gemini／Copilot binaryをversion・auth・helpの全probeへ伝播するようにした。明示Claude binaryのplaceholder fallbackへの勝手な置換も抑止した。
 - **検証**: provider-capability-registry **1 file / 16 tests passed**、typecheck、対象ESLint、Prettier、`git diff --check`。Cursor CLIのprovider実機認証とOS-level enforcement probe、残存catalog／外部provider確認は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1408
 
-- **対象**: `libs/core/agent-input-queue.ts`、`libs/core/agent-input-queue.test.ts`
+- **対象**: `libs/core/agent/agent-input-queue.ts`、`libs/core/agent/agent-input-queue.test.ts`
 - **変更**: durable `next_run` queueのread／append前にoperation-timeのregular-file検査を追加した。既存のrepository path検証、append-only reducer、lock、scope filtering、volatile laneのsemanticsは維持し、queue pathがディレクトリへ置換された場合に読み書きを拒否する回帰テストを追加した。
 - **検証**: AgentInputQueue **1 file / 15 tests passed**、全体typecheck、対象ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1409
 
-- **対象**: `libs/core/artifact-registry.ts`、`libs/core/artifact-registry.test.ts`
+- **対象**: `libs/core/workforce/artifact-registry.ts`、`libs/core/workforce/artifact-registry.test.ts`
 - **変更**: 共有 artifact ownership registry の append／read 前に operation-time の regular-file 検査を追加した。既存の repository path／symlink 検証、catalog validation、ownership query、tmp delivery 制約は維持し、registry leaf がディレクトリへ置換された場合に fail-closed となる回帰テストを追加した。
 - **検証**: artifact-registry **1 file / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21668,31 +21668,31 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1411
 
-- **対象**: `libs/core/agent-collaboration-projection.ts`、`libs/core/agent-collaboration-projection.test.ts`
+- **対象**: `libs/core/agent/agent-collaboration-projection.ts`、`libs/core/agent/agent-collaboration-projection.test.ts`
 - **変更**: agent collaboration projection の worker event JSONL reader に operation-time の regular-file 検査を追加した。repository／symlink boundary、tenant projection の fail-closed filter、malformed event の既存スキップ、worker event の列挙 semantics は維持し、`.jsonl` 名のディレクトリをイベントとして読まない回帰テストを追加した。
 - **検証**: agent-collaboration-projection **1 file / 11 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1412
 
-- **対象**: `libs/core/src/knowledge-feedback-loop.ts`、`libs/core/src/knowledge-feedback-loop.test.ts`
+- **対象**: `libs/core/knowledge/knowledge-feedback-loop.ts`、`libs/core/knowledge/knowledge-feedback-loop.test.ts`
 - **変更**: knowledge feedback の human／gap／delivery JSONL append と gap read 前に operation-time の regular-file 検査を追加した。scope partition、feedback policy、usage aggregate、memory promotion、telemetry の best-effort semantics は維持し、feedback log leaf のディレクトリ置換を拒否する回帰テストを追加した。
 - **検証**: knowledge-feedback-loop **1 file / 13 tests passed**、全体 typecheck、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1413
 
-- **対象**: `libs/core/agent-runtime-manual-drive-bridge.ts`、`libs/core/agent-runtime-manual-drive-bridge.test.ts`
+- **対象**: `libs/core/agent/agent-runtime-manual-drive-bridge.ts`、`libs/core/agent/agent-runtime-manual-drive-bridge.test.ts`
 - **変更**: manual-drive bridge の descriptor／commands／results／cancellations JSON／JSONL read／append／write 前に operation-time の regular-file 検査を追加した。lock、descriptor TTL、approval resume、executor output redaction、command lifecycle semantics は維持し、bridge record leaf のディレクトリ置換を拒否する回帰テストを追加した。
 - **検証**: manual-drive bridge **1 file / 6 tests passed**、全体 typecheck、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1414
 
-- **対象**: `libs/core/artifact-store.ts`、`libs/core/artifact-store.test.ts`
+- **対象**: `libs/core/workforce/artifact-store.ts`、`libs/core/workforce/artifact-store.test.ts`
 - **変更**: 共通 governed artifact の JSON／JSONL write／append／read 前に operation-time の regular-file 検査を追加した。artifact path governance、role authority、scope-local index、既存 symlink boundary、artifact payload semantics は維持し、共通 writer を利用する peer messaging 等もファイル置換時に fail-closed となる境界テストを追加した。
 - **検証**: artifact-store／peer messaging／mesh adapter **3 files / 42 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1415
 
-- **対象**: `libs/core/peer-messaging.ts`、`libs/core/peer-messaging.test.ts`
+- **対象**: `libs/core/mesh/peer-messaging.ts`、`libs/core/mesh/peer-messaging.test.ts`
 - **変更**: peer network catalog、inbox／outbox／events JSONL reader、peer runtime state writer に operation-time の regular-file 検査を追加した。共通 artifact writer の role／path／tenant／signature検証、HTTP dispatch、runtime state semanticsは維持し、peer JSONL leaf のディレクトリ置換を拒否する回帰テストを追加した。
 - **検証**: peer-messaging **1 file / 22 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21704,13 +21704,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1417
 
-- **対象**: `libs/core/mesh-hub-peer-messaging-adapter.ts`、`libs/core/mesh-hub-peer-messaging-adapter.test.ts`
+- **対象**: `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`、`libs/core/mesh/mesh-hub-peer-messaging-adapter.test.ts`
 - **変更**: mesh-hub recipient proposal／decision の JSONL reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外・symlink・ディレクトリ置換された JSONL leaf を tenant projection 前に読まず、既存の malformed row skip、proposal／decision lifecycle、governed artifact write semanticsは維持した。
 - **検証**: mesh-hub-peer-messaging-adapter **1 file / 8 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1418
 
-- **対象**: `libs/core/mesh-message-broker.ts`、`libs/core/mesh-message-broker.test.ts`
+- **対象**: `libs/core/mesh/mesh-message-broker.ts`、`libs/core/mesh/mesh-message-broker.test.ts`
 - **変更**: mesh message broker の tenant root 列挙と delivery／dead-letter JSONL reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` 境界へ接続した。symlink・repository 外・非 regular file／directory replacement を delivery projection 前に拒否し、既存の malformed row skip、tenant filter、retry／dead-letter lifecycle、governed artifact write semanticsは維持した。
 - **検証**: mesh-message-broker **1 file / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21722,7 +21722,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1420
 
-- **対象**: `libs/core/tenant-rate-limiter.ts`、`libs/core/tenant-rate-limiter.test.ts`
+- **対象**: `libs/core/organization/tenant-rate-limiter.ts`、`libs/core/organization/tenant-rate-limiter.test.ts`
 - **変更**: tenant rate limiter の lock reader に operation-time の `assertSafeRepositoryPath`／`safeLstat` regular-file 境界を追加した。symlink／非 regular file の lock 内容を外部 scope から読まず、stale lock reclaim と quota state の read-modify-write semanticsは維持した。
 - **検証**: tenant-rate-limiter **1 file / 10 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21758,7 +21758,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1426
 
-- **対象**: `libs/core/knowledge-provider.ts`、`libs/core/knowledge-provider.test.ts`
+- **対象**: `libs/core/knowledge/knowledge-provider.ts`、`libs/core/knowledge/knowledge-provider.test.ts`
 - **変更**: KnowledgeProvider の knowledge-root resource read に operation-time の regular-file 検査を追加した。既存の tenant／tier scope、repository root、symlink traversal、missing resource の default semanticsは維持し、knowledge leaf がディレクトリへ置換された場合に read しない回帰テストを追加した。
 - **検証**: knowledge-provider **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21770,7 +21770,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1428
 
-- **対象**: `libs/core/voice-sample-ingestion-policy.ts`、`libs/core/voice-sample-ingestion-policy.test.ts`
+- **対象**: `libs/core/voice/voice-sample-ingestion-policy.ts`、`libs/core/voice/voice-sample-ingestion-policy.test.ts`
 - **変更**: voice sample registration のサンプル実体読込前に operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、拡張子・サイズ・言語 coverage の検証 semanticsは維持し、サンプル leaf がディレクトリへ置換された場合は例外化せず violation として返す回帰テストを追加した。
 - **検証**: voice-sample-ingestion-policy **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21782,7 +21782,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1430
 
-- **対象**: `libs/core/mission-process-planning.ts`、`libs/core/mission-process-planning.test.ts`
+- **対象**: `libs/core/mission/mission-process-planning.ts`、`libs/core/mission/mission-process-planning.test.ts`
 - **変更**: process template 再計画時の `NEXT_TASKS.json` reader が schema／shape error を空配列へ隠して既存 task board を上書きする fail-open を削除した。既存の mission path／schema／planner-authored protection、force による明示的再計画、task progress carry-over semanticsは維持し、形状不正ファイルを保持したまま拒否する回帰テストを追加した。
 - **検証**: mission-process-planning **2 files / 20 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21794,13 +21794,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1432
 
-- **対象**: `libs/core/tenant-registry.ts`、`libs/core/tenant-registry.test.ts`
+- **対象**: `libs/core/organization/tenant-registry.ts`、`libs/core/organization/tenant-registry.test.ts`
 - **変更**: tenant profile の state read 前に operation-time の regular-file 検査を追加した。既存の tenant path／symlink 境界、personal-tier access failure と corrupt JSON の分類、profile schema／tenant identity 検証は維持し、directory replacement の診断に regular-file 原因を含める回帰検証を追加した。
 - **検証**: tenant-registry **2 files / 18 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1433
 
-- 対象: libs/core/adf-repair-agent.ts、libs/core/adf-repair-agent.test.ts
+- 対象: libs/core/pipeline/adf-repair-agent.ts、libs/core/pipeline/adf-repair-agent.test.ts
 - 変更: ADF repair の初回read、軽量修復write、delegated repair 前後のread/write、最後のJSON recovery writeに operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、project-trust、schema／guardrail、delegation／repair output semanticsは維持し、repair target が directoryへ置換された場合に修復処理へ進まない回帰テストを追加した。
 - 検証: adf-repair-agent 2 files / 18 tests passed、対象 ESLint、Prettier、git diff --check。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21812,25 +21812,25 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1435
 
-- **対象**: `libs/core/speech-to-text-bridge.ts`、`libs/core/speech-to-text-bridge.test.ts`
+- **対象**: `libs/core/voice/speech-to-text-bridge.ts`、`libs/core/voice/speech-to-text-bridge.test.ts`
 - **変更**: STT bridge の audio input、stub transcript sidecar、既存 transcript output に operation-time の regular-file 検査を追加した。既存の repository／symlink path boundary、stub fallback、shell command、structured output、transcript write semanticsは維持し、audio／sidecar の directory replacement を拒否する回帰テストを追加した。
 - **検証**: speech-to-text-bridge **2 files / 19 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1436
 
-- **対象**: `libs/core/agent-manifest.ts`、`libs/core/agent-manifest.test.ts`
+- **対象**: `libs/core/agent/agent-manifest.ts`、`libs/core/agent/agent-manifest.test.ts`
 - **変更**: agent manifest 列挙後の content read 前に operation-time の regular-file 検査を追加した。既存の repository／symlink boundary、filename traversal rejection、frontmatter defaulting、selection-hint overlay semanticsは維持し、manifest entry が directoryへ置換された場合に明示 skip する回帰テストを追加した。
 - **検証**: agent-manifest **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1437
 
-- **対象**: `libs/core/project-trust.ts`、`libs/core/project-trust.test.ts`
+- **対象**: `libs/core/project/project-trust.ts`、`libs/core/project/project-trust.test.ts`
 - **変更**: project-local pipeline の approval payload hash 算出前に operation-time の regular-file 検査を追加した。既存の repository scope、symlink traversal rejection、built-in pipeline exemption、content drift／human approval binding semanticsは維持し、pipeline resource が directoryへ置換された場合に approval request を作成しない回帰テストを追加した。
 - **検証**: project-trust **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1438
 
-- **対象**: `libs/core/agent-instruction-loader.ts`、`libs/core/agent-instruction-loader.test.ts`
+- **対象**: `libs/core/agent/agent-instruction-loader.ts`、`libs/core/agent/agent-instruction-loader.test.ts`
 - **変更**: trusted override／base AGENTS contract の read 前に operation-time の regular-file 検査を追加した。既存の repository scope、symlink traversal rejection、worktree shadow exclusion、trust 未解決時の override 非消費、nearest replacement semanticsは維持し、trusted override が directoryへ置換された場合に拒否する回帰テストを追加した。
 - **検証**: agent-instruction-loader **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21842,7 +21842,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1440
 
-- **対象**: `libs/core/mission-context-pack-knowledge.ts`、`libs/core/mission-context-pack.test.ts`
+- **対象**: `libs/core/mission/mission-context-pack-knowledge.ts`、`libs/core/mission/mission-context-pack.test.ts`
 - **変更**: pinned knowledge hint の read 前に operation-time の regular-file 検査を追加した。既存の knowledge root／symlink scope、pinned path escape rejection、slice filtering、hint budget、search fallback semanticsは維持し、pinned resource が directoryへ置換された場合に hint として採用しない回帰テストを追加した。
 - **検証**: mission-context-pack **2 files / 27 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21854,55 +21854,55 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1442
 
-- **対象**: `libs/core/project-management.ts`、`libs/core/project-management.test.ts`
+- **対象**: `libs/core/project/project-management.ts`、`libs/core/project/project-management.test.ts`
 - **変更**: project OS scaffold の required blueprint read 前に operation-time の regular-file 検査を追加した。既存の governed artifact map、project OS path／tier scope、missing blueprint skip、scaffold generation semanticsは維持し、blueprint が directoryへ置換された場合に scaffold を拒否する回帰テストを追加した。
 - **検証**: project-management **2 files / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1443
 
-- **対象**: `libs/core/browser-onboarding.ts`、`libs/core/browser-onboarding.test.ts`
+- **対象**: `libs/core/browser/browser-onboarding.ts`、`libs/core/browser/browser-onboarding.test.ts`
 - **変更**: browser onboarding state の optional `my-vision.md` read 前に operation-time の regular-file 検査を追加した。既存の active profile root boundary、identity vision の優先、missing vision の空値 semantics は維持し、vision resource が directory へ置換された場合に明示拒否する回帰テストを追加した。
 - **検証**: browser-onboarding **2 files / 14 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1444
 
-- **対象**: `libs/core/agent-adapter.ts`、`libs/core/agent-adapter.test.ts`
+- **対象**: `libs/core/agent/agent-adapter.ts`、`libs/core/agent/agent-adapter.test.ts`
 - **変更**: Gemini wisdom lesson の content read 前に operation-time の regular-file 検査を追加した。既存の evolution directory／lesson path boundary と失敗時の prompt 非拡張 semantics は維持し、lesson が directory 等へ置換された場合の診断を明示した。
 - **検証**: agent-adapter の path-boundary **1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1445
 
-- **対象**: `libs/core/skill-plugin-loader.ts`、`libs/core/skill-plugin-loader.test.ts`
+- **対象**: `libs/core/plugin/skill-plugin-loader.ts`、`libs/core/plugin/skill-plugin-loader.test.ts`
 - **変更**: plugin contribution manifest の content read 前に operation-time の regular-file 検査を追加した。既存の provenance／managed-copy／human approval gate と manifest parse failure の skip semantics は維持し、manifest が directory 等へ置換された場合の診断を明示した。
 - **検証**: skill-plugin-loader の contribution manifest boundary **3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1446
 
-- **対象**: `libs/core/mission-lifecycle-completion.ts`、`libs/core/mission-lifecycle.test.ts`
+- **対象**: `libs/core/mission/mission-lifecycle-completion.ts`、`libs/core/mission/mission-lifecycle.test.ts`
 - **変更**: meeting follow-up evidence の customer delivery copy と minutes excerpt read 前に operation-time の regular-file 検査を追加した。既存の tenant/customer 一致、delivery artifact、summary、audit log semantics は維持し、evidence の directory replacement を delivery 前に拒否する回帰テストを追加した。
 - **検証**: 新規 boundary test **1 passed**、対象 ESLint、Prettier、`git diff --check`。mission-lifecycle 全体は既存4件（latest_commit期待値差分1件、10秒timeout 3件）が残存。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1447
 
-- **対象**: `libs/core/mission-distill.ts`、`libs/core/mission-distill.test.ts`
+- **対象**: `libs/core/mission/mission-distill.ts`、`libs/core/mission/mission-distill.test.ts`
 - **変更**: mission evidence ledger の read 前に operation-time の regular-file 検査を追加した。既存の mission-local scope、末尾イベント抽出、structural/LLM distillation、promotion queue semantics は維持し、ledger が directory 等へ置換された場合に distillation を拒否する回帰テストを追加した。
 - **検証**: mission-distill **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1448
 
-- **対象**: `libs/core/mission-gate-engine.ts`、`libs/core/mission-gate-engine.test.ts`
+- **対象**: `libs/core/mission/mission-gate-engine.ts`、`libs/core/mission/mission-gate-engine.test.ts`
 - **変更**: `evidence_exists`、`deliverable_quality`、`llm_review` の artifact boundary で operation-time の regular-file 検査を追加した。既存の path scope、missing／quality／stub backend の fail-closed semantics は維持し、directory を evidence／deliverable として通過させない回帰テストを追加した。
 - **検証**: mission-gate-engine **2 files / 12 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1449
 
-- **対象**: `libs/core/desktop-recording-compiler.ts`、`libs/core/desktop-recording.test.ts`
+- **対象**: `libs/core/virtual/desktop-recording-compiler.ts`、`libs/core/virtual/desktop-recording.test.ts`
 - **変更**: desktop promotion の screen artifact、procedure catalog、generated pipeline の read 前に operation-time の regular-file 検査を追加した。既存の allowlisted recording、intent review、catalog validation、transaction rollback semantics は維持し、promotion resource boundary を明示した。
 - **検証**: desktop-recording の resource-boundary **1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1450
 
-- **対象**: `libs/core/a2a-envelope-signature.ts`、`libs/core/a2a-envelope-signature.test.ts`
+- **対象**: `libs/core/mesh/a2a-envelope-signature.ts`、`libs/core/mesh/a2a-envelope-signature.test.ts`
 - **変更**: persisted A2A secret の read 前に operation-time の regular-file 検査を追加し、directory 等の置換時に process-local secret へ黙ってフォールバックしないようにした。既存の環境変数 secret、永続 secret、warn／enforce signature mode semantics は維持した。
 - **検証**: A2A secret resource boundary **1 test passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21932,13 +21932,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1455
 
-- **対象**: `libs/core/mission-coordination-bus.ts`、`libs/core/mission-coordination-bus.test.ts`
+- **対象**: `libs/core/mission/mission-coordination-bus.ts`、`libs/core/mission/mission-coordination-bus.test.ts`
 - **変更**: mission coordination bus の current／archive JSONL read と current stream の line count 前に operation-time の regular-file 検査を追加した。stream が directory 等へ置換された場合に空の coordination state として扱わず拒否し、既存の append／archive rotation／ack reconstruction semantics は維持した。
 - **検証**: mission-coordination-bus **10 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1456
 
-- **対象**: `libs/core/worker-state-journal.ts`、`libs/core/worker-state-journal.test.ts`
+- **対象**: `libs/core/workforce/worker-state-journal.ts`、`libs/core/workforce/worker-state-journal.test.ts`
 - **変更**: worker state journal／derived index の read 前に operation-time の regular-file 検査を追加した。journal leaf が directory 等へ置換された場合に空のrestore stateとして扱わず拒否し、通常のjournal replay、corrupt derived index の再投影、restore silence semantics は維持した。
 - **検証**: worker-state-journal resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -21950,61 +21950,61 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1458
 
-- **対象**: `libs/core/task-scoped-grants.ts`、`libs/core/task-scoped-grants.test.ts`
+- **対象**: `libs/core/task/task-scoped-grants.ts`、`libs/core/task/task-scoped-grants.test.ts`
 - **変更**: task-scoped grant store の read／append 前に operation-time の regular-file 検査を追加した。認可台帳が directory 等へ置換された場合に空のgrant集合として扱わず、発行・一覧の両経路で明示拒否する。既存の audience／tenant scope、expiry、revocation semantics は維持した。
 - **検証**: task-scoped-grants の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1459
 
-- **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-journal.test.ts`
+- **対象**: `libs/core/mission/mission-orchestration-journal.ts`、`libs/core/mission/mission-orchestration-journal.test.ts`
 - **変更**: mission orchestration journal の replay read 前に operation-time の regular-file 検査を追加した。`orchestration-journal.jsonl` が directory 等へ置換された場合に空のjournalとして扱わず `MISSION_LOG_CORRUPT` で拒否し、既存のjournal validation／replay／provisioned-entry recovery semantics は維持した。
 - **検証**: mission-orchestration-journal の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1460
 
-- **対象**: `libs/core/agent-identity.ts`、`libs/core/agent-identity.test.ts`
+- **対象**: `libs/core/agent/agent-identity.ts`、`libs/core/agent/agent-identity.test.ts`
 - **変更**: NHI identity journal の restore read 前に operation-time の regular-file 検査を追加した。identity journal が directory 等へ置換された場合に空の identity state として復元せず拒否し、既存のNHI lifecycle／replay／governed write semantics は維持した。
 - **検証**: agent-identity の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1461
 
-- **対象**: `libs/core/surface-runtime.ts`、`libs/core/surface-runtime.test.ts`
+- **対象**: `libs/core/surface/surface-runtime.ts`、`libs/core/surface/surface-runtime.test.ts`
 - **変更**: surface runtime log tail の read 前に operation-time の regular-file 検査を追加した。runtime log が directory 等へ置換された場合に空のログとして扱わず拒否し、既存の surface manifest／state catalog と log tail semantics は維持した。
 - **検証**: surface-runtime **7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1462
 
-- **対象**: `libs/core/orchestrator-session.ts`、`libs/core/orchestrator-session.test.ts`
+- **対象**: `libs/core/mission/orchestrator-session.ts`、`libs/core/mission/orchestrator-session.test.ts`
 - **変更**: orchestrator session journal の restore read 前に operation-time の regular-file 検査を追加した。session journal が directory 等へ置換された場合に空のsession stateとして復元せず拒否し、既存のthread／mission ownership、release、restart replay semantics は維持した。
 - **検証**: orchestrator-session の resource-boundary test、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1463
 
-- **対象**: `libs/core/intent-reconciliation.ts`、`libs/core/intent-reconciliation.test.ts`
+- **対象**: `libs/core/intent/intent-reconciliation.ts`、`libs/core/intent/intent-reconciliation.test.ts`
 - **変更**: completion reconciliation の evidence reader に regular-file 境界を追加し、path ref 自体を成功条件の証拠として照合する fallback を削除した。directory／missing／symlink／binary resource や単なるパス名では completion を満たさず、実際に読めた text evidence と preview text のみを構造判定へ渡すようにした。
 - **検証**: intent-reconciliation **5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1464
 
-- **対象**: `libs/core/artifact-review.ts`、`libs/core/artifact-review.test.ts`
+- **対象**: `libs/core/workforce/artifact-review.ts`、`libs/core/workforce/artifact-review.test.ts`
 - **変更**: artifact hash／artifact-review receipt の read 前に operation-time の regular-file 検査を追加した。directory 等へ置換された artifact／receipt をレビュー対象として読み込まず、既存の repository path／symlink 境界と hash-bound review semantics は維持した。
 - **検証**: artifact-review **2 files / 9 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1465
 
-- **対象**: `libs/core/analysis-corpus.ts`、`libs/core/analysis-corpus.test.ts`
+- **対象**: `libs/core/analysis/analysis-corpus.ts`、`libs/core/analysis/analysis-corpus.test.ts`
 - **変更**: model-visible な analysis corpus snippet の read 前に operation-time の regular-file 検査を追加した。allowed lexical ref が directory 等へ置換された場合は snippet 化せず、既存の repository／symlink 境界と ref ranking semantics は維持した。
 - **検証**: analysis-corpus **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1466
 
-- **対象**: `libs/core/distill-knowledge-injector.ts`、`libs/core/distill-knowledge-injector.test.ts`
+- **対象**: `libs/core/knowledge/distill-knowledge-injector.ts`、`libs/core/knowledge/distill-knowledge-injector.test.ts`
 - **変更**: distill catalog の markdown entry read 前に operation-time の regular-file 検査を追加した。ファイル名だけが `distill_*.md` に一致する directory 等を knowledge injection 対象へ含めず、既存の tenant scope／symlink／placeholder quarantine と ranking semantics は維持した。
 - **検証**: distill-knowledge-injector **2 files / 12 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1467
 
-- **対象**: `libs/core/a2a-conversation-store.ts`、`libs/core/a2a-conversation-store.test.ts`
+- **対象**: `libs/core/mesh/a2a-conversation-store.ts`、`libs/core/mesh/a2a-conversation-store.test.ts`
 - **変更**: A2A conversation JSONL の read／append 前に operation-time の regular-file 検査を追加した。履歴ファイルが directory 等へ置換された場合に空履歴や新規 append の fallback として扱わず拒否し、既存の symlink 境界、行単位 validation、lock／MAX_TURNS／confidential mission semantics は維持した。
 - **検証**: a2a-conversation-store **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -22016,13 +22016,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1469
 
-- **対象**: `libs/core/screen-frame-redaction.ts`、`libs/core/screen-frame-redaction.test.ts`
+- **対象**: `libs/core/virtual/screen-frame-redaction.ts`、`libs/core/virtual/screen-frame-redaction.test.ts`
 - **変更**: raw screen capture の read 前に operation-time の regular-file 検査を追加し、directory 等の異常入力を明示拒否するようにした。拒否対象を cleanup で再帰削除せず、入力エラーが cleanup error に置き換わらないよう raw capture cleanup を保護した。通常の redacted output、OCR failure、raw capture cleanup semantics は維持した。
 - **検証**: screen-frame-redaction **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1470
 
-- **対象**: `libs/core/mission-seal.ts`、`libs/core/mission-seal.test.ts`
+- **対象**: `libs/core/mission/mission-seal.ts`、`libs/core/mission/mission-seal.test.ts`
 - **変更**: mission seal の暗号化 archive／encrypted key 出力後、hash／anchor 処理へ進む前に operation-time の regular-file 検査を追加した。暗号化出力が directory 等へ置換された場合に seal を有効 artifact として扱わず、既存の re-seal／intermediate cleanup／best-effort anchor semantics は維持した。
 - **検証**: mission-seal **2 files / 7 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -22046,13 +22046,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1474
 
-- **対象**: `libs/core/mission-orchestration-worker-part-results.ts`、`libs/core/mission-draft-refine-persistence.test.ts`
+- **対象**: `libs/core/mission/mission-orchestration-worker-part-results.ts`、`libs/core/mission/mission-draft-refine-persistence.test.ts`
 - **変更**: draft-refine の deliverable read 前に operation-time の regular-file 検査を追加した。directory 等の deliverable を refinement backend へ渡さず、既存の mission scope、missing／outside-path skip、provisioned receipt semantics は維持した。
 - **検証**: mission-draft-refine-persistence **2 files / 3 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1475
 
-- **対象**: `libs/core/mission-project-ledger.ts`、`libs/core/mission-project-reassignment.test.ts`
+- **対象**: `libs/core/mission/mission-project-ledger.ts`、`libs/core/mission/mission-project-reassignment.test.ts`
 - **変更**: project mission ledger の下位 regular-file resource error を上位 loader が `null`／missing ledger fallback に変換しないよう再送出するようにした。既存 JSON ledger が directory 等へ置換された場合に新規 ledger として上書きせず、既存の project scope／reassignment／schema validation semantics は維持した。
 - **検証**: mission-project-reassignment **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -22064,19 +22064,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1477
 
-- **対象**: `libs/core/screen-capture-bridge.ts`、`libs/core/screen-capture-bridge.test.ts`
+- **対象**: `libs/core/virtual/screen-capture-bridge.ts`、`libs/core/virtual/screen-capture-bridge.test.ts`
 - **変更**: screen capture stream の結果 path を payload read 前に operation-time の regular-file として検査するようにした。capture result が directory 等へ置換された場合に frame を生成せず、異常時の cleanup が入力エラーを覆い隠さないよう保護した。通常の stub capture／stream／VideoFrameBus semantics は維持した。
 - **検証**: screen-capture-bridge **2 files / 6 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1478
 
-- **対象**: `libs/core/virtual-camera-bridge.ts`、`libs/core/virtual-camera-bridge.test.ts`
+- **対象**: `libs/core/virtual/virtual-camera-bridge.ts`、`libs/core/virtual/virtual-camera-bridge.test.ts`
 - **変更**: virtual camera stream の結果 path を payload read 前に operation-time の regular-file として検査するようにした。capture result が directory 等へ置換された場合に frame を生成せず、read／yield 中断時の cleanup が入力エラーを覆い隠さないよう `finally` で保護した。通常の stub capture／stream／VideoFrameBus semantics は維持した。
 - **検証**: virtual-camera-bridge **2 files / 5 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1479
 
-- **対象**: `libs/core/video-frame-archive.ts`、`libs/core/video-frame-archive.test.ts`
+- **対象**: `libs/core/video/video-frame-archive.ts`、`libs/core/video/video-frame-archive.test.ts`
 - **変更**: MP4 decode の input path を ffmpeg 実行前に operation-time の regular-file として検査するようにした。input video が directory 等へ置換された場合に外部 decoder を起動せず、既存の frame output regular-file 検査と archive cleanup semantics は維持した。
 - **検証**: video-frame-archive **2 files / 4 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、未監査direct loader全件inventory、全script harness／generator移行は継続課題とする。
 
@@ -22460,49 +22460,49 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1543
 
-- **対象**: `libs/shared-nerve/src/reflex-engine.ts`、`libs/core/deliverable-inbox.ts`、`libs/core/agent-adapter.ts`、`libs/shared-network/src/mcp-server-engine.ts` と対象テスト
+- **対象**: `libs/shared-nerve/src/reflex-engine.ts`、`libs/core/deliverable-inbox.ts`、`libs/core/agent/agent-adapter.ts`、`libs/shared-network/src/mcp-server-engine.ts` と対象テスト
 - **変更**: reflex定義、deliverable lock、Gemini wisdom、MCP pipeline／actuator manifest の本文読込を foundation の `readTextFile` へ移行した。secure path／regular-file検証、JSON／catalog解析、lock stale判定、MCPのallowlist・caller scope・approval semanticsは変更せず、既存テストのFoundation I/Oモックを新しい読取経路へ適応した。
 - **検証**: 対象テスト **4 files／80 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1544
 
-- **対象**: `libs/core/skill-plugin-loader.ts`、`libs/core/adf-repair-agent.ts`、`libs/core/browser-extension-bridge.ts` と対象テスト
+- **対象**: `libs/core/plugin/skill-plugin-loader.ts`、`libs/core/pipeline/adf-repair-agent.ts`、`libs/core/browser/browser-extension-bridge.ts` と対象テスト
 - **変更**: plugin config／manifest、ADF input／schema／recheck、browser observation JSONL の本文読込を foundation の `readTextFile` へ移行した。provenance／symlink／regular-file境界、ADF repair の validation・repair cascade、browser observation のサイズ／承認／監査 semanticsは変更せず、secure-io はバイナリ・書込用途に限定した。
 - **検証**: 対象テスト **4 files／72 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1545
 
-- **対象**: `libs/core/project-trust.ts`、`libs/core/plugin-managed-install.ts`、`libs/core/knowledge-provider.ts`、`libs/core/project-management.ts`、`libs/core/persona-loader.ts`、`libs/core/procedure-registry.ts` と対象テスト
+- **対象**: `libs/core/project/project-trust.ts`、`libs/core/plugin/plugin-managed-install.ts`、`libs/core/knowledge/knowledge-provider.ts`、`libs/core/project/project-management.ts`、`libs/core/persona-loader.ts`、`libs/core/knowledge/procedure-registry.ts` と対象テスト
 - **変更**: project trust、managed plugin manifest、knowledge provider、project artifact、persona matrix、procedure catalog の本文読込を foundation の `readTextFile` へ移行した。各既存のpath／symlink／regular-file境界、catalog schema／dedup、project／procedure resolution semanticsは変更せず、procedure registry のテストseamを新しいreaderへ適応した。
 - **検証**: 対象テスト **7 files／59 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1546
 
-- **対象**: `libs/core/agent-instruction-loader.ts`、`libs/core/skill-resource-loader.ts`、`libs/core/plugin-pack.ts`、`libs/core/ops-alert-log.ts`、`libs/core/pipeline-run-journal.ts`、`libs/core/report-contract.ts`
+- **対象**: `libs/core/agent/agent-instruction-loader.ts`、`libs/core/plugin/skill-resource-loader.ts`、`libs/core/plugin/plugin-pack.ts`、`libs/core/ops-alert-log.ts`、`libs/core/pipeline/pipeline-run-journal.ts`、`libs/core/report-contract.ts`
 - **変更**: instruction override／skill resource、plugin pack manifest／import record、ops alert、pipeline journal、report schema prompt の本文読込を foundation の `readTextFile` へ移行した。各既存のpath scope／provenance、catalog・journal・report schema、append／write semanticsは変更せず、secure-io は存在・属性・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **5 files／48 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1547
 
-- **対象**: `libs/core/agent-manifest.ts`、`libs/core/a2a-conversation-store.ts`、`libs/core/scope-context.ts`、`libs/core/src/knowledge-curation-report.ts`、`libs/core/tenant-registry.ts`、`libs/core/mission-project-ledger.ts`、`libs/core/mission-process-planning.ts`
+- **対象**: `libs/core/agent/agent-manifest.ts`、`libs/core/mesh/a2a-conversation-store.ts`、`libs/core/scope-context.ts`、`libs/core/knowledge/knowledge-curation-report.ts`、`libs/core/organization/tenant-registry.ts`、`libs/core/mission/mission-project-ledger.ts`、`libs/core/mission/mission-process-planning.ts`
 - **変更**: agent manifest、A2A conversation、scope context、knowledge curation、tenant registry、mission ledger／task board の本文読込を foundation の `readTextFile` へ移行した。tenant／tier／path scope、conversation retention、catalog／ledger／task expansion semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **7 files／88 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1548
 
-- **対象**: `libs/core/vision-resolver.ts`、`libs/core/mission-distill.ts`、`libs/core/in-room-minutes-recorder.ts`、`libs/core/ace-core.ts`、`libs/core/ledger.ts`、`libs/core/facet-registry.ts`
+- **対象**: `libs/core/vision-resolver.ts`、`libs/core/mission/mission-distill.ts`、`libs/core/in-room-minutes-recorder.ts`、`libs/core/ace-core.ts`、`libs/core/ledger.ts`、`libs/core/facet-registry.ts`
 - **変更**: vision、mission distill／prompt、in-room transcript、ACE minutes、ledger、facet Markdown の本文読込を foundation の `readTextFile` へ移行した。tenant／path scope、ledger hash／audit、distill validation、recording／facet boundary semanticsは変更せず、secure-io は属性検証・追記／書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **7 files／35 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1549
 
-- **対象**: `libs/core/src/knowledge-curation-tenant-ingest.ts`、`libs/core/src/knowledge-index.ts`、`libs/core/cowork-knowledge-bridge.ts`、`libs/core/deal-documents.ts`、`libs/core/mission-context-pack-knowledge.ts`、`libs/core/locale.ts` と対象テスト
+- **対象**: `libs/core/knowledge/knowledge-curation-tenant-ingest.ts`、`libs/core/knowledge/knowledge-index.ts`、`libs/core/cowork-knowledge-bridge.ts`、`libs/core/deal-documents.ts`、`libs/core/mission/mission-context-pack-knowledge.ts`、`libs/core/locale.ts` と対象テスト
 - **変更**: tenant curation card、knowledge indexのhint／Markdown、Cowork knowledge、deal document、mission context、locale catalog の本文読込を foundation の `readTextFile` へ移行した。tier／tenant／path scope、ranking／embedding、Cowork promotion、document／locale semanticsは変更せず、knowledge-indexテストのreader mockを新APIへ適応した。
 - **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1557
 
-- **対象**: `libs/core/speech-to-text-bridge.ts`、`libs/core/browser-onboarding.ts`、`libs/core/a2a-envelope-signature.ts`、`libs/core/background-review-patch.ts` と対象テスト
+- **対象**: `libs/core/voice/speech-to-text-bridge.ts`、`libs/core/browser/browser-onboarding.ts`、`libs/core/mesh/a2a-envelope-signature.ts`、`libs/core/workforce/background-review-patch.ts` と対象テスト
 - **変更**: STT sidecar、browser onboarding vision、A2A persisted secret、background review の承認対象本文を foundation の `readTextFile` へ移行した。音声／画像などのバイナリ読込、secret／approval／patch hash、既存のscope・provenance・validation semanticsは変更せず、secure-io はバイナリ・属性検証・書込用途に限定した。
 - **検証**: 対象テスト **4 files／53 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22514,7 +22514,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1559
 
-- **対象**: `libs/core/ingest-asset-ledger.ts`、`libs/core/onboarding-context.ts`、`libs/core/spill-result.ts` と対象テスト
+- **対象**: `libs/core/ingest-asset-ledger.ts`、`libs/core/organization/onboarding-context.ts`、`libs/core/spill-result.ts` と対象テスト
 - **変更**: ingest asset ledger、onboarding context binding、spill locator の本文読込を foundation の `readTextFile` へ移行した。tenant／organization／project context、ledger lineage、spill path／permission semanticsは変更せず、個別サイズ上限を持つ他のreaderやバイナリ用途は対象外として保持した。
 - **検証**: 対象テスト **3 files／29 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22526,13 +22526,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1561
 
-- **対象**: `libs/core/customer-conversation.ts`、`libs/core/cli-utils.ts`、`libs/core/mesh-hub-peer-messaging-adapter.ts`、`libs/core/orchestrator-session.ts`、`libs/core/classifier.ts`、`libs/core/entropy-gate.ts` と既存対象テスト
+- **対象**: `libs/core/customer-conversation.ts`、`libs/core/cli-utils.ts`、`libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`、`libs/core/mission/orchestrator-session.ts`、`libs/core/classifier.ts`、`libs/core/entropy-gate.ts` と既存対象テスト
 - **変更**: customer notes、CLI input、mesh JSONL、orchestrator journal、classifier input、entropy hash の本文読込を foundation の `readTextFile` へ移行した。customer tenant scope、mesh／journal replay、classifier result、entropy cache semanticsは変更せず、バイナリ・個別サイズ上限付きreaderは対象外として保持した。
 - **検証**: 対象既存テスト **6 files／52 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。classifier は専用テストファイルが存在しないため静的検査と既存利用経路で確認した。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1562
 
-- **対象**: `libs/core/desktop-recording-compiler.ts`、`libs/core/openai-compatible-backend.ts`、`libs/core/openrouter-backend.ts` と対象テスト
+- **対象**: `libs/core/virtual/desktop-recording-compiler.ts`、`libs/core/provider/openai-compatible-backend.ts`、`libs/core/provider/openrouter-backend.ts` と対象テスト
 - **変更**: desktop recording の pipeline／procedure catalog、OpenAI／OpenRouter tool `read_file` の本文読込を foundation の `readTextFile` へ移行した。recording／vision image bytes、resource path validation、tool-loop・provider semanticsは変更せず、バイナリ用途の `safeReadFile` は保持した。
 - **検証**: 対象テスト **3 files／46 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22580,7 +22580,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1570
 
-- **対象**: `libs/core/policy-engine.ts`
+- **対象**: `libs/core/governance/policy-engine.ts`
 - **変更**: domain 層に残っていた `getFoundationIo().readFile` の直接利用を foundation の `readTextFile` へ移行した。policy file の存在確認、YAML parse、policy normalization、fail-closed evaluation semanticsは変更していない。
 - **検証**: 対象テスト **2 files／13 tests passed**、`pnpm run typecheck`、`git diff --check`。残る foundation 内部 reader と domain loader／catalog統合は継続課題とする。
 
@@ -22604,43 +22604,43 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1574
 
-- **対象**: `libs/core/channel-adapter.ts`、`libs/core/channel-adapter.test.ts`、Slack／Telegram／Discord／iMessage bridge、SX-09b
+- **対象**: `libs/core/surface/channel-adapter.ts`、`libs/core/surface/channel-adapter.test.ts`、Slack／Telegram／Discord／iMessage bridge、SX-09b
 - **変更**: 共通 thread formatter の `en` 固定を解消し、`SupportedLocale` を受け取る optional 引数を追加した。4 bridge はそれぞれの `resolveOperatorLocale()` を formatter へ渡し、履歴見出し・話者ラベルも operator locale に従って描画する。既定値 `en`、current message 除外、履歴件数制限、delivery gate は維持した。
 - **検証**: channel adapter／4 bridge **5 files／50 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider 実機受入、日英 literal の全面移行は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1575
 
-- **対象**: `libs/core/slack-approval-ui.ts`、`libs/core/slack-mission-proposal-ui.ts`、Slack bridge と対象テスト、SX-08b／SX-09b
+- **対象**: `libs/core/integrations/slack-approval-ui.ts`、`libs/core/integrations/slack-mission-proposal-ui.ts`、Slack bridge と対象テスト、SX-08b／SX-09b
 - **変更**: Slack approval／mission proposal の contract label、approval control、mission confirmation、fallback に残っていた日英直書きを bridge vocabulary と `SupportedLocale` に接続した。Slack bridge は `resolveOperatorLocale()` を builderへ渡し、省略時の既存互換表示、approval／proposal state、`shouldSend`／external delivery semantics は維持した。
 - **検証**: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1576
 
-- **対象**: `libs/core/channel-adapter.ts`、`libs/core/channel-adapter.test.ts`、4 bridge、SX-08b／SX-09b
+- **対象**: `libs/core/surface/channel-adapter.ts`、`libs/core/surface/channel-adapter.test.ts`、4 bridge、SX-08b／SX-09b
 - **変更**: text-only contract projectionのlocaleを本文の日本語文字判定だけでなく `ChannelTurnInput.locale` から指定できるようにした。Slack／Telegram／Discord／iMessage が `resolveOperatorLocale()` を共通formatterへ渡し、thread contextとcontract labelsのlocaleを統一した。既存の推定fallback、delivery gate、approval semanticsは維持した。
 - **検証**: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1577
 
-- **対象**: `libs/core/intent-resolution-contract.ts`、`libs/core/channel-surface-types.ts`、`libs/core/surface-interaction-model.ts`、`libs/core/surface-runtime-orchestrator.ts`、4 bridge、契約／orchestratorテスト、SX-08b／SX-09b
+- **対象**: `libs/core/intent/intent-resolution-contract.ts`、`libs/core/surface/channel-surface-types.ts`、`libs/core/surface/surface-interaction-model.ts`、`libs/core/surface/surface-runtime-orchestrator.ts`、4 bridge、契約／orchestratorテスト、SX-08b／SX-09b
 - **変更**: `IntentResolutionContract` の `next_action` label／consequence に `SupportedLocale` を渡せるようにし、surface conversation inputからorchestratorまでlocaleを伝播した。4 bridgeのoperator localeがtext-only formatterだけでなく、契約を直接描画するsurfaceの次アクション文言にも反映される。省略時の既定値、intent packet、tenant／tier、approval gateは維持した。
 - **検証**: intent contract／surface interaction／orchestrator／4 bridge **8 files／83 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1578
 
-- **対象**: `libs/core/surface-approval-ui.ts`、`libs/core/surface-mission-proposals.ts`、Telegram／Discord／iMessage bridge、generic approval／proposalテスト、SX-08b／SX-09b
+- **対象**: `libs/core/surface/surface-approval-ui.ts`、`libs/core/surface/surface-mission-proposals.ts`、Telegram／Discord／iMessage bridge、generic approval／proposalテスト、SX-08b／SX-09b
 - **変更**: generic approval text と mission proposal confirmation にoptionalな `SupportedLocale` を追加し、Telegram／Discord／iMessage bridgeのoperator localeを渡すようにした。Slackで先行したlocale境界を3 bridgeのapproval／proposal fallbackにも揃え、省略時の既存日本語、approval state、proposal state、external delivery gateは維持した。
 - **検証**: generic approval／proposal／3 bridge **5 test files／46 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1579
 
-- **対象**: `libs/core/surface-mission-proposals.ts`、mission proposal test、Telegram／Discord／iMessage bridge、SX-08b／SX-09b
+- **対象**: `libs/core/surface/surface-mission-proposals.ts`、mission proposal test、Telegram／Discord／iMessage bridge、SX-08b／SX-09b
 - **変更**: pending mission proposal の取消返信と発行結果にもoptional localeを接続し、3 bridgeがoperator localeを確認後のgeneric proposal replyへ渡すようにした。proposal state、mission issuance、external delivery gate、既定の日本語表示は維持した。
 - **検証**: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1580
 
-- **対象**: `libs/core/surface-mission-steering.ts`、mission steering test、SX-08b／SX-09b
+- **対象**: `libs/core/surface/surface-mission-steering.ts`、mission steering test、SX-08b／SX-09b
 - **変更**: approval-gated な mission steering の承認待ち応答を `SurfaceConversationInput.locale` から描画するようにした。locale未指定時の既存日本語、承認 request の生成、human-only decision、steering authority、finish／verify の実行境界は維持し、qps-ploc の承認文言回帰を追加した。
 - **検証**: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
@@ -22670,43 +22670,43 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1550
 
-- **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
+- **対象**: `libs/core/tool/runtime-health-history.ts`、`libs/core/surface/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
 - **変更**: runtime health、surface log、report JSONL、mesh delivery、ingest cursor、customer known-issues の本文読込を foundation の `readTextFile` へ移行した。health／surface／tenant scope、report／mesh／cursor append semantics、customer approval・tier semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **7 files／48 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1551
 
-- **対象**: `libs/core/mission-orchestration-journal.ts`、`libs/core/mission-orchestration-progress.ts`、`libs/core/mission-creation.ts`、`libs/core/mission-gate-engine.ts`、`libs/core/mission-retrospective.ts`
+- **対象**: `libs/core/mission/mission-orchestration-journal.ts`、`libs/core/mission/mission-orchestration-progress.ts`、`libs/core/mission/mission-creation.ts`、`libs/core/mission/mission-gate-engine.ts`、`libs/core/mission/mission-retrospective.ts`
 - **変更**: mission orchestration journal／task board／events、mission creation board、gate artifact、retrospective queue の本文読込を foundation の `readTextFile` へ移行した。mission scope、journal／ledger append、gate validation、creation／retrospective lifecycle semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／41 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1552
 
-- **対象**: `libs/core/mission-orchestration-worker-part-results.ts`、`libs/core/mission-orchestration-worker-part-context.ts`、`libs/core/mission-coordination-bus.ts`、`libs/core/mission-lifecycle-completion.ts`、`libs/core/mission-lifecycle.ts`
+- **対象**: `libs/core/mission/mission-orchestration-worker-part-results.ts`、`libs/core/mission/mission-orchestration-worker-part-context.ts`、`libs/core/mission/mission-coordination-bus.ts`、`libs/core/mission/mission-lifecycle-completion.ts`、`libs/core/mission/mission-lifecycle.ts`
 - **変更**: worker deliverable／diff／procedure、coordination message、completion evidence／minutes、mission memory の本文読込を foundation の `readTextFile` へ移行した。worker／coordination／completion／lifecycleのscope、audit、reconciliation、memory promotion semanticsは変更していない。
 - **検証**: worker結果・coordination・lifecycle service **3 files／33 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。`mission-lifecycle.test.ts` 全体には今回のreader行と無関係な完了summary期待値差分1件とtimeout 3件が残るため、CIでの再確認課題として明記する。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1553
 
-- **対象**: `libs/core/scope-offboarding.ts`、`libs/core/task-scoped-grants.ts`、`libs/core/oauth-session-store.ts`、`libs/core/tenant-rate-limiter.ts`
+- **対象**: `libs/core/scope-offboarding.ts`、`libs/core/task/task-scoped-grants.ts`、`libs/core/oauth-session-store.ts`、`libs/core/organization/tenant-rate-limiter.ts`
 - **変更**: scope offboarding、task-scoped grant store、OAuth lock、tenant rate-limit lock の本文読込を foundation の `readTextFile` へ移行した。tenant／scope／grant authorization、lock ownership／expiry、offboarding audit semanticsは変更せず、secure-io は属性検証・lock／書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／61 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1554
 
-- **対象**: `libs/core/analysis-corpus.ts`、`libs/core/agent-identity.ts`、`libs/core/distill-knowledge-injector.ts`、`libs/core/intent-reconciliation.ts`、`libs/core/cognitive-routing.ts`、`libs/core/cli-input.ts`
+- **対象**: `libs/core/analysis/analysis-corpus.ts`、`libs/core/agent/agent-identity.ts`、`libs/core/knowledge/distill-knowledge-injector.ts`、`libs/core/intent/intent-reconciliation.ts`、`libs/core/cognitive-routing.ts`、`libs/core/cli-input.ts`
 - **変更**: analysis corpus、agent identity journal、distill markdown、intent reconciliation、cognitive routing schema、CLI text／JSON input の本文読込を foundation の `readTextFile` へ移行した。path／tenant scope、identity journal、distill ranking、reconciliation／routing validation、CLI input boundary semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **6 files／60 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1555
 
-- **対象**: `libs/core/knowledge-weight-recalculation.ts`、`libs/core/protocol-service-lifecycle.ts`、`libs/core/worker-state-journal.ts`、`libs/core/sdlc-gate-readiness.ts`
+- **対象**: `libs/core/knowledge/knowledge-weight-recalculation.ts`、`libs/core/protocol-service-lifecycle.ts`、`libs/core/workforce/worker-state-journal.ts`、`libs/core/sdlc-gate-readiness.ts`
 - **変更**: knowledge ranking governance、protocol lifecycle log、worker state journal、SDLC template の本文読込を foundation の `readTextFile` へ移行した。ranking／protocol audit、journal resume、SDLC gate／template validation semanticsは変更せず、secure-io は属性検証・書込・バイナリ用途に限定した。
 - **検証**: 対象テスト **4 files／36 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1556
 
-- **対象**: `libs/core/worker-context-compaction.ts`、`libs/core/email-workflow.ts`、`libs/core/promoted-memory.ts`、`libs/core/codex-cli-query.ts`、`libs/core/mission-artifact-closure.ts` と対象テスト
+- **対象**: `libs/core/workforce/worker-context-compaction.ts`、`libs/core/integrations/email-workflow.ts`、`libs/core/promoted-memory.ts`、`libs/core/provider/codex-cli-query.ts`、`libs/core/mission/mission-artifact-closure.ts` と対象テスト
 - **変更**: worker compaction prompt、email draft、promoted-memory hints、Codex CLI output、mission artifact index の本文読込を foundation の `readTextFile` へ移行した。既存のpath／scope、provider output parsing、memory promotion、email safety、artifact closure semanticsは変更せず、codex-cli test seamを新readerへ適応した。
 - **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22790,7 +22790,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1598
 
-- **対象**: `libs/core/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
+- **対象**: `libs/core/provider/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
 - **変更**: provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。snapshot parser／JSON Schemaを拡張し、build済みcore package経由のscanでもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
 - **検証**: build後の実scanで provider registry の registered／available capability／available provider／missing provider 集計を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
 
@@ -22802,7 +22802,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1600
 
-- **対象**: `libs/core/mission-state.ts`、mission-state test、PI-03
+- **対象**: `libs/core/mission/mission-state.ts`、mission-state test、PI-03
 - **変更**: legacy `loadStateForRepair` の JSON read 前に operation-time の `safeLstat(...).isFile()` を追加し、解決済み mission state leaf がディレクトリへ置換された場合に repair read を拒否する。通常の schema-aware loader と repair semantics は変更していない。
 - **検証**: mission-state **1 file／7 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
@@ -22814,7 +22814,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1602
 
-- **対象**: `libs/core/policy-engine.ts`、policy-engine test、PI-03
+- **対象**: `libs/core/governance/policy-engine.ts`、policy-engine test、PI-03
 - **変更**: PolicyEngine の policy override read を `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外の path と directory replacement は YAML parse 前に拒否し、既存の policy normalization と lazy default load semantics は変更していない。
 - **検証**: policy-engine **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
@@ -22826,7 +22826,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1604
 
-- **対象**: `libs/core/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
+- **対象**: `libs/core/mission/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
 - **変更**: project mission ledger の既存 markdown leaf を `ensureProjectMissionLedgerExists` で operation-time に regular-file 検証し、directory replacement を `readTextFile` 前に拒否するようにした。JSON ledger 側と同じ明示的な `PROJECT_MISSION_LEDGER` error semantics を維持した。
 - **検証**: mission-project-reassignment **2 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
@@ -22844,19 +22844,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1607
 
-- **対象**: `libs/core/mission-orchestration-journal.ts`、journal test、PI-03
+- **対象**: `libs/core/mission/mission-orchestration-journal.ts`、journal test、PI-03
 - **変更**: verified provisioned artifact の replay verification 前に operation-time の regular-file 検査を追加し、target directory replacement を `readTextFile` に到達させず corruption として拒否するようにした。
 - **検証**: mission-orchestration-journal **2 files／14 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
 ## 2026-09-06 再レビュー実装 1608
 
-- **対象**: `libs/core/plugin-pack.ts`、plugin-pack test、PI-03
+- **対象**: `libs/core/plugin/plugin-pack.ts`、plugin-pack test、PI-03
 - **変更**: plugin pack の import telemetry JSONL reader に operation-time の regular-file 検査を追加し、directory replacement を既存の lenient read semanticsに従って空履歴として扱うようにした。
 - **検証**: plugin-pack **2 files／20 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
 ## 2026-09-06 再レビュー実装 1609
 
-- **対象**: `libs/core/email-workflow.ts`、email-workflow test、PI-03
+- **対象**: `libs/core/integrations/email-workflow.ts`、email-workflow test、PI-03
 - **変更**: email draft の latest JSON／Markdown reader を operation-time の `safeLstat(...).isFile()` 境界へ接続し、directory replacement を draft parse／body extraction に到達させないようにした。既存の malformed JSON／markdown fallback semantics は維持した。
 - **検証**: email-workflow **2 files／8 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
 
@@ -22874,25 +22874,25 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1612
 
-- **対象**: `libs/core/worker-context-compaction.ts`、worker-context-compaction test、PI-03
+- **対象**: `libs/core/workforce/worker-context-compaction.ts`、worker-context-compaction test、PI-03
 - **変更**: worker context compaction の update-summary prompt read を operation-time の regular-file 境界へ接続し、directory replacement を要約生成へ到達させず既定 fallbackへ閉じるようにした。prompt不存在時の既存 fallback と要約処理 semantics は維持した。
 - **検証**: worker-context-compaction **2 files／14 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1613
 
-- **対象**: `libs/core/mission-distill.ts`、mission-distill test、wisdom-policy catalog test、PI-03
+- **対象**: `libs/core/mission/mission-distill.ts`、mission-distill test、wisdom-policy catalog test、PI-03
 - **変更**: mission-distill の distill prompt read を operation-time の regular-file 境界へ接続し、directory replacement を wisdom生成へ到達させず空prompt fallbackへ閉じるようにした。governed wisdom policy catalog と既存の distillation semantics は維持した。
 - **検証**: mission-distill／wisdom-policy catalog **2 files／6 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1614
 
-- **対象**: `libs/core/knowledge-weight-recalculation.ts`、knowledge-weight-recalculation test、PI-03
+- **対象**: `libs/core/knowledge/knowledge-weight-recalculation.ts`、knowledge-weight-recalculation test、PI-03
 - **変更**: knowledge-weight recalculation の governance backup read を operation-time の regular-file 境界へ接続し、directory replacement の本文を backup／historyへ読み込まないようにした。既存の tenant scope、steward approval、stale proposal、governed weight loader semantics は維持した。
 - **検証**: knowledge-weight-recalculation **2 files／5 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1615
 
-- **対象**: `libs/core/mission-orchestration-progress.ts`、progress test、PI-03
+- **対象**: `libs/core/mission/mission-orchestration-progress.ts`、progress test、PI-03
 - **変更**: mission orchestration progress の PLAN／NEXT_TASKS／TASK_BOARD read gate を operation-time の regular-file 境界へ接続し、directory replacement を task board 再調整へ到達させないようにした。既存の mission path containment と provisioned write semantics は維持した。
 - **検証**: mission-orchestration-progress **2 files／4 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
@@ -22904,7 +22904,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1617
 
-- **対象**: `libs/core/mission-process-planning.ts`、mission-process-planning test、PI-03
+- **対象**: `libs/core/mission/mission-process-planning.ts`、mission-process-planning test、PI-03
 - **変更**: mission process planning の TASK_BOARD read／checklist render を operation-time の regular-file 境界へ接続し、directory replacement を planner read に到達させず checklist更新をスキップするようにした。NEXT_TASKS／gate生成と既存の mission path／provisioned write semantics は維持した。
 - **検証**: mission-process-planning **2 files／21 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
@@ -22916,13 +22916,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1619
 
-- **対象**: `libs/core/mission-orchestration-worker-part-context.ts`、専用resource-loader test、PI-03
+- **対象**: `libs/core/mission/mission-orchestration-worker-part-context.ts`、専用resource-loader test、PI-03
 - **変更**: mission worker の authority-role `PROCEDURE.md` injection read に operation-time の regular-file 検査を追加し、directory replacement を worker promptへ混入させないようにした。既存の role procedure injection semantics は維持した。
 - **検証**: 専用resource-loader **3 files／1 test passed**、typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1620
 
-- **対象**: `libs/core/mission-orchestration-worker-part-context.ts`、worker resource-loader test、PI-03
+- **対象**: `libs/core/mission/mission-orchestration-worker-part-context.ts`、worker resource-loader test、PI-03
 - **変更**: mission worker の review diff read に operation-time の regular-file 検査を追加し、directory replacement を review promptへ混入させないようにした。既存のreview role filter、diff truncation、changed-file表示 semantics は維持した。
 - **検証**: worker resource-loader **2 files／2 tests passed**、typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
@@ -22934,13 +22934,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1622
 
-- **対象**: `libs/core/onboarding-context.ts`、onboarding-context test、PI-03
+- **対象**: `libs/core/organization/onboarding-context.ts`、onboarding-context test、PI-03
 - **変更**: onboarding apply／rollback の existing binding／organization snapshot read を共通 `readOptionalOnboardingFile` の operation-time regular-file 境界へ統一し、directory replacement を状態復元・binding更新へ到達させないようにした。既存の tenant activation、organization scaffold、rollback semantics は維持した。
 - **検証**: onboarding-context **2 files／11 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1623
 
-- **対象**: `libs/core/background-review-patch.ts`、background-review-patch test、PI-03
+- **対象**: `libs/core/workforce/background-review-patch.ts`、background-review-patch test、PI-03
 - **変更**: background-review の pipeline／managed skill／memory target read を共通 operation-time regular-file 境界へ統一し、directory replacement を pre-image hash／patch適用へ到達させないようにした。既存の path containment、provenance、approval、hash-bound patch semantics は維持した。
 - **検証**: background-review-patch **2 files／13 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
@@ -22952,19 +22952,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1625
 
-- **対象**: `libs/core/codex-cli-query.ts`、codex-cli-query test、PI-03
+- **対象**: `libs/core/provider/codex-cli-query.ts`、codex-cli-query test、PI-03
 - **変更**: Codex CLI structured output の read 前へ operation-time の regular-file 検査を追加し、CLI 出力が欠落・directory replacementされた場合に JSON parse／usage記録へ到達させないようにした。既存の一時ファイル cleanup、schema validation、provider permission semantics は維持した。
 - **検証**: codex-cli-query **2 files／15 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1626
 
-- **対象**: `libs/core/src/knowledge-curation-tenant-ingest.ts`、tenant-ingest test、PI-03
+- **対象**: `libs/core/knowledge/knowledge-curation-tenant-ingest.ts`、tenant-ingest test、PI-03
 - **変更**: tenant curation card の frontmatter read 前へ operation-time の regular-file 検査を追加し、directory replacement を kind／last_updated parseへ到達させず ledgerの `ingested_at` fallbackへ閉じるようにした。既存の tenant scope、freshness SLO、advisory／fail-open semantics は維持した。
 - **検証**: knowledge-curation-tenant-ingest **2 files／5 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1627
 
-- **対象**: `libs/core/src/knowledge-index.ts`、knowledge-index test、PI-03
+- **対象**: `libs/core/knowledge/knowledge-index.ts`、knowledge-index test、PI-03
 - **変更**: knowledge index の Markdown scan read 前へ operation-time の regular-file 検査を追加し、`.md` 名の directoryを本文解析／chunk indexへ到達させないようにした。既存の scanner containment、symlink拒否、hint／chunk ranking semantics は維持した。
 - **検証**: knowledge-index **2 files／15 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
 
@@ -23006,19 +23006,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1634
 
-- **対象**: `libs/core/mission-orchestration-journal.ts`、journal test、PI-03
+- **対象**: `libs/core/mission/mission-orchestration-journal.ts`、journal test、PI-03
 - **変更**: mission orchestration の provisioned artifact read／write-after-read verification を共通 `assertRegularArtifactPath` 境界へ接続し、directory replacement を JSON／text verificationへ到達させないようにした。既存の hash-bound receipt、schema validation、replay semantics は維持した。
 - **検証**: mission-orchestration-journal **2 files／14 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1635
 
-- **対象**: `libs/core/adf-repair-agent.ts`、adf-repair-agent test、PI-03
+- **対象**: `libs/core/pipeline/adf-repair-agent.ts`、adf-repair-agent test、PI-03
 - **変更**: ADF repair の pipeline schema read 前へ `assertRegularAdfResource` 境界を追加し、directory replacement を repair prompt の schema readへ到達させないようにした。既存の ADF target guard、trust gate、schema fallback semantics は維持した。
 - **検証**: adf-repair-agent **2 files／19 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1636
 
-- **対象**: `libs/core/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
+- **対象**: `libs/core/mission/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
 - **変更**: project mission ledger の Markdown removal read 前へ regular-file 境界を追加し、directory replacement を ledger removal に到達させないようにした。既存の project scope、symlink rejection、JSON ledger loader semantics は維持した。
 - **検証**: mission-project-reassignment **2 files／7 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
 
@@ -23042,9 +23042,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1640
 
-- **対象**: `libs/core/src/knowledge-index.ts`、`libs/core/src/knowledge-index.test.ts`、PI-03
+- **対象**: `libs/core/knowledge/knowledge-index.ts`、`libs/core/knowledge/knowledge-index.test.ts`、PI-03
 - **変更**: JSON hint scanner の本文 read 前へ operation-time の `safeLstat(...).isFile()` 検査を追加し、`.json` 名のディレクトリ置換を parse／index登録へ到達させないようにした。既存の scanner containment、symlink 拒否、malformed hint の skip、Markdown index semantics は維持し、JSON hint directory の回帰テストを追加した。
-- **検証**: `libs/core/src/knowledge-index.test.ts` **1 file／16 tests passed**、`libs/core` typecheck、Prettier、`git diff --check`。needs-review loader の個別修正、完了計画の archive 移動、provider 実機受入を継続する。
+- **検証**: `libs/core/knowledge/knowledge-index.test.ts` **1 file／16 tests passed**、`libs/core` typecheck、Prettier、`git diff --check`。needs-review loader の個別修正、完了計画の archive 移動、provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1641
 
@@ -23078,7 +23078,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1646
 
-- **対象**: `libs/core/reasoning-backend-contracts.ts`、`libs/core/reasoning-backend.ts`、`libs/core/openai-compatible-backend.ts`／test、PI-10
+- **対象**: `libs/core/reasoning/reasoning-backend-contracts.ts`、`libs/core/reasoning/reasoning-backend.ts`、`libs/core/provider/openai-compatible-backend.ts`／test、PI-10
 - **変更**: `delegateStructured` の能力gate後の constrained sampling request を共通 `ReasoningCallOptions` へ伝播し、OpenAI-compatible adapterが JSON Schema を `response_format.json_schema` としてprovider wireへ載せるようにした。generic adapterがgrammar形式を推測して送らないよう、未対応grammarは送信前にfail-closedとした。画像promptを含む既存options／abort伝播も維持した。
 - **検証**: OpenAI-compatible／reasoning backend **2 files／48 tests passed**、`libs/core` typecheck、対象ESLint、Prettier、`git diff --check`。実モデル別capability probeとprovider実機wire受入は継続する。
 
@@ -23534,7 +23534,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1722
 
-- **対象**: `libs/core/surface-request-input.ts`、Presence Studio／Computer Surface の OS control-plane route、SX-09b
+- **対象**: `libs/core/surface/surface-request-input.ts`、Presence Studio／Computer Surface の OS control-plane route、SX-09b
 - **変更**: 2つの Express surface に重複していた `mission_id` の scalar判定を共有 `readSurfaceStringParam` へ統合した。repeated query は既存どおり400で拒否し、単一 string だけを OS projection へ渡す境界と、配列・object を暗黙文字列化しない core 回帰を追加した。
 - **検証**: core／Presence Studio／Computer Surface **3 files／24 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部OS provider 実機受入は継続課題である。
 
@@ -24105,7 +24105,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 ## 2026-09-07 再レビュー実装 1817
 
 - **対象**: native DOCX round-trip example entrypoint、SX-06／SX-12
-- **変更**: `libs/core/src/native-docx-engine/examples/roundtrip_docx.ts` に残っていた `process.argv`／`process.exit`／直接 `main().catch` を shared script harnessへ移行した。明示的な argv、usage error、compiled／source の direct-entry 判定を追加し、DOCX抽出・再生成・比較の処理内容は変更していない。entrypoint contract testで直接 process 境界の再発を固定した。
+- **変更**: `libs/core/media/native-docx-engine/examples/roundtrip_docx.ts` に残っていた `process.argv`／`process.exit`／直接 `main().catch` を shared script harnessへ移行した。明示的な argv、usage error、compiled／source の direct-entry 判定を追加し、DOCX抽出・再生成・比較の処理内容は変更していない。entrypoint contract testで直接 process 境界の再発を固定した。
 - **検証**: DOCX entrypoint **1 test passed**、core build、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
 
 ## 2026-09-07 再レビュー実装 1818

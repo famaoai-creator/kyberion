@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import type { ChannelDirectoryEntry } from '@agent/core/channel-directory';
+import type { ChannelDirectoryEntry } from '@agent/core/surface/channel-directory';
 import {
   renderChannelDirectory,
   resolveChannelDirectoryEntries,

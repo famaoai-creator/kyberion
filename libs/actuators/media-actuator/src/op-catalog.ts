@@ -1,10 +1,10 @@
-import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
+import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
 
 // Self-described operation catalog for media-actuator.
 // These entries mirror the operation switches in media-action-{capture,transform,apply}.
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const MEDIA_MIGRATION_SCHEMA: InputSchema = {

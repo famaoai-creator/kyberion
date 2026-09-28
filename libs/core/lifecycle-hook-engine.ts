@@ -25,13 +25,9 @@ import { isRecord } from './foundation/text.js';
 import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeLstat } from './secure-io.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
-import {
-  createApprovalRequest,
-  listApprovalRequests,
-  type ApprovalRequestRecord,
-} from './approval-store.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
+import { getDefaultWorkerEventStream } from './workforce/worker-event-stream.js';
+import type { ApprovalRequestRecord } from './governance/approval-store.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 
 export const LIFECYCLE_HOOK_EVENTS = [
   'pre_tool_use',
@@ -480,14 +476,16 @@ export async function fireLifecycleHooksWithApproval(
   return materializeLifecycleHookApproval(outcome, event, payload, surface);
 }
 
-function materializeLifecycleHookApproval(
+async function materializeLifecycleHookApproval(
   outcome: LifecycleHookOutcome,
   event: LifecycleHookEvent,
   payload: LifecycleHookPayload,
   surface: LifecycleHookApprovalSurface
-): LifecycleHookOutcome {
+): Promise<LifecycleHookOutcome> {
   if (outcome.decision !== 'ask') return outcome;
 
+  const { createApprovalRequest, listApprovalRequests } =
+    await import('./governance/approval-store.js');
   const pending = listApprovalRequests({ status: 'pending', kind: 'channel-approval' }).find(
     (record) =>
       record.correlationId === surface.correlationId &&
@@ -641,7 +639,9 @@ export async function fireDefaultLifecycleHooks(
   if (!resolver) return outcome;
   try {
     const surface = await resolver({ event, payload, outcome });
-    return surface ? materializeLifecycleHookApproval(outcome, event, payload, surface) : outcome;
+    return surface
+      ? await materializeLifecycleHookApproval(outcome, event, payload, surface)
+      : outcome;
   } catch {
     return outcome;
   }

@@ -16,7 +16,7 @@ status: archived
 - **契約エラーが最多**: `calendar-actuator: create_event requires title, start_date, and calendar_names[0]` が **47 回**記録(unclassified-error-registry)。呼び出し側(意図解決)が必須パラメータを埋めずに実行し、実行時に初めて落ちる構図。
 - **経路が2系統あり整理されていない**:
   - calendar-actuator は macOS Calendar.app を JXA/osascript で操作(`libs/actuators/calendar-actuator/src/calendar-actuator-helpers.ts:141`)。
-  - 一方 `google-workspace` preset(`gws` CLI 経由)には `calendar_events_list/insert`、`calendar_freebusy_query` 等の実 op があり、`libs/core/email-workflow.ts` は Gmail の読取/トリアージ/アーカイブ/送信まで実装済み。**Google 経路のほうが深いのに、actuator の正面口は macOS 経路**。
+  - 一方 `google-workspace` preset(`gws` CLI 経由)には `calendar_events_list/insert`、`calendar_freebusy_query` 等の実 op があり、`libs/core/integrations/email-workflow.ts` は Gmail の読取/トリアージ/アーカイブ/送信まで実装済み。**Google 経路のほうが深いのに、actuator の正面口は macOS 経路**。
 - **email-actuator は送信専用の薄い層**(138行): Mail.app(darwin)/SMTP(送信のみ、draft 不可)。受信・検索は email-workflow(gws)側にしかない。
 - **macOS 外では calendar/email(draft) が丸ごと使えない**(`email-actuator/src/index.ts:6,26`、calendar は JXA 必須)。V-1-10(マルチプラットフォーム)PARTIAL の主因。
 - `gws` は外部 CLI・セッション認証(`gws auth login`)依存で、未ログイン時の失敗が分かりにくい。
@@ -40,7 +40,7 @@ status: archived
 
 1. calendar-actuator のヘルパーに backend 抽象(`jxa` | `gws`)を導入し、op ごとに google-workspace preset の対応 op(`calendar_events_insert` 等)へマップする。選択順: 明示指定 > 環境自動判定(darwin かつ Calendar.app 利用可 → jxa / gws セッション有効 → gws)。
 2. `gws` セッション有効性のプローブ(軽量コマンドの exit code、TTL キャッシュ)を AC-01 のプローブ機構に登録する。
-3. email-actuator にも同様に、draft/送信の backend として email-workflow(gws)経路を追加する(darwin 以外での draft を gws の `gmail` draft op で実現)。email-workflow 側の既存実装(`libs/core/email-workflow.ts:304-388,860-890`)を呼ぶだけにし、ロジックを複製しない。
+3. email-actuator にも同様に、draft/送信の backend として email-workflow(gws)経路を追加する(darwin 以外での draft を gws の `gmail` draft op で実現)。email-workflow 側の既存実装(`libs/core/integrations/email-workflow.ts:304-388,860-890`)を呼ぶだけにし、ロジックを複製しない。
 4. 両経路の結果形式を統一し、既存テスト + backend 別の新テスト(gws はモック)で検証する。
 
 ### Task 3: manifest / カタログ更新 — `claude-haiku`

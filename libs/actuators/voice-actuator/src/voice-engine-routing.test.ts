@@ -11,10 +11,10 @@ const mocks = vi.hoisted(() => ({
   performPlayback: vi.fn(async () => ({ playback_source_path: undefined, outputs: [] })),
 }));
 
-vi.mock('@agent/core/audit-chain', () => ({
+vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: (...args: unknown[]) => mocks.record(...args) },
 }));
-vi.mock('@agent/core/provider-pins-store', () => ({
+vi.mock('@agent/core/provider/provider-pins-store', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: (...args: unknown[]) => mocks.pinWrites(...args),
 }));
@@ -22,9 +22,9 @@ vi.mock('@agent/core/trace', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/trace')>('@agent/core/trace');
   return { ...actual, persistTrace: vi.fn(() => 'trace-not-persisted-in-tests') };
 });
-vi.mock('@agent/core/voice-profile-registry', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/voice-profile-registry')>(
-    '@agent/core/voice-profile-registry'
+vi.mock('@agent/core/voice/voice-profile-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/voice/voice-profile-registry')>(
+    '@agent/core/voice/voice-profile-registry'
   );
   return { ...actual, getVoiceProfileRecord: () => mocks.profile };
 });
@@ -39,7 +39,7 @@ vi.mock('./voice-runtime-helpers.js', async () => {
   };
 });
 
-const { getVoiceEngineRecord } = await import('@agent/core/voice-engine-registry');
+const { getVoiceEngineRecord } = await import('@agent/core/voice/voice-engine-registry');
 const { pathResolver } = await import('@agent/core/path-resolver');
 const { safeRmSync } = await import('@agent/core/secure-io');
 const { setSeamSelectionRule } = await import('@agent/core/seam-selection-rules');

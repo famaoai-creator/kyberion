@@ -7,7 +7,7 @@ import {
   resolveSurfaceCwd,
   saveSurfaceState,
   surfaceStatePath,
-} from '@agent/core/surface-runtime';
+} from '@agent/core/surface/surface-runtime';
 import { pathResolver } from '@agent/core';
 
 const testStatePath = path.join(process.cwd(), 'active/shared/tmp/runtime-surface-state.test.json');

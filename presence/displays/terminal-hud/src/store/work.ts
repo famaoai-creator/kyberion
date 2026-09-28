@@ -4,8 +4,8 @@ import {
   listBoards,
   type WorkItem,
   type WorkLease,
-} from '@agent/core/work-coordination';
-import { listTaskSessions } from '@agent/core/task-session';
+} from '@agent/core/workforce/work-coordination';
+import { listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runChannelTurn } from '@agent/core/channel-adapter';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { runChannelTurn } from '@agent/core/surface/channel-adapter';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import type { IMessageStimulus } from '@agent/core/imessage-utils';
-import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
+import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface-types';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -13,8 +13,9 @@ const stubs = vi.hoisted(() => ({
   history: [] as IMessageStimulus[],
 }));
 
-vi.mock('@agent/core/bluebubbles-adapter', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/bluebubbles-adapter')>();
+vi.mock('@agent/core/integrations/bluebubbles-adapter', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/integrations/bluebubbles-adapter')>();
   return {
     ...actual,
     resolveBlueBubblesConfig: () => undefined,

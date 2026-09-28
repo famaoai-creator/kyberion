@@ -1,0 +1,840 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/**
+ * Speech-to-Text Bridge — contract for transcribing audio files into text
+ * so downstream pipelines (requirements-elicitation etc.) can consume
+ * recordings directly rather than waiting for a manual transcript.
+ *
+ * The stub resolves by looking for a `<audio>.transcript.txt` sidecar next
+ * to the audio file — this lets operators drop a pre-made transcript when
+ * no real backend is registered, keeping offline / CI flows working.
+ *
+ * Real backends:
+ *   - ShellSpeechToTextBridge — runs a user-configured CLI (whisper.cpp,
+ *     mlx-audio, openai-whisper, etc.). Registered via bootstrap when
+ *     KYBERION_STT_COMMAND is set.
+ *   - Future: WhisperKit / MLX server adapter (voice-stt.ts already
+ *     resolves server config).
+ */
+
+import * as path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { isRecord, readTextFile } from '../foundation/text.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeExecResult,
+  safeWriteFile,
+} from '../secure-io.js';
+import { rootResolve } from '../path-resolver.js';
+import { resolveLocale } from '../locale.js';
+import {
+  discoverLocalSttBackends,
+  selectPreferredLocalSttBackend,
+} from '../local-stt-discovery.js';
+import { coreSeamCatalog, createSeam } from '../seam.js';
+import {
+  getSeamSelectionPolicy,
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type SeamProviderDecision,
+} from '../seam-provider-selection.js';
+import { matchSeamSelectionRule } from '../seam-selection-rules.js';
+import {
+  primaryLanguageSubtag,
+  supportsSpeechLanguage,
+  WHISPER_LANGUAGES,
+} from './speech-languages.js';
+
+export interface TranscribeInput {
+  audioPath: string;
+  /** BCP-47 tag. Leave empty for auto-detect. */
+  language?: string;
+  /** Optional output path for the transcript text. Defaults to <audio>.transcript.txt. */
+  outputPath?: string;
+}
+
+export interface SpeechToTextCapabilities {
+  /** Whether the backend returns time ranges for transcript segments. */
+  timestamps: boolean;
+  /** The finest timestamp granularity available from the backend. */
+  granularity: 'none' | 'segment' | 'word';
+  /** Whether audio remains on the local machine during transcription. */
+  local_only?: boolean;
+  /** Whether the backend exposes a confidence score for its output. */
+  confidence?: boolean;
+  /**
+   * Primary language subtags (ISO 639, lowercase) the backend can transcribe.
+   * Unset means "not declared": the backend is not filtered by language.
+   */
+  languages?: string[];
+}
+
+export { WHISPER_LANGUAGES, primaryLanguageSubtag, supportsSpeechLanguage };
+
+export interface TranscriptSegment {
+  start_sec: number;
+  end_sec: number;
+  text: string;
+}
+
+export interface TranscribeResult {
+  text: string;
+  language?: string;
+  written_to?: string;
+  backend: string;
+  capabilities?: SpeechToTextCapabilities;
+  segments?: TranscriptSegment[];
+  /** True when the result came from a fallback (e.g. sidecar) rather than real STT. */
+  synthetic?: boolean;
+}
+
+export interface SpeechToTextBridge {
+  name: string;
+  capabilities?: SpeechToTextCapabilities;
+  /** Stable tie-breaker; higher values are preferred when capabilities match. */
+  priority?: number;
+  transcribe(input: TranscribeInput): Promise<TranscribeResult>;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
+}
+
+export const NO_TIMESTAMP_STT_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: false,
+  granularity: 'none',
+};
+
+export function getSpeechToTextCapabilities(
+  bridge: Pick<SpeechToTextBridge, 'capabilities'>
+): SpeechToTextCapabilities {
+  return bridge.capabilities ?? NO_TIMESTAMP_STT_CAPABILITIES;
+}
+
+const speechToTextSeam = createSeam<SpeechToTextBridge>({
+  key: 'speech-to-text-bridge',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+  select: (providers) =>
+    [...providers].sort(
+      (left, right) =>
+        (right.implementation.priority ?? 0) - (left.implementation.priority ?? 0) ||
+        left.id.localeCompare(right.id)
+    )[0]?.implementation,
+});
+const registeredDisposers = new Map<string, () => void>();
+
+export function registerSpeechToTextBridge(bridge: SpeechToTextBridge): () => void {
+  const name = String(bridge.name || '').trim();
+  if (!name) throw new Error('SpeechToTextBridge.name is required');
+  const disposer = speechToTextSeam.register(name, bridge, {
+    provenance: 'builtin',
+    source: 'speech-to-text-bridge',
+  });
+  registeredDisposers.set(name, disposer);
+  return disposer;
+}
+
+export function getSpeechToTextBridge(): SpeechToTextBridge {
+  return speechToTextSeam.getOptional() || stubSpeechToTextBridge;
+}
+
+export function getSpeechToTextBridges(): SpeechToTextBridge[] {
+  const bridges = speechToTextSeam.list().map((provider) => provider.implementation);
+  return bridges.length > 0 ? bridges : [stubSpeechToTextBridge];
+}
+
+/** The bridge the seam's priority select would pick among `bridges`. */
+function highestPriorityBridge(bridges: SpeechToTextBridge[]): SpeechToTextBridge | undefined {
+  return [...bridges].sort(
+    (left, right) =>
+      (right.priority ?? 0) - (left.priority ?? 0) || left.name.localeCompare(right.name)
+  )[0];
+}
+
+/**
+ * The bridge a caller without an explicit choice should use: the selected
+ * one when shouldSelectSpeechToTextBridges() says so, else the priority
+ * default. Throws like selectSpeechToTextBridges() when selection finds none.
+ */
+export function resolveSpeechToTextBridge(
+  options: SelectSpeechToTextBridgesOptions = {}
+): SpeechToTextBridge {
+  if (!shouldSelectSpeechToTextBridges(options)) {
+    return options.bridges?.length
+      ? highestPriorityBridge(options.bridges)!
+      : getSpeechToTextBridge();
+  }
+  return selectSpeechToTextBridges(options).bridges[0]!;
+}
+
+export const SPEECH_TO_TEXT_SEAM = 'speech-to-text-bridge';
+
+/** Hard needs of a transcription task; a bridge that cannot meet them is never chosen. */
+export interface SpeechToTextRequirements {
+  /** Minimum timestamp granularity the bridge must declare. Unset: timestamps not required. */
+  timestamps?: 'segment' | 'word';
+  /** Audio must stay on this machine (bridge declares `local_only: true`). */
+  localOnly?: boolean;
+  /** Allow synthetic output (the sidecar-only stub). Default false. */
+  allowSynthetic?: boolean;
+  /**
+   * BCP-47 language of the audio. Bridges that declare `languages` without it
+   * are ineligible; bridges that declare none are not filtered.
+   */
+  language?: string;
+}
+
+export interface SelectSpeechToTextBridgesOptions {
+  /** Governed purpose (see the seam policy). Unset: operator rules, then the seam default. */
+  purpose?: string;
+  requires?: SpeechToTextRequirements;
+  /**
+   * Request facts operator rules may match on. `language` defaults to the
+   * primary subtag of `requires.language`.
+   */
+  context?: Record<string, string>;
+  /** Bridges to choose from. Default: every registered bridge (or the stub). */
+  bridges?: SpeechToTextBridge[];
+}
+
+export interface SpeechToTextSelection {
+  /** Eligible bridges, best first for the purpose. */
+  bridges: SpeechToTextBridge[];
+  decision: SeamProviderDecision;
+}
+
+/** Thrown when no bridge can meet the requirements; carries the audited decision. */
+export class SpeechToTextSelectionError extends Error {
+  constructor(readonly decision: SeamProviderDecision) {
+    super(`[STT_SELECTION] ${decision.rationale}`);
+    this.name = 'SpeechToTextSelectionError';
+  }
+}
+
+const GRANULARITY_RANK: Record<SpeechToTextCapabilities['granularity'], number> = {
+  none: 0,
+  segment: 1,
+  word: 2,
+};
+
+function unmetSpeechToTextRequirements(
+  bridge: SpeechToTextBridge,
+  requires: SpeechToTextRequirements
+): string[] {
+  const capabilities = getSpeechToTextCapabilities(bridge);
+  const unmet: string[] = [];
+  if (bridge.name === stubSpeechToTextBridge.name && !requires.allowSynthetic) {
+    unmet.push('synthetic output not allowed');
+  }
+  if (
+    requires.timestamps &&
+    (!capabilities.timestamps ||
+      GRANULARITY_RANK[capabilities.granularity] < GRANULARITY_RANK[requires.timestamps])
+  ) {
+    unmet.push(`timestamps (${requires.timestamps})`);
+  }
+  if (requires.localOnly && capabilities.local_only !== true) unmet.push('local_only');
+  if (!supportsSpeechLanguage(capabilities.languages, requires.language)) {
+    unmet.push(`language (${primaryLanguageSubtag(requires.language)})`);
+  }
+  return unmet;
+}
+
+/** Selection candidates (id, eligible, unmet) for a task's requirements. */
+export function listSpeechToTextCandidates(
+  requires: SpeechToTextRequirements = {},
+  bridges: SpeechToTextBridge[] = getSpeechToTextBridges()
+): Array<{ id: string; eligible: boolean; unmet: string[] }> {
+  return bridges.map((bridge) => {
+    const unmet = unmetSpeechToTextRequirements(bridge, requires);
+    return { id: bridge.name, eligible: unmet.length === 0, unmet };
+  });
+}
+
+function selectionContext(options: {
+  requires?: SpeechToTextRequirements;
+  context?: Record<string, string>;
+}): Record<string, string> | undefined {
+  const language = primaryLanguageSubtag(options.requires?.language);
+  const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
+  return Object.keys(context).length > 0 ? context : undefined;
+}
+
+/**
+ * Whether a caller without an explicit bridge should go through
+ * selectSpeechToTextBridges() rather than the priority default
+ * (getSpeechToTextBridge()): a purpose was given, an operator rule matches
+ * this request, or the priority default cannot meet the requirements and the
+ * policy names a fallback purpose. Otherwise the priority default stays.
+ */
+export function shouldSelectSpeechToTextBridges(
+  options: Omit<SelectSpeechToTextBridgesOptions, 'bridges'> & {
+    bridges?: SpeechToTextBridge[];
+  } = {}
+): boolean {
+  if (String(options.purpose || '').trim()) return true;
+  if (matchSeamSelectionRule(SPEECH_TO_TEXT_SEAM, { context: selectionContext(options) })) {
+    return true;
+  }
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const priorityDefault = options.bridges
+    ? highestPriorityBridge(bridges)
+    : getSpeechToTextBridge();
+  if (!priorityDefault) return false;
+  if (unmetSpeechToTextRequirements(priorityDefault, requires).length === 0) return false;
+  return Boolean(getSeamSelectionPolicy(SPEECH_TO_TEXT_SEAM)?.fallback_purpose);
+}
+
+/**
+ * Purpose-driven bridge choice. Requirements decide eligibility from the
+ * bridges' declared capabilities; the governed selection policy ranks the
+ * eligible ones by purpose; the decision is audited and pinned per mission.
+ * Without a purpose, operator rules (matched on `context`) and then the seam
+ * default / fallback purpose decide (decision key `default`). Callers that
+ * have neither a purpose nor a reason to select (shouldSelectSpeechToTextBridges)
+ * keep using getSpeechToTextBridge() (priority).
+ */
+export function selectSpeechToTextBridges(
+  options: SelectSpeechToTextBridgesOptions = {}
+): SpeechToTextSelection {
+  const purpose = String(options.purpose || '').trim();
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const candidates = listSpeechToTextCandidates(requires, bridges);
+  const context = selectionContext(options);
+  const decision = resolveSeamProviderDecision({
+    seam: SPEECH_TO_TEXT_SEAM,
+    candidates,
+    ...(purpose ? { purpose } : {}),
+    ...(context ? { context } : {}),
+    decisionKey: purpose || 'default',
+  });
+  if (decision.strategy === 'unresolved') {
+    const known = listSeamSelectionPurposes(SPEECH_TO_TEXT_SEAM);
+    if (purpose && !known.includes(purpose)) {
+      throw new Error(
+        `[STT_SELECTION] unknown purpose '${purpose}' for seam '${SPEECH_TO_TEXT_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+    throw new SpeechToTextSelectionError(decision);
+  }
+  const byName = new Map(bridges.map((bridge) => [bridge.name, bridge]));
+  return {
+    bridges: decision.ranked.flatMap((id) => byName.get(id) ?? []),
+    decision,
+  };
+}
+
+export function resetSpeechToTextBridge(): void {
+  for (const dispose of registeredDisposers.values()) dispose();
+  registeredDisposers.clear();
+}
+
+export function normalizeSpeechToTextResult(
+  bridge: Pick<SpeechToTextBridge, 'name' | 'capabilities'>,
+  result: TranscribeResult
+): TranscribeResult {
+  const validSegments = (result.segments || []).filter((segment) => {
+    return (
+      Number.isFinite(segment.start_sec) &&
+      Number.isFinite(segment.end_sec) &&
+      segment.start_sec >= 0 &&
+      segment.end_sec > segment.start_sec &&
+      Boolean(String(segment.text || '').trim())
+    );
+  });
+  const declared = result.capabilities || getSpeechToTextCapabilities(bridge);
+  const hasTimestamps = declared.timestamps && validSegments.length > 0;
+  return {
+    ...result,
+    backend: result.backend || bridge.name,
+    capabilities: {
+      ...declared,
+      timestamps: hasTimestamps,
+      granularity: hasTimestamps ? declared.granularity : 'none',
+    },
+    ...(result.segments ? { segments: validSegments } : {}),
+  };
+}
+
+export function parseSpeechToTextCapabilities(
+  value: unknown
+): SpeechToTextCapabilities | undefined {
+  if (!isRecord(value) || typeof value.timestamps !== 'boolean') return undefined;
+  if (
+    value.granularity !== 'none' &&
+    value.granularity !== 'segment' &&
+    value.granularity !== 'word'
+  ) {
+    return undefined;
+  }
+  return {
+    timestamps: value.timestamps,
+    granularity: value.granularity,
+    ...(typeof value.local_only === 'boolean' ? { local_only: value.local_only } : {}),
+    ...(typeof value.confidence === 'boolean' ? { confidence: value.confidence } : {}),
+    ...(Array.isArray(value.languages) &&
+    value.languages.length > 0 &&
+    value.languages.every((entry) => typeof entry === 'string' && entry.trim())
+      ? { languages: value.languages.map((entry) => primaryLanguageSubtag(entry as string)) }
+      : {}),
+  };
+}
+
+function parseStructuredSegments(value: unknown): TranscriptSegment[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.start_sec !== 'number' ||
+      !Number.isFinite(entry.start_sec) ||
+      typeof entry.end_sec !== 'number' ||
+      !Number.isFinite(entry.end_sec) ||
+      typeof entry.text !== 'string'
+    ) {
+      return [];
+    }
+    return [{ start_sec: entry.start_sec, end_sec: entry.end_sec, text: entry.text }];
+  });
+}
+
+function projectStructuredOutput(record: Record<string, unknown>): Partial<TranscribeResult> {
+  const capabilities = parseSpeechToTextCapabilities(record.capabilities);
+  const segments = parseStructuredSegments(record.segments);
+  return {
+    ...(typeof record.text === 'string' ? { text: record.text } : {}),
+    ...(typeof record.language === 'string' ? { language: record.language } : {}),
+    ...(capabilities ? { capabilities } : {}),
+    ...(segments ? { segments } : {}),
+  };
+}
+
+function parseStructuredOutput(stdout: string): Partial<TranscribeResult> {
+  const parseRecord = (candidate: string): Record<string, unknown> | undefined => {
+    try {
+      const parsed: unknown = parseSafeJsonInput(candidate, 'speech-to-text response');
+      return isRecord(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const parsed = parseRecord(stdout);
+  if (parsed) {
+    return projectStructuredOutput(parsed);
+  }
+
+  try {
+    // Swift/CoreML loaders and model runtimes may print informational lines;
+    // accept the final JSON object while keeping malformed output fatal.
+    for (const line of stdout.split(/\r?\n/u).reverse()) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('{')) continue;
+      const lineRecord = parseRecord(trimmed);
+      if (lineRecord) {
+        return projectStructuredOutput(lineRecord);
+      }
+    }
+  } catch {
+    // Keep the stable error below even when a future candidate parser throws.
+  }
+  throw new Error('structured output was not valid JSON');
+}
+
+function deriveSidecar(audioAbs: string): string {
+  return `${audioAbs}.transcript.txt`;
+}
+
+function defaultTranscriptPath(audioAbs: string): string {
+  const parsed = path.parse(audioAbs);
+  return path.join(parsed.dir, `${parsed.name}.transcript.txt`);
+}
+
+function resolveAudioPath(audioPath: string): string {
+  return assertSafeRepositoryPath(rootResolve(audioPath));
+}
+
+function resolveTranscriptPath(outputPath: string | undefined, audioAbs: string): string {
+  const candidate = outputPath ? rootResolve(outputPath) : defaultTranscriptPath(audioAbs);
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+function assertRegularFile(filePath: string, label: string): void {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[stt-bridge] ${label} must be a regular file: ${filePath}`);
+  }
+}
+
+/**
+ * Stub bridge — accepts a sidecar `<audio>.transcript.txt` next to the
+ * audio file as a pre-baked transcript. Never tries to actually decode
+ * audio; fails loudly when no sidecar is available.
+ */
+export const stubSpeechToTextBridge: SpeechToTextBridge = {
+  name: 'stub',
+  capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
+  async transcribe(input) {
+    const audioAbs = resolveAudioPath(input.audioPath);
+    if (safeExistsSync(audioAbs)) assertRegularFile(audioAbs, 'audio input');
+    const sidecar = assertSafeRepositoryPath(deriveSidecar(audioAbs), {
+      allowMissingLeaf: true,
+    });
+    if (safeExistsSync(sidecar)) {
+      assertRegularFile(sidecar, 'transcript sidecar');
+      const text = readTextFile(sidecar);
+      logger.warn(
+        `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`
+      );
+      return {
+        text,
+        // I18N-06: an unset transcribe language falls back to the resolved
+        // locale (identity/env/OS), not a hardcoded default — same pattern
+        // as `python-voice-bridge.ts`'s TTS language (I18N-01).
+        language: input.language || resolveLocale(),
+        written_to: sidecar,
+        backend: 'stub-sidecar',
+        capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
+        synthetic: true,
+      };
+    }
+    throw new Error(
+      `[stt-bridge:stub] no transcript backend registered and no sidecar at ${sidecar}. ` +
+        `Register a ShellSpeechToTextBridge or drop a pre-made transcript next to the audio.`
+    );
+  },
+};
+
+export interface ShellSpeechToTextBridgeOptions {
+  /** Stable bridge name used in registry diagnostics. Defaults to `shell`. */
+  name?: string;
+  /**
+   * Shell command template. `{{audio}}` is replaced with the absolute audio
+   * path, `{{language}}` with the BCP-47 code (empty string when unset).
+   * Stdout is captured as the transcript.
+   *
+   * Example (whisper.cpp):
+   *   'whisper -m models/ggml-base.bin -f "{{audio}}" -l "{{language}}" --output-txt -'
+   * Example (openai CLI):
+   *   'openai audio transcribe --file "{{audio}}" --response-format text'
+   */
+  command: string;
+  /** Shell binary. Defaults to $SHELL or /bin/sh. */
+  shell?: string;
+  /** Timeout ms. Defaults to 5 minutes (audio files can be long). */
+  timeoutMs?: number;
+  /** Parse stdout as structured JSON with text/capabilities/segments. */
+  structuredOutput?: boolean;
+  capabilities?: SpeechToTextCapabilities;
+  priority?: number;
+}
+
+export class ShellSpeechToTextBridge implements SpeechToTextBridge {
+  readonly name: string;
+  readonly capabilities: SpeechToTextCapabilities;
+  readonly priority: number;
+  constructor(private readonly options: ShellSpeechToTextBridgeOptions) {
+    this.name = options.name?.trim() || 'shell';
+    this.capabilities = options.capabilities || NO_TIMESTAMP_STT_CAPABILITIES;
+    this.priority = Number(options.priority || 0);
+  }
+
+  private getCapabilities(): SpeechToTextCapabilities {
+    return this.capabilities;
+  }
+
+  async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
+    const audioAbs = resolveAudioPath(input.audioPath);
+    if (!safeExistsSync(audioAbs)) {
+      throw new Error(`[stt-bridge:shell] audio file not found: ${input.audioPath}`);
+    }
+    assertRegularFile(audioAbs, 'audio input');
+    // I18N-06: an unset transcribe language falls back to the resolved
+    // locale (identity/env/OS) instead of an empty string, matching the
+    // stub bridge above and `python-voice-bridge.ts`'s TTS language (I18N-01).
+    const resolvedLanguage = input.language ?? resolveLocale();
+    // Shell-quote substituted values: audioAbs comes from caller input and
+    // could otherwise inject shell syntax into the -c command string.
+    const shellQuote = (value: string): string => `'${value.replace(/'/g, "'\\''")}'`;
+    const cmd = this.options.command
+      .replace(/\{\{audio\}\}/gu, shellQuote(audioAbs))
+      .replace(/\{\{language\}\}/gu, shellQuote(resolvedLanguage));
+    const shell = this.options.shell ?? envText(process.env, 'SHELL') ?? '/bin/sh';
+    const stdout = execFileSync(shell, ['-c', cmd], {
+      encoding: 'utf8',
+      timeout: this.options.timeoutMs ?? 5 * 60 * 1000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    let structured: Partial<TranscribeResult> = {};
+    if (this.options.structuredOutput) {
+      try {
+        structured = parseStructuredOutput(stdout);
+      } catch (error: any) {
+        throw new Error(
+          `[stt-bridge:shell] structured output was not valid JSON: ${error.message}`
+        );
+      }
+    }
+    const text = String(structured.text || stdout).trim();
+    const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+    if (safeExistsSync(outputPath)) assertRegularFile(outputPath, 'transcript output');
+    safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+    return {
+      text,
+      language: resolvedLanguage,
+      written_to: outputPath,
+      backend: 'shell',
+      capabilities: structured.capabilities || this.getCapabilities(),
+      ...(structured.segments ? { segments: structured.segments } : {}),
+    };
+  }
+}
+
+/**
+ * Install a FluidAudio/Parakeet batch bridge when the caller supplies a local
+ * command. The command receives {{audio}} and {{language}} substitutions and
+ * must print {"text":"..."}; this keeps the Swift package optional while
+ * making the Kyberion boundary concrete and testable.
+ */
+export function installFluidAudioSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) return false;
+  const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
+  if (!command) return false;
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet')) {
+    return true;
+  }
+  const timeoutText = envText(env, 'KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS');
+  registerSpeechToTextBridge(
+    new ShellSpeechToTextBridge({
+      name: 'fluid-audio-parakeet',
+      command,
+      structuredOutput: true,
+      priority: 100,
+      capabilities: { timestamps: true, granularity: 'segment', local_only: true },
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
+    })
+  );
+  logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
+  return true;
+}
+
+/**
+ * Bootstrap helper: wire up a ShellSpeechToTextBridge when
+ * `KYBERION_STT_COMMAND` is set in the environment. Returns true when
+ * a real backend was installed; false when the stub remains.
+ */
+export function installShellSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
+  if (!command) return false;
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'shell')) return true;
+  let capabilities: SpeechToTextCapabilities | undefined;
+  const capabilitiesText = envText(env, 'KYBERION_STT_CAPABILITIES')?.trim();
+  if (capabilitiesText) {
+    try {
+      const parsed: unknown = parseSafeJsonInput(capabilitiesText, 'speech-to-text capabilities');
+      capabilities = parseSpeechToTextCapabilities(parsed);
+      if (!capabilities) {
+        logger.warn('[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES shape');
+      }
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.warn(`[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES: ${detail}`);
+    }
+  }
+  const priorityText = envText(env, 'KYBERION_STT_PRIORITY');
+  const timeoutText = envText(env, 'KYBERION_STT_TIMEOUT_MS');
+  registerSpeechToTextBridge(
+    new ShellSpeechToTextBridge({
+      command,
+      ...(envText(env, 'KYBERION_STT_OUTPUT_FORMAT') === 'json' ? { structuredOutput: true } : {}),
+      ...(capabilities ? { capabilities } : {}),
+      ...(priorityText ? { priority: parseInt(priorityText, 10) } : {}),
+      ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
+    })
+  );
+  logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
+  return true;
+}
+
+const WHISPERKIT_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: false,
+  granularity: 'none',
+  local_only: true,
+  languages: [...WHISPER_LANGUAGES],
+};
+
+const MLX_WHISPER_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: true,
+  granularity: 'segment',
+  local_only: true,
+  languages: [...WHISPER_LANGUAGES],
+};
+
+export function buildWhisperKitTranscribeArgs(audioPath: string, language?: string): string[] {
+  return [
+    'transcribe',
+    '--audio-path',
+    audioPath,
+    ...(language ? ['--language', language] : []),
+    '--without-timestamps',
+  ];
+}
+
+/**
+ * Register the Apple Silicon WhisperKit CLI when it is available from the
+ * current OS PATH. The same detector feeds onboarding/service registration;
+ * the executable is passed as an argv command, never interpolated into a
+ * shell string.
+ */
+export function installWhisperKitSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'whisperkit-cli') ||
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
+    return false;
+  }
+  const detected = discoverLocalSttBackends().find(
+    (candidate) => typeof candidate.connection.whisperkit_cli_path === 'string'
+  );
+  const executable = detected?.executable;
+  if (!executable) return false;
+
+  registerSpeechToTextBridge({
+    name: 'whisperkit-cli',
+    priority: detected?.priority ?? 0,
+    capabilities: WHISPERKIT_CAPABILITIES,
+    async transcribe(input) {
+      const audioAbs = resolveAudioPath(input.audioPath);
+      if (!safeExistsSync(audioAbs)) {
+        throw new Error(`[stt-bridge:whisperkit-cli] audio file not found: ${input.audioPath}`);
+      }
+      assertRegularFile(audioAbs, 'audio input');
+      const result = safeExecResult(
+        executable,
+        buildWhisperKitTranscribeArgs(audioAbs, input.language),
+        {
+          timeoutMs: 5 * 60 * 1000,
+          maxOutputMB: 64,
+        }
+      );
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          `[stt-bridge:whisperkit-cli] backend failed: ${result.stderr || result.error?.message || `exit ${result.status}`}`
+        );
+      }
+      const text = result.stdout.trim();
+      if (!text) throw new Error('[stt-bridge:whisperkit-cli] backend returned empty text');
+      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      return {
+        text,
+        language: input.language || resolveLocale(),
+        written_to: outputPath,
+        backend: 'whisperkit-cli',
+        capabilities: WHISPERKIT_CAPABILITIES,
+      };
+    },
+  });
+  logger.success(`[stt-bridge] installed WhisperKit CLI bridge (${executable})`);
+  return true;
+}
+
+/**
+ * Use the governed MLX Whisper runtime when no explicit STT adapter was set.
+ * This keeps the model process behind the SpeechToTextBridge boundary while
+ * allowing the realtime CLI to work immediately after `kyberion voice setup --apply`.
+ */
+export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
+    return false;
+  }
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper')) return true;
+  const detected = discoverLocalSttBackends().filter(
+    (candidate) => candidate.verification === 'python-module' && Boolean(candidate.python_bin)
+  );
+  const selected = selectPreferredLocalSttBackend(detected);
+  const pythonBin = selected?.python_bin;
+  const priority = selected?.priority ?? 0;
+  const bridgeScript = assertSafeRepositoryPath(
+    rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py')
+  );
+  if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
+
+  registerSpeechToTextBridge({
+    name: 'mlx_whisper',
+    priority,
+    capabilities: MLX_WHISPER_CAPABILITIES,
+    async transcribe(input) {
+      const audioAbs = resolveAudioPath(input.audioPath);
+      if (!safeExistsSync(audioAbs)) {
+        throw new Error(`[stt-bridge:mlx_whisper] audio file not found: ${input.audioPath}`);
+      }
+      const result = safeExecResult(pythonBin, [bridgeScript], {
+        input: JSON.stringify({
+          action: 'transcribe',
+          params: { audio_path: audioAbs, ...(input.language ? { language: input.language } : {}) },
+        }),
+        env: { KYBERION_PROJECT_ROOT: assertSafeRepositoryPath(rootResolve('.')) },
+        timeoutMs: 120_000,
+        maxOutputMB: 2,
+      });
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          `[stt-bridge:mlx_whisper] backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
+        );
+      }
+      const response = parseStructuredOutput(result.stdout);
+      const text = String(response.text || '').trim();
+      if (!text) throw new Error('[stt-bridge:mlx_whisper] backend returned empty text');
+      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      return {
+        text,
+        language: String(response.language || input.language || resolveLocale()),
+        written_to: outputPath,
+        backend: 'mlx_whisper',
+        capabilities: response.capabilities || MLX_WHISPER_CAPABILITIES,
+        ...(Array.isArray(response.segments)
+          ? { segments: response.segments as TranscriptSegment[] }
+          : {}),
+      };
+    },
+  });
+  logger.success('[stt-bridge] installed managed mlx_whisper SpeechToTextBridge');
+  return true;
+}
+
+/**
+ * Register all locally available synchronous STT bridges, then let the seam
+ * select the winner from the governed discovery catalog priorities. Explicit
+ * operator commands remain an intentional configuration override; discovered
+ * backends are never ordered by this caller.
+ */
+export function installAvailableSpeechToTextBridges(
+  env: NodeJS.ProcessEnv = process.env
+): SpeechToTextBridge {
+  if (installShellSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
+  if (installFluidAudioSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
+
+  installWhisperKitSpeechToTextBridgeIfAvailable(env);
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable(env);
+  return getSpeechToTextBridge();
+}

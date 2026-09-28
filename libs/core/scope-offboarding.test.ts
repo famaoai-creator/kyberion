@@ -20,17 +20,33 @@ import * as os from 'node:os';
  * lazy accessor hands that early caller a real directory. Each test then
  * repoints it to a fresh root.
  */
-/* eslint-disable no-var */
-var rootDirState: string | undefined;
-var createdRoots: string[] | undefined;
-/* eslint-enable no-var */
+// The vi.mock factory below is hoisted into a separate evaluation context —
+// it closes over a *copy* of any module-level `var`, so a shared module var
+// drifts out of sync (the mock kept seeing `undefined` and minted a fresh
+// mkdtemp per call). Keep the fixture root on globalThis, which both the
+// hoisted factory and the module body resolve identically.
+const ROOT_STATE_KEY = '__kyberion_al04_root__';
+const CREATED_ROOTS_KEY = '__kyberion_al04_created__';
+const sharedState = globalThis as Record<string, string | string[] | undefined>;
+
+function rootDirState(): string | undefined {
+  return sharedState[ROOT_STATE_KEY] as string | undefined;
+}
+function setRootDirState(value: string | undefined): void {
+  sharedState[ROOT_STATE_KEY] = value;
+}
+function createdRoots(): string[] {
+  if (!Array.isArray(sharedState[CREATED_ROOTS_KEY])) sharedState[CREATED_ROOTS_KEY] = [];
+  return sharedState[CREATED_ROOTS_KEY] as string[];
+}
 
 function currentRoot(): string {
-  if (!rootDirState) {
-    rootDirState = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-al04-'));
-    (createdRoots ??= []).push(rootDirState);
-  }
-  return rootDirState;
+  const existing = rootDirState();
+  if (existing) return existing;
+  const created = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-al04-'));
+  setRootDirState(created);
+  createdRoots().push(created);
+  return created;
 }
 
 vi.mock('./secure-io.js', async () => {
@@ -127,17 +143,39 @@ vi.mock('./foundation/io.js', () => ({
   registerFoundationIo: vi.fn(),
 }));
 
-vi.mock('./path-resolver.js', () => {
+vi.mock('./path-resolver.js', async () => {
+  // This factory is hoisted: it cannot see the module-level helpers above
+  // (TDZ) and module `var`s would be captured stale. Reach the SAME fixture
+  // root via globalThis and lazily imported node modules only.
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const nodePath = await import('node:path');
+  const g = globalThis as Record<string, string | undefined>;
+  const factoryRoot = (): string => {
+    if (!g.__kyberion_al04_root__) {
+      g.__kyberion_al04_root__ = mkdtempSync(nodePath.join(tmpdir(), 'kyberion-al04-'));
+    }
+    return g.__kyberion_al04_root__;
+  };
   const resolver = {
-    rootDir: () => currentRoot(),
-    rootResolve: (rel: string) => (path.isAbsolute(rel) ? rel : path.join(currentRoot(), rel)),
-    resolve: (rel: string) => (path.isAbsolute(rel) ? rel : path.join(currentRoot(), rel)),
-    shared: (sub = '') => path.join(currentRoot(), 'active', 'shared', sub),
-    sharedTmp: (sub = '') => path.join(currentRoot(), 'active', 'shared', 'tmp', sub),
-    sharedExports: (sub = '') => path.join(currentRoot(), 'active', 'shared', 'exports', sub),
+    rootDir: () => factoryRoot(),
+    rootResolve: (rel: string) =>
+      nodePath.isAbsolute(rel)
+        ? rel
+        : nodePath.join(rel.startsWith('knowledge/product/') ? process.cwd() : factoryRoot(), rel),
+    resolve: (rel: string) => (nodePath.isAbsolute(rel) ? rel : nodePath.join(factoryRoot(), rel)),
+    shared: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', sub),
+    sharedTmp: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', 'tmp', sub),
+    sharedExports: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', 'exports', sub),
     sharedLogsAudit: (sub = '') =>
-      path.join(currentRoot(), 'active', 'shared', 'logs', 'audit', sub),
-    knowledge: (sub = '') => path.join(currentRoot(), 'knowledge', sub),
+      nodePath.join(factoryRoot(), 'active', 'shared', 'logs', 'audit', sub),
+    // `knowledge/product/*` (schemas, governed catalogs) are read-only
+    // fixtures — resolve them against the real repository. Tenant-scoped
+    // knowledge trees stay inside the disposable tmp root.
+    knowledge: (sub = '') =>
+      sub.startsWith('product/')
+        ? nodePath.join(process.cwd(), 'knowledge', sub)
+        : nodePath.join(factoryRoot(), 'knowledge', sub),
     findMissionPath: () => null,
   };
   // `pathResolver` (the namespace-style export) is what audit-chain — pulled
@@ -213,7 +251,7 @@ function auditEvents(): Array<Record<string, any>> {
 }
 
 beforeEach(() => {
-  rootDirState = undefined;
+  setRootDirState(undefined);
   const root = currentRoot();
   const schemaPath = path.join(root, 'knowledge/product/schemas/mission-state.schema.json');
   fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
@@ -224,11 +262,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (rootDirState) fs.rmSync(rootDirState, { recursive: true, force: true });
+  const root = rootDirState();
+  if (root) fs.rmSync(root, { recursive: true, force: true });
 });
 
 afterAll(() => {
-  for (const root of createdRoots ?? []) fs.rmSync(root, { recursive: true, force: true });
+  for (const root of createdRoots()) fs.rmSync(root, { recursive: true, force: true });
 });
 
 describe('AL-04 mission runtime residue GC', () => {

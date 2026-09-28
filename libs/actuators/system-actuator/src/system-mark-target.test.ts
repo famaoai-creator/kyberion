@@ -23,21 +23,21 @@ vi.mock('@agent/core/mark-target-resolver', async (importOriginal) => ({
   resolveMarkTarget: mocks.resolveMarkTarget,
   loadMarks: mocks.loadMarks,
 }));
-vi.mock('@agent/core/screen-capture-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/screen-capture-bridge')>()),
+vi.mock('@agent/core/virtual/screen-capture-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/virtual/screen-capture-bridge')>()),
   createScreenCaptureBridge: () => ({ captureScreenshot: mocks.captureScreenshot }),
 }));
-vi.mock('@agent/core/image-dhash', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/image-dhash')>()),
+vi.mock('@agent/core/media/image-dhash', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media/image-dhash')>()),
   dhashFile: mocks.dhashFile,
 }));
-vi.mock('@agent/core/os-automation', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/os-automation')>()),
+vi.mock('@agent/core/virtual/os-automation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/virtual/os-automation')>()),
   clickAt: mocks.clickAt,
   rightClickAt: mocks.rightClickAt,
   moveMouse: mocks.moveMouse,
 }));
-vi.mock('@agent/core/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
+vi.mock('@agent/core/virtual/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
 
 const { resolveSystemClickCoordinate } = await import('./system-mark-target.js');
 const { handleSystemAction } = await import('./system-action-helpers.js');

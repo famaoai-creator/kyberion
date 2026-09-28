@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { Jimp } from 'jimp';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { dhashRegion, hamming } from './image-dhash.js';
+import { dhashRegion, hamming } from './media/image-dhash.js';
 import {
   createReasoningVisionDescribeFn,
   type DescribeFn,
   type PayloadTier,
-} from './image-description-bridge.js';
+} from './media/image-description-bridge.js';
 import { assertVolatileId, pathResolver } from './path-resolver.js';
-import { redactScreenCaptureFile } from './screen-frame-redaction.js';
+import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 /**

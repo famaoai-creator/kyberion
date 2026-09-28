@@ -77,7 +77,7 @@ The WS items bound that shared state and the disk that per-session copies use.
 
 ## WS-02 — One spawn-env builder for every provider CLI
 
-`libs/core/provider-spawn-env.ts` —
+`libs/core/provider/provider-spawn-env.ts` —
 `buildDelegationSpawnEnv({ provider, cwd?, sessionId, profile? }) → { env, dispose }`.
 
 - `env` = XP-02 `buildProviderChildEnv` (credential allowlist) + SA-05
@@ -123,7 +123,7 @@ enforces it; a worker commit is absorbed by the WS-01 dispose reconciliation.
 The private index captures accidental staging. The owner may commit what a
 session staged:
 
-- `commitFromSessionIndex(idx, message)` (`libs/core/mission-git.ts`) refuses
+- `commitFromSessionIndex(idx, message)` (`libs/core/mission/mission-git.ts`) refuses
   on a delegated path (`KYBERION_DELEGATION_DEPTH > 0`) or a non-owner role
   (`mission_controller` / `orchestrator` / `mission_owner`), and refuses when
   HEAD moved away from `baselineSha` — the index is a full tree snapshot, so a
@@ -144,7 +144,7 @@ session staged:
 
 ## WS-05 — Workspace ledger
 
-`libs/core/workspace-ledger.ts`, `active/shared/runtime/workspaces/ledger.json`
+`libs/core/workforce/workspace-ledger.ts`, `active/shared/runtime/workspaces/ledger.json`
 (schema `knowledge/product/schemas/workspace-ledger.schema.json`, updates
 under the shared lock). Kinds: `git-worktree`, `scratch-dir`, `git-index`.
 The ledger is the only source of ownership: deletion goes through
@@ -171,7 +171,7 @@ mid-use.
 
 ## WS-06 — Disk budget
 
-`libs/core/workspace-budget.ts` — `checkWorkspaceBudget(targetDir, expectedBytes)`.
+`libs/core/workforce/workspace-budget.ts` — `checkWorkspaceBudget(targetDir, expectedBytes)`.
 Policy `knowledge/product/governance/workspace-budget-policy.json` (cap
 20 GiB, free-disk floor 2 GiB, orphan TTL 24h) with
 `KYBERION_WORKSPACE_DISK_CAP_BYTES` / `KYBERION_WORKSPACE_MIN_FREE_BYTES` /
@@ -190,7 +190,7 @@ closed when a floor is configured.
 
 ## WS-07 — Janitor sweep and CLI
 
-The storage janitor calls `sweepWorkspaces` (`libs/core/workspace-sweep.ts`).
+The storage janitor calls `sweepWorkspaces` (`libs/core/workforce/workspace-sweep.ts`).
 Orphans are:
 
 - released entries past the TTL;

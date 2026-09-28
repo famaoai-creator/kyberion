@@ -6,7 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   evaluateBlueBubblesConfiguration,
   type BlueBubblesConfigurationReport,
-} from './bluebubbles-adapter.js';
+} from './integrations/bluebubbles-adapter.js';
 import { safeExistsSync, safeExec, safeMkdir, validateFileSize } from './secure-io.js';
 
 export interface IMessageSendRequest {
@@ -266,5 +266,5 @@ export function buildIMessageSendScript(request: {
   text: string;
   serviceName?: string;
 }): string {
-  return `tell application "Messages" to send "${request.text.replace(/"/g, '\\"')}" to buddy "${request.recipient}"`;
+  return `tell application "Messages" to send "${request.text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" to buddy "${request.recipient}"`;
 }

@@ -1,9 +1,9 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
-import { createPeerMessagingServer } from '@agent/core/peer-messaging';
+import { createPeerMessagingServer } from '@agent/core/mesh/peer-messaging';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import type { PeerMessageEnvelope } from '@agent/core/peer-messaging';
+import type { PeerMessageEnvelope } from '@agent/core/mesh/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 

@@ -82,12 +82,12 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
    - inbox 新着: Task 3 の `listInboxEntries({ unread: true }).length`
    - 次の一手: 既存 `buildNextAction` / `formatNextAction`
    - 最後に「主要コマンド」10行(mission create / meeting:preflight / pipeline campaign-suite / dashboard / doctor / backup / inbox open / notification set / cli / help)を固定表示
-3. `--json` オプションで機械可読出力(Chronos ホーム(Task 4)が同じ集計を使うため、**集計部は `libs/core/operator-home-summary.ts` に置き core から export**。CLI はその薄い表示層)。
-4. **検証**: `pnpm kyberion` 実行で全セクション表示 / `libs/core/operator-home-summary.test.ts`(各ソースをモックして件数集計を固定)。
+3. `--json` オプションで機械可読出力(Chronos ホーム(Task 4)が同じ集計を使うため、**集計部は `libs/core/surface/operator-home-summary.ts` に置き core から export**。CLI はその薄い表示層)。
+4. **検証**: `pnpm kyberion` 実行で全セクション表示 / `libs/core/surface/operator-home-summary.test.ts`(各ソースをモックして件数集計を固定)。
 
 ### Task 2: 通知ルーティング(復路の配達)— `gpt-5.4-mini`
 
-1. `libs/core/operator-notifications.ts` を新設:
+1. `libs/core/surface/operator-notifications.ts` を新設:
 
    ```ts
    type OperatorEvent =

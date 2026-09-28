@@ -14,9 +14,9 @@ status: archived
 
 AGY 側で作成された「ローカル LLM ランタイムとクラウド AI プロバイダーを横断して管理する」という方向性は、Kyberion の運用価値に合っている。ただし、提示仕様のまま実装を確定してはならない。現行リポジトリには既に次の機構が存在するためである。
 
-- `libs/core/reasoning-backend.ts` に `ReasoningBackend` 契約、transient retry、provider health demotion、failover、spend guard、egress gate がある。
-- `libs/core/reasoning-model-routing.ts` と `knowledge/product/governance/model-registry.json` に、モデル ID・tier・コスト・レイテンシ・役割適合性の管理がある。
-- `knowledge/product/governance/reasoning-backend-policy.json` と `libs/core/reasoning-bootstrap.ts` に、CLI 系・API 系・OpenAI-compatible 系の選択と起動がある。
+- `libs/core/reasoning/reasoning-backend.ts` に `ReasoningBackend` 契約、transient retry、provider health demotion、failover、spend guard、egress gate がある。
+- `libs/core/reasoning/reasoning-model-routing.ts` と `knowledge/product/governance/model-registry.json` に、モデル ID・tier・コスト・レイテンシ・役割適合性の管理がある。
+- `knowledge/product/governance/reasoning-backend-policy.json` と `libs/core/reasoning/reasoning-bootstrap.ts` に、CLI 系・API 系・OpenAI-compatible 系の選択と起動がある。
 - `MO-05` はタスク単位の model tier / effort routing、`IP-13` はモデル ID 一元化、`OP-01` はコストと spend cap、`SA-04` は reasoning egress を既に所有している。
 
 したがって本計画の対象は「新しい LLM 抽象を追加すること」ではなく、既存機構を壊さずに **runtime adapter / model / profile / role route / policy constraint** を一つの解決契約へ統合することである。

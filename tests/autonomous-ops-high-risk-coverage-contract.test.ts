@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { matchHighRiskPaths } from '@agent/core/autonomous-ops-gate';
+import { matchHighRiskPaths } from '@agent/core/governance/autonomous-ops-gate';
 
 const rootDir = process.cwd();
 const policy = JSON.parse(
@@ -42,8 +42,8 @@ describe('Autonomous ops high-risk path coverage contract', () => {
     const guarded = [
       'knowledge/product/governance/autonomous-ops-policy.json',
       'knowledge/product/schemas/autonomous-ops-policy.schema.json',
-      'libs/core/autonomous-ops-gate.ts',
-      'libs/core/src/autonomous-ops-gate.test.ts',
+      'libs/core/governance/autonomous-ops-gate.ts',
+      'libs/core/governance/autonomous-ops-gate.test.ts',
       'libs/core/foundation/governed-catalog.ts',
       'libs/core/package.json',
       'tests/autonomous-ops-high-risk-coverage-contract.test.ts',

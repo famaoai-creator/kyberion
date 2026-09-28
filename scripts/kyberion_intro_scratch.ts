@@ -31,28 +31,38 @@ const NARRATION = [
     seconds: 4,
     say: 'Kyberion。',
     title: 'KYBERION',
+    // i18n-exempt: JA demo script content
     line: '自律オペレーションのための実行基盤',
   },
   {
     id: 'hook',
     seconds: 7,
+    // i18n-exempt: JA demo script content
     say: '曖昧な指示は、そのまま実行しません。',
+    // i18n-exempt: JA demo script content
     title: '曖昧な指示は実行しない',
+    // i18n-exempt: JA demo script content
     line: 'まず人間と意図を合意する',
   },
   {
     id: 'process',
     seconds: 12,
+    // i18n-exempt: JA demo script content
     say: '意図を合意し、検証可能な活動定義に変換してから、安全なサンドボックスで実行します。Trace と Quality Gate が再現性を支えます。',
     title: '意図 → 契約 → 実行',
+    // i18n-exempt: JA demo script content
     line: '合意・実行・検証のサイクル',
+    // i18n-exempt: JA demo script content
     steps: ['意図の合意', '活動定義へ変換', 'サンドボックス実行', 'Trace / Quality Gate'],
   },
   {
     id: 'cta',
     seconds: 7,
+    // i18n-exempt: JA demo script content
     say: 'さあ、Kyberion を動かして、自律オペレーションを始めましょう。',
+    // i18n-exempt: JA demo script content
     title: '今すぐ始める',
+    // i18n-exempt: JA demo script content
     line: 'ミッションとして動かし、証拠を残す',
   },
 ] as const;

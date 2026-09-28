@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Rule changes and decisions are audited; keep the real audit log untouched.
-vi.mock('@agent/core/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { getSeamTraitOverrides } from '@agent/core/seam-selection-rules';

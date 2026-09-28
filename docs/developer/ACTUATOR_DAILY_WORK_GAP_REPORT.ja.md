@@ -138,7 +138,7 @@ libs/actuators/*/manifest.json          ← 正本(スキャン: libs/core の a
 
 1. パイプライン step の `op` は `domain:action`(例: `working-memory:daily-open`, `service:preset`)
 2. `resolveActuatorOperation` → `dist/libs/actuators/<id>/src/index.js`
-3. `actuator.dispatch` またはレガシー `handleAction`(`libs/core/actuator-sdk.ts`)
+3. `actuator.dispatch` またはレガシー `handleAction`(`libs/core/actuator/actuator-sdk.ts`)
 
 **ビルド必須。** `pnpm kyberion run` も `dist/` の entry を探す(`scripts/cli.ts` `resolveActuatorPath`)。無いと「Run `pnpm build` first」。
 
@@ -477,7 +477,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 ## 9. 参照(この報告が踏んだパス)
 
 - カタログ: `libs/actuators/*/manifest.json`, `CAPABILITIES_GUIDE.md`, `libs/actuators/README.md`
-- 発見: `knowledge/product/orchestration/actuator-discovery-registry.md`, `scripts/generate_op_registry.ts`, `libs/core/actuator-sdk.ts`, `libs/core/actuator-op-registry.ts`
+- 発見: `knowledge/product/orchestration/actuator-discovery-registry.md`, `scripts/generate_op_registry.ts`, `libs/core/actuator/actuator-sdk.ts`, `libs/core/actuator/actuator-op-registry.ts`
 - 起動: `scripts/cli.ts`, `scripts/actuator_playground.ts`, `package.json`
 - MCP: `knowledge/product/governance/mcp-tool-catalog.json`
 - SaaS: `knowledge/product/orchestration/service-presets/github.json`, `github-mcp.json`, `slack.json`, `google-workspace.json`, `service-harness-registry.json`

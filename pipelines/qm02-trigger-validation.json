@@ -23,7 +23,7 @@
         "files": [
           "libs/core/trigger-runner.test.ts",
           "libs/core/managed-process.watch.test.ts",
-          "libs/core/src/pipeline-scheduler.test.ts"
+          "libs/core/pipeline/pipeline-scheduler.test.ts"
         ]
       }
     },

@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net';
 import express from 'express';
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import {
   COMPUTER_SURFACE_SCRIPT_VOCABULARY_KEYS,
   SHARED_UI_MESSAGES_ROUTE,

@@ -41,7 +41,7 @@ phase_affinity: [alignment, execution]
 - `ocr: true` でスライド画像を OCR する。EMF/WMF（Excel 範囲の貼り付けで Office が保存する形式）は LibreOffice で PNG 化してから読む。それでも読めない画像は `ocr_skipped` に載る。「OCR テキストが無い」を「図が無い」と読まないこと。
 - `media:pptx_extract` → テキストだけでなく配置・テーマ・アセットまで要るときのフル design protocol。
 
-### DOCX / XLSX — ネイティブ読み取り（`libs/core/src/docx-utils.ts`・`xlsx-utils.ts`）
+### DOCX / XLSX — ネイティブ読み取り（`libs/core/media/docx-utils.ts`・`xlsx-utils.ts`）
 
 `native-docx-engine` / `native-xlsx-engine` は**書き出し**用。読み取りは `distillDocxDesign` / `distillXlsxDesign`（JSZip ベース、mammoth / exceljs 不使用）で、パスでもバイト列でも受け取れる。
 

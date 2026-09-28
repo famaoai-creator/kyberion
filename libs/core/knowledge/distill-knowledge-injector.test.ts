@@ -1,0 +1,280 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  findRelevantDistilledKnowledge,
+  formatDistilledKnowledgeSummary,
+  PLACEHOLDER_DISTILL_PATTERNS,
+} from './distill-knowledge-injector.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  registerEmbeddingBackend,
+  resetEmbeddingBackend,
+  type EmbeddingBackend,
+} from '../embedding-backend.js';
+
+describe('distill-knowledge-injector (E5)', () => {
+  it('returns empty when topic and tags are both empty', async () => {
+    const r = await findRelevantDistilledKnowledge({ topic: '' });
+    expect(r).toEqual([]);
+  });
+
+  it('returns the most relevant entries by tag overlap (against real fixtures)', async () => {
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'tenant isolation',
+      tags: ['mission-retrofit', 'dog-food'],
+      limit: 10,
+    });
+    for (let i = 1; i < r.length; i++) {
+      expect(r[i - 1].score!).toBeGreaterThanOrEqual(r[i].score!);
+    }
+    if (r.length > 0) {
+      const top = r[0];
+      const overlap = top.tags.some((t) =>
+        ['mission-retrofit', 'dog-food'].includes(t.toLowerCase())
+      );
+      expect(overlap || top.score! < 0.5).toBe(true);
+    }
+  });
+
+  it('respects the limit parameter', async () => {
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'mission',
+      limit: 2,
+    });
+    expect(r.length).toBeLessThanOrEqual(2);
+  });
+
+  it('formats a summary that includes title, tags, and source path', () => {
+    const fake = {
+      path: 'knowledge/product/evolution/distill_test.md',
+      title: 'Test Title',
+      tags: ['a', 'b', 'c'],
+      excerpt: 'A useful insight about something important happens here.',
+      score: 0.85,
+    };
+    const formatted = formatDistilledKnowledgeSummary(fake);
+    expect(formatted).toContain('Test Title');
+    expect(formatted).toContain('[a, b, c]');
+    expect(formatted).toContain('score=0.85');
+    expect(formatted).toContain('knowledge/product/evolution/distill_test.md');
+  });
+});
+
+// ── KP-07: placeholder / policy-fallback distill quarantine ─────────────────
+
+describe('findRelevantDistilledKnowledge — placeholder distill quarantine (KP-07)', () => {
+  const dir = pathResolver.rootResolve('knowledge/product/evolution');
+  const probeName = `distill_kp07-placeholder-probe-${process.pid}.md`;
+  const probePath = path.join(dir, probeName);
+
+  // A query specific enough to match ONLY this probe file's title/tags, so a
+  // failure to quarantine it would make it rank (rather than merely appear
+  // among unrelated results).
+  const uniqueTag = `kp07-probe-tag-${process.pid}`;
+  const probeBody = `---
+title: 'KP-07 Placeholder Probe ${process.pid}'
+category: Incident
+tags: ['${uniqueTag}', 'auto-distilled']
+importance: 9
+source_mission: MSN-KP07-PLACEHOLDER-PROBE
+last_updated: 2026-07-25
+---
+
+# KP-07 Placeholder Probe
+
+## Summary
+
+Synthetic fixture for the placeholder-distill quarantine regression test.
+
+## Patterns Discovered
+
+- ${PLACEHOLDER_DISTILL_PATTERNS[1]}
+`;
+
+  afterEach(() => {
+    if (fs.existsSync(probePath)) fs.rmSync(probePath);
+  });
+
+  it('never ranks a distill doc containing a placeholder/policy-fallback pattern', async () => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(probePath, probeBody);
+
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'KP-07 Placeholder Probe',
+      tags: [uniqueTag],
+      limit: 10,
+      minScore: 0,
+    });
+
+    expect(r.some((entry) => entry.path.endsWith(probeName))).toBe(false);
+  });
+
+  it('does not inject a distill document reached through a symbolic link', async () => {
+    const linkName = `distill_kp07-symlink-probe-${process.pid}.md`;
+    const linkPath = path.join(dir, linkName);
+    const targetPath = pathResolver.shared(`tmp/${linkName}`);
+    const uniqueTag = `kp07-symlink-tag-${process.pid}`;
+    try {
+      fs.writeFileSync(
+        targetPath,
+        `---\ntitle: Symlink Probe\ntags: ['${uniqueTag}']\n---\n\nExternal content\n`
+      );
+      fs.symlinkSync(targetPath, linkPath);
+
+      const r = await findRelevantDistilledKnowledge({
+        topic: 'Symlink Probe',
+        tags: [uniqueTag],
+        limit: 10,
+        minScore: 0,
+      });
+
+      expect(r.some((entry) => entry.path.endsWith(linkName))).toBe(false);
+    } finally {
+      if (fs.existsSync(linkPath)) fs.unlinkSync(linkPath);
+      if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+    }
+  });
+
+  it('does not inject a distill directory named like a markdown entry', async () => {
+    const directoryName = `distill_kp07-directory-probe-${process.pid}.md`;
+    const directoryPath = path.join(dir, directoryName);
+    const uniqueTag = `kp07-directory-tag-${process.pid}`;
+    try {
+      fs.mkdirSync(directoryPath, { recursive: true });
+
+      const r = await findRelevantDistilledKnowledge({
+        topic: 'Directory Probe',
+        tags: [uniqueTag],
+        limit: 10,
+        minScore: 0,
+      });
+
+      expect(r.some((entry) => entry.path.endsWith(directoryName))).toBe(false);
+    } finally {
+      if (fs.existsSync(directoryPath)) fs.rmSync(directoryPath, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── Hybrid search (semantic RRF) ─────────────────────────────────────────────
+
+/**
+ * Synthetic embedding backend for deterministic scenario testing.
+ *
+ * Each entry in the corpus is given a "semantic cluster" vector and the query
+ * is assigned the vector of the intended top result, so we can verify that
+ * RRF fusion lifts the semantically-correct answer even when lexical score
+ * is low.
+ *
+ * Vectors are 4-d unit vectors assigned by category.
+ */
+const CLUSTER_VECTORS: Record<string, Float32Array> = {
+  meeting: new Float32Array([1, 0, 0, 0]),
+  governance: new Float32Array([0, 1, 0, 0]),
+  architecture: new Float32Array([0, 0, 1, 0]),
+  voice: new Float32Array([0.707, 0, 0.707, 0]),
+  default: new Float32Array([0.5, 0.5, 0.5, 0.5]),
+};
+
+function clusterFor(text: string): Float32Array {
+  const t = text.toLowerCase();
+  if (t.includes('meeting') || t.includes('会議') || t.includes('facilitator'))
+    return CLUSTER_VECTORS['meeting'];
+  if (t.includes('governance') || t.includes('consent') || t.includes('compliance'))
+    return CLUSTER_VECTORS['governance'];
+  if (t.includes('architecture') || t.includes('catalog') || t.includes('intent'))
+    return CLUSTER_VECTORS['architecture'];
+  if (t.includes('voice') || t.includes('cloning') || t.includes('audio'))
+    return CLUSTER_VECTORS['voice'];
+  return CLUSTER_VECTORS['default'];
+}
+
+function makeSemanticBackend(): EmbeddingBackend {
+  return {
+    name: 'test-semantic',
+    dimensions: 4,
+    embed: async (text) => clusterFor(text),
+    embedBatch: async (texts) => texts.map(clusterFor),
+  };
+}
+
+describe('findRelevantDistilledKnowledge — hybrid (with embedding backend)', () => {
+  beforeEach(() => {
+    resetEmbeddingBackend();
+    registerEmbeddingBackend(makeSemanticBackend());
+  });
+
+  afterEach(() => {
+    resetEmbeddingBackend();
+  });
+
+  it('retrieves meeting-related entries for Japanese query (cross-lingual semantic)', async () => {
+    // "会議をAIが進行する" → meeting cluster → should find meeting-facilitator docs
+    const r = await findRelevantDistilledKnowledge({
+      topic: '会議をAIが進行する',
+      tags: [],
+      limit: 3,
+    });
+    // With semantic backend, meeting-related entries should appear
+    expect(r.length).toBeGreaterThan(0);
+    const topTitles = r.map((e) => e.title.toLowerCase());
+    const hasMeeting = topTitles.some((t) => t.includes('meeting') || t.includes('facilitator'));
+    expect(hasMeeting).toBe(true);
+  });
+
+  it('boosts semantically-matched entries via RRF even with low lexical score', async () => {
+    // Pure lexical query: "voice cloning" → low lexical score since it doesn't
+    // match many token patterns; semantic backend should boost voice-related entry
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'voice cloning consent',
+      tags: [],
+      limit: 5,
+    });
+    expect(r.length).toBeGreaterThan(0);
+    // All returned entries should have a positive RRF score
+    for (const e of r) {
+      expect(e.score).toBeGreaterThan(0);
+    }
+  });
+
+  it('results are still sorted by descending score with hybrid scoring', async () => {
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'architecture governance decisions',
+      tags: [],
+      limit: 5,
+    });
+    for (let i = 1; i < r.length; i++) {
+      expect(r[i - 1].score!).toBeGreaterThanOrEqual(r[i].score!);
+    }
+  });
+
+  it('respects limit parameter with hybrid search', async () => {
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'mission implementation pipeline',
+      limit: 2,
+    });
+    expect(r.length).toBeLessThanOrEqual(2);
+  });
+
+  it('falls back gracefully when embed() throws', async () => {
+    resetEmbeddingBackend();
+    registerEmbeddingBackend({
+      name: 'failing',
+      dimensions: 4,
+      embed: async () => {
+        throw new Error('embed unavailable');
+      },
+      embedBatch: async () => {
+        throw new Error('embedBatch unavailable');
+      },
+    });
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'intent catalog',
+      tags: ['intent-catalog'],
+      limit: 3,
+    });
+    // Should fall back to lexical — still returns results
+    expect(r.length).toBeGreaterThanOrEqual(0);
+  });
+});

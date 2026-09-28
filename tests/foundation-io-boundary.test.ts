@@ -10,7 +10,7 @@ const allowedImporters = new Set([
   'libs/core/customer-resolver.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
-  'libs/core/vault-mount.ts',
+  'libs/core/secret/vault-mount.ts',
 ]);
 
 function normalize(relPath: string): string {

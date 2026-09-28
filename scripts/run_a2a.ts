@@ -3,7 +3,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { loadA2AEnvelopeAtPath } from '@agent/core/a2a-envelope';
+import { loadA2AEnvelopeAtPath } from '@agent/core/mesh/a2a-envelope';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import { nowIso } from '@agent/core/foundation';

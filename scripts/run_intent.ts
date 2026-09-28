@@ -1,24 +1,24 @@
-import { compileUserIntentFlow } from '@agent/core/intent-contract';
+import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
 import { createAssistantCompilerRequest } from '@agent/core/assistant-compiler-request';
-import { createAssistantDelegationRequest } from '@agent/core/delegation-request';
+import { createAssistantDelegationRequest } from '@agent/core/mission/delegation-request';
 import {
   createTaskSession,
   getTaskIntentBuilder,
   saveTaskSession,
   validateTaskSession,
-} from '@agent/core/task-session';
-import { getRegisteredEnv } from '@agent/core/foundation';
-import { executeApprovedClaudeTaskSession } from '@agent/core/claude-task-session-executor';
-import { formatClarificationPacket } from '@agent/core/intent-clarification-format';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+} from '@agent/core/task/task-session';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { executeApprovedClaudeTaskSession } from '@agent/core/provider/claude-task-session-executor';
+import { formatClarificationPacket } from '@agent/core/intent/intent-clarification-format';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { safeExistsSync } from '@agent/core/secure-io';
 import {
   chooseExecutionIntent,
   gatherImprovementHints,
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
-} from '@agent/core/intent-resolution';
-import { issueMissionFromProposal } from '@agent/core/surface-mission-proposals';
+} from '@agent/core/intent/intent-resolution';
+import { issueMissionFromProposal } from '@agent/core/surface/surface-mission-proposals';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ChannelAdapter } from '@agent/core/channel-adapter';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import type { ChannelAdapter } from '@agent/core/surface/channel-adapter';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
-} from '@agent/core/channel-surface-types';
-import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
+} from '@agent/core/surface/channel-surface-types';
+import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -19,8 +19,8 @@ const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
 }));
 
-vi.mock('@agent/core/channel-surface', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/channel-surface')>();
+vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/surface/channel-surface')>();
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {
@@ -43,10 +43,10 @@ import {
   approvalStoreRoots,
   createApprovalRequest,
   loadApprovalRequest,
-} from '@agent/core/approval-store';
-import { buildVetoWindow } from '@agent/core/approval-veto-window';
+} from '@agent/core/governance/approval-store';
+import { buildVetoWindow } from '@agent/core/governance/approval-veto-window';
 import { withExecutionContext } from '@agent/core/authority';
-import { buildDecisionCard } from '@agent/core/decision-card';
+import { buildDecisionCard } from '@agent/core/governance/decision-card';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import {
   collectSlackThreadContext,

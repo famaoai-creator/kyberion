@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ClipboardEvent, type DragEvent } from 'react';
-import type { KbFileDropProps, KbFileEntry } from '@agent/core/a2ui-catalog';
+import type { KbFileDropProps, KbFileEntry } from '@agent/core/surface/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import {
   KB_FORM_ACTIONS,

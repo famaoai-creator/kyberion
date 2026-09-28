@@ -7,14 +7,15 @@ import {
 import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
-import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
-import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
+
 import { retry } from '@agent/core/async-utils';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { parseProcessAction, type ProcessAction } from './process-action-input.js';
 
 const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(
@@ -52,10 +53,10 @@ export function readProcessJsonObject(filePath: string, label: string): Record<s
   return parseSafeJsonObjectValue(readProcessJson(filePath, label), label);
 }
 
-const buildRetryOptions = createGovernedRetryOptionsBuilder({
+const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: PROCESS_MANIFEST_PATH,
-  defaults: DEFAULT_PROCESS_RETRY,
-  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  retryDefaults: DEFAULT_PROCESS_RETRY,
+  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
 export async function handleAction(input: ProcessAction) {

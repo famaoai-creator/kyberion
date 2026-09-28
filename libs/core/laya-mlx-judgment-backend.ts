@@ -46,7 +46,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { buildSafeExecEnv, safeExistsSync } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
 import { createLogger } from './logger.js';
 import {
   describeChoiceOptions,
@@ -56,7 +56,7 @@ import {
   type JudgmentBackend,
   type JudgmentQuestion,
   type JudgmentRequest,
-} from './judgment-backend.js';
+} from './reasoning/judgment-backend.js';
 
 const logger = createLogger('laya-mlx');
 

@@ -4,7 +4,7 @@ import {
   loadWorkInventoryEntry,
   listWorkInventoryEntries,
   saveWorkInventoryEntry,
-} from '@agent/core/work-inventory';
+} from '@agent/core/workforce/work-inventory';
 import {
   attachObservationToEntry,
   confirmObservationSummary,
@@ -13,8 +13,8 @@ import {
   loadObservationSummary,
   observationDigestLine,
   type WorkInventoryObservationSummary,
-} from '@agent/core/work-inventory-observation';
-import { WorkInventoryConsentError } from '@agent/core/work-inventory-consent';
+} from '@agent/core/workforce/work-inventory-observation';
+import { WorkInventoryConsentError } from '@agent/core/workforce/work-inventory-consent';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';

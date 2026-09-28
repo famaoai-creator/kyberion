@@ -13,7 +13,7 @@ vi.mock('./tier-guard.js', () => ({
   detectTier: () => 'confidential',
 }));
 
-vi.mock('./policy-engine.js', () => ({
+vi.mock('./governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 

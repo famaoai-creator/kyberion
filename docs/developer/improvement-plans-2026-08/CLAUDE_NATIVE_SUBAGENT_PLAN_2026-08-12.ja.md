@@ -40,7 +40,7 @@ SDK 側は `Options.agents?: Record<string, AgentDefinition>` を持ち、メッ
 
 ### CN-01: `ClaudeCliSessionAdapter`(共有 stream-json セッション)
 
-`libs/core/claude-cli-session-adapter.ts`。1本の `claude -p --input-format stream-json --output-format stream-json` プロセスを保持し、NDJSON でターンを往復する。`boot / ask / askNativeSubagent / getRuntimeInfo / shutdown` は `CodexHarnessSession` / `AgyHarnessSession` と同型。
+`libs/core/provider/claude-cli-session-adapter.ts`。1本の `claude -p --input-format stream-json --output-format stream-json` プロセスを保持し、NDJSON でターンを往復する。`boot / ask / askNativeSubagent / getRuntimeInfo / shutdown` は `CodexHarnessSession` / `AgyHarnessSession` と同型。
 
 - **観測ゲート(4条件すべて)**: ① `Agent`/`Task` の `tool_use` である、② その `subagent_type` が当該 tier の `kyberion-<tier>` と**完全一致**する、③ 同じ `tool_use.id` を閉じる `tool_result` が来る、④ その `tool_result` が error でも background の launch ack でもない。1つでも欠ければ `nativeSubagent` metadata を出さず `[SUBAGENT_UNAVAILABLE]`。`parent_tool_use_id` 付きメッセージは「活動の痕跡」であって完了の証拠ではないため、単独では採用しない。
 - **非統制サブエージェントの遮断**: `subagent_type` が組み込み(`general-purpose` 等)だった場合は fail-closed に加えて `interrupt` + セッション破棄を行う。既に親の permission mode で動き始めているため、ターンを失敗させるだけでは統制外の作業が走り続ける。
@@ -52,7 +52,7 @@ SDK 側は `Options.agents?: Record<string, AgentDefinition>` を持ち、メッ
 
 ### CN-02: KD-05 → Claude ネイティブ射影と backend 配線
 
-`libs/core/claude-native-subagent.ts` が唯一の射影点:
+`libs/core/provider/claude-native-subagent.ts` が唯一の射影点:
 
 - `--agents` JSON を **実行時に** KD-05 レジストリから生成(コミット済み生成物ではないのでドリフト不能)。prompt は `systemPromptPrefix` + working principles + secure-io 制約 + 共有ディレクトリ規約。
 - 後者2つは `libs/core/subagent-prompt-framing.ts` に SSoT 化し、`scripts/generate_subagent_definitions.ts`(`.claude/agents/*.md` 生成儀式)も同じ定数を参照するよう変更した。`pnpm agents:generate -- --check` はドリフト0のまま。

@@ -9,7 +9,7 @@
 // the fixed, escaped, external-resource-free canvas.
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
-import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   resolveCreativeDesign,
   type ResolvedCreativeDesign,

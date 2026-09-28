@@ -10,7 +10,9 @@ describe('claude_code_hook entrypoint', () => {
     expect(source).toContain('process.stdout.write(');
     expect(source).toContain("permissionDecision: 'deny'");
     expect(source).toContain('run: async ({ argv }) =>');
-    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain(
+      "import { isRecord, readTextFile } from '@agent/core/foundation/text'"
+    );
     expect(source).toContain('readClaudeCodeHookTranscript(filePath: string)');
   });
 

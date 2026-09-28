@@ -114,7 +114,7 @@
 
 **成果物**
 
-- `libs/core/approval-cowork-adapter.ts`（`approval-gate.ts` / `approval-policy.ts` のフロントエンド）
+- `libs/core/governance/approval-cowork-adapter.ts`（`approval-gate.ts` / `approval-policy.ts` のフロントエンド）
 - MCP ツール: `kyberion.approval.list_pending` / `kyberion.approval.decide`
 - 監査連携: `kyberion.audit.export`（既存 `audit:export` ラップ）/ `audit.verify`
 

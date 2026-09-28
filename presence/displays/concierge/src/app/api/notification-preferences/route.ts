@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
-import { listChannelDirectoryEntries } from '@agent/core/channel-directory';
+import { isSurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
+import { listChannelDirectoryEntries } from '@agent/core/surface/channel-directory';
 import {
   loadNotificationPreferences,
   saveNotificationPreferences,
   type NotificationChannelTarget,
   type NotificationPreferences,
-} from '@agent/core/operator-notifications';
+} from '@agent/core/surface/operator-notifications';
 import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';

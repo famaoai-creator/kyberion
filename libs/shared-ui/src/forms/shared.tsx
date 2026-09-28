@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { KbFieldBase } from '@agent/core/a2ui-catalog';
+import type { KbFieldBase } from '@agent/core/surface/a2ui-catalog';
 import { useA2UIActions } from '../actions.js';
 import { useKbI18n } from '../i18n.js';
 import { KB_ICON_PATHS } from '../../vanilla/kyberion-ui.js';

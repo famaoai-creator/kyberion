@@ -11,7 +11,7 @@
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import type { TranscriptSegment } from '@agent/core/speech-to-text-bridge';
+import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,

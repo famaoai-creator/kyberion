@@ -128,7 +128,7 @@ Apply these constraints to every implementation task:
 
 **Files in scope:**
 
-- Add `libs/core/mission-classification-contract.test.ts`
+- Add `libs/core/mission/mission-classification-contract.test.ts`
 - Modify no production code
 
 **Required assertions:**
@@ -143,7 +143,7 @@ Apply these constraints to every implementation task:
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/mission-classification-contract.test.ts
+pnpm exec vitest run libs/core/mission/mission-classification-contract.test.ts
 ```
 
 **Completion condition:** The test fails only on confirmed current drift and documents each mismatched layer in its assertion message.
@@ -156,9 +156,9 @@ pnpm exec vitest run libs/core/mission-classification-contract.test.ts
 
 **Files in scope:**
 
-- Modify `libs/core/mission-classification.ts`
-- Modify `libs/core/mission-classification.test.ts`
-- Modify `libs/core/mission-classification-contract.test.ts`
+- Modify `libs/core/mission/mission-classification.ts`
+- Modify `libs/core/mission/mission-classification.test.ts`
+- Modify `libs/core/mission/mission-classification-contract.test.ts`
 
 **Required behavior:**
 
@@ -175,7 +175,7 @@ pnpm exec vitest run libs/core/mission-classification-contract.test.ts
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/mission-classification.test.ts libs/core/mission-classification-contract.test.ts
+pnpm exec vitest run libs/core/mission/mission-classification.test.ts libs/core/mission/mission-classification-contract.test.ts
 pnpm --filter @agent/core typecheck
 pnpm build
 ```
@@ -190,9 +190,9 @@ pnpm build
 
 - Add `libs/core/execution-shape.ts`
 - Add `libs/core/execution-shape.test.ts`
-- Modify `libs/core/intent-contract.ts`
-- Modify `libs/core/work-design.ts`
-- Modify `libs/core/mission-workflow-catalog.ts`
+- Modify `libs/core/intent/intent-contract.ts`
+- Modify `libs/core/workforce/work-design.ts`
+- Modify `libs/core/mission/mission-workflow-catalog.ts`
 - Modify composer input types that currently repeat the four-value union
 
 **Required contract:**
@@ -213,7 +213,7 @@ Provide a pure normalization function and a workflow projection function. The pr
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/execution-shape.test.ts libs/core/intent-contract.test.ts libs/core/work-design.test.ts libs/core/mission-workflow-catalog.test.ts
+pnpm exec vitest run libs/core/execution-shape.test.ts libs/core/intent/intent-contract.test.ts libs/core/workforce/work-design.test.ts libs/core/mission/mission-workflow-catalog.test.ts
 pnpm --filter @agent/core typecheck
 pnpm build
 ```
@@ -228,8 +228,8 @@ pnpm build
 
 **Files in scope:**
 
-- Add `libs/core/work-scope-decision.ts`
-- Add `libs/core/work-scope-decision.test.ts`
+- Add `libs/core/workforce/work-scope-decision.ts`
+- Add `libs/core/workforce/work-scope-decision.test.ts`
 - Add `knowledge/product/governance/work-scope-policy.json`
 - Add `knowledge/product/schemas/work-scope-policy.schema.json`
 
@@ -278,7 +278,7 @@ The resolver must be pure when policy data is injected. Policy loading and schem
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/work-scope-decision.test.ts
+pnpm exec vitest run libs/core/workforce/work-scope-decision.test.ts
 pnpm run check -- --scope full --only contract-schemas
 pnpm check -- --only governance-rules
 pnpm build
@@ -294,8 +294,8 @@ pnpm build
 
 **Files in scope:**
 
-- Modify `libs/core/work-design.ts`
-- Modify `libs/core/work-design.test.ts`
+- Modify `libs/core/workforce/work-design.ts`
+- Modify `libs/core/workforce/work-design.test.ts`
 - Modify the relevant work-design result schema if the result is schema-bound
 
 **Required behavior:**
@@ -309,7 +309,7 @@ pnpm build
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/work-design.test.ts libs/core/intent-contract.test.ts
+pnpm exec vitest run libs/core/workforce/work-design.test.ts libs/core/intent/intent-contract.test.ts
 pnpm build
 ```
 
@@ -323,8 +323,8 @@ pnpm build
 
 **Files in scope:**
 
-- Modify `libs/core/surface-runtime-orchestrator.ts`
-- Modify `libs/core/surface-runtime-orchestrator.fastpath.test.ts`
+- Modify `libs/core/surface/surface-runtime-orchestrator.ts`
+- Modify `libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts`
 - Modify `scripts/mission_controller.ts` only if an existing create/start API cannot accept the resolved contract
 
 **Required behavior:**
@@ -338,7 +338,7 @@ pnpm build
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/work-design.test.ts
+pnpm exec vitest run libs/core/surface/surface-runtime-orchestrator.fastpath.test.ts libs/core/workforce/work-design.test.ts
 pnpm test -- --suite core
 pnpm build
 ```
@@ -358,8 +358,8 @@ pnpm build
 - Modify `knowledge/product/orchestration/mission-team-templates.json` only if a dedicated template is justified by missing roles
 - Modify the related schemas only when adding a field or enum value
 - Modify contract tests from Task 1
-- Modify `libs/core/mission-workflow-catalog.test.ts`
-- Modify `libs/core/mission-review-gates.test.ts`
+- Modify `libs/core/mission/mission-workflow-catalog.test.ts`
+- Modify `libs/core/mission/mission-review-gates.test.ts`
 
 **Required behavior:**
 
@@ -372,7 +372,7 @@ pnpm build
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/mission-classification-contract.test.ts libs/core/mission-workflow-catalog.test.ts libs/core/mission-review-gates.test.ts
+pnpm exec vitest run libs/core/mission/mission-classification-contract.test.ts libs/core/mission/mission-workflow-catalog.test.ts libs/core/mission/mission-review-gates.test.ts
 pnpm check -- --only intent-domain-coverage
 pnpm check -- --only catalogs
 pnpm check -- --only governance-rules
@@ -389,7 +389,7 @@ pnpm build
 
 - Add `knowledge/product/governance/mission-task-classification-scenarios.json`
 - Add `knowledge/product/schemas/mission-task-classification-scenarios.schema.json`
-- Add `libs/core/mission-task-classification-scenarios.test.ts`
+- Add `libs/core/mission/mission-task-classification-scenarios.test.ts`
 - Modify Japanese contextual intent fixtures only when a scenario exposes an actual resolution gap
 
 **Minimum scenario set:**
@@ -415,7 +415,7 @@ Each scenario must declare expected intent, execution shape, mission class, risk
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/mission-task-classification-scenarios.test.ts libs/core/contextual-intent-corpus.test.ts
+pnpm exec vitest run libs/core/mission/mission-task-classification-scenarios.test.ts libs/core/contextual-intent-corpus.test.ts
 pnpm check -- --only intent-domain-coverage
 pnpm build
 ```
@@ -465,8 +465,8 @@ pnpm check -- --only reference-drift
 **Files in scope:**
 
 - Modify `docs/OPERATOR_UX_GUIDE.md`
-- Modify `libs/core/surface-ux-contract.ts`
-- Modify `libs/core/surface-ux-contract.test.ts`
+- Modify `libs/core/surface/surface-ux-contract.ts`
+- Modify `libs/core/surface/surface-ux-contract.test.ts`
 - Modify one operator-facing surface test selected from the actual integration path
 
 **Required user-facing behavior:**
@@ -480,7 +480,7 @@ pnpm check -- --only reference-drift
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/surface-ux-contract.test.ts
+pnpm exec vitest run libs/core/surface/surface-ux-contract.test.ts
 pnpm check -- --scope full --only doc-examples
 pnpm build
 ```

@@ -5,10 +5,10 @@
 import type { WisdomOperationExecutor, WisdomOperationSpec } from './contracts/wisdom-operation.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { DEPRECATED_WISDOM_ALIASES } from './compatibility/legacy-aliases.js';
-import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
+import { withCatalogInputContract } from '../../../core/actuator/actuator-sdk.js';
 
-import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
-import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
+import type { PipelineStepType } from '../../../core/actuator/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 const WISDOM_INPUT_SCHEMA = {
   type: 'object',

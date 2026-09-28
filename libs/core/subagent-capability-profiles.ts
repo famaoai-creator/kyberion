@@ -1,7 +1,7 @@
-import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './governance-action-recorder.js';
-import { policyEngine, type PolicyDecision } from './policy-engine.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import { auditChain } from './governance/audit-chain.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
+import { policyEngine, type PolicyDecision } from './governance/policy-engine.js';
+import { getDefaultWorkerEventStream } from './workforce/worker-event-stream.js';
 
 /**
  * Subagent capability tiers (KD-05).
@@ -40,7 +40,7 @@ export interface SubagentCapabilityProfile {
    * CLI/Agent-SDK tool-name projection of this tier (Claude Code `tools:`
    * frontmatter vocabulary and Agent SDK `allowedTools`). This is the single
    * source of truth both `scripts/generate_subagent_definitions.ts` (CT-01
-   * `.claude/agents/*.md` frontmatter) and `libs/core/agent-dispatch.ts`
+   * `.claude/agents/*.md` frontmatter) and `libs/core/agent/agent-dispatch.ts`
    * (CT-02 `HarnessSubagentDispatcher` allowlist) derive from — see
    * {@link SUBAGENT_PROFILE_CLI_TOOLS}.
    */
@@ -123,7 +123,7 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
  * name. Derived (not hand-typed) from {@link SUBAGENT_CAPABILITY_PROFILES}
  * so there is exactly one place a tier's tool surface is declared; both
  * `scripts/generate_subagent_definitions.ts` (CT-01) and
- * `libs/core/agent-dispatch.ts` (CT-02) consume this map instead of keeping
+ * `libs/core/agent/agent-dispatch.ts` (CT-02) consume this map instead of keeping
  * their own hand-mirrored copies.
  */
 export const SUBAGENT_PROFILE_CLI_TOOLS: Readonly<Record<string, readonly string[]>> =

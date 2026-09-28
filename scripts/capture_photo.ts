@@ -1,4 +1,4 @@
-import { createVirtualCameraBridge } from '@agent/core/virtual-camera-bridge';
+import { createVirtualCameraBridge } from '@agent/core/virtual/virtual-camera-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';

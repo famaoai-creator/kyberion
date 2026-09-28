@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApprovalRequestRecord } from '@agent/core/approval-store';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 
 const mocks = vi.hoisted(() => ({
   listApprovalRequests: vi.fn(),
@@ -8,11 +8,11 @@ const mocks = vi.hoisted(() => ({
   loadStateAtPath: vi.fn(),
 }));
 
-vi.mock('@agent/core/approval-store', () => ({
+vi.mock('@agent/core/governance/approval-store', () => ({
   listApprovalRequests: mocks.listApprovalRequests,
 }));
 vi.mock('@agent/core/secure-io', () => ({ safeExecResult: mocks.safeExecResult }));
-vi.mock('@agent/core/mission-state', () => ({
+vi.mock('@agent/core/mission/mission-state', () => ({
   listMissionsInSearchDirs: mocks.listMissionsInSearchDirs,
   loadStateAtPath: mocks.loadStateAtPath,
 }));

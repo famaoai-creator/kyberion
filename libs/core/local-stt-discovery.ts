@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, assertSafeRepositoryPath } from './secure-io.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
 
 export type LocalSttBackend = string;
 export type LocalSttSource = string;
@@ -200,8 +200,8 @@ function nativeScriptAvailable(
 function interpolateConnection(value: unknown, variables: Record<string, string>): unknown {
   if (typeof value === 'string') {
     return value.replace(
-      /\{\{\s*([^}]+)\s*\}\}/gu,
-      (match: string, key: string) => variables[key] ?? match
+      /\{\{([^}]*)\}\}/gu,
+      (match: string, key: string) => variables[key.trim()] ?? match
     );
   }
   if (Array.isArray(value)) return value.map((entry) => interpolateConnection(entry, variables));

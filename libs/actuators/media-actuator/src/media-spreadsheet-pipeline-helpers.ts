@@ -7,12 +7,12 @@ import {
   type MediaTheme,
 } from './media-document-helpers.js';
 import type { SemanticRenderTokenCatalog } from './media-layout-design-tokens.js';
-import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
+import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
-import { resolveMediaToneStyle } from '@agent/core/media-tone-style-map';
+import { resolveMediaToneStyle } from '@agent/core/media/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
-import type { XlsxDesignProtocol } from '@agent/core/types/xlsx-protocol';
+import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
 import { hasStructured } from './media-structured-content.js';
 import { appendStructuredXlsxSections } from './media-structured-xlsx.js';
 import { columnNumberToLetter, inferPrimitiveCellType } from './media-structured-xlsx.js';

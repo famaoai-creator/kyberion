@@ -3,15 +3,15 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   composeMissionTeamPlan,
   writeMissionTeamPlan,
-} from '@agent/core/mission-team-plan-composer';
+} from '@agent/core/mission/mission-team-plan-composer';
 import {
   composeMissionTeamBrief,
   writeMissionTeamBrief,
-} from '@agent/core/mission-team-brief-composer';
-import { loadOrganizationProfile } from '@agent/core/organization-profile';
-import { initializeMissionTeamBindings } from '@agent/core/mission-team-binding';
+} from '@agent/core/mission/mission-team-brief-composer';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
+import { initializeMissionTeamBindings } from '@agent/core/mission/mission-team-binding';
 import { findMissionPath, missionDir } from '@agent/core/path-resolver';
-import { loadStateAtPath } from '@agent/core/mission-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { withOrganizationContext } from './refactor/organization-context.js';

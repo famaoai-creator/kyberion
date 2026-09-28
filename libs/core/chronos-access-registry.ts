@@ -4,7 +4,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, withSensitivePathMediation } from './secure-io.js';
-import { secretGuard } from './secret-guard.js';
+import { secretGuard } from './secret/secret-guard.js';
 
 const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
 const TOKEN_HASH_PATTERN = /^[0-9a-f]{64}$/u;

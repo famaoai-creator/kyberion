@@ -13,7 +13,7 @@ status: archived
 
 ## 背景と課題
 
-- **kill-switch が完全に不活性**(CRITICAL): `libs/core/kill-switch.ts` の `logAction()` / `startMonitor()` / `detectAnomalies()` は**本番呼び出し元ゼロ**(定義とユニットテストのみ)。`detectAnomalies` は空の `actionLogs`(`:85`)を見るため常に何も検知しない。`respond`(`:134-173`、`shutdownAgentRuntimeViaDaemon` 経由で agent を隔離/kill 可能)は実装されているのに**データを一切与えられず、監視ループも起動されない**。カバレッジ除外がこの死蔵を隠している。
+- **kill-switch が完全に不活性**(CRITICAL): `libs/core/governance/kill-switch.ts` の `logAction()` / `startMonitor()` / `detectAnomalies()` は**本番呼び出し元ゼロ**(定義とユニットテストのみ)。`detectAnomalies` は空の `actionLogs`(`:85`)を見るため常に何も検知しない。`respond`(`:134-173`、`shutdownAgentRuntimeViaDaemon` 経由で agent を隔離/kill 可能)は実装されているのに**データを一切与えられず、監視ループも起動されない**。カバレッジ除外がこの死蔵を隠している。
 - **ポリシーエンジンが file_write しかゲートしない + fail-open**: `policy-engine.ts`(16 ルール)の実運用呼び出しは `secure-io.ts:169` の 1 箇所(`file_write` のみ)。network/shell/delegation/actuator dispatch はゲートしない。しかも `[POLICY_BLOCKED]` 以外の例外(ポリシーファイル欠落・YAML parse 失敗)を握りつぶして**書き込みを許可**(`secure-io.ts:178-184`)。ポリシーファイルが壊れると静かにゲートが無効化。`operation` が file_write 以外・ring・delegation_depth・capability を条件とするルールは**発火文脈が渡らず死んでいる**。
 - **承認ゲートのカバレッジが狭い + fail-open**: `enforceApprovalGate`(`approval-gate.ts:55-183`)自体は fail-closed で良くできているが、呼び出し元は procedure-dispatcher / browser-extension-bridge / risky-op-registry の数箇所のみ。一般の network/system/file 実行は通らない。`resolveApprovalPolicy`(`approval-policy.ts:62-65`)は設定欠落時 `requiresApproval=false`(fail-open)。CLI の `-y`/`--yes`(`core.ts:81-82`)は全プロンプトを無言承認。
 

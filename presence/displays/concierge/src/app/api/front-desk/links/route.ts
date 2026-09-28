@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 /**

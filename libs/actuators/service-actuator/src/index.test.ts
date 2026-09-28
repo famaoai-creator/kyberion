@@ -4,7 +4,7 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
-import { registerOpPreflightListener, resetOpPreflight } from '@agent/core/op-preflight';
+import { registerOpPreflightListener, resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
@@ -36,8 +36,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/service-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/service-engine')>();
+vi.mock('@agent/core/service/service-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/service/service-engine')>();
   return {
     ...actual,
     executeServicePreset: mocks.executeServicePreset,
@@ -198,7 +198,8 @@ describe('service-actuator handleAction', () => {
       number: 42,
       html_url: 'https://example.invalid/42',
     });
-    const { startServiceRecordingSession } = await import('@agent/core/service-recording-session');
+    const { startServiceRecordingSession } =
+      await import('@agent/core/service/service-recording-session');
     const session = startServiceRecordingSession({
       target_name: 'Issue intake',
       recording_id: 'svc-actuator-test',
