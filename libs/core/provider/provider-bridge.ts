@@ -1,3 +1,4 @@
+import { providerCliBinary } from './provider-binary-map.js';
 import { buildSafeExecEnv, safeExec } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -37,13 +38,6 @@ function normalizePayload(payload: unknown): string {
   return JSON.stringify(payload);
 }
 
-function resolveProviderBinary(provider: string): string {
-  if (provider === 'gh') return 'gh';
-  if (provider === 'gemini-cli') return 'gemini';
-  if (provider === 'codex-cli') return 'codex';
-  return provider.replace('-cli', '');
-}
-
 export function buildProviderInvocationPlan(
   capability: CapabilityRegistryEntry,
   params: ProviderInvokeParams
@@ -52,7 +46,7 @@ export function buildProviderInvocationPlan(
     throw new Error(`[PROVIDER_BRIDGE] Capability is not CLI-native: ${capability.capability_id}`);
   }
 
-  const bin = resolveProviderBinary(capability.source.provider);
+  const bin = providerCliBinary(capability.source.provider);
   const name = capability.source.name;
   const extraArgs = params.args ?? [];
   const payloadText =
