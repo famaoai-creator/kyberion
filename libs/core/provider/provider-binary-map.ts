@@ -36,3 +36,13 @@ const PLACEHOLDER_FALLBACK_PROVIDERS = new Set(['claude-cli']);
 export function modeHasPlaceholderFallback(mode: string): boolean {
   return PLACEHOLDER_FALLBACK_PROVIDERS.has(mode);
 }
+
+/**
+ * Providers exempt from gating chain usability on local-binary health.
+ *
+ * `provider-discovery` probes these binaries like any other CLI, but the
+ * backend can delegate through API-configured auth — a missing local binary
+ * must not mark the reasoning chain "hollow". New local CLI providers added
+ * to provider-discovery automatically join the gating set.
+ */
+export const CHAIN_GATING_EXEMPT_PROVIDERS = new Set(['devin']);
