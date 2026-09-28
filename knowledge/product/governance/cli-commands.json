@@ -737,6 +737,14 @@
       "audience": "dev"
     },
     {
+      "id": "script.build.bundle",
+      "script": "build:bundle",
+      "command": "build bundle",
+      "noun": "build",
+      "verb": "bundle",
+      "audience": "dev"
+    },
+    {
       "id": "script.build.repo",
       "script": "build:repo",
       "command": "build repo",
