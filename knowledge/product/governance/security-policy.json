@@ -179,9 +179,12 @@
     },
     "worker": {
       "allow_read": [
-        "active/projects/",
+        "active/projects/public/shared/${KYBERION_PROJECT_ID}/",
+        "active/projects/public/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
         "active/shared/tmp/",
         "active/missions/${MISSION_ID}/",
+        "active/missions/confidential/${KYBERION_TENANT}/${MISSION_ID}/",
         "active/missions/confidential/${MISSION_ID}/",
         "active/missions/personal/${MISSION_ID}/",
         "active/missions/public/${MISSION_ID}/",
@@ -191,9 +194,12 @@
         "knowledge/product/"
       ],
       "allow_write": [
-        "active/projects/",
+        "active/projects/public/shared/${KYBERION_PROJECT_ID}/",
+        "active/projects/public/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
         "active/shared/tmp/",
         "active/missions/${MISSION_ID}/evidence/",
+        "active/missions/confidential/${KYBERION_TENANT}/${MISSION_ID}/evidence/",
         "active/missions/confidential/${MISSION_ID}/evidence/",
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/"

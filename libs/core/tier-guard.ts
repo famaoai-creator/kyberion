@@ -9,6 +9,7 @@ import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -109,6 +110,7 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'knowledge/confidential') ||
     pathStartsWith(relativePath, 'active/organizations/personal') ||
     pathStartsWith(relativePath, 'active/organizations/confidential') ||
+    pathStartsWith(relativePath, 'active/projects/personal') ||
     pathStartsWith(relativePath, 'active/missions/confidential') ||
     pathStartsWith(relativePath, 'active/projects/confidential')
   );
@@ -155,6 +157,7 @@ function checkProjectScope(
 }
 
 const TENANT_PLACEHOLDER = '${KYBERION_TENANT}';
+const PROJECT_ID_PLACEHOLDER = '${KYBERION_PROJECT_ID}';
 
 /**
  * Expand policy placeholders. `${KYBERION_TENANT}` expands to the tenant bound
@@ -169,6 +172,11 @@ function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: stri
     const tenant = tenantSlug?.trim() || '';
     if (!tenant || !isValidTenantSlug(tenant)) return null;
     pattern = pattern.split(TENANT_PLACEHOLDER).join(tenant);
+  }
+  if (pattern.includes(PROJECT_ID_PLACEHOLDER)) {
+    const projectId = resolveProjectScopeId() || '';
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(projectId)) return null;
+    pattern = pattern.split(PROJECT_ID_PLACEHOLDER).join(projectId);
   }
   const customerSlug = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || 'NONE';
   return pattern
@@ -619,7 +627,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     };
   }
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
-  const currentMission = getRegisteredEnvText('MISSION_ID');
+  const currentMission = resolveProjectScope().missionId;
 
   if (isOutsideProjectRoot(relativePath)) {
     return {
@@ -710,12 +718,14 @@ export function detectTier(filePath: string): TierLevel {
   const resolved = path.resolve(filePath);
   if (
     resolved.includes('/knowledge/personal/') ||
-    resolved.includes('/active/organizations/personal/')
+    resolved.includes('/active/organizations/personal/') ||
+    resolved.includes('/active/projects/personal/')
   )
     return 'personal';
   if (
     resolved.includes('/knowledge/confidential/') ||
-    resolved.includes('/active/organizations/confidential/')
+    resolved.includes('/active/organizations/confidential/') ||
+    resolved.includes('/active/projects/confidential/')
   )
     return 'confidential';
   return 'public';
@@ -742,17 +752,22 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     pathStartsWith(relativePath, 'active/organizations/personal') ||
     pathStartsWith(relativePath, 'active/organizations/confidential') ||
     pathStartsWith(relativePath, 'active/organizations/public');
+  const projectTier = relativePath.match(
+    /^active\/projects\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
+  const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
   const organizationTier = relativePath.match(
     /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
-  if (!pathStartsWith(relativePath, 'knowledge') && !organizationStatePath)
+  if (!pathStartsWith(relativePath, 'knowledge') && !organizationStatePath && !protectedProjectPath)
     return { allowed: true };
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
   if (
     !pathStartsWith(relativePath, 'knowledge/personal') &&
     !pathStartsWith(relativePath, 'knowledge/confidential') &&
-    !organizationStatePath
+    !organizationStatePath &&
+    !protectedProjectPath
   ) {
     return { allowed: true };
   }
@@ -761,7 +776,7 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;
-  const currentMission = getRegisteredEnvText('MISSION_ID');
+  const currentMission = resolveProjectScope().missionId;
 
   const {
     persona: currentPersona,
@@ -833,6 +848,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (organizationTier === 'confidential') {
+    return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
+  }
+  if (projectTier === 'personal') {
+    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+  }
+  if (projectTier === 'confidential') {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
 
