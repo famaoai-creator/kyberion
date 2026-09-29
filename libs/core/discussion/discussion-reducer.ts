@@ -21,6 +21,7 @@ function emptyState(id: string): DiscussionRoomState {
     round: 0,
     participants: [],
     staffing_gaps: [],
+    roster_source: 'rules',
     agenda: [],
     messages: [],
     speaking: null,
@@ -33,6 +34,7 @@ function emptyState(id: string): DiscussionRoomState {
     message_counts: {},
     votes: [],
     decision: null,
+    outcomes: { proposals: [], minutes: null, work_items: {} },
     pending_commands: [],
     last_seq: 0,
   };
@@ -68,6 +70,7 @@ export function reduceDiscussionRoom(
       case 'team_formed':
         state.participants = event.participants;
         state.staffing_gaps = event.gaps;
+        state.roster_source = event.roster_source ?? 'rules';
         break;
       case 'agenda_set':
         state.agenda = event.agenda;
@@ -175,6 +178,19 @@ export function reduceDiscussionRoom(
         state.speaking = null;
         state.agenda = state.agenda.map((item) => ({ ...item, status: 'done' }));
         break;
+      case 'outcomes_proposed':
+        state.outcomes.proposals = event.proposals;
+        break;
+      case 'minutes_published':
+        state.outcomes.minutes = {
+          artifact_id: event.artifact_id,
+          path: event.path,
+          kind: event.kind,
+        };
+        break;
+      case 'workitems_created':
+        for (const link of event.links) state.outcomes.work_items[link.proposal_id] = link.item_id;
+        break;
       case 'error':
         state.error = event.message;
         state.status = 'failed';
@@ -196,6 +212,9 @@ export function summarizeDiscussionRoom(state: DiscussionRoomState): DiscussionR
     consensus: state.consensus,
     participant_count: state.participants.length,
     message_count: state.messages.length,
+    proposal_count: state.outcomes.proposals.length,
+    work_item_count: Object.keys(state.outcomes.work_items).length,
+    has_minutes: state.outcomes.minutes !== null,
     scope: state.scope,
     created_at: state.created_at,
     updated_at: state.updated_at,

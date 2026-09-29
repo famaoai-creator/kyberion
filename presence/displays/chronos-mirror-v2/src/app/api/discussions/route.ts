@@ -11,8 +11,10 @@ import {
   resolveDiscussionCreateScope,
 } from '../../../lib/discussion-access';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
+import { buildMissionHistoryItems } from '../../../lib/su-surface-data';
 import {
   resolveViewerContextForRequest,
+  strictViewerScopeTenantSlugs,
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
@@ -60,14 +62,49 @@ export async function POST(req: NextRequest) {
     const body = parsed.body;
     const goal = typeof body.goal === 'string' ? body.goal.trim() : '';
     if (!goal) return NextResponse.json({ ok: false, error: 'goal is required' }, { status: 400 });
+    const missionId = typeof body.mission_id === 'string' ? body.mission_id.trim() : '';
+    let missionScope: {
+      tenant?: string;
+      project?: string;
+      mission?: string;
+      tier?: 'public' | 'confidential' | 'personal';
+    } = {};
+    if (missionId) {
+      // A room may only attach to a mission the viewer can already see; the
+      // mission then supplies the tenant / project of the room's context chain.
+      const mission = withViewerExecutionContext(viewer, () =>
+        buildMissionHistoryItems({
+          missionId,
+          tier: 'confidential',
+          tenantSlugs: strictViewerScopeTenantSlugs(viewer),
+          limit: 1,
+        })
+      ).find((entry) => entry.missionId.toUpperCase() === missionId.toUpperCase());
+      if (!mission) {
+        return NextResponse.json(
+          { ok: false, error: 'mission not found in your scope' },
+          { status: 404 }
+        );
+      }
+      missionScope = {
+        tenant: mission.tenantSlug,
+        project: mission.projectId,
+        mission: mission.missionId,
+        tier: mission.tier,
+      };
+    }
     const scope = resolveDiscussionCreateScope(
       viewer,
-      typeof body.tenant === 'string' ? body.tenant.trim() || undefined : undefined,
+      missionScope.tenant ??
+        (typeof body.tenant === 'string' ? body.tenant.trim() || undefined : undefined),
       typeof body.organization_id === 'string'
         ? body.organization_id.trim() || undefined
         : undefined,
-      typeof body.project_id === 'string' ? body.project_id.trim() || undefined : undefined
+      missionScope.project ??
+        (typeof body.project_id === 'string' ? body.project_id.trim() || undefined : undefined)
     );
+    if (missionScope.mission) scope.mission_id = missionScope.mission;
+    if (missionScope.tier) scope.tier = missionScope.tier;
     const speaker =
       body.speaker === 'scripted' || body.speaker === 'reasoning' ? body.speaker : 'auto';
     const room = withViewerExecutionContext(viewer, () => {

@@ -36,6 +36,25 @@ export interface DiscussionCopy {
     default_agreement: Localized;
     next_steps: Record<Locale, string[]>;
   };
+  minutes: Record<
+    | 'title'
+    | 'goal'
+    | 'status'
+    | 'consensus'
+    | 'team'
+    | 'decision'
+    | 'agreements'
+    | 'dissent'
+    | 'next_steps'
+    | 'votes'
+    | 'transcript'
+    | 'round'
+    | 'human'
+    | 'none'
+    | 'footer',
+    Localized
+  >;
+  work_proposal: { description: Localized };
   scripts: Record<string, ScriptStep[]>;
   generic_script: ScriptStep[];
 }

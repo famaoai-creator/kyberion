@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   Compass,
   CornerDownRight,
+  ExternalLink,
+  FileText,
   Flag,
   Flame,
   Gavel,
@@ -25,6 +27,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import {
+  createDiscussionWorkItems,
   dt,
   roleLabel,
   sendDiscussionCommand,
@@ -115,6 +118,11 @@ export function RosterPane({
         <h2>{dt('team', locale)}</h2>
         <span className="dr-pane__count">{room.participants.length}</span>
       </header>
+      {room.participants.length > 0 ? (
+        <div className="dr-muted dr-roster__source">
+          {room.roster_source === 'llm' ? dt('rosterLlm', locale) : dt('rosterRules', locale)}
+        </div>
+      ) : null}
       {room.participants.length === 0 ? (
         <div className="dr-forming" role="status">
           <span className="dr-forming__pulse" />
@@ -507,9 +515,13 @@ function Trend({ points, max }: { points: Array<{ round: number; value: number }
 export function SituationPane({
   room,
   locale,
+  canSteer,
+  onRoom,
 }: {
   room: DiscussionRoomState;
   locale: DiscussionLocale;
+  canSteer: boolean;
+  onRoom: (room: DiscussionRoomState) => void;
 }) {
   const voters = room.participants.filter((p) => p.role !== 'facilitator' && p.role !== 'scribe');
   const decisionRef = React.useRef<HTMLDivElement>(null);
@@ -530,14 +542,29 @@ export function SituationPane({
             <Gavel size={14} aria-hidden /> {dt('decision', locale)}
           </div>
           <p className="dr-decision__summary">{room.decision.summary}</p>
-          <DecisionList title={dt('agreements', locale)} items={room.decision.agreements} />
+          <DecisionList
+            title={dt('agreements', locale)}
+            items={room.decision.agreements}
+            collapsed
+          />
           <DecisionList
             title={dt('dissent', locale)}
             items={room.decision.dissent}
             tone="warning"
+            collapsed
           />
-          <DecisionList title={dt('nextSteps', locale)} items={room.decision.next_steps} ordered />
+          {room.outcomes.proposals.length === 0 ? (
+            <DecisionList
+              title={dt('nextSteps', locale)}
+              items={room.decision.next_steps}
+              ordered
+            />
+          ) : null}
         </div>
+      ) : null}
+
+      {room.decision ? (
+        <OutcomesCard room={room} locale={locale} canSteer={canSteer} onRoom={onRoom} />
       ) : null}
 
       <div className="dr-card dr-consensus">
@@ -608,22 +635,39 @@ function DecisionList({
   items,
   ordered,
   tone,
+  collapsed,
 }: {
   title: string;
   items: string[];
   ordered?: boolean;
   tone?: 'warning';
+  /** Fold long, low-signal lists (the minutes keep the full text). */
+  collapsed?: boolean;
 }) {
   if (items.length === 0) return null;
   const List = ordered ? 'ol' : 'ul';
+  const list = (
+    <List className="dr-bullets">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </List>
+  );
   return (
     <div className="dr-decision__group" data-tone={tone}>
-      <div className="dr-decision__label">{title}</div>
-      <List className="dr-bullets">
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </List>
+      {collapsed ? (
+        <details>
+          <summary className="dr-decision__label">
+            {title} ({items.length})
+          </summary>
+          {list}
+        </details>
+      ) : (
+        <>
+          <div className="dr-decision__label">{title}</div>
+          {list}
+        </>
+      )}
     </div>
   );
 }
@@ -889,5 +933,133 @@ export function CommandCenter({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/* ------------------------------------------------------------ outcomes -- */
+
+function OutcomesCard({
+  room,
+  locale,
+  canSteer,
+  onRoom,
+}: {
+  room: DiscussionRoomState;
+  locale: DiscussionLocale;
+  canSteer: boolean;
+  onRoom: (room: DiscussionRoomState) => void;
+}) {
+  const { proposals, minutes, work_items: created } = room.outcomes;
+  const open = proposals.filter((p) => !created[p.id]);
+  const [picked, setPicked] = React.useState<Set<string>>(() => new Set(open.map((p) => p.id)));
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Proposals arrive right after the decision; select them all by default.
+  const proposalKey = proposals.map((p) => p.id).join(',');
+  React.useEffect(() => {
+    setPicked(new Set(proposals.filter((p) => !created[p.id]).map((p) => p.id)));
+  }, [proposalKey]);
+
+  if (proposals.length === 0 && !minutes) return null;
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await createDiscussionWorkItems(room.id, [...picked]);
+    setBusy(false);
+    if (!result.ok || !result.data) {
+      setError(result.error ?? 'failed');
+      return;
+    }
+    onRoom(result.data.room);
+  };
+
+  return (
+    <div className="dr-card dr-outcomes">
+      <div className="dr-card__title">
+        <Flag size={14} aria-hidden /> {dt('outcomes', locale)}
+      </div>
+
+      {minutes ? (
+        <div className="dr-outcome-row">
+          <FileText size={16} aria-hidden />
+          <div className="dr-outcome-row__body">
+            <strong>{dt('minutes', locale)}</strong>
+            <span className="dr-muted">{dt('minutesReady', locale)}</span>
+          </div>
+          <a
+            className="dr-btn"
+            href={`/?section=deliverables${room.scope.mission_id ? `&missionId=${encodeURIComponent(room.scope.mission_id)}` : ''}`}
+          >
+            <ExternalLink size={13} aria-hidden /> {dt('openDeliverables', locale)}
+          </a>
+        </div>
+      ) : null}
+
+      {proposals.length > 0 ? (
+        <>
+          <div className="dr-decision__label">{dt('proposals', locale)}</div>
+          <ul className="dr-proposals">
+            {proposals.map((proposal) => {
+              const itemId = created[proposal.id];
+              return (
+                <li key={proposal.id} data-created={itemId ? 'true' : undefined}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={itemId ? true : picked.has(proposal.id)}
+                      disabled={Boolean(itemId) || !canSteer || busy}
+                      onChange={(event) => {
+                        const next = new Set(picked);
+                        if (event.target.checked) next.add(proposal.id);
+                        else next.delete(proposal.id);
+                        setPicked(next);
+                      }}
+                    />
+                    <span>{proposal.title}</span>
+                  </label>
+                  {proposal.priority === 'high' ? (
+                    <span className="dr-pill" data-tone="warning">
+                      {dt('priorityHigh', locale)}
+                    </span>
+                  ) : null}
+                  {itemId ? (
+                    <span className="dr-created" title={itemId}>
+                      <CheckCircle2 size={13} aria-hidden /> {dt('workItemCreated', locale)}
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {open.length > 0 ? (
+            <>
+              <p className="dr-muted dr-outcomes__hint">{dt('proposalsHint', locale)}</p>
+              <button
+                type="button"
+                className="dr-btn dr-btn--primary"
+                disabled={!canSteer || busy || picked.size === 0}
+                onClick={submit}
+              >
+                <ListChecks size={14} aria-hidden />{' '}
+                {busy
+                  ? dt('creating', locale)
+                  : `${dt('createWorkItems', locale)} (${picked.size})`}
+              </button>
+            </>
+          ) : (
+            <a className="dr-btn" href="/?section=work-items">
+              <ExternalLink size={13} aria-hidden /> {dt('openWorkItems', locale)}
+            </a>
+          )}
+        </>
+      ) : null}
+      {error ? (
+        <div className="dr-note" data-tone="danger" role="alert">
+          {error}
+        </div>
+      ) : null}
+    </div>
   );
 }

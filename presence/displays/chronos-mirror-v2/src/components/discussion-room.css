@@ -1383,3 +1383,140 @@
     align-self: flex-start;
   }
 }
+
+/* ----------------------------------------------------------- outcomes -- */
+.dr-roster__source {
+  margin: -4px 0 2px 2px;
+  font-size: var(--kb-ui-font-size-xs);
+}
+.dr-mission-field select {
+  max-width: 100%;
+}
+.dr-outcomes {
+  border-color: var(--kb-ui-accent);
+  background: color-mix(in srgb, var(--kb-ui-accent-soft) 45%, var(--kb-ui-surface-sunken));
+}
+.dr-outcome-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-3);
+  padding: var(--kb-ui-space-2);
+  margin-bottom: var(--kb-ui-space-2);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+}
+.dr-outcome-row__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.3;
+}
+.dr-outcome-row .dr-btn {
+  flex: none;
+  text-decoration: none;
+}
+.dr-proposals {
+  list-style: none;
+  margin: 0 0 var(--kb-ui-space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dr-proposals li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kb-ui-space-2);
+  padding: 6px var(--kb-ui-space-2);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+}
+.dr-proposals li[data-created='true'] {
+  border-color: var(--kb-ui-success-border);
+  background: var(--kb-ui-success-bg);
+}
+.dr-proposals label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kb-ui-space-2);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  cursor: pointer;
+}
+.dr-proposals input {
+  margin-top: 3px;
+  accent-color: var(--kb-ui-accent);
+}
+.dr-proposals .dr-pill {
+  margin-left: 0;
+  flex: none;
+}
+.dr-created {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  color: var(--kb-ui-success-fg);
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 700;
+}
+.dr-outcomes__hint {
+  margin: 0 0 var(--kb-ui-space-2);
+}
+.dr-outcomes a.dr-btn {
+  text-decoration: none;
+}
+
+/* Embedded in the Chronos console: fit inside the shell instead of owning the page. */
+.dr-root[data-embedded='true'] {
+  min-height: 0;
+  background: transparent;
+}
+.dr-root[data-embedded='true'] .dr-room {
+  height: calc(100dvh - 168px);
+  min-height: 640px;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--kb-ui-canvas);
+}
+.dr-root[data-embedded='true'] .dr-launcher {
+  padding-top: var(--kb-ui-space-4);
+}
+@media (max-width: 800px) {
+  .dr-root[data-embedded='true'] .dr-room {
+    height: auto;
+    min-height: 100dvh;
+  }
+}
+
+/* Once the room has ended, steering is moot: fold the command center so the outcomes get the room. */
+.dr-room[data-status='concluded'] .dr-command,
+.dr-room[data-status='stopped'] .dr-command,
+.dr-room[data-status='failed'] .dr-command {
+  padding-block: var(--kb-ui-space-3);
+}
+.dr-room[data-status='concluded'] .dr-command > :not(.dr-pane__head),
+.dr-room[data-status='stopped'] .dr-command > :not(.dr-pane__head),
+.dr-room[data-status='failed'] .dr-command > :not(.dr-pane__head) {
+  display: none;
+}
+.dr-room[data-status='concluded'] .dr-command,
+.dr-room[data-status='stopped'] .dr-command,
+.dr-room[data-status='failed'] .dr-command {
+  border-color: var(--kb-ui-border);
+  box-shadow: var(--kb-ui-shadow-sm);
+  opacity: 0.85;
+}
+
+.dr-decision__group summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.dr-decision__group details[open] summary {
+  margin-bottom: 2px;
+}

@@ -48,6 +48,8 @@ export interface DiscussionSpeaker {
   speak(request: SpeakRequest): Promise<SpeakResult>;
   summarize(request: SpeakRequest): Promise<SummaryResult>;
   conclude(request: SpeakRequest): Promise<DecisionDraft>;
+  /** Optional: pick discretionary team seats for a goal (live speakers only). */
+  proposeRoles?(goal: string, candidates: string[], locale: 'ja' | 'en'): Promise<string[]>;
 }
 
 function roleLabel(role: string, locale: 'ja' | 'en'): string {
@@ -248,6 +250,23 @@ export class ReasoningDiscussionSpeaker implements DiscussionSpeaker {
       };
     } catch {
       return this.fallback.speak(request);
+    }
+  }
+
+  async proposeRoles(goal: string, candidates: string[]): Promise<string[]> {
+    const instruction = [
+      "You staff a facilitated multi-agent discussion. A facilitator, researcher, devil's advocate and scribe are always seated.",
+      `Goal: ${goal}`,
+      `Pick 1 to 2 additional seats that this goal really needs, only from: ${candidates.join(', ')}.`,
+      'Return ONLY JSON: {"roles": string[]}',
+    ].join('\n');
+    try {
+      const json = extractJson(await this.ask(instruction, ''));
+      return asStringArray(json?.roles)
+        .filter((role) => candidates.includes(role))
+        .slice(0, 2);
+    } catch {
+      return [];
     }
   }
 
