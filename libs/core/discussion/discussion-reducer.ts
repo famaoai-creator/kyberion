@@ -416,7 +416,13 @@ export function summarizeDiscussionRoom(state: DiscussionRoomState): DiscussionR
     readiness: state.dialogue.readiness,
     last_message_preview: (() => {
       const last = [...state.messages].reverse().find((m) => !m.superseded);
-      return last ? last.text.replace(/\s+/gu, ' ').slice(0, 120) : '';
+      return last
+        ? last.text
+            .replace(/[*_`#>]+/gu, '')
+            .replace(/\s+/gu, ' ')
+            .trim()
+            .slice(0, 120)
+        : '';
     })(),
     scope: state.scope,
     created_at: state.created_at,
