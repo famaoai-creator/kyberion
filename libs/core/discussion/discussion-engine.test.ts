@@ -9,7 +9,7 @@ import {
 } from './discussion-store.js';
 import { composeDiscussionTeam } from './discussion-team.js';
 import { ensureDiscussionRunning } from './discussion-engine.js';
-import { ScriptedDiscussionSpeaker } from './discussion-speaker.js';
+import { extractJson, ScriptedDiscussionSpeaker } from './discussion-speaker.js';
 
 const created: string[] = [];
 const noSleep = async () => undefined;
@@ -122,5 +122,25 @@ describe('discussion engine', () => {
     expect(vote.status).toBe('closed');
     expect(vote.ballots.human?.choice).toBe('yes');
     expect(room.status).toBe('concluded');
+  });
+});
+
+describe('extractJson', () => {
+  it('finds the object inside surrounding prose', () => {
+    expect(extractJson('Sure! {"text":"hi","stance":"support"} done')).toEqual({
+      text: 'hi',
+      stance: 'support',
+    });
+  });
+
+  it('returns null for missing or malformed objects', () => {
+    expect(extractJson('no json here')).toBeNull();
+    expect(extractJson('{not json}')).toBeNull();
+  });
+
+  it('stays fast on adversarial brace-heavy output', () => {
+    const started = Date.now();
+    expect(extractJson('{'.repeat(200_000))).toBeNull();
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });
