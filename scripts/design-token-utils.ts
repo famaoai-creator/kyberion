@@ -16,6 +16,8 @@ import {
 import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReaddir } from '@agent/core/secure-io';
+import { loadDesignFoundation } from '@agent/core/design-foundation';
+import { deriveStyleUiOverride, type StyleUiOverride } from '@agent/core/design-foundation-ui';
 
 export type KyberionDesignTokens = BrandTokens;
 export type KyberionColorTokens = BrandTokenColors;
@@ -372,6 +374,68 @@ function webFontStacks(tokens: KyberionDesignTokens): { sans: string; mono: stri
  */
 export type KyberionUiTokenScope = 'root' | 'host';
 
+/**
+ * KDS v2 style overrides for the Surfaces: one `[data-kds-style="<id>"]` scope per
+ * style that re-declares the same `--kb-ui-*` semantic tokens (palette, radius,
+ * shadow) plus `--kb-ui-font-heading` / `--kb-ui-gradient-accent`. Derived by
+ * `deriveStyleUiOverride`, so contrast floors hold by construction and are
+ * re-verified per style by `scripts/check_design_contrast.ts`.
+ */
+function styleOverrideDeclarations(
+  override: StyleUiOverride,
+  scheme: 'light' | 'dark',
+  indent: string
+): string[] {
+  return [
+    ...uiPaletteDeclarations(override.palette, scheme, indent),
+    ...Object.entries(override.radius).map(
+      ([size, value]) => `${indent}--kb-ui-radius-${size}: ${value};`
+    ),
+    ...(override.fontHeading ? [`${indent}--kb-ui-font-heading: ${override.fontHeading};`] : []),
+    `${indent}--kb-ui-gradient-accent: ${override.gradientAccent};`,
+  ];
+}
+
+export function renderKyberionStyleOverrideBlocks(
+  ui: BrandUiTokens,
+  scope: 'root' | 'host'
+): string[] {
+  const foundation = loadDesignFoundation();
+  if (!foundation) return [];
+  const out: string[] = [];
+  for (const style of Object.values(foundation.styles)) {
+    const light = deriveStyleUiOverride(ui, foundation, style, 'light');
+    const dark = deriveStyleUiOverride(ui, foundation, style, 'dark');
+    if (!light || !dark) continue;
+    const attr = `[data-kds-style="${style.id}"]`;
+    const lightSel = scope === 'host' ? `:host(${attr})` : `:root${attr}`;
+    const systemDark =
+      scope === 'host'
+        ? `:host(:not([data-theme="light"])${attr})`
+        : `:root:not([data-theme="light"])${attr}`;
+    const forcedDark =
+      scope === 'host' ? `:host([data-theme="dark"]${attr})` : `:root[data-theme="dark"]${attr}`;
+    out.push(
+      '',
+      `/* kds style: ${style.id} */`,
+      `${lightSel} {`,
+      ...styleOverrideDeclarations(light, 'light', '  '),
+      '}',
+      '',
+      '@media (prefers-color-scheme: dark) {',
+      `  ${systemDark} {`,
+      ...styleOverrideDeclarations(dark, 'dark', '    '),
+      '  }',
+      '}',
+      '',
+      `${forcedDark} {`,
+      ...styleOverrideDeclarations(dark, 'dark', '  '),
+      '}'
+    );
+  }
+  return out;
+}
+
 export function renderKyberionUiTokenBlock(
   tokens: KyberionDesignTokens,
   options: { scope?: KyberionUiTokenScope } = {}
@@ -410,6 +474,7 @@ export function renderKyberionUiTokenBlock(
     `${forcedDark} {`,
     ...uiPaletteDeclarations(ui.dark, 'dark', '  '),
     '}',
+    ...renderKyberionStyleOverrideBlocks(ui, host ? 'host' : 'root'),
     KB_UI_TOKEN_BLOCK_END,
   ].join('\n');
 }
