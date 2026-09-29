@@ -1,0 +1,919 @@
+{
+  "version": "2.0.0",
+  "name": "Kyberion Design Foundation",
+  "_meta": "KDS v2 — additive foundation layer on top of kyberion.json. kyberion.json stays the canonical brand/semantic token file (colors, tokens.ui, type roles). This file adds (1) full palette ramps, (2) primitive scales (space, radius, elevation, motion, type, layout), (3) named STYLES that restyle the fixed media/web scenarios without touching scenario definitions, and (4) COMPOSITIONS — 12-column region recipes that let a scenario pick a layout freely. Consumed by libs/core/design-foundation.ts; CSS emitted by scripts/generate_design_foundation.ts as knowledge/public/design-patterns/web/kyberion-ds.css (--kds-* variables). Never hardcode values from here in surfaces; resolve them.",
+  "palettes": {
+    "neutral": {
+      "50": "#f8fafc",
+      "100": "#f1f5f9",
+      "200": "#e2e8f0",
+      "300": "#cbd5e1",
+      "400": "#94a3b8",
+      "500": "#64748b",
+      "600": "#475569",
+      "700": "#334155",
+      "800": "#1e293b",
+      "900": "#0f172a",
+      "950": "#020617"
+    },
+    "stone": {
+      "50": "#fafaf9",
+      "100": "#f5f5f4",
+      "200": "#e7e5e4",
+      "300": "#d6d3d1",
+      "400": "#a8a29e",
+      "500": "#78716c",
+      "600": "#57534e",
+      "700": "#44403c",
+      "800": "#292524",
+      "900": "#1c1917",
+      "950": "#0c0a09"
+    },
+    "brand": {
+      "50": "#eff6ff",
+      "100": "#dbeafe",
+      "200": "#bfdbfe",
+      "300": "#93c5fd",
+      "400": "#60a5fa",
+      "500": "#3b82f6",
+      "600": "#2563eb",
+      "700": "#1d4ed8",
+      "800": "#1e40af",
+      "900": "#1e3a8a",
+      "950": "#172554"
+    },
+    "signal": {
+      "50": "#ecfeff",
+      "100": "#cffafe",
+      "200": "#a5f3fc",
+      "300": "#67e8f9",
+      "400": "#22d3ee",
+      "500": "#06b6d4",
+      "600": "#0891b2",
+      "700": "#0e7490",
+      "800": "#155e75",
+      "900": "#164e63",
+      "950": "#083344"
+    },
+    "ember": {
+      "50": "#fff7ed",
+      "100": "#ffedd5",
+      "200": "#fed7aa",
+      "300": "#fdba74",
+      "400": "#fb923c",
+      "500": "#f97316",
+      "600": "#ea580c",
+      "700": "#c2410c",
+      "800": "#9a3412",
+      "900": "#7c2d12",
+      "950": "#431407"
+    },
+    "moss": {
+      "50": "#f0fdf4",
+      "100": "#dcfce7",
+      "200": "#bbf7d0",
+      "300": "#86efac",
+      "400": "#4ade80",
+      "500": "#22c55e",
+      "600": "#16a34a",
+      "700": "#15803d",
+      "800": "#166534",
+      "900": "#14532d",
+      "950": "#052e16"
+    },
+    "rose": {
+      "50": "#fff1f2",
+      "100": "#ffe4e6",
+      "200": "#fecdd3",
+      "300": "#fda4af",
+      "400": "#fb7185",
+      "500": "#f43f5e",
+      "600": "#e11d48",
+      "700": "#be123c",
+      "800": "#9f1239",
+      "900": "#881337",
+      "950": "#4c0519"
+    },
+    "violet": {
+      "50": "#f5f3ff",
+      "100": "#ede9fe",
+      "200": "#ddd6fe",
+      "300": "#c4b5fd",
+      "400": "#a78bfa",
+      "500": "#8b5cf6",
+      "600": "#7c3aed",
+      "700": "#6d28d9",
+      "800": "#5b21b6",
+      "900": "#4c1d95",
+      "950": "#2e1065"
+    }
+  },
+  "scales": {
+    "space": {
+      "0": "0px",
+      "0.5": "2px",
+      "1": "4px",
+      "1.5": "6px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "5": "20px",
+      "6": "24px",
+      "8": "32px",
+      "10": "40px",
+      "12": "48px",
+      "16": "64px",
+      "20": "80px",
+      "24": "96px"
+    },
+    "radius": {
+      "none": "0px",
+      "xs": "2px",
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "xl": "16px",
+      "2xl": "24px",
+      "full": "9999px"
+    },
+    "border_width": {
+      "hairline": "1px",
+      "regular": "1.5px",
+      "strong": "2px",
+      "heavy": "4px"
+    },
+    "elevation": {
+      "light": {
+        "xs": "0 1px 1px rgba(15, 23, 42, 0.05)",
+        "sm": "0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04)",
+        "md": "0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)",
+        "lg": "0 8px 20px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06)",
+        "xl": "0 16px 40px rgba(15, 23, 42, 0.14), 0 4px 10px rgba(15, 23, 42, 0.06)",
+        "2xl": "0 28px 64px rgba(15, 23, 42, 0.20), 0 8px 16px rgba(15, 23, 42, 0.08)"
+      },
+      "dark": {
+        "xs": "0 1px 1px rgba(0, 0, 0, 0.30)",
+        "sm": "0 1px 2px rgba(0, 0, 0, 0.40)",
+        "md": "0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30)",
+        "lg": "0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30)",
+        "xl": "0 16px 44px rgba(0, 0, 0, 0.55), 0 4px 10px rgba(0, 0, 0, 0.30)",
+        "2xl": "0 28px 72px rgba(0, 0, 0, 0.65), 0 8px 16px rgba(0, 0, 0, 0.35)"
+      }
+    },
+    "opacity": {
+      "disabled": "0.4",
+      "muted": "0.62",
+      "overlay": "0.72",
+      "scrim": "0.48"
+    },
+    "blur": {
+      "sm": "4px",
+      "md": "12px",
+      "lg": "24px"
+    },
+    "z": {
+      "base": "0",
+      "raised": "10",
+      "sticky": "100",
+      "overlay": "1000",
+      "modal": "1100",
+      "toast": "1200"
+    },
+    "motion": {
+      "duration": {
+        "instant": "0ms",
+        "fast": "120ms",
+        "base": "200ms",
+        "slow": "320ms",
+        "slower": "500ms"
+      },
+      "easing": {
+        "standard": "cubic-bezier(0.2, 0, 0, 1)",
+        "enter": "cubic-bezier(0, 0, 0, 1)",
+        "exit": "cubic-bezier(0.3, 0, 1, 1)",
+        "emphasized": "cubic-bezier(0.3, 0, 0, 1.15)"
+      }
+    },
+    "type": {
+      "size_px": {
+        "2xs": "11px",
+        "xs": "12px",
+        "sm": "13px",
+        "base": "15px",
+        "md": "16px",
+        "lg": "18px",
+        "xl": "22px",
+        "2xl": "28px",
+        "3xl": "36px",
+        "4xl": "48px",
+        "5xl": "64px",
+        "6xl": "80px"
+      },
+      "weight": {
+        "light": "300",
+        "regular": "400",
+        "medium": "500",
+        "semibold": "600",
+        "bold": "700",
+        "black": "800"
+      },
+      "tracking": {
+        "tight": "-0.02em",
+        "snug": "-0.01em",
+        "normal": "0em",
+        "wide": "0.04em",
+        "caps": "0.12em"
+      },
+      "leading": {
+        "none": "1",
+        "tight": "1.15",
+        "snug": "1.3",
+        "normal": "1.5",
+        "relaxed": "1.7"
+      },
+      "measure": {
+        "narrow": "38ch",
+        "base": "62ch",
+        "wide": "78ch"
+      }
+    },
+    "layout": {
+      "breakpoints": {
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1280px",
+        "2xl": "1536px"
+      },
+      "containers": {
+        "narrow": "640px",
+        "reading": "760px",
+        "base": "1080px",
+        "wide": "1280px",
+        "full": "100%"
+      },
+      "grid": {
+        "columns": 12,
+        "gutter": "24px",
+        "margin": "32px"
+      },
+      "aspect": {
+        "slide": "16 / 9",
+        "square": "1 / 1",
+        "portrait": "4 / 5",
+        "story": "9 / 16",
+        "wide": "21 / 9"
+      }
+    }
+  },
+  "gradients": {
+    "aurora": {
+      "light": "linear-gradient(135deg, #7c3aed 0%, #2563eb 55%, #0891b2 100%)",
+      "dark": "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 55%, #22d3ee 100%)"
+    },
+    "dusk": {
+      "light": "linear-gradient(160deg, #1e293b 0%, #334155 100%)",
+      "dark": "linear-gradient(160deg, #0f172a 0%, #1e293b 100%)"
+    },
+    "ember": {
+      "light": "linear-gradient(135deg, #c2410c 0%, #ea580c 100%)",
+      "dark": "linear-gradient(135deg, #ea580c 0%, #fb923c 100%)"
+    }
+  },
+  "styles": {
+    "standard": {
+      "label": "Standard",
+      "description": "The baseline Kyberion look (kyberion.json as-is). Selecting it is the same as selecting no style.",
+      "intent": "default, system-wide",
+      "radius": "md",
+      "elevation": "sm",
+      "density": "comfortable",
+      "gradient": null
+    },
+    "editorial": {
+      "label": "Editorial",
+      "description": "Warm paper ground, serif display face, generous whitespace and quiet ember accents. Reads like a printed briefing rather than a UI.",
+      "intent": "proposals, reports, long-form decks, case studies",
+      "colors": {
+        "light": {
+          "primary": "#1c1917",
+          "secondary": "#57534e",
+          "accent": "#c2410c",
+          "background": "#fafaf9",
+          "text": "#1c1917",
+          "warning": "#b45309",
+          "surface": "#f5f5f4",
+          "muted": "#e7e5e4",
+          "border": "#d6d3d1"
+        },
+        "dark": {
+          "primary": "#fafaf9",
+          "secondary": "#a8a29e",
+          "accent": "#fb923c",
+          "background": "#0c0a09",
+          "text": "#fafaf9",
+          "warning": "#fbbf24",
+          "surface": "#1c1917",
+          "muted": "#292524",
+          "border": "#44403c"
+        }
+      },
+      "fonts": {
+        "heading": "'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
+      },
+      "typography": {
+        "scale_ratio": 1.333,
+        "roles": {
+          "display": {
+            "size_pt": 40,
+            "min_size_pt": 26,
+            "weight": 600,
+            "line_spacing_pct": 108
+          },
+          "headline": {
+            "size_pt": 28,
+            "min_size_pt": 20,
+            "weight": 600,
+            "line_spacing_pct": 116
+          },
+          "title": {
+            "size_pt": 20,
+            "min_size_pt": 14,
+            "weight": 600,
+            "line_spacing_pct": 128
+          },
+          "body": {
+            "size_pt": 13,
+            "min_size_pt": 10,
+            "weight": 400,
+            "line_spacing_pct": 165
+          },
+          "label": {
+            "size_pt": 10,
+            "min_size_pt": 8,
+            "weight": 600,
+            "line_spacing_pct": 130
+          }
+        }
+      },
+      "radius": "xs",
+      "elevation": "xs",
+      "density": "comfortable",
+      "gradient": null,
+      "preferred_compositions": ["editorial-asym", "spotlight", "hero-split"],
+      "tone_words": ["editorial", "warm paper", "serif headline", "generous whitespace", "calm"],
+      "avoid": ["neon", "glossy 3d", "gradient washes", "busy collage"]
+    },
+    "midnight-signal": {
+      "label": "Midnight Signal",
+      "description": "Deep navy ground with a single cyan signal colour. Sharp hierarchy, strong weight contrast, restrained glow.",
+      "intent": "product demos, video, operator/command surfaces, tech keynotes",
+      "colors": {
+        "light": {
+          "primary": "#0b1220",
+          "secondary": "#334155",
+          "accent": "#0e7490",
+          "background": "#f8fafc",
+          "text": "#0b1220",
+          "warning": "#a16207",
+          "surface": "#eef2f7",
+          "muted": "#e2e8f0",
+          "border": "#cbd5e1"
+        },
+        "dark": {
+          "primary": "#e6f4f8",
+          "secondary": "#94a3b8",
+          "accent": "#22d3ee",
+          "background": "#060b16",
+          "text": "#e6ebf2",
+          "warning": "#fbbf24",
+          "surface": "#0f172a",
+          "muted": "#1e293b",
+          "border": "#334155"
+        }
+      },
+      "fonts": {
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
+      },
+      "typography": {
+        "scale_ratio": 1.25,
+        "roles": {
+          "display": {
+            "size_pt": 40,
+            "min_size_pt": 26,
+            "weight": 800,
+            "line_spacing_pct": 106
+          },
+          "headline": {
+            "size_pt": 28,
+            "min_size_pt": 20,
+            "weight": 700,
+            "line_spacing_pct": 116
+          },
+          "label": {
+            "size_pt": 11,
+            "min_size_pt": 9,
+            "weight": 700,
+            "line_spacing_pct": 130
+          }
+        }
+      },
+      "radius": "lg",
+      "elevation": "lg",
+      "density": "comfortable",
+      "gradient": "dusk",
+      "preferred_compositions": ["hero-split", "bento-4", "stat-rail"],
+      "tone_words": ["deep navy", "single cyan accent", "high contrast", "precise", "cinematic"],
+      "avoid": ["rainbow palettes", "clip-art", "low-contrast text"]
+    },
+    "graphite-executive": {
+      "label": "Graphite Executive",
+      "description": "Cool graphite neutrals, a single deep-blue accent, hairline rules and sharp corners. Dense but calm.",
+      "intent": "board / QBR decks, finance and ops dashboards, spreadsheets",
+      "colors": {
+        "light": {
+          "primary": "#111827",
+          "secondary": "#4b5563",
+          "accent": "#1d4ed8",
+          "background": "#ffffff",
+          "text": "#111827",
+          "warning": "#a16207",
+          "surface": "#f3f4f6",
+          "muted": "#e5e7eb",
+          "border": "#d1d5db"
+        },
+        "dark": {
+          "primary": "#f3f4f6",
+          "secondary": "#9ca3af",
+          "accent": "#7aa7ff",
+          "background": "#0b0f17",
+          "text": "#f3f4f6",
+          "warning": "#fbbf24",
+          "surface": "#111827",
+          "muted": "#1f2937",
+          "border": "#374151"
+        }
+      },
+      "fonts": {
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
+      },
+      "typography": {
+        "scale_ratio": 1.2,
+        "roles": {
+          "display": {
+            "size_pt": 34,
+            "min_size_pt": 24,
+            "weight": 700,
+            "line_spacing_pct": 110
+          },
+          "headline": {
+            "size_pt": 24,
+            "min_size_pt": 18,
+            "weight": 700,
+            "line_spacing_pct": 118
+          },
+          "title": {
+            "size_pt": 18,
+            "min_size_pt": 14,
+            "weight": 600,
+            "line_spacing_pct": 128
+          },
+          "body": {
+            "size_pt": 12,
+            "min_size_pt": 10,
+            "weight": 400,
+            "line_spacing_pct": 150
+          },
+          "label": {
+            "size_pt": 10,
+            "min_size_pt": 8,
+            "weight": 600,
+            "line_spacing_pct": 125
+          }
+        }
+      },
+      "radius": "xs",
+      "elevation": "xs",
+      "density": "compact",
+      "gradient": null,
+      "preferred_compositions": ["stat-rail", "dashboard-grid", "sidebar-detail"],
+      "tone_words": ["graphite neutrals", "hairline rules", "data-dense", "sober", "corporate"],
+      "avoid": ["playful illustration", "saturated colours", "drop shadows"]
+    },
+    "aurora": {
+      "label": "Aurora",
+      "description": "Violet-to-cyan gradient accents on a clean canvas, round corners and soft lift. Expressive, for reach not record.",
+      "intent": "marketing, launch decks, social and video, landing pages",
+      "colors": {
+        "light": {
+          "primary": "#1e1b4b",
+          "secondary": "#4338ca",
+          "accent": "#6d28d9",
+          "background": "#ffffff",
+          "text": "#1e1b4b",
+          "warning": "#b45309",
+          "surface": "#f5f3ff",
+          "muted": "#ede9fe",
+          "border": "#ddd6fe"
+        },
+        "dark": {
+          "primary": "#ede9fe",
+          "secondary": "#a5b4fc",
+          "accent": "#a78bfa",
+          "background": "#0b0a1f",
+          "text": "#f5f3ff",
+          "warning": "#fbbf24",
+          "surface": "#15132e",
+          "muted": "#1e1b4b",
+          "border": "#312e81"
+        }
+      },
+      "fonts": {
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
+      },
+      "typography": {
+        "scale_ratio": 1.333,
+        "roles": {
+          "display": {
+            "size_pt": 44,
+            "min_size_pt": 28,
+            "weight": 800,
+            "line_spacing_pct": 104
+          },
+          "headline": {
+            "size_pt": 30,
+            "min_size_pt": 20,
+            "weight": 800,
+            "line_spacing_pct": 112
+          }
+        }
+      },
+      "radius": "2xl",
+      "elevation": "lg",
+      "density": "comfortable",
+      "gradient": "aurora",
+      "preferred_compositions": ["spotlight", "hero-split", "three-up"],
+      "tone_words": [
+        "violet to cyan gradient",
+        "soft glow",
+        "rounded shapes",
+        "optimistic",
+        "launch energy"
+      ],
+      "avoid": ["muddy colours", "harsh black outlines", "stock-photo look"]
+    },
+    "paper-minimal": {
+      "label": "Paper Minimal",
+      "description": "Near-monochrome, hairline borders, almost no radius or shadow. Content first; colour only where it carries meaning.",
+      "intent": "documents, specs, worksheets, print-first artifacts",
+      "colors": {
+        "light": {
+          "primary": "#171717",
+          "secondary": "#525252",
+          "accent": "#15803d",
+          "background": "#ffffff",
+          "text": "#171717",
+          "warning": "#a16207",
+          "surface": "#f5f5f5",
+          "muted": "#e5e5e5",
+          "border": "#d4d4d4"
+        },
+        "dark": {
+          "primary": "#fafafa",
+          "secondary": "#a3a3a3",
+          "accent": "#4ade80",
+          "background": "#0a0a0a",
+          "text": "#fafafa",
+          "warning": "#fbbf24",
+          "surface": "#171717",
+          "muted": "#262626",
+          "border": "#404040"
+        }
+      },
+      "fonts": {
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
+      },
+      "typography": {
+        "scale_ratio": 1.2,
+        "roles": {
+          "display": {
+            "size_pt": 32,
+            "min_size_pt": 22,
+            "weight": 600,
+            "line_spacing_pct": 112
+          },
+          "headline": {
+            "size_pt": 22,
+            "min_size_pt": 16,
+            "weight": 600,
+            "line_spacing_pct": 122
+          },
+          "body": {
+            "size_pt": 12,
+            "min_size_pt": 10,
+            "weight": 400,
+            "line_spacing_pct": 160
+          }
+        }
+      },
+      "radius": "xs",
+      "elevation": "xs",
+      "density": "comfortable",
+      "gradient": null,
+      "preferred_compositions": ["sidebar-detail", "three-up", "spotlight"],
+      "tone_words": [
+        "near-monochrome",
+        "hairline borders",
+        "text-first",
+        "print-like",
+        "restrained"
+      ],
+      "avoid": ["gradients", "heavy shadows", "decorative icons"]
+    }
+  },
+  "compositions": {
+    "_meta": "12-column region recipes. col/row are 1-based [start, span]. `rows` is the number of equal rows the canvas is divided into. roles: title, subtitle, kicker, body, visual, kpi, card, caption, side. Regions must stay inside the grid and must not overlap unless `layer: true`.",
+    "hero-split": {
+      "label": "Hero split",
+      "description": "Statement left, full-height visual right. Covers, launches, section openers.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "title",
+          "role": "title",
+          "col": [1, 6],
+          "row": [2, 2],
+          "align": "start",
+          "valign": "end"
+        },
+        {
+          "id": "body",
+          "role": "body",
+          "col": [1, 5],
+          "row": [4, 2],
+          "align": "start",
+          "valign": "start"
+        },
+        {
+          "id": "visual",
+          "role": "visual",
+          "col": [8, 5],
+          "row": [1, 6],
+          "bleed": "right"
+        }
+      ]
+    },
+    "editorial-asym": {
+      "label": "Editorial asymmetric",
+      "description": "Kicker, wide headline, offset visual, narrow reading column. Long-form storytelling.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "kicker",
+          "role": "kicker",
+          "col": [1, 4],
+          "row": [1, 1],
+          "align": "start",
+          "valign": "start"
+        },
+        {
+          "id": "title",
+          "role": "title",
+          "col": [1, 8],
+          "row": [2, 2],
+          "align": "start",
+          "valign": "start"
+        },
+        {
+          "id": "visual",
+          "role": "visual",
+          "col": [9, 4],
+          "row": [2, 4]
+        },
+        {
+          "id": "body",
+          "role": "body",
+          "col": [1, 6],
+          "row": [4, 3],
+          "align": "start",
+          "valign": "start"
+        }
+      ]
+    },
+    "bento-4": {
+      "label": "Bento 4",
+      "description": "One lead tile plus three supporting tiles of different weights. Feature overviews.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "lead",
+          "role": "card",
+          "col": [1, 7],
+          "row": [1, 4],
+          "emphasis": "high"
+        },
+        {
+          "id": "side-top",
+          "role": "card",
+          "col": [8, 5],
+          "row": [1, 2]
+        },
+        {
+          "id": "side-bottom",
+          "role": "card",
+          "col": [8, 5],
+          "row": [3, 2]
+        },
+        {
+          "id": "wide",
+          "role": "card",
+          "col": [1, 12],
+          "row": [5, 2]
+        }
+      ]
+    },
+    "stat-rail": {
+      "label": "Stat rail",
+      "description": "Headline, three KPI tiles, one supporting paragraph. Results and status.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "title",
+          "role": "title",
+          "col": [1, 12],
+          "row": [1, 1],
+          "align": "start",
+          "valign": "center"
+        },
+        {
+          "id": "kpi-1",
+          "role": "kpi",
+          "col": [1, 4],
+          "row": [2, 3],
+          "emphasis": "high"
+        },
+        {
+          "id": "kpi-2",
+          "role": "kpi",
+          "col": [5, 4],
+          "row": [2, 3]
+        },
+        {
+          "id": "kpi-3",
+          "role": "kpi",
+          "col": [9, 4],
+          "row": [2, 3]
+        },
+        {
+          "id": "body",
+          "role": "body",
+          "col": [1, 12],
+          "row": [5, 2],
+          "align": "start",
+          "valign": "start"
+        }
+      ]
+    },
+    "spotlight": {
+      "label": "Spotlight",
+      "description": "One centred statement with space around it. Quotes, closers, decisions.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "title",
+          "role": "title",
+          "col": [3, 8],
+          "row": [2, 2],
+          "align": "center",
+          "valign": "end"
+        },
+        {
+          "id": "body",
+          "role": "body",
+          "col": [4, 6],
+          "row": [4, 2],
+          "align": "center",
+          "valign": "start"
+        }
+      ]
+    },
+    "sidebar-detail": {
+      "label": "Sidebar detail",
+      "description": "Narrow context rail beside a main reading area. Specs, procedures, references.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "side",
+          "role": "side",
+          "col": [1, 4],
+          "row": [1, 6]
+        },
+        {
+          "id": "title",
+          "role": "title",
+          "col": [5, 8],
+          "row": [1, 1],
+          "align": "start",
+          "valign": "center"
+        },
+        {
+          "id": "body",
+          "role": "body",
+          "col": [5, 8],
+          "row": [2, 5],
+          "align": "start",
+          "valign": "start"
+        }
+      ]
+    },
+    "three-up": {
+      "label": "Three-up",
+      "description": "Headline over three equal cards. Options, pillars, tiers.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "title",
+          "role": "title",
+          "col": [1, 12],
+          "row": [1, 2],
+          "align": "start",
+          "valign": "center"
+        },
+        {
+          "id": "card-1",
+          "role": "card",
+          "col": [1, 4],
+          "row": [3, 4]
+        },
+        {
+          "id": "card-2",
+          "role": "card",
+          "col": [5, 4],
+          "row": [3, 4]
+        },
+        {
+          "id": "card-3",
+          "role": "card",
+          "col": [9, 4],
+          "row": [3, 4]
+        }
+      ]
+    },
+    "dashboard-grid": {
+      "label": "Dashboard grid",
+      "description": "Header band plus a 3x2 tile grid. Monitoring and review boards.",
+      "rows": 6,
+      "regions": [
+        {
+          "id": "title",
+          "role": "title",
+          "col": [1, 12],
+          "row": [1, 1],
+          "align": "start",
+          "valign": "center"
+        },
+        {
+          "id": "tile-1",
+          "role": "card",
+          "col": [1, 4],
+          "row": [2, 2]
+        },
+        {
+          "id": "tile-2",
+          "role": "card",
+          "col": [5, 4],
+          "row": [2, 2]
+        },
+        {
+          "id": "tile-3",
+          "role": "card",
+          "col": [9, 4],
+          "row": [2, 2]
+        },
+        {
+          "id": "tile-4",
+          "role": "card",
+          "col": [1, 4],
+          "row": [4, 3]
+        },
+        {
+          "id": "tile-5",
+          "role": "card",
+          "col": [5, 4],
+          "row": [4, 3]
+        },
+        {
+          "id": "tile-6",
+          "role": "card",
+          "col": [9, 4],
+          "row": [4, 3]
+        }
+      ]
+    }
+  }
+}

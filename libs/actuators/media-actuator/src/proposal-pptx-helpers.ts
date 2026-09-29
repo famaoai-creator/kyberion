@@ -398,6 +398,8 @@ function buildGenericDeckSectionList(brief: any): any[] {
         section?.visual ||
         (section?.callouts?.[0]?.title ? String(section.callouts[0].title) : undefined),
       ...pickStructuredSectionFields(section),
+      // KDS v2: a slide may name its own composition (kyberion-foundation.json).
+      composition: section?.composition,
       columns: section?.columns,
       checklist: section?.checklist,
       cta: section?.cta,
@@ -637,6 +639,7 @@ function buildProposalNarrativeOutline(
               section.semantic_type ||
               classifyRenderSemantic(section.layout_key, section.media_kind),
             ...pickStructuredSectionFields(section),
+            composition: section.composition,
             columns: section.columns,
             checklist: section.checklist,
             cta: section.cta,
