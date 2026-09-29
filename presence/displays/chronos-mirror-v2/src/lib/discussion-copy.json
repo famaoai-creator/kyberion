@@ -1,0 +1,527 @@
+{
+  "strings": {
+    "title": {
+      "ja": "ディスカッションルーム",
+      "en": "Discussion Room"
+    },
+    "subtitle": {
+      "ja": "目的に向けて、組織のエージェントがファシリテーターのもとで議論します",
+      "en": "Organization agents deliberate toward a goal under a facilitator"
+    },
+    "goalLabel": {
+      "ja": "達成したい目的",
+      "en": "Goal to achieve"
+    },
+    "goalPlaceholder": {
+      "ja": "例: 新しい請求システムを段階的に導入すべきか判断する",
+      "en": "e.g. Decide whether to roll out the new billing system in stages"
+    },
+    "start": {
+      "ja": "チームを組成して開始",
+      "en": "Form a team and start"
+    },
+    "starting": {
+      "ja": "組成中…",
+      "en": "Forming…"
+    },
+    "tempo": {
+      "ja": "進行速度",
+      "en": "Tempo"
+    },
+    "tempoFast": {
+      "ja": "速い",
+      "en": "Fast"
+    },
+    "tempoNormal": {
+      "ja": "標準",
+      "en": "Normal"
+    },
+    "tempoSlow": {
+      "ja": "ゆっくり",
+      "en": "Slow"
+    },
+    "engine": {
+      "ja": "発言エンジン",
+      "en": "Speaker engine"
+    },
+    "engineAuto": {
+      "ja": "自動（利用可能ならLLM）",
+      "en": "Auto (LLM if available)"
+    },
+    "engineScripted": {
+      "ja": "デモ台本（オフライン）",
+      "en": "Scripted demo (offline)"
+    },
+    "engineReasoning": {
+      "ja": "LLM推論",
+      "en": "LLM reasoning"
+    },
+    "examples": {
+      "ja": "例から始める",
+      "en": "Start from an example"
+    },
+    "recent": {
+      "ja": "過去のルーム",
+      "en": "Recent rooms"
+    },
+    "noRooms": {
+      "ja": "まだルームがありません",
+      "en": "No rooms yet"
+    },
+    "newRoom": {
+      "ja": "新しいルーム",
+      "en": "New room"
+    },
+    "team": {
+      "ja": "チーム",
+      "en": "Team"
+    },
+    "agenda": {
+      "ja": "議題",
+      "en": "Agenda"
+    },
+    "conversation": {
+      "ja": "会話",
+      "en": "Conversation"
+    },
+    "situation": {
+      "ja": "現在の状況",
+      "en": "Situation"
+    },
+    "command": {
+      "ja": "コマンドセンター",
+      "en": "Command Center"
+    },
+    "consensus": {
+      "ja": "合意度",
+      "en": "Consensus"
+    },
+    "consensusTrend": {
+      "ja": "合意度の推移",
+      "en": "Consensus by round"
+    },
+    "stanceMap": {
+      "ja": "立場マップ",
+      "en": "Stance map"
+    },
+    "openIssues": {
+      "ja": "未解消の論点",
+      "en": "Open issues"
+    },
+    "agreements": {
+      "ja": "合意事項",
+      "en": "Agreements"
+    },
+    "decision": {
+      "ja": "決定",
+      "en": "Decision"
+    },
+    "dissent": {
+      "ja": "残った反対意見",
+      "en": "Recorded dissent"
+    },
+    "nextSteps": {
+      "ja": "次のアクション",
+      "en": "Next steps"
+    },
+    "votes": {
+      "ja": "投票",
+      "en": "Vote"
+    },
+    "thinking": {
+      "ja": "発言を準備中",
+      "en": "is composing"
+    },
+    "round": {
+      "ja": "ラウンド",
+      "en": "Round"
+    },
+    "roundSummary": {
+      "ja": "ファシリテーターの総括",
+      "en": "Facilitator summary"
+    },
+    "you": {
+      "ja": "あなた（人間）",
+      "en": "You (human)"
+    },
+    "everyone": {
+      "ja": "全員",
+      "en": "Everyone"
+    },
+    "pause": {
+      "ja": "一時停止",
+      "en": "Pause"
+    },
+    "resume": {
+      "ja": "再開",
+      "en": "Resume"
+    },
+    "conclude": {
+      "ja": "結論に進む",
+      "en": "Conclude now"
+    },
+    "stop": {
+      "ja": "中止",
+      "en": "Stop"
+    },
+    "modeInject": {
+      "ja": "発言する",
+      "en": "Say"
+    },
+    "modeAsk": {
+      "ja": "指名して質問",
+      "en": "Ask"
+    },
+    "modeRedirect": {
+      "ja": "議題を変える",
+      "en": "Redirect"
+    },
+    "modeVote": {
+      "ja": "投票を開く",
+      "en": "Call a vote"
+    },
+    "send": {
+      "ja": "送信",
+      "en": "Send"
+    },
+    "messagePlaceholderInject": {
+      "ja": "議論に割り込んで意見や条件を伝える",
+      "en": "Interject with an opinion or constraint"
+    },
+    "messagePlaceholderAsk": {
+      "ja": "選んだエージェントに質問する",
+      "en": "Ask the selected agent"
+    },
+    "messagePlaceholderRedirect": {
+      "ja": "新しい論点を議題の先頭に置く",
+      "en": "Put a new topic at the top of the agenda"
+    },
+    "messagePlaceholderVote": {
+      "ja": "投票にかける問い",
+      "en": "Question to put to a vote"
+    },
+    "target": {
+      "ja": "宛先",
+      "en": "To"
+    },
+    "castVote": {
+      "ja": "あなたの1票",
+      "en": "Cast your vote"
+    },
+    "speakNext": {
+      "ja": "次に発言させる",
+      "en": "Speak next"
+    },
+    "readOnly": {
+      "ja": "閲覧のみ: 操作には localadmin 権限が必要です",
+      "en": "View only: steering requires localadmin access"
+    },
+    "connecting": {
+      "ja": "接続中…",
+      "en": "Connecting…"
+    },
+    "live": {
+      "ja": "ライブ",
+      "en": "Live"
+    },
+    "ended": {
+      "ja": "終了",
+      "en": "Ended"
+    },
+    "stancesSupport": {
+      "ja": "賛成",
+      "en": "Support"
+    },
+    "stancesOppose": {
+      "ja": "反対",
+      "en": "Oppose"
+    },
+    "stancesNeutral": {
+      "ja": "中立",
+      "en": "Neutral"
+    },
+    "stancesQuestion": {
+      "ja": "要確認",
+      "en": "Question"
+    },
+    "engineMode": {
+      "ja": "エンジン",
+      "en": "Engine"
+    },
+    "fit": {
+      "ja": "適合度",
+      "en": "Fit"
+    },
+    "gaps": {
+      "ja": "配置できなかった役割",
+      "en": "Unstaffed roles"
+    },
+    "back": {
+      "ja": "ルーム一覧へ",
+      "en": "All rooms"
+    },
+    "errorTitle": {
+      "ja": "エラー",
+      "en": "Error"
+    },
+    "scope": {
+      "ja": "スコープ",
+      "en": "Scope"
+    },
+    "outcomes": {
+      "ja": "成果と次のアクション",
+      "en": "Outcomes & next actions"
+    },
+    "minutes": {
+      "ja": "議事録",
+      "en": "Minutes"
+    },
+    "minutesReady": {
+      "ja": "成果物として登録済み",
+      "en": "Registered as a deliverable"
+    },
+    "openDeliverables": {
+      "ja": "開く",
+      "en": "Open"
+    },
+    "proposals": {
+      "ja": "フォローアップ候補",
+      "en": "Proposed follow-ups"
+    },
+    "proposalsHint": {
+      "ja": "チェックしたものを WorkItem として登録します（人間の承認が必要）",
+      "en": "Checked items become WorkItems once you approve"
+    },
+    "createWorkItems": {
+      "ja": "WorkItem に登録",
+      "en": "Create WorkItems"
+    },
+    "creating": {
+      "ja": "登録中…",
+      "en": "Creating…"
+    },
+    "workItemCreated": {
+      "ja": "登録済み",
+      "en": "Created"
+    },
+    "openWorkItems": {
+      "ja": "WorkItem を開く",
+      "en": "Open work items"
+    },
+    "priorityHigh": {
+      "ja": "優先",
+      "en": "High"
+    },
+    "linkMission": {
+      "ja": "紐づけるミッション（任意）",
+      "en": "Link to a mission (optional)"
+    },
+    "noMission": {
+      "ja": "紐づけない",
+      "en": "Not linked"
+    },
+    "missionLinked": {
+      "ja": "ミッション",
+      "en": "Mission"
+    },
+    "rosterLlm": {
+      "ja": "LLMが編成",
+      "en": "Staffed by LLM"
+    },
+    "rosterRules": {
+      "ja": "ルールで編成",
+      "en": "Staffed by rules"
+    },
+    "startDiscussion": {
+      "ja": "この目的で議論する",
+      "en": "Discuss this"
+    },
+    "minutesShort": {
+      "ja": "議事録あり",
+      "en": "Minutes"
+    },
+    "workItemsShort": {
+      "ja": "WorkItem",
+      "en": "Work items"
+    },
+    "brief": {
+      "ja": "意思決定ブリーフ",
+      "en": "Decision brief"
+    },
+    "briefHint": {
+      "ja": "インタラクティブなHTML。担当や優先度を編集して、承認・差し戻し・却下できます",
+      "en": "Interactive HTML. Edit owners and priorities, then accept, send back or reject"
+    },
+    "reviewAndDecide": {
+      "ja": "レビューして決定する",
+      "en": "Review and decide"
+    },
+    "openBrief": {
+      "ja": "ブリーフを開く",
+      "en": "Open the brief"
+    },
+    "closeDialog": {
+      "ja": "閉じる",
+      "en": "Close"
+    },
+    "reviewed": {
+      "ja": "レビュー済み",
+      "en": "Reviewed"
+    },
+    "verdictAccept": {
+      "ja": "承認",
+      "en": "Accepted"
+    },
+    "verdictRequestChanges": {
+      "ja": "差し戻し",
+      "en": "Sent back"
+    },
+    "verdictReject": {
+      "ja": "却下",
+      "en": "Rejected"
+    },
+    "missionAwaiting": {
+      "ja": "ミッション開始の承認待ち",
+      "en": "Mission start awaiting approval"
+    },
+    "openApprovals": {
+      "ja": "承認画面を開く",
+      "en": "Open approvals"
+    },
+    "missionApproved": {
+      "ja": "承認されました。ミッションを開始できます",
+      "en": "Approved — the mission can start"
+    },
+    "startMission": {
+      "ja": "ミッションを開始",
+      "en": "Start the mission"
+    },
+    "startingMission": {
+      "ja": "開始中…",
+      "en": "Starting…"
+    },
+    "missionRejected": {
+      "ja": "ミッション開始は却下されました",
+      "en": "The mission start was rejected"
+    },
+    "missionStarted": {
+      "ja": "ミッションを開始しました",
+      "en": "Mission started"
+    },
+    "openMissions": {
+      "ja": "ミッションを開く",
+      "en": "Open missions"
+    }
+  },
+  "role_labels": {
+    "facilitator": {
+      "ja": "ファシリテーター",
+      "en": "Facilitator"
+    },
+    "researcher": {
+      "ja": "リサーチャー",
+      "en": "Researcher"
+    },
+    "devils_advocate": {
+      "ja": "悪魔の代弁者",
+      "en": "Devil's Advocate"
+    },
+    "scribe": {
+      "ja": "書記",
+      "en": "Scribe"
+    },
+    "planner": {
+      "ja": "プランナー",
+      "en": "Planner"
+    },
+    "implementer": {
+      "ja": "実装担当",
+      "en": "Implementer"
+    },
+    "reviewer": {
+      "ja": "レビュアー",
+      "en": "Reviewer"
+    },
+    "product_strategist": {
+      "ja": "プロダクト戦略",
+      "en": "Product Strategist"
+    },
+    "experience_designer": {
+      "ja": "UXデザイナー",
+      "en": "Experience Designer"
+    },
+    "tester": {
+      "ja": "テスター",
+      "en": "Tester"
+    }
+  },
+  "status_labels": {
+    "forming": {
+      "ja": "チーム組成中",
+      "en": "Forming team"
+    },
+    "running": {
+      "ja": "議論中",
+      "en": "In discussion"
+    },
+    "paused": {
+      "ja": "一時停止中",
+      "en": "Paused"
+    },
+    "awaiting_human": {
+      "ja": "人間の判断待ち",
+      "en": "Awaiting human"
+    },
+    "concluded": {
+      "ja": "結論に到達",
+      "en": "Concluded"
+    },
+    "stopped": {
+      "ja": "中止",
+      "en": "Stopped"
+    },
+    "failed": {
+      "ja": "失敗",
+      "en": "Failed"
+    }
+  },
+  "phase_steps": [
+    {
+      "id": "forming",
+      "ja": "組成",
+      "en": "Form"
+    },
+    {
+      "id": "framing",
+      "ja": "論点設定",
+      "en": "Frame"
+    },
+    {
+      "id": "exploring",
+      "ja": "検討",
+      "en": "Explore"
+    },
+    {
+      "id": "converging",
+      "ja": "収束",
+      "en": "Converge"
+    },
+    {
+      "id": "concluded",
+      "ja": "決定",
+      "en": "Decide"
+    }
+  ],
+  "examples": {
+    "ja": [
+      "新しい請求システムを段階的に導入すべきか判断する",
+      "来期のプロダクトロードマップの優先順位を決める",
+      "社内ナレッジ基盤の移行計画とリスクを整理する"
+    ],
+    "en": [
+      "Decide whether to roll out the new billing system in stages",
+      "Prioritize next quarter’s product roadmap",
+      "Plan the knowledge-base migration and weigh its risks"
+    ]
+  }
+}
