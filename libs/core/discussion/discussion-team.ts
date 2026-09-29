@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { readJsonIfPresent } from '../foundation/json.js';
+import { loadDiscussionCopy } from './discussion-copy.js';
 import type { DiscussionParticipant } from './discussion-types.js';
 
 interface TeamRoleFile {
@@ -23,18 +24,6 @@ export interface DiscussionTeamPlan {
 
 /** Roles a deliberation always needs, then goal-driven discretionary seats. */
 const CORE_ROLES = ['facilitator', 'researcher', 'devils_advocate', 'scribe'] as const;
-
-const DISCRETIONARY_ROLES: Array<{ role: string; keywords: RegExp }> = [
-  {
-    role: 'planner',
-    keywords: /計画|ロードマップ|戦略|スケジュール|plan|roadmap|strategy|schedule/i,
-  },
-  { role: 'implementer', keywords: /実装|開発|移行|構築|implement|build|migrat|develop/i },
-  { role: 'reviewer', keywords: /レビュー|品質|リスク|監査|review|quality|risk|audit/i },
-  { role: 'product_strategist', keywords: /製品|プロダクト|市場|価格|product|market|pricing/i },
-  { role: 'experience_designer', keywords: /UX|UI|デザイン|体験|design|experience/i },
-  { role: 'tester', keywords: /テスト|検証|test|verify|validation/i },
-];
 
 const MAX_TEAM_SIZE = 6;
 
@@ -135,9 +124,9 @@ export function composeDiscussionTeam(goal: string): DiscussionTeamPlan {
   const agents = loadAgentProfiles();
   const used = new Map<string, number>();
   const wanted: string[] = [...CORE_ROLES];
-  for (const { role, keywords } of DISCRETIONARY_ROLES) {
+  for (const { role, keywords } of loadDiscussionCopy().discretionary_roles) {
     if (wanted.length >= MAX_TEAM_SIZE) break;
-    if (keywords.test(goal)) wanted.push(role);
+    if (new RegExp(keywords, 'iu').test(goal)) wanted.push(role);
   }
   // Always keep a second substantive voice besides the devil's advocate.
   if (wanted.length < 5) wanted.splice(3, 0, wanted.includes('planner') ? 'reviewer' : 'planner');
@@ -168,16 +157,3 @@ export function composeDiscussionTeam(goal: string): DiscussionTeamPlan {
   }
   return { participants, gaps };
 }
-
-export const DISCUSSION_ROLE_LABELS: Record<string, { ja: string; en: string }> = {
-  facilitator: { ja: 'ファシリテーター', en: 'Facilitator' },
-  researcher: { ja: 'リサーチャー', en: 'Researcher' },
-  devils_advocate: { ja: '悪魔の代弁者', en: "Devil's Advocate" },
-  scribe: { ja: '書記', en: 'Scribe' },
-  planner: { ja: 'プランナー', en: 'Planner' },
-  implementer: { ja: '実装担当', en: 'Implementer' },
-  reviewer: { ja: 'レビュアー', en: 'Reviewer' },
-  product_strategist: { ja: 'プロダクト戦略', en: 'Product Strategist' },
-  experience_designer: { ja: 'UXデザイナー', en: 'Experience Designer' },
-  tester: { ja: 'テスター', en: 'Tester' },
-};
