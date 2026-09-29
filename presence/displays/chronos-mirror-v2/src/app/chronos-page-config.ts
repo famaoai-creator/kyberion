@@ -48,6 +48,7 @@ export type ConsoleSectionId =
   | 'surface-control'
   | 'deliverables'
   | 'approvals'
+  | 'discussion'
   | 'knowledge'
   | 'operations'
   | 'governance'
@@ -82,6 +83,11 @@ export const CONSOLE_SECTIONS: Array<{
     id: 'approvals',
     labelKey: 'chronos_nav_approvals',
     detailKey: 'chronos_nav_approvals_hint',
+  },
+  {
+    id: 'discussion',
+    labelKey: 'chronos_nav_discussion',
+    detailKey: 'chronos_nav_discussion_hint',
   },
   {
     id: 'knowledge',
@@ -129,7 +135,11 @@ export const CHRONOS_NAV_GROUPS: ReadonlyArray<{
     labelKey: 'chronos_group_work',
     sections: ['missions', 'work-items', 'deliverables'],
   },
-  { id: 'decide', labelKey: 'chronos_group_decide', sections: ['approvals', 'knowledge'] },
+  {
+    id: 'decide',
+    labelKey: 'chronos_group_decide',
+    sections: ['approvals', 'discussion', 'knowledge'],
+  },
   {
     id: 'operate',
     labelKey: 'chronos_group_operate',

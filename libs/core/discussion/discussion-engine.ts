@@ -5,7 +5,8 @@ import {
   sanitizeDiscussionId,
 } from './discussion-store.js';
 import { loadDiscussionCopy } from './discussion-copy.js';
-import { composeDiscussionTeam } from './discussion-team.js';
+import { publishDiscussionOutcomes } from './discussion-outcomes.js';
+import { composeDiscussionTeam, discussionRosterCandidates } from './discussion-team.js';
 import {
   resolveDiscussionSpeaker,
   type DiscussionSpeaker,
@@ -122,11 +123,17 @@ class DiscussionEngine {
     if (TERMINAL.has(room.status)) return;
 
     if (room.participants.length === 0) {
-      const plan = composeDiscussionTeam(room.goal);
+      const extraRoles = this.speaker.proposeRoles
+        ? await this.speaker
+            .proposeRoles(room.goal, discussionRosterCandidates(), room.config.locale)
+            .catch(() => [])
+        : [];
+      const plan = composeDiscussionTeam(room.goal, { extra_roles: extraRoles });
       appendDiscussionEvent(this.roomId, {
         type: 'team_formed',
         participants: plan.participants,
         gaps: plan.gaps,
+        roster_source: plan.roster_source,
       });
       room = this.room();
       appendDiscussionEvent(this.roomId, { type: 'agenda_set', agenda: defaultAgenda(room) });
@@ -301,6 +308,7 @@ class DiscussionEngine {
       consensus: computeConsensus(this.room()),
       concluded_by: facilitator.id,
     });
+    publishDiscussionOutcomes(this.roomId);
   }
 
   private closeOpenVotes(room: DiscussionRoomState): void {

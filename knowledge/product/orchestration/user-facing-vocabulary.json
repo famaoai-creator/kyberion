@@ -10963,6 +10963,26 @@
         "ja": "変更内容を確認して判断",
         "qps-ploc": "⟦Řėṽïėẇ ŧħė řėɋůėşŧėḓ ƈħȧñɠė ƀėƒőřė ḓėƈïḓïñɠ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "chronos_nav_discussion": {
+        "en": "Discussion",
+        "ja": "議論",
+        "qps-ploc": "⟦Ḓïşƈůşşïőñ ŀőř⟧"
+      },
+      "chronos_nav_discussion_hint": {
+        "en": "Let a facilitated agent team deliberate a goal into a decision",
+        "ja": "エージェントチームが目的について議論し、決定まで進める",
+        "qps-ploc": "⟦Ŀėŧ ȧ ƒȧƈïŀïŧȧŧėḓ ȧɠėñŧ ŧėȧɱ ḓėŀïƀėřȧŧė ȧ ɠőȧŀ ïñŧő ȧ ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_ws_discuss_item": {
+        "en": "Discuss this",
+        "ja": "この件を議論する",
+        "qps-ploc": "⟦Ḓïşƈůşş ŧħïş ŀőř⟧"
+      },
+      "chronos_ws_open_discussion": {
+        "en": "Open source discussion",
+        "ja": "元の議論を開く",
+        "qps-ploc": "⟦Őṗėñ şőůřƈė ḓïşƈůşşïőñ ŀőřėɱ ï⟧"
+      },
       "chronos_nav_knowledge": {
         "en": "Knowledge",
         "ja": "ナレッジ",

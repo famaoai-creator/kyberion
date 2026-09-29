@@ -22,6 +22,8 @@ export interface DiscussionScope {
   organization_id?: string;
   project_id?: string;
   mission_id?: string;
+  /** Data tier the room's outputs inherit (from the linked mission); defaults to confidential. */
+  tier?: 'public' | 'confidential' | 'personal';
 }
 
 export interface DiscussionParticipant {
@@ -98,7 +100,13 @@ export type DiscussionEvent = EventBase &
         config: DiscussionConfig;
         created_by: string;
       }
-    | { type: 'team_formed'; participants: DiscussionParticipant[]; gaps: string[] }
+    | {
+        type: 'team_formed';
+        participants: DiscussionParticipant[];
+        gaps: string[];
+        /** Who chose the discretionary seats: fixed rules or the reasoning backend. */
+        roster_source?: 'rules' | 'llm';
+      }
     | { type: 'agenda_set'; agenda: DiscussionAgendaItem[] }
     | { type: 'phase_changed'; phase: DiscussionPhase; round: number; note?: string }
     | { type: 'turn_started'; speaker: string; agenda_id?: string }
@@ -152,8 +160,37 @@ export type DiscussionEvent = EventBase &
         consensus: number;
         concluded_by: string;
       }
+    | { type: 'outcomes_proposed'; proposals: DiscussionWorkProposal[] }
+    | {
+        type: 'minutes_published';
+        artifact_id: string;
+        path: string;
+        kind: string;
+      }
+    | {
+        type: 'workitems_created';
+        actor: string;
+        links: Array<{ proposal_id: string; item_id: string }>;
+      }
     | { type: 'error'; message: string }
   );
+
+/** A follow-up the decision implies, offered to a human before it becomes a WorkItem. */
+export interface DiscussionWorkProposal {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'normal' | 'high';
+  /** Team role best placed to own it (informational; assignment stays human). */
+  owner_role?: string;
+}
+
+export interface DiscussionOutcomes {
+  proposals: DiscussionWorkProposal[];
+  minutes: { artifact_id: string; path: string; kind: string } | null;
+  /** proposal id → created WorkItem id */
+  work_items: Record<string, string>;
+}
 
 export type DiscussionEventType = DiscussionEvent['type'];
 
@@ -203,6 +240,7 @@ export interface DiscussionRoomState {
   round: number;
   participants: DiscussionParticipant[];
   staffing_gaps: string[];
+  roster_source: 'rules' | 'llm';
   agenda: DiscussionAgendaItem[];
   messages: DiscussionMessageView[];
   /** Participant currently composing (turn_started with no message yet). */
@@ -216,6 +254,7 @@ export interface DiscussionRoomState {
   message_counts: Record<string, number>;
   votes: DiscussionVoteView[];
   decision: Extract<DiscussionEvent, { type: 'decision' }> | null;
+  outcomes: DiscussionOutcomes;
   /** Commands not yet acknowledged by the engine. */
   pending_commands: Array<{ id: string; actor: string; command: DiscussionCommand; ts: string }>;
   last_seq: number;
@@ -232,6 +271,9 @@ export interface DiscussionRoomSummary {
   consensus: number;
   participant_count: number;
   message_count: number;
+  proposal_count: number;
+  work_item_count: number;
+  has_minutes: boolean;
   scope: DiscussionScope;
   created_at: string;
   updated_at: string;

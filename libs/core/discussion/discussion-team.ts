@@ -119,14 +119,42 @@ function rankCandidates(
  * deterministic (capability match + preferred-agent hints + separation of
  * duties), so a room's roster is reproducible from its goal.
  */
-export function composeDiscussionTeam(goal: string): DiscussionTeamPlan {
+export interface ComposeDiscussionTeamOptions {
+  /**
+   * Discretionary seats chosen by the reasoning backend. When present they
+   * replace the keyword rules; unknown roles are dropped and the team is still
+   * capped, so a bad proposal can never break composition.
+   */
+  extra_roles?: string[];
+}
+
+/** Roles a proposer may add on top of the always-seated core roles. */
+export function discussionRosterCandidates(): string[] {
+  const core = new Set<string>(CORE_ROLES);
+  return Object.keys(loadDiscussionCopy().role_labels).filter((role) => !core.has(role));
+}
+
+export function composeDiscussionTeam(
+  goal: string,
+  options: ComposeDiscussionTeamOptions = {}
+): DiscussionTeamPlan & { roster_source: 'rules' | 'llm' } {
   const roles = loadTeamRoles();
   const agents = loadAgentProfiles();
   const used = new Map<string, number>();
   const wanted: string[] = [...CORE_ROLES];
-  for (const { role, keywords } of loadDiscussionCopy().discretionary_roles) {
-    if (wanted.length >= MAX_TEAM_SIZE) break;
-    if (new RegExp(keywords, 'iu').test(goal)) wanted.push(role);
+  const candidates = new Set(discussionRosterCandidates());
+  const proposed = (options.extra_roles ?? []).filter((role) => candidates.has(role));
+  const roster_source: 'rules' | 'llm' = proposed.length > 0 ? 'llm' : 'rules';
+  if (proposed.length > 0) {
+    for (const role of proposed) {
+      if (wanted.length >= MAX_TEAM_SIZE) break;
+      if (!wanted.includes(role)) wanted.push(role);
+    }
+  } else {
+    for (const { role, keywords } of loadDiscussionCopy().discretionary_roles) {
+      if (wanted.length >= MAX_TEAM_SIZE) break;
+      if (new RegExp(keywords, 'iu').test(goal)) wanted.push(role);
+    }
   }
   // Always keep a second substantive voice besides the devil's advocate.
   if (wanted.length < 5) wanted.splice(3, 0, wanted.includes('planner') ? 'reviewer' : 'planner');
@@ -155,5 +183,5 @@ export function composeDiscussionTeam(goal: string): DiscussionTeamPlan {
       capabilities: best.capabilities,
     });
   }
-  return { participants, gaps };
+  return { participants, gaps, roster_source };
 }
