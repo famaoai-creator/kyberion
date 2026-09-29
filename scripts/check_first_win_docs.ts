@@ -39,7 +39,9 @@ function fenceIsBalanced(markdown: string): boolean {
 
 function extractFirstWinCommands(markdown: string): string[] {
   const lines = markdown.split(/\r?\n/);
-  const marker = lines.findIndex((line) => line.trim() === '# kyberion-first-win');
+  const marker = lines.findIndex((line) =>
+    ['# kyberion-first-win', '<!-- kyberion-first-win -->'].includes(line.trim())
+  );
   if (marker < 0) return [];
   const openingFence = lines.findIndex(
     (line, index) => index > marker && /^\s*```bash\s*$/.test(line)
