@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWorkItemsFromDecision } from '@agent/core/discussion/discussion-outcomes';
-import { readDiscussionRoom, sanitizeDiscussionId } from '@agent/core/discussion/discussion-store';
+import {
+  readDiscussionRoom,
+  sanitizeDiscussionId,
+  DiscussionUserError,
+} from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../../../lib/api-guard';
 import { assertDiscussionVisible } from '../../../../../lib/discussion-access';
 import { readChronosJsonObject } from '../../../../../lib/request-input';
@@ -57,6 +61,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       room: withViewerExecutionContext(viewer, () => readDiscussionRoom(roomId)),
     });
   } catch (error) {
+    if (error instanceof DiscussionUserError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
     return viewerErrorResponse(error, 400);
   }
 }

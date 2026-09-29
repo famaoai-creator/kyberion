@@ -2,10 +2,12 @@ import { pathResolver } from '../path-resolver.js';
 import { safeWriteFile } from '../secure-io.js';
 import { logger } from '../core.js';
 import { createArtifactRecord, saveArtifactRecord } from '../workforce/artifact-record.js';
+import { renderDiscussionBriefHtml } from './discussion-brief.js';
 import { createWorkItem } from '../workforce/work-coordination.js';
 import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
 import {
   appendDiscussionEvent,
+  DiscussionUserError,
   readDiscussionRoom,
   sanitizeDiscussionId,
 } from './discussion-store.js';
@@ -18,6 +20,10 @@ const TITLE_MAX = 100;
 
 function minutesLogicalPath(roomId: string): string {
   return `active/shared/runtime/discussions/${sanitizeDiscussionId(roomId)}/minutes.md`;
+}
+
+function briefLogicalPath(roomId: string): string {
+  return `active/shared/runtime/discussions/${sanitizeDiscussionId(roomId)}/brief.html`;
 }
 
 function clip(text: string, max: number): string {
@@ -101,9 +107,11 @@ export function buildWorkProposals(room: DiscussionRoomState): DiscussionWorkPro
 }
 
 /**
- * After a decision: register the minutes as a deliverable (visible in the
- * Deliverables inbox under the room's tenant / organization / project /
- * mission) and offer the follow-ups as WorkItem proposals. Idempotent.
+ * After a decision: write the minutes (markdown, for machines and diffs) and
+ * the decision brief (interactive HTML, for people), register both as
+ * deliverables (visible in the Deliverables inbox under the room's tenant /
+ * organization / project / mission) and offer the follow-ups as WorkItem
+ * proposals. Idempotent; calling it again refreshes the files.
  */
 export function publishDiscussionOutcomes(roomId: string): void {
   const room = readDiscussionRoom(roomId);
@@ -112,40 +120,86 @@ export function publishDiscussionOutcomes(roomId: string): void {
     const proposals = buildWorkProposals(room);
     if (proposals.length) appendDiscussionEvent(room.id, { type: 'outcomes_proposed', proposals });
   }
-  if (room.outcomes.minutes) return;
   try {
-    const logicalPath = minutesLogicalPath(room.id);
-    const markdown = renderDiscussionMinutes(room);
-    safeWriteFile(pathResolver.rootResolve(logicalPath), markdown);
-    const record = createArtifactRecord({
-      kind: 'markdown',
-      storage_class: 'repo',
-      path: logicalPath,
-      preview_text: clip(room.decision.summary, 400),
-      ...(room.scope.tenant_slug ? { tenant_slug: room.scope.tenant_slug } : {}),
-      ...(room.scope.organization_id ? { organization_id: room.scope.organization_id } : {}),
-      project_id: room.scope.project_id ?? FALLBACK_PROJECT_ID,
-      ...(room.scope.mission_id ? { mission_id: room.scope.mission_id } : {}),
-      metadata: {
-        source: 'discussion_room',
-        // Deliverables fail closed without a tier; discussions default to confidential.
-        tier: room.scope.tier ?? 'confidential',
-        discussion_id: room.id,
-        title: room.title,
-        consensus: room.consensus,
-      },
-    });
-    saveArtifactRecord(record);
-    appendDiscussionEvent(room.id, {
-      type: 'minutes_published',
-      artifact_id: record.artifact_id,
-      path: logicalPath,
-      kind: record.kind,
-    });
+    const fresh = readDiscussionRoom(roomId) as DiscussionRoomState;
+    const minutesPath = minutesLogicalPath(fresh.id);
+    safeWriteFile(pathResolver.rootResolve(minutesPath), renderDiscussionMinutes(fresh));
+    const briefPath = briefLogicalPath(fresh.id);
+    safeWriteFile(
+      pathResolver.rootResolve(briefPath),
+      renderDiscussionBriefHtml(fresh, { mode: 'view' })
+    );
+    const common = {
+      storage_class: 'repo' as const,
+      ...(fresh.scope.tenant_slug ? { tenant_slug: fresh.scope.tenant_slug } : {}),
+      ...(fresh.scope.organization_id ? { organization_id: fresh.scope.organization_id } : {}),
+      project_id: fresh.scope.project_id ?? FALLBACK_PROJECT_ID,
+      ...(fresh.scope.mission_id ? { mission_id: fresh.scope.mission_id } : {}),
+    };
+    const metadata = {
+      source: 'discussion_room',
+      // Deliverables fail closed without a tier; discussions default to confidential.
+      tier: fresh.scope.tier ?? 'confidential',
+      discussion_id: fresh.id,
+      title: fresh.title,
+      consensus: fresh.consensus,
+    };
+    const preview = clip(fresh.decision?.summary ?? fresh.goal, 400);
+    if (!fresh.outcomes.minutes) {
+      const record = createArtifactRecord({
+        ...common,
+        kind: 'markdown',
+        path: minutesPath,
+        preview_text: preview,
+        metadata,
+      });
+      saveArtifactRecord(record);
+      appendDiscussionEvent(fresh.id, {
+        type: 'minutes_published',
+        artifact_id: record.artifact_id,
+        path: minutesPath,
+        kind: record.kind,
+      });
+    }
+    if (!fresh.outcomes.brief) {
+      const record = createArtifactRecord({
+        ...common,
+        kind: 'html',
+        path: briefPath,
+        preview_text: preview,
+        metadata: { ...metadata, view: 'decision_brief' },
+      });
+      saveArtifactRecord(record);
+      appendDiscussionEvent(fresh.id, {
+        type: 'brief_published',
+        artifact_id: record.artifact_id,
+        path: briefPath,
+      });
+    }
   } catch (error) {
-    // The decision stands even if the deliverable could not be registered.
+    // The decision stands even if the deliverables could not be registered.
     logger.warn(
-      `[discussion] minutes were not published for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
+      `[discussion] outcomes were not published for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/** Rewrite the stored brief and minutes after the room changed (edits, review). */
+export function refreshDiscussionDeliverables(roomId: string): void {
+  const room = readDiscussionRoom(roomId);
+  if (!room?.decision) return;
+  try {
+    safeWriteFile(
+      pathResolver.rootResolve(minutesLogicalPath(room.id)),
+      renderDiscussionMinutes(room)
+    );
+    safeWriteFile(
+      pathResolver.rootResolve(briefLogicalPath(room.id)),
+      renderDiscussionBriefHtml(room, { mode: 'view' })
+    );
+  } catch (error) {
+    logger.warn(
+      `[discussion] deliverables were not refreshed for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -166,8 +220,10 @@ export function createWorkItemsFromDecision(
   proposalIds?: string[]
 ): CreateWorkItemsResult {
   const room = readDiscussionRoom(roomId);
-  if (!room?.decision) throw new Error('The discussion has no decision yet');
-  const wanted = new Set(proposalIds ?? room.outcomes.proposals.map((p) => p.id));
+  if (!room?.decision) throw new DiscussionUserError('The discussion has no decision yet');
+  const wanted = new Set(
+    proposalIds ?? room.outcomes.proposals.filter((p) => p.included !== false).map((p) => p.id)
+  );
   const result: CreateWorkItemsResult = { created: [], skipped: [] };
   for (const proposal of room.outcomes.proposals) {
     if (!wanted.has(proposal.id)) continue;
@@ -183,7 +239,11 @@ export function createWorkItemsFromDecision(
       source: 'local',
       sourceRef: `discussion:${room.id}#${proposal.id}`,
       ...(room.scope.project_id ? { projectId: room.scope.project_id } : {}),
-      labels: ['discussion', `discussion:${room.id}`],
+      labels: [
+        'discussion',
+        `discussion:${room.id}`,
+        ...(proposal.owner_role ? [`owner-role:${proposal.owner_role}`] : []),
+      ],
       context: {
         ...(room.scope.tenant_slug ? { tenant_slug: room.scope.tenant_slug } : {}),
         ...(room.scope.organization_id ? { organization_id: room.scope.organization_id } : {}),
@@ -194,6 +254,7 @@ export function createWorkItemsFromDecision(
       metadata: {
         discussion_id: room.id,
         proposal_id: proposal.id,
+        ...(proposal.owner_role ? { owner_role: proposal.owner_role } : {}),
         created_by: actor,
         ...(room.outcomes.minutes
           ? { minutes_artifact_id: room.outcomes.minutes.artifact_id }

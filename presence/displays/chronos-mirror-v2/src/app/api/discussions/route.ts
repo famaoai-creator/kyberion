@@ -4,6 +4,7 @@ import {
   createDiscussionRoom,
   listDiscussionRooms,
   readDiscussionRoom,
+  DiscussionUserError,
 } from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
@@ -130,6 +131,9 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, room }, { status: 201 });
   } catch (error) {
+    if (error instanceof DiscussionUserError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
     return viewerErrorResponse(error, 400);
   }
 }
