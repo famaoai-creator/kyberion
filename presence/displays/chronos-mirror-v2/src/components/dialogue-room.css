@@ -8,8 +8,8 @@
   height: 100dvh;
 }
 .dr-root[data-embedded='true'] .dl-room {
-  height: calc(100dvh - 150px);
-  min-height: 640px;
+  height: calc(100dvh - 250px);
+  min-height: 560px;
   border: 1px solid var(--kb-ui-border);
   border-radius: 16px;
   overflow: hidden;
@@ -43,12 +43,22 @@
 }
 .dl-list__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--kb-ui-space-2);
 }
+.dl-list__head .dr-btn {
+  white-space: nowrap;
+  padding-inline: 10px;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dl-list__head h2 {
   margin: 0;
+  flex-shrink: 0;
   font-size: var(--kb-ui-font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
