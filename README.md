@@ -23,7 +23,7 @@
 
 <p align="center">Intent → Plan → Result</p>
 
-Kyberion turns a request into a visible plan and a verified result. You say `今週の進捗レポートを作って` or `この PDF をパワポにして`; it picks the tools, asks only when something is genuinely ambiguous, and hands back the result, the artifact, and the evidence that future work builds on.
+Kyberion turns a request into a visible plan and a verified result. You say `今週の進捗レポートを作って` or `この PDF をパワポにして`; it picks the tools, asks only when something is genuinely ambiguous, and hands back the result, the artifact, the evidence that future work builds on, and the next action.
 
 It is OSS and self-hosted: your data stays on your machine, every side effect is governed, and every run leaves an audit trail.
 
