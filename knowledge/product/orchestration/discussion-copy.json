@@ -1,0 +1,547 @@
+{
+  "version": 1,
+  "note": "Discussion Room copy (ja/en). Placeholders: {goal} {agenda} {human} {role} {round} {supporting} {open} {items}. Data, not code — keep user-facing prose here.",
+  "role_labels": {
+    "facilitator": {
+      "ja": "ファシリテーター",
+      "en": "Facilitator"
+    },
+    "researcher": {
+      "ja": "リサーチャー",
+      "en": "Researcher"
+    },
+    "devils_advocate": {
+      "ja": "悪魔の代弁者",
+      "en": "Devil's Advocate"
+    },
+    "scribe": {
+      "ja": "書記",
+      "en": "Scribe"
+    },
+    "planner": {
+      "ja": "プランナー",
+      "en": "Planner"
+    },
+    "implementer": {
+      "ja": "実装担当",
+      "en": "Implementer"
+    },
+    "reviewer": {
+      "ja": "レビュアー",
+      "en": "Reviewer"
+    },
+    "product_strategist": {
+      "ja": "プロダクト戦略",
+      "en": "Product Strategist"
+    },
+    "experience_designer": {
+      "ja": "UXデザイナー",
+      "en": "Experience Designer"
+    },
+    "tester": {
+      "ja": "テスター",
+      "en": "Tester"
+    }
+  },
+  "discretionary_roles": [
+    {
+      "role": "planner",
+      "keywords": "計画|ロードマップ|戦略|スケジュール|plan|roadmap|strategy|schedule"
+    },
+    {
+      "role": "implementer",
+      "keywords": "実装|開発|移行|構築|implement|build|migrat|develop"
+    },
+    {
+      "role": "reviewer",
+      "keywords": "レビュー|品質|リスク|監査|review|quality|risk|audit"
+    },
+    {
+      "role": "product_strategist",
+      "keywords": "製品|プロダクト|市場|価格|product|market|pricing"
+    },
+    {
+      "role": "experience_designer",
+      "keywords": "UX|UI|デザイン|体験|design|experience"
+    },
+    {
+      "role": "tester",
+      "keywords": "テスト|検証|test|verify|validation"
+    }
+  ],
+  "agenda": [
+    {
+      "id": "ag-1",
+      "ja": "目的と前提条件の整理",
+      "en": "Clarify the goal and preconditions"
+    },
+    {
+      "id": "ag-2",
+      "ja": "選択肢・懸念・リスクの検討",
+      "en": "Weigh options, concerns and risks"
+    },
+    {
+      "id": "ag-3",
+      "ja": "合意形成と次のアクション",
+      "en": "Converge on a decision and next actions"
+    }
+  ],
+  "vote_options": {
+    "ja": ["賛成", "反対", "保留"],
+    "en": ["Approve", "Reject", "Abstain"]
+  },
+  "facilitator_frame": {
+    "ja": "本日の目的は「{goal}」です。今回の論点は「{agenda}」。各自、立場を明確にして発言してください。まず{researcher}から事実整理をお願いします。",
+    "en": "Our goal: \"{goal}\". Current topic: \"{agenda}\". Please state your position clearly; let's start with the researcher's fact base."
+  },
+  "respond_human": {
+    "ja": "ご指摘ありがとうございます。「{human}」を踏まえ、{role}の立場で論点を見直します。",
+    "en": "Thanks for the steer. Taking \"{human}\" into account, I'll revisit the points from my {role} seat."
+  },
+  "summary": {
+    "text": {
+      "ja": "第{round}ラウンド: 支持{supporting}、要確認・反対{open}。{tail}",
+      "en": "Round {round}: {supporting} supporting, {open} open. {tail}"
+    },
+    "tail_open": {
+      "ja": "未解消の論点を次ラウンドで詰めます。",
+      "en": "Unresolved points go to the next round."
+    },
+    "tail_done": {
+      "ja": "全員の立場が揃いました。決定に進めます。",
+      "en": "Everyone is aligned; ready to decide."
+    },
+    "issue_oppose": {
+      "ja": "{role}: 反対意見が未解消",
+      "en": "{role}: objection unresolved"
+    },
+    "issue_question": {
+      "ja": "{role}: 確認事項が未解消",
+      "en": "{role}: question unresolved"
+    },
+    "agreement": {
+      "ja": "{role}が方向性を支持",
+      "en": "{role} backs the direction"
+    }
+  },
+  "decision": {
+    "summary": {
+      "ja": "「{goal}」について、段階導入を前提に進めることで合意しました。撤退条件と独立した判定者を置くことが条件です。",
+      "en": "On \"{goal}\", the team agreed to proceed on a staged basis, conditional on an abort criterion and an independent judge."
+    },
+    "default_agreement": {
+      "ja": "段階導入で進める",
+      "en": "Proceed in stages"
+    },
+    "next_steps": {
+      "ja": [
+        "パイロットの範囲とオーナーを確定する",
+        "撤退条件と指標の閾値を文書化する",
+        "独立した判定者を任命する"
+      ],
+      "en": [
+        "Fix pilot scope and owner",
+        "Document abort criteria and metric thresholds",
+        "Appoint an independent judge"
+      ]
+    }
+  },
+  "scripts": {
+    "researcher": [
+      {
+        "performative": "inform",
+        "stance": "neutral",
+        "ja": "「{goal}」に関して、まず事実を整理します。既存の運用資産と制約を洗い出すと、選択肢は3案に絞れます。定量的な根拠は次のラウンドで補強します。",
+        "en": "On \"{goal}\": let me ground us in facts first. Surveying existing assets and constraints narrows this to three options; I'll back them with numbers next round."
+      },
+      {
+        "performative": "inform",
+        "stance": "support",
+        "ja": "懸念点を踏まえて追加調査しました。段階導入案は過去事例でも失敗率が低く、ロールバック手段を先に用意すれば主要リスクは管理可能です。",
+        "en": "I dug into the concerns. Phased rollout shows a lower failure rate in comparable cases, and with a rollback path prepared first the main risks are manageable."
+      },
+      {
+        "performative": "agree",
+        "stance": "support",
+        "ja": "提示された修正案は調査結果と整合しています。前提条件を明記すれば、根拠として十分だと判断します。",
+        "en": "The revised proposal is consistent with the evidence. With its assumptions written down, I consider the grounds sufficient."
+      }
+    ],
+    "planner": [
+      {
+        "performative": "propose",
+        "stance": "support",
+        "ja": "「{goal}」の進め方として、①小さく試す → ②評価基準で判定 → ③展開、の3段階を提案します。各段階に完了条件とオーナーを置きます。",
+        "en": "For \"{goal}\" I propose three stages: (1) pilot small, (2) judge against explicit criteria, (3) roll out. Each stage gets exit criteria and an owner."
+      },
+      {
+        "performative": "propose",
+        "stance": "support",
+        "ja": "反対意見を取り込み、第1段階に「撤退条件」を追加します。撤退条件を満たさない場合は自動的に第2段階へ進まず、人間の判断を仰ぎます。",
+        "en": "Taking the objection on board, I'm adding an abort condition to stage 1: if it isn't met we don't advance automatically, we escalate to a human."
+      },
+      {
+        "performative": "agree",
+        "stance": "support",
+        "ja": "計画は合意可能な形になりました。担当と期限を割り当てて確定させたいです。",
+        "en": "The plan is in a shape we can agree on. Let's assign owners and dates and lock it in."
+      }
+    ],
+    "reviewer": [
+      {
+        "performative": "challenge",
+        "stance": "question",
+        "ja": "品質面で確認したい点があります。成功をどう測るのか、失敗時の影響範囲はどこまでか、が現時点では曖昧です。",
+        "en": "From a quality view, two things are unclear: how success is measured, and how far a failure would spread."
+      },
+      {
+        "performative": "challenge",
+        "stance": "neutral",
+        "ja": "撤退条件の追加は前進です。ただし計測指標の閾値が未定です。数値を決めれば承認できます。",
+        "en": "The abort condition is progress, but the metric thresholds are still open. Once numbers are set I can approve."
+      },
+      {
+        "performative": "agree",
+        "stance": "support",
+        "ja": "指標と閾値が明記されたので、レビュー観点では承認します。",
+        "en": "Metrics and thresholds are now explicit; from a review standpoint I approve."
+      }
+    ],
+    "devils_advocate": [
+      {
+        "performative": "challenge",
+        "stance": "oppose",
+        "ja": "あえて反対します。「{goal}」は本当に今やるべきでしょうか。現状維持のコストを過小評価していないか、成功前提で話が進んでいないか、疑うべきです。",
+        "en": "Let me push back deliberately: should we do \"{goal}\" now at all? Are we underestimating the cost of the status quo, and assuming success too readily?"
+      },
+      {
+        "performative": "challenge",
+        "stance": "question",
+        "ja": "段階導入と撤退条件は評価しますが、撤退条件を誰が判定するのかが未定です。判定者が推進側だと形骸化します。独立した判定者を置くべきです。",
+        "en": "Staging and an abort condition are good, but who judges the abort? If it's the proponents it becomes theatre. We need an independent judge."
+      },
+      {
+        "performative": "agree",
+        "stance": "support",
+        "ja": "独立した判定者を置く条件付きで賛成に回ります。ただし反対意見として「想定外の外部要因」は残余リスクとして記録してください。",
+        "en": "I'll support on the condition of an independent judge. Please record \"unforeseen external factors\" as residual risk for the dissent log."
+      }
+    ],
+    "scribe": [
+      {
+        "performative": "inform",
+        "stance": "neutral",
+        "ja": "記録します。現時点の論点は「実施の要否」「進め方」「リスク管理」の3つです。発言はすべて議事に紐づけます。",
+        "en": "Noted. Open threads: whether to proceed, how to proceed, and risk control. Every statement is linked to the minutes."
+      },
+      {
+        "performative": "inform",
+        "stance": "neutral",
+        "ja": "暫定合意: 段階導入、撤退条件の設定。未決: 判定者の独立性、指標の閾値。反対意見は分離して保存しています。",
+        "en": "Tentative agreements: staged rollout, an abort condition. Open: judge independence, metric thresholds. Dissent is stored separately."
+      },
+      {
+        "performative": "summarize",
+        "stance": "support",
+        "ja": "合意事項・残余リスク・次のアクションを整理しました。最終決定に反映できます。",
+        "en": "Agreements, residual risks and next actions are organized and ready for the final decision."
+      }
+    ]
+  },
+  "generic_script": [
+    {
+      "performative": "inform",
+      "stance": "neutral",
+      "ja": "専門の立場から見ると、「{goal}」は前提条件の確認が先決です。",
+      "en": "From my specialty, \"{goal}\" needs its preconditions verified first."
+    },
+    {
+      "performative": "propose",
+      "stance": "support",
+      "ja": "議論の内容を踏まえ、提案の方向性に賛成します。詳細は実行段階で詰めましょう。",
+      "en": "Given the discussion I support the direction; details can be settled at execution."
+    },
+    {
+      "performative": "agree",
+      "stance": "support",
+      "ja": "合意内容で問題ありません。",
+      "en": "No objection to the agreed content."
+    }
+  ],
+  "minutes": {
+    "title": {
+      "ja": "議事録: {title}",
+      "en": "Minutes: {title}"
+    },
+    "goal": {
+      "ja": "目的",
+      "en": "Goal"
+    },
+    "status": {
+      "ja": "状態",
+      "en": "Status"
+    },
+    "consensus": {
+      "ja": "合意度",
+      "en": "Consensus"
+    },
+    "team": {
+      "ja": "参加者",
+      "en": "Participants"
+    },
+    "decision": {
+      "ja": "決定",
+      "en": "Decision"
+    },
+    "agreements": {
+      "ja": "合意事項",
+      "en": "Agreements"
+    },
+    "dissent": {
+      "ja": "残った反対意見",
+      "en": "Recorded dissent"
+    },
+    "next_steps": {
+      "ja": "次のアクション",
+      "en": "Next steps"
+    },
+    "votes": {
+      "ja": "投票",
+      "en": "Votes"
+    },
+    "transcript": {
+      "ja": "議論の経過",
+      "en": "Discussion"
+    },
+    "round": {
+      "ja": "ラウンド {round}",
+      "en": "Round {round}"
+    },
+    "human": {
+      "ja": "人間",
+      "en": "Human"
+    },
+    "none": {
+      "ja": "なし",
+      "en": "None"
+    },
+    "footer": {
+      "ja": "Kyberion ディスカッションルーム（{id}）が自動生成した議事録です。",
+      "en": "Generated by the Kyberion Discussion Room ({id})."
+    }
+  },
+  "work_proposal": {
+    "description": {
+      "ja": "ディスカッション「{title}」の決定に基づくフォローアップです。\n\n決定: {decision}\n\n議事録: {minutes}",
+      "en": "Follow-up from the discussion \"{title}\".\n\nDecision: {decision}\n\nMinutes: {minutes}"
+    }
+  },
+  "brief": {
+    "eyebrow": {
+      "ja": "意思決定ブリーフ",
+      "en": "Decision brief"
+    },
+    "goal": {
+      "ja": "目的",
+      "en": "Goal"
+    },
+    "consensus": {
+      "ja": "合意度",
+      "en": "Consensus"
+    },
+    "participants": {
+      "ja": "参加者",
+      "en": "Participants"
+    },
+    "decision": {
+      "ja": "決定",
+      "en": "Decision"
+    },
+    "agreements": {
+      "ja": "合意事項",
+      "en": "Agreements"
+    },
+    "dissent": {
+      "ja": "残った反対意見",
+      "en": "Recorded dissent"
+    },
+    "objections": {
+      "ja": "懸念と解消の経過",
+      "en": "Objections and how they resolved"
+    },
+    "resolved": {
+      "ja": "解消",
+      "en": "Resolved"
+    },
+    "unresolved": {
+      "ja": "未解消",
+      "en": "Open"
+    },
+    "next_steps": {
+      "ja": "次のアクション",
+      "en": "Next actions"
+    },
+    "stance_map": {
+      "ja": "立場の推移",
+      "en": "Stance over rounds"
+    },
+    "consensus_trend": {
+      "ja": "合意度の推移",
+      "en": "Consensus by round"
+    },
+    "discussion": {
+      "ja": "議論の全文",
+      "en": "Full discussion"
+    },
+    "filter_all": {
+      "ja": "全員",
+      "en": "Everyone"
+    },
+    "expand_all": {
+      "ja": "すべて開く",
+      "en": "Expand all"
+    },
+    "collapse_all": {
+      "ja": "すべて閉じる",
+      "en": "Collapse all"
+    },
+    "round": {
+      "ja": "ラウンド {round}",
+      "en": "Round {round}"
+    },
+    "human": {
+      "ja": "人間",
+      "en": "Human"
+    },
+    "no_data": {
+      "ja": "データなし",
+      "en": "No data"
+    },
+    "review_title": {
+      "ja": "レビューして決定する",
+      "en": "Review and decide"
+    },
+    "edit_hint": {
+      "ja": "件名・優先度・担当は編集できます。外したい項目はチェックを外してください。",
+      "en": "Title, priority and owner are editable. Uncheck anything you want to drop."
+    },
+    "col_include": {
+      "ja": "採用",
+      "en": "Keep"
+    },
+    "col_title": {
+      "ja": "アクション",
+      "en": "Action"
+    },
+    "col_priority": {
+      "ja": "優先度",
+      "en": "Priority"
+    },
+    "col_owner": {
+      "ja": "担当の役割",
+      "en": "Owner role"
+    },
+    "priority_low": {
+      "ja": "低",
+      "en": "Low"
+    },
+    "priority_normal": {
+      "ja": "通常",
+      "en": "Normal"
+    },
+    "priority_high": {
+      "ja": "高",
+      "en": "High"
+    },
+    "owner_none": {
+      "ja": "未定",
+      "en": "Unassigned"
+    },
+    "note_label": {
+      "ja": "コメント",
+      "en": "Comment"
+    },
+    "note_placeholder": {
+      "ja": "差し戻す場合は理由や追加してほしい観点を書いてください",
+      "en": "If you send it back, say what to reconsider"
+    },
+    "request_mission": {
+      "ja": "承認と同時にミッション開始の承認を依頼する",
+      "en": "Also request approval to start a mission"
+    },
+    "accept": {
+      "ja": "承認して進める",
+      "en": "Accept and proceed"
+    },
+    "request_changes": {
+      "ja": "差し戻す",
+      "en": "Send back"
+    },
+    "reject": {
+      "ja": "却下",
+      "en": "Reject"
+    },
+    "note_required": {
+      "ja": "差し戻しにはコメントが必要です",
+      "en": "A comment is required to send it back"
+    },
+    "sending": {
+      "ja": "送信中…",
+      "en": "Sending…"
+    },
+    "sent": {
+      "ja": "反映しました",
+      "en": "Applied"
+    },
+    "failed": {
+      "ja": "失敗しました",
+      "en": "Failed"
+    },
+    "readonly_hint": {
+      "ja": "閲覧専用です。レビューと編集は Chronos の議論画面から行えます。",
+      "en": "View only. Review and edit from the Chronos discussion screen."
+    },
+    "reviewed": {
+      "ja": "レビュー済み",
+      "en": "Reviewed"
+    },
+    "verdict_accept": {
+      "ja": "承認",
+      "en": "Accepted"
+    },
+    "verdict_request_changes": {
+      "ja": "差し戻し",
+      "en": "Sent back"
+    },
+    "verdict_reject": {
+      "ja": "却下",
+      "en": "Rejected"
+    },
+    "mission_pending": {
+      "ja": "ミッション開始の承認待ち",
+      "en": "Mission start awaiting approval"
+    },
+    "generated": {
+      "ja": "Kyberion ディスカッションルーム（{id}）が生成した意思決定ブリーフです。",
+      "en": "Decision brief generated by the Kyberion Discussion Room ({id})."
+    }
+  },
+  "mission_request": {
+    "title": {
+      "ja": "ミッション開始の承認: {title}",
+      "en": "Approve starting a mission: {title}"
+    },
+    "summary": {
+      "ja": "ディスカッションの決定に基づき、ミッションを開始してよいか承認してください。",
+      "en": "Approve starting a mission based on the outcome of a discussion."
+    },
+    "details": {
+      "ja": "目的: {goal}\n\n決定: {decision}\n\n意思決定ブリーフ: {brief}\n\n承認後、ディスカッション画面の「ミッションを開始」から mission_controller 経由で開始します。",
+      "en": "Goal: {goal}\n\nDecision: {decision}\n\nDecision brief: {brief}\n\nAfter approval, start it from the discussion screen; it is issued through mission_controller."
+    },
+    "reopen_agenda": {
+      "ja": "差し戻し: {note}",
+      "en": "Sent back: {note}"
+    }
+  }
+}
