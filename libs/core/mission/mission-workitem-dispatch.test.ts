@@ -22,6 +22,7 @@ import {
   updateWorkItem,
 } from '../workforce/work-coordination.js';
 import { hashArtifactForReview, loadArtifactReviewReceipt } from '../workforce/artifact-review.js';
+import { withExecutionContext } from '../authority.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExec,
@@ -241,7 +242,13 @@ beforeEach(() => {
 afterEach(() => {
   clearWorkCoordinationStore();
   safeRmSync(missionPath, { recursive: true, force: true });
-  safeRmSync(projectWorkspace, { recursive: true, force: true });
+  withExecutionContext(
+    'sovereign',
+    () => {
+      safeRmSync(projectWorkspace, { recursive: true, force: true });
+    },
+    'sovereign'
+  );
   setWorkCoordinationNamespace(null);
   artifactRegistryStore.records.length = 0;
 });
