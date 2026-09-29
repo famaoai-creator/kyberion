@@ -199,6 +199,13 @@ export interface JanitorReport {
   /** WS-07: ledger-registered workspace sweep (orphans deleted only through the ledger). */
   workspaces: JanitorWorkspacesReport;
   /**
+   * File-free directory debris under `active/missions/` swept this run —
+   * dirs whose whole subtree holds no real file (never a ledger-bearing
+   * mission). `candidates` is the full list found; `removed` what this run
+   * actually deleted (empty in dry-run).
+   */
+  emptyMissionDirs: { candidates: string[]; removed: string[] };
+  /**
    * AL-01: repo-relative `active/shared/runtime/<subdir>` directories that
    * exist on disk but are skipped because no retention-catalog entry covers
    * them (reported, never deleted).
@@ -668,6 +675,9 @@ export function scanRuntime(opts: {
  * `presence/bridge/runtime/`). Adding a new event stream therefore needs only a
  * catalog entry, not another scan function.
  */
+/** Tracked keep-files that must survive inside event-store trees. */
+const EVENT_STORE_PROTECTED_BASENAMES = new Set(['.gitignore', '.gitkeep', '.gitattributes']);
+
 export function scanEventStores(opts: {
   dryRun: boolean;
   catalog?: LoadedRetentionCatalog;
@@ -691,7 +701,11 @@ export function scanEventStores(opts: {
         const baseName = nodePath.basename(filePath);
         if (
           baseName === SUPERVISOR_EVENTS_LEGACY_FILE ||
-          SUPERVISOR_EVENTS_FILE_PATTERN.test(baseName)
+          SUPERVISOR_EVENTS_FILE_PATTERN.test(baseName) ||
+          // Tracked infrastructure inside runtime dirs (e.g.
+          // presence/bridge/runtime/.gitignore, which is what keeps the rest
+          // of the tree gitignored) is never retention debris.
+          EVENT_STORE_PROTECTED_BASENAMES.has(baseName)
         ) {
           continue;
         }
@@ -1136,6 +1150,104 @@ export function sweepWorkspaces(opts: SweepWorkspacesOptions): SweepWorkspacesRe
   return sweepRegisteredWorkspaces({ audit: appendRetentionAudit, ...opts });
 }
 
+export interface SweepEmptyMissionDirsResult {
+  /** Repo-relative dirs whose subtree holds no meaningful files (post-order, deepest first). */
+  candidates: string[];
+  removed: string[];
+  errors: string[];
+}
+
+const MISSIONS_ROOT_REPO_PATH = 'active/missions';
+const EMPTY_DIR_DEBRIS_FILES = new Set(['.DS_Store', 'Thumbs.db']);
+/**
+ * Subtrees the sweep never descends into: VCS and dependency internals are
+ * managed by their own tooling — an "empty" `.git/objects/pack` or a
+ * symlink-farmed `node_modules` is not debris for a directory janitor.
+ * Their presence also disqualifies the parent (not file-free by contract).
+ */
+const EMPTY_DIR_SWEEP_SKIP_DIRS = new Set(['.git', 'node_modules']);
+
+/**
+ * File-free mission-directory debris sweep.
+ *
+ * Mission creation can leave behind directories that never received a ledger
+ * (`mission-state.json`): abandoned creates, interrupted template expansion,
+ * scope containers whose missions all closed. A directory tree holding no
+ * real file cannot contain mission state, so removing it can never lose a
+ * ledger. Tier roots (depth 1 below `active/missions/`) are always kept —
+ * a dir is a removal candidate only at depth >= 2 and only when its whole
+ * subtree is file-free (OS debris files like `.DS_Store` are removed with it;
+ * any symlink anywhere in the subtree disqualifies the dir).
+ *
+ * Detection needs only read access, but `active/missions/` writes are gated
+ * to the `mission_controller` authority role — the governed entry point for
+ * removal is `pnpm mission sweep-empty-dirs --execute` (dry-run without
+ * `--execute`). `runJanitor` therefore runs this sweep detection-only and
+ * reports candidates; it never attempts the delete itself.
+ */
+export function sweepEmptyMissionDirs(opts: { dryRun: boolean }): SweepEmptyMissionDirsResult {
+  const missionsRoot = nodePath.join(rootDir(), ...MISSIONS_ROOT_REPO_PATH.split('/'));
+  const result: SweepEmptyMissionDirsResult = { candidates: [], removed: [], errors: [] };
+  if (!safeExistsSync(missionsRoot)) return result;
+
+  const visit = (dirPath: string, depth: number): { clean: boolean; debris: string[] } => {
+    let entries: string[];
+    try {
+      entries = safeReaddir(dirPath);
+    } catch {
+      return { clean: true, debris: [] };
+    }
+    let clean = true;
+    const debris: string[] = [];
+    for (const name of entries) {
+      const child = nodePath.join(dirPath, name);
+      let stat;
+      try {
+        stat = safeLstat(child);
+      } catch {
+        clean = false;
+        continue;
+      }
+      if (stat.isSymbolicLink()) {
+        clean = false;
+        continue;
+      }
+      if (stat.isDirectory()) {
+        if (EMPTY_DIR_SWEEP_SKIP_DIRS.has(name)) {
+          clean = false;
+          continue;
+        }
+        const sub = visit(child, depth + 1);
+        if (!sub.clean) clean = false;
+        else debris.push(...sub.debris);
+        continue;
+      }
+      if (EMPTY_DIR_DEBRIS_FILES.has(name)) debris.push(child);
+      else clean = false;
+    }
+    if (!clean) return { clean: false, debris: [] };
+    if (depth >= 2) {
+      const repoRel = repoRelativePosix(dirPath);
+      result.candidates.push(repoRel);
+      if (!opts.dryRun) {
+        try {
+          for (const debrisFile of debris) {
+            if (safeExistsSync(debrisFile)) safeUnlinkSync(debrisFile);
+          }
+          safeRmdirSync(dirPath);
+          result.removed.push(repoRel);
+        } catch (err: unknown) {
+          result.errors.push(`${repoRel}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+    return { clean: true, debris };
+  };
+
+  visit(missionsRoot, 0);
+  return result;
+}
+
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
@@ -1257,6 +1369,22 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`workspaces: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  let emptyMissionDirsResult: SweepEmptyMissionDirsResult = {
+    candidates: [],
+    removed: [],
+    errors: [],
+  };
+  try {
+    // Detection-only: `active/missions/` writes belong to the
+    // mission_controller role, so the janitor reports candidates rather than
+    // attempting deletes it cannot authorize (removal runs through
+    // `pnpm mission sweep-empty-dirs --execute`).
+    emptyMissionDirsResult = sweepEmptyMissionDirs({ dryRun: true });
+    errors.push(...emptyMissionDirsResult.errors.map((error) => `mission-dirs: ${error}`));
+  } catch (err: unknown) {
+    errors.push(`mission-dirs: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const report: JanitorReport = {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
@@ -1279,6 +1407,10 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
       orphaned: workspacesResult.orphaned.length,
       deleted: workspacesResult.deleted.length,
       unregisteredDirs: workspacesResult.unregisteredDirs,
+    },
+    emptyMissionDirs: {
+      candidates: emptyMissionDirsResult.candidates,
+      removed: emptyMissionDirsResult.removed,
     },
     uncoveredRuntimeDirs,
     uncoveredEventStoreDirs,
