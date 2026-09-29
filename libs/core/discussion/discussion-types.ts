@@ -167,13 +167,36 @@ export type DiscussionEvent = EventBase &
         path: string;
         kind: string;
       }
+    | { type: 'brief_published'; artifact_id: string; path: string }
     | {
         type: 'workitems_created';
         actor: string;
         links: Array<{ proposal_id: string; item_id: string }>;
       }
+    | {
+        type: 'proposals_edited';
+        actor: string;
+        edits: Array<{
+          id: string;
+          title?: string;
+          priority?: DiscussionWorkProposal['priority'];
+          owner_role?: string | null;
+          included?: boolean;
+        }>;
+      }
+    | {
+        type: 'review_recorded';
+        actor: string;
+        verdict: DiscussionReviewVerdict;
+        note?: string;
+      }
+    | { type: 'reopened'; actor: string; note: string; extra_rounds: number }
+    | { type: 'mission_requested'; approval_id: string; approval_channel: string; actor: string }
+    | { type: 'mission_started'; mission_id: string; actor: string }
     | { type: 'error'; message: string }
   );
+
+export type DiscussionReviewVerdict = 'accept' | 'request-changes' | 'reject';
 
 /** A follow-up the decision implies, offered to a human before it becomes a WorkItem. */
 export interface DiscussionWorkProposal {
@@ -183,13 +206,27 @@ export interface DiscussionWorkProposal {
   priority: 'low' | 'normal' | 'high';
   /** Team role best placed to own it (informational; assignment stays human). */
   owner_role?: string;
+  /** Reviewer can drop a proposal before accepting; defaults to included. */
+  included?: boolean;
 }
 
 export interface DiscussionOutcomes {
   proposals: DiscussionWorkProposal[];
   minutes: { artifact_id: string; path: string; kind: string } | null;
+  /** The interactive decision brief (HTML deliverable). */
+  brief: { artifact_id: string; path: string } | null;
   /** proposal id → created WorkItem id */
   work_items: Record<string, string>;
+  /** The human review of the decision brief; null until someone decides. */
+  review: { verdict: DiscussionReviewVerdict; note?: string; actor: string; ts: string } | null;
+  /** The mission-start approval request raised by an accepted decision. */
+  mission: {
+    approval_id: string;
+    approval_channel: string;
+    /** Live status of the approval, filled in when the room is read. */
+    approval_status?: 'pending' | 'approved' | 'rejected' | 'unknown';
+    mission_id?: string;
+  } | null;
 }
 
 export type DiscussionEventType = DiscussionEvent['type'];

@@ -16,6 +16,18 @@ import type {
 import { DEFAULT_DISCUSSION_CONFIG } from './discussion-types.js';
 import { reduceDiscussionRoom, summarizeDiscussionRoom } from './discussion-reducer.js';
 
+/**
+ * An expected, user-correctable failure (nothing to review yet, a comment is
+ * missing, the approval is still pending). Its message is safe to show to the
+ * person who triggered it, unlike an unexpected error, which surfaces masked.
+ */
+export class DiscussionUserError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'DiscussionUserError';
+  }
+}
+
 const ROOM_ID_PATTERN = /^[A-Za-z0-9._-]{1,96}$/;
 const MAX_EVENTS_PER_ROOM = 5000;
 
@@ -97,10 +109,11 @@ export interface CreateDiscussionRoomInput {
 
 export function createDiscussionRoom(input: CreateDiscussionRoomInput): DiscussionRoomState {
   const goal = input.goal.trim();
-  if (!goal) throw new Error('A discussion goal is required');
-  if (goal.length > 2000) throw new Error('Discussion goal is too long');
+  if (!goal) throw new DiscussionUserError('A discussion goal is required');
+  if (goal.length > 2000) throw new DiscussionUserError('Discussion goal is too long');
   const id = sanitizeDiscussionId(input.id ?? `disc-${randomUUID().slice(0, 12)}`);
-  if (readDiscussionEvents(id).length > 0) throw new Error(`Discussion room already exists: ${id}`);
+  if (readDiscussionEvents(id).length > 0)
+    throw new DiscussionUserError(`Discussion room already exists: ${id}`);
   const config: DiscussionConfig = { ...DEFAULT_DISCUSSION_CONFIG, ...input.config };
   appendDiscussionEvent(id, {
     type: 'room_created',

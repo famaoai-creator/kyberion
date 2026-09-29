@@ -6,8 +6,6 @@ import {
   CheckCircle2,
   Compass,
   CornerDownRight,
-  ExternalLink,
-  FileText,
   Flag,
   Flame,
   Gavel,
@@ -27,7 +25,6 @@ import {
   Wrench,
 } from 'lucide-react';
 import {
-  createDiscussionWorkItems,
   dt,
   roleLabel,
   sendDiscussionCommand,
@@ -35,6 +32,7 @@ import {
   type DiscussionLocale,
   type DiscussionRoomState,
 } from '../lib/discussion-client';
+import { OutcomesCard } from './DiscussionOutcomes';
 import './discussion-room.css';
 
 type Participant = DiscussionRoomState['participants'][number];
@@ -933,133 +931,5 @@ export function CommandCenter({
         </div>
       ) : null}
     </section>
-  );
-}
-
-/* ------------------------------------------------------------ outcomes -- */
-
-function OutcomesCard({
-  room,
-  locale,
-  canSteer,
-  onRoom,
-}: {
-  room: DiscussionRoomState;
-  locale: DiscussionLocale;
-  canSteer: boolean;
-  onRoom: (room: DiscussionRoomState) => void;
-}) {
-  const { proposals, minutes, work_items: created } = room.outcomes;
-  const open = proposals.filter((p) => !created[p.id]);
-  const [picked, setPicked] = React.useState<Set<string>>(() => new Set(open.map((p) => p.id)));
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  // Proposals arrive right after the decision; select them all by default.
-  const proposalKey = proposals.map((p) => p.id).join(',');
-  React.useEffect(() => {
-    setPicked(new Set(proposals.filter((p) => !created[p.id]).map((p) => p.id)));
-  }, [proposalKey]);
-
-  if (proposals.length === 0 && !minutes) return null;
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    const result = await createDiscussionWorkItems(room.id, [...picked]);
-    setBusy(false);
-    if (!result.ok || !result.data) {
-      setError(result.error ?? 'failed');
-      return;
-    }
-    onRoom(result.data.room);
-  };
-
-  return (
-    <div className="dr-card dr-outcomes">
-      <div className="dr-card__title">
-        <Flag size={14} aria-hidden /> {dt('outcomes', locale)}
-      </div>
-
-      {minutes ? (
-        <div className="dr-outcome-row">
-          <FileText size={16} aria-hidden />
-          <div className="dr-outcome-row__body">
-            <strong>{dt('minutes', locale)}</strong>
-            <span className="dr-muted">{dt('minutesReady', locale)}</span>
-          </div>
-          <a
-            className="dr-btn"
-            href={`/?section=deliverables${room.scope.mission_id ? `&missionId=${encodeURIComponent(room.scope.mission_id)}` : ''}`}
-          >
-            <ExternalLink size={13} aria-hidden /> {dt('openDeliverables', locale)}
-          </a>
-        </div>
-      ) : null}
-
-      {proposals.length > 0 ? (
-        <>
-          <div className="dr-decision__label">{dt('proposals', locale)}</div>
-          <ul className="dr-proposals">
-            {proposals.map((proposal) => {
-              const itemId = created[proposal.id];
-              return (
-                <li key={proposal.id} data-created={itemId ? 'true' : undefined}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={itemId ? true : picked.has(proposal.id)}
-                      disabled={Boolean(itemId) || !canSteer || busy}
-                      onChange={(event) => {
-                        const next = new Set(picked);
-                        if (event.target.checked) next.add(proposal.id);
-                        else next.delete(proposal.id);
-                        setPicked(next);
-                      }}
-                    />
-                    <span>{proposal.title}</span>
-                  </label>
-                  {proposal.priority === 'high' ? (
-                    <span className="dr-pill" data-tone="warning">
-                      {dt('priorityHigh', locale)}
-                    </span>
-                  ) : null}
-                  {itemId ? (
-                    <span className="dr-created" title={itemId}>
-                      <CheckCircle2 size={13} aria-hidden /> {dt('workItemCreated', locale)}
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {open.length > 0 ? (
-            <>
-              <p className="dr-muted dr-outcomes__hint">{dt('proposalsHint', locale)}</p>
-              <button
-                type="button"
-                className="dr-btn dr-btn--primary"
-                disabled={!canSteer || busy || picked.size === 0}
-                onClick={submit}
-              >
-                <ListChecks size={14} aria-hidden />{' '}
-                {busy
-                  ? dt('creating', locale)
-                  : `${dt('createWorkItems', locale)} (${picked.size})`}
-              </button>
-            </>
-          ) : (
-            <a className="dr-btn" href="/?section=work-items">
-              <ExternalLink size={13} aria-hidden /> {dt('openWorkItems', locale)}
-            </a>
-          )}
-        </>
-      ) : null}
-      {error ? (
-        <div className="dr-note" data-tone="danger" role="alert">
-          {error}
-        </div>
-      ) : null}
-    </div>
   );
 }

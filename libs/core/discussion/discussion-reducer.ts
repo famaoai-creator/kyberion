@@ -34,7 +34,14 @@ function emptyState(id: string): DiscussionRoomState {
     message_counts: {},
     votes: [],
     decision: null,
-    outcomes: { proposals: [], minutes: null, work_items: {} },
+    outcomes: {
+      proposals: [],
+      minutes: null,
+      work_items: {},
+      brief: null,
+      review: null,
+      mission: null,
+    },
     pending_commands: [],
     last_seq: 0,
   };
@@ -188,8 +195,63 @@ export function reduceDiscussionRoom(
           kind: event.kind,
         };
         break;
+      case 'brief_published':
+        state.outcomes.brief = { artifact_id: event.artifact_id, path: event.path };
+        break;
       case 'workitems_created':
         for (const link of event.links) state.outcomes.work_items[link.proposal_id] = link.item_id;
+        break;
+      case 'proposals_edited':
+        state.outcomes.proposals = state.outcomes.proposals.map((proposal) => {
+          const edit = event.edits.find((e) => e.id === proposal.id);
+          if (!edit) return proposal;
+          const next = { ...proposal };
+          if (edit.title !== undefined) next.title = edit.title;
+          if (edit.priority !== undefined) next.priority = edit.priority;
+          if (edit.included !== undefined) next.included = edit.included;
+          if (edit.owner_role !== undefined) {
+            if (edit.owner_role) next.owner_role = edit.owner_role;
+            else delete next.owner_role;
+          }
+          return next;
+        });
+        break;
+      case 'review_recorded':
+        state.outcomes.review = {
+          verdict: event.verdict,
+          ...(event.note ? { note: event.note } : {}),
+          actor: event.actor,
+          ts: event.ts,
+        };
+        break;
+      case 'reopened':
+        // The room takes another round on the reviewer's note; the decision is
+        // reset so the next conclusion (and its proposals) replaces this one.
+        state.decision = null;
+        state.status = 'running';
+        state.phase = 'exploring';
+        state.outcomes.proposals = [];
+        state.outcomes.review = null;
+        state.config = {
+          ...state.config,
+          max_rounds: Math.max(state.config.max_rounds, state.round + event.extra_rounds),
+          max_messages: Math.max(state.config.max_messages, state.messages.length + 24),
+        };
+        break;
+      case 'mission_requested':
+        state.outcomes.mission = {
+          approval_id: event.approval_id,
+          approval_channel: event.approval_channel,
+        };
+        break;
+      case 'mission_started':
+        if (state.outcomes.mission) state.outcomes.mission.mission_id = event.mission_id;
+        else
+          state.outcomes.mission = {
+            approval_id: '',
+            approval_channel: '',
+            mission_id: event.mission_id,
+          };
         break;
       case 'error':
         state.error = event.message;

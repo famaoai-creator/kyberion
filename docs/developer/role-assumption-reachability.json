@@ -98,6 +98,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
       "roles": ["generation_scheduler"],
       "unresolved": []
@@ -2012,8 +2022,11 @@
         "presence/displays/chronos-mirror-v2/src/app/api/deliverable-review/deliverable-review-input.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/deliverable-review/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/deliverables/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/brief/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/command/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/mission/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/outcomes/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/review/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/stream/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts",
@@ -2074,6 +2087,7 @@
         "presence/displays/chronos-mirror-v2/src/components/CloudflareOsPanel.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DeliverablesWorkspace.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiagnosticsAttentionSummary.tsx",
+        "presence/displays/chronos-mirror-v2/src/components/DiscussionOutcomes.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionPanes.tsx",
         "presence/displays/chronos-mirror-v2/src/components/DiscussionRoom.tsx",
         "presence/displays/chronos-mirror-v2/src/components/FirstRunBanner.tsx",

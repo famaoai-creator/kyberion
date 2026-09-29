@@ -343,6 +343,74 @@
     "workItemsShort": {
       "ja": "WorkItem",
       "en": "Work items"
+    },
+    "brief": {
+      "ja": "意思決定ブリーフ",
+      "en": "Decision brief"
+    },
+    "briefHint": {
+      "ja": "インタラクティブなHTML。担当や優先度を編集して、承認・差し戻し・却下できます",
+      "en": "Interactive HTML. Edit owners and priorities, then accept, send back or reject"
+    },
+    "reviewAndDecide": {
+      "ja": "レビューして決定する",
+      "en": "Review and decide"
+    },
+    "openBrief": {
+      "ja": "ブリーフを開く",
+      "en": "Open the brief"
+    },
+    "closeDialog": {
+      "ja": "閉じる",
+      "en": "Close"
+    },
+    "reviewed": {
+      "ja": "レビュー済み",
+      "en": "Reviewed"
+    },
+    "verdictAccept": {
+      "ja": "承認",
+      "en": "Accepted"
+    },
+    "verdictRequestChanges": {
+      "ja": "差し戻し",
+      "en": "Sent back"
+    },
+    "verdictReject": {
+      "ja": "却下",
+      "en": "Rejected"
+    },
+    "missionAwaiting": {
+      "ja": "ミッション開始の承認待ち",
+      "en": "Mission start awaiting approval"
+    },
+    "openApprovals": {
+      "ja": "承認画面を開く",
+      "en": "Open approvals"
+    },
+    "missionApproved": {
+      "ja": "承認されました。ミッションを開始できます",
+      "en": "Approved — the mission can start"
+    },
+    "startMission": {
+      "ja": "ミッションを開始",
+      "en": "Start the mission"
+    },
+    "startingMission": {
+      "ja": "開始中…",
+      "en": "Starting…"
+    },
+    "missionRejected": {
+      "ja": "ミッション開始は却下されました",
+      "en": "The mission start was rejected"
+    },
+    "missionStarted": {
+      "ja": "ミッションを開始しました",
+      "en": "Mission started"
+    },
+    "openMissions": {
+      "ja": "ミッションを開く",
+      "en": "Open missions"
     }
   },
   "role_labels": {

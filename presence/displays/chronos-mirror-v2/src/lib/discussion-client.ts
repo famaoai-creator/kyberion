@@ -110,6 +110,36 @@ export async function fetchMissionOptions(): Promise<MissionOption[]> {
   }));
 }
 
+export interface ReviewPayload {
+  verdict: 'accept' | 'request-changes' | 'reject';
+  note?: string;
+  edits?: Array<{
+    id: string;
+    title?: string;
+    priority?: string;
+    owner_role?: string | null;
+    included?: boolean;
+  }>;
+  request_mission?: boolean;
+}
+
+export function reviewDiscussionDecision(roomId: string, payload: ReviewPayload) {
+  return call<{
+    room: DiscussionRoomState;
+    result: { mission_error?: string; mission_approval_id?: string };
+  }>(`/api/discussions/${encodeURIComponent(roomId)}/review`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function issueDiscussionMission(roomId: string) {
+  return call<{ result: { mission_id: string }; room: DiscussionRoomState }>(
+    `/api/discussions/${encodeURIComponent(roomId)}/mission`,
+    { method: 'POST', body: JSON.stringify({ action: 'issue' }) }
+  );
+}
+
 export function createDiscussionWorkItems(roomId: string, proposalIds: string[]) {
   return call<{
     created: Array<{ proposal_id: string; item_id: string }>;

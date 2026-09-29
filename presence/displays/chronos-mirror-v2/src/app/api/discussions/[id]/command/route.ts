@@ -4,6 +4,7 @@ import {
   readDiscussionRoom,
   sanitizeDiscussionId,
   submitDiscussionCommand,
+  DiscussionUserError,
 } from '@agent/core/discussion/discussion-store';
 import type {
   DiscussionCommand,
@@ -94,6 +95,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     });
     return NextResponse.json({ ok: true, room: next }, { status: 202 });
   } catch (error) {
+    if (error instanceof DiscussionUserError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
     return viewerErrorResponse(error, 400);
   }
 }

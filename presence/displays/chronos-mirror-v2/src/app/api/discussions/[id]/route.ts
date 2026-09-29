@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withLiveMissionStatus } from '@agent/core/discussion/discussion-mission';
 import { readDiscussionRoom, sanitizeDiscussionId } from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import { assertDiscussionVisible } from '../../../../lib/discussion-access';
@@ -27,7 +28,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     if (!room)
       return NextResponse.json({ ok: false, error: 'discussion not found' }, { status: 404 });
     assertDiscussionVisible(viewer, room.scope);
-    return NextResponse.json({ ok: true, room, accessRole: viewer.role });
+    return NextResponse.json({
+      ok: true,
+      room: withLiveMissionStatus(room),
+      accessRole: viewer.role,
+    });
   } catch (error) {
     return viewerErrorResponse(error);
   }
