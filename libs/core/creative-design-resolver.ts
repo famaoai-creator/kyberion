@@ -100,6 +100,18 @@ export interface MediaThemeRecord {
     accent: string;
     background: string;
     text: string;
+    /**
+     * KDS v2 style projection only: supporting roles the media layouts already
+     * read (panel fill, hairline, header bar, CTA, text pair) so a style's
+     * neutrals reach every slide role instead of the blue fallbacks.
+     */
+    surface?: string;
+    muted?: string;
+    border?: string;
+    navy?: string;
+    cta?: string;
+    text_primary?: string;
+    text_secondary?: string;
   };
   fonts: {
     heading: string;
@@ -627,7 +639,8 @@ function buildMediaProjection(
   spacing: CreativeDesignSpacing,
   constraints: CreativeDesignConstraints,
   themeName: string,
-  logoUrl: string | undefined
+  logoUrl: string | undefined,
+  styleColors?: Partial<MediaThemeRecord['colors']>
 ): CreativeProjection {
   return {
     surface,
@@ -639,6 +652,7 @@ function buildMediaProjection(
         accent: colors.accent,
         background: colors.background,
         text: colors.text,
+        ...(styleColors || {}),
       },
       fonts: { heading: fonts.heading, body: fonts.body },
       typography,
@@ -700,19 +714,27 @@ function loadStylePackConfig(): StylePackConfig {
 
 function buildPromptProjection(
   colors: CreativeDesignColors,
-  fonts: CreativeDesignFonts
+  fonts: CreativeDesignFonts,
+  style?: DesignStyle
 ): CreativeProjection {
   const config = loadStylePackConfig();
   return {
     surface: 'prompt',
     style_pack: {
       palette_hex: [colors.primary, colors.secondary, colors.accent, colors.background],
-      tone_words: config.tone_words?.length
-        ? config.tone_words
-        : DEFAULT_STYLE_PACK_BASE.tone_words,
-      typography_hint:
-        config.typography_hint || `${DEFAULT_STYLE_PACK_BASE.typography_hint} (${fonts.sans})`,
-      avoid: config.avoid?.length ? config.avoid : DEFAULT_STYLE_PACK_BASE.avoid,
+      tone_words: style?.tone_words.length
+        ? style.tone_words
+        : config.tone_words?.length
+          ? config.tone_words
+          : DEFAULT_STYLE_PACK_BASE.tone_words,
+      typography_hint: style
+        ? `${style.label} style: headings in ${fonts.heading}, body in ${fonts.body}`
+        : config.typography_hint || `${DEFAULT_STYLE_PACK_BASE.typography_hint} (${fonts.sans})`,
+      avoid: style?.avoid.length
+        ? [...style.avoid, ...DEFAULT_STYLE_PACK_BASE.avoid]
+        : config.avoid?.length
+          ? config.avoid
+          : DEFAULT_STYLE_PACK_BASE.avoid,
       music: config.music || DEFAULT_STYLE_PACK_BASE.music,
     },
   };
@@ -782,6 +804,7 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
     colors = applyStyleColors(colors, style, mode);
     fonts = applyStyleFonts(fonts, style);
     typography = applyStyleTypography(typography, style);
+    themeName = `kds:${style.id}`;
     foundationCssVars = {
       ...buildFoundationPrimitiveVars(foundation),
       ...buildFoundationModeVars(foundation, mode),
@@ -829,7 +852,22 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
         spacing,
         constraints,
         themeName,
-        logoUrl
+        logoUrl,
+        style
+          ? {
+              ...(source === 'brand-default' && style.colors?.[mode]
+                ? {
+                    surface: style.colors[mode].surface,
+                    muted: style.colors[mode].muted,
+                    border: style.colors[mode].border,
+                  }
+                : {}),
+              navy: colors.primary,
+              cta: colors.accent,
+              text_primary: colors.text,
+              text_secondary: colors.secondary,
+            }
+          : undefined
       );
       break;
     case 'video':
@@ -842,7 +880,7 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
       }
       break;
     case 'prompt':
-      projection = buildPromptProjection(colors, fonts);
+      projection = buildPromptProjection(colors, fonts, style);
       break;
   }
 

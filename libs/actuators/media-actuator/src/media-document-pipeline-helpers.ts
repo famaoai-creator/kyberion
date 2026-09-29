@@ -226,6 +226,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       layout_key: entry.layout_key,
       semantic_type: entry.semantic_type,
       ...pickStructuredSectionFields(entry),
+      composition: entry.composition,
       columns: entry.columns,
       checklist: entry.checklist,
       cta: entry.cta,

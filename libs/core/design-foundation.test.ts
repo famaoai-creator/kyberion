@@ -13,6 +13,7 @@ import {
   type CompositionSpec,
 } from './design-foundation.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
+import { buildCampaignPlan, type CampaignBrief } from './campaign-suite.js';
 
 const foundation = loadDesignFoundation();
 
@@ -172,5 +173,57 @@ describe('resolveCreativeDesign({ style })', () => {
       // brand mode vars still win where both define a key
       expect(dark.projection.css_vars['--kb-accent']).toBe('#22d3ee');
     }
+  });
+});
+
+describe('one style across every creative output (campaign suite + prompts)', () => {
+  const campaign = (design_style?: string): CampaignBrief => ({
+    kind: 'campaign-brief',
+    title: '新製品ローンチ',
+    audience: '経営層',
+    ...(design_style ? { design_style } : {}),
+    deliverables: ['deck', 'doc', 'intro_video', 'web_lp'],
+    key_messages: ['承認を速くする', '証跡を自動で残す'],
+  });
+
+  it('every deliverable resolves the same styled accent', () => {
+    const plan = buildCampaignPlan(campaign('editorial'), { outputRoot: 'out' });
+    expect(plan.entries.map((entry) => entry.design.accent_hex)).toEqual(
+      plan.entries.map(() => '#c2410c')
+    );
+    expect(plan.manifest.design_style).toBe('editorial');
+  });
+
+  it('passes the style to the media briefs and into the video/web design', () => {
+    const plan = buildCampaignPlan(campaign('editorial'), { outputRoot: 'out' });
+    const deck = plan.entries.find((entry) => entry.kind === 'deck')!;
+    const context = (deck.action_input as any).context.last_json;
+    expect(context.design_style).toBe('editorial');
+    const video = plan.entries.find((entry) => entry.kind === 'intro_video')!;
+    const cssVars = (video.action_input as any).params.content_brief.design_system_ref.css_vars;
+    expect(cssVars['--kds-style-radius']).toBe('2px');
+    const web = plan.entries.find((entry) => entry.kind === 'web_lp')!;
+    const html = (web.action_input as any).context.lp_html as string;
+    expect(html).toContain('--kds-style-radius');
+    expect(html).toContain('var(--kds-style-radius, 14px)');
+  });
+
+  it('a campaign without a style keeps the baseline (no design_style anywhere)', () => {
+    const plan = buildCampaignPlan(campaign(), { outputRoot: 'out' });
+    const deck = plan.entries.find((entry) => entry.kind === 'deck')!;
+    expect((deck.action_input as any).context.last_json.design_style).toBeUndefined();
+    expect(plan.manifest.design_style).toBeUndefined();
+  });
+
+  it('the prompt style pack carries the style tone words, palette and anti-patterns', () => {
+    const resolved = resolveCreativeDesign({ surface: 'prompt', style: 'midnight-signal' });
+    if (resolved.projection.surface !== 'prompt') throw new Error('expected prompt projection');
+    const pack = resolved.projection.style_pack;
+    expect(pack.tone_words).toContain('single cyan accent');
+    expect(pack.avoid).toContain('rainbow palettes');
+    expect(pack.palette_hex).toContain('#22d3ee');
+    const base = resolveCreativeDesign({ surface: 'prompt' });
+    if (base.projection.surface !== 'prompt') throw new Error('expected prompt projection');
+    expect(base.projection.style_pack.tone_words).not.toContain('single cyan accent');
   });
 });

@@ -1,3 +1,4 @@
+import { listDesignStyles } from '@agent/core/design-foundation';
 import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import { logger } from '@agent/core/core';
@@ -474,13 +475,25 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       // Story-matched theme (deck counterpart of video-visual-direction):
       // only when the brief did not explicitly choose one — operator intent
       // always wins, and failure keeps the preset default.
-      const explicitTheme = (brief as any).theme || (brief as any).payload?.theme;
+      // A KDS style (design_style / design_system_id `kds-*`) is an explicit choice too.
+      const explicitTheme =
+        (brief as any).theme ||
+        (brief as any).payload?.theme ||
+        (brief as any).design_style ||
+        (brief as any).payload?.design_style ||
+        (String((brief as any).design_system_id || '').startsWith('kds-') ? 'kds' : '');
       if (!explicitTheme && outline?.recommended_theme) {
         const catalogRaw = loadThemeCatalog(rootDir)?.themes || {};
-        const catalog = Object.entries(catalogRaw).map(([id, record]: [string, any]) => ({
-          id,
-          name: record?.name ? String(record.name) : undefined,
-        }));
+        const catalog = [
+          ...Object.entries(catalogRaw).map(([id, record]: [string, any]) => ({
+            id,
+            name: record?.name ? String(record.name) : undefined,
+          })),
+          // KDS v2 styles are candidates for story-matched selection too.
+          ...listDesignStyles()
+            .filter((style) => style.id !== 'standard')
+            .map((style) => ({ id: `kds:${style.id}`, name: `${style.label} — ${style.intent}` })),
+        ];
         outline.recommended_theme = await selectDeckTheme({
           title: String((brief as any).title || outline.document_type || 'Document'),
           summary: JSON.stringify(

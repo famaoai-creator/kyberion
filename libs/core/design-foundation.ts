@@ -25,6 +25,10 @@ export interface StyleColors {
   background: string;
   text: string;
   warning: string;
+  /** Optional supporting neutrals so media roles (panel fill, hairline) match the style. */
+  surface?: string;
+  muted?: string;
+  border?: string;
 }
 
 export interface StyleTypeRole {
@@ -47,6 +51,9 @@ export interface DesignStyle {
   density: 'comfortable' | 'compact';
   gradient: string | null;
   preferred_compositions: string[];
+  /** Mood words / anti-patterns injected into generative prompts (image / video / music). */
+  tone_words: string[];
+  avoid: string[];
 }
 
 export type CompositionRole =
@@ -147,6 +154,14 @@ function safeCssValue(value: unknown, fallback: string): string {
   return trimmed;
 }
 
+function safeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.length <= 80 && !CSS_VALUE_FORBIDDEN.test(entry));
+}
+
 function parseStyleColors(value: unknown): Record<FoundationMode, StyleColors> | undefined {
   if (!isRecord(value)) return undefined;
   const out = {} as Record<FoundationMode, StyleColors>;
@@ -166,6 +181,10 @@ function parseStyleColors(value: unknown): Record<FoundationMode, StyleColors> |
       const safe = safeCssValue(raw[key], '');
       if (!safe) return undefined;
       colors[key] = safe;
+    }
+    for (const key of ['surface', 'muted', 'border'] as const) {
+      const safe = safeCssValue(raw[key], '');
+      if (safe) colors[key] = safe;
     }
     out[mode] = colors;
   }
@@ -217,6 +236,8 @@ function parseStyles(
             (entry): entry is string => typeof entry === 'string' && entry in compositions
           )
         : [],
+      tone_words: safeStringList(raw.tone_words),
+      avoid: safeStringList(raw.avoid),
     };
   }
   return out;
@@ -419,6 +440,9 @@ export function buildStyleVars(
     vars['--kds-style-background'] = c.background;
     vars['--kds-style-text'] = c.text;
     vars['--kds-style-warning'] = c.warning;
+    if (c.surface) vars['--kds-style-surface'] = c.surface;
+    if (c.muted) vars['--kds-style-muted'] = c.muted;
+    if (c.border) vars['--kds-style-border'] = c.border;
   }
   if (style.fonts?.heading) vars['--kds-style-font-heading'] = style.fonts.heading;
   if (style.fonts?.body) vars['--kds-style-font-body'] = style.fonts.body;
@@ -621,6 +645,98 @@ export function renderCompositionCss(id: string, spec: CompositionSpec, columns 
     lines.push(`.kds-comp-${id} > [data-region="${region.id}"] { ${decl.join('; ')}; }`);
   }
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Composition → media body-zone regions
+// ---------------------------------------------------------------------------
+
+/**
+ * A region in the shape the media actuator's region-declarative body zones use
+ * (`ZoneRegionSpec`). Kept structural here so libs/core does not depend on the
+ * actuator; positions are absolute inches.
+ */
+export interface ZoneRegionLike {
+  id: string;
+  type: 'text' | 'panel';
+  source: string;
+  pos: { x: number; y: number; w: number; h: number };
+  font_size?: number;
+  fill?: string;
+  color?: string;
+  bold?: boolean;
+  align?: string;
+  valign?: string;
+}
+
+const ZONE_ROLE_STYLE: Partial<
+  Record<CompositionRole, Pick<ZoneRegionLike, 'font_size' | 'fill' | 'color' | 'bold'>>
+> = {
+  kicker: { font_size: 11, color: 'accent', bold: true },
+  side: { font_size: 12, fill: 'surface', color: 'text_primary' },
+  card: { font_size: 12, fill: 'surface', color: 'text_primary' },
+  kpi: { font_size: 20, fill: 'surface', color: 'accent', bold: true },
+  body: { font_size: 13, color: 'text_primary' },
+  caption: { font_size: 10, color: 'text_secondary' },
+};
+
+/**
+ * Lay a composition out inside a slide's body rectangle and assign the slide's
+ * body lines to its regions in reading order (kicker ← objective, side/card/kpi
+ * ← one line each, body ← the rest, caption ← last line). Title/subtitle/visual
+ * regions belong to slide chrome or imagery and produce no text region.
+ * Returns undefined when the composition id is unknown.
+ */
+export function compositionToZoneRegions(
+  compositionId: string,
+  body: { x: number; y: number; w: number; h: number },
+  options: { gutterIn?: number; foundation?: DesignFoundation | null } = {}
+): ZoneRegionLike[] | undefined {
+  const foundation = options.foundation ?? loadDesignFoundation();
+  const spec = foundation?.compositions[compositionId];
+  if (!foundation || !spec) return undefined;
+  const placed = resolveComposition(
+    spec,
+    { width: body.w, height: body.h, gutter: options.gutterIn ?? 0.12 },
+    foundation
+  );
+  const regions: ZoneRegionLike[] = [];
+  const hasBodyRegion = placed.some((region) => region.role === 'body');
+  const tileCount = placed.filter(
+    (region) => region.role === 'card' || region.role === 'kpi'
+  ).length;
+  let consumed = 0;
+  for (const region of placed) {
+    const style = ZONE_ROLE_STYLE[region.role];
+    if (!style) continue;
+    let source: string;
+    if (region.role === 'kicker' || region.role === 'side') source = 'objective';
+    else if (region.role === 'caption') source = 'cta';
+    else if (region.role === 'body') source = consumed > 0 ? `body_rest:${consumed}` : 'body_all';
+    else {
+      consumed += 1;
+      // Without a body region, the last tile takes every remaining line so no content is dropped.
+      source =
+        !hasBodyRegion && consumed === tileCount
+          ? `body_rest:${consumed - 1}`
+          : `body_line:${consumed}`;
+    }
+    regions.push({
+      id: region.id,
+      type: style.fill ? 'panel' : 'text',
+      source,
+      pos: {
+        x: round(body.x + region.x),
+        y: round(body.y + region.y),
+        w: region.w,
+        h: region.h,
+      },
+      ...style,
+      align: region.align ?? 'left',
+      valign: region.valign ?? (style.fill ? 'middle' : 'top'),
+    });
+  }
+  return regions;
 }
 
 // ---------------------------------------------------------------------------
