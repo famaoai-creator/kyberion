@@ -6975,6 +6975,10 @@
       "types": "./dist/discussion/discussion-engine.d.ts",
       "default": "./dist/discussion/discussion-engine.js"
     },
+    "./discussion/discussion-outcomes": {
+      "types": "./dist/discussion/discussion-outcomes.d.ts",
+      "default": "./dist/discussion/discussion-outcomes.js"
+    },
     "./discussion/discussion-reducer": {
       "types": "./dist/discussion/discussion-reducer.d.ts",
       "default": "./dist/discussion/discussion-reducer.js"

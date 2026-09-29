@@ -2013,6 +2013,7 @@
         "presence/displays/chronos-mirror-v2/src/app/api/deliverable-review/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/deliverables/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/command/route.ts",
+        "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/outcomes/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/[id]/stream/route.ts",
         "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts",

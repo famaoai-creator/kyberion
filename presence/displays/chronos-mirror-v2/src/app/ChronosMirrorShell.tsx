@@ -1,5 +1,6 @@
 'use client';
 
+import { DiscussionRoom } from '../components/DiscussionRoom';
 import { Suspense, useCallback, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -1144,6 +1145,8 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
           {consoleSection === 'approvals' ? (
             <ApprovalsWorkspace tenant={tenant || undefined} />
           ) : null}
+
+          {consoleSection === 'discussion' ? <DiscussionRoom embedded /> : null}
 
           {consoleSection === 'knowledge' ? (
             <KnowledgeWorkspace tenant={tenant || undefined} />

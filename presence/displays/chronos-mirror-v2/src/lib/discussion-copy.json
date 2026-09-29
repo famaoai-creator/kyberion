@@ -267,6 +267,82 @@
     "scope": {
       "ja": "スコープ",
       "en": "Scope"
+    },
+    "outcomes": {
+      "ja": "成果と次のアクション",
+      "en": "Outcomes & next actions"
+    },
+    "minutes": {
+      "ja": "議事録",
+      "en": "Minutes"
+    },
+    "minutesReady": {
+      "ja": "成果物として登録済み",
+      "en": "Registered as a deliverable"
+    },
+    "openDeliverables": {
+      "ja": "開く",
+      "en": "Open"
+    },
+    "proposals": {
+      "ja": "フォローアップ候補",
+      "en": "Proposed follow-ups"
+    },
+    "proposalsHint": {
+      "ja": "チェックしたものを WorkItem として登録します（人間の承認が必要）",
+      "en": "Checked items become WorkItems once you approve"
+    },
+    "createWorkItems": {
+      "ja": "WorkItem に登録",
+      "en": "Create WorkItems"
+    },
+    "creating": {
+      "ja": "登録中…",
+      "en": "Creating…"
+    },
+    "workItemCreated": {
+      "ja": "登録済み",
+      "en": "Created"
+    },
+    "openWorkItems": {
+      "ja": "WorkItem を開く",
+      "en": "Open work items"
+    },
+    "priorityHigh": {
+      "ja": "優先",
+      "en": "High"
+    },
+    "linkMission": {
+      "ja": "紐づけるミッション（任意）",
+      "en": "Link to a mission (optional)"
+    },
+    "noMission": {
+      "ja": "紐づけない",
+      "en": "Not linked"
+    },
+    "missionLinked": {
+      "ja": "ミッション",
+      "en": "Mission"
+    },
+    "rosterLlm": {
+      "ja": "LLMが編成",
+      "en": "Staffed by LLM"
+    },
+    "rosterRules": {
+      "ja": "ルールで編成",
+      "en": "Staffed by rules"
+    },
+    "startDiscussion": {
+      "ja": "この目的で議論する",
+      "en": "Discuss this"
+    },
+    "minutesShort": {
+      "ja": "議事録あり",
+      "en": "Minutes"
+    },
+    "workItemsShort": {
+      "ja": "WorkItem",
+      "en": "Work items"
     }
   },
   "role_labels": {

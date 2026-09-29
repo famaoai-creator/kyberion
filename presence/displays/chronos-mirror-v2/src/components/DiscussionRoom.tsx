@@ -8,12 +8,14 @@ import {
   DISCUSSION_EXAMPLES,
   dt,
   fetchDiscussionRooms,
+  fetchMissionOptions,
   PHASE_STEPS,
   STATUS_LABELS,
   useDiscussionStream,
   type DiscussionLocale,
   type DiscussionRoomState,
   type DiscussionRoomSummary,
+  type MissionOption,
 } from '../lib/discussion-client';
 import { CommandCenter, ConversationPane, RosterPane, SituationPane } from './DiscussionPanes';
 import './discussion-room.css';
@@ -40,7 +42,7 @@ function writeRoomParam(id: string | null) {
   window.history.replaceState(null, '', url.toString());
 }
 
-export function DiscussionRoom() {
+export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
   const chronosLocale = useChronosLocale();
   const [override, setOverride] = React.useState<DiscussionLocale | null>(null);
   const locale: DiscussionLocale = override ?? (chronosLocale === 'ja' ? 'ja' : 'en');
@@ -60,11 +62,17 @@ export function DiscussionRoom() {
 
   if (!hydrated) return <div className="dr-root" aria-busy="true" />;
   return (
-    <div className="dr-root" data-locale={locale}>
+    <div className="dr-root" data-locale={locale} data-embedded={embedded ? 'true' : undefined}>
       {roomId ? (
         <RoomView roomId={roomId} locale={locale} canSteer={canSteer} onBack={() => open(null)} />
       ) : (
-        <Launcher locale={locale} onLocale={setOverride} onOpen={open} onAccess={setCanSteer} />
+        <Launcher
+          embedded={embedded}
+          locale={locale}
+          onLocale={setOverride}
+          onOpen={open}
+          onAccess={setCanSteer}
+        />
       )}
     </div>
   );
@@ -73,11 +81,13 @@ export function DiscussionRoom() {
 /* ---------------------------------------------------------- launcher -- */
 
 function Launcher({
+  embedded,
   locale,
   onLocale,
   onOpen,
   onAccess,
 }: {
+  embedded: boolean;
   locale: DiscussionLocale;
   onLocale: (locale: DiscussionLocale) => void;
   onOpen: (id: string) => void;
@@ -89,6 +99,18 @@ function Launcher({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
+  const [missions, setMissions] = React.useState<MissionOption[]>([]);
+  const [missionId, setMissionId] = React.useState('');
+
+  // Deep links (`?goal=…&mission=…`) let a mission or WorkItem open a room with its context.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedGoal = params.get('goal');
+    const linkedMission = params.get('mission');
+    if (linkedGoal) setGoal(linkedGoal.slice(0, 2000));
+    if (linkedMission) setMissionId(linkedMission);
+    void fetchMissionOptions().then(setMissions);
+  }, []);
 
   const refresh = React.useCallback(async () => {
     const result = await fetchDiscussionRooms();
@@ -116,6 +138,7 @@ function Launcher({
       locale,
       speaker,
       turn_delay_ms: TEMPO.find((t) => t.id === tempo)?.ms ?? 1800,
+      ...(missionId ? { mission_id: missionId } : {}),
     });
     setBusy(false);
     if (!result.ok || !result.data) {
@@ -128,9 +151,11 @@ function Launcher({
   return (
     <div className="dr-launcher">
       <header className="dr-hero">
-        <a className="dr-hero__back" href="/">
-          <ArrowLeft size={14} aria-hidden /> Chronos
-        </a>
+        {embedded ? null : (
+          <a className="dr-hero__back" href="/">
+            <ArrowLeft size={14} aria-hidden /> Chronos
+          </a>
+        )}
         <div className="dr-langs" role="radiogroup" aria-label="language">
           {(['ja', 'en'] as const).map((code) => (
             <button
@@ -175,6 +200,20 @@ function Launcher({
             </button>
           ))}
         </div>
+        <label className="dr-field dr-mission-field">
+          <span>{dt('linkMission', locale)}</span>
+          <select value={missionId} onChange={(e) => setMissionId(e.target.value)}>
+            <option value="">{dt('noMission', locale)}</option>
+            {missionId && !missions.some((m) => m.missionId === missionId) ? (
+              <option value={missionId}>{missionId}</option>
+            ) : null}
+            {missions.map((m) => (
+              <option key={m.missionId} value={m.missionId}>
+                {m.missionId} — {m.title.slice(0, 60)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="dr-launch-card__options">
           <div className="dr-seg" role="radiogroup" aria-label={dt('tempo', locale)}>
             <span className="dr-muted">{dt('tempo', locale)}</span>
@@ -228,6 +267,10 @@ function Launcher({
                   <span className="dr-muted">
                     {STATUS_LABELS[room.status]?.[locale] ?? room.status} · {room.message_count} ·{' '}
                     {Math.round(room.consensus * 100)}%
+                    {room.has_minutes ? ` · ${dt('minutesShort', locale)}` : ''}
+                    {room.work_item_count > 0
+                      ? ` · ${dt('workItemsShort', locale)} ${room.work_item_count}`
+                      : ''}
                   </span>
                 </button>
               </li>
@@ -292,7 +335,12 @@ function RoomView({
         <RosterPane room={room} locale={roomLocale} />
         <ConversationPane room={room} locale={roomLocale} />
         <div className="dr-side">
-          <SituationPane room={room} locale={roomLocale} />
+          <SituationPane
+            room={room}
+            locale={roomLocale}
+            canSteer={access}
+            onRoom={(next: DiscussionRoomState) => setRoom(next)}
+          />
           <CommandCenter
             room={room}
             locale={roomLocale}
@@ -336,6 +384,11 @@ function TopBar({
         <div className="dr-top__titles">
           <div className="dr-top__eyebrow">
             <Sparkles size={13} aria-hidden /> {dt('title', locale)}
+            {room.scope.mission_id ? (
+              <span className="dr-pill">
+                {dt('missionLinked', locale)}: {room.scope.mission_id}
+              </span>
+            ) : null}
             {room.scope.tenant_slug ? (
               <span className="dr-pill">
                 {dt('scope', locale)}: {room.scope.tenant_slug}

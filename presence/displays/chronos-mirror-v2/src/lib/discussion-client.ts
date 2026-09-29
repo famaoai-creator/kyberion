@@ -78,10 +78,46 @@ export function createDiscussion(body: {
   speaker: 'auto' | 'scripted' | 'reasoning';
   turn_delay_ms: number;
   tenant?: string;
+  mission_id?: string;
 }) {
   return call<{ room: DiscussionRoomState }>('/api/discussions', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export interface MissionOption {
+  missionId: string;
+  title: string;
+  status: string;
+}
+
+/** Missions the viewer can already see — a room may only link to one of these. */
+export async function fetchMissionOptions(): Promise<MissionOption[]> {
+  const result = await call<{
+    missions: Array<{
+      missionId: string;
+      goalSummary?: string;
+      intentText?: string;
+      status: string;
+    }>;
+  }>('/api/missions/search?limit=30');
+  if (!result.ok || !result.data) return [];
+  return result.data.missions.map((m) => ({
+    missionId: m.missionId,
+    title: m.goalSummary || m.intentText || m.missionId,
+    status: m.status,
+  }));
+}
+
+export function createDiscussionWorkItems(roomId: string, proposalIds: string[]) {
+  return call<{
+    created: Array<{ proposal_id: string; item_id: string }>;
+    skipped: string[];
+    room: DiscussionRoomState;
+  }>(`/api/discussions/${encodeURIComponent(roomId)}/outcomes`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_workitems', proposal_ids: proposalIds }),
   });
 }
 
