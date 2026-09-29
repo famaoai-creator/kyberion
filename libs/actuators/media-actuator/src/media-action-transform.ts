@@ -476,12 +476,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       // only when the brief did not explicitly choose one — operator intent
       // always wins, and failure keeps the preset default.
       // A KDS style (design_style / design_system_id `kds-*`) is an explicit choice too.
+      const briefFields = brief as unknown as Record<string, unknown> & {
+        payload?: Record<string, unknown>;
+      };
       const explicitTheme =
-        (brief as any).theme ||
-        (brief as any).payload?.theme ||
-        (brief as any).design_style ||
-        (brief as any).payload?.design_style ||
-        (String((brief as any).design_system_id || '').startsWith('kds-') ? 'kds' : '');
+        briefFields.theme ||
+        briefFields.payload?.theme ||
+        briefFields.design_style ||
+        briefFields.payload?.design_style ||
+        (String(briefFields.design_system_id || '').startsWith('kds-') ? 'kds' : '');
       if (!explicitTheme && outline?.recommended_theme) {
         const catalogRaw = loadThemeCatalog(rootDir)?.themes || {};
         const catalog = [
