@@ -6963,6 +6963,34 @@
       "types": "./dist/voice/index.d.ts",
       "default": "./dist/voice/index.js"
     },
+    "./discussion": {
+      "types": "./dist/discussion/index.d.ts",
+      "default": "./dist/discussion/index.js"
+    },
+    "./discussion/discussion-engine": {
+      "types": "./dist/discussion/discussion-engine.d.ts",
+      "default": "./dist/discussion/discussion-engine.js"
+    },
+    "./discussion/discussion-reducer": {
+      "types": "./dist/discussion/discussion-reducer.d.ts",
+      "default": "./dist/discussion/discussion-reducer.js"
+    },
+    "./discussion/discussion-speaker": {
+      "types": "./dist/discussion/discussion-speaker.d.ts",
+      "default": "./dist/discussion/discussion-speaker.js"
+    },
+    "./discussion/discussion-store": {
+      "types": "./dist/discussion/discussion-store.d.ts",
+      "default": "./dist/discussion/discussion-store.js"
+    },
+    "./discussion/discussion-team": {
+      "types": "./dist/discussion/discussion-team.d.ts",
+      "default": "./dist/discussion/discussion-team.js"
+    },
+    "./discussion/discussion-types": {
+      "types": "./dist/discussion/discussion-types.d.ts",
+      "default": "./dist/discussion/discussion-types.js"
+    },
     "./workforce": {
       "types": "./dist/workforce/index.d.ts",
       "default": "./dist/workforce/index.js"
