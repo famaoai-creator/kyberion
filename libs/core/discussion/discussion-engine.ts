@@ -4,6 +4,7 @@ import {
   readDiscussionRoom,
   sanitizeDiscussionId,
 } from './discussion-store.js';
+import { DialogueRunner } from './discussion-dialogue-engine.js';
 import { loadDiscussionCopy } from './discussion-copy.js';
 import { publishDiscussionOutcomes } from './discussion-outcomes.js';
 import { composeDiscussionTeam, discussionRosterCandidates } from './discussion-team.js';
@@ -32,6 +33,9 @@ export interface DiscussionEngineOptions {
   speaker?: DiscussionSpeaker;
   /** Injected in tests; defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>;
+  /** Dialogue rooms: return once nothing is left to do rather than waiting for the human (tests). */
+  exitWhenIdle?: boolean;
+  idleMs?: number;
 }
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -96,6 +100,7 @@ export function computeConsensus(state: DiscussionRoomState): number {
 class DiscussionEngine {
   private readonly speaker: DiscussionSpeaker;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly options: DiscussionEngineOptions;
   private forceConclude = false;
   private forcedNext: string | null = null;
 
@@ -104,6 +109,7 @@ class DiscussionEngine {
     options: DiscussionEngineOptions
   ) {
     const room = this.room();
+    this.options = options;
     this.speaker = options.speaker ?? resolveDiscussionSpeaker(room.config.speaker);
     this.sleep = options.sleep ?? realSleep;
   }
@@ -139,6 +145,14 @@ class DiscussionEngine {
       appendDiscussionEvent(this.roomId, { type: 'agenda_set', agenda: defaultAgenda(room) });
     }
     room = this.room();
+    if (room.config.mode === 'dialogue') {
+      return new DialogueRunner(this.roomId, {
+        speaker: this.speaker,
+        sleep: this.sleep,
+        exitWhenIdle: this.options.exitWhenIdle,
+        idleMs: this.options.idleMs,
+      }).run();
+    }
     const facilitator = this.facilitator(room);
     if (!facilitator) {
       appendDiscussionEvent(this.roomId, {

@@ -1,7 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowLeft, Check, Gavel, Radio, Rocket, Sparkles, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Gavel,
+  MessagesSquare,
+  Radio,
+  Rocket,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
 import {
   createDiscussion,
@@ -17,6 +26,7 @@ import {
   type DiscussionRoomSummary,
   type MissionOption,
 } from '../lib/discussion-client';
+import { DialogueView } from './DialogueRoom';
 import { CommandCenter, ConversationPane, RosterPane, SituationPane } from './DiscussionPanes';
 import './discussion-room.css';
 
@@ -64,7 +74,13 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className="dr-root" data-locale={locale} data-embedded={embedded ? 'true' : undefined}>
       {roomId ? (
-        <RoomView roomId={roomId} locale={locale} canSteer={canSteer} onBack={() => open(null)} />
+        <RoomView
+          roomId={roomId}
+          locale={locale}
+          canSteer={canSteer}
+          onBack={() => open(null)}
+          onOpen={open}
+        />
       ) : (
         <Launcher
           embedded={embedded}
@@ -96,6 +112,7 @@ function Launcher({
   const [goal, setGoal] = React.useState('');
   const [tempo, setTempo] = React.useState<'fast' | 'normal' | 'slow'>('normal');
   const [speaker, setSpeaker] = React.useState<'auto' | 'scripted' | 'reasoning'>('auto');
+  const [mode, setMode] = React.useState<'panel' | 'dialogue'>('panel');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [rooms, setRooms] = React.useState<DiscussionRoomSummary[] | null>(null);
@@ -137,6 +154,7 @@ function Launcher({
       goal: goal.trim(),
       locale,
       speaker,
+      mode,
       turn_delay_ms: TEMPO.find((t) => t.id === tempo)?.ms ?? 1800,
       ...(missionId ? { mission_id: missionId } : {}),
     });
@@ -178,14 +196,41 @@ function Launcher({
       </header>
 
       <form className="dr-launch-card" onSubmit={start}>
+        <div className="dl-modes" role="radiogroup" aria-label={dt('modeTitle', locale)}>
+          {(
+            [
+              { id: 'panel', icon: Users, title: 'modePanel', hint: 'modePanelHint' },
+              {
+                id: 'dialogue',
+                icon: MessagesSquare,
+                title: 'modeDialogue',
+                hint: 'modeDialogueHint',
+              },
+            ] as const
+          ).map((option) => (
+            <button
+              type="button"
+              key={option.id}
+              role="radio"
+              className="dl-mode"
+              aria-checked={mode === option.id}
+              aria-pressed={mode === option.id}
+              onClick={() => setMode(option.id)}
+            >
+              <option.icon size={18} aria-hidden />
+              <strong>{dt(option.title, locale)}</strong>
+              <span>{dt(option.hint, locale)}</span>
+            </button>
+          ))}
+        </div>
         <label className="dr-launch-card__label" htmlFor="dr-goal">
-          {dt('goalLabel', locale)}
+          {dt(mode === 'dialogue' ? 'dlgGoalLabel' : 'goalLabel', locale)}
         </label>
         <textarea
           id="dr-goal"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder={dt('goalPlaceholder', locale)}
+          placeholder={dt(mode === 'dialogue' ? 'dlgGoalPlaceholder' : 'goalPlaceholder', locale)}
           rows={3}
           maxLength={2000}
           onKeyDown={(e) => {
@@ -243,7 +288,8 @@ function Launcher({
             className="dr-btn dr-btn--primary dr-btn--lg"
             disabled={busy || !goal.trim()}
           >
-            <Rocket size={16} aria-hidden /> {busy ? dt('starting', locale) : dt('start', locale)}
+            <Rocket size={16} aria-hidden />{' '}
+            {busy ? dt('starting', locale) : dt(mode === 'dialogue' ? 'dlgStart' : 'start', locale)}
           </button>
         </div>
         {error ? (
@@ -264,6 +310,9 @@ function Launcher({
                 <button type="button" onClick={() => onOpen(room.id)}>
                   <span className="dr-recent__status" data-status={room.status} />
                   <span className="dr-recent__goal">{room.title}</span>
+                  {room.mode === 'dialogue' ? (
+                    <span className="dr-pill">{dt('dialogueBadge', locale)}</span>
+                  ) : null}
                   <span className="dr-muted">
                     {STATUS_LABELS[room.status]?.[locale] ?? room.status} · {room.message_count} ·{' '}
                     {Math.round(room.consensus * 100)}%
@@ -289,11 +338,13 @@ function RoomView({
   locale,
   canSteer,
   onBack,
+  onOpen,
 }: {
   roomId: string;
   locale: DiscussionLocale;
   canSteer: boolean;
   onBack: () => void;
+  onOpen: (id: string) => void;
 }) {
   const { room, connection, error, setRoom } = useDiscussionStream(roomId);
   const [access, setAccess] = React.useState(canSteer);
@@ -326,6 +377,20 @@ function RoomView({
           <p>{dt('connecting', locale)}</p>
         </div>
       </div>
+    );
+  }
+  if (room.config.mode === 'dialogue') {
+    return (
+      <DialogueView
+        room={room}
+        locale={roomLocale}
+        canSteer={access}
+        connection={connection}
+        onRoom={(next: DiscussionRoomState) => setRoom(next)}
+        onOpen={onOpen}
+        onNew={onBack}
+        onBack={onBack}
+      />
     );
   }
   return (

@@ -57,6 +57,29 @@ export interface DiscussionCopy {
   work_proposal: { description: Localized };
   brief: Record<string, Localized>;
   mission_request: Record<'title' | 'summary' | 'details' | 'reopen_agenda', Localized>;
+  dialogue: {
+    questions: Record<
+      string,
+      { text: Localized; label: Localized; suggestions: Record<Locale, string[]> }
+    >;
+    opening: Localized;
+    ack: Localized;
+    next: Localized;
+    ready: Localized;
+    freeform: Localized;
+    consult_intro: Localized;
+    attachment_read: Localized;
+    attachment_stored: Localized;
+    summary: Record<
+      'title' | 'objective' | 'criteria' | 'constraints' | 'decisions' | 'open' | 'none',
+      Localized
+    >;
+    decision: {
+      summary: Localized;
+      next_steps: Record<Locale, string[]>;
+      open_dissent: Localized;
+    };
+  };
   scripts: Record<string, ScriptStep[]>;
   generic_script: ScriptStep[];
 }
