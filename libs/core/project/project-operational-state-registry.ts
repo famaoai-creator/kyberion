@@ -250,13 +250,19 @@ function recursiveProjectStateFiles(dir: string): string[] {
 
 function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): string[] {
   if (query.projectId && query.tier) {
+    if (
+      query.tier === 'confidential' &&
+      (!query.tenantSlug || !isValidTenantSlug(query.tenantSlug))
+    ) {
+      return [];
+    }
     const pathHint = projectOperationalStatePath(
       query.projectId,
       query.tier,
       query.tenantSlug,
       query.rootDir
     );
-    if (safeExistsSync(pathHint)) return [pathHint];
+    return safeExistsSync(pathHint) ? [pathHint] : [];
   }
   if (query.projectId && query.tenantSlug && !query.tier) {
     const tiers: Array<ProjectOperationalState['tier']> = ['personal', 'confidential', 'public'];
@@ -265,7 +271,39 @@ function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): st
         projectOperationalStatePath(query.projectId!, tier, query.tenantSlug, query.rootDir)
       )
       .filter((candidate) => safeExistsSync(candidate));
-    if (direct.length > 0) return direct;
+    return direct;
+  }
+  if (query.projectId && !query.tier && !query.tenantSlug) {
+    const project = loadProjectRecord(query.projectId, { rootDir: query.rootDir });
+    if (project) {
+      return projectStateFilesForQuery({
+        ...query,
+        tier: project.tier,
+        tenantSlug: project.tenant_slug,
+      });
+    }
+    return [];
+  }
+  if (query.tier) {
+    if (query.tier !== 'public' && !query.tenantSlug) return [];
+    if (
+      query.tier === 'confidential' &&
+      (!query.tenantSlug || !isValidTenantSlug(query.tenantSlug))
+    ) {
+      return [];
+    }
+    const partition = query.tenantSlug || 'shared';
+    return recursiveProjectStateFiles(
+      assertSafeRepositoryPath(
+        path.resolve(
+          query.rootDir || pathResolver.rootDir(),
+          'active/projects',
+          query.tier,
+          partition
+        ),
+        { allowMissingLeaf: true }
+      )
+    );
   }
   return recursiveProjectStateFiles(
     assertSafeRepositoryPath(
