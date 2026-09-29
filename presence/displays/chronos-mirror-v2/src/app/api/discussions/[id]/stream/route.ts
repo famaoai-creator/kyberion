@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { withLiveReply } from '@agent/core/discussion/discussion-live';
 import { withLiveMissionStatus } from '@agent/core/discussion/discussion-mission';
 import { readDiscussionRoom, sanitizeDiscussionId } from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../../../lib/api-guard';
@@ -70,8 +71,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         if (!raw) return;
         // The mission approval is decided elsewhere (no room event), so its live
         // status is part of what makes a frame new.
-        const room = withLiveMissionStatus(raw);
-        const signature = `${room.last_seq}:${room.outcomes.mission?.approval_status ?? ''}`;
+        const room = withLiveReply(withLiveMissionStatus(raw));
+        const signature = `${room.last_seq}:${room.outcomes.mission?.approval_status ?? ''}:${room.live?.text.length ?? -1}`;
         if (signature === lastSent) return;
         lastSent = signature;
         write(sse('state', room, room.last_seq));
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       };
       write('retry: 1500\n\n');
       poll();
-      timer = setInterval(poll, 400);
+      timer = setInterval(poll, 180);
       ping = setInterval(() => write(': keep-alive\n\n'), 15_000);
     },
     cancel() {

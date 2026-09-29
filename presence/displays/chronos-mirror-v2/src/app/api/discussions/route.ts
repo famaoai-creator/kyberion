@@ -33,9 +33,16 @@ export function GET(req: NextRequest) {
   const viewer = resolvedViewer.context;
   try {
     const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
-    const rooms = withViewerExecutionContext(viewer, () => listDiscussionRooms()).filter((room) =>
-      isDiscussionVisibleToViewer(viewer, room.scope, requestedTenant)
-    );
+    const params = req.nextUrl.searchParams;
+    const query = readChronosOptionalStringParam(params.get('q'));
+    const mode = readChronosOptionalStringParam(params.get('mode'));
+    const rooms = withViewerExecutionContext(viewer, () =>
+      listDiscussionRooms({
+        ...(query ? { query } : {}),
+        archived: readChronosOptionalStringParam(params.get('archived')) === '1',
+        ...(mode === 'panel' || mode === 'dialogue' ? { mode } : {}),
+      })
+    ).filter((room) => isDiscussionVisibleToViewer(viewer, room.scope, requestedTenant));
     return NextResponse.json({ ok: true, rooms, accessRole: viewer.role });
   } catch (error) {
     return viewerErrorResponse(error);
@@ -117,6 +124,7 @@ export async function POST(req: NextRequest) {
         config: {
           locale: body.locale === 'en' ? 'en' : 'ja',
           speaker,
+          mode: body.mode === 'dialogue' ? 'dialogue' : 'panel',
           ...(clampNumber(body.max_rounds, 1, 8)
             ? { max_rounds: clampNumber(body.max_rounds, 1, 8)! }
             : {}),
