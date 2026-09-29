@@ -6971,6 +6971,18 @@
       "types": "./dist/discussion/discussion-copy.d.ts",
       "default": "./dist/discussion/discussion-copy.js"
     },
+    "./discussion/discussion-brief": {
+      "types": "./dist/discussion/discussion-brief.d.ts",
+      "default": "./dist/discussion/discussion-brief.js"
+    },
+    "./discussion/discussion-mission": {
+      "types": "./dist/discussion/discussion-mission.d.ts",
+      "default": "./dist/discussion/discussion-mission.js"
+    },
+    "./discussion/discussion-review": {
+      "types": "./dist/discussion/discussion-review.d.ts",
+      "default": "./dist/discussion/discussion-review.js"
+    },
     "./discussion/discussion-engine": {
       "types": "./dist/discussion/discussion-engine.d.ts",
       "default": "./dist/discussion/discussion-engine.js"

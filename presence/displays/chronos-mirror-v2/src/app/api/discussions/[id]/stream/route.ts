@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { withLiveMissionStatus } from '@agent/core/discussion/discussion-mission';
 import { readDiscussionRoom, sanitizeDiscussionId } from '@agent/core/discussion/discussion-store';
 import { guardRequest, requireChronosAccess } from '../../../../../lib/api-guard';
 import { assertDiscussionVisible } from '../../../../../lib/discussion-access';
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   let closed = false;
   let timer: ReturnType<typeof setInterval> | undefined;
   let ping: ReturnType<typeof setInterval> | undefined;
-  let lastSent = -1;
+  let lastSent = '';
   const close = () => {
     if (closed) return;
     closed = true;
@@ -65,9 +66,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       };
       const poll = () => {
         if (closed) return;
-        const room = withViewerExecutionContext(viewer, () => readDiscussionRoom(roomId));
-        if (!room || room.last_seq === lastSent) return;
-        lastSent = room.last_seq;
+        const raw = withViewerExecutionContext(viewer, () => readDiscussionRoom(roomId));
+        if (!raw) return;
+        // The mission approval is decided elsewhere (no room event), so its live
+        // status is part of what makes a frame new.
+        const room = withLiveMissionStatus(raw);
+        const signature = `${room.last_seq}:${room.outcomes.mission?.approval_status ?? ''}`;
+        if (signature === lastSent) return;
+        lastSent = signature;
         write(sse('state', room, room.last_seq));
         if (TERMINAL.has(room.status)) {
           write(sse('end', { status: room.status }));

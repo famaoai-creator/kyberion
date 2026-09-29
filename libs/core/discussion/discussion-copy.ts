@@ -55,6 +55,8 @@ export interface DiscussionCopy {
     Localized
   >;
   work_proposal: { description: Localized };
+  brief: Record<string, Localized>;
+  mission_request: Record<'title' | 'summary' | 'details' | 'reopen_agenda', Localized>;
   scripts: Record<string, ScriptStep[]>;
   generic_script: ScriptStep[];
 }
