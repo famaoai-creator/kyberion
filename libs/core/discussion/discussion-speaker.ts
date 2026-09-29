@@ -172,11 +172,17 @@ function transcript(room: DiscussionRoomState, limit = 14): string {
     .join('\n');
 }
 
-function extractJson(raw: string): Record<string, unknown> | null {
-  const match = raw.match(/\{[\s\S]*\}/u);
-  if (!match) return null;
+/**
+ * Pull the outermost JSON object out of free-form model output. Uses index
+ * scans instead of a backtracking pattern so adversarial output (thousands of
+ * `{`) stays linear.
+ */
+export function extractJson(raw: string): Record<string, unknown> | null {
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
   try {
-    const parsed = JSON.parse(match[0]);
+    const parsed = JSON.parse(raw.slice(start, end + 1));
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
