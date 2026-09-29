@@ -40,6 +40,8 @@ describe('tier-guard tenant scope (IP-1)', () => {
   let savedRole: string | undefined;
   let savedSudo: string | undefined;
   let savedMission: string | undefined;
+  let savedProject: string | undefined;
+  let savedScopeEnvPath: string | undefined;
   let savedTenantScopeRequired: string | undefined;
   let savedUnitSharedGroup: string | null;
 
@@ -49,6 +51,8 @@ describe('tier-guard tenant scope (IP-1)', () => {
     savedRole = process.env.MISSION_ROLE;
     savedSudo = process.env.KYBERION_SUDO;
     savedMission = process.env.MISSION_ID;
+    savedProject = process.env.KYBERION_PROJECT_ID;
+    savedScopeEnvPath = process.env.KYBERION_SCOPE_ENV_PATH;
     savedTenantScopeRequired = process.env.KYBERION_TENANT_SCOPE_REQUIRED;
     const groupPath = path.join(ROOT, 'knowledge/confidential/tenant-groups/unit-shared.json');
     savedUnitSharedGroup = fs.existsSync(groupPath) ? fs.readFileSync(groupPath, 'utf8') : null;
@@ -73,6 +77,10 @@ describe('tier-guard tenant scope (IP-1)', () => {
     else process.env.KYBERION_SUDO = savedSudo;
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
+    if (savedProject === undefined) delete process.env.KYBERION_PROJECT_ID;
+    else process.env.KYBERION_PROJECT_ID = savedProject;
+    if (savedScopeEnvPath === undefined) delete process.env.KYBERION_SCOPE_ENV_PATH;
+    else process.env.KYBERION_SCOPE_ENV_PATH = savedScopeEnvPath;
     if (savedTenantScopeRequired === undefined) delete process.env.KYBERION_TENANT_SCOPE_REQUIRED;
     else process.env.KYBERION_TENANT_SCOPE_REQUIRED = savedTenantScopeRequired;
   });
@@ -144,6 +152,81 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'tenant.scope_violation', result: 'denied' })
     );
+  });
+
+  it('limits worker public project writes to the bound project and public partition', () => {
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PROJECT_ID = 'PRJ-TG-PUBLIC';
+
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/projects/public/shared/PRJ-TG-PUBLIC/notes.md')
+      ).allowed
+    ).toBe(true);
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/projects/public/acme-corp/PRJ-TG-PUBLIC/notes.md')
+      ).allowed
+    ).toBe(true);
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/projects/public/beta-co/PRJ-TG-PUBLIC/notes.md')
+      ).allowed
+    ).toBe(false);
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/projects/public/shared/PRJ-TG-OTHER/notes.md')
+      ).allowed
+    ).toBe(false);
+  });
+
+  it('uses the persisted project binding for worker tier policy when env is unset', () => {
+    const scopePath = path.join(ROOT, 'active/shared/tmp/tier-guard-persisted-project-scope.env');
+    fs.rmSync(scopePath, { force: true });
+    process.env.KYBERION_SCOPE_ENV_PATH = scopePath;
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    delete process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_PROJECT_ID;
+    delete process.env.MISSION_ID;
+    fs.writeFileSync(
+      scopePath,
+      'KYBERION_PROJECT_ID=PRJ-TG-PERSISTED\nKYBERION_TENANT=acme-corp\nMISSION_ID=MSN-TG-PERSISTED\n',
+      'utf8'
+    );
+
+    try {
+      const allowed = validateWritePermission(
+        path.join(ROOT, 'active/projects/confidential/acme-corp/PRJ-TG-PERSISTED/notes.md')
+      );
+      const denied = validateWritePermission(
+        path.join(ROOT, 'active/projects/confidential/acme-corp/PRJ-TG-OTHER/notes.md')
+      );
+      const missionEvidence = validateWritePermission(
+        path.join(
+          ROOT,
+          'active/missions/confidential/acme-corp/MSN-TG-PERSISTED/evidence/result.json'
+        )
+      );
+      const otherMissionEvidence = validateWritePermission(
+        path.join(ROOT, 'active/missions/confidential/acme-corp/MSN-TG-OTHER/evidence/result.json')
+      );
+      const foreignTenantEvidence = validateWritePermission(
+        path.join(
+          ROOT,
+          'active/missions/confidential/beta-co/MSN-TG-PERSISTED/evidence/result.json'
+        )
+      );
+      expect(allowed.allowed).toBe(true);
+      expect(denied.allowed).toBe(false);
+      expect(missionEvidence.allowed).toBe(true);
+      expect(otherMissionEvidence.allowed).toBe(false);
+      expect(foreignTenantEvidence.allowed).toBe(false);
+    } finally {
+      fs.rmSync(scopePath, { force: true });
+    }
   });
 
   it('SUDO bypasses tenant scope (cross-tenant tooling)', () => {
@@ -338,6 +421,48 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const result = validateReadPermission(target);
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.group_unknown/);
+  });
+
+  it('limits worker reads of confidential project state to the bound tenant and project', () => {
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PROJECT_ID = 'PRJ-ACME-OPS';
+
+    const ownProject = path.join(
+      ROOT,
+      'active/projects/confidential/acme-corp/PRJ-ACME-OPS/state.json'
+    );
+    const otherProject = path.join(
+      ROOT,
+      'active/projects/confidential/acme-corp/PRJ-OTHER/state.json'
+    );
+    const otherTenant = path.join(
+      ROOT,
+      'active/projects/confidential/other-tenant/PRJ-ACME-OPS/state.json'
+    );
+
+    expect(validateReadPermission(ownProject).allowed).toBe(true);
+    expect(validateReadPermission(otherProject).allowed).toBe(false);
+    expect(validateReadPermission(otherTenant).allowed).toBe(false);
+    expect(validateWritePermission(ownProject).allowed).toBe(true);
+    expect(validateWritePermission(otherProject).allowed).toBe(false);
+  });
+
+  it('denies worker access to confidential projects when project scope is missing or invalid', () => {
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_TENANT = 'acme-corp';
+    delete process.env.KYBERION_PROJECT_ID;
+
+    const target = path.join(
+      ROOT,
+      'active/projects/confidential/acme-corp/PRJ-ACME-OPS/state.json'
+    );
+    expect(validateReadPermission(target).allowed).toBe(false);
+
+    process.env.KYBERION_PROJECT_ID = '../PRJ-ACME-OPS';
+    expect(validateReadPermission(target).allowed).toBe(false);
   });
 });
 

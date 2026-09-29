@@ -63,14 +63,14 @@ function printProjectList(): void {
   for (const view of listManagedProjects()) {
     const { project } = view;
     printOutput(
-      `${project.project_id}\t${project.status}\t${project.tier}\t${project.name}\ttasks=${view.tasks.length}\tmissions=${view.missions.length}\ttask_sessions=${view.task_sessions.length}`
+      `${project.project_id}\t${project.status}\t${project.tier}\t${project.name}\ttasks=${view.lineage.tasks.length}\tmissions=${view.missions.length}\ttask_sessions=${view.task_sessions.length}`
     );
   }
 }
 
 function printHelp(): void {
   printOutput(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state.`
+    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`
   );
 }
 
@@ -154,7 +154,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
         printOutput(`${view.project.project_id}: ${view.project.name}`);
         printOutput(`status=${view.project.status} tier=${view.project.tier}`);
         printOutput(
-          `tracks=${view.tracks.length} tasks=${view.tasks.length} missions=${view.missions.length} task_sessions=${view.task_sessions.length} pipelines=${view.lineage.pipelines.length}`
+          `tracks=${view.tracks.length} tasks=${view.lineage.tasks.length} missions=${view.missions.length} task_sessions=${view.task_sessions.length} pipelines=${view.lineage.pipelines.length}`
         );
         printOutput(`operational_states=${view.operational_states.length}`);
         printOutput('hierarchy=Project -> Track -> Mission -> Task / Task Session');
@@ -282,8 +282,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
         ? [positional]
         : listManagedProjects().map((view) => view.project.project_id);
       const apply = hasFlag(argv, '--apply');
+      const includeCrossScopeDiagnostics = hasFlag(argv, '--cross-scope');
       const reports = projectIds.map((projectId) =>
-        reconcileProjectOperationalState(projectId, { apply })
+        reconcileProjectOperationalState(projectId, { apply, includeCrossScopeDiagnostics })
       );
       if (json) jsonOutput(positional ? reports[0] : reports);
       else

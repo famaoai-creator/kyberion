@@ -1,5 +1,6 @@
 import type { Authority, IdentityContext } from './types.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
+import { resolveProjectScope } from './foundation/project-scope-env.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import { scopedAssumedRole, scopedPersona } from './foundation/execution-scope.js';
 
@@ -20,6 +21,7 @@ const identityContextResolverSeam = createSeam<IdentityContextResolver>({
 const defaultResolver: IdentityContextResolver = (tenantOverride) => {
   // RA-01: an in-process withExecutionContext* assumption outranks the env.
   const scoped = scopedPersona();
+  const projectScope = resolveProjectScope();
   const envPersona = scoped.bound ? scoped.persona : getRegisteredEnvText('KYBERION_PERSONA');
   const persona =
     envPersona === 'sovereign' ||
@@ -43,9 +45,9 @@ const defaultResolver: IdentityContextResolver = (tenantOverride) => {
           ? 'system'
           : 'mission',
     authorities,
-    missionId: getRegisteredEnvText('MISSION_ID'),
+    missionId: projectScope.missionId,
     role: scopedAssumedRole() || getRegisteredEnvText('MISSION_ROLE'),
-    tenantSlug: tenantOverride || getRegisteredEnvText('KYBERION_TENANT'),
+    tenantSlug: tenantOverride || projectScope.tenantSlug,
   };
 };
 

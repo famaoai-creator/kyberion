@@ -16,21 +16,34 @@ import {
   createManagedProject,
   ensureProjectOsScaffold,
   getProjectManagementView,
+  listManagedProjects,
   loadProjectOperatingSystemArtifactMap,
   reconcileProjectOperationalState,
 } from './project-management.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
+import { saveProjectOperationalState } from './project-operational-state-registry.js';
 import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState } from '../mission/mission-state.js';
+import { withExecutionContextAsync } from '../authority.js';
 import type { MissionState } from '../mission/mission-types.js';
+import {
+  clearWorkCoordinationNamespace,
+  clearWorkCoordinationStore,
+  createWorkItem,
+  setWorkCoordinationNamespace,
+} from '../workforce/work-coordination.js';
 
 const PROJECT_ID = 'PRJ-PMC-TEST-001';
 const TRACK_PROJECT_ID = 'PRJ-PMC-TRACK';
 const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
 const CALLBACK_ROOT = pathResolver.sharedTmp('project-management-callback-test');
+const PERSISTED_SCOPE_ENV_PATH = pathResolver.sharedTmp('project-management-worker-scope.env');
 const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 const ORIGINAL_TENANT = process.env.KYBERION_TENANT;
+const ORIGINAL_PROJECT_ID = process.env.KYBERION_PROJECT_ID;
+const ORIGINAL_MISSION_ID = process.env.MISSION_ID;
+const ORIGINAL_SCOPE_ENV_PATH = process.env.KYBERION_SCOPE_ENV_PATH;
 
 function cleanupJsonFiles(directory: string, prefix: string): void {
   if (!safeExistsSync(directory)) return;
@@ -40,6 +53,7 @@ function cleanupJsonFiles(directory: string, prefix: string): void {
 }
 
 function cleanup(): void {
+  safeRmSync(PERSISTED_SCOPE_ENV_PATH, { force: true });
   cleanupJsonFiles(pathResolver.shared('runtime/projects'), 'PRJ-PMC-');
   cleanupJsonFiles(pathResolver.shared('runtime/project-tracks'), 'TRK-PMC-');
   cleanupJsonFiles(pathResolver.shared('runtime/task-sessions'), 'TSK-PMC-TEST-');
@@ -48,6 +62,20 @@ function cleanup(): void {
   const foreignMissionPath = pathResolver.missionDir('MSN-PMC-FOREIGN', 'confidential');
   if (safeExistsSync(foreignMissionPath))
     safeRmSync(foreignMissionPath, { recursive: true, force: true });
+  const workerMissionPath = pathResolver.tenantMissionDir(
+    'MSN-PMC-WORKER-SCOPE',
+    'tenant-pmc-test',
+    'confidential'
+  );
+  if (safeExistsSync(workerMissionPath))
+    safeRmSync(workerMissionPath, { recursive: true, force: true });
+  const persistedWorkerMissionPath = pathResolver.tenantMissionDir(
+    'MSN-PMC-PERSISTED-WORKER',
+    'tenant-pmc-test',
+    'confidential'
+  );
+  if (safeExistsSync(persistedWorkerMissionPath))
+    safeRmSync(persistedWorkerMissionPath, { recursive: true, force: true });
   for (const tenant of ['tenant-pmc-test', 'other-tenant']) {
     const tenantMissionPath = pathResolver.tenantMissionDir(
       'MSN-PMC-FOREIGN',
@@ -91,6 +119,8 @@ function cleanup(): void {
 
 describe('project-management facade', () => {
   beforeEach(() => {
+    setWorkCoordinationNamespace('project-management-facade-test');
+    clearWorkCoordinationStore();
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_TENANT = 'tenant-pmc-test';
@@ -100,11 +130,19 @@ describe('project-management facade', () => {
   afterEach(() => {
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
+    clearWorkCoordinationStore();
+    clearWorkCoordinationNamespace();
     cleanup();
     process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
     if (ORIGINAL_TENANT === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = ORIGINAL_TENANT;
+    if (ORIGINAL_PROJECT_ID === undefined) delete process.env.KYBERION_PROJECT_ID;
+    else process.env.KYBERION_PROJECT_ID = ORIGINAL_PROJECT_ID;
+    if (ORIGINAL_MISSION_ID === undefined) delete process.env.MISSION_ID;
+    else process.env.MISSION_ID = ORIGINAL_MISSION_ID;
+    if (ORIGINAL_SCOPE_ENV_PATH === undefined) delete process.env.KYBERION_SCOPE_ENV_PATH;
+    else process.env.KYBERION_SCOPE_ENV_PATH = ORIGINAL_SCOPE_ENV_PATH;
   });
 
   it('creates a managed Project and repairs registry drift', () => {
@@ -154,6 +192,185 @@ describe('project-management facade', () => {
     expect(repaired.status).toBe('repaired');
     expect(loadProjectRecord(PROJECT_ID)?.active_missions).toEqual([]);
     expect(loadProjectRecord(PROJECT_ID)?.active_task_sessions).toEqual([]);
+  });
+
+  it('projects tenant-scoped canonical WorkItems and their live status into the Project view', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-CANONICAL-WORK',
+      name: 'Canonical Work Project',
+      summary: 'Project view follows canonical WorkItem state.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const workItem = createWorkItem({
+      itemId: 'work-pmc-canonical',
+      title: 'Canonical task status',
+      description: 'The status is maintained by the canonical WorkItem.',
+      projectId: project.project_id,
+      status: 'in_progress',
+      context: {
+        tenant_slug: 'tenant-pmc-test',
+        project_id: project.project_id,
+        task_id: 'TASK-PMC-CANONICAL',
+      },
+    });
+    process.env.KYBERION_TENANT = 'other-tenant';
+    try {
+      createWorkItem({
+        itemId: 'work-pmc-foreign-tenant',
+        title: 'Foreign tenant task',
+        description: 'Same project id in another tenant must not appear.',
+        projectId: project.project_id,
+        context: {
+          tenant_slug: 'other-tenant',
+          project_id: project.project_id,
+          task_id: 'TASK-PMC-FOREIGN',
+        },
+      });
+    } finally {
+      process.env.KYBERION_TENANT = 'tenant-pmc-test';
+    }
+
+    const view = getProjectManagementView(project.project_id);
+
+    expect(view.work_items.map((item) => item.item_id)).toEqual([workItem.item_id]);
+    expect(view.lineage.tasks).toEqual([
+      expect.objectContaining({
+        work_id: 'TASK-PMC-CANONICAL',
+        title: 'Canonical task status',
+        status: 'in_progress',
+        role: 'work_item',
+      }),
+    ]);
+  });
+
+  it('limits worker project and mission views to the bound project, tenant, and mission', async () => {
+    const ownProject = createManagedProject({
+      project_id: 'PRJ-PMC-WORKER-OWN',
+      name: 'Worker Own Project',
+      summary: 'Worker has one explicit project scope.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const otherProject = createManagedProject({
+      project_id: 'PRJ-PMC-WORKER-OTHER',
+      name: 'Other Worker Project',
+      summary: 'Another project must remain outside worker scope.',
+      tier: 'confidential',
+      tenant_slug: 'other-tenant',
+      status: 'active',
+    });
+    const mission: MissionState = {
+      mission_id: 'MSN-PMC-WORKER-SCOPE',
+      mission_type: 'development',
+      tier: 'confidential',
+      status: 'active',
+      tenant_slug: 'tenant-pmc-test',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      relationships: { project: { project_id: ownProject.project_id } },
+      git: {
+        branch: 'mission/worker-scope',
+        start_commit: 'fixture',
+        latest_commit: 'fixture',
+        checkpoints: [],
+      },
+      history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
+    };
+    await saveState(mission.mission_id, mission);
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_TENANT = 'tenant-pmc-test';
+    process.env.KYBERION_PROJECT_ID = ownProject.project_id;
+    process.env.MISSION_ID = mission.mission_id;
+
+    expect(listManagedProjects().map((view) => view.project.project_id)).toEqual([
+      ownProject.project_id,
+    ]);
+    expect(getProjectManagementView(ownProject.project_id).project.project_id).toBe(
+      ownProject.project_id
+    );
+    expect(getProjectManagementView(ownProject.project_id).missions).toEqual([
+      expect.objectContaining({ mission_id: mission.mission_id }),
+    ]);
+    expect(() => getProjectManagementView(otherProject.project_id)).toThrow(
+      '[PROJECT_SCOPE_VIOLATION]'
+    );
+  });
+
+  it('resolves worker project, tenant, and mission access from the governed persisted scope', async () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-WORKER-PERSISTED',
+      name: 'Persisted Scope Project',
+      summary: 'Worker scope can be persisted by pnpm scope use.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const mission: MissionState = {
+      mission_id: 'MSN-PMC-PERSISTED-WORKER',
+      mission_type: 'development',
+      tier: 'confidential',
+      status: 'active',
+      tenant_slug: 'tenant-pmc-test',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      relationships: { project: { project_id: project.project_id } },
+      git: {
+        branch: 'mission/persisted-worker-scope',
+        start_commit: 'fixture',
+        latest_commit: 'fixture',
+        checkpoints: [],
+      },
+      history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
+    };
+    await saveState(mission.mission_id, mission);
+    process.env.KYBERION_SCOPE_ENV_PATH = PERSISTED_SCOPE_ENV_PATH;
+    delete process.env.KYBERION_PROJECT_ID;
+    delete process.env.MISSION_ID;
+    safeWriteFile(
+      PERSISTED_SCOPE_ENV_PATH,
+      `KYBERION_PROJECT_ID=${project.project_id}\nKYBERION_TENANT=tenant-pmc-test\nMISSION_ID=${mission.mission_id}\n`
+    );
+    delete process.env.KYBERION_TENANT;
+
+    await withExecutionContextAsync(
+      'mission_controller',
+      async () => {
+        expect(listManagedProjects().map((view) => view.project.project_id)).toEqual([
+          project.project_id,
+        ]);
+        expect(getProjectManagementView(project.project_id).missions).toEqual([
+          expect.objectContaining({ mission_id: mission.mission_id }),
+        ]);
+        expect(() => getProjectManagementView('PRJ-PMC-WORKER-OTHER')).toThrow(
+          '[PROJECT_SCOPE_VIOLATION]'
+        );
+      },
+      'worker'
+    );
+  });
+
+  it('denies workers access to a matching personal project scope', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-WORKER-PERSONAL',
+      name: 'Personal Project Boundary',
+      summary: 'Personal projects are outside worker project scope.',
+      tier: 'personal',
+      status: 'active',
+    });
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_PROJECT_ID = project.project_id;
+
+    expect(() => getProjectManagementView(project.project_id)).toThrow('[PROJECT_SCOPE_VIOLATION]');
+    expect(() => listManagedProjects()).toThrow('[PROJECT_SCOPE_VIOLATION]');
   });
 
   it('rejects a directory used as a project OS blueprint', () => {
@@ -406,6 +623,105 @@ describe('project-management facade', () => {
         expect.objectContaining({ kind: 'out_of_scope_track', actual: ['TRK-PMC-FOREIGN'] }),
       ])
     );
+  });
+
+  it('denies worker reconciliation outside the bound project and tenant', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-WORKER-RECONCILE',
+      name: 'Worker Reconciliation Scope',
+      summary: 'Reconciliation respects the worker project and tenant bindings.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_PROJECT_ID = 'PRJ-PMC-OTHER-PROJECT';
+
+    expect(() => reconcileProjectOperationalState(project.project_id, { apply: true })).toThrow(
+      /PROJECT_SCOPE_VIOLATION/
+    );
+
+    process.env.KYBERION_PROJECT_ID = project.project_id;
+    process.env.KYBERION_TENANT = 'other-tenant';
+    expect(() => reconcileProjectOperationalState(project.project_id, { apply: true })).toThrow(
+      /worker tenant 'other-tenant' cannot access project tenant 'tenant-pmc-test'/
+    );
+  });
+
+  it('audits sovereign cross-scope diagnostics for mismatched project state records', () => {
+    const projectId = 'PRJ-PMC-FOREIGN-STATE';
+    const project = createManagedProject({
+      project_id: projectId,
+      name: 'Foreign State Project',
+      summary: 'Cross-scope diagnostics detect mismatched operational state.',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const mismatchedWorkspaces = [
+      pathResolver.projectWorkspaceDir(projectId, 'public', 'tenant-pmc-test'),
+      pathResolver.projectWorkspaceDir(projectId, 'personal', 'tenant-pmc-test'),
+    ];
+
+    try {
+      saveProjectOperationalState({
+        project_id: projectId,
+        name: project.name,
+        summary: 'Mismatched tier state fixture.',
+        status: 'active',
+        tier: 'public',
+        tenant_slug: 'tenant-pmc-test',
+      });
+      saveProjectOperationalState({
+        project_id: projectId,
+        name: project.name,
+        summary: 'Personal tenant partition state fixture.',
+        status: 'active',
+        tier: 'personal',
+        tenant_slug: 'tenant-pmc-test',
+      });
+
+      const scopedReport = reconcileProjectOperationalState(projectId);
+      expect(scopedReport.issues).not.toContainEqual(
+        expect.objectContaining({ kind: 'out_of_scope_operational_state' })
+      );
+
+      const diagnosticReport = reconcileProjectOperationalState(projectId, {
+        includeCrossScopeDiagnostics: true,
+      });
+      expect(diagnosticReport.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'out_of_scope_operational_state',
+          actual: ['personal:tenant-pmc-test', 'public:tenant-pmc-test'],
+        })
+      );
+
+      process.env.KYBERION_PERSONA = 'worker';
+      process.env.KYBERION_PROJECT_ID = projectId;
+      expect(() =>
+        reconcileProjectOperationalState(projectId, { includeCrossScopeDiagnostics: true })
+      ).toThrow(/requires the sovereign persona/);
+    } finally {
+      const previousPersona = process.env.KYBERION_PERSONA;
+      const previousRole = process.env.MISSION_ROLE;
+      const previousTenant = process.env.KYBERION_TENANT;
+      process.env.KYBERION_PERSONA = 'sovereign';
+      process.env.MISSION_ROLE = 'sovereign';
+      process.env.KYBERION_TENANT = 'tenant-pmc-test';
+      try {
+        for (const workspace of mismatchedWorkspaces) {
+          safeRmSync(workspace, { recursive: true, force: true });
+        }
+      } finally {
+        if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+        else process.env.KYBERION_PERSONA = previousPersona;
+        if (previousRole === undefined) delete process.env.MISSION_ROLE;
+        else process.env.MISSION_ROLE = previousRole;
+        if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+        else process.env.KYBERION_TENANT = previousTenant;
+      }
+    }
   });
 
   it('runs the rollback hook when the commit callback fails after a partial write', () => {

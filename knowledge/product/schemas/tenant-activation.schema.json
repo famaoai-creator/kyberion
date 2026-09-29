@@ -30,7 +30,7 @@
     "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
     "organization_id": { "type": "string", "minLength": 1 },
     "tier": { "enum": ["personal", "confidential", "public"] },
-    "owner_id": { "type": "string", "minLength": 1 },
+    "owner_id": { "type": "string" },
     "customer_stance": { "type": "string", "minLength": 1 },
     "nhi_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "next_actions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
@@ -101,11 +101,31 @@
   },
   "allOf": [
     {
+      "if": {
+        "properties": {
+          "checks": {
+            "type": "object",
+            "properties": { "accountable_human": { "const": true } },
+            "required": ["accountable_human"]
+          }
+        },
+        "required": ["checks"]
+      },
+      "then": {
+        "properties": { "owner_id": { "type": "string", "pattern": "^human:\\S+$" } }
+      }
+    },
+    {
       "if": { "properties": { "status": { "const": "active" } } },
       "then": {
         "required": ["activated_at"],
         "properties": {
           "nhi_ids": { "type": "array", "minItems": 1 },
+          "checks": {
+            "type": "object",
+            "properties": { "accountable_human": { "const": true } },
+            "required": ["accountable_human"]
+          },
           "probe_refs": {
             "type": "object",
             "required": ["viewer_scope", "nhi_provisioned", "service_readiness", "isolation_probe"]

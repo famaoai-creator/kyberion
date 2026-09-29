@@ -8,6 +8,7 @@ import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-p
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { resolveProjectScope } from './foundation/project-scope-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
@@ -861,7 +862,8 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 }
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
-  const missionId = getRegisteredEnvText('MISSION_ID');
+  const projectScope = resolveProjectScope();
+  const missionId = getRegisteredEnvText('MISSION_ID')?.trim() || projectScope.missionId;
   const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
@@ -870,9 +872,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const executionScope = currentExecutionScope();
   let tenantSlug: string | undefined = normalizeTenantSlug(
     tenantOverride ??
-      (executionScope?.tenantBound
-        ? executionScope.tenantSlug
-        : getRegisteredEnvText('KYBERION_TENANT'))
+      (executionScope?.tenantBound ? executionScope.tenantSlug : projectScope.tenantSlug)
   );
   let brokeredTenants: string[] | undefined;
   let brokerApproval:
@@ -992,7 +992,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
       if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
         const actorNhiId = resolveGrantActorNhiId(envRole);
         if (actorNhiId) {
-          const taskId = getRegisteredEnvText('TASK_ID')?.trim() || undefined;
+          const taskId = getRegisteredEnvText('TASK_ID')?.trim() || projectScope.taskId;
           const latestGrants = new Map<string, JsonRecord>();
           for (const line of rawReadTextFile(taskGrantsPath).split('\n')) {
             const trimmed = line.trim();
@@ -1034,7 +1034,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
             const audience = grant.audience;
             const scope = grant.scope;
             const grantTenant = (stringField(scope, 'tenant_slug') || '').trim();
-            const actorTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+            const actorTenant = projectScope.tenantSlug;
             if (!grantTenant || !actorTenant || grantTenant !== actorTenant) {
               logger.debug(
                 `task grant ${stringField(grant, 'grant_id')} skipped: tenant scope ${grantTenant || '<missing>'} != ${actorTenant || '<missing>'}`
