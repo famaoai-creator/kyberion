@@ -6975,6 +6975,22 @@
       "types": "./dist/discussion/discussion-copy.d.ts",
       "default": "./dist/discussion/discussion-copy.js"
     },
+    "./discussion/discussion-attachments": {
+      "types": "./dist/discussion/discussion-attachments.d.ts",
+      "default": "./dist/discussion/discussion-attachments.js"
+    },
+    "./discussion/discussion-dialogue-actions": {
+      "types": "./dist/discussion/discussion-dialogue-actions.d.ts",
+      "default": "./dist/discussion/discussion-dialogue-actions.js"
+    },
+    "./discussion/discussion-dialogue-engine": {
+      "types": "./dist/discussion/discussion-dialogue-engine.d.ts",
+      "default": "./dist/discussion/discussion-dialogue-engine.js"
+    },
+    "./discussion/discussion-live": {
+      "types": "./dist/discussion/discussion-live.d.ts",
+      "default": "./dist/discussion/discussion-live.js"
+    },
     "./discussion/discussion-brief": {
       "types": "./dist/discussion/discussion-brief.d.ts",
       "default": "./dist/discussion/discussion-brief.js"
