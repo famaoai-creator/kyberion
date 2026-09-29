@@ -5,7 +5,13 @@
  * Rules:
  *   - Colors, radii, spacing and type sizes come only from `--kb-ui-*`
  *     variables (tokens.ui in brand-tokens/kyberion.json). No literal colors.
- *   - No glass, blur or gradient backgrounds; shadows stay subtle.
+ *   - No glass or blur; shadows stay subtle. Gradients are allowed only through
+ *     `--kb-ui-gradient-accent` (primary controls), which is `none` unless a KDS v2
+ *     style opts in (`surface_gradient`); its stops are derived so the button ink
+ *     keeps 4.5:1 on every stop (scripts/check_design_contrast.ts).
+ *   - A KDS v2 style (`[data-kds-style]` on <html>, see the UI token block) may
+ *     re-declare the same `--kb-ui-*` tokens and `--kb-ui-font-heading`;
+ *     components never branch on the style itself.
  *   - Class names are the renderer contract: one `.kb-<component>` root per
  *     `ui:<component>` type, BEM `__element` / `--modifier`, and state via
  *     data attributes (`data-tone`, `data-status`, `data-density`, ...).
@@ -1418,11 +1424,13 @@ a.kb-list__title:hover {
 
 .kb-btn--primary {
   background: var(--kb-ui-accent);
+  background-image: var(--kb-ui-gradient-accent, none);
   color: var(--kb-ui-text-on-accent);
 }
 
 .kb-btn--primary:hover {
   background: var(--kb-ui-accent-hover);
+  background-image: none;
 }
 
 .kb-btn--secondary {
@@ -1618,4 +1626,14 @@ a.kb-list__title:hover {
   .kb-disclosure > summary::before {
     transition: none;
   }
+}
+
+/* ------------------------------------------------- heading face (KDS v2) -- */
+/* Headings follow the style's heading face when one is declared; otherwise the UI sans. */
+.kb-page-header__title,
+.kb-section__title,
+.kb-next-action__title,
+.kb-empty-state__title,
+.kb-callout__title {
+  font-family: var(--kb-ui-font-heading, var(--kb-ui-font-sans));
 }
