@@ -91,6 +91,7 @@ export const UI_GALLERY_VOCABULARY_KEYS = [
   'presence_studio:ui_gallery_theme',
   'presence_studio:ui_gallery_theme_light',
   'presence_studio:ui_gallery_theme_dark',
+  'presence_studio:ui_gallery_style',
   'presence_studio:ui_gallery_density',
   'presence_studio:ui_gallery_density_comfortable',
   'presence_studio:ui_gallery_density_compact',

@@ -50,6 +50,8 @@ export interface DesignStyle {
   elevation: string;
   density: 'comfortable' | 'compact';
   gradient: string | null;
+  /** Surfaces (web UI) may paint primary controls with an accent gradient for this style. */
+  surface_gradient: boolean;
   preferred_compositions: string[];
   /** Mood words / anti-patterns injected into generative prompts (image / video / music). */
   tone_words: string[];
@@ -231,6 +233,7 @@ function parseStyles(
       elevation,
       density: raw.density === 'compact' ? 'compact' : 'comfortable',
       gradient,
+      surface_gradient: raw.surface_gradient === true && gradient !== null,
       preferred_compositions: Array.isArray(raw.preferred_compositions)
         ? raw.preferred_compositions.filter(
             (entry): entry is string => typeof entry === 'string' && entry in compositions

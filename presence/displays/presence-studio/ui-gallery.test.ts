@@ -422,7 +422,7 @@ describe('ui-gallery-prefs.js applies the shared theme / language before paint',
 
   interface PrefsRun {
     attrs: Map<string, string>;
-    prefs: { theme: string | null; locale: string };
+    prefs: { theme: string | null; locale: string; style: string | null };
   }
 
   /** Run the blocking script against a fake page (`storage: null` = storage throws). */
@@ -471,11 +471,24 @@ describe('ui-gallery-prefs.js applies the shared theme / language before paint',
     expect(readRepoFile(`${STATIC_DIR}/ui-gallery.js`)).toContain('window.KyberionGalleryPrefs');
   });
 
+  it('?style= previews a known KDS style before paint and is never stored or guessed', () => {
+    const known = runPrefs({ search: '?style=editorial' });
+    expect(known.attrs.get('data-kds-style')).toBe('editorial');
+    expect(known.prefs.style).toBe('editorial');
+    // unknown / baseline ids leave the attribute off, and a stored value is not read at all
+    for (const search of ['?style=standard', '?style=nope', '']) {
+      const run = runPrefs({ search, storage: { 'kyberion.ui.style': 'aurora' } });
+      expect(run.attrs.has('data-kds-style')).toBe(false);
+      expect(run.prefs.style).toBeNull();
+    }
+    expect(source).not.toContain("'kyberion.ui.style'");
+  });
+
   it('first load uses the stored shared theme and language', () => {
     const run = runPrefs({ storage: { 'kyberion.ui.theme': 'dark', 'kyberion.ui.locale': 'ja' } });
     expect(run.attrs.get('data-theme')).toBe('dark');
     expect(run.attrs.get('lang')).toBe('ja');
-    expect(run.prefs).toEqual({ theme: 'dark', locale: 'ja' });
+    expect(run.prefs).toEqual({ theme: 'dark', locale: 'ja', style: null });
   });
 
   it('?theme= and ?lang= override the stored choice', () => {
@@ -492,7 +505,7 @@ describe('ui-gallery-prefs.js applies the shared theme / language before paint',
   it('no stored theme follows the system (no data-theme); the browser language is the fallback', () => {
     const run = runPrefs({ storage: {}, language: 'ja-JP' });
     expect(run.attrs.has('data-theme')).toBe(false);
-    expect(run.prefs).toEqual({ theme: null, locale: 'ja' });
+    expect(run.prefs).toEqual({ theme: null, locale: 'ja', style: null });
     const invalid = runPrefs({
       search: '?theme=neon&lang=xx',
       storage: { 'kyberion.ui.theme': 'sepia', 'kyberion.ui.locale': 'fr' },
