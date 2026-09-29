@@ -20,11 +20,11 @@ Canonical reference: [DESIGN_SYSTEM.md](../../../../docs/developer/design/DESIGN
 | Specs, worksheets, print              | `paper-minimal`      | Near-monochrome, content first                        |
 | Anything else                         | omit / `standard`    | Baseline Kyberion look                                |
 
-Pass `style` to `resolveCreativeDesign` (or `resolvePptxSurfaceDesign(tenant, style)`). Tenant branding still overrides the style.
+In a brief: `design_style: "editorial"` (or `design_system_id: "kds-editorial"`, which also re-lays out generic slides). In code: `resolveCreativeDesign({ style })`. In a campaign brief the same `design_style` styles deck, doc, video and landing page together. Tenant branding still overrides the style.
 
 ## Pick a composition (free layout)
 
-Read `design_style.preferred_compositions`, or choose from the catalog by the slide's job: statement → `hero-split` / `spotlight`; numbers → `stat-rail`; options → `three-up`; feature overview → `bento-4`; monitoring → `dashboard-grid`; reference → `sidebar-detail`; story → `editorial-asym`. When none fits, author a custom `CompositionSpec` (12 columns × N rows) and run `validateComposition` before use.
+Name it on a section (`composition: "stat-rail"`), or let `kds-<style>` map it. Read `design_style.preferred_compositions`, or choose from the catalog by the slide's job: statement → `hero-split` / `spotlight`; numbers → `stat-rail`; options → `three-up`; feature overview → `bento-4`; monitoring → `dashboard-grid`; reference → `sidebar-detail`; story → `editorial-asym`. When none fits, author a custom `CompositionSpec` (12 columns × N rows) and run `validateComposition` before use.
 
 ## Rules
 
