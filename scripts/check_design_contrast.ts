@@ -13,6 +13,8 @@ import {
   type BrandUiTokens,
 } from '@agent/core/brand-tokens';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadDesignFoundation } from '@agent/core/design-foundation';
+import { deriveStyleUiOverride } from '@agent/core/design-foundation-ui';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -383,6 +385,26 @@ function checkUiTokens(ui: BrandUiTokens | undefined): string[] {
   });
 }
 
+/**
+ * KDS v2: every style's derived Surface palette is held to the same pairs as the
+ * base palette, in both themes. A style that cannot reach the floors fails here,
+ * so a style is either legible on the Surfaces or it does not ship.
+ */
+export function checkStyleUiTokens(ui: BrandUiTokens | undefined): string[] {
+  const foundation = loadDesignFoundation();
+  if (!ui || !foundation) return [];
+  return Object.values(foundation.styles).flatMap((style) =>
+    (['light', 'dark'] as const).flatMap((theme) => {
+      const override = deriveStyleUiOverride(ui, foundation, style, theme);
+      if (!override) return [];
+      return checkPalette(`ui.style.${style.id}.${theme}`, flattenUiPalette(override.palette), [
+        ...buildUiContrastPairs(Object.keys(override.palette.role)),
+        ...buildUiVizContrastPairs(),
+      ]);
+    })
+  );
+}
+
 export function checkDesignContrast(): string[] {
   const brandTokens = loadBrandTokensAtPath();
   const themes = parseJson<{ default_theme: string; themes: Record<string, { colors: Palette }> }>(
@@ -447,6 +469,7 @@ export function checkDesignContrast(): string[] {
     }),
     ...checkDerivedWebThemePacks(),
     ...checkUiTokens(brandTokens.tokens.ui),
+    ...checkStyleUiTokens(brandTokens.tokens.ui),
   ];
 
   return violations;

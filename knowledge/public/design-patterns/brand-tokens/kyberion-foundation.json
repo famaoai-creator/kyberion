@@ -361,9 +361,24 @@
       "elevation": "xs",
       "density": "comfortable",
       "gradient": null,
-      "preferred_compositions": ["editorial-asym", "spotlight", "hero-split"],
-      "tone_words": ["editorial", "warm paper", "serif headline", "generous whitespace", "calm"],
-      "avoid": ["neon", "glossy 3d", "gradient washes", "busy collage"]
+      "preferred_compositions": [
+        "editorial-asym",
+        "spotlight",
+        "hero-split"
+      ],
+      "tone_words": [
+        "editorial",
+        "warm paper",
+        "serif headline",
+        "generous whitespace",
+        "calm"
+      ],
+      "avoid": [
+        "neon",
+        "glossy 3d",
+        "gradient washes",
+        "busy collage"
+      ]
     },
     "midnight-signal": {
       "label": "Midnight Signal",
@@ -424,9 +439,23 @@
       "elevation": "lg",
       "density": "comfortable",
       "gradient": "dusk",
-      "preferred_compositions": ["hero-split", "bento-4", "stat-rail"],
-      "tone_words": ["deep navy", "single cyan accent", "high contrast", "precise", "cinematic"],
-      "avoid": ["rainbow palettes", "clip-art", "low-contrast text"]
+      "preferred_compositions": [
+        "hero-split",
+        "bento-4",
+        "stat-rail"
+      ],
+      "tone_words": [
+        "deep navy",
+        "single cyan accent",
+        "high contrast",
+        "precise",
+        "cinematic"
+      ],
+      "avoid": [
+        "rainbow palettes",
+        "clip-art",
+        "low-contrast text"
+      ]
     },
     "graphite-executive": {
       "label": "Graphite Executive",
@@ -499,9 +528,23 @@
       "elevation": "xs",
       "density": "compact",
       "gradient": null,
-      "preferred_compositions": ["stat-rail", "dashboard-grid", "sidebar-detail"],
-      "tone_words": ["graphite neutrals", "hairline rules", "data-dense", "sober", "corporate"],
-      "avoid": ["playful illustration", "saturated colours", "drop shadows"]
+      "preferred_compositions": [
+        "stat-rail",
+        "dashboard-grid",
+        "sidebar-detail"
+      ],
+      "tone_words": [
+        "graphite neutrals",
+        "hairline rules",
+        "data-dense",
+        "sober",
+        "corporate"
+      ],
+      "avoid": [
+        "playful illustration",
+        "saturated colours",
+        "drop shadows"
+      ]
     },
     "aurora": {
       "label": "Aurora",
@@ -556,7 +599,11 @@
       "elevation": "lg",
       "density": "comfortable",
       "gradient": "aurora",
-      "preferred_compositions": ["spotlight", "hero-split", "three-up"],
+      "preferred_compositions": [
+        "spotlight",
+        "hero-split",
+        "three-up"
+      ],
       "tone_words": [
         "violet to cyan gradient",
         "soft glow",
@@ -564,7 +611,12 @@
         "optimistic",
         "launch energy"
       ],
-      "avoid": ["muddy colours", "harsh black outlines", "stock-photo look"]
+      "avoid": [
+        "muddy colours",
+        "harsh black outlines",
+        "stock-photo look"
+      ],
+      "surface_gradient": true
     },
     "paper-minimal": {
       "label": "Paper Minimal",
@@ -625,7 +677,11 @@
       "elevation": "xs",
       "density": "comfortable",
       "gradient": null,
-      "preferred_compositions": ["sidebar-detail", "three-up", "spotlight"],
+      "preferred_compositions": [
+        "sidebar-detail",
+        "three-up",
+        "spotlight"
+      ],
       "tone_words": [
         "near-monochrome",
         "hairline borders",
@@ -633,7 +689,11 @@
         "print-like",
         "restrained"
       ],
-      "avoid": ["gradients", "heavy shadows", "decorative icons"]
+      "avoid": [
+        "gradients",
+        "heavy shadows",
+        "decorative icons"
+      ]
     }
   },
   "compositions": {
@@ -646,24 +706,42 @@
         {
           "id": "title",
           "role": "title",
-          "col": [1, 6],
-          "row": [2, 2],
+          "col": [
+            1,
+            6
+          ],
+          "row": [
+            2,
+            2
+          ],
           "align": "start",
           "valign": "end"
         },
         {
           "id": "body",
           "role": "body",
-          "col": [1, 5],
-          "row": [4, 2],
+          "col": [
+            1,
+            5
+          ],
+          "row": [
+            4,
+            2
+          ],
           "align": "start",
           "valign": "start"
         },
         {
           "id": "visual",
           "role": "visual",
-          "col": [8, 5],
-          "row": [1, 6],
+          "col": [
+            8,
+            5
+          ],
+          "row": [
+            1,
+            6
+          ],
           "bleed": "right"
         }
       ]
@@ -676,30 +754,54 @@
         {
           "id": "kicker",
           "role": "kicker",
-          "col": [1, 4],
-          "row": [1, 1],
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            1,
+            1
+          ],
           "align": "start",
           "valign": "start"
         },
         {
           "id": "title",
           "role": "title",
-          "col": [1, 8],
-          "row": [2, 2],
+          "col": [
+            1,
+            8
+          ],
+          "row": [
+            2,
+            2
+          ],
           "align": "start",
           "valign": "start"
         },
         {
           "id": "visual",
           "role": "visual",
-          "col": [9, 4],
-          "row": [2, 4]
+          "col": [
+            9,
+            4
+          ],
+          "row": [
+            2,
+            4
+          ]
         },
         {
           "id": "body",
           "role": "body",
-          "col": [1, 6],
-          "row": [4, 3],
+          "col": [
+            1,
+            6
+          ],
+          "row": [
+            4,
+            3
+          ],
           "align": "start",
           "valign": "start"
         }
@@ -713,27 +815,51 @@
         {
           "id": "lead",
           "role": "card",
-          "col": [1, 7],
-          "row": [1, 4],
+          "col": [
+            1,
+            7
+          ],
+          "row": [
+            1,
+            4
+          ],
           "emphasis": "high"
         },
         {
           "id": "side-top",
           "role": "card",
-          "col": [8, 5],
-          "row": [1, 2]
+          "col": [
+            8,
+            5
+          ],
+          "row": [
+            1,
+            2
+          ]
         },
         {
           "id": "side-bottom",
           "role": "card",
-          "col": [8, 5],
-          "row": [3, 2]
+          "col": [
+            8,
+            5
+          ],
+          "row": [
+            3,
+            2
+          ]
         },
         {
           "id": "wide",
           "role": "card",
-          "col": [1, 12],
-          "row": [5, 2]
+          "col": [
+            1,
+            12
+          ],
+          "row": [
+            5,
+            2
+          ]
         }
       ]
     },
@@ -745,35 +871,65 @@
         {
           "id": "title",
           "role": "title",
-          "col": [1, 12],
-          "row": [1, 1],
+          "col": [
+            1,
+            12
+          ],
+          "row": [
+            1,
+            1
+          ],
           "align": "start",
           "valign": "center"
         },
         {
           "id": "kpi-1",
           "role": "kpi",
-          "col": [1, 4],
-          "row": [2, 3],
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            2,
+            3
+          ],
           "emphasis": "high"
         },
         {
           "id": "kpi-2",
           "role": "kpi",
-          "col": [5, 4],
-          "row": [2, 3]
+          "col": [
+            5,
+            4
+          ],
+          "row": [
+            2,
+            3
+          ]
         },
         {
           "id": "kpi-3",
           "role": "kpi",
-          "col": [9, 4],
-          "row": [2, 3]
+          "col": [
+            9,
+            4
+          ],
+          "row": [
+            2,
+            3
+          ]
         },
         {
           "id": "body",
           "role": "body",
-          "col": [1, 12],
-          "row": [5, 2],
+          "col": [
+            1,
+            12
+          ],
+          "row": [
+            5,
+            2
+          ],
           "align": "start",
           "valign": "start"
         }
@@ -787,16 +943,28 @@
         {
           "id": "title",
           "role": "title",
-          "col": [3, 8],
-          "row": [2, 2],
+          "col": [
+            3,
+            8
+          ],
+          "row": [
+            2,
+            2
+          ],
           "align": "center",
           "valign": "end"
         },
         {
           "id": "body",
           "role": "body",
-          "col": [4, 6],
-          "row": [4, 2],
+          "col": [
+            4,
+            6
+          ],
+          "row": [
+            4,
+            2
+          ],
           "align": "center",
           "valign": "start"
         }
@@ -810,22 +978,40 @@
         {
           "id": "side",
           "role": "side",
-          "col": [1, 4],
-          "row": [1, 6]
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            1,
+            6
+          ]
         },
         {
           "id": "title",
           "role": "title",
-          "col": [5, 8],
-          "row": [1, 1],
+          "col": [
+            5,
+            8
+          ],
+          "row": [
+            1,
+            1
+          ],
           "align": "start",
           "valign": "center"
         },
         {
           "id": "body",
           "role": "body",
-          "col": [5, 8],
-          "row": [2, 5],
+          "col": [
+            5,
+            8
+          ],
+          "row": [
+            2,
+            5
+          ],
           "align": "start",
           "valign": "start"
         }
@@ -839,28 +1025,52 @@
         {
           "id": "title",
           "role": "title",
-          "col": [1, 12],
-          "row": [1, 2],
+          "col": [
+            1,
+            12
+          ],
+          "row": [
+            1,
+            2
+          ],
           "align": "start",
           "valign": "center"
         },
         {
           "id": "card-1",
           "role": "card",
-          "col": [1, 4],
-          "row": [3, 4]
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            3,
+            4
+          ]
         },
         {
           "id": "card-2",
           "role": "card",
-          "col": [5, 4],
-          "row": [3, 4]
+          "col": [
+            5,
+            4
+          ],
+          "row": [
+            3,
+            4
+          ]
         },
         {
           "id": "card-3",
           "role": "card",
-          "col": [9, 4],
-          "row": [3, 4]
+          "col": [
+            9,
+            4
+          ],
+          "row": [
+            3,
+            4
+          ]
         }
       ]
     },
@@ -872,46 +1082,88 @@
         {
           "id": "title",
           "role": "title",
-          "col": [1, 12],
-          "row": [1, 1],
+          "col": [
+            1,
+            12
+          ],
+          "row": [
+            1,
+            1
+          ],
           "align": "start",
           "valign": "center"
         },
         {
           "id": "tile-1",
           "role": "card",
-          "col": [1, 4],
-          "row": [2, 2]
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            2,
+            2
+          ]
         },
         {
           "id": "tile-2",
           "role": "card",
-          "col": [5, 4],
-          "row": [2, 2]
+          "col": [
+            5,
+            4
+          ],
+          "row": [
+            2,
+            2
+          ]
         },
         {
           "id": "tile-3",
           "role": "card",
-          "col": [9, 4],
-          "row": [2, 2]
+          "col": [
+            9,
+            4
+          ],
+          "row": [
+            2,
+            2
+          ]
         },
         {
           "id": "tile-4",
           "role": "card",
-          "col": [1, 4],
-          "row": [4, 3]
+          "col": [
+            1,
+            4
+          ],
+          "row": [
+            4,
+            3
+          ]
         },
         {
           "id": "tile-5",
           "role": "card",
-          "col": [5, 4],
-          "row": [4, 3]
+          "col": [
+            5,
+            4
+          ],
+          "row": [
+            4,
+            3
+          ]
         },
         {
           "id": "tile-6",
           "role": "card",
-          "col": [9, 4],
-          "row": [4, 3]
+          "col": [
+            9,
+            4
+          ],
+          "row": [
+            4,
+            3
+          ]
         }
       ]
     }
