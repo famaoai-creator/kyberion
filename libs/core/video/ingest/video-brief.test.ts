@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { withExecutionContext, withExecutionContextAsync } from '../../authority.js';
 import * as pathResolver from '../../path-resolver.js';
 import {
   safeExistsSync,
@@ -199,6 +200,11 @@ function options(overrides: Partial<TestOptions> = {}): TestOptions {
 
 /** Tenant authorizer that accepts every slug (the registry is not a fixture here). */
 const registered = () => undefined;
+
+const withSovereignFixture = <T>(operation: () => T): T =>
+  withExecutionContext('sovereign', operation, 'sovereign');
+const withSovereignFixtureAsync = <T>(operation: () => Promise<T> | T): Promise<T> =>
+  withExecutionContextAsync('sovereign', operation, 'sovereign');
 
 afterAll(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
@@ -906,41 +912,49 @@ describe('video cache tenant placement', () => {
 
   it("refuses to cache tenant A's input under tenant B", async () => {
     const slug = `vt${randomUUID().slice(0, 8)}`;
-    const tenantDir = path.join(root, 'active/projects/confidential', slug);
+    const projectId = `p${randomUUID().slice(0, 8)}`;
+    const tenantDir = path.join(root, 'active/projects/confidential', slug, projectId);
     const file = path.join(tenantDir, 'clip.mp4');
-    asMissionController();
-    try {
+    const runner = vi.fn<VideoCommandRunner>();
+    const other: VideoCachePlacement = {
+      scope: 'tenant',
+      root: path.join(TEST_ROOT, randomUUID()),
+      tier: 'confidential',
+      tenant_slug: 'other-tenant',
+    };
+    withSovereignFixture(() => {
       safeMkdir(tenantDir, { recursive: true });
       safeWriteFile(file, 'tenant-a-clip');
-      const runner = vi.fn<VideoCommandRunner>();
-      const other: VideoCachePlacement = {
-        scope: 'tenant',
-        root: path.join(TEST_ROOT, randomUUID()),
-        tier: 'confidential',
-        tenant_slug: 'other-tenant',
-      };
-      const mismatch = await buildVideoBrief(
-        { kind: 'file', path: file },
-        options({ runner, cachePlacement: other })
+    });
+    try {
+      const mismatch = await withSovereignFixtureAsync(() =>
+        buildVideoBrief({ kind: 'file', path: file }, options({ runner, cachePlacement: other }))
       );
       expect(mismatch).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
-      const tenantless = await buildVideoBrief(
-        { kind: 'file', path: file },
-        options({ runner, cachePlacement: { ...other, scope: 'mission', tenant_slug: undefined } })
+      const tenantless = await withSovereignFixtureAsync(() =>
+        buildVideoBrief(
+          { kind: 'file', path: file },
+          options({
+            runner,
+            cachePlacement: { ...other, scope: 'mission', tenant_slug: undefined },
+          })
+        )
       );
       expect(tenantless).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
       expect(runner).not.toHaveBeenCalled();
-      const same = await buildVideoBrief(
-        { kind: 'file', path: file },
-        options({
-          runner: fakeRunner({}, []),
-          cachePlacement: { ...other, tenant_slug: slug },
-          transcript_preference: 'subtitles_only',
-        })
+      const same = await withSovereignFixtureAsync(() =>
+        buildVideoBrief(
+          { kind: 'file', path: file },
+          options({
+            runner: fakeRunner({}, []),
+            cachePlacement: { ...other, tenant_slug: slug },
+            transcript_preference: 'subtitles_only',
+          })
+        )
       );
       expect(same.status).toBe('ok');
     } finally {
-      safeRmSync(tenantDir, { recursive: true, force: true });
+      withSovereignFixture(() => safeRmSync(tenantDir, { recursive: true, force: true }));
     }
   });
 });
@@ -1069,34 +1083,40 @@ describe('video cache fail-closed classification', () => {
 
   it('classifies through a symlinked parent directory and refuses a cross-tenant cache', async () => {
     const slug = `vl${randomUUID().slice(0, 8)}`;
-    const tenantDir = path.join(root, 'active/projects/confidential', slug);
+    const projectId = `p${randomUUID().slice(0, 8)}`;
+    const tenantDir = path.join(root, 'active/projects/confidential', slug, projectId);
     const linkDir = path.join(TEST_ROOT, `link-${randomUUID()}`);
-    asMissionController();
-    try {
+    withSovereignFixture(() => {
       safeMkdir(tenantDir, { recursive: true });
       safeWriteFile(path.join(tenantDir, 'clip.mp4'), 'tenant-clip');
       safeSymlinkSync(tenantDir, linkDir);
+    });
+    try {
       const viaLink = path.join(linkDir, 'clip.mp4');
       expect(tierOfPath(viaLink)).toBe('confidential');
       expect(tenantOfPath(viaLink)).toBe(slug);
       const runner = vi.fn<VideoCommandRunner>();
-      const outcome = await buildVideoBrief(
-        { kind: 'file', path: viaLink },
-        options({
-          runner,
-          cachePlacement: {
-            scope: 'tenant',
-            root: path.join(TEST_ROOT, randomUUID()),
-            tier: 'confidential',
-            tenant_slug: 'other-tenant',
-          },
-        })
+      const outcome = await withSovereignFixtureAsync(() =>
+        buildVideoBrief(
+          { kind: 'file', path: viaLink },
+          options({
+            runner,
+            cachePlacement: {
+              scope: 'tenant',
+              root: path.join(TEST_ROOT, randomUUID()),
+              tier: 'confidential',
+              tenant_slug: 'other-tenant',
+            },
+          })
+        )
       );
       expect(outcome).toMatchObject({ status: 'failed', code: 'TENANT_MISMATCH' });
       expect(runner).not.toHaveBeenCalled();
     } finally {
-      safeRmSync(linkDir, { force: true });
-      safeRmSync(tenantDir, { recursive: true, force: true });
+      withSovereignFixture(() => {
+        safeRmSync(linkDir, { force: true });
+        safeRmSync(tenantDir, { recursive: true, force: true });
+      });
     }
   });
 });

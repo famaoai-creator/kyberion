@@ -11,17 +11,20 @@ import { projectWorkGraphToNextTasks, readCanonicalWorkGraph } from './work-grap
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../index.js';
 
 const missionPath = pathResolver.sharedTmp('work-graph-projection-test');
+const alternateRoot = pathResolver.sharedTmp('work-graph-projection-root-test');
 
 beforeEach(() => {
   setWorkCoordinationNamespace('work-graph-projection-test');
   clearWorkCoordinationStore();
   safeRmSync(missionPath, { recursive: true, force: true });
+  safeRmSync(alternateRoot, { recursive: true, force: true });
 });
 
 afterEach(() => {
   clearWorkCoordinationStore();
   clearWorkCoordinationNamespace();
   safeRmSync(missionPath, { recursive: true, force: true });
+  safeRmSync(alternateRoot, { recursive: true, force: true });
 });
 
 describe('work graph projection', () => {
@@ -58,6 +61,24 @@ describe('work graph projection', () => {
 
     const canonical = readCanonicalWorkGraph('PRJ-SHARED-ID', { tenantSlug: 'tenant-a' });
     expect(canonical.items.map((entry) => entry.item_id)).toEqual([tenantA.item_id]);
+  });
+
+  it('reads canonical WorkItems from the requested checkout root', () => {
+    const item = createWorkItem({
+      itemId: 'canonical-root-override',
+      title: 'Checkout-local work item',
+      description: 'Project views use the same checkout as project state.',
+      projectId: 'PRJ-ROOT-OVERRIDE',
+      context: { project_id: 'PRJ-ROOT-OVERRIDE', task_id: 'root-override' },
+      rootDir: alternateRoot,
+    });
+
+    expect(
+      readCanonicalWorkGraph('PRJ-ROOT-OVERRIDE', { rootDir: alternateRoot }).items.map(
+        (entry) => entry.item_id
+      )
+    ).toEqual([item.item_id]);
+    expect(readCanonicalWorkGraph('PRJ-ROOT-OVERRIDE').items).toEqual([]);
   });
 
   it('regenerates NEXT_TASKS from canonical WorkItems after the projection is deleted', () => {

@@ -157,6 +157,18 @@ function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function isAccountableHumanResource(value: unknown): value is string {
+  if (!nonEmpty(value)) return false;
+  const ownerId = value.trim();
+  const resourceId = ownerId.slice('human:'.length);
+  return (
+    ownerId.startsWith('human:') &&
+    nonEmpty(resourceId) &&
+    resourceId === resourceId.trim() &&
+    !/\s/u.test(resourceId)
+  );
+}
+
 function readBinding(customerSlug: string, rootDir: string): Record<string, unknown> | null {
   const filePath = bindingPath(customerSlug, rootDir);
   if (!safeExistsSync(filePath)) return null;
@@ -198,7 +210,7 @@ function isTenantActivationRecord(value: unknown): value is TenantActivationReco
     !nonEmpty(value.tenant_slug) ||
     !nonEmpty(value.organization_id) ||
     !['personal', 'confidential', 'public'].includes(String(value.tier)) ||
-    !nonEmpty(value.owner_id) ||
+    typeof value.owner_id !== 'string' ||
     !nonEmpty(value.customer_stance) ||
     !Array.isArray(value.nhi_ids) ||
     value.nhi_ids.some((id) => !nonEmpty(id)) ||
@@ -224,6 +236,7 @@ function isTenantActivationRecord(value: unknown): value is TenantActivationReco
   ) {
     return false;
   }
+  if (value.checks.accountable_human && !isAccountableHumanResource(value.owner_id)) return false;
   return [
     'task_leases',
     'heartbeat_watchdog',
@@ -238,6 +251,7 @@ function buildChecks(
   input: TenantActivationInput,
   nhiIds: string[]
 ): {
+  ownerId?: string;
   checks: Record<TenantActivationCheck, boolean>;
   probeRefs: TenantActivationProbeRefs;
   blockers: string[];
@@ -277,8 +291,12 @@ function buildChecks(
   if (!checks.organization_state)
     blockers.push('organization operational state is not active and tenant-bound');
 
-  const ownerId = input.ownerId || (nonEmpty(binding?.owner_id) ? binding?.owner_id : undefined);
-  checks.accountable_human = Boolean(ownerId && ownerId.startsWith('human:'));
+  const ownerId = nonEmpty(input.ownerId)
+    ? input.ownerId.trim()
+    : nonEmpty(binding?.owner_id)
+      ? binding.owner_id.trim()
+      : undefined;
+  checks.accountable_human = isAccountableHumanResource(ownerId);
   if (!checks.accountable_human)
     blockers.push('accountable_human must be an explicit human:* resource');
 
@@ -302,7 +320,7 @@ function buildChecks(
       blockers.push('nhi_provisioned requires at least one provisioned NHI id');
     }
   }
-  return { checks, probeRefs, blockers: [...new Set(blockers)] };
+  return { ownerId, checks, probeRefs, blockers: [...new Set(blockers)] };
 }
 
 export function loadTenantActivation(
@@ -342,7 +360,7 @@ export function resolveTenantActivation(input: TenantActivationInput): TenantAct
   const now = nowIso();
   const previous = loadTenantActivation(input, rootDir);
   const nhiIds = (input.nhiIds || previous?.nhi_ids || []).map((id) => id.trim()).filter(Boolean);
-  const { checks, probeRefs, blockers } = buildChecks(input, nhiIds);
+  const { ownerId, checks, probeRefs, blockers } = buildChecks(input, nhiIds);
   const active = previous?.status === 'active' && blockers.length === 0;
   const record: TenantActivationRecord = {
     version: '1.0.0',
@@ -351,7 +369,7 @@ export function resolveTenantActivation(input: TenantActivationInput): TenantAct
     tenant_slug: input.tenantSlug,
     organization_id: input.organizationId,
     tier: input.tier || 'confidential',
-    owner_id: input.ownerId || previous?.owner_id || 'human:operator',
+    owner_id: ownerId || '',
     customer_stance: input.customerSlug,
     nhi_ids: nhiIds,
     next_actions: input.nextActions || [

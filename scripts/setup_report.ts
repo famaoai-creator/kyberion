@@ -4,6 +4,7 @@ import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
+import { buildVitalReport } from './vital_check.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { formatSetupSummaryLine } from './setup-report-format.js';
 export {
@@ -29,6 +30,7 @@ type SetupReport = {
   services: Awaited<ReturnType<typeof setupServices>>;
   reasoning: { must: number; should: number; nice: number };
   doctor: Awaited<ReturnType<typeof collectDoctorReport>>;
+  vital: ReturnType<typeof buildVitalReport>;
   recommendedSurfaces: SurfaceRecommendation[];
   nextActions: ReturnType<typeof buildNextAction>[];
 };
@@ -46,17 +48,41 @@ export async function runSetupReportWithPersona(options: {
   const services = await setupServices({ quiet });
   const reasoning = await runReasoningSetup({ quiet });
   const doctor = await collectDoctorReport({});
+  const vital = buildVitalReport();
   const recommendedSurfaces = buildRecommendedSurfaces({ surfaces, doctor });
 
-  const nextActions = buildFirstTimeUserNextActions({ surfaces, services, doctor });
+  const nextActions = buildFirstTimeUserNextActions({ surfaces, services, doctor, vital });
 
-  return { surfaces, services, reasoning, doctor, recommendedSurfaces, nextActions };
+  return { surfaces, services, reasoning, doctor, vital, recommendedSurfaces, nextActions };
 }
 
-function buildFirstTimeUserNextActions(
-  report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor'>
+export function buildProfileSetupNextAction(
+  vital: Pick<ReturnType<typeof buildVitalReport>, 'checks'>
+): ReturnType<typeof buildNextAction> | undefined {
+  const profileCheckIds = new Set([
+    'sovereign_identity',
+    'agent_identity',
+    'sovereign_vision',
+    'onboarding_summary',
+  ]);
+  const profileGaps = vital.checks.filter(
+    (check) => profileCheckIds.has(check.id) && check.status !== 'ok'
+  );
+  if (profileGaps.length === 0) return undefined;
+  return buildNextAction({
+    title: 'Complete identity and onboarding profile',
+    reason: `Vital reports ${profileGaps.length} missing or invalid profile files: ${profileGaps.map((check) => check.label).join(', ')}.`,
+    next_action_type: 'bootstrap_environment',
+    suggested_command: 'pnpm onboard',
+  });
+}
+
+export function buildFirstTimeUserNextActions(
+  report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor' | 'vital'>
 ): Array<ReturnType<typeof buildNextAction>> {
   const actions: Array<ReturnType<typeof buildNextAction>> = [];
+  const profileAction = buildProfileSetupNextAction(report.vital);
+  if (profileAction) actions.push(profileAction);
   if (report.surfaces.summary.missing > 0 || report.surfaces.summary.disabled > 0) {
     actions.push(
       buildNextAction({
@@ -206,6 +232,18 @@ function formatSetupReport(report: SetupReport, persona: SetupPersona): string {
   const lines = [
     '',
     formatSetupSummaryLine([
+      [
+        'identity/onboarding missing',
+        report.vital.checks.filter(
+          (check) =>
+            [
+              'sovereign_identity',
+              'agent_identity',
+              'sovereign_vision',
+              'onboarding_summary',
+            ].includes(check.id) && check.status !== 'ok'
+        ).length,
+      ],
       ['surface issues', report.surfaces.summary.missing],
       ['service auth missing', report.services.summary.authMissing],
       ['service connections missing', report.services.summary.connectionMissing],

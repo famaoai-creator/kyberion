@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   applyTenantActivation,
   isTenantActivationActive,
+  loadTenantActivation,
   rollbackTenantActivation,
   resolveTenantActivation,
   suspendTenantActivation,
@@ -64,12 +65,44 @@ describe('tenant activation', () => {
       rootDir,
     });
     expect(result.record.status).toBe('validating');
+    expect(result.record.owner_id).toBe('human:founder');
+    expect(result.record.checks.accountable_human).toBe(true);
     expect(result.record.blockers).toEqual(
       expect.arrayContaining([
         'viewer_scope requires an explicit successful probe',
         'nhi_provisioned requires an explicit successful probe',
       ])
     );
+  });
+
+  it('requires a nonempty human resource suffix and keeps unowned dry-runs schema-valid', () => {
+    seed();
+    const scope = {
+      customerSlug: 'acme-ai',
+      tenantSlug: 'acme-prod',
+      organizationId: 'org-acme-ai',
+      rootDir,
+    };
+    const invalidOwner = resolveTenantActivation({ ...scope, ownerId: 'human:' });
+    expect(invalidOwner.record.checks.accountable_human).toBe(false);
+    expect(invalidOwner.record.blockers).toContain(
+      'accountable_human must be an explicit human:* resource'
+    );
+    const whitespaceOwner = resolveTenantActivation({ ...scope, ownerId: 'human: founder' });
+    expect(whitespaceOwner.record.checks.accountable_human).toBe(false);
+    expect(whitespaceOwner.record.blockers).toContain(
+      'accountable_human must be an explicit human:* resource'
+    );
+
+    safeRmSync(path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json'), {
+      force: true,
+    });
+    const unowned = resolveTenantActivation(scope);
+    expect(unowned.record.owner_id).toBe('');
+    expect(unowned.record.checks.accountable_human).toBe(false);
+    safeMkdir(path.dirname(unowned.activation_path), { recursive: true });
+    safeWriteFile(unowned.activation_path, JSON.stringify(unowned.record));
+    expect(loadTenantActivation(scope, rootDir)?.owner_id).toBe('');
   });
 
   it('fails closed when the organization context binding is schema-invalid or a directory', () => {
