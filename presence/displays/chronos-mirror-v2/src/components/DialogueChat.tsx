@@ -663,8 +663,8 @@ export const Composer = React.forwardRef<
     setFiles((current) => [...current, ...result.attachments]);
   };
 
-  const submit = () => {
-    const value = text.trim();
+  const submit = (override?: string) => {
+    const value = (override ?? text).trim();
     if ((!value && files.length === 0) || disabled) return;
     if (value.startsWith('/')) {
       const [command, ...rest] = value.split(/\s+/u);
@@ -686,8 +686,7 @@ export const Composer = React.forwardRef<
       const chosen = slashMatches[index] ?? slashMatches[0];
       if (chosen.command === '/consult') setText('/consult @');
       else {
-        setText(chosen.command);
-        window.setTimeout(submit, 0);
+        submit(chosen.command);
       }
       return;
     }
@@ -935,7 +934,7 @@ export const Composer = React.forwardRef<
               type="button"
               className="dr-btn dr-btn--primary dl-send"
               disabled={disabled || (!text.trim() && files.length === 0)}
-              onClick={submit}
+              onClick={() => submit()}
               aria-label={dt('sendMessage', locale)}
             >
               <Send size={14} aria-hidden /> {dt('sendMessage', locale)}
