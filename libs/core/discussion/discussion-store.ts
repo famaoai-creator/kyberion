@@ -86,14 +86,33 @@ export function readDiscussionRoom(roomId: string): DiscussionRoomState | null {
   return reduceDiscussionRoom(sanitizeDiscussionId(roomId), events);
 }
 
-export function listDiscussionRooms(): DiscussionRoomSummary[] {
+export interface ListDiscussionRoomsOptions {
+  /** Case-insensitive text search over the title, goal and message text. */
+  query?: string;
+  archived?: boolean;
+  mode?: 'panel' | 'dialogue';
+}
+
+export function listDiscussionRooms(
+  options: ListDiscussionRoomsOptions = {}
+): DiscussionRoomSummary[] {
   const dir = roomsDir();
   if (!safeExistsSync(dir)) return [];
   const summaries: DiscussionRoomSummary[] = [];
   for (const name of safeReaddir(dir)) {
     if (!ROOM_ID_PATTERN.test(name)) continue;
     const room = readDiscussionRoom(name);
-    if (room) summaries.push(summarizeDiscussionRoom(room));
+    if (!room) continue;
+    if (options.archived !== undefined && room.archived !== options.archived) continue;
+    if (options.mode && room.config.mode !== options.mode) continue;
+    const needle = options.query?.trim().toLowerCase();
+    if (needle) {
+      const haystack = [room.title, room.goal, ...room.messages.map((m) => m.text)]
+        .join('\n')
+        .toLowerCase();
+      if (!haystack.includes(needle)) continue;
+    }
+    summaries.push(summarizeDiscussionRoom(room));
   }
   return summaries.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
