@@ -6967,6 +6967,10 @@
       "types": "./dist/discussion/index.d.ts",
       "default": "./dist/discussion/index.js"
     },
+    "./discussion/discussion-copy": {
+      "types": "./dist/discussion/discussion-copy.d.ts",
+      "default": "./dist/discussion/discussion-copy.js"
+    },
     "./discussion/discussion-engine": {
       "types": "./dist/discussion/discussion-engine.d.ts",
       "default": "./dist/discussion/discussion-engine.js"

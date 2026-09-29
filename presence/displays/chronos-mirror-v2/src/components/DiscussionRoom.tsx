@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Gavel, Radio, Rocket, Sparkles, Users } from 'lucide-
 import { useChronosLocale } from '../lib/hooks';
 import {
   createDiscussion,
+  DISCUSSION_EXAMPLES,
   dt,
   fetchDiscussionRooms,
   PHASE_STEPS,
@@ -16,19 +17,6 @@ import {
 } from '../lib/discussion-client';
 import { CommandCenter, ConversationPane, RosterPane, SituationPane } from './DiscussionPanes';
 import './discussion-room.css';
-
-const EXAMPLES: Record<DiscussionLocale, string[]> = {
-  ja: [
-    '新しい請求システムを段階的に導入すべきか判断する',
-    '来期のプロダクトロードマップの優先順位を決める',
-    '社内ナレッジ基盤の移行計画とリスクを整理する',
-  ],
-  en: [
-    'Decide whether to roll out the new billing system in stages',
-    'Prioritize next quarter’s product roadmap',
-    'Plan the knowledge-base migration and weigh its risks',
-  ],
-};
 
 const TEMPO: Array<{
   id: 'fast' | 'normal' | 'slow';
@@ -181,7 +169,7 @@ function Launcher({
         />
         <div className="dr-examples">
           <span className="dr-muted">{dt('examples', locale)}</span>
-          {EXAMPLES[locale].map((example) => (
+          {DISCUSSION_EXAMPLES[locale].map((example) => (
             <button type="button" key={example} onClick={() => setGoal(example)}>
               {example}
             </button>

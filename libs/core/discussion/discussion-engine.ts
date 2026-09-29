@@ -4,6 +4,7 @@ import {
   readDiscussionRoom,
   sanitizeDiscussionId,
 } from './discussion-store.js';
+import { loadDiscussionCopy } from './discussion-copy.js';
 import { composeDiscussionTeam } from './discussion-team.js';
 import {
   resolveDiscussionSpeaker,
@@ -73,24 +74,12 @@ export function ensureDiscussionRunning(
 }
 
 function defaultAgenda(state: DiscussionRoomState): DiscussionAgendaItem[] {
-  const ja = state.config.locale === 'ja';
-  return [
-    {
-      id: 'ag-1',
-      title: ja ? '目的と前提条件の整理' : 'Clarify the goal and preconditions',
-      status: 'pending',
-    },
-    {
-      id: 'ag-2',
-      title: ja ? '選択肢・懸念・リスクの検討' : 'Weigh options, concerns and risks',
-      status: 'pending',
-    },
-    {
-      id: 'ag-3',
-      title: ja ? '合意形成と次のアクション' : 'Converge on a decision and next actions',
-      status: 'pending',
-    },
-  ];
+  const locale = state.config.locale;
+  return loadDiscussionCopy().agenda.map((item) => ({
+    id: item.id,
+    title: item[locale],
+    status: 'pending' as const,
+  }));
 }
 
 export function computeConsensus(state: DiscussionRoomState): number {
@@ -450,13 +439,10 @@ class DiscussionEngine {
       }
       case 'open_vote': {
         if (!text) return this.ack(commandId, 'ignored', 'empty question');
-        const ja = room.config.locale === 'ja';
         const options =
           command.options && command.options.length >= 2
             ? command.options.slice(0, 5)
-            : ja
-              ? ['賛成', '反対', '保留']
-              : ['Approve', 'Reject', 'Abstain'];
+            : loadDiscussionCopy().vote_options[room.config.locale];
         const voteId = `vote-${randomUUID().slice(0, 8)}`;
         const eligible = room.participants.filter((p) => p.role !== 'scribe').map((p) => p.id);
         appendDiscussionEvent(this.roomId, {
