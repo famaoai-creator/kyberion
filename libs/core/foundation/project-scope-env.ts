@@ -1,5 +1,5 @@
 import { getRegisteredEnvText } from './env.js';
-import { isValidTenantSlug } from '../entity-scope.js';
+import { isValidTenantSlug } from './scope.js';
 import { rawExistsSync, rawLstatSync, rawReadTextFile } from '../fs-primitives.js';
 import { assertSafeRepositoryPath, pathResolver } from '../path-resolver.js';
 
