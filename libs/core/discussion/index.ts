@@ -1,0 +1,7 @@
+/** Domain barrel — public surface for libs/core/discussion */
+export * from './discussion-engine.js';
+export * from './discussion-reducer.js';
+export * from './discussion-speaker.js';
+export * from './discussion-store.js';
+export * from './discussion-team.js';
+export * from './discussion-types.js';
