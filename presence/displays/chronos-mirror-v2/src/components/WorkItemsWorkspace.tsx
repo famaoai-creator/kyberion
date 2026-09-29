@@ -313,6 +313,22 @@ export function WorkItemsWorkspace({
                             {compactDate(item.created_at)}
                           </span>
                           <WorkItemLineageChain context={item.context} locale={locale} />
+                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <a
+                              className="chronos-mission-cell__id"
+                              href={`/?section=discussion&goal=${encodeURIComponent(item.title)}${missionId ? `&mission=${encodeURIComponent(missionId)}` : ''}`}
+                            >
+                              {uxText('chronos_ws_discuss_item', locale)}
+                            </a>
+                            {typeof item.metadata?.discussion_id === 'string' ? (
+                              <a
+                                className="chronos-mission-cell__id"
+                                href={`/?section=discussion&room=${encodeURIComponent(item.metadata.discussion_id)}`}
+                              >
+                                {uxText('chronos_ws_open_discussion', locale)}
+                              </a>
+                            ) : null}
+                          </div>
                           {missionId && onOpenMission ? (
                             <div>
                               <button
