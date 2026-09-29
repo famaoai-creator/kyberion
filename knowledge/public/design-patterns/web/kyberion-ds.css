@@ -238,6 +238,9 @@
   --kds-style-background: #fafaf9;
   --kds-style-text: #1c1917;
   --kds-style-warning: #b45309;
+  --kds-style-surface: #f5f5f4;
+  --kds-style-muted: #e7e5e4;
+  --kds-style-border: #d6d3d1;
   --kds-style-font-heading: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -253,6 +256,9 @@
     --kds-style-background: #0c0a09;
     --kds-style-text: #fafaf9;
     --kds-style-warning: #fbbf24;
+    --kds-style-surface: #1c1917;
+    --kds-style-muted: #292524;
+    --kds-style-border: #44403c;
     --kds-style-font-heading: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
     --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
   }
@@ -268,6 +274,9 @@
   --kds-style-background: #0c0a09;
   --kds-style-text: #fafaf9;
   --kds-style-warning: #fbbf24;
+  --kds-style-surface: #1c1917;
+  --kds-style-muted: #292524;
+  --kds-style-border: #44403c;
   --kds-style-font-heading: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -282,6 +291,9 @@
   --kds-style-background: #f8fafc;
   --kds-style-text: #0b1220;
   --kds-style-warning: #a16207;
+  --kds-style-surface: #eef2f7;
+  --kds-style-muted: #e2e8f0;
+  --kds-style-border: #cbd5e1;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -297,6 +309,9 @@
     --kds-style-background: #060b16;
     --kds-style-text: #e6ebf2;
     --kds-style-warning: #fbbf24;
+    --kds-style-surface: #0f172a;
+    --kds-style-muted: #1e293b;
+    --kds-style-border: #334155;
     --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
     --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
   }
@@ -312,6 +327,9 @@
   --kds-style-background: #060b16;
   --kds-style-text: #e6ebf2;
   --kds-style-warning: #fbbf24;
+  --kds-style-surface: #0f172a;
+  --kds-style-muted: #1e293b;
+  --kds-style-border: #334155;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -326,6 +344,9 @@
   --kds-style-background: #ffffff;
   --kds-style-text: #111827;
   --kds-style-warning: #a16207;
+  --kds-style-surface: #f3f4f6;
+  --kds-style-muted: #e5e7eb;
+  --kds-style-border: #d1d5db;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -341,6 +362,9 @@
     --kds-style-background: #0b0f17;
     --kds-style-text: #f3f4f6;
     --kds-style-warning: #fbbf24;
+    --kds-style-surface: #111827;
+    --kds-style-muted: #1f2937;
+    --kds-style-border: #374151;
     --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
     --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
   }
@@ -356,6 +380,9 @@
   --kds-style-background: #0b0f17;
   --kds-style-text: #f3f4f6;
   --kds-style-warning: #fbbf24;
+  --kds-style-surface: #111827;
+  --kds-style-muted: #1f2937;
+  --kds-style-border: #374151;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -370,6 +397,9 @@
   --kds-style-background: #ffffff;
   --kds-style-text: #1e1b4b;
   --kds-style-warning: #b45309;
+  --kds-style-surface: #f5f3ff;
+  --kds-style-muted: #ede9fe;
+  --kds-style-border: #ddd6fe;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -385,6 +415,9 @@
     --kds-style-background: #0b0a1f;
     --kds-style-text: #f5f3ff;
     --kds-style-warning: #fbbf24;
+    --kds-style-surface: #15132e;
+    --kds-style-muted: #1e1b4b;
+    --kds-style-border: #312e81;
     --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
     --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
   }
@@ -400,6 +433,9 @@
   --kds-style-background: #0b0a1f;
   --kds-style-text: #f5f3ff;
   --kds-style-warning: #fbbf24;
+  --kds-style-surface: #15132e;
+  --kds-style-muted: #1e1b4b;
+  --kds-style-border: #312e81;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -414,6 +450,9 @@
   --kds-style-background: #ffffff;
   --kds-style-text: #171717;
   --kds-style-warning: #a16207;
+  --kds-style-surface: #f5f5f5;
+  --kds-style-muted: #e5e5e5;
+  --kds-style-border: #d4d4d4;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }
@@ -429,6 +468,9 @@
     --kds-style-background: #0a0a0a;
     --kds-style-text: #fafafa;
     --kds-style-warning: #fbbf24;
+    --kds-style-surface: #171717;
+    --kds-style-muted: #262626;
+    --kds-style-border: #404040;
     --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
     --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
   }
@@ -444,6 +486,9 @@
   --kds-style-background: #0a0a0a;
   --kds-style-text: #fafafa;
   --kds-style-warning: #fbbf24;
+  --kds-style-surface: #171717;
+  --kds-style-muted: #262626;
+  --kds-style-border: #404040;
   --kds-style-font-heading: Inter, 'Noto Sans JP', sans-serif;
   --kds-style-font-body: Inter, 'Noto Sans JP', sans-serif;
 }

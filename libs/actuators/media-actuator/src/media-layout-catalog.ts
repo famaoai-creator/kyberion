@@ -16,6 +16,8 @@ import {
   type LayoutFitResult,
 } from '@agent/core/media/native-pptx-engine/text-metrics';
 import { resolvePptxSurfaceDesign } from '@agent/core/media/native-pptx-engine/design-cascade';
+import { KDS_SYSTEM_PREFIX, buildKdsDesignSystem } from './media-kds.js';
+import { compositionToZoneRegions, loadDesignFoundation } from '@agent/core/design-foundation';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
@@ -544,13 +546,37 @@ function resolveLayoutTemplate(
   return resolveTokens(loadBodyZoneLayouts(rootDir), null);
 }
 
+export const KDS_ZONE_PREFIX = 'kds-';
+
+/** `kds-<composition-id>` zone keys are synthesized from KDS v2 compositions. */
+export function resolveZoneRegions(
+  zoneKey: string,
+  declared: ZoneRegionSpec[] | undefined,
+  body: { x: number; y: number; w: number; h: number }
+): ZoneRegionSpec[] | undefined {
+  if (Array.isArray(declared)) return declared;
+  if (!zoneKey.startsWith(KDS_ZONE_PREFIX)) return undefined;
+  return compositionToZoneRegions(zoneKey.slice(KDS_ZONE_PREFIX.length), body) as
+    ZoneRegionSpec[] | undefined;
+}
+
 function resolveBodyZoneKey(
   semanticType: string,
   designSystemId: string | undefined,
-  rootDir: string
+  rootDir: string,
+  compositionId?: string
 ): string {
+  // A slide may name its composition directly ("layout freedom"); unknown ids are ignored.
+  if (compositionId && loadDesignFoundation()?.compositions[compositionId]) {
+    return `${KDS_ZONE_PREFIX}${compositionId}`;
+  }
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
+  const system = designSystemId
+    ? (designSystems.systems?.[designSystemId] ??
+      (designSystemId.startsWith(KDS_SYSTEM_PREFIX)
+        ? buildKdsDesignSystem(designSystemId.slice(KDS_SYSTEM_PREFIX.length))
+        : null))
+    : null;
   const mapped: string | undefined = system?.body_zone_map?.[semanticType];
   if (mapped) return mapped;
   return resolveBodyZoneLayout(semanticType).replace(/-/g, '_');
@@ -734,6 +760,12 @@ function resolveZoneRegionText(
       return context.balanced.left.join('\n');
     case 'body_balanced_right':
       return context.balanced.right.join('\n');
+    case 'body_line':
+      // 1-based single line (KDS compositions assign one line per tile).
+      return context.bodyLines[Math.max(0, count - 1)] ?? '';
+    case 'body_rest':
+      // Everything after the first N lines already assigned to tiles.
+      return context.bodyLines.slice(Math.max(0, count)).join('\n');
     case 'body_last':
       return context.bodyLines[context.bodyLines.length - 1] ?? '';
     case 'objective':
