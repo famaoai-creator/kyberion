@@ -95,12 +95,12 @@ cd kyberion
 ```bash
 pnpm install
 pnpm build
-pnpm env:bootstrap --manifest kyberion-toolchain # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-The last command opens a local first-win page and writes `active/shared/tmp/first-win-session.png`. `pnpm exec playwright install chromium` is optional: without Chromium the pipeline writes its governed text fallback instead of hiding the readiness result.
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. The last command opens a local first-win page and writes `active/shared/tmp/first-win-session.png`. `pnpm exec playwright install chromium` is optional: without Chromium the pipeline writes its governed text fallback instead of hiding the readiness result.
 
 | Path            | Prerequisites                                    | Time         | Command                                            | Notes                                                                   |
 | :-------------- | :----------------------------------------------- | :----------- | :------------------------------------------------- | :---------------------------------------------------------------------- |
