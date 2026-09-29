@@ -883,6 +883,7 @@
 
 ## 📁 public/procedures/media
 - [BlackHole 2ch TTS loopback 手順](./public/procedures/media/blackhole-tts-loopback.md) (public | Unknown)
+- [Design Foundation v2 — choosing a style and a layout](./public/procedures/media/design-foundation-guide.md) (public | Unknown)
 - [Design Narrative By Document Profile](./public/procedures/media/design-narrative-by-document-profile.md) (public | Unknown)
 - [Procedure: Collect Voice Samples](./public/procedures/media/collect-voice-samples.md) (public | Unknown)
 - [Procedure: Compose Video From ADF](./public/procedures/media/compose-video-from-adf.md) (public | Unknown)

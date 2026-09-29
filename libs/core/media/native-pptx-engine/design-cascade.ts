@@ -104,13 +104,17 @@ export function designDefaultsFromMediaTheme(theme: {
  * last mile: callers pass a tenant slug and get the cascade defaults plus the
  * type ramp and constraints that layout-fit needs.
  */
-export function resolvePptxSurfaceDesign(tenantSlug?: string): {
+export function resolvePptxSurfaceDesign(
+  tenantSlug?: string,
+  /** KDS v2 style id (see kyberion-foundation.json). Omitted = baseline look. */
+  style?: string
+): {
   theme: MediaThemeRecord;
   typography: CreativeDesignTypography;
   constraints: CreativeDesignConstraints;
   defaults: Partial<PptxDesignDefaults>;
 } {
-  const resolved = resolveCreativeDesign({ surface: 'pptx', tenantSlug });
+  const resolved = resolveCreativeDesign({ surface: 'pptx', tenantSlug, style });
   if (resolved.projection.surface !== 'pptx') {
     throw new Error(`expected pptx projection, received ${resolved.projection.surface}`);
   }

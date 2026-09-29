@@ -504,6 +504,8 @@ function applyPromptStylePack(action: string, params: any): any {
   const resolved = resolveCreativeDesign({
     surface: 'prompt',
     tenantSlug: typeof params.tenant_slug === 'string' ? params.tenant_slug : undefined,
+    // KDS v2: a named style shifts palette, tone words and anti-patterns of the prompt.
+    style: typeof params.design_style === 'string' ? params.design_style : undefined,
   });
   if (resolved.projection.surface !== 'prompt') return params;
   const block = renderPromptStyleBlock(resolved.projection.style_pack, {

@@ -22,6 +22,8 @@ export interface CampaignBrief {
   title: string;
   audience: string;
   tenant_slug?: string;
+  /** KDS v2 style id: one style restyles every deliverable of the campaign consistently. */
+  design_style?: string;
   tone?: string;
   language?: string;
   deliverables: CampaignDeliverableKind[];
@@ -63,6 +65,7 @@ export interface CampaignManifest {
   kind: 'campaign-manifest';
   title: string;
   tenant_slug?: string;
+  design_style?: string;
   design_source: ResolvedCreativeDesign['source'];
   primary_hex: string;
   accent_hex: string;
@@ -116,6 +119,7 @@ function buildDocumentBrief(
     document_type: documentType,
     render_target: renderTarget,
     locale: brief.language || 'ja',
+    ...(brief.design_style ? { design_style: brief.design_style } : {}),
     payload: {
       title: brief.title,
       summary: brief.key_messages.join(' / '),
@@ -133,9 +137,13 @@ function slugifyTitle(title: string): string {
  * campaign's web deliverable is a REAL page in the design system, not a JSON
  * dump. Kept dependency-free (inline CSS from webThemePackToCssVars).
  */
-export function buildLandingPageHtml(brief: CampaignBrief, themePack: unknown): string {
+export function buildLandingPageHtml(
+  brief: CampaignBrief,
+  themePack: unknown,
+  foundationVars: Record<string, string> = {}
+): string {
   const pack = themePack as WebThemePack | null;
-  const cssVars = pack ? webThemePackToCssVars(pack) : {};
+  const cssVars = { ...(pack ? webThemePackToCssVars(pack) : {}), ...foundationVars };
   const varLines = Object.entries(cssVars)
     .map(([key, value]) => `      ${key}: ${value};`)
     .join('\n');
@@ -182,10 +190,10 @@ ${varLines}
            token — keeps light brand themes readable. */
         background: color-mix(in srgb, var(--kb-accent, #38bdf8) 7%, var(--kb-bg-main, #020617));
         border: 1px solid var(--kb-border, rgba(226,232,240,0.1));
-        border-radius: 14px;
+        border-radius: var(--kds-style-radius, 14px);
         padding: 28px 32px;
         margin-top: 28px;
-        box-shadow: var(--kb-glow-cyan, none);
+        box-shadow: var(--kds-style-shadow, var(--kb-glow-cyan, none));
       }
       .panel h2 { font-family: ${heading}; font-size: 1.35rem; margin-bottom: 12px; color: var(--kb-accent, #38bdf8); }
       .panel ul { margin-left: 1.2em; }
@@ -218,7 +226,12 @@ export function buildCampaignPlan(
   const entries: CampaignPlanEntry[] = [];
   // Resolve once per surface — the single-resolution invariant of E2E-02.
   const designFor = (surface: 'pptx' | 'doc' | 'video' | 'web') => {
-    const resolved = resolveCreativeDesign({ surface, tenantSlug, mode: 'light' });
+    const resolved = resolveCreativeDesign({
+      surface,
+      tenantSlug,
+      mode: 'light',
+      style: brief.design_style,
+    });
     return {
       resolved,
       fingerprint: {
@@ -326,7 +339,7 @@ export function buildCampaignPlan(
             // write_file writes strings — pre-serialize so the pipeline is
             // deterministic and the LP is a real page, not raw JSON dumps.
             web_theme_pack_json: JSON.stringify(themePack, null, 2),
-            lp_html: buildLandingPageHtml(brief, themePack),
+            lp_html: buildLandingPageHtml(brief, themePack, resolved.foundation_css_vars),
           },
           steps: [
             {
@@ -351,6 +364,7 @@ export function buildCampaignPlan(
     kind: 'campaign-manifest',
     title: brief.title,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(brief.design_style ? { design_style: brief.design_style } : {}),
     design_source: entries[0]?.design.source || 'brand-default',
     primary_hex: primary,
     accent_hex: entries[0]?.design.accent_hex || '',

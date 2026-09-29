@@ -86,6 +86,45 @@ When building a new UI surface for Kyberion, ensure you follow this checklist:
 - [ ] Ensure your `body` tag uses `font-family: var(--kb-font-sans)`.
 - [ ] Do **not** hardcode HEX color values in your components. Use the generated CSS variables.
 
+## Design Foundation v2 (KDS v2): more tokens, freer layout
+
+`kyberion.json` stays canonical for brand and semantic tokens. `knowledge/public/design-patterns/brand-tokens/kyberion-foundation.json` adds an **additive** layer so scenarios can look better or be laid out freely without changing any scenario definition:
+
+- **Palette ramps** — `neutral`, `stone`, `brand`, `signal`, `ember`, `moss`, `rose`, `violet` (50–950).
+- **Primitive scales** — space (0–96px), radius (`none`…`full`), border width, elevation (`xs`…`2xl`, light/dark), opacity, blur, z-index, motion (duration + easing), type (12-step size ramp, weight, tracking, leading, measure), layout (breakpoints, containers, 12-col grid, aspect ratios), gradients.
+- **Styles** — named looks that restyle a fixed scenario: `standard` (baseline), `editorial`, `midnight-signal`, `graphite-executive`, `aurora`, `paper-minimal`. A style overrides palette (per mode), heading face, type-role sizes/weights, radius, elevation, density and gradient. Every style is held to WCAG text 4.5:1 / accent 3:1 in both modes by `libs/core/design-foundation.test.ts`.
+- **Compositions** — 12-column region recipes (`hero-split`, `editorial-asym`, `bento-4`, `stat-rail`, `spotlight`, `sidebar-detail`, `three-up`, `dashboard-grid`). `resolveComposition(idOrCustomSpec, { width, height, margins, gutter })` returns absolute rectangles (inches for pptx, px for web/video); pass a custom `CompositionSpec` for a fully free layout. `validateComposition` rejects overflow and overlap (`layer: true` opts in to overlap) and is the ADF preflight for custom layouts.
+
+Use it through the single entry point — never read the JSON in a surface:
+
+```ts
+const design = resolveCreativeDesign({ surface: 'pptx', style: 'editorial', tenantSlug });
+// design.colors / fonts / typography are restyled; design.design_style.preferred_compositions
+// suggests layouts; design.foundation_css_vars carries --kds-* for web/video.
+const regions = resolveComposition(design.design_style!.preferred_compositions[0], {
+  width: 10,
+  height: 5.625,
+  margins: [0.3, 0.35, 0.3, 0.35],
+  gutter: 0.15,
+});
+```
+
+Precedence is **brand tokens → style → tenant override** (a tenant's palette/fonts always win). Omitting `style`, or passing `standard` or an unknown id, is a strict no-op. `resolvePptxSurfaceDesign(tenantSlug, style)` accepts the style for the native PPTX engine.
+
+**Where it is wired in (so it is actually used):**
+
+| Output                                 | How to select                                                                                    | What changes                                                                                                                                                                                                                                                                                    |
+| :------------------------------------- | :----------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PPTX / DOCX / XLSX via media-actuator  | brief `design_style: "<style>"`, or `design_system_id: "kds-<style>"`, or `theme: "kds:<style>"` | palette, heading face, type ramp, panel/hairline/header roles; `kds-<style>` also maps generic semantic types (content, summary, problem, solution, comparison, metrics/roi) to compositions. Specialised zones (hero, contents, architecture, timeline, decision_cta) keep their own geometry. |
+| A single slide                         | section `composition: "<composition-id>"`                                                        | that slide's body is laid out from the composition (`kds-<id>` zone)                                                                                                                                                                                                                            |
+| Automatic deck theme choice            | none of the above given                                                                          | KDS styles are candidates for story-matched selection alongside the base themes                                                                                                                                                                                                                 |
+| Campaign (deck + doc + video + web LP) | `campaign-brief` `design_style`                                                                  | one style resolved once per surface; video gets `--kds-*` css_vars, the landing page gets radius/shadow, deck/doc get the brief style                                                                                                                                                           |
+| Image / video / music prompts          | params `design_style`                                                                            | style palette, tone words and anti-patterns in the style block                                                                                                                                                                                                                                  |
+
+Composition regions map body lines in reading order: kicker/side ← objective, card/kpi ← one line each (the last tile of a body-less composition takes all remaining lines), body ← the rest, caption ← call to action. Title, subtitle and visual regions belong to slide chrome or imagery.
+
+Web: `knowledge/public/design-patterns/web/kyberion-ds.css` (generated by `node --import ./scripts/ts-loader.mjs scripts/generate_design_foundation.ts`; drift is caught by `design-foundation.test.ts`) defines `--kds-*` primitives, `[data-kds-style="<id>"]` scopes (with `data-theme` light/dark handling identical to `--kb-ui-*`) and `.kds-comp-<id>` grid classes whose children are placed by `data-region="<region-id>"`.
+
 ## Tenant Branding (DS-02)
 
 Tenant-specific branding overlays the canonical tokens through one shared resolver:

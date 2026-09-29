@@ -52,6 +52,8 @@ import {
 } from './media-catalog-loaders.js';
 import * as path from 'node:path';
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
+import { findDesignStyle } from '@agent/core/design-foundation';
+import { KDS_THEME_PREFIX, buildKdsDesignSystem, resolveKdsTheme } from './media-kds.js';
 import {
   loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
   resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
@@ -366,6 +368,8 @@ function resolveDesignBindingHints(brief: any): {
   design_system_id?: string;
   design_reference?: string;
   theme?: string;
+  /** KDS v2 style id (kyberion-foundation.json). Selects theme `kds:<id>`. */
+  design_style?: string;
   branding?: Record<string, unknown>;
 } {
   const direct = {
@@ -383,6 +387,8 @@ function resolveDesignBindingHints(brief: any): {
     design_reference:
       String(brief?.design_reference || brief?.payload?.design_reference || '').trim() || undefined,
     theme: String(brief?.theme || brief?.payload?.theme || '').trim() || undefined,
+    design_style:
+      String(brief?.design_style || brief?.payload?.design_style || '').trim() || undefined,
     branding:
       brief?.branding && typeof brief.branding === 'object'
         ? brief.branding
@@ -443,6 +449,10 @@ function resolveDesignBindingHints(brief: any): {
       ).trim() ||
       undefined,
     theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
+    design_style:
+      direct.design_style ||
+      String(projectMeta.design_style || bindingMeta.design_style || '').trim() ||
+      undefined,
     branding: {
       ...recordValue(projectMeta.branding),
       ...recordValue(bindingMeta.branding),
@@ -608,7 +618,13 @@ function resolveMediaDesignSystem(
       system,
       tenantOverride,
       resolvedThemeName: String(
-        bindingHints.theme || tenantOverride?.theme || system?.theme || 'kyberion-standard'
+        bindingHints.theme ||
+          (findDesignStyle(bindingHints.design_style)
+            ? `${KDS_THEME_PREFIX}${bindingHints.design_style}`
+            : '') ||
+          tenantOverride?.theme ||
+          system?.theme ||
+          'kyberion-standard'
       ),
       branding: {
         ...(system?.branding || {}),
@@ -633,6 +649,10 @@ function resolveMediaDesignSystem(
   if (explicit && catalog.systems?.[explicit]) {
     return buildResult(explicit, catalog.systems[explicit]);
   }
+  // KDS v2: `kds-<style>` is an implicit design system — theme from the style,
+  // body zones from the style's preferred compositions.
+  const kdsSystem = explicit.startsWith('kds-') ? buildKdsDesignSystem(explicit.slice(4)) : null;
+  if (kdsSystem) return buildResult(explicit, kdsSystem);
   const imported = resolveImportedDesignReference(rootDir, {
     ...bindingHints,
     client: brief?.client || brief?.payload?.client,
@@ -687,6 +707,10 @@ function resolveSemanticComponentRule(
 function resolveNamedTheme(rootDir: string, preferredTheme?: string): MediaTheme | null {
   const catalog = loadThemeCatalog(rootDir);
   const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
+
+  // 0. KDS v2 style theme (`kds:<style>`), resolved through the single design entry point
+  const kdsTheme = resolveKdsTheme(themeName);
+  if (kdsTheme) return kdsTheme;
 
   // 1. Try public theme directly
   const publicTheme = catalog.themes?.[themeName] || null;

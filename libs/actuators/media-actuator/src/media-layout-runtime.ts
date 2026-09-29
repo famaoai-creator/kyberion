@@ -26,6 +26,7 @@ import {
   resolveConfidentialTenantOverride,
   resolveLayoutTemplate,
   resolveBodyZoneKey,
+  resolveZoneRegions,
   resolveTypeFloors,
   fitBodyText,
   resolveZoneCoord,
@@ -330,7 +331,12 @@ function buildPptxSlideFromPattern(
     // ── Standard content slides ─────────────────────────────────────────────
     // SBISS design: full-height blue header bar with white title text,
     // white logo box on right side of header, navy separator, body below.
-    const bodyZoneKey = resolveBodyZoneKey(semanticType, data.design_system_id, rootDir);
+    const bodyZoneKey = resolveBodyZoneKey(
+      semanticType,
+      data.design_system_id,
+      rootDir,
+      typeof data.composition === 'string' ? data.composition : undefined
+    );
     renderedBodyZone = bodyZoneKey;
     const bodyY = chr.body_y;
     const bodyH = chr.body_h;
@@ -955,9 +961,23 @@ function buildPptxSlideFromPattern(
             text: ctaLine,
           });
         }
-      } else if (Array.isArray(bzl.body_zones?.[bodyZoneKey]?.regions)) {
-        // Region-declarative zone: built from JSON, no branch of its own.
-        const zoneSpec = bzl.body_zones[bodyZoneKey];
+      } else if (
+        resolveZoneRegions(bodyZoneKey, bzl.body_zones?.[bodyZoneKey]?.regions, {
+          x: bodyX,
+          y: bodyY,
+          w: bodyW,
+          h: bodyH,
+        })
+      ) {
+        // Region-declarative zone: built from JSON (or a KDS composition), no branch of its own.
+        const zoneSpec = {
+          regions: resolveZoneRegions(bodyZoneKey, bzl.body_zones?.[bodyZoneKey]?.regions, {
+            x: bodyX,
+            y: bodyY,
+            w: bodyW,
+            h: bodyH,
+          }) as ZoneRegionSpec[],
+        };
         const anchors: ZoneAnchors = { body_x: bodyX, body_y: bodyY, body_w: bodyW, body_h: bodyH };
         const themeRoles: Record<string, string> = {
           primary: primaryHex,
