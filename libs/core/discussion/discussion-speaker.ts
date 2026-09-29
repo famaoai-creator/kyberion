@@ -42,12 +42,59 @@ export interface DecisionDraft {
   next_steps: string[];
 }
 
+export interface DialogueAttachmentContext {
+  name: string;
+  status: 'read' | 'stored';
+  excerpt?: string;
+}
+
+export interface DialogueTurnRequest {
+  room: DiscussionRoomState;
+  facilitator: DiscussionParticipant;
+  human: { id: string; text: string; attachments: DialogueAttachmentContext[] };
+  /** The person asked for another answer to the same message. */
+  retry: boolean;
+}
+
+export interface DialogueGoalPatch {
+  objective?: string;
+  add_success_criteria?: string[];
+  add_constraints?: string[];
+  add_assumptions?: string[];
+  add_decisions?: string[];
+}
+
+export interface DialogueReply {
+  text: string;
+  suggestions: string[];
+  goal_patch: DialogueGoalPatch;
+  resolve: Array<{ id: string; answer?: string }>;
+  new_questions: Array<{ id: string; text: string; blocking: boolean }>;
+  /** Team roles the facilitator wants to hear from before the next question. */
+  consult: string[];
+}
+
+export interface DialogueHooks {
+  /** Report the reply so far (streaming). */
+  onText(textSoFar: string): void;
+  shouldStop(): boolean;
+  /** Pace streaming; a no-op in tests. */
+  delay(ms: number): Promise<void>;
+}
+
 /** The seam between the facilitator engine and whatever produces utterances. */
 export interface DiscussionSpeaker {
   readonly mode: 'scripted' | 'reasoning';
   speak(request: SpeakRequest): Promise<SpeakResult>;
   summarize(request: SpeakRequest): Promise<SummaryResult>;
   conclude(request: SpeakRequest): Promise<DecisionDraft>;
+  /** Dialogue mode: the facilitator's opening message and first questions. */
+  dialogueOpen?(
+    room: DiscussionRoomState,
+    facilitator: DiscussionParticipant
+  ): Promise<DialogueReply>;
+  /** Dialogue mode: answer one human message, updating the goal as it takes shape. */
+  dialogueTurn?(request: DialogueTurnRequest, hooks: DialogueHooks): Promise<DialogueReply>;
   /** Optional: pick discretionary team seats for a goal (live speakers only). */
   proposeRoles?(goal: string, candidates: string[], locale: 'ja' | 'en'): Promise<string[]>;
 }
@@ -106,6 +153,122 @@ export class ScriptedDiscussionSpeaker implements DiscussionSpeaker {
     };
   }
 
+  // ---- dialogue mode (deterministic, offline) -------------------------------
+
+  private slotOrder(): string[] {
+    return Object.keys(loadDiscussionCopy().dialogue.questions);
+  }
+
+  private questionReply(
+    room: DiscussionRoomState,
+    text: string,
+    goal_patch: DialogueGoalPatch,
+    resolve: DialogueReply['resolve'],
+    newQuestions: DialogueReply['new_questions'] = []
+  ): DialogueReply {
+    const locale = room.config.locale;
+    const { questions } = loadDiscussionCopy().dialogue;
+    const resolvedNow = new Set(resolve.map((r) => r.id));
+    const nextOpen = this.slotOrder().find((id) => {
+      const known = room.dialogue.questions.find((q) => q.id === id);
+      const isOpen = known ? known.status === 'open' : true;
+      return isOpen && !resolvedNow.has(id);
+    });
+    return {
+      text,
+      suggestions: nextOpen ? questions[nextOpen].suggestions[locale] : [],
+      goal_patch,
+      resolve,
+      new_questions: newQuestions,
+      consult: [],
+    };
+  }
+
+  async dialogueOpen(
+    room: DiscussionRoomState,
+    _facilitator: DiscussionParticipant
+  ): Promise<DialogueReply> {
+    const locale = room.config.locale;
+    const { dialogue } = loadDiscussionCopy();
+    const order = this.slotOrder();
+    const first = dialogue.questions[order[0]];
+    const text = fillCopy(dialogue.opening[locale], {
+      objective: clip(room.goal, 80),
+      question: first.text[locale],
+    });
+    return {
+      text,
+      suggestions: first.suggestions[locale],
+      goal_patch: { objective: clip(room.goal, 200) },
+      resolve: [],
+      new_questions: order.map((id) => ({
+        id,
+        text: dialogue.questions[id].text[locale],
+        blocking: true,
+      })),
+      consult: [],
+    };
+  }
+
+  async dialogueTurn(request: DialogueTurnRequest, hooks: DialogueHooks): Promise<DialogueReply> {
+    const { room, human } = request;
+    const locale = room.config.locale;
+    const { dialogue } = loadDiscussionCopy();
+    const answer = clip(human.text, 300);
+    const parts: string[] = [];
+    for (const attachment of human.attachments) {
+      parts.push(
+        fillCopy(
+          (attachment.status === 'read' ? dialogue.attachment_read : dialogue.attachment_stored)[
+            locale
+          ],
+          { name: attachment.name }
+        )
+      );
+    }
+
+    // The first still-open scripted question is the one this message answers.
+    const slot = this.slotOrder().find(
+      (id) => room.dialogue.questions.find((q) => q.id === id)?.status !== 'resolved'
+    );
+    let reply: DialogueReply;
+    if (slot) {
+      const label = dialogue.questions[slot].label[locale];
+      const patch: DialogueGoalPatch =
+        slot === 'q-criteria'
+          ? { add_success_criteria: [answer] }
+          : slot === 'q-constraints'
+            ? { add_constraints: [answer] }
+            : { add_decisions: [slot === 'q-first-step' ? `${label}: ${answer}` : answer] };
+      const after = this.slotOrder().find(
+        (id) =>
+          id !== slot && room.dialogue.questions.find((q) => q.id === id)?.status !== 'resolved'
+      );
+      parts.push(fillCopy(dialogue.ack[locale], { label, answer }));
+      if (after) {
+        parts.push(
+          fillCopy(dialogue.next[locale], { question: dialogue.questions[after].text[locale] })
+        );
+      } else {
+        parts.push(dialogue.ready[locale]);
+      }
+      reply = this.questionReply(room, parts.join('\n\n'), patch, [{ id: slot, answer }]);
+    } else {
+      // Everything scripted is settled; fold further input in as an assumption.
+      parts.push(fillCopy(dialogue.freeform[locale], { answer }), dialogue.ready[locale]);
+      reply = this.questionReply(room, parts.join('\n\n'), { add_assumptions: [answer] }, []);
+    }
+
+    // Stream it out in small chunks so the surface can show it arriving.
+    const chunk = 6;
+    for (let end = chunk; end < reply.text.length + chunk; end += chunk) {
+      if (hooks.shouldStop()) return reply;
+      hooks.onText(reply.text.slice(0, end));
+      await hooks.delay(28);
+    }
+    return reply;
+  }
+
   async summarize(request: SpeakRequest): Promise<SummaryResult> {
     const { room } = request;
     const locale = room.config.locale;
@@ -138,6 +301,20 @@ export class ScriptedDiscussionSpeaker implements DiscussionSpeaker {
     const { room } = request;
     const locale = room.config.locale;
     const { decision } = loadDiscussionCopy();
+    if (room.config.mode === 'dialogue') {
+      const dialogue = loadDiscussionCopy().dialogue;
+      const goal = room.dialogue;
+      return {
+        summary: fillCopy(dialogue.decision.summary[locale], {
+          objective: clip(goal.objective || room.goal, 80),
+        }),
+        agreements: [...goal.success_criteria, ...goal.decisions],
+        dissent: goal.questions
+          .filter((q) => q.status === 'open')
+          .map((q) => fillCopy(dialogue.decision.open_dissent[locale], { question: q.text })),
+        next_steps: dialogue.decision.next_steps[locale],
+      };
+    }
     const dissent = room.messages
       .filter((m) => m.kind === 'agent' && (m.stance === 'oppose' || m.stance === 'question'))
       .slice(-3)
@@ -204,6 +381,80 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
+const DIALOGUE_MARKER = '===JSON===';
+
+/** Split a streamed dialogue answer into the visible reply and its trailing JSON control block. */
+export function splitDialogueStream(raw: string): { text: string; json: string | null } {
+  const at = raw.indexOf(DIALOGUE_MARKER);
+  const visible = (at < 0 ? raw : raw.slice(0, at)).replace(/^\s*REPLY:\s*/u, '');
+  return { text: visible.trimEnd(), json: at < 0 ? null : raw.slice(at + DIALOGUE_MARKER.length) };
+}
+
+function stringList(value: unknown, limit: number): string[] {
+  return Array.isArray(value)
+    ? value
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+        .map((v) => v.trim().slice(0, 300))
+        .slice(0, limit)
+    : [];
+}
+
+/** Turn the model's control block into a validated reply; anything malformed is dropped, never trusted. */
+export function parseDialogueReply(
+  raw: string,
+  known: { questionIds: string[]; roles: string[] }
+): DialogueReply | null {
+  const { text, json } = splitDialogueStream(raw);
+  if (!text.trim()) return null;
+  const control = json ? extractJson(json) : null;
+  const patch = (control?.goal_patch ?? {}) as Record<string, unknown>;
+  const resolve = Array.isArray(control?.resolve)
+    ? (control?.resolve as unknown[]).flatMap((item) => {
+        const entry = item as { id?: unknown; answer?: unknown } | string;
+        const id = typeof entry === 'string' ? entry : entry?.id;
+        if (typeof id !== 'string' || !known.questionIds.includes(id)) return [];
+        return [
+          {
+            id,
+            ...(typeof entry !== 'string' && typeof entry.answer === 'string'
+              ? { answer: entry.answer.slice(0, 300) }
+              : {}),
+          },
+        ];
+      })
+    : [];
+  const newQuestions = Array.isArray(control?.new_questions)
+    ? (control?.new_questions as unknown[]).slice(0, 4).flatMap((item, index) => {
+        const q = item as { text?: unknown; blocking?: unknown } | string;
+        const questionText = typeof q === 'string' ? q : q?.text;
+        if (typeof questionText !== 'string' || !questionText.trim()) return [];
+        return [
+          {
+            id: `q-${Date.now().toString(36)}-${index}`,
+            text: questionText.trim().slice(0, 240),
+            blocking: typeof q === 'string' ? true : q.blocking !== false,
+          },
+        ];
+      })
+    : [];
+  return {
+    text: text.trim().slice(0, 4000),
+    suggestions: stringList(control?.suggestions, 4),
+    goal_patch: {
+      ...(typeof patch.objective === 'string' && patch.objective.trim()
+        ? { objective: patch.objective.trim().slice(0, 200) }
+        : {}),
+      add_success_criteria: stringList(patch.add_success_criteria, 5),
+      add_constraints: stringList(patch.add_constraints, 5),
+      add_assumptions: stringList(patch.add_assumptions, 5),
+      add_decisions: stringList(patch.add_decisions, 5),
+    },
+    resolve,
+    new_questions: newQuestions,
+    consult: stringList(control?.consult, 2).filter((role) => known.roles.includes(role)),
+  };
+}
+
 export class ReasoningDiscussionSpeaker implements DiscussionSpeaker {
   readonly mode = 'reasoning' as const;
   private readonly fallback = new ScriptedDiscussionSpeaker();
@@ -253,6 +504,112 @@ export class ReasoningDiscussionSpeaker implements DiscussionSpeaker {
     }
   }
 
+  // ---- dialogue mode -------------------------------------------------------
+
+  private dialoguePrompt(request: DialogueTurnRequest | null, room: DiscussionRoomState): string {
+    const goal = room.dialogue;
+    const roles = room.participants
+      .filter((p) => p.role !== 'facilitator' && p.role !== 'scribe')
+      .map((p) => p.role);
+    return [
+      `You are the facilitator of a goal-driven conversation with one human. Reply in ${this.language(room)}.`,
+      'Ask ONE clear question at a time, in at most 120 words. Markdown is allowed. Never invent what the human did not say.',
+      'Record only what the human actually stated. Raise a blocking question only if the brief cannot be drafted without it.',
+      `Consult a teammate only when their view would help now; allowed roles: ${roles.join(', ') || 'none'}.`,
+      `Current goal state: ${JSON.stringify({
+        objective: goal.objective,
+        success_criteria: goal.success_criteria,
+        constraints: goal.constraints,
+        assumptions: goal.assumptions,
+        decisions: goal.decisions,
+        open_questions: goal.questions
+          .filter((q) => q.status === 'open')
+          .map((q) => ({ id: q.id, text: q.text })),
+      })}`,
+      request?.retry ? 'The human asked for a different answer: vary your wording and angle.' : '',
+      ...(request?.human.attachments ?? []).map(
+        (a) =>
+          `Attachment "${a.name}" (${a.status}): ${a.excerpt ? a.excerpt.slice(0, 1500) : '(contents not readable)'}`
+      ),
+      'Output format — first the reply text for the human, then a line containing exactly ===JSON=== and then JSON only:',
+      '{"goal_patch":{"objective":string?,"add_success_criteria":string[],"add_constraints":string[],"add_assumptions":string[],"add_decisions":string[]},"resolve":[{"id":string,"answer":string}],"new_questions":[{"text":string,"blocking":boolean}],"suggestions":string[],"consult":string[]}',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private async runDialogueModel(
+    instruction: string,
+    context: string,
+    room: DiscussionRoomState,
+    hooks: DialogueHooks
+  ): Promise<DialogueReply | null> {
+    const known = {
+      questionIds: room.dialogue.questions.map((q) => q.id),
+      roles: room.participants.map((p) => p.role),
+    };
+    const backend = getReasoningBackend();
+    let raw = '';
+    if (typeof backend.streamPrompt === 'function') {
+      for await (const piece of backend.streamPrompt(`${instruction}\n\n${context}`)) {
+        if (hooks.shouldStop()) break;
+        raw += piece;
+        hooks.onText(splitDialogueStream(raw).text);
+      }
+    } else {
+      raw = await backend.delegateTask(instruction, context);
+      hooks.onText(splitDialogueStream(raw).text);
+    }
+    return parseDialogueReply(raw, known);
+  }
+
+  async dialogueOpen(
+    room: DiscussionRoomState,
+    facilitator: DiscussionParticipant
+  ): Promise<DialogueReply> {
+    const noop: DialogueHooks = {
+      onText: () => undefined,
+      shouldStop: () => false,
+      delay: async () => undefined,
+    };
+    try {
+      const reply = await this.runDialogueModel(
+        `${this.dialoguePrompt(null, room)}\nThis is your opening message: greet, restate the objective, and ask the first question.`,
+        `Objective: ${room.goal}`,
+        room,
+        noop
+      );
+      if (reply) {
+        return {
+          ...reply,
+          goal_patch: {
+            ...reply.goal_patch,
+            objective: reply.goal_patch.objective ?? clip(room.goal, 200),
+          },
+        };
+      }
+    } catch {
+      /* fall through to the scripted opening */
+    }
+    return this.fallback.dialogueOpen(room, facilitator);
+  }
+
+  async dialogueTurn(request: DialogueTurnRequest, hooks: DialogueHooks): Promise<DialogueReply> {
+    const { room } = request;
+    try {
+      const reply = await this.runDialogueModel(
+        this.dialoguePrompt(request, room),
+        `${transcript(room, 16)}\n[HUMAN] ${request.human.text}`,
+        room,
+        hooks
+      );
+      if (reply) return reply;
+    } catch {
+      /* fall through to the scripted facilitator */
+    }
+    return this.fallback.dialogueTurn(request, hooks);
+  }
+
   async proposeRoles(goal: string, candidates: string[]): Promise<string[]> {
     const instruction = [
       "You staff a facilitated multi-agent discussion. A facilitator, researcher, devil's advocate and scribe are always seated.",
@@ -300,7 +657,9 @@ export class ReasoningDiscussionSpeaker implements DiscussionSpeaker {
       'Return ONLY JSON: {"summary": string, "agreements": string[], "dissent": string[], "next_steps": string[]}',
     ].join('\n');
     try {
-      const json = extractJson(await this.ask(instruction, transcript(room, 30)));
+      const goalContext =
+        room.config.mode === 'dialogue' ? `\nGoal state: ${JSON.stringify(room.dialogue)}` : '';
+      const json = extractJson(await this.ask(instruction, transcript(room, 30) + goalContext));
       if (typeof json?.summary !== 'string') throw new Error('no decision');
       return {
         summary: json.summary,

@@ -1,4 +1,5 @@
 import type {
+  DialogueGoalState,
   DiscussionEvent,
   DiscussionRoomState,
   DiscussionRoomSummary,
@@ -34,6 +35,19 @@ function emptyState(id: string): DiscussionRoomState {
     message_counts: {},
     votes: [],
     decision: null,
+    dialogue: {
+      objective: '',
+      success_criteria: [],
+      constraints: [],
+      assumptions: [],
+      decisions: [],
+      questions: [],
+      readiness: 0,
+      ready: false,
+    },
+    attachments: [],
+    archived: false,
+    stalled_for: null,
     outcomes: {
       proposals: [],
       minutes: null,
@@ -56,12 +70,44 @@ function tallyVote(vote: DiscussionVoteView): void {
   vote.tally = tally;
 }
 
+const READY_THRESHOLD = 0.8;
+/** How many blocking questions a dialogue is expected to settle before drafting a brief. */
+const EXPECTED_BLOCKING = 4;
+
+/**
+ * Deterministic readiness: the objective, success criteria, constraints or
+ * assumptions, at least one decision, and the blocking questions answered.
+ * It is what the progress pane shows and what gates "draft the brief".
+ */
+export function computeDialogueReadiness(
+  goal: Pick<
+    DialogueGoalState,
+    'objective' | 'success_criteria' | 'constraints' | 'assumptions' | 'decisions' | 'questions'
+  >
+): { readiness: number; ready: boolean } {
+  const blocking = goal.questions.filter((q) => q.blocking);
+  const resolved = blocking.filter((q) => q.status === 'resolved').length;
+  const open = blocking.length - resolved;
+  let score = 0;
+  if (goal.objective) score += 0.2;
+  if (goal.success_criteria.length > 0) score += 0.2;
+  if (goal.constraints.length + goal.assumptions.length > 0) score += 0.15;
+  if (goal.decisions.length > 0) score += 0.15;
+  score += 0.3 * Math.min(1, resolved / Math.max(EXPECTED_BLOCKING, blocking.length));
+  const readiness = Number(Math.min(1, score).toFixed(2));
+  return { readiness, ready: readiness >= READY_THRESHOLD && open === 0 };
+}
+
 /** Pure projection of the event log into the state every surface renders. */
 export function reduceDiscussionRoom(
   id: string,
   events: readonly DiscussionEvent[]
 ): DiscussionRoomState {
   const state = emptyState(id);
+  const superseded = new Set<string>();
+  for (const event of events) {
+    if (event.type === 'message_superseded') for (const target of event.ids) superseded.add(target);
+  }
   for (const event of events) {
     state.last_seq = event.seq;
     state.updated_at = event.ts;
@@ -70,7 +116,7 @@ export function reduceDiscussionRoom(
         state.title = event.title;
         state.goal = event.goal;
         state.scope = event.scope;
-        state.config = event.config;
+        state.config = { ...DEFAULT_DISCUSSION_CONFIG, ...event.config };
         state.created_by = event.created_by;
         state.created_at = event.ts;
         break;
@@ -99,7 +145,8 @@ export function reduceDiscussionRoom(
           );
         }
         break;
-      case 'message':
+      case 'message': {
+        const isSuperseded = superseded.has(event.id);
         state.speaking = null;
         state.messages.push({
           id: event.id,
@@ -111,12 +158,20 @@ export function reduceDiscussionRoom(
           stance: event.stance,
           ...(event.reply_to ? { reply_to: event.reply_to } : {}),
           ...(event.mentions?.length ? { mentions: event.mentions } : {}),
+          ...(event.suggestions?.length ? { suggestions: event.suggestions } : {}),
+          ...(event.consulted ? { consulted: true } : {}),
+          ...(isSuperseded ? { superseded: true } : {}),
           round: event.round,
         });
-        state.stance_by_speaker[event.speaker] = event.stance;
-        state.message_counts[event.speaker] = (state.message_counts[event.speaker] ?? 0) + 1;
+        if (!event.consulted && !isSuperseded) state.stalled_for = null;
+        if (!isSuperseded) {
+          state.stance_by_speaker[event.speaker] = event.stance;
+          state.message_counts[event.speaker] = (state.message_counts[event.speaker] ?? 0) + 1;
+        }
         break;
+      }
       case 'human_message':
+        state.stalled_for = null;
         state.messages.push({
           id: event.id,
           kind: 'human',
@@ -124,6 +179,8 @@ export function reduceDiscussionRoom(
           text: event.text,
           ts: event.ts,
           ...(event.target ? { mentions: [event.target] } : {}),
+          ...(event.attachments?.length ? { attachments: event.attachments } : {}),
+          ...(superseded.has(event.id) ? { superseded: true } : {}),
           round: event.round,
         });
         break;
@@ -253,6 +310,82 @@ export function reduceDiscussionRoom(
             mission_id: event.mission_id,
           };
         break;
+      case 'goal_patched': {
+        if (event.for_message && superseded.has(event.for_message)) break;
+        const goal = state.dialogue;
+        if (event.objective) goal.objective = event.objective;
+        const add = (list: string[], items?: string[]) => {
+          for (const item of items ?? []) if (item && !list.includes(item)) list.push(item);
+        };
+        add(goal.success_criteria, event.add_success_criteria);
+        add(goal.constraints, event.add_constraints);
+        add(goal.assumptions, event.add_assumptions);
+        add(goal.decisions, event.add_decisions);
+        break;
+      }
+      case 'question_raised':
+        if (event.for_message && superseded.has(event.for_message)) break;
+        if (!state.dialogue.questions.some((q) => q.id === event.id)) {
+          state.dialogue.questions.push({
+            id: event.id,
+            text: event.text,
+            blocking: event.blocking,
+            status: 'open',
+          });
+        }
+        break;
+      case 'question_resolved': {
+        if (event.for_message && superseded.has(event.for_message)) break;
+        const question = state.dialogue.questions.find((q) => q.id === event.id);
+        if (question) {
+          question.status = 'resolved';
+          if (event.answer) question.answer = event.answer;
+        }
+        break;
+      }
+      case 'message_edited': {
+        const target = state.messages.find((m) => m.id === event.id);
+        if (state.stalled_for === event.id) state.stalled_for = null;
+        if (target) {
+          target.text = event.text;
+          target.edited = true;
+        }
+        break;
+      }
+      case 'message_feedback': {
+        const target = state.messages.find((m) => m.id === event.id);
+        if (target) {
+          if (event.value) target.feedback = event.value;
+          else delete target.feedback;
+        }
+        break;
+      }
+      case 'attachment_added':
+        state.attachments.push({
+          id: event.id,
+          name: event.name,
+          mime: event.mime,
+          size: event.size,
+          path: event.path,
+          status: event.status,
+          ...(event.excerpt ? { excerpt: event.excerpt } : {}),
+          ts: event.ts,
+        });
+        break;
+      case 'generation_stopped': {
+        state.speaking = null;
+        const lastHuman = [...state.messages]
+          .reverse()
+          .find((m) => m.kind === 'human' && !m.superseded);
+        state.stalled_for = lastHuman?.id ?? null;
+        break;
+      }
+      case 'room_renamed':
+        state.title = event.title;
+        break;
+      case 'room_archived':
+        state.archived = event.archived;
+        break;
       case 'error':
         state.error = event.message;
         state.status = 'failed';
@@ -260,6 +393,7 @@ export function reduceDiscussionRoom(
         break;
     }
   }
+  Object.assign(state.dialogue, computeDialogueReadiness(state.dialogue));
   return state;
 }
 
@@ -277,6 +411,13 @@ export function summarizeDiscussionRoom(state: DiscussionRoomState): DiscussionR
     proposal_count: state.outcomes.proposals.length,
     work_item_count: Object.keys(state.outcomes.work_items).length,
     has_minutes: state.outcomes.minutes !== null,
+    mode: state.config.mode,
+    archived: state.archived,
+    readiness: state.dialogue.readiness,
+    last_message_preview: (() => {
+      const last = [...state.messages].reverse().find((m) => !m.superseded);
+      return last ? last.text.replace(/\s+/gu, ' ').slice(0, 120) : '';
+    })(),
     scope: state.scope,
     created_at: state.created_at,
     updated_at: state.updated_at,

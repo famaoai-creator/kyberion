@@ -141,8 +141,8 @@
       "en": "Facilitator summary"
     },
     "you": {
-      "ja": "あなた（人間）",
-      "en": "You (human)"
+      "ja": "あなた",
+      "en": "You"
     },
     "everyone": {
       "ja": "全員",
@@ -411,6 +411,330 @@
     "openMissions": {
       "ja": "ミッションを開く",
       "en": "Open missions"
+    },
+    "modeTitle": {
+      "ja": "進め方を選ぶ",
+      "en": "Choose how to work"
+    },
+    "modePanel": {
+      "ja": "エージェントに議論させる",
+      "en": "Let agents discuss"
+    },
+    "modePanelHint": {
+      "ja": "チームが議論し、あなたは必要なときに介入します",
+      "en": "The team deliberates; you step in when needed"
+    },
+    "modeDialogue": {
+      "ja": "私と対話して進める",
+      "en": "Work it out with me"
+    },
+    "modeDialogueHint": {
+      "ja": "ファシリテーターが質問しながら、目的・成功条件・制約を一緒に整理します",
+      "en": "A facilitator asks questions and helps you shape the goal, success criteria and constraints"
+    },
+    "dlgGoalLabel": {
+      "ja": "何を進めたいですか？",
+      "en": "What do you want to work on?"
+    },
+    "dlgGoalPlaceholder": {
+      "ja": "例: 新入社員向けオンボーディングの改善を進めたい",
+      "en": "e.g. Improve onboarding for new hires"
+    },
+    "dlgStart": {
+      "ja": "対話を始める",
+      "en": "Start the conversation"
+    },
+    "dialogueBadge": {
+      "ja": "対話",
+      "en": "Dialogue"
+    },
+    "panelBadge": {
+      "ja": "議論",
+      "en": "Discussion"
+    },
+    "convos": {
+      "ja": "会話",
+      "en": "Conversations"
+    },
+    "newConvo": {
+      "ja": "新しい対話",
+      "en": "New conversation"
+    },
+    "searchConvos": {
+      "ja": "会話を検索",
+      "en": "Search conversations"
+    },
+    "noMatches": {
+      "ja": "該当する会話はありません",
+      "en": "No matching conversations"
+    },
+    "showArchived": {
+      "ja": "アーカイブを表示",
+      "en": "Show archived"
+    },
+    "archive": {
+      "ja": "アーカイブ",
+      "en": "Archive"
+    },
+    "restore": {
+      "ja": "元に戻す",
+      "en": "Restore"
+    },
+    "rename": {
+      "ja": "名前を変更",
+      "en": "Rename"
+    },
+    "untitled": {
+      "ja": "無題の対話",
+      "en": "Untitled conversation"
+    },
+    "composerPlaceholder": {
+      "ja": "メッセージを入力（Enter で送信 / Shift+Enter で改行 / / でコマンド）",
+      "en": "Type a message (Enter to send, Shift+Enter for a new line, / for commands)"
+    },
+    "sendMessage": {
+      "ja": "送信",
+      "en": "Send"
+    },
+    "stopGeneration": {
+      "ja": "生成を停止",
+      "en": "Stop generating"
+    },
+    "attachFile": {
+      "ja": "ファイルを添付",
+      "en": "Attach a file"
+    },
+    "voiceStart": {
+      "ja": "音声で入力",
+      "en": "Dictate"
+    },
+    "voiceStop": {
+      "ja": "音声入力を止める",
+      "en": "Stop dictation"
+    },
+    "voiceUnsupported": {
+      "ja": "このブラウザは音声入力に対応していません",
+      "en": "This browser does not support dictation"
+    },
+    "dropFiles": {
+      "ja": "ここにファイルをドロップして添付",
+      "en": "Drop files here to attach"
+    },
+    "uploading": {
+      "ja": "アップロード中…",
+      "en": "Uploading…"
+    },
+    "uploadFailed": {
+      "ja": "添付に失敗しました",
+      "en": "Could not attach the file"
+    },
+    "attachmentRead": {
+      "ja": "内容を読み取り済み",
+      "en": "Contents read"
+    },
+    "attachmentStored": {
+      "ja": "保存のみ（内容は未読）",
+      "en": "Stored (contents not read)"
+    },
+    "removeAttachment": {
+      "ja": "添付を外す",
+      "en": "Remove attachment"
+    },
+    "typing": {
+      "ja": "回答を作成中",
+      "en": "is replying"
+    },
+    "sendFailed": {
+      "ja": "送信に失敗しました",
+      "en": "Could not send"
+    },
+    "resend": {
+      "ja": "再送",
+      "en": "Retry"
+    },
+    "today": {
+      "ja": "今日",
+      "en": "Today"
+    },
+    "copy": {
+      "ja": "コピー",
+      "en": "Copy"
+    },
+    "copied": {
+      "ja": "コピーしました",
+      "en": "Copied"
+    },
+    "readAloud": {
+      "ja": "読み上げ",
+      "en": "Read aloud"
+    },
+    "regenerate": {
+      "ja": "再生成",
+      "en": "Regenerate"
+    },
+    "editMessage": {
+      "ja": "編集",
+      "en": "Edit"
+    },
+    "saveAndResend": {
+      "ja": "保存して再送",
+      "en": "Save and resend"
+    },
+    "cancel": {
+      "ja": "キャンセル",
+      "en": "Cancel"
+    },
+    "goodAnswer": {
+      "ja": "良い回答",
+      "en": "Good answer"
+    },
+    "badAnswer": {
+      "ja": "改善が必要",
+      "en": "Needs work"
+    },
+    "edited": {
+      "ja": "編集済み",
+      "en": "edited"
+    },
+    "previousReplies": {
+      "ja": "以前の返信 {n} 件",
+      "en": "{n} earlier replies"
+    },
+    "generationStopped": {
+      "ja": "生成を停止しました",
+      "en": "Generation stopped"
+    },
+    "consultedTag": {
+      "ja": "相談",
+      "en": "consulted"
+    },
+    "slashBrief": {
+      "ja": "ブリーフを作る",
+      "en": "Draft the decision brief"
+    },
+    "slashSummary": {
+      "ja": "ここまでの整理を見る",
+      "en": "Show where we are"
+    },
+    "slashConsult": {
+      "ja": "チームに相談する（例: /consult @researcher 質問）",
+      "en": "Ask the team (e.g. /consult @researcher question)"
+    },
+    "slashExport": {
+      "ja": "会話をエクスポート",
+      "en": "Export the conversation"
+    },
+    "slashHelp": {
+      "ja": "使い方とショートカット",
+      "en": "Help and shortcuts"
+    },
+    "helpTitle": {
+      "ja": "使い方とショートカット",
+      "en": "Help and shortcuts"
+    },
+    "helpSend": {
+      "ja": "Enter で送信、Shift+Enter で改行",
+      "en": "Enter to send, Shift+Enter for a new line"
+    },
+    "helpEdit": {
+      "ja": "入力が空のとき ↑ で直前の自分のメッセージを編集",
+      "en": "↑ in an empty box edits your last message"
+    },
+    "helpStop": {
+      "ja": "Esc で生成を停止（またはメニューを閉じる）",
+      "en": "Esc stops generating (or closes a menu)"
+    },
+    "helpSlash": {
+      "ja": "/ でコマンド、@ でチームメイトに相談",
+      "en": "/ for commands, @ to consult a teammate"
+    },
+    "helpAttach": {
+      "ja": "ファイルはドラッグ＆ドロップ、または貼り付け",
+      "en": "Drag and drop or paste files"
+    },
+    "goalTitle": {
+      "ja": "目標の整理",
+      "en": "Goal so far"
+    },
+    "readiness": {
+      "ja": "準備度",
+      "en": "Readiness"
+    },
+    "objective": {
+      "ja": "目的",
+      "en": "Objective"
+    },
+    "criteria": {
+      "ja": "成功条件",
+      "en": "Success criteria"
+    },
+    "constraintsTitle": {
+      "ja": "制約・前提",
+      "en": "Constraints and assumptions"
+    },
+    "decisionsTitle": {
+      "ja": "決定事項",
+      "en": "Decisions"
+    },
+    "questionsTitle": {
+      "ja": "確認したいこと",
+      "en": "Open questions"
+    },
+    "blockingTag": {
+      "ja": "必須",
+      "en": "required"
+    },
+    "nothingYet": {
+      "ja": "まだありません",
+      "en": "Nothing yet"
+    },
+    "draftBrief": {
+      "ja": "ブリーフを作る",
+      "en": "Draft the brief"
+    },
+    "draftBriefReady": {
+      "ja": "必要な情報が揃いました",
+      "en": "Everything needed is in place"
+    },
+    "draftBriefEarly": {
+      "ja": "未解決の質問が残っています。このまま作りますか？",
+      "en": "Some questions are still open. Draft it anyway?"
+    },
+    "draftingBrief": {
+      "ja": "作成中…",
+      "en": "Drafting…"
+    },
+    "teamConsult": {
+      "ja": "チーム（クリックで相談）",
+      "en": "Team (click to consult)"
+    },
+    "consultPrefill": {
+      "ja": "に相談: ",
+      "en": "Ask "
+    },
+    "exportMd": {
+      "ja": "エクスポート (.md)",
+      "en": "Export (.md)"
+    },
+    "summaryNow": {
+      "ja": "整理を見る",
+      "en": "Summarize"
+    },
+    "phaseOrganize": {
+      "ja": "整理中",
+      "en": "Shaping"
+    },
+    "phaseConverge": {
+      "ja": "まとめ",
+      "en": "Converging"
+    },
+    "phaseDecided": {
+      "ja": "決定",
+      "en": "Decided"
+    },
+    "dialogueEnded": {
+      "ja": "この対話は終了しました。下の成果を確認してください。",
+      "en": "This conversation has ended. Review the outcomes below."
     }
   },
   "role_labels": {
