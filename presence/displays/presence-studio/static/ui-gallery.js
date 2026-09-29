@@ -30,6 +30,15 @@ import { KB_UI_DEFAULT_LOCALE, renderA2UI } from '/shared-ui/kyberion-ui.js';
 
 const THEMES = ['light', 'dark'];
 const DENSITIES = ['comfortable', 'compact'];
+// `standard` = no style attribute (the baseline `--kb-ui-*` tokens).
+const STYLES = [
+  'standard',
+  'editorial',
+  'midnight-signal',
+  'graphite-executive',
+  'aurora',
+  'paper-minimal',
+];
 // Locales the vocabulary catalog supports; `qps-ploc` (pseudo-locale) has no
 // sample data of its own and reuses the English fixtures (resolved by the
 // `/ui-gallery/fixtures/<locale>.json` route).
@@ -57,6 +66,14 @@ function setChoice(attribute, value) {
   html.setAttribute(`data-${attribute}`, value);
   setPressed(attribute, value);
   setParam(attribute, value);
+}
+
+/** Preview a KDS style: `data-kds-style` on <html>; `standard` removes it. */
+function setStyleChoice(value) {
+  if (value === 'standard') html.removeAttribute('data-kds-style');
+  else html.setAttribute('data-kds-style', value);
+  setPressed('style', value);
+  setParam('style', value);
 }
 
 /**
@@ -108,6 +125,8 @@ function initToggles() {
     setPressed('theme', THEMES.includes(applied) ? applied : systemDark ? 'dark' : 'light');
   }
   setChoice('density', DENSITIES.includes(density) ? density : 'comfortable');
+  // ui-gallery-prefs.js already applied `?style=` before paint; only mark the toggle.
+  setPressed('style', html.getAttribute('data-kds-style') || 'standard');
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest('button') : null;
     if (!target) return;
@@ -115,6 +134,8 @@ function initToggles() {
     if (theme && THEMES.includes(theme)) setChoice('theme', theme);
     const density = target.getAttribute('data-set-density');
     if (density && DENSITIES.includes(density)) setChoice('density', density);
+    const style = target.getAttribute('data-set-style');
+    if (style && STYLES.includes(style)) setStyleChoice(style);
     const lang = target.getAttribute('data-set-lang');
     if (lang && LOCALES.includes(lang) && lang !== state.locale) {
       setParam('lang', lang);

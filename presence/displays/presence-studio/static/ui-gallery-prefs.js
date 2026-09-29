@@ -9,6 +9,9 @@
  *   theme  — `?theme=light|dark`, else the shared stored choice
  *            (`kyberion.ui.theme`), else none: `data-theme` stays unset and
  *            the generated tokens follow `prefers-color-scheme`.
+ *   style  — `?style=<id>` (KDS v2 Surface style; `standard`/unknown = none).
+ *            Preview only: there is no stored choice, so a style is never
+ *            applied by accident to another page.
  *   locale — `?lang=<supported>`, else the shared stored choice
  *            (`kyberion.ui.locale`), else the browser language, else `en`.
  *
@@ -61,6 +64,11 @@
         ? storedTheme
         : null;
 
+  // Style ids are the KDS v2 styles that ship a `[data-kds-style]` token scope.
+  var STYLES = ['editorial', 'midnight-signal', 'graphite-executive', 'aurora', 'paper-minimal'];
+  var requestedStyle = param('style');
+  var style = STYLES.indexOf(requestedStyle) >= 0 ? requestedStyle : null;
+
   var requestedLocale = param('lang');
   var browserLocale =
     (navigator && navigator.languages && navigator.languages[0]) ||
@@ -73,7 +81,9 @@
 
   if (theme) root.setAttribute('data-theme', theme);
   else root.removeAttribute('data-theme');
+  if (style) root.setAttribute('data-kds-style', style);
+  else root.removeAttribute('data-kds-style');
   root.setAttribute('lang', locale);
 
-  window.KyberionGalleryPrefs = { theme: theme, locale: locale };
+  window.KyberionGalleryPrefs = { theme: theme, locale: locale, style: style };
 })();
