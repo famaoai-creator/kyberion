@@ -15731,6 +15731,11 @@
         "ja": "ダーク",
         "qps-ploc": "⟦Ḓȧřķ ŀőř⟧"
       },
+      "ui_gallery_style": {
+        "en": "Style",
+        "ja": "スタイル",
+        "qps-ploc": "⟦Şŧẏŀė ŀőř⟧"
+      },
       "ui_gallery_density": {
         "en": "Density",
         "ja": "密度",

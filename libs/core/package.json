@@ -1435,6 +1435,10 @@
       "types": "./dist/media/media-backend-registry.d.ts",
       "default": "./dist/media/media-backend-registry.js"
     },
+    "./design-foundation-ui": {
+      "types": "./dist/design-foundation-ui.d.ts",
+      "default": "./dist/design-foundation-ui.js"
+    },
     "./design-foundation": {
       "types": "./dist/design-foundation.d.ts",
       "default": "./dist/design-foundation.js"
