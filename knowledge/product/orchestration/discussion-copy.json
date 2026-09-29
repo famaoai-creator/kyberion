@@ -543,5 +543,153 @@
       "ja": "差し戻し: {note}",
       "en": "Sent back: {note}"
     }
+  },
+  "dialogue": {
+    "questions": {
+      "q-criteria": {
+        "text": {
+          "ja": "何ができたら成功と言えますか？（成功条件）",
+          "en": "What would make this a success? (success criteria)"
+        },
+        "label": {
+          "ja": "成功条件",
+          "en": "Success criteria"
+        },
+        "suggestions": {
+          "ja": ["期限内に完了すること", "関係者が納得していること", "品質基準を満たすこと"],
+          "en": ["Delivered on time", "Stakeholders are on board", "Meets the quality bar"]
+        }
+      },
+      "q-constraints": {
+        "text": {
+          "ja": "制約や前提はありますか？（期限・予算・使えないもの など）",
+          "en": "Any constraints or assumptions? (deadline, budget, things you can't use…)"
+        },
+        "label": {
+          "ja": "制約・前提",
+          "en": "Constraints and assumptions"
+        },
+        "suggestions": {
+          "ja": ["特に制約はありません", "期限は今月末です", "予算は限られています"],
+          "en": [
+            "No particular constraints",
+            "The deadline is end of month",
+            "The budget is limited"
+          ]
+        }
+      },
+      "q-decision": {
+        "text": {
+          "ja": "進め方で先に決めておきたいことはありますか？（優先順位・やらないこと など）",
+          "en": "Is there anything about the approach to settle first? (priorities, what not to do…)"
+        },
+        "label": {
+          "ja": "決定事項",
+          "en": "Decisions"
+        },
+        "suggestions": {
+          "ja": ["まず小さく試す", "品質より速さを優先する", "やらないことを先に決める"],
+          "en": ["Start small", "Speed over polish", "Decide what we won't do first"]
+        }
+      },
+      "q-first-step": {
+        "text": {
+          "ja": "最初の一歩は何にしますか？（誰が・いつまでに）",
+          "en": "What is the first step? (who, by when)"
+        },
+        "label": {
+          "ja": "最初の一歩",
+          "en": "First step"
+        },
+        "suggestions": {
+          "ja": ["私が今週中に着手します", "担当を決めてから始めます"],
+          "en": ["I'll start this week", "Assign an owner, then start"]
+        }
+      }
+    },
+    "opening": {
+      "ja": "はじめまして。**{objective}** について、一緒に整理していきましょう。いくつか質問しますので、わかる範囲で答えてください。分からない点は「未定」でも大丈夫です。\n\n{question}",
+      "en": "Hi — let's shape **{objective}** together. I'll ask a few questions; answer what you can, \"not sure yet\" is fine.\n\n{question}"
+    },
+    "ack": {
+      "ja": "**{label}** として記録しました:\n\n> {answer}",
+      "en": "Recorded as **{label}**:\n\n> {answer}"
+    },
+    "next": {
+      "ja": "次の質問です。{question}",
+      "en": "Next question: {question}"
+    },
+    "ready": {
+      "ja": "必要な情報が揃いました。右の **ブリーフを作る** で、意思決定ブリーフにまとめられます。補足があれば、そのまま続けてください。",
+      "en": "I have what I need. Use **Draft the brief** on the right to turn this into a decision brief — or keep going if there is more to add."
+    },
+    "freeform": {
+      "ja": "承知しました。前提として整理に加えます:\n\n> {answer}",
+      "en": "Understood. Added to the picture as an assumption:\n\n> {answer}"
+    },
+    "consult_intro": {
+      "ja": "{role} に確認します。",
+      "en": "Let me ask the {role}."
+    },
+    "attachment_read": {
+      "ja": "添付「{name}」を確認しました。",
+      "en": "I read the attachment \"{name}\"."
+    },
+    "attachment_stored": {
+      "ja": "添付「{name}」を受け取りました（内容の読み取りはできませんでした）。",
+      "en": "I received the attachment \"{name}\" (I could not read its contents)."
+    },
+    "summary": {
+      "title": {
+        "ja": "ここまでの整理",
+        "en": "Where we are"
+      },
+      "objective": {
+        "ja": "目的",
+        "en": "Objective"
+      },
+      "criteria": {
+        "ja": "成功条件",
+        "en": "Success criteria"
+      },
+      "constraints": {
+        "ja": "制約・前提",
+        "en": "Constraints and assumptions"
+      },
+      "decisions": {
+        "ja": "決定事項",
+        "en": "Decisions"
+      },
+      "open": {
+        "ja": "未解決の質問",
+        "en": "Open questions"
+      },
+      "none": {
+        "ja": "まだありません",
+        "en": "None yet"
+      }
+    },
+    "decision": {
+      "summary": {
+        "ja": "「{objective}」について、対話で整理した内容に沿って進めることをまとめました。",
+        "en": "For \"{objective}\", this captures what was worked out in conversation."
+      },
+      "next_steps": {
+        "ja": [
+          "整理した成功条件を測る指標を決める",
+          "制約と前提を関係者に共有して確認する",
+          "最初の一歩の担当と期限を確定する"
+        ],
+        "en": [
+          "Define how the success criteria will be measured",
+          "Share the constraints and assumptions with stakeholders",
+          "Confirm the owner and date of the first step"
+        ]
+      },
+      "open_dissent": {
+        "ja": "未解決: {question}",
+        "en": "Still open: {question}"
+      }
+    }
   }
 }

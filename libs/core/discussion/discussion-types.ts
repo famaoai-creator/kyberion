@@ -56,7 +56,15 @@ export type DiscussionCommandKind =
   | 'cast_vote'
   | 'conclude'
   | 'stop'
-  | 'set_speaker';
+  | 'set_speaker'
+  // Dialogue mode (a human talking with the facilitator):
+  | 'finalize'
+  | 'consult'
+  | 'regenerate'
+  | 'edit_message'
+  | 'stop_generation'
+  | 'feedback'
+  | 'summarize';
 
 export interface DiscussionCommand {
   kind: DiscussionCommandKind;
@@ -66,6 +74,8 @@ export interface DiscussionCommand {
   /** Vote options (open_vote) or the chosen option (cast_vote). */
   options?: string[];
   choice?: string;
+  /** Uploaded attachment ids that ride along with an inject (dialogue mode). */
+  attachments?: string[];
 }
 
 export interface DiscussionConfig {
@@ -77,6 +87,12 @@ export interface DiscussionConfig {
   locale: 'ja' | 'en';
   /** `auto` uses the reasoning backend when one is registered, else scripted. */
   speaker: 'auto' | 'scripted' | 'reasoning';
+  /**
+   * `panel`: agents discuss among themselves, the human steers.
+   * `dialogue`: the human converses with the facilitator, who asks, records
+   * the goal as it takes shape and pulls in the team on request.
+   */
+  mode: 'panel' | 'dialogue';
 }
 
 export const DEFAULT_DISCUSSION_CONFIG: DiscussionConfig = {
@@ -86,6 +102,7 @@ export const DEFAULT_DISCUSSION_CONFIG: DiscussionConfig = {
   turn_delay_ms: 1800,
   locale: 'ja',
   speaker: 'auto',
+  mode: 'panel',
 };
 
 type EventBase = { seq: number; ts: string };
@@ -121,6 +138,10 @@ export type DiscussionEvent = EventBase &
         mentions?: string[];
         round: number;
         agenda_id?: string;
+        /** Quick replies the speaker offers the human (dialogue mode). */
+        suggestions?: string[];
+        /** Pulled in by the facilitator or by an @mention rather than taking a scheduled turn. */
+        consulted?: boolean;
       }
     | {
         type: 'human_message';
@@ -129,6 +150,7 @@ export type DiscussionEvent = EventBase &
         text: string;
         target?: string;
         round: number;
+        attachments?: string[];
       }
     | {
         type: 'facilitator_summary';
@@ -193,6 +215,46 @@ export type DiscussionEvent = EventBase &
     | { type: 'reopened'; actor: string; note: string; extra_rounds: number }
     | { type: 'mission_requested'; approval_id: string; approval_channel: string; actor: string }
     | { type: 'mission_started'; mission_id: string; actor: string }
+    | {
+        type: 'goal_patched';
+        /** The facilitator reply this patch came with; superseding that reply rolls the patch back. */
+        for_message?: string;
+        objective?: string;
+        add_success_criteria?: string[];
+        add_constraints?: string[];
+        add_assumptions?: string[];
+        add_decisions?: string[];
+      }
+    | {
+        type: 'question_raised';
+        for_message?: string;
+        id: string;
+        text: string;
+        blocking: boolean;
+      }
+    | { type: 'question_resolved'; for_message?: string; id: string; answer?: string }
+    | { type: 'message_edited'; id: string; text: string; actor: string }
+    | { type: 'message_superseded'; ids: string[]; reason: 'regenerate' | 'edit' }
+    | {
+        type: 'message_feedback';
+        id: string;
+        value: 'up' | 'down' | null;
+        actor: string;
+      }
+    | {
+        type: 'attachment_added';
+        id: string;
+        name: string;
+        mime: string;
+        size: number;
+        path: string;
+        status: 'read' | 'stored';
+        excerpt?: string;
+        actor: string;
+      }
+    | { type: 'generation_stopped'; speaker: string }
+    | { type: 'room_renamed'; title: string; actor: string }
+    | { type: 'room_archived'; archived: boolean; actor: string }
     | { type: 'error'; message: string }
   );
 
@@ -249,6 +311,13 @@ export interface DiscussionMessageView {
   reply_to?: string;
   mentions?: string[];
   round: number;
+  suggestions?: string[];
+  consulted?: boolean;
+  attachments?: string[];
+  edited?: boolean;
+  /** Replaced by a regenerate / edit; kept so the history stays honest. */
+  superseded?: boolean;
+  feedback?: 'up' | 'down';
 }
 
 export interface DiscussionVoteView {
@@ -260,6 +329,39 @@ export interface DiscussionVoteView {
   status: 'open' | 'closed';
   tally: Record<string, number>;
   winner?: string;
+}
+
+export interface DialogueQuestion {
+  id: string;
+  text: string;
+  blocking: boolean;
+  status: 'open' | 'resolved';
+  answer?: string;
+}
+
+/** What the conversation has established so far — the goal as it takes shape. */
+export interface DialogueGoalState {
+  objective: string;
+  success_criteria: string[];
+  constraints: string[];
+  assumptions: string[];
+  decisions: string[];
+  questions: DialogueQuestion[];
+  /** 0..1: how much of what is needed to draft a decision brief is in place. */
+  readiness: number;
+  /** Enough is settled to draft the brief (readiness high and nothing blocking is open). */
+  ready: boolean;
+}
+
+export interface DiscussionAttachmentView {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  path: string;
+  status: 'read' | 'stored';
+  excerpt?: string;
+  ts: string;
 }
 
 export interface DiscussionRoomState {
@@ -292,10 +394,17 @@ export interface DiscussionRoomState {
   votes: DiscussionVoteView[];
   decision: Extract<DiscussionEvent, { type: 'decision' }> | null;
   outcomes: DiscussionOutcomes;
+  dialogue: DialogueGoalState;
+  attachments: DiscussionAttachmentView[];
+  archived: boolean;
+  /** A human message whose reply the person stopped; it waits for an explicit regenerate. */
+  stalled_for: string | null;
   /** Commands not yet acknowledged by the engine. */
   pending_commands: Array<{ id: string; actor: string; command: DiscussionCommand; ts: string }>;
   last_seq: number;
   error?: string;
+  /** Ephemeral partial reply being generated; never persisted, added when the room is served. */
+  live?: { speaker: string; text: string } | null;
 }
 
 export interface DiscussionRoomSummary {
@@ -311,6 +420,10 @@ export interface DiscussionRoomSummary {
   proposal_count: number;
   work_item_count: number;
   has_minutes: boolean;
+  mode: 'panel' | 'dialogue';
+  archived: boolean;
+  readiness: number;
+  last_message_preview: string;
   scope: DiscussionScope;
   created_at: string;
   updated_at: string;

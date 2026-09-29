@@ -33,16 +33,34 @@ const COMMAND_KINDS: readonly DiscussionCommandKind[] = [
   'conclude',
   'stop',
   'set_speaker',
+  'finalize',
+  'consult',
+  'regenerate',
+  'edit_message',
+  'summarize',
 ];
-const TEXT_KINDS = new Set<DiscussionCommandKind>(['inject', 'redirect', 'ask', 'open_vote']);
+const TEXT_KINDS = new Set<DiscussionCommandKind>([
+  'redirect',
+  'ask',
+  'open_vote',
+  'consult',
+  'edit_message',
+]);
 
 function parseCommand(body: Record<string, unknown>): DiscussionCommand | string {
   const kind = body.kind;
   if (typeof kind !== 'string' || !COMMAND_KINDS.includes(kind as DiscussionCommandKind)) {
     return 'unknown command kind';
   }
-  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 1000) : undefined;
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 4000) : undefined;
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments
+        .filter((a): a is string => typeof a === 'string')
+        .map((a) => a.slice(0, 64))
+        .slice(0, 8)
+    : [];
   if (TEXT_KINDS.has(kind as DiscussionCommandKind) && !text) return 'text is required';
+  if (kind === 'inject' && !text && attachments.length === 0) return 'text is required';
   const options = Array.isArray(body.options)
     ? body.options
         .filter((o): o is string => typeof o === 'string' && o.trim().length > 0)
@@ -55,6 +73,7 @@ function parseCommand(body: Record<string, unknown>): DiscussionCommand | string
     ...(typeof body.target === 'string' && body.target ? { target: body.target.slice(0, 64) } : {}),
     ...(options?.length ? { options } : {}),
     ...(typeof body.choice === 'string' && body.choice ? { choice: body.choice.slice(0, 60) } : {}),
+    ...(attachments.length ? { attachments } : {}),
   };
 }
 

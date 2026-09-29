@@ -68,8 +68,17 @@ async function call<T>(url: string, init?: RequestInit): Promise<DiscussionApiRe
   }
 }
 
-export function fetchDiscussionRooms() {
-  return call<{ rooms: DiscussionRoomSummary[]; accessRole?: string }>('/api/discussions');
+export function fetchDiscussionRooms(
+  options: { q?: string; archived?: boolean; mode?: 'panel' | 'dialogue' } = {}
+) {
+  const params = new URLSearchParams();
+  if (options.q) params.set('q', options.q);
+  if (options.archived) params.set('archived', '1');
+  if (options.mode) params.set('mode', options.mode);
+  const query = params.toString();
+  return call<{ rooms: DiscussionRoomSummary[]; accessRole?: string }>(
+    `/api/discussions${query ? `?${query}` : ''}`
+  );
 }
 
 export function createDiscussion(body: {
@@ -79,6 +88,7 @@ export function createDiscussion(body: {
   turn_delay_ms: number;
   tenant?: string;
   mission_id?: string;
+  mode?: 'panel' | 'dialogue';
 }) {
   return call<{ room: DiscussionRoomState }>('/api/discussions', {
     method: 'POST',
@@ -239,4 +249,89 @@ export function useDiscussionStream(roomId: string | null) {
 
 function fetchRoom(roomId: string) {
   return call<{ room: DiscussionRoomState }>(`/api/discussions/${encodeURIComponent(roomId)}`);
+}
+
+export async function stopDiscussionReply(roomId: string) {
+  return call<{ stopped: boolean }>(`/api/discussions/${encodeURIComponent(roomId)}/stop`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export function sendMessageFeedback(
+  roomId: string,
+  messageId: string,
+  value: 'up' | 'down' | null
+) {
+  return call<Record<string, never>>(`/api/discussions/${encodeURIComponent(roomId)}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify({ message_id: messageId, value }),
+  });
+}
+
+export function patchDiscussionRoom(roomId: string, patch: { title?: string; archived?: boolean }) {
+  return call<{ room: DiscussionRoomState }>(`/api/discussions/${encodeURIComponent(roomId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export interface UploadedAttachment {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  status: 'read' | 'stored';
+}
+
+/** Upload files; multipart, so the JSON content-type `call` sets must not be used. */
+export async function uploadDiscussionAttachments(roomId: string, files: File[]) {
+  try {
+    const form = new FormData();
+    for (const file of files) form.append('file', file);
+    const response = await fetch(`/api/discussions/${encodeURIComponent(roomId)}/attachments`, {
+      method: 'POST',
+      body: form,
+    });
+    const body = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+      attachments?: UploadedAttachment[];
+    } | null;
+    if (!response.ok || body?.ok === false) {
+      return { ok: false as const, error: body?.error ?? response.statusText };
+    }
+    return { ok: true as const, attachments: body?.attachments ?? [] };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function attachmentUrl(roomId: string, attachmentId: string): string {
+  return `/api/discussions/${encodeURIComponent(roomId)}/attachments/${encodeURIComponent(attachmentId)}`;
+}
+
+/** The whole conversation as Markdown, for the Export button. */
+export function conversationToMarkdown(
+  room: DiscussionRoomState,
+  locale: DiscussionLocale
+): string {
+  const lines = [
+    `# ${room.title}`,
+    '',
+    `${dt('objective', locale)}: ${room.dialogue.objective || room.goal}`,
+    '',
+  ];
+  for (const message of room.messages) {
+    if (message.superseded) continue;
+    const who =
+      message.kind === 'human'
+        ? dt('you', locale)
+        : roleLabel(
+            room.participants.find((p) => p.id === message.speaker)?.role ?? message.speaker,
+            locale
+          );
+    lines.push(`**${who}** (${message.ts})`, '', message.text, '');
+  }
+  return lines.join('\n');
 }
