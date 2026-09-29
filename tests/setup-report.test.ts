@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   setupServices: vi.fn(),
   runReasoningSetup: vi.fn(),
   collectDoctorReport: vi.fn(),
+  buildVitalReport: vi.fn(),
 }));
 
 vi.mock('../scripts/surface_runtime.js', () => ({
@@ -21,6 +22,10 @@ vi.mock('../scripts/reasoning_setup.js', () => ({
 
 vi.mock('../scripts/run_doctor.js', () => ({
   collectDoctorReport: mocks.collectDoctorReport,
+}));
+
+vi.mock('../scripts/vital_check.js', () => ({
+  buildVitalReport: mocks.buildVitalReport,
 }));
 
 describe('setup report', () => {
@@ -57,6 +62,8 @@ describe('setup report', () => {
         },
       ],
     });
+
+    mocks.buildVitalReport.mockReturnValue({ checks: [] });
 
     const { runSetupReport } = await import('../scripts/setup_report.js');
     const report = await runSetupReport();
@@ -139,6 +146,15 @@ describe('setup report', () => {
       ],
     });
 
+    mocks.buildVitalReport.mockReturnValue({
+      checks: [
+        { id: 'sovereign_identity', label: 'Sovereign identity', status: 'missing' },
+        { id: 'agent_identity', label: 'Agent identity', status: 'missing' },
+        { id: 'sovereign_vision', label: 'Sovereign vision', status: 'missing' },
+        { id: 'onboarding_summary', label: 'Onboarding summary', status: 'missing' },
+      ],
+    });
+
     const { runSetupReportWithPersona } = await import('../scripts/setup_report.js');
     const report = await runSetupReportWithPersona({ persona: 'first-time-user' });
 
@@ -164,16 +180,20 @@ describe('setup report', () => {
       readiness: 'needs_setup',
       suggestedCommand: 'pnpm surfaces setup',
     });
-    expect(report.nextActions).toHaveLength(3);
+    expect(report.nextActions).toHaveLength(4);
     expect(report.nextActions[0]).toMatchObject({
+      title: 'Complete identity and onboarding profile',
+      suggested_command: 'pnpm onboard',
+    });
+    expect(report.nextActions[1]).toMatchObject({
       title: 'Reconcile surface readiness',
       suggested_command: 'pnpm surfaces reconcile',
     });
-    expect(report.nextActions[1]).toMatchObject({
+    expect(report.nextActions[2]).toMatchObject({
       title: 'Repair service setup',
       suggested_command: 'pnpm services:setup',
     });
-    expect(report.nextActions[2]).toMatchObject({
+    expect(report.nextActions[3]).toMatchObject({
       title: 'Bootstrap kyberion-runtime-baseline',
       suggested_command: 'pnpm env:bootstrap --manifest kyberion-runtime-baseline --apply',
     });
