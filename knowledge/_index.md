@@ -70,6 +70,7 @@
 - [Corporate Memory Loop](./product/architecture/corporate-memory-loop.md) (public | Ecosystem Architect)
 - [DOCX Markdown Ingestion Model](./product/architecture/docx-markdown-ingestion-model.md) (public | Unknown)
 - [Decision-Support Design Rationale](./product/architecture/decision-support-design-rationale.md) (public | famao)
+- [Discussion Room — facilitated multi-agent discussion](./product/architecture/discussion-room.md) (public | Ecosystem Architect)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
 - [External Identity → Member Mapping and the Human Role Model](./product/architecture/external-identity-member-mapping.md) (public | ecosystem_architect)
