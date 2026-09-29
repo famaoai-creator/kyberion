@@ -44,7 +44,16 @@ function brief(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function compile(input: Record<string, unknown>): Promise<any> {
+interface SlideLike {
+  metadata?: { bodyZone?: string };
+}
+interface ProtocolLike {
+  theme?: unknown;
+  metadata: { theme?: unknown; layoutDiagnostics: { overflowCount: number } };
+  slides: SlideLike[];
+}
+
+async function compile(input: Record<string, unknown>): Promise<ProtocolLike> {
   const result = await handleAction({
     action: 'pipeline',
     context: { last_json: input },
@@ -55,14 +64,17 @@ async function compile(input: Record<string, unknown>): Promise<any> {
         params: { from: 'last_json', export_as: 'pptx_design' },
       },
     ],
-  } as any);
+  } as never);
   expect(result.status).toBe('succeeded');
-  return result.context.pptx_design;
+  return result.context.pptx_design as ProtocolLike;
 }
 
-const themeOf = (protocol: any) => JSON.stringify(protocol.theme ?? protocol.metadata?.theme ?? {});
-const zonesOf = (protocol: any): string[] =>
-  protocol.slides.map((slide: any) => slide.metadata?.bodyZone).filter(Boolean);
+const themeOf = (protocol: ProtocolLike) =>
+  JSON.stringify(protocol.theme ?? protocol.metadata?.theme ?? {});
+const zonesOf = (protocol: ProtocolLike): string[] =>
+  protocol.slides
+    .map((slide) => slide.metadata?.bodyZone)
+    .filter((zone): zone is string => Boolean(zone));
 
 describe('KDS v2 in the media actuator', () => {
   it('leaves a brief without a style byte-for-byte on the baseline path', async () => {

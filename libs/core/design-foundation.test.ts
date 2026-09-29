@@ -176,7 +176,15 @@ describe('resolveCreativeDesign({ style })', () => {
   });
 });
 
+interface PlanInput {
+  context?: { last_json?: { design_style?: string }; lp_html?: string };
+  params?: { content_brief: { design_system_ref: { css_vars: Record<string, string> } } };
+}
+
 describe('one style across every creative output (campaign suite + prompts)', () => {
+  const inputOf = (plan: ReturnType<typeof buildCampaignPlan>, kind: string): PlanInput =>
+    plan.entries.find((entry) => entry.kind === kind)!.action_input as PlanInput;
+
   const campaign = (design_style?: string): CampaignBrief => ({
     kind: 'campaign-brief',
     title: '新製品ローンチ',
@@ -196,22 +204,18 @@ describe('one style across every creative output (campaign suite + prompts)', ()
 
   it('passes the style to the media briefs and into the video/web design', () => {
     const plan = buildCampaignPlan(campaign('editorial'), { outputRoot: 'out' });
-    const deck = plan.entries.find((entry) => entry.kind === 'deck')!;
-    const context = (deck.action_input as any).context.last_json;
+    const context = inputOf(plan, 'deck').context!.last_json!;
     expect(context.design_style).toBe('editorial');
-    const video = plan.entries.find((entry) => entry.kind === 'intro_video')!;
-    const cssVars = (video.action_input as any).params.content_brief.design_system_ref.css_vars;
+    const cssVars = inputOf(plan, 'intro_video').params!.content_brief.design_system_ref.css_vars;
     expect(cssVars['--kds-style-radius']).toBe('2px');
-    const web = plan.entries.find((entry) => entry.kind === 'web_lp')!;
-    const html = (web.action_input as any).context.lp_html as string;
+    const html = inputOf(plan, 'web_lp').context!.lp_html as string;
     expect(html).toContain('--kds-style-radius');
     expect(html).toContain('var(--kds-style-radius, 14px)');
   });
 
   it('a campaign without a style keeps the baseline (no design_style anywhere)', () => {
     const plan = buildCampaignPlan(campaign(), { outputRoot: 'out' });
-    const deck = plan.entries.find((entry) => entry.kind === 'deck')!;
-    expect((deck.action_input as any).context.last_json.design_style).toBeUndefined();
+    expect(inputOf(plan, 'deck').context!.last_json!.design_style).toBeUndefined();
     expect(plan.manifest.design_style).toBeUndefined();
   });
 
