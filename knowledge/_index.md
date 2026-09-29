@@ -435,6 +435,7 @@
 - [パイプライン結晶化ループ設計メモ](./product/orchestration/pipeline-crystallization-memo.md) (public | Kyberion)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
+- [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)
 - [能力動詞の棚卸し（どの能力が一語になっていて、どれがなっていないか）](./product/orchestration/capability-verb-inventory.ja.md) (public | Ecosystem Architect)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./product/orchestration/optimization-standards.md) (public | Ecosystem Architect)
