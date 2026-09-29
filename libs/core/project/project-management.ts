@@ -1,5 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
+import { executionPersonaText } from '../foundation/execution-scope.js';
+import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import { readTextFile } from '../foundation/text.js';
 import {
   buildProjectBootstrapWorkItems,
@@ -32,12 +34,11 @@ import { missionSeedRecordPath, saveMissionSeedRecord } from '../mission/mission
 import {
   createTaskSession,
   loadTaskSession,
-  listTaskSessions,
   saveTaskSession,
   taskSessionPath,
   type TaskSession,
 } from '../task/task-session.js';
-import { listMissionsInSearchDirs, loadState, saveState } from '../mission/mission-state.js';
+import { loadState, saveState } from '../mission/mission-state.js';
 import type { MissionState } from '../mission/mission-types.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
@@ -64,11 +65,28 @@ import {
   loadOrganizationOperationalState,
   saveOrganizationOperationalState,
 } from '../organization/organization-operating-model.js';
+import { readCanonicalWorkGraph } from '../workforce/work-graph-projection.js';
+import type { WorkItem } from '../workforce/work-coordination.js';
+import {
+  assertWorkerProjectScope,
+  isInProjectScope,
+  isMissionInProjectScope,
+  isOperationalStateInProjectScope,
+  isTrackInProjectScope,
+  isWorkerProjectContext,
+  projectMissions,
+  projectMissionScope,
+  projectSessionScope,
+  projectSessions,
+  workerProjectScopeId,
+} from './project-view-scope.js';
+import { projectLineageTasks } from './project-task-view.js';
 
 export interface ProjectManagementView {
   project: ProjectRecord;
   tracks: ReturnType<typeof listProjectTracksForProject>;
   tasks: ProjectBootstrapWorkItem[];
+  work_items: WorkItem[];
   missions: MissionState[];
   task_sessions: TaskSession[];
   operational_states: ProjectOperationalState[];
@@ -248,8 +266,13 @@ export function createManagedProjectTrack(
     currentDefaultTrack.status === 'active' &&
     isTrackInProjectScope(currentDefaultTrack, project)
   );
-  const previousStatePaths = listProjectOperationalStatePaths({ projectId });
-  const previousStates = listProjectOperationalStates({ projectId });
+  const stateQuery = {
+    projectId,
+    tier: project.tier,
+    tenantSlug: project.tenant_slug,
+  };
+  const previousStatePaths = listProjectOperationalStatePaths(stateQuery);
+  const previousStates = listProjectOperationalStates(stateQuery);
   const trackPath = saveProjectTrackRecord(record);
   try {
     saveProjectRecord({
@@ -272,7 +295,7 @@ export function createManagedProjectTrack(
     safeUnlinkSync(trackPath);
     try {
       saveProjectRecord(project);
-      for (const statePath of listProjectOperationalStatePaths({ projectId })) {
+      for (const statePath of listProjectOperationalStatePaths(stateQuery)) {
         if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
       }
       for (const state of previousStates) saveProjectOperationalState(state);
@@ -301,8 +324,13 @@ export function updateManagedProjectTrack(
     ...current,
     ...(patch.tenant_slug ? { tenant_slug: patch.tenant_slug } : {}),
   };
-  const previousStatePaths = listProjectOperationalStatePaths({ projectId: current.project_id });
-  const previousStates = listProjectOperationalStates({ projectId: current.project_id });
+  const stateQuery = {
+    projectId: current.project_id,
+    tier: project.tier,
+    tenantSlug: project.tenant_slug,
+  };
+  const previousStatePaths = listProjectOperationalStatePaths(stateQuery);
+  const previousStates = listProjectOperationalStates(stateQuery);
   saveProjectTrackRecord(next);
   try {
     reconcileProjectOperationalState(current.project_id, { apply: true });
@@ -317,7 +345,7 @@ export function updateManagedProjectTrack(
     try {
       saveProjectTrackRecord(current);
       saveProjectRecord(project);
-      for (const statePath of listProjectOperationalStatePaths({ projectId: current.project_id })) {
+      for (const statePath of listProjectOperationalStatePaths(stateQuery)) {
         if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
       }
       for (const state of previousStates) saveProjectOperationalState(state);
@@ -340,83 +368,6 @@ export function assertManagedProjectId(value: string): string {
 }
 
 export { assertManagedProjectTrackScope };
-
-function projectMissions(projectId: string, rootDir = pathResolver.rootDir()): MissionState[] {
-  const project = loadProjectRecord(projectId, { rootDir });
-  const missionDirectories = project
-    ? [
-        project.tier === 'personal'
-          ? path.join(rootDir, 'knowledge/personal/missions')
-          : project.tier === 'confidential'
-            ? path.join(rootDir, 'active/missions/confidential')
-            : path.join(rootDir, 'active/missions/public'),
-      ]
-    : undefined;
-  const missionOptions = {
-    rootDir,
-    ...(missionDirectories ? { directories: missionDirectories } : {}),
-  };
-  return listMissionsInSearchDirs(missionOptions)
-    .map(({ missionId }) => loadState(missionId, missionOptions))
-    .filter((state): state is MissionState => Boolean(state))
-    .filter((state) => state.relationships?.project?.project_id === projectId);
-}
-
-function projectSessions(projectId: string, rootDir = pathResolver.rootDir()): TaskSession[] {
-  return listTaskSessions(undefined, { rootDir }).filter(
-    (session) => session.project_context?.project_id === projectId
-  );
-}
-
-function projectSessionScope(
-  session: TaskSession,
-  project: ProjectRecord
-): { tier: ProjectRecord['tier']; tenant?: string } {
-  const tier = session.project_context?.tier || project.tier;
-  const tenant =
-    session.project_context?.tenant_slug ||
-    (tier === 'confidential' ? undefined : project.tenant_slug || 'shared');
-  return { tier, tenant };
-}
-
-function projectMissionScope(mission: MissionState): {
-  tier: ProjectRecord['tier'];
-  tenant?: string;
-} {
-  const tier = mission.tier;
-  const tenant =
-    mission.tenant_slug || mission.tenant_id || (tier === 'confidential' ? undefined : 'shared');
-  return { tier, tenant };
-}
-
-function isMissionInProjectScope(mission: MissionState, project: ProjectRecord): boolean {
-  const scope = projectMissionScope(mission);
-  return scope.tier === project.tier && scope.tenant === (project.tenant_slug || 'shared');
-}
-
-function isTrackInProjectScope(track: ProjectTrackRecord, project: ProjectRecord): boolean {
-  if (track.project_id !== project.project_id || track.tier !== project.tier) return false;
-  if (project.tier === 'confidential' && !track.tenant_slug) return false;
-  return (
-    (track.tenant_slug || project.tenant_slug || 'shared') === (project.tenant_slug || 'shared')
-  );
-}
-
-function isOperationalStateInProjectScope(
-  state: ProjectOperationalState,
-  project: ProjectRecord
-): boolean {
-  return (
-    state.project_id === project.project_id &&
-    state.tier === project.tier &&
-    (state.tenant_slug || 'shared') === (project.tenant_slug || 'shared')
-  );
-}
-
-function isInProjectScope(session: TaskSession, project: ProjectRecord): boolean {
-  const scope = projectSessionScope(session, project);
-  return scope.tier === project.tier && scope.tenant === (project.tenant_slug || 'shared');
-}
 
 function scopeKey(tier: ProjectRecord['tier'], tenantSlug?: string): string {
   return `${tier}:${tenantSlug || 'shared'}`;
@@ -770,12 +721,19 @@ export function getProjectManagementView(
   projectId: string,
   rootDir = pathResolver.rootDir()
 ): ProjectManagementView {
-  const project = loadProjectRecord(normalizeId(projectId, 'project_id'), { rootDir });
+  const normalizedProjectId = normalizeId(projectId, 'project_id');
+  assertWorkerProjectScope(normalizedProjectId);
+  const project = loadProjectRecord(normalizedProjectId, { rootDir });
   if (!project) throw new Error(`Project not found: ${projectId}`);
+  assertWorkerProjectScope(project.project_id, project);
   const tracks = listProjectTracksForProject(project.project_id, { rootDir }).filter((track) =>
     isTrackInProjectScope(track, project)
   );
   const tasks = project.bootstrap_work_items || [];
+  const workItems = readCanonicalWorkGraph(project.project_id, {
+    tenantSlug: project.tenant_slug || null,
+    rootDir,
+  }).items;
   const missions = projectMissions(project.project_id, rootDir).filter((mission) =>
     isMissionInProjectScope(mission, project)
   );
@@ -792,10 +750,13 @@ export function getProjectManagementView(
     project,
     tracks,
     tasks,
+    work_items: workItems,
     missions,
     task_sessions: taskSessions,
     operational_states: listProjectOperationalStates({
       projectId: project.project_id,
+      tier: project.tier,
+      tenantSlug: project.tenant_slug,
       rootDir,
     }).filter(
       (state) =>
@@ -810,15 +771,7 @@ export function getProjectManagementView(
         status: track.status,
         role: 'planning_slice',
       })),
-      tasks: tasks.map((task) => ({
-        work_id: task.work_id,
-        title: task.title,
-        status: task.status,
-        ...(task.kind === 'task_session' && project.kickoff_task_session_id
-          ? { task_session_id: project.kickoff_task_session_id }
-          : {}),
-        role: 'work_item',
-      })),
+      tasks: projectLineageTasks(tasks, workItems, project.kickoff_task_session_id),
       missions: missions.map((mission) => ({
         mission_id: mission.mission_id,
         status: mission.status,
@@ -851,14 +804,67 @@ export function getProjectManagementView(
 
 export function reconcileProjectOperationalState(
   projectId: string,
-  options: { apply?: boolean } = {}
+  options: { apply?: boolean; includeCrossScopeDiagnostics?: boolean } = {}
 ): ProjectReconciliationReport {
-  const project = loadProjectRecord(normalizeId(projectId, 'project_id'));
+  const normalizedProjectId = normalizeId(projectId, 'project_id');
+  assertWorkerProjectScope(normalizedProjectId);
+  const project = loadProjectRecord(normalizedProjectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
+  assertWorkerProjectScope(project.project_id, project);
   const allMissions = projectMissions(project.project_id);
   const allTracks = listProjectTracksForProject(project.project_id);
   const allSessions = projectSessions(project.project_id);
-  const allStateRecords = listProjectOperationalStates({ projectId: project.project_id });
+  const projectStateQuery = {
+    projectId: project.project_id,
+    tier: project.tier,
+    tenantSlug: project.tenant_slug,
+  };
+  const includeCrossScopeDiagnostics = options.includeCrossScopeDiagnostics === true;
+  if (includeCrossScopeDiagnostics) {
+    const persona = executionPersonaText();
+    if (persona !== 'sovereign') {
+      throw new Error(
+        `[POLICY_VIOLATION] Cross-scope project reconciliation requires the sovereign persona (got ${persona || 'unset'}).`
+      );
+    }
+    auditChain.record({
+      agentId: persona,
+      action: 'project.reconciliation',
+      operation: 'diagnostic:cross_scope',
+      result: 'allowed',
+      metadata: {
+        project_id: project.project_id,
+        project_scope: `${project.tier}:${project.tenant_slug || 'shared'}`,
+      },
+    });
+  }
+  let allStateRecords = listProjectOperationalStates(projectStateQuery);
+  if (includeCrossScopeDiagnostics) {
+    const tenantSlugs = [
+      ...new Set(
+        [...listTenantProfileSlugs(), project.tenant_slug].filter((slug): slug is string =>
+          Boolean(slug)
+        )
+      ),
+    ];
+    allStateRecords = [
+      ...tenantSlugs.flatMap((tenantSlug) =>
+        (['personal', 'confidential', 'public'] as const).flatMap((tier) =>
+          listProjectOperationalStates({ projectId: project.project_id, tier, tenantSlug })
+        )
+      ),
+      ...listProjectOperationalStates({
+        projectId: project.project_id,
+        tier: 'personal',
+        tenantSlug: 'shared',
+      }),
+      ...listProjectOperationalStates({
+        projectId: project.project_id,
+        tier: 'public',
+        tenantSlug: 'shared',
+      }),
+    ];
+  }
   const scopedMissions = allMissions.filter((mission) => isMissionInProjectScope(mission, project));
   const scopedTracks = allTracks.filter((track) => isTrackInProjectScope(track, project));
   const scopedStateRecords = allStateRecords.filter((state) =>
@@ -1027,7 +1033,7 @@ export function reconcileProjectOperationalState(
     repairedPaths.push('project-registry');
     for (const scope of scopes.values()) {
       const scoped = expectedForScope(project.project_id, scope.tier, scope.tenant);
-      const existing = listProjectOperationalStates({ projectId: project.project_id }).find(
+      const existing = listProjectOperationalStates(projectStateQuery).find(
         (state) =>
           state.tier === scope.tier &&
           (state.tenant_slug || 'shared') === (scope.tenant || 'shared')
@@ -1484,6 +1490,15 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
 }
 
 export function listManagedProjects(rootDir = pathResolver.rootDir()): ProjectManagementView[] {
+  if (isWorkerProjectContext()) {
+    const projectId = workerProjectScopeId();
+    if (!projectId) {
+      throw new Error('[PROJECT_SCOPE_MISSING] worker project list requires KYBERION_PROJECT_ID.');
+    }
+    return loadProjectRecord(projectId, { rootDir })
+      ? [getProjectManagementView(projectId, rootDir)]
+      : [];
+  }
   return listProjectRecords(rootDir).map((project) =>
     getProjectManagementView(project.project_id, rootDir)
   );

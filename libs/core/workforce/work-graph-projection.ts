@@ -259,15 +259,18 @@ function assertMissionPathWithinRoot(missionPath: string): string {
 /** Read dispatch/reconciliation state from canonical WorkItems, never NEXT_TASKS. */
 export function readCanonicalWorkGraph(
   projectId: string,
-  options: { tenantSlug?: string } = {}
+  options: { tenantSlug?: string | null; rootDir?: string } = {}
 ): CanonicalWorkGraphRead {
   const normalizedProjectId = projectId.trim();
   if (!normalizedProjectId) throw new Error('projectId is required');
-  const tenantSlug = options.tenantSlug?.trim();
-  const items = listWorkItems({
-    projectId: normalizedProjectId,
-    ...(tenantSlug ? { tenantSlugs: [tenantSlug] } : {}),
-  });
+  const items = listWorkItems(
+    { projectId: normalizedProjectId },
+    { rootDir: options.rootDir }
+  ).filter(
+    (item) =>
+      options.tenantSlug === undefined ||
+      (item.context?.tenant_slug || null) === (options.tenantSlug?.trim() || null)
+  );
   const graph = buildWorkGraph(items, normalizedProjectId);
   return { project_id: normalizedProjectId, items, graph };
 }

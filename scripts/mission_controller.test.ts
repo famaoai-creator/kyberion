@@ -13,6 +13,7 @@ import {
 } from '@agent/core';
 import * as killSwitch from '@agent/core/governance/kill-switch';
 import * as orchestratorSession from '@agent/core/mission/orchestrator-session';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,
@@ -62,6 +63,14 @@ function cleanupPublicTenantFixture(): void {
   safeRmSync(pathResolver.shared('runtime/projects/PRJ-TEST-PUBLIC-TENANT.json'), {
     force: true,
   });
+}
+
+function withProjectMissionController<T>(run: () => T): T {
+  return withExecutionContext('mission_controller', run, 'ecosystem_architect');
+}
+
+function withProjectMissionControllerAsync<T>(run: () => Promise<T> | T): Promise<T> {
+  return withExecutionContextAsync('mission_controller', run, 'ecosystem_architect');
 }
 
 describe('mission_controller argument parsing', () => {
@@ -1224,35 +1233,37 @@ describe('mission_controller argument parsing', () => {
       tenant_slug: 'tenant-a',
     });
 
-    expect(() =>
-      validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT', [
-        'node',
-        'dist/scripts/mission_controller.js',
-        'create',
-        '--tier',
-        'public',
-        '--tenant-slug',
-        'tenant-a',
-        '--project-id',
-        projectId,
-        '--project-path',
-        'active/projects/public/tenant-a/project',
-      ])
-    ).not.toThrow();
+    withProjectMissionController(() => {
+      expect(() =>
+        validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT', [
+          'node',
+          'dist/scripts/mission_controller.js',
+          'create',
+          '--tier',
+          'public',
+          '--tenant-slug',
+          'tenant-a',
+          '--project-id',
+          projectId,
+          '--project-path',
+          'active/projects/public/tenant-a/project',
+        ])
+      ).not.toThrow();
 
-    expect(() =>
-      validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT-MISSING', [
-        'node',
-        'dist/scripts/mission_controller.js',
-        'create',
-        '--tier',
-        'public',
-        '--project-id',
-        projectId,
-        '--project-path',
-        'active/projects/public/tenant-a/project',
-      ])
-    ).toThrow("mission tenant 'shared' must match project tenant 'tenant-a'");
+      expect(() =>
+        validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT-MISSING', [
+          'node',
+          'dist/scripts/mission_controller.js',
+          'create',
+          '--tier',
+          'public',
+          '--project-id',
+          projectId,
+          '--project-path',
+          'active/projects/public/tenant-a/project',
+        ])
+      ).toThrow("mission tenant 'shared' must match project tenant 'tenant-a'");
+    });
   });
 
   it('emits a redacted intent-track gate summary for project-linked dry runs', async () => {
@@ -1277,14 +1288,16 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main(undefined, (value) => output.push(value));
-      const payload = JSON.parse(String(output[0]));
-      expect(payload.input.relationships.track.track_id).toBe('TRK-TEST-INTENT-DRY-DELIVERY');
-      expect(payload.intentTrackGate.status).toBe('ready_to_provision');
-      expect(payload.intentTrackGate.track_record.project_id).toBe('PRJ-TEST-INTENT-DRY');
-      expect(payload.intentTrackGate.policy).toBeUndefined();
-      expect(payload.intentTrackGate.effective_policy).toBeUndefined();
-      expect(payload.intentTrackGate.track_record.metadata).toBeUndefined();
+      await withProjectMissionControllerAsync(async () => {
+        await main(undefined, (value) => output.push(value));
+        const payload = JSON.parse(String(output[0]));
+        expect(payload.input.relationships.track.track_id).toBe('TRK-TEST-INTENT-DRY-DELIVERY');
+        expect(payload.intentTrackGate.status).toBe('ready_to_provision');
+        expect(payload.intentTrackGate.track_record.project_id).toBe('PRJ-TEST-INTENT-DRY');
+        expect(payload.intentTrackGate.policy).toBeUndefined();
+        expect(payload.intentTrackGate.effective_policy).toBeUndefined();
+        expect(payload.intentTrackGate.track_record.metadata).toBeUndefined();
+      });
     } finally {
       process.argv = originalArgv;
     }
@@ -1333,10 +1346,12 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main(undefined, (value) => output.push(value));
-      const payload = JSON.parse(String(output[0]));
-      expect(payload.intentTrackGate.status).toBe('escalation_required');
-      expect(payload.input.relationships.track).toBeUndefined();
+      await withProjectMissionControllerAsync(async () => {
+        await main(undefined, (value) => output.push(value));
+        const payload = JSON.parse(String(output[0]));
+        expect(payload.intentTrackGate.status).toBe('escalation_required');
+        expect(payload.input.relationships.track).toBeUndefined();
+      });
     } finally {
       process.argv = originalArgv;
     }
@@ -1366,10 +1381,12 @@ describe('mission_controller argument parsing', () => {
     ];
 
     try {
-      await main(undefined, (value) => output.push(value));
-      const payload = JSON.parse(String(output[0]));
-      expect(payload.intentTrackGate.status).toBe('ready_to_provision');
-      expect(payload.input.relationships.track.note).toContain('confirmed below threshold');
+      await withProjectMissionControllerAsync(async () => {
+        await main(undefined, (value) => output.push(value));
+        const payload = JSON.parse(String(output[0]));
+        expect(payload.intentTrackGate.status).toBe('ready_to_provision');
+        expect(payload.input.relationships.track.note).toContain('confirmed below threshold');
+      });
     } finally {
       process.argv = originalArgv;
     }

@@ -93,7 +93,12 @@ describe('project-operational-state-registry', () => {
       loadProjectOperationalState('PRJ-TEST-OPS', { tier: 'public', tenantSlug: 'tenant-alpha' })
         ?.current_phase
     ).toBe('build');
-    expect(loadProjectOperationalState('PRJ-TEST-OPS')?.tenant_slug).toBe('tenant-alpha');
+    expect(
+      loadProjectOperationalState('PRJ-TEST-OPS', {
+        tier: 'public',
+        tenantSlug: 'tenant-alpha',
+      })?.tenant_slug
+    ).toBe('tenant-alpha');
     expect(
       listProjectOperationalStates({ tier: 'public', tenantSlug: 'tenant-alpha' })
     ).toHaveLength(1);
@@ -239,6 +244,11 @@ describe('project-operational-state-registry', () => {
         'project-state.json'
       )
     );
-    expect(loadProjectOperationalState('PRJ-TEST-OPS-TENANTLESS')?.tenant_slug).toBeUndefined();
+    expect(
+      loadProjectOperationalState('PRJ-TEST-OPS-TENANTLESS', {
+        tier: 'public',
+        tenantSlug: 'shared',
+      })?.tenant_slug
+    ).toBeUndefined();
   });
 });

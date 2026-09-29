@@ -583,9 +583,14 @@ export function clearWorkCoordinationStore(): void {
   });
 }
 
-export function listWorkItems(filter: WorkItemFilter = {}): WorkItem[] {
-  const items = applyWorkItemFilters(currentWorkItems(), filter);
-  return sortItems(items, 'updated_at');
+export function listWorkItems(
+  filter: WorkItemFilter = {},
+  options: { rootDir?: string } = {}
+): WorkItem[] {
+  return withCoordinationRoot(options.rootDir, () => {
+    const items = applyWorkItemFilters(currentWorkItems(), filter);
+    return sortItems(items, 'updated_at');
+  });
 }
 
 export function getWorkItem(itemId: string, options: { rootDir?: string } = {}): WorkItem | null {
