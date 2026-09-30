@@ -1,14 +1,50 @@
-import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core';
+
+const mocks = vi.hoisted(() => ({
+  safeExec: vi.fn(),
+  safeReadFile: vi.fn(),
+  checkPrKnowledgeReadiness: vi.fn(),
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeExec: mocks.safeExec,
+  safeReadFile: mocks.safeReadFile,
+}));
+
+vi.mock('@agent/core/knowledge/pr-knowledge-readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/knowledge/pr-knowledge-readiness')>()),
+  checkPrKnowledgeReadiness: mocks.checkPrKnowledgeReadiness,
+}));
+
 import {
   PRE_PR_READINESS_CHECKLIST,
   buildGhArgs,
+  main,
   parseDefaultBranchResponse,
   parsePublishArgs,
   resolvePublishTitle,
+  runKnowledgeReadinessGate,
 } from './publish_pull_request.js';
 
+/** Default `safeExec` stub covering every gh/git call `main()` makes before `gh pr create`. */
+function stubGhAndGit(): void {
+  mocks.safeExec.mockImplementation((command: string, args: string[] = []) => {
+    if (command === 'gh' && args[0] === '--version') return 'gh version 2.0.0\n';
+    if (command === 'gh' && args[0] === 'auth') return 'Logged in to github.com\n';
+    if (command === 'gh' && args[0] === 'repo') return '{"defaultBranchRef":{"name":"main"}}';
+    if (command === 'git' && args[0] === 'branch') return 'agent/kl-03\n';
+    if (command === 'gh' && args[0] === 'pr') return 'https://github.com/acme/repo/pull/1\n';
+    throw new Error(`unexpected safeExec(${command}, ${JSON.stringify(args)})`);
+  });
+}
+
 describe('publish_pull_request', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('parses explicit publish flags', () => {
     const options = parsePublishArgs(['--title', 'fix(pr): validate before publish', '--no-fill']);
     expect(options.title).toBe('fix(pr): validate before publish');
@@ -24,6 +60,12 @@ describe('publish_pull_request', () => {
       '--skip-readiness',
     ]);
     expect(options.skipReadiness).toBe(true);
+  });
+
+  it('parses --mission-root (KL-03)', () => {
+    const options = parsePublishArgs(['--mission-root', '/main/checkout']);
+    expect(options.missionRoot).toBe('/main/checkout');
+    expect(parsePublishArgs([]).missionRoot).toBeUndefined();
   });
 
   it('rejects a non-conventional PR title before publish', () => {
@@ -62,9 +104,14 @@ describe('publish_pull_request', () => {
     ).toThrow('dangerous JSON key');
   });
 
-  it('routes gh output through the shared harness printer and wires readiness', () => {
+  it('routes gh output through the shared harness printer and wires readiness', async () => {
+    // Bypass this file's `safeExec`/`safeReadFile` mock (below) to read the
+    // real script source rather than whatever the current test set the mock
+    // to return.
+    const actualSecureIo =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/publish_pull_request.ts'), {
+      actualSecureIo.safeReadFile(pathResolver.rootResolve('scripts/publish_pull_request.ts'), {
         encoding: 'utf8',
       }) || ''
     );
@@ -76,5 +123,133 @@ describe('publish_pull_request', () => {
     expect(source).toContain('--skip-readiness');
     expect(source).toContain(PRE_PR_READINESS_CHECKLIST);
     expect(source).toContain("['check', '--', '--scope', 'pr']");
+    expect(source).toContain('checkPrKnowledgeReadiness');
+    expect(source).toContain('--mission-root');
+  });
+});
+
+describe('runKnowledgeReadinessGate (KL-03)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('fails closed with no --body-file (e.g. --fill) without calling the readiness evaluator', () => {
+    expect(() =>
+      runKnowledgeReadinessGate({
+        draft: true,
+        fill: true,
+        skipReadiness: false,
+      })
+    ).toThrow();
+    expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
+  });
+
+  it('reads --body-file and evaluates readiness; passes through when ok', () => {
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone — no mission for this PR\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+
+    expect(() =>
+      runKnowledgeReadinessGate({
+        draft: true,
+        fill: true,
+        skipReadiness: false,
+        bodyFile: 'body.md',
+        missionRoot: '/main/checkout',
+      })
+    ).not.toThrow();
+
+    expect(mocks.checkPrKnowledgeReadiness).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: '## Knowledge\nnone — no mission for this PR\n',
+        missionRootInput: expect.objectContaining({ explicitRoot: '/main/checkout' }),
+      })
+    );
+  });
+
+  it('throws without calling gh when the evaluator reports a violation', () => {
+    mocks.safeReadFile.mockReturnValue('## Summary\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({
+      ok: false,
+      violations: [{ code: 'missing_knowledge_section', message: 'no Knowledge section' }],
+    });
+
+    expect(() =>
+      runKnowledgeReadinessGate({
+        draft: true,
+        fill: true,
+        skipReadiness: false,
+        bodyFile: 'body.md',
+      })
+    ).toThrow();
+  });
+});
+
+describe('main() wiring (KL-03)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('runs the knowledge check even with --skip-readiness, and still calls gh when it passes', async () => {
+    stubGhAndGit();
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone — no mission for this PR\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+
+    await main([
+      '--title',
+      'fix(pr): guard knowledge readiness',
+      '--body-file',
+      'body.md',
+      '--skip-readiness',
+    ]);
+
+    expect(mocks.checkPrKnowledgeReadiness).toHaveBeenCalledTimes(1);
+    expect(mocks.safeExec).not.toHaveBeenCalledWith(
+      'pnpm',
+      expect.arrayContaining(['check']),
+      expect.anything()
+    );
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'gh',
+      expect.arrayContaining(['pr', 'create']),
+      expect.anything()
+    );
+  });
+
+  it('aborts before calling gh pr create when the knowledge check fails, even with --skip-readiness', async () => {
+    stubGhAndGit();
+    mocks.safeReadFile.mockReturnValue('## Summary\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({
+      ok: false,
+      violations: [{ code: 'missing_knowledge_section', message: 'no Knowledge section' }],
+    });
+
+    await expect(
+      main([
+        '--title',
+        'fix(pr): guard knowledge readiness',
+        '--body-file',
+        'body.md',
+        '--skip-readiness',
+      ])
+    ).rejects.toThrow();
+
+    const prCreateCalls = mocks.safeExec.mock.calls.filter(
+      ([command, args]) => command === 'gh' && Array.isArray(args) && args[0] === 'pr'
+    );
+    expect(prCreateCalls).toEqual([]);
+  });
+
+  it('aborts before calling gh pr create when --body-file is missing (e.g. --fill)', async () => {
+    stubGhAndGit();
+
+    await expect(
+      main(['--title', 'fix(pr): guard knowledge readiness', '--skip-readiness'])
+    ).rejects.toThrow();
+
+    expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
+    const prCreateCalls = mocks.safeExec.mock.calls.filter(
+      ([command, args]) => command === 'gh' && Array.isArray(args) && args[0] === 'pr'
+    );
+    expect(prCreateCalls).toEqual([]);
   });
 });
