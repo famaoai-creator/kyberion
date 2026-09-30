@@ -1,7 +1,6 @@
 /** Low-level PDF writer, encoding, labels, and embedded CJK font primitives. */
 
 import * as zlib from 'zlib';
-import { createRequire } from 'node:module';
 import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
@@ -11,6 +10,7 @@ import type {
   PdfPageLabel,
   PdfOutlineItem,
 } from '../../contracts/pdf-protocol.js';
+import { createFontkitRequire } from './fontkit-require.js';
 
 interface ObjEntry {
   id: number;
@@ -285,9 +285,8 @@ export type FontKitCollection = {
   fonts?: FontKitFont[];
 };
 
-// Resolve from @agent/core's package root so inlined CLI bundles
-// (`dist/scripts/cli.js`) still find the workspace fontkit dependency.
-export const FONTKIT_REQUIRE = createRequire(pathResolver.rootResolve('libs/core/package.json'));
+export { createFontkitRequire } from './fontkit-require.js';
+export const FONTKIT_REQUIRE = createFontkitRequire();
 export const FONTKIT = FONTKIT_REQUIRE('fontkit') as {
   openSync: (source: string) => FontKitFont | FontKitCollection;
 };
