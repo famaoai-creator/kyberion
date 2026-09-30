@@ -9,6 +9,10 @@ Usage: node dist/scripts/mission_controller.js <command> [args]
 
 Lifecycle Commands:
   create   <ID>                  Create a new mission (status: planned)
+                                 ID convention: <PREFIX>-<TOPIC>-<YYYYMMDD> (e.g. MSN-LOG-OPT-20260930)
+                                 repo-internal work needs --tier public (default is confidential)
+  kickoff  <ID>                  One-step create+start: creates the mission if absent, then activates
+                                 it (same options as start: --tier --goal --success-condition)
   start    <ID>                  Activate a mission (planned/paused/failed → active)
                                  --goal <TEXT> carries the user goal into the intent baseline
                                  --success-condition <TEXT> records the acceptance condition
@@ -159,7 +163,7 @@ Maintenance Commands:
                                            knowledge/product/schemas/organization-catalog-report.example.json
 
   Typical Workflow:
-  start → checkpoint (repeat) → verify → distill → finish
+  kickoff (one-step create+start) or create → start → checkpoint (repeat) → verify → distill → finish
 
 Mission Input Contract:
   Positionals:

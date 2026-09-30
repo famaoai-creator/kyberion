@@ -171,7 +171,8 @@ export async function createMission(args: {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
     const message =
       `[SCOPE_CONTEXT_INVALID] Confidential mission '${id}' requires --tenant-slug (registered tenant). ` +
-      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind. ` +
+      `For tenant-free repo-internal work, rerun with --tier public.`;
     if (policy === 'strict') throw new Error(message);
     if (policy === 'warn') logger.warn(message);
   }
@@ -483,7 +484,8 @@ const MISSION_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/;
 export function assertValidMissionId(missionId: string): void {
   if (!MISSION_ID_PATTERN.test(missionId)) {
     throw new Error(
-      `[mission-creation] invalid mission id '${missionId}'; must match ${MISSION_ID_PATTERN.source} (no spaces — check shell quoting)`
+      `[mission-creation] invalid mission id '${missionId}'; must match ${MISSION_ID_PATTERN.source} ` +
+        `(no spaces — check shell quoting). Convention: <PREFIX>-<TOPIC>-<YYYYMMDD> (e.g. MSN-LOG-OPT-20260930).`
     );
   }
 }
@@ -551,7 +553,8 @@ export async function startMission(args: {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
     const message =
       `[SCOPE_CONTEXT_INVALID] Confidential mission '${upperId}' requires --tenant-slug (registered tenant) before start. ` +
-      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
+      `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind. ` +
+      `For tenant-free repo-internal work, rerun with --tier public.`;
     if (policy === 'strict') throw new Error(message);
     if (policy === 'warn') logger.warn(message);
   }
