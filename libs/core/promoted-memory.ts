@@ -17,7 +17,17 @@ import {
 import type { DistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
 import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
-import { isPublicMemoryEvidencePath } from './knowledge/memory-promotion-queue.js';
+import {
+  isPublicMemoryEvidencePath,
+  type MemoryApprovalChannel,
+} from './knowledge/memory-promotion-queue.js';
+import {
+  readGitProvenance,
+  resolvePromotionTargetRoot,
+  writePromotedFilesToWorktree,
+  type GitRunner,
+  type WorktreeFileWriter,
+} from './knowledge/memory-promotion-git.js';
 import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,
@@ -46,6 +56,10 @@ interface PromotedMemoryRecordBase {
   artifact_ids?: string[];
   evidence_refs?: string[];
   created_at: string;
+  /** KL-05: branch of the checkout the record was written into (omitted when git is unavailable). */
+  source_branch?: string;
+  /** KL-05: HEAD commit of that checkout at promotion time. */
+  source_commit?: string;
 }
 
 export interface PromotedPatternRecord extends PromotedMemoryRecordBase {
@@ -252,6 +266,8 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
     `specialist_id: ${record.specialist_id || ''}`,
     `locale: ${record.locale || ''}`,
     `created_at: ${record.created_at}`,
+    ...(record.source_branch ? [`source_branch: ${record.source_branch}`] : []),
+    ...(record.source_commit ? [`source_commit: ${record.source_commit}`] : []),
     `---`,
     ``,
     `# ${record.title}`,
@@ -773,10 +789,29 @@ export function isMeaningfulPromotionCandidate(
   return { ok: true };
 }
 
+export interface SavePromotedMemoryRecordOptions {
+  executionRole?: PromotedMemoryExecutionRole;
+  /**
+   * KL-05: write the record files into this worktree of the same repository
+   * (e.g. a PR branch checkout) instead of the current root. Product domain only.
+   */
+  targetRoot?: string;
+  /**
+   * Approval channel of the queue candidate. A sibling-worktree `targetRoot`
+   * requires `pr_review`: the PR merge is the only ratification that record
+   * gets (KL-04), so steward-approved knowledge must not travel that way.
+   */
+  approvalChannel?: MemoryApprovalChannel;
+  /** Test seam: git runner used for target validation and provenance. */
+  gitRunner?: GitRunner;
+  /** Test seam: writer used for a sibling worktree target. */
+  worktreeWriter?: WorktreeFileWriter;
+}
+
 export function savePromotedMemoryRecord(
   candidate: DistillCandidateRecord,
-  options: { executionRole?: PromotedMemoryExecutionRole } = {}
-): { logicalPath: string; record: PromotedMemoryRecord } {
+  options: SavePromotedMemoryRecordOptions = {}
+): { logicalPath: string; record: PromotedMemoryRecord; targetRoot?: string } {
   const metadata = candidate.metadata || {};
   const domain = metadata.knowledge_domain;
   if (
@@ -805,8 +840,34 @@ export function savePromotedMemoryRecord(
     );
   }
   const executionRole = options.executionRole || 'mission_controller';
+  const requestedTarget = options.targetRoot?.trim();
+  const target = requestedTarget
+    ? resolvePromotionTargetRoot(requestedTarget, { gitRunner: options.gitRunner })
+    : undefined;
+  const externalTargetRoot = target && !target.sameAsCurrent ? target.root : undefined;
+  if (externalTargetRoot) {
+    if (domain !== 'product') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root only supports product-domain knowledge — candidate ${candidate.candidate_id} is ${String(domain || 'organization')} | next: promote without --target-root`
+      );
+    }
+    if (options.approvalChannel !== 'pr_review') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root requires approval_channel=pr_review — candidate ${candidate.candidate_id} is ${options.approvalChannel || 'steward'}; a record written into another worktree is only ratified by its PR reaching origin/main | next: re-approve with \`mission_controller memory-approve <CANDIDATE_ID> --approval-channel pr_review\`, or promote without --target-root`
+      );
+    }
+    if (typeof metadata.supersedes === 'string' && metadata.supersedes.trim()) {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --supersedes cannot be combined with --target-root — the superseded record backlink would be written to the wrong checkout | next: promote without --supersedes, or run the promotion from the target checkout`
+      );
+    }
+  }
+  const provenance = readGitProvenance(
+    externalTargetRoot || pathResolver.rootDir(),
+    options.gitRunner
+  );
   return withPromotedMemoryExecutionContext(executionRole, () => {
-    const record = buildPromotedMemoryRecord(candidate);
+    const record: PromotedMemoryRecord = { ...buildPromotedMemoryRecord(candidate), ...provenance };
     const validate = ensureValidator(record.kind);
     if (!validate(record)) {
       const errors = (validate.errors || []).map(
@@ -820,11 +881,29 @@ export function savePromotedMemoryRecord(
       domain: record.knowledge_domain,
       scope: candidate.scope,
     });
+    const baseName = record.record_id;
+    if (externalTargetRoot) {
+      // The queue/distill state stays in this checkout; only the record files
+      // go to the target worktree. logicalDir is repo-relative for product
+      // knowledge, so the returned promoted_ref is valid in both checkouts.
+      (options.worktreeWriter || writePromotedFilesToWorktree)({
+        root: externalTargetRoot,
+        executionRole,
+        files: [
+          { path: `${logicalDir}/${baseName}.json`, content: JSON.stringify(record, null, 2) },
+          { path: `${logicalDir}/${baseName}.md`, content: buildMarkdown(record) },
+        ],
+      });
+      return {
+        logicalPath: `${logicalDir}/${baseName}.md`,
+        record,
+        targetRoot: externalTargetRoot,
+      };
+    }
     const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
-    const baseName = record.record_id;
     const jsonPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.json`), {
       allowMissingLeaf: true,
     });

@@ -349,6 +349,8 @@ export const VALUE_FLAGS = new Set([
   '--evidence',
   '--note',
   '--supersedes',
+  '--target-root',
+  '--approval-channel',
   // HT-03 (2nd half): `scripts/lib/decided-by-args.ts`'s `--decided-by` /
   // `--decided-by-name` / `--decided-by-role` grammar was read correctly by
   // `resolveDecidedByFromArgv` (a direct `argv.indexOf` lookup) but, absent

@@ -2139,6 +2139,10 @@
       "types": "./dist/secure-io.d.ts",
       "default": "./dist/secure-io.js"
     },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "default": "./dist/logger.js"
+    },
     "./text-escaping": {
       "types": "./dist/text-escaping.d.ts",
       "default": "./dist/text-escaping.js"
@@ -4459,6 +4463,10 @@
       "types": "./dist/knowledge/memory-notebook.d.ts",
       "default": "./dist/knowledge/memory-notebook.js"
     },
+    "./knowledge/memory-promotion-git": {
+      "types": "./dist/knowledge/memory-promotion-git.d.ts",
+      "default": "./dist/knowledge/memory-promotion-git.js"
+    },
     "./knowledge/memory-promotion-queue": {
       "types": "./dist/knowledge/memory-promotion-queue.d.ts",
       "default": "./dist/knowledge/memory-promotion-queue.js"
@@ -4466,6 +4474,10 @@
     "./knowledge/memory-promotion-review": {
       "types": "./dist/knowledge/memory-promotion-review.d.ts",
       "default": "./dist/knowledge/memory-promotion-review.js"
+    },
+    "./knowledge/pr-knowledge-readiness": {
+      "types": "./dist/knowledge/pr-knowledge-readiness.d.ts",
+      "default": "./dist/knowledge/pr-knowledge-readiness.js"
     },
     "./knowledge/memory-promotion-workflow": {
       "types": "./dist/knowledge/memory-promotion-workflow.d.ts",
