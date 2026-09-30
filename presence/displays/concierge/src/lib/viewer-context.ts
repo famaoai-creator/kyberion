@@ -13,6 +13,10 @@ import {
   resolveSurfaceViewerTierAccess,
   extractSurfaceBearerToken,
 } from '@agent/core/surface/surface-mutation-guard';
+import {
+  extractSurfaceCredential,
+  type SurfaceCredentialSource,
+} from '@agent/core/surface/surface-session-cookie';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
@@ -65,8 +69,26 @@ function isLoopbackRequest(req: NextRequest): boolean {
   return peerIp === '127.0.0.1' || peerIp === '::1' || peerIp === '::ffff:127.0.0.1';
 }
 
+/**
+ * The request credential: an Authorization bearer wins, then the browser
+ * `kyberion_session` cookie. `source` lets callers apply the CSRF check to
+ * cookie-borne unsafe requests.
+ */
+export function conciergeCredential(req: NextRequest): {
+  token: string | null;
+  source: SurfaceCredentialSource;
+} {
+  const header = extractSurfaceBearerToken(req.headers.get('authorization'));
+  if (header) return { token: header, source: 'header' };
+  const { token, source } = extractSurfaceCredential({
+    authorization: null,
+    cookie: req.headers.get('cookie'),
+  });
+  return { token: token || null, source };
+}
+
 function bearerToken(req: NextRequest): string | null {
-  return extractSurfaceBearerToken(req.headers.get('authorization')) || null;
+  return conciergeCredential(req).token;
 }
 
 function conciergeClientAddress(req: NextRequest): string {

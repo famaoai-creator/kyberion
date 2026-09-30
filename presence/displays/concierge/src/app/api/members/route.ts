@@ -39,6 +39,8 @@ interface MemberListItem {
   /** Derived: a member with any access_registrations signs in with a token; otherwise (only ever the owner) locally. */
   sign_in: 'local' | 'token';
   memberships: MemberProfile['memberships'];
+  /** Bound IdP identities (issuer + subject only — never the email). Always an array. */
+  external_identities: { issuer: string; subject: string }[];
 }
 
 function toListItem(profile: MemberProfile): MemberListItem {
@@ -48,6 +50,10 @@ function toListItem(profile: MemberProfile): MemberListItem {
     status: profile.status,
     sign_in: profile.access_registrations.length > 0 ? 'token' : 'local',
     memberships: profile.memberships,
+    external_identities: (profile.external_identities ?? []).map(({ issuer, subject }) => ({
+      issuer,
+      subject,
+    })),
   };
 }
 

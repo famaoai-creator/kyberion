@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveAuthnPrincipal } from '@agent/core/authn-principal-resolver';
 import { consumeTenantBudget } from '@agent/core/organization/tenant-rate-limiter';
 import {
   extractSurfaceBearerToken,
   resolveSurfaceViewerToken,
 } from '@agent/core/surface/surface-mutation-guard';
+import {
+  SURFACE_SESSION_COOKIE,
+  SURFACE_SESSION_TOKEN_PREFIX,
+  isSameOriginMutation,
+} from '@agent/core/surface/surface-session-cookie';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
@@ -104,8 +110,35 @@ export function resolveChronosToken(req: NextRequest): string | null {
   return (
     extractSurfaceBearerToken(req.headers.get('authorization')) ||
     req.cookies.get('kyberion_token')?.value ||
+    req.cookies.get(SURFACE_SESSION_COOKIE)?.value ||
     null
   );
+}
+
+/**
+ * True when the credential is the OIDC `kyberion_session` cookie (no header,
+ * no legacy `kyberion_token` cookie) and the request is an unsafe cross-origin
+ * mutation. Header credentials and the pre-existing `kyberion_token` cookie
+ * keep their previous behaviour and skip the check.
+ */
+function isBlockedCookieMutation(req: NextRequest): boolean {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
+  if (extractSurfaceBearerToken(req.headers.get('authorization'))) return false;
+  // A `kys1.` value is a browser session wherever the cookie jar put it (a
+  // planted `kyberion_token=kys1.…` must not dodge the check); the pre-existing
+  // opaque kyberion_token keeps its previous behaviour.
+  const token = resolveChronosToken(req);
+  if (!token || !token.startsWith(SURFACE_SESSION_TOKEN_PREFIX)) return false;
+  return !isSameOriginMutation({
+    method,
+    headers: req.headers,
+    expectedHost: req.headers.get('host') || '',
+  });
+}
+
+function crossOriginResponse(): NextResponse {
+  return NextResponse.json({ error: 'Cross-origin request blocked.' }, { status: 403 });
 }
 
 function getRateLimitKey(req: NextRequest): string {
@@ -116,9 +149,26 @@ function getRateLimitKey(req: NextRequest): string {
   return `ip:${getClientIP(req)}`;
 }
 
+function resolveBrowserSessionRole(token: string): ChronosAccessRole | null {
+  try {
+    return resolveAuthnPrincipal(
+      { credential: { type: 'bearer', token } },
+      { providerIds: ['browser-session'], purpose: 'remote_human', context: { surface: 'chronos' } }
+    ).principal.role;
+  } catch {
+    // Expired / forged / unbound / suspended — all fail closed to 401.
+    return null;
+  }
+}
+
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveChronosToken(req);
   const isLocal = isChronosLoopbackRequest(req);
+  if (token && token.startsWith(SURFACE_SESSION_TOKEN_PREFIX)) {
+    // OIDC browser session: the role comes from the bound member (re-read on
+    // every request), not from a static token or registry entry.
+    return resolveBrowserSessionRole(token);
+  }
   if (token) {
     const resolution = resolveSurfaceViewerToken(token, {
       registrations: loadChronosTokenRegistrations(),
@@ -157,6 +207,7 @@ export function guardRequest(req: NextRequest): NextResponse | null {
       { status: 401 }
     );
   }
+  if (isBlockedCookieMutation(req)) return crossOriginResponse();
 
   const registration = resolveChronosTokenRegistration(resolveChronosToken(req) || '');
   const tenantSlugs = registration?.tenant_slugs || [];
@@ -188,6 +239,7 @@ export function requireChronosAccess(
       { status: 401 }
     );
   }
+  if (isBlockedCookieMutation(req)) return crossOriginResponse();
   if (requiredRole === 'localadmin' && resolved !== 'localadmin') {
     return NextResponse.json(
       { error: 'Forbidden. This action requires Chronos localadmin access.' },

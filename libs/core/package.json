@@ -5755,6 +5755,22 @@
       "types": "./dist/surface/surface-authn.d.ts",
       "default": "./dist/surface/surface-authn.js"
     },
+    "./surface/oidc-browser-login": {
+      "types": "./dist/surface/oidc-browser-login.d.ts",
+      "default": "./dist/surface/oidc-browser-login.js"
+    },
+    "./surface/surface-auth-routes": {
+      "types": "./dist/surface/surface-auth-routes.d.ts",
+      "default": "./dist/surface/surface-auth-routes.js"
+    },
+    "./surface/surface-login-pages": {
+      "types": "./dist/surface/surface-login-pages.d.ts",
+      "default": "./dist/surface/surface-login-pages.js"
+    },
+    "./surface/surface-session-cookie": {
+      "types": "./dist/surface/surface-session-cookie.d.ts",
+      "default": "./dist/surface/surface-session-cookie.js"
+    },
     "./surface/surface-authorization": {
       "types": "./dist/surface/surface-authorization.d.ts",
       "default": "./dist/surface/surface-authorization.js"

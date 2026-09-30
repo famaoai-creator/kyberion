@@ -14,6 +14,10 @@ vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
   authorizeSurfaceMutation: () => ({ ok: true }),
 }));
 
+vi.mock('../../../lib/viewer-context', () => ({
+  requireOperatorViewerAccess: () => null,
+}));
+
 import { POST } from './route.js';
 
 describe('operator-surface inbox route', () => {

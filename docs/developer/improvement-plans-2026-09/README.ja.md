@@ -11,6 +11,7 @@ status: active
 
 ## プロダクトと利用体験
 
+- [サーフェスの OIDC ログイン](./SURFACE_OIDC_LOGIN_PLAN_2026-09-30.ja.md) — 未認証ブラウザを生の 401 で止めず、標準 OIDC(Google / Entra 確認済み)の共通ログイン画面へ。無状態セッション + member 束縛、5 サーフェス共通。
 - [マネージド SaaS 実用化](./SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md) — OSS / self-hosted と並行する専用環境パイロット、production gate、共有マルチテナント移行条件を定義。
 - [フロントデスク再設計](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) — 秘書室と相棒の共有レール、テナント表示、メンバーとアクターの境界を再設計。
 - [ヒアリングとトレーニング](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md) — 依頼の要件化と、テナント単位の学習支援。

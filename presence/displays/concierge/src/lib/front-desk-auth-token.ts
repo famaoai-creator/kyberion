@@ -8,6 +8,22 @@
  */
 
 const TOKEN_STORAGE_KEY = 'front-desk.token';
+/**
+ * UX-only hint so the page-navigation middleware does not bounce a pasted-token
+ * user to /login (it cannot see sessionStorage). Grants nothing: API routes
+ * still verify the real token.
+ */
+const TOKEN_HINT_COOKIE = 'kyberion_client_token';
+
+function setTokenHintCookie(present: boolean): void {
+  try {
+    document.cookie = present
+      ? `${TOKEN_HINT_COOKIE}=1; Path=/; SameSite=Lax`
+      : `${TOKEN_HINT_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0`;
+  } catch {
+    // best-effort
+  }
+}
 
 export function getStoredFrontDeskToken(): string | null {
   try {
@@ -20,6 +36,7 @@ export function getStoredFrontDeskToken(): string | null {
 export function storeFrontDeskToken(token: string): void {
   try {
     window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    setTokenHintCookie(true);
   } catch {
     // best-effort only — a token that cannot persist still works for this fetch.
   }
@@ -31,6 +48,7 @@ export function clearFrontDeskToken(): void {
   } catch {
     // best-effort
   }
+  setTokenHintCookie(false);
 }
 
 /** Merge an `Authorization: Bearer <token>` header in, when a token is stored. */

@@ -27,6 +27,7 @@ import {
   createHash,
   createHmac,
   createPublicKey,
+  randomBytes,
   timingSafeEqual,
   verify,
   type webcrypto,
@@ -720,7 +721,7 @@ const agentTokenProvider: AuthnProvider = {
 // oidc-jwt — external IdP JWT verified against configured JWKS
 // ---------------------------------------------------------------------------
 
-interface OidcConfig {
+export interface OidcConfig {
   issuer?: string;
   audience?: string;
   jwks?: { keys: JsonWebKeyLike[] };
@@ -805,7 +806,11 @@ const oidcJwtProvider: AuthnProvider = {
   },
   canResolve(request, deps) {
     const token = credentialToken(request.credential);
-    if (!JWT_SHAPE.test(token) || token.startsWith(AGENT_TOKEN_PREFIX)) {
+    if (
+      !JWT_SHAPE.test(token) ||
+      token.startsWith(AGENT_TOKEN_PREFIX) ||
+      token.startsWith(BROWSER_SESSION_PREFIX)
+    ) {
       return { eligible: false, unmet: ['credential is not a JWT'] };
     }
     // Issuer binding is mandatory: without it the provider would claim every
@@ -846,7 +851,7 @@ const oidcJwtProvider: AuthnProvider = {
   },
 };
 
-function verifyJwtSignature(
+export function verifyJwtSignature(
   token: string,
   header: { alg?: string; kid?: string },
   claims: Record<string, unknown>,
@@ -928,7 +933,16 @@ function verifyJwtSignature(
 function claimsToPrincipal(
   claims: Record<string, unknown>,
   request: AuthnRequest,
-  deps?: AuthnResolveDeps
+  deps?: AuthnResolveDeps,
+  options?: {
+    /**
+     * Ignore claim-borne member ids (`member_id`, `sub = user:<id>`) and resolve
+     * ONLY through a registry `external_identities` binding. A browser session's
+     * `sub` is the IdP's own subject — on a self-hosted IdP a user may choose it
+     * — so it must never be able to name a member directly.
+     */
+    memberBindingOnly?: boolean;
+  }
 ): ResolvedPrincipal {
   const sub = typeof claims.sub === 'string' ? claims.sub.trim() : '';
   const memberIdClaim =
@@ -939,9 +953,10 @@ function claimsToPrincipal(
   let actor;
   let memberId: string | undefined;
   let mappedMember: MemberProfile | null = null;
-  const claimedMemberId =
-    memberIdClaim ??
-    (sub.startsWith('user:') && isValidMemberId(sub.slice(5)) ? sub.slice(5) : undefined);
+  const claimedMemberId = options?.memberBindingOnly
+    ? undefined
+    : (memberIdClaim ??
+      (sub.startsWith('user:') && isValidMemberId(sub.slice(5)) ? sub.slice(5) : undefined));
   if (claimedMemberId) {
     // Claim-borne member ids (custom-claim IdPs) are an asserted member
     // binding: the member must exist AND be active in the local registry.
@@ -1110,6 +1125,180 @@ function claimsToPrincipal(
 }
 
 // ---------------------------------------------------------------------------
+// browser-session — kys1.<b64url payload>.<b64url HMAC-SHA256> browser login
+// ---------------------------------------------------------------------------
+//
+// Minted by the surface OIDC login callback (surface/oidc-browser-login.ts)
+// only AFTER the IdP id_token was verified AND its iss+sub resolved to an
+// ACTIVE member. The cookie therefore carries no scope claims of its own:
+// every request re-derives the principal from the member registry (via the
+// same claimsToPrincipal path as oidc-jwt), so suspending a member or
+// changing its memberships takes effect on the next request even though the
+// cookie itself is stateless.
+
+export const BROWSER_SESSION_ISSUER = 'kyberion-browser-session';
+export const BROWSER_SESSION_PREFIX = 'kys1.';
+
+export interface BrowserSessionPayload {
+  iss: typeof BROWSER_SESSION_ISSUER;
+  /** Upstream IdP issuer + subject the session was minted for. */
+  idp_iss: string;
+  sub: string;
+  exp: number; // epoch seconds
+  iat: number;
+  sid: string;
+}
+
+/** Shortest accepted session key: a short key makes the HMAC forgeable offline. */
+export const BROWSER_SESSION_MIN_KEY_BYTES = 32;
+
+/** Sync key lookup shared by the signer (login callback) and the verifier. */
+export function browserSessionKey(deps?: AuthnResolveDeps): Buffer | null {
+  // A weak key is treated as "not configured" rather than silently accepted.
+  const strong = (value: string | undefined): Buffer | null =>
+    value && Buffer.byteLength(value, 'utf8') >= BROWSER_SESSION_MIN_KEY_BYTES
+      ? Buffer.from(value, 'utf8')
+      : null;
+  const envKey = envText(deps, 'KYBERION_SESSION_SECRET')?.trim();
+  if (envKey) return strong(envKey);
+  try {
+    const doc = secretGuard.loadConnectionDocument('kyberion-browser-session') as
+      { hmac_key?: string } | undefined;
+    return strong(doc?.hmac_key?.trim());
+  } catch {
+    return null;
+  }
+}
+
+function signBrowserSessionPayload(payloadB64: string, key: Buffer): string {
+  return createHmac('sha256', key)
+    .update(`${BROWSER_SESSION_PREFIX}${payloadB64}`)
+    .digest('base64url');
+}
+
+export function mintBrowserSessionToken(
+  input: { idpIssuer: string; subject: string; ttlSeconds: number },
+  deps?: AuthnResolveDeps
+): { token: string; payload: BrowserSessionPayload } {
+  const key = browserSessionKey(deps);
+  if (!key) {
+    throw new AuthnError(
+      401,
+      'unauthenticated',
+      'no browser session signing key (KYBERION_SESSION_SECRET or secret-guard kyberion-browser-session)'
+    );
+  }
+  const nowSec = Math.floor((deps?.now ?? Date.now()) / 1000);
+  const payload: BrowserSessionPayload = {
+    iss: BROWSER_SESSION_ISSUER,
+    idp_iss: input.idpIssuer,
+    sub: input.subject,
+    iat: nowSec,
+    exp: nowSec + Math.max(1, input.ttlSeconds),
+    sid: randomBytes(12).toString('hex'),
+  };
+  const payloadB64 = b64urlJson(payload);
+  return {
+    token: `${BROWSER_SESSION_PREFIX}${payloadB64}.${signBrowserSessionPayload(payloadB64, key)}`,
+    payload,
+  };
+}
+
+/**
+ * Verify signature + expiry and return the payload, or null when the token is
+ * not a well-formed, correctly signed, unexpired browser session. Pure
+ * crypto — no member lookup (the provider / login callback do that).
+ */
+export function verifyBrowserSessionToken(
+  token: string,
+  deps?: AuthnResolveDeps
+): BrowserSessionPayload | null {
+  if (!token.startsWith(BROWSER_SESSION_PREFIX)) return null;
+  const key = browserSessionKey(deps);
+  if (!key) return null;
+  const body = token.slice(BROWSER_SESSION_PREFIX.length);
+  const dot = body.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const payloadB64 = body.slice(0, dot);
+  const signature = body.slice(dot + 1);
+  const expected = signBrowserSessionPayload(payloadB64, key);
+  if (
+    signature.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  ) {
+    return null;
+  }
+  let payload: BrowserSessionPayload;
+  try {
+    payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (
+    !payload ||
+    payload.iss !== BROWSER_SESSION_ISSUER ||
+    typeof payload.sub !== 'string' ||
+    !payload.sub ||
+    typeof payload.idp_iss !== 'string' ||
+    !payload.idp_iss
+  ) {
+    return null;
+  }
+  const nowSec = Math.floor((deps?.now ?? Date.now()) / 1000);
+  if (typeof payload.exp !== 'number' || payload.exp <= nowSec) return null;
+  return payload;
+}
+
+const browserSessionProvider: AuthnProvider = {
+  id: 'browser-session',
+  capabilities: {
+    credentialTypes: ['bearer'],
+    loopback: false,
+    agentPrincipals: false,
+    humanPrincipals: true,
+    externalIdp: true,
+    requiresNetwork: false,
+    zeroConfig: false,
+  },
+  canResolve(request, deps) {
+    const token = credentialToken(request.credential);
+    if (!token.startsWith(BROWSER_SESSION_PREFIX)) {
+      return { eligible: false, unmet: ['credential is not a kys1. browser session'] };
+    }
+    if (!browserSessionKey(deps)) {
+      return { eligible: false, unmet: ['no browser session verification key configured'] };
+    }
+    return { eligible: true };
+  },
+  resolve(request, deps) {
+    const token = credentialToken(request.credential);
+    if (!token.startsWith(BROWSER_SESSION_PREFIX)) return null;
+    const payload = verifyBrowserSessionToken(token, deps);
+    if (!payload) {
+      throw new AuthnError(401, 'unauthenticated', 'browser session invalid or expired');
+    }
+    const principal = claimsToPrincipal(
+      { iss: payload.idp_iss, sub: payload.sub, exp: payload.exp },
+      request,
+      deps,
+      { memberBindingOnly: true }
+    );
+    // A browser session is only ever minted for a bound, active member.
+    // An unbound subject would otherwise degrade to the `ext-` path (which
+    // still inherits the server-bound tenant) — never grant that to
+    // "anyone with a Google account".
+    if (!principal.memberId) {
+      throw new AuthnError(403, 'scope_denied', 'browser session subject is not a bound member');
+    }
+    return {
+      ...principal,
+      provider: 'browser-session',
+      claims: { ...principal.claims, sid: payload.sid },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // registration
 // ---------------------------------------------------------------------------
 
@@ -1127,6 +1316,7 @@ export function registerBuiltinAuthnProviders(): void {
     agentContextProvider,
     agentTokenProvider,
     oidcJwtProvider,
+    browserSessionProvider,
   ]) {
     registerAuthnProvider(provider);
   }
@@ -1142,4 +1332,5 @@ export const BUILTIN_AUTHN_PROVIDER_IDS = [
   'agent-context',
   'agent-token',
   'oidc-jwt',
+  'browser-session',
 ] as const;

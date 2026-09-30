@@ -2421,6 +2421,24 @@
       "subsystem": "identity"
     },
     {
+      "name": "KYBERION_OIDC_CLIENT_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "OAuth client id of the surface browser login (Authorization Code + PKCE). Together with KYBERION_OIDC_ISSUER it enables /login on every surface.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_CLIENT_SECRET",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "OAuth client secret for the surface browser login token exchange (Google and Entra web clients require it). Values stay in the secret store; PKCE is always used as well.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
       "name": "KYBERION_OIDC_ISSUER",
       "category": "runtime",
       "type": "string",
@@ -2453,6 +2471,42 @@
       "type": "string",
       "required": false,
       "description": "Remote JWKS endpoint for OIDC verification. The synchronous resolve path never fetches it; surfaces that own egress pre-fetch into deps.jwks.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_PROVIDER_LABEL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Display name for the sign-in button on the login screen (e.g. \"Google\", \"Microsoft\"). Default: \"SSO\".",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_PUBLIC_BASE_URL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Externally visible origin of a surface (e.g. https://kyberion.example.com). The OIDC redirect URI is <base>/auth/callback. Defaults to the request origin on loopback only.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_PUBLIC_BASE_URLS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Per-surface public origins for the OIDC redirect URI, as comma-separated surface=origin pairs (e.g. \"concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com\"). Overrides KYBERION_OIDC_PUBLIC_BASE_URL for the named surface.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_SCOPES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Space-separated scopes requested by the surface browser login. Default: \"openid\".",
       "documented": true,
       "subsystem": "identity"
     },
@@ -3216,6 +3270,24 @@
       "description": "Give implementer provider CLI delegations a private GIT_INDEX_FILE seeded from the checkout index so worker git add never stages into the shared index. Default on; 0 disables. Under Vitest it is off unless set to 1.",
       "documented": true,
       "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_SESSION_SECRET",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "HMAC key (at least 32 bytes; shorter values are treated as not configured) signing kyberion_session browser session cookies (kys1.) and pre-auth login cookies. Must be identical across every surface process/host that shares the login. Values stay in the secret store.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_SESSION_TTL_SECONDS",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "description": "Lifetime of a browser login session in seconds. Default 28800 (8 hours).",
+      "documented": true,
+      "subsystem": "identity"
     },
     {
       "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",

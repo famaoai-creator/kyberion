@@ -306,6 +306,20 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(trainingAssignmentsRoute).not.toContain('割り当ての入力を確認してください。');
   });
 
+  it('FD-07 SSO: member list exposes external_identities (no email) and the section binds/unbinds via PATCH', () => {
+    const membersRoute = read('src/app/api/members/route.ts');
+    const membersSection = read('src/app/settings/sections/MembersSection.tsx');
+    const settingsPage = read('src/app/settings/page.tsx');
+    expect(membersRoute).toContain('external_identities');
+    expect(membersRoute).not.toMatch(/external_identities[^;]*email/);
+    expect(membersSection).toContain('external_identity_remove');
+    expect(membersSection).toContain('external_identity:');
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_bind', locale)");
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_unbind', locale)");
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_help', locale)");
+    expect(settingsPage).toContain('external_identity_remove');
+  });
+
   it('HT-05 second pass: /api/training/progress is owner-only, the hook fetches it, and the section renders training_lessons_done', () => {
     const progressRoute = read('src/app/api/training/progress/route.ts');
     const useTrainingAssignments = read('src/lib/use-training-assignments.ts');
