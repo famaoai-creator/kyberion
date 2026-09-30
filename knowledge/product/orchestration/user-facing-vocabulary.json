@@ -18913,6 +18913,11 @@
         "en": "Unbind",
         "ja": "解除",
         "qps-ploc": "⟦Ůñƀïñḓ ŀőř⟧"
+      },
+      "signin_sso_link": {
+        "en": "Sign in with your organization account instead",
+        "ja": "組織のアカウントでサインインする",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ïñşŧėȧḓ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       }
     },
     "operator": {
@@ -21752,9 +21757,9 @@
         "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř ḓïḓ ñőŧ ȧƈƈėṗŧ ŧħė şïɠñ-ïñ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "failed_token_invalid": {
-        "en": "The identity provider response failed verification.",
-        "ja": "ID プロバイダーの応答を検証できませんでした。",
-        "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř řėşṗőñşė ƒȧïŀėḓ ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "en": "The identity provider response failed verification. Try again; if it keeps happening, contact an administrator.",
+        "ja": "ID プロバイダーの応答を検証できませんでした。もう一度お試しください。繰り返す場合は管理者に連絡してください。",
+        "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř řėşṗőñşė ƒȧïŀėḓ ṽėřïƒïƈȧŧïőñ. Ŧřẏ ȧɠȧïñ; ïƒ ïŧ ķėėṗş ħȧṗṗėñïñɠ, ƈőñŧȧƈŧ ȧñ ȧḓɱïñïşŧřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
       },
       "failed_session_unavailable": {
         "en": "A session could not be created. Contact an administrator.",
@@ -21785,6 +21790,16 @@
         "en": "Sign in with a different account",
         "ja": "別のアカウントでサインインする",
         "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ȧ ḓïƒƒėřėñŧ ȧƈƈőůñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "failed_method_not_allowed": {
+        "en": "That request is not supported here. Start again from the sign-in page.",
+        "ja": "この操作はここではできません。サインイン画面からやり直してください。",
+        "qps-ploc": "⟦Ŧħȧŧ řėɋůėşŧ ïş ñőŧ şůṗṗőřŧėḓ ħėřė. Şŧȧřŧ ȧɠȧïñ ƒřőɱ ŧħė şïɠñ-ïñ ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "failed_rate_limited": {
+        "en": "Too many sign-in attempts. Wait a minute and try again.",
+        "ja": "サインインの試行が多すぎます。1 分ほど待ってからもう一度お試しください。",
+        "qps-ploc": "⟦Ŧőő ɱȧñẏ şïɠñ-ïñ ȧŧŧėɱṗŧş. Ẇȧïŧ ȧ ɱïñůŧė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       }
     }
   }

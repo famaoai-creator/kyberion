@@ -7,6 +7,7 @@ import {
   isSameOriginMutation,
   parseCookieHeader,
   peekSessionExpiry,
+  resolveAuthClientKey,
   resolveLoginRedirect,
   sanitizeNextPath,
   serializeCookie,
@@ -165,5 +166,21 @@ describe('extractSurfaceCredential', () => {
       source: 'session-cookie',
     });
     expect(extractSurfaceCredential({})).toEqual({ token: '', source: 'none' });
+  });
+});
+
+describe('resolveAuthClientKey', () => {
+  it('trusts only a real peer, or forwarded headers behind a declared proxy', () => {
+    expect(
+      resolveAuthClientKey({ ip: '203.0.113.5', forwardedFor: '1.1.1.1', trustProxy: false })
+    ).toBe('203.0.113.5');
+    expect(resolveAuthClientKey({ forwardedFor: '1.1.1.1', trustProxy: false })).toBe('shared');
+    expect(resolveAuthClientKey({ forwardedFor: '1.1.1.1, 2.2.2.2', trustProxy: true })).toBe(
+      '1.1.1.1'
+    );
+    expect(
+      resolveAuthClientKey({ realIp: '9.9.9.9', forwardedFor: '1.1.1.1', trustProxy: true })
+    ).toBe('9.9.9.9');
+    expect(resolveAuthClientKey({ trustProxy: true })).toBe('shared');
   });
 });

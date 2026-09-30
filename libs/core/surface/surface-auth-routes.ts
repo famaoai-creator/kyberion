@@ -29,6 +29,7 @@ import {
   SURFACE_LOGIN_PATH,
   SURFACE_LOGOUT_PATH,
   SURFACE_SESSION_COOKIE,
+  isSurfaceAuthPath,
   parseCookieHeader,
   sanitizeNextPath,
   serializeClearedCookie,
@@ -49,6 +50,15 @@ export interface SurfaceAuthRouteRequest {
   requestOrigin: string;
   /** Adapter-proven loopback peer. */
   loopback: boolean;
+  /**
+   * Stable per-client bucket for rate limiting, supplied by the adapter ONLY
+   * from a peer it can trust (never a caller-controlled header unless a trusted
+   * proxy rewrites it). Omit on surfaces that already rate-limit at the HTTP
+   * layer; the per-surface cap below still applies when it is present.
+   */
+  clientKey?: string;
+  /** `Sec-Fetch-Site` of the request, when the client sent one. */
+  secFetchSite?: string | null;
   /** Where a surface that supports pasted access tokens (concierge `/signin`) offers that path. */
   tokenSignInHref?: string;
 }
@@ -62,19 +72,79 @@ export interface SurfaceAuthRouteResponse {
   body: string;
 }
 
+/** `/login` with the caller's `next` and `lang` carried along. */
+function loginHrefFor(req: SurfaceAuthRouteRequest): string {
+  const params = new URLSearchParams();
+  const next = sanitizeNextPath(req.searchParams.get('next'));
+  if (next !== '/') params.set('next', next);
+  const lang = req.searchParams.get('lang');
+  if (lang === 'ja' || lang === 'en') params.set('lang', lang);
+  const query = params.toString();
+  return query ? `${SURFACE_LOGIN_PATH}?${query}` : SURFACE_LOGIN_PATH;
+}
+
 function html(
   req: SurfaceAuthRouteRequest,
   status: number,
   view: SurfaceLoginView,
-  setCookies: string[] = []
+  setCookies: string[] = [],
+  extraHeaders: Record<string, string> = {}
 ): SurfaceAuthRouteResponse {
   const locale = resolveLoginLocale(req.searchParams.get('lang'), req.acceptLanguage);
   return {
     status,
-    headers: { ...SURFACE_LOGIN_PAGE_HEADERS },
+    headers: { ...SURFACE_LOGIN_PAGE_HEADERS, ...extraHeaders },
     setCookies,
-    body: renderSurfaceLoginPage({ surfaceLabel: req.surfaceLabel, view, locale }),
+    body: renderSurfaceLoginPage({
+      surfaceLabel: req.surfaceLabel,
+      view,
+      locale,
+      loginHref: loginHrefFor(req),
+    }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Rate limit (framework-neutral, in-memory, per process)
+// ---------------------------------------------------------------------------
+
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT_PER_CLIENT = 120;
+/** Whole-surface ceiling: a rotating caller-supplied key cannot exceed it. */
+const RATE_LIMIT_PER_SURFACE = 600;
+const RATE_MAX_TRACKED_KEYS = 5_000;
+const rateBuckets = new Map<string, { windowStart: number; count: number }>();
+
+export function resetSurfaceAuthRateLimitForTests(): void {
+  rateBuckets.clear();
+}
+
+function takeRateToken(key: string, limit: number, now: number): boolean {
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
+    if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+      // Bound memory under key-rotation abuse: drop expired buckets, then the oldest.
+      for (const [k, v] of rateBuckets) {
+        if (now - v.windowStart >= RATE_WINDOW_MS) rateBuckets.delete(k);
+      }
+      if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+        const oldest = rateBuckets.keys().next().value;
+        if (oldest !== undefined) rateBuckets.delete(oldest);
+      }
+    }
+    rateBuckets.set(key, { windowStart: now, count: 1 });
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= limit;
+}
+
+/** True when this request may proceed. Only applies when the adapter gave a clientKey. */
+function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
+  if (req.clientKey === undefined) return true;
+  const surfaceOk = takeRateToken(`s:${req.surfaceId}`, RATE_LIMIT_PER_SURFACE, now);
+  const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, RATE_LIMIT_PER_CLIENT, now);
+  return surfaceOk && clientOk;
 }
 
 function redirect(location: string, setCookies: string[] = []): SurfaceAuthRouteResponse {
@@ -96,6 +166,11 @@ function startHref(next: string): string {
     : `${SURFACE_AUTH_START_PATH}?next=${encodeURIComponent(next)}`;
 }
 
+function notAllowed(req: SurfaceAuthRouteRequest): SurfaceAuthRouteResponse {
+  const allow = req.pathname === SURFACE_LOGOUT_PATH ? 'GET, POST' : 'GET, HEAD';
+  return html(req, 405, { kind: 'failed', code: 'method_not_allowed' }, [], { Allow: allow });
+}
+
 /** Whether `pathname` belongs to the shared login flow. */
 export { isSurfaceAuthPath } from './surface-session-cookie.js';
 
@@ -108,6 +183,9 @@ export async function handleSurfaceAuthRoute(
   deps: OidcLoginDeps = {}
 ): Promise<SurfaceAuthRouteResponse | null> {
   const method = req.method.toUpperCase();
+  if (isSurfaceAuthPath(req.pathname) && !withinRateLimit(req, deps.now ?? Date.now())) {
+    return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], { 'Retry-After': '60' });
+  }
   const next = sanitizeNextPath(req.searchParams.get('next'));
   // `Secure` follows the origin the browser actually uses: the DECLARED public
   // origin when there is one (a TLS-terminating proxy hands the app an http
@@ -124,8 +202,7 @@ export async function handleSurfaceAuthRoute(
 
   switch (req.pathname) {
     case SURFACE_LOGIN_PATH: {
-      if (method !== 'GET' && method !== 'HEAD')
-        return html(req, 405, { kind: 'failed', code: 'expired' });
+      if (method !== 'GET' && method !== 'HEAD') return notAllowed(req);
       const { config, missing } = resolveOidcLoginConfig(deps);
       if (!config) {
         return html(req, 200, { kind: 'unconfigured', missing, tokenHref: req.tokenSignInHref });
@@ -149,7 +226,7 @@ export async function handleSurfaceAuthRoute(
     }
 
     case SURFACE_AUTH_START_PATH: {
-      if (method !== 'GET') return html(req, 405, { kind: 'failed', code: 'expired' });
+      if (method !== 'GET') return notAllowed(req);
       const started = await startOidcLogin(
         {
           surfaceId: req.surfaceId,
@@ -172,7 +249,7 @@ export async function handleSurfaceAuthRoute(
     }
 
     case SURFACE_AUTH_CALLBACK_PATH: {
-      if (method !== 'GET') return html(req, 405, { kind: 'failed', code: 'expired' });
+      if (method !== 'GET') return notAllowed(req);
       const txName = loginTransactionCookieName(req.surfaceId);
       const cookies = parseCookieHeader(req.cookieHeader);
       const result = await completeOidcLogin(
@@ -200,8 +277,10 @@ export async function handleSurfaceAuthRoute(
     }
 
     case SURFACE_LOGOUT_PATH: {
-      if (method !== 'GET' && method !== 'POST')
-        return html(req, 405, { kind: 'failed', code: 'expired' });
+      if (method !== 'GET' && method !== 'POST') return notAllowed(req);
+      // A cross-site request (an <img>, a link on another origin) must not be
+      // able to sign the user out; browsers tag it with Sec-Fetch-Site.
+      if (req.secFetchSite === 'cross-site') return redirect(loginHrefFor(req));
       return redirect(`${SURFACE_LOGIN_PATH}?signedout=1`, [
         serializeClearedCookie(SURFACE_SESSION_COOKIE, secure),
       ]);

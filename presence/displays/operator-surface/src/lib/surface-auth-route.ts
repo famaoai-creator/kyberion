@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import { isLoopbackRequest } from './peer';
+import { getRegisteredEnvBool } from '@agent/core/foundation/env';
+import { resolveAuthClientKey } from '@agent/core/surface/surface-session-cookie';
 
 export const OPERATOR_SURFACE_ID = 'operator-surface';
 export const OPERATOR_SURFACE_LABEL = 'Operator';
@@ -18,6 +20,13 @@ export async function handleOperatorAuthRoute(req: NextRequest): Promise<Respons
     acceptLanguage: req.headers.get('accept-language'),
     requestOrigin: url.origin,
     loopback: isLoopbackRequest(req),
+    clientKey: resolveAuthClientKey({
+      ip: (req as { ip?: string }).ip,
+      forwardedFor: req.headers.get('x-forwarded-for'),
+      realIp: req.headers.get('x-real-ip'),
+      trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
+    }),
+    secFetchSite: req.headers.get('sec-fetch-site'),
   });
   if (!result) return new Response('Not found', { status: 404 });
   const headers = new Headers(result.headers);

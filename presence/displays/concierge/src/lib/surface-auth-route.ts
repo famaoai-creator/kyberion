@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import { isLoopbackPeer } from './loopback-peer';
+import { getRegisteredEnvBool } from '@agent/core/foundation/env';
+import { resolveAuthClientKey } from '@agent/core/surface/surface-session-cookie';
 
 export const CONCIERGE_SURFACE_ID = 'concierge';
 export const CONCIERGE_SURFACE_LABEL = 'Concierge';
@@ -19,6 +21,13 @@ export async function handleConciergeAuthRoute(req: NextRequest): Promise<Respon
     acceptLanguage: req.headers.get('accept-language'),
     requestOrigin: url.origin,
     loopback: isLoopbackPeer(req),
+    clientKey: resolveAuthClientKey({
+      ip: (req as { ip?: string }).ip,
+      forwardedFor: req.headers.get('x-forwarded-for'),
+      realIp: req.headers.get('x-real-ip'),
+      trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
+    }),
+    secFetchSite: req.headers.get('sec-fetch-site'),
     tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
   });
   if (!result) return new Response('Not found', { status: 404 });
