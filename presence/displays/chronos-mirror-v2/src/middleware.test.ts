@@ -19,6 +19,7 @@ function makeReq(
 ) {
   return {
     ip: options.ip,
+    url: `https://chronos.example.com${options.pathname ?? '/api/status'}${options.search ?? ''}`,
     method: options.method ?? 'GET',
     headers: {
       get(name: string) {
@@ -114,7 +115,10 @@ describe('chronos middleware', () => {
         makeReq({ pathname: '/missions', ip: '203.0.113.7', headers: nav, search: '?a=1' })
       );
       expect(res.status).toBe(302);
-      expect(res.headers.get('location')).toMatch(/^\/login\?next=/);
+      const location = new URL(res.headers.get('location') ?? '');
+      expect(location.origin).toBe('https://chronos.example.com');
+      expect(location.pathname).toBe('/login');
+      expect(location.searchParams.get('next')).toBe('/missions?a=1');
     });
 
     it('keeps API calls as 401 JSON even with navigation headers', () => {

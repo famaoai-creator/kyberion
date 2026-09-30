@@ -9,6 +9,7 @@ import {
   type MemberExternalIdentity,
   type MemberProfile,
 } from '@agent/core/organization/member-registry';
+import { trimTrailingSlashes } from '@agent/core/surface/surface-session-cookie';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';
 import {
@@ -51,7 +52,7 @@ function parseExternalIdentity(value: unknown, allowEmail: boolean): MemberExter
   const record = value as Record<string, unknown>;
   const allowed = allowEmail ? ['issuer', 'subject', 'email'] : ['issuer', 'subject'];
   if (Object.keys(record).some((key) => !allowed.includes(key))) return null;
-  const issuer = typeof record.issuer === 'string' ? record.issuer.trim().replace(/\/+$/, '') : '';
+  const issuer = typeof record.issuer === 'string' ? trimTrailingSlashes(record.issuer.trim()) : '';
   const subject = typeof record.subject === 'string' ? record.subject.trim() : '';
   if (!issuer || !subject) return null;
   if (issuer.length > EXTERNAL_IDENTITY_TEXT_MAX || subject.length > EXTERNAL_IDENTITY_TEXT_MAX) {

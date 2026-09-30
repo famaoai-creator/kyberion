@@ -42,7 +42,11 @@ import {
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import type { MemberRegistryPathOptions } from '../organization/member-registry.js';
-import { SURFACE_LOGIN_TX_COOKIE_PREFIX, sanitizeNextPath } from './surface-session-cookie.js';
+import {
+  SURFACE_LOGIN_TX_COOKIE_PREFIX,
+  sanitizeNextPath,
+  trimTrailingSlashes,
+} from './surface-session-cookie.js';
 import type { SurfaceLoginFailureCode, SurfaceLoginView } from './surface-login-pages.js';
 
 export const DEFAULT_SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -103,7 +107,7 @@ function envText(deps: OidcLoginDeps, name: string): string | undefined {
 }
 
 function normalizeIssuer(issuer: string): string {
-  return issuer.trim().replace(/\/+$/, '');
+  return trimTrailingSlashes(issuer.trim());
 }
 
 /**

@@ -314,9 +314,9 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(membersRoute).not.toMatch(/external_identities[^;]*email/);
     expect(membersSection).toContain('external_identity_remove');
     expect(membersSection).toContain('external_identity:');
-    expect(membersSection).toContain("ssoText('settings_member_sso_bind', locale)");
-    expect(membersSection).toContain("ssoText('settings_member_sso_unbind', locale)");
-    expect(membersSection).toContain("ssoText('settings_member_sso_help', locale)");
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_bind', locale)");
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_unbind', locale)");
+    expect(membersSection).toContain("frontDeskText('settings_member_sso_help', locale)");
     expect(settingsPage).toContain('external_identity_remove');
   });
 

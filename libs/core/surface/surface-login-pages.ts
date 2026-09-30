@@ -9,6 +9,9 @@
  * `iss`/`sub`, which is attacker-influenced text.
  */
 
+import { t } from '../t.js';
+import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
+
 export type SurfaceLoginLocale = 'en' | 'ja';
 
 export type SurfaceLoginView =
@@ -45,74 +48,6 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-const TEXT = {
-  en: {
-    title: 'Sign in',
-    surface: 'Surface',
-    lead: 'Sign in with your organization account to continue.',
-    button: (label: string) => `Sign in with ${label}`,
-    unconfiguredTitle: 'Single sign-on is not configured',
-    unconfiguredLead:
-      'This surface cannot verify who you are yet. An administrator must finish the sign-in setup:',
-    unconfiguredHint:
-      'Until then, use an access token (KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN). Loopback auto-admin only applies where the surface can see a real local peer; on Next.js surfaces it needs KYBERION_TRUST_PROXY=1 behind a trusted proxy.',
-    unboundTitle: 'Your account is not registered',
-    unboundLead:
-      'You signed in successfully, but this identity is not bound to a Kyberion member, so no access was granted. Send the identifiers below to an administrator so they can bind them to your member profile.',
-    issuer: 'Issuer',
-    subject: 'Subject',
-    suspendedTitle: 'Your member account is suspended',
-    suspendedLead: 'Your identity is bound to a suspended member. Contact an administrator.',
-    failedTitle: 'Sign-in could not be completed',
-    failed: {
-      idp_error: 'The identity provider returned an error. Try again.',
-      state_mismatch:
-        'The sign-in request could not be verified. Start again from the sign-in page.',
-      expired: 'The sign-in attempt expired. Start again.',
-      exchange_failed: 'The identity provider did not accept the sign-in. Try again.',
-      token_invalid: 'The identity provider response failed verification.',
-      session_unavailable: 'A session could not be created. Contact an administrator.',
-    } as Record<SurfaceLoginFailureCode, string>,
-    retry: 'Try again',
-    tokenLink: 'Use an access token instead',
-    signedOutTitle: 'Signed out',
-    signedOutLead: 'Your session on this surface has ended.',
-  },
-  ja: {
-    title: 'サインイン',
-    surface: 'サーフェス',
-    lead: '組織のアカウントでサインインして続けます。',
-    button: (label: string) => `${label} でサインイン`,
-    unconfiguredTitle: 'シングルサインオンが未設定です',
-    unconfiguredLead:
-      'この画面はまだ本人確認ができません。管理者がサインインの設定を完了する必要があります:',
-    unconfiguredHint:
-      'それまでは、アクセストークン(KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN)を使ってください。loopback の自動 admin は、サーフェスが実際のローカル接続元を判別できる場合だけ有効です(Next.js 系は、信頼できるプロキシの背後で KYBERION_TRUST_PROXY=1 が必要)。',
-    unboundTitle: 'このアカウントは登録されていません',
-    unboundLead:
-      'サインイン自体は成功しましたが、この識別子は Kyberion のメンバーに紐付いていないため、アクセスは許可されませんでした。下の識別子を管理者に伝えて、あなたのメンバープロファイルに紐付けてもらってください。',
-    issuer: '発行者 (issuer)',
-    subject: '識別子 (subject)',
-    suspendedTitle: 'メンバーアカウントが停止されています',
-    suspendedLead: 'この識別子は停止中のメンバーに紐付いています。管理者に連絡してください。',
-    failedTitle: 'サインインを完了できませんでした',
-    failed: {
-      idp_error: 'ID プロバイダーがエラーを返しました。もう一度お試しください。',
-      state_mismatch:
-        'サインイン要求を検証できませんでした。サインイン画面からやり直してください。',
-      expired: 'サインインの有効期限が切れました。最初からやり直してください。',
-      exchange_failed:
-        'ID プロバイダーがサインインを受け付けませんでした。もう一度お試しください。',
-      token_invalid: 'ID プロバイダーの応答を検証できませんでした。',
-      session_unavailable: 'セッションを作成できませんでした。管理者に連絡してください。',
-    } as Record<SurfaceLoginFailureCode, string>,
-    retry: 'もう一度試す',
-    tokenLink: 'アクセストークンでサインインする',
-    signedOutTitle: 'サインアウトしました',
-    signedOutLead: 'この画面でのセッションを終了しました。',
-  },
-} as const;
-
 const CSS = `
 :root{--bg:#f4f6fb;--panel:#fff;--fg:#0f1b33;--muted:#55627d;--accent:#1f4fd8;--accent-fg:#fff;--border:#d5dbea;--danger:#b42318;--code:#eef1f8}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1324;--panel:#121d36;--fg:#e6ecfb;--muted:#9aa8c7;--accent:#6b93ff;--accent-fg:#0b1324;--border:#26365c;--danger:#ff8a80;--code:#0e1830}}
@@ -133,6 +68,15 @@ ul{padding-left:1.25rem;margin:.5rem 0}
 code{background:var(--code);padding:.1rem .35rem;border-radius:5px;font-size:.88em}
 `;
 
+const FAILURE_KEYS: Record<SurfaceLoginFailureCode, VocabularyKey> = {
+  idp_error: 'surface_login:failed_idp_error',
+  state_mismatch: 'surface_login:failed_state_mismatch',
+  expired: 'surface_login:failed_expired',
+  exchange_failed: 'surface_login:failed_exchange_failed',
+  token_invalid: 'surface_login:failed_token_invalid',
+  session_unavailable: 'surface_login:failed_session_unavailable',
+};
+
 function tokenLink(href: string | undefined, label: string): string {
   return href ? `<p class="muted"><a href="${escapeHtml(href)}">${escapeHtml(label)}</a></p>` : '';
 }
@@ -142,46 +86,47 @@ export function renderSurfaceLoginPage(input: {
   view: SurfaceLoginView;
   locale: SurfaceLoginLocale;
 }): string {
-  const t = TEXT[input.locale];
-  const { view } = input;
+  const { locale, view } = input;
+  const text = (key: VocabularyKey, params?: Record<string, string>): string =>
+    escapeHtml(t(key, params, locale));
   let title: string;
   let body: string;
   switch (view.kind) {
     case 'ready':
-      title = t.title;
-      body = `<h1>${escapeHtml(t.title)}</h1><p>${escapeHtml(t.lead)}</p><a class="btn" href="${escapeHtml(view.startHref)}">${escapeHtml(t.button(view.providerLabel))}</a>${tokenLink(view.tokenHref, t.tokenLink)}`;
+      title = t('surface_login:title', undefined, locale);
+      body = `<h1>${text('surface_login:title')}</h1><p>${text('surface_login:lead')}</p><a class="btn" href="${escapeHtml(view.startHref)}">${text('surface_login:button', { label: view.providerLabel })}</a>${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
       break;
     case 'unconfigured':
-      title = t.unconfiguredTitle;
-      body = `<h1>${escapeHtml(t.unconfiguredTitle)}</h1><p>${escapeHtml(t.unconfiguredLead)}</p><ul>${view.missing
+      title = t('surface_login:unconfigured_title', undefined, locale);
+      body = `<h1>${text('surface_login:unconfigured_title')}</h1><p>${text('surface_login:unconfigured_lead')}</p><ul>${view.missing
         .map((name) => `<li><code>${escapeHtml(name)}</code></li>`)
         .join(
           ''
-        )}</ul><p class="muted">${escapeHtml(t.unconfiguredHint)}</p>${tokenLink(view.tokenHref, t.tokenLink)}`;
+        )}</ul><p class="muted">${text('surface_login:unconfigured_hint')}</p>${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
       break;
     case 'unbound':
-      title = t.unboundTitle;
-      body = `<h1>${escapeHtml(t.unboundTitle)}</h1><p>${escapeHtml(t.unboundLead)}</p><dl><dt>${escapeHtml(t.issuer)}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${escapeHtml(t.subject)}</dt><dd>${escapeHtml(view.subject)}</dd></dl>`;
+      title = t('surface_login:unbound_title', undefined, locale);
+      body = `<h1>${text('surface_login:unbound_title')}</h1><p>${text('surface_login:unbound_lead')}</p><dl><dt>${text('surface_login:issuer')}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${text('surface_login:subject')}</dt><dd>${escapeHtml(view.subject)}</dd></dl>`;
       break;
     case 'suspended':
-      title = t.suspendedTitle;
-      body = `<h1>${escapeHtml(t.suspendedTitle)}</h1><p>${escapeHtml(t.suspendedLead)}</p>`;
+      title = t('surface_login:suspended_title', undefined, locale);
+      body = `<h1>${text('surface_login:suspended_title')}</h1><p>${text('surface_login:suspended_lead')}</p>`;
       break;
     case 'failed':
-      title = t.failedTitle;
-      body = `<h1>${escapeHtml(t.failedTitle)}</h1><p class="err" role="alert">${escapeHtml(t.failed[view.code])}</p><a class="btn" href="/login">${escapeHtml(t.retry)}</a>`;
+      title = t('surface_login:failed_title', undefined, locale);
+      body = `<h1>${text('surface_login:failed_title')}</h1><p class="err" role="alert">${text(FAILURE_KEYS[view.code])}</p><a class="btn" href="/login">${text('surface_login:retry')}</a>`;
       break;
     case 'signed-out':
-      title = t.signedOutTitle;
-      body = `<h1>${escapeHtml(t.signedOutTitle)}</h1><p>${escapeHtml(t.signedOutLead)}</p>${
+      title = t('surface_login:signed_out_title', undefined, locale);
+      body = `<h1>${text('surface_login:signed_out_title')}</h1><p>${text('surface_login:signed_out_lead')}</p>${
         view.startHref
-          ? `<a class="btn" href="${escapeHtml(view.startHref)}">${escapeHtml(t.button(view.providerLabel ?? 'SSO'))}</a>`
+          ? `<a class="btn" href="${escapeHtml(view.startHref)}">${text('surface_login:button', { label: view.providerLabel ?? 'SSO' })}</a>`
           : ''
       }`;
       break;
   }
   return `<!doctype html>
-<html lang="${input.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="robots" content="noindex"><title>${escapeHtml(title)} — ${escapeHtml(input.surfaceLabel)}</title><style>${CSS}</style></head><body><main><p class="surface">${escapeHtml(t.surface)} · ${escapeHtml(input.surfaceLabel)}</p>${body}</main></body></html>`;
+<html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="robots" content="noindex"><title>${escapeHtml(title)} — ${escapeHtml(input.surfaceLabel)}</title><style>${CSS}</style></head><body><main><p class="surface">${text('surface_login:surface')} · ${escapeHtml(input.surfaceLabel)}</p>${body}</main></body></html>`;
 }
 
 /** Headers for every login-flow response: no caching, no framing, no script. */

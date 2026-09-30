@@ -23,7 +23,11 @@ vi.mock('@agent/core/surface/surface-authn', async (importOriginal) => {
   };
 });
 
-import { presenceStudioLoginRedirect, registerPresenceStudioAuthRoutes } from './surface-auth.js';
+import {
+  presenceStudioLoginRedirect,
+  registerPresenceStudioAuthRoutes,
+  presenceStudioAuthRateLimiter,
+} from './surface-auth.js';
 import { requirePresenceStudioAccess, requirePresenceStudioRateLimit } from './security.js';
 
 const ENV_KEYS = [
@@ -55,11 +59,16 @@ beforeAll(async () => {
     next();
   });
   registerPresenceStudioAuthRoutes(app);
-  app.use(presenceStudioLoginRedirect());
+  app.use(presenceStudioAuthRateLimiter, presenceStudioLoginRedirect());
   app.get('/', (_req, res) => res.type('html').send('<html>home</html>'));
   app.get('/favicon.ico', (_req, res) => res.send('icon'));
   app.use(express.json());
-  app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
+  app.use(
+    ['/api', '/a2ui'],
+    presenceStudioAuthRateLimiter,
+    requirePresenceStudioRateLimit(),
+    requirePresenceStudioAccess()
+  );
   app.get('/api/me', (_req, res) => res.json({ ok: true }));
   app.post('/api/me', (_req, res) => res.json({ ok: true }));
   app.post('/api/other', (_req, res) => res.json({ ok: true }));

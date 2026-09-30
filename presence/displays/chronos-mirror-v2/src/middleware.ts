@@ -70,8 +70,9 @@ export function middleware(request: NextRequest): NextResponse {
       hasCredential: hasCredential && !staleSessionOnly,
     });
     if (redirect) {
-      // Relative Location keeps the browser on the public host behind a proxy.
-      return new NextResponse(null, { status: 302, headers: { location: redirect } });
+      // Next's middleware runtime rejects a bare relative Location ("Invalid URL");
+      // resolve against the request URL like the other Next surfaces do.
+      return NextResponse.redirect(new URL(redirect, request.url), 302);
     }
     return NextResponse.next();
   }

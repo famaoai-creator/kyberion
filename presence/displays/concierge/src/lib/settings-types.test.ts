@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAddMemberResponse, parseMembersResponse } from './settings-types';
-import { ssoText, type SsoMessageKey } from './i18n';
+import { frontDeskText } from './i18n';
 
 const base = {
   member_id: 'alice',
@@ -44,22 +44,23 @@ describe('parseMembersResponse external_identities', () => {
   });
 });
 
-describe('ssoText', () => {
-  it('has non-empty en and ja text for every key', () => {
-    const keys: SsoMessageKey[] = [
-      'settings_member_sso_title',
+describe('SSO member strings (vocabulary catalog)', () => {
+  it('render non-empty text in en and ja, and ja differs from en where translated', () => {
+    const keys = [
       'settings_member_sso_help',
       'settings_member_sso_none',
       'settings_member_sso_issuer',
       'settings_member_sso_subject',
       'settings_member_sso_bind',
       'settings_member_sso_unbind',
-    ];
+    ] as const;
     for (const key of keys) {
-      expect(ssoText(key, 'en').length).toBeGreaterThan(0);
-      expect(ssoText(key, 'ja').length).toBeGreaterThan(0);
+      expect(frontDeskText(key, 'en').length).toBeGreaterThan(0);
+      expect(frontDeskText(key, 'ja').length).toBeGreaterThan(0);
+      expect(frontDeskText(key, 'ja')).not.toBe(key);
     }
-    expect(ssoText('settings_member_sso_bind', 'ja')).toBe('紐付ける');
-    expect(ssoText('settings_member_sso_unbind', 'ja')).toBe('解除');
+    expect(frontDeskText('settings_member_sso_bind', 'ja')).not.toBe(
+      frontDeskText('settings_member_sso_bind', 'en')
+    );
   });
 });

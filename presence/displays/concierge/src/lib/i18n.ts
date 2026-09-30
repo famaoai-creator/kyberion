@@ -49,30 +49,3 @@ export function frontDeskText(
 ): string {
   return browserVocabulary.renderMessage(`front_desk:${String(key)}`, params, locale);
 }
-
-/**
- * FD-07 SSO binding strings for 「組織とメンバー」. Package-local (en + ja)
- * so the concierge surface can ship them without a shared-catalog change;
- * `frontDeskText` keeps serving every other settings_member_* key.
- */
-const SSO_TEXT = {
-  settings_member_sso_title: { en: 'SSO', ja: 'SSO' },
-  settings_member_sso_help: {
-    en: 'The issuer and subject are shown on the sign-in screen when an unregistered person tries to sign in.',
-    ja: '発行元 (issuer) と識別子 (subject) は、未登録の人がサインインしようとしたときにサインイン画面に表示されます。',
-  },
-  settings_member_sso_none: {
-    en: 'No SSO identity is bound.',
-    ja: '紐付け済みの SSO はありません。',
-  },
-  settings_member_sso_issuer: { en: 'Issuer', ja: '発行元 (issuer)' },
-  settings_member_sso_subject: { en: 'Subject', ja: '識別子 (subject)' },
-  settings_member_sso_bind: { en: 'Bind', ja: '紐付ける' },
-  settings_member_sso_unbind: { en: 'Unbind', ja: '解除' },
-} as const;
-
-export type SsoMessageKey = keyof typeof SSO_TEXT;
-
-export function ssoText(key: SsoMessageKey, locale: ConciergeLocale): string {
-  return SSO_TEXT[key][locale];
-}

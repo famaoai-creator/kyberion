@@ -60,7 +60,11 @@ import {
   readPresenceStudioStringParam,
   validateLocalServiceUrl,
 } from './security.js';
-import { presenceStudioLoginRedirect, registerPresenceStudioAuthRoutes } from './surface-auth.js';
+import {
+  presenceStudioLoginRedirect,
+  registerPresenceStudioAuthRoutes,
+  presenceStudioAuthRateLimiter,
+} from './surface-auth.js';
 import {
   authorizePresenceOperation,
   buildPresenceOverviewA2UI,
@@ -1128,7 +1132,7 @@ app.post(
 // `front-desk-pages.ts`, split out to keep this file under the
 // `max-file-lines` gate.)
 registerPresenceStudioAuthRoutes(app);
-app.use(presenceStudioLoginRedirect());
+app.use(presenceStudioAuthRateLimiter, presenceStudioLoginRedirect());
 registerFrontDeskHomeWorkPages(app, staticDir);
 
 app.use(express.json({ limit: '1mb' }));

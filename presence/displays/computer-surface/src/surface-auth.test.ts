@@ -16,6 +16,7 @@ import {
 import {
   computerSurfaceLoginRedirect,
   registerComputerSurfaceAuthRoutes,
+  computerSurfaceAuthRateLimiter,
 } from '../surface-auth.js';
 
 const REMOTE = { 'x-forwarded-for': '10.0.0.5' };
@@ -46,7 +47,7 @@ function get(
 async function withApp<T>(fn: (base: string) => Promise<T>): Promise<T> {
   const app = express();
   registerComputerSurfaceAuthRoutes(app);
-  app.use(computerSurfaceLoginRedirect());
+  app.use(computerSurfaceAuthRateLimiter, computerSurfaceLoginRedirect());
   app.get('/', (_req, res) => res.send('page'));
   app.get('/api/x', (_req, res) => res.json({ ok: true }));
   const server = app.listen(0, '127.0.0.1');

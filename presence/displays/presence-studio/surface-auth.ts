@@ -1,3 +1,4 @@
+import { rateLimit } from 'express-rate-limit';
 import type { Express, Request, RequestHandler } from 'express';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import {
@@ -16,6 +17,23 @@ import {
 
 const SURFACE_ID = 'presence-studio';
 const SURFACE_LABEL = 'Presence Studio';
+
+/**
+ * Login routes and the page-navigation redirect read credentials, so they sit
+ * behind an `express-rate-limit` limiter: remote callers only (loopback is
+ * skipped), generous enough for page + asset loads. The finer per-client
+ * limiter for /api and /a2ui (`requirePresenceStudioRateLimit`) is unchanged.
+ */
+export const presenceStudioAuthRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  skip: (req) => isLoopbackAddress(getPresenceStudioClientAddress(req)),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ ok: false, error: 'Presence Studio rate limit exceeded.' });
+  },
+});
 
 function requestUrl(req: Request): { pathname: string; search: string } {
   const raw = String(req.originalUrl || req.url || '/');
@@ -59,8 +77,18 @@ export function registerPresenceStudioAuthRoutes(app: Express): void {
     }
   };
   const limiter = requirePresenceStudioRateLimit();
-  app.get(['/login', '/auth/start', '/auth/callback', '/logout'], limiter, handler);
-  app.post(['/login', '/auth/start', '/auth/callback', '/logout'], limiter, handler);
+  app.get(
+    ['/login', '/auth/start', '/auth/callback', '/logout'],
+    presenceStudioAuthRateLimiter,
+    limiter,
+    handler
+  );
+  app.post(
+    ['/login', '/auth/start', '/auth/callback', '/logout'],
+    presenceStudioAuthRateLimiter,
+    limiter,
+    handler
+  );
 }
 
 /** 302 an unauthenticated remote browser page navigation to /login?next=... */

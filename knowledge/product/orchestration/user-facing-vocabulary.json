@@ -18878,6 +18878,41 @@
         "en": "About {title}",
         "ja": "{title} について",
         "qps-ploc": "⟦Ȧƀőůŧ {title} ŀőřė⟧"
+      },
+      "settings_member_sso_title": {
+        "en": "SSO",
+        "ja": "SSO",
+        "qps-ploc": "⟦ŞŞŐ ŀőř⟧"
+      },
+      "settings_member_sso_help": {
+        "en": "The issuer and subject are shown on the sign-in screen when an unregistered person tries to sign in.",
+        "ja": "発行元 (issuer) と識別子 (subject) は、未登録の人がサインインしようとしたときにサインイン画面に表示されます。",
+        "qps-ploc": "⟦Ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ ȧřė şħőẇñ őñ ŧħė şïɠñ-ïñ şƈřėėñ ẇħėñ ȧñ ůñřėɠïşŧėřėḓ ṗėřşőñ ŧřïėş ŧő şïɠñ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "settings_member_sso_none": {
+        "en": "No SSO identity is bound.",
+        "ja": "紐付け済みの SSO はありません。",
+        "qps-ploc": "⟦Ñő ŞŞŐ ïḓėñŧïŧẏ ïş ƀőůñḓ. ŀőřėɱ ïṗ⟧"
+      },
+      "settings_member_sso_issuer": {
+        "en": "Issuer",
+        "ja": "発行元 (issuer)",
+        "qps-ploc": "⟦Ïşşůėř ŀőř⟧"
+      },
+      "settings_member_sso_subject": {
+        "en": "Subject",
+        "ja": "識別子 (subject)",
+        "qps-ploc": "⟦Şůƀĵėƈŧ ŀőř⟧"
+      },
+      "settings_member_sso_bind": {
+        "en": "Bind",
+        "ja": "紐付ける",
+        "qps-ploc": "⟦Ƀïñḓ ŀőř⟧"
+      },
+      "settings_member_sso_unbind": {
+        "en": "Unbind",
+        "ja": "解除",
+        "qps-ploc": "⟦Ůñƀïñḓ ŀőř⟧"
       }
     },
     "operator": {
@@ -21623,6 +21658,128 @@
         "en": "object",
         "ja": "異議",
         "qps-ploc": "⟦őƀĵėƈŧ ŀőř⟧"
+      }
+    },
+    "surface_login": {
+      "title": {
+        "en": "Sign in",
+        "ja": "サインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
+      },
+      "surface": {
+        "en": "Surface",
+        "ja": "サーフェス",
+        "qps-ploc": "⟦Şůřƒȧƈė ŀőř⟧"
+      },
+      "lead": {
+        "en": "Sign in with your organization account to continue.",
+        "ja": "組織のアカウントでサインインして続けます。",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "button": {
+        "en": "Sign in with {label}",
+        "ja": "{label} でサインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ {label} ŀőřėɱ ⟧"
+      },
+      "unconfigured_title": {
+        "en": "Single sign-on is not configured",
+        "ja": "シングルサインオンが未設定です",
+        "qps-ploc": "⟦Şïñɠŀė şïɠñ-őñ ïş ñőŧ ƈőñƒïɠůřėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "unconfigured_lead": {
+        "en": "This surface cannot verify who you are yet. An administrator must finish the sign-in setup:",
+        "ja": "この画面はまだ本人確認ができません。管理者がサインインの設定を完了する必要があります:",
+        "qps-ploc": "⟦Ŧħïş şůřƒȧƈė ƈȧññőŧ ṽėřïƒẏ ẇħő ẏőů ȧřė ẏėŧ. Ȧñ ȧḓɱïñïşŧřȧŧőř ɱůşŧ ƒïñïşħ ŧħė şïɠñ-ïñ şėŧůṗ: ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "unconfigured_hint": {
+        "en": "Until then, use an access token (KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN). Loopback auto-admin only applies where the surface can see a real local peer; on Next.js surfaces it needs KYBERION_TRUST_PROXY=1 behind a trusted proxy.",
+        "ja": "それまでは、アクセストークン(KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN)を使ってください。loopback の自動 admin は、サーフェスが実際のローカル接続元を判別できる場合だけ有効です(Next.js 系は、信頼できるプロキシの背後で KYBERION_TRUST_PROXY=1 が必要)。",
+        "qps-ploc": "⟦Ůñŧïŀ ŧħėñ, ůşė ȧñ ȧƈƈėşş ŧőķėñ (ĶẎɃĖŘÏŐÑ_ȦṖÏ_ŦŐĶĖÑ / ĶẎɃĖŘÏŐÑ_ĿŐƇȦĿȦḒⱮÏÑ_ŦŐĶĖÑ). Ŀőőṗƀȧƈķ ȧůŧő-ȧḓɱïñ őñŀẏ ȧṗṗŀïėş ẇħėřė ŧħė şůřƒȧƈė ƈȧñ şėė ȧ řėȧŀ ŀőƈȧŀ ṗėėř; őñ Ñėẋŧ.ĵş şůřƒȧƈėş ïŧ ñėėḓş ĶẎɃĖŘÏŐÑ_ŦŘŮŞŦ_ṖŘŐẊẎ=1 ƀėħïñḓ ȧ ŧřůşŧėḓ ṗřőẋẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "unbound_title": {
+        "en": "Your account is not registered",
+        "ja": "このアカウントは登録されていません",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ ïş ñőŧ řėɠïşŧėřėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "unbound_lead": {
+        "en": "You signed in successfully, but this identity is not bound to a Kyberion member, so no access was granted. Send the identifiers below to an administrator so they can bind them to your member profile.",
+        "ja": "サインイン自体は成功しましたが、この識別子は Kyberion のメンバーに紐付いていないため、アクセスは許可されませんでした。下の識別子を管理者に伝えて、あなたのメンバープロファイルに紐付けてもらってください。",
+        "qps-ploc": "⟦Ẏőů şïɠñėḓ ïñ şůƈƈėşşƒůŀŀẏ, ƀůŧ ŧħïş ïḓėñŧïŧẏ ïş ñőŧ ƀőůñḓ ŧő ȧ Ķẏƀėřïőñ ɱėɱƀėř, şő ñő ȧƈƈėşş ẇȧş ɠřȧñŧėḓ. Şėñḓ ŧħė ïḓėñŧïƒïėřş ƀėŀőẇ ŧő ȧñ ȧḓɱïñïşŧřȧŧőř şő ŧħėẏ ƈȧñ ƀïñḓ ŧħėɱ ŧő ẏőůř ɱėɱƀėř ṗřőƒïŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "issuer": {
+        "en": "Issuer",
+        "ja": "発行者 (issuer)",
+        "qps-ploc": "⟦Ïşşůėř ŀőř⟧"
+      },
+      "subject": {
+        "en": "Subject",
+        "ja": "識別子 (subject)",
+        "qps-ploc": "⟦Şůƀĵėƈŧ ŀőř⟧"
+      },
+      "suspended_title": {
+        "en": "Your member account is suspended",
+        "ja": "メンバーアカウントが停止されています",
+        "qps-ploc": "⟦Ẏőůř ɱėɱƀėř ȧƈƈőůñŧ ïş şůşṗėñḓėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "suspended_lead": {
+        "en": "Your identity is bound to a suspended member. Contact an administrator.",
+        "ja": "この識別子は停止中のメンバーに紐付いています。管理者に連絡してください。",
+        "qps-ploc": "⟦Ẏőůř ïḓėñŧïŧẏ ïş ƀőůñḓ ŧő ȧ şůşṗėñḓėḓ ɱėɱƀėř. Ƈőñŧȧƈŧ ȧñ ȧḓɱïñïşŧřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "failed_title": {
+        "en": "Sign-in could not be completed",
+        "ja": "サインインを完了できませんでした",
+        "qps-ploc": "⟦Şïɠñ-ïñ ƈőůŀḓ ñőŧ ƀė ƈőɱṗŀėŧėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "failed_idp_error": {
+        "en": "The identity provider returned an error. Try again.",
+        "ja": "ID プロバイダーがエラーを返しました。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř řėŧůřñėḓ ȧñ ėřřőř. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "failed_state_mismatch": {
+        "en": "The sign-in request could not be verified. Start again from the sign-in page.",
+        "ja": "サインイン要求を検証できませんでした。サインイン画面からやり直してください。",
+        "qps-ploc": "⟦Ŧħė şïɠñ-ïñ řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Şŧȧřŧ ȧɠȧïñ ƒřőɱ ŧħė şïɠñ-ïñ ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "failed_expired": {
+        "en": "The sign-in attempt expired. Start again.",
+        "ja": "サインインの有効期限が切れました。最初からやり直してください。",
+        "qps-ploc": "⟦Ŧħė şïɠñ-ïñ ȧŧŧėɱṗŧ ėẋṗïřėḓ. Şŧȧřŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "failed_exchange_failed": {
+        "en": "The identity provider did not accept the sign-in. Try again.",
+        "ja": "ID プロバイダーがサインインを受け付けませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř ḓïḓ ñőŧ ȧƈƈėṗŧ ŧħė şïɠñ-ïñ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "failed_token_invalid": {
+        "en": "The identity provider response failed verification.",
+        "ja": "ID プロバイダーの応答を検証できませんでした。",
+        "qps-ploc": "⟦Ŧħė ïḓėñŧïŧẏ ṗřőṽïḓėř řėşṗőñşė ƒȧïŀėḓ ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "failed_session_unavailable": {
+        "en": "A session could not be created. Contact an administrator.",
+        "ja": "セッションを作成できませんでした。管理者に連絡してください。",
+        "qps-ploc": "⟦Ȧ şėşşïőñ ƈőůŀḓ ñőŧ ƀė ƈřėȧŧėḓ. Ƈőñŧȧƈŧ ȧñ ȧḓɱïñïşŧřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "retry": {
+        "en": "Try again",
+        "ja": "もう一度試す",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "token_link": {
+        "en": "Use an access token instead",
+        "ja": "アクセストークンでサインインする",
+        "qps-ploc": "⟦Ůşė ȧñ ȧƈƈėşş ŧőķėñ ïñşŧėȧḓ ŀőřėɱ ïṗ⟧"
+      },
+      "signed_out_title": {
+        "en": "Signed out",
+        "ja": "サインアウトしました",
+        "qps-ploc": "⟦Şïɠñėḓ őůŧ ŀőř⟧"
+      },
+      "signed_out_lead": {
+        "en": "Your session on this surface has ended.",
+        "ja": "この画面でのセッションを終了しました。",
+        "qps-ploc": "⟦Ẏőůř şėşşïőñ őñ ŧħïş şůřƒȧƈė ħȧş ėñḓėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     }
   }
