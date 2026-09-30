@@ -12,7 +12,10 @@ import {
   type OidcLoginDeps,
   type OidcLoginFetchRequest,
 } from './oidc-browser-login.js';
-import { handleSurfaceAuthRoute } from './surface-auth-routes.js';
+import {
+  handleSurfaceAuthRoute,
+  resetSurfaceAuthRateLimitForTests,
+} from './surface-auth-routes.js';
 import { mintBrowserSessionToken, verifyBrowserSessionToken } from '../authn-providers.js';
 import { resolveAuthnPrincipal } from '../authn-principal-resolver.js';
 import {
@@ -794,5 +797,114 @@ describe('review hardening', () => {
       deps
     );
     expect(logout?.setCookies[0]).toContain('Secure');
+  });
+});
+
+describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
+  const base = {
+    surfaceId: 'concierge',
+    surfaceLabel: 'Concierge',
+    method: 'GET',
+    pathname: '/login',
+    searchParams: new URLSearchParams(),
+    requestOrigin: 'https://desk.example.com',
+    loopback: false,
+  };
+  const env = baseEnv();
+  beforeEach(() => resetSurfaceAuthRateLimitForTests());
+
+  it('rate-limits a client after the per-client budget and sends Retry-After', async () => {
+    let last;
+    for (let i = 0; i < 121; i++) {
+      last = await handleSurfaceAuthRoute(
+        { ...base, clientKey: '203.0.113.9' },
+        { env, now: 1_000 }
+      );
+    }
+    expect(last?.status).toBe(429);
+    expect(last?.headers['Retry-After']).toBe('60');
+    // another client is unaffected, and the window resets.
+    const other = await handleSurfaceAuthRoute(
+      { ...base, clientKey: '203.0.113.10' },
+      { env, now: 1_000 }
+    );
+    expect(other?.status).toBe(200);
+    const later = await handleSurfaceAuthRoute(
+      { ...base, clientKey: '203.0.113.9' },
+      { env, now: 70_000 }
+    );
+    expect(later?.status).toBe(200);
+  });
+
+  it('caps the whole surface so rotating client keys cannot mint fresh budgets', async () => {
+    let denied = 0;
+    for (let i = 0; i < 700; i++) {
+      const res = await handleSurfaceAuthRoute(
+        { ...base, clientKey: `k-${i}` },
+        { env, now: 2_000 }
+      );
+      if (res?.status === 429) denied += 1;
+    }
+    expect(denied).toBeGreaterThan(0);
+  });
+
+  it('does not rate-limit when the adapter supplies no client key (Express surfaces limit at the HTTP layer)', async () => {
+    for (let i = 0; i < 700; i++) {
+      const res = await handleSurfaceAuthRoute(base, { env, now: 3_000 });
+      expect(res?.status).toBe(200);
+    }
+  });
+
+  it('answers a wrong method with 405, Allow and an accurate message (not "expired")', async () => {
+    const res = await handleSurfaceAuthRoute(
+      { ...base, method: 'DELETE', pathname: '/auth/start' },
+      { env }
+    );
+    expect(res?.status).toBe(405);
+    expect(res?.headers.Allow).toBe('GET, HEAD');
+    expect(res?.body).toContain('not supported');
+    expect(res?.body).not.toContain('expired');
+  });
+
+  it('keeps next and lang on the retry link after a failure', async () => {
+    const res = await handleSurfaceAuthRoute(
+      {
+        ...base,
+        pathname: '/auth/callback',
+        searchParams: new URLSearchParams({
+          next: '/settings',
+          lang: 'ja',
+          error: 'access_denied',
+        }),
+      },
+      { env }
+    );
+    expect(res?.body).toContain('href="/login?next=%2Fsettings&amp;lang=ja"');
+    // an unsafe next never survives
+    const unsafe = await handleSurfaceAuthRoute(
+      {
+        ...base,
+        pathname: '/auth/callback',
+        searchParams: new URLSearchParams({ next: '//evil.example', error: 'x' }),
+      },
+      { env }
+    );
+    expect(unsafe?.body).toContain('href="/login"');
+  });
+
+  it('ignores a cross-site logout but honours a same-site one', async () => {
+    const cross = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', secFetchSite: 'cross-site' },
+      { env }
+    );
+    expect(cross?.status).toBe(302);
+    expect(cross?.setCookies).toEqual([]);
+    const same = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', secFetchSite: 'same-origin' },
+      { env }
+    );
+    expect(same?.setCookies[0]).toContain('Max-Age=0');
+    const none = await handleSurfaceAuthRoute({ ...base, pathname: '/logout' }, { env });
+    expect(none?.setCookies[0]).toContain('Max-Age=0');
   });
 });

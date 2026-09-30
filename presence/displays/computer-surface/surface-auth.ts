@@ -54,6 +54,7 @@ export function registerComputerSurfaceAuthRoutes(app: Express): void {
         acceptLanguage: first(req.headers['accept-language']) ?? null,
         requestOrigin: `${req.protocol}://${req.headers.host ?? ''}`,
         loopback: isComputerSurfaceLoopbackRequest(req),
+        secFetchSite: first(req.headers['sec-fetch-site']) ?? null,
       });
       if (!result) {
         next();
