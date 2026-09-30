@@ -81,7 +81,10 @@ export default defineConfig({
       '**/vault/**',
       '**/active/**',
       '**/docs/**',
-      '**/knowledge/**',
+      // Root-level governed data only. A `**/knowledge/**` glob also hid the
+      // source-module tests under libs/core/knowledge/ and
+      // libs/actuators/wisdom-actuator/src/knowledge/, so they never ran.
+      'knowledge/**',
       '**/.pnpm-store/**',
       // Not in pnpm-workspace.yaml's packages list - archived code kept for
       // reference, with no guaranteed-valid tsconfig for vitest to resolve.
