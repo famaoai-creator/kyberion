@@ -4,6 +4,11 @@ import {
   extractSurfaceBearerToken,
   resolveSurfaceViewerToken,
 } from '@agent/core/surface/surface-mutation-guard';
+import {
+  SURFACE_SESSION_COOKIE,
+  extractSurfaceCredential,
+  isSameOriginMutation,
+} from '@agent/core/surface/surface-session-cookie';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
@@ -104,8 +109,38 @@ export function resolveChronosToken(req: NextRequest): string | null {
   return (
     extractSurfaceBearerToken(req.headers.get('authorization')) ||
     req.cookies.get('kyberion_token')?.value ||
+    req.cookies.get(SURFACE_SESSION_COOKIE)?.value ||
     null
   );
+}
+
+/**
+ * True when the credential is carried only by a browser cookie (legacy token
+ * or OIDC session) and the request is an unsafe cross-origin mutation. Header
+ * credentials are not cookie-borne and skip the check.
+ */
+function isBlockedCookieMutation(req: NextRequest): boolean {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
+  const authorization = req.headers.get('authorization');
+  const cookieCredential = extractSurfaceCredential({
+    authorization,
+    cookie: req.headers.get('cookie'),
+  });
+  const cookieBorne =
+    cookieCredential.source === 'session-cookie' ||
+    (!extractSurfaceBearerToken(authorization) &&
+      Boolean(req.cookies.get('kyberion_token')?.value));
+  if (!cookieBorne) return false;
+  return !isSameOriginMutation({
+    method,
+    headers: req.headers,
+    expectedHost: req.headers.get('host') || '',
+  });
+}
+
+function crossOriginResponse(): NextResponse {
+  return NextResponse.json({ error: 'Cross-origin request blocked.' }, { status: 403 });
 }
 
 function getRateLimitKey(req: NextRequest): string {
@@ -157,6 +192,7 @@ export function guardRequest(req: NextRequest): NextResponse | null {
       { status: 401 }
     );
   }
+  if (isBlockedCookieMutation(req)) return crossOriginResponse();
 
   const registration = resolveChronosTokenRegistration(resolveChronosToken(req) || '');
   const tenantSlugs = registration?.tenant_slugs || [];
@@ -188,6 +224,7 @@ export function requireChronosAccess(
       { status: 401 }
     );
   }
+  if (isBlockedCookieMutation(req)) return crossOriginResponse();
   if (requiredRole === 'localadmin' && resolved !== 'localadmin') {
     return NextResponse.json(
       { error: 'Forbidden. This action requires Chronos localadmin access.' },

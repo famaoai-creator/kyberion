@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeSurfaceMutation } from '@agent/core/surface/surface-mutation-guard';
+import { isSameOriginMutation } from '@agent/core/surface/surface-session-cookie';
 import {
-  authorizeSurfaceMutation,
-  extractSurfaceBearerToken,
-} from '@agent/core/surface/surface-mutation-guard';
-import { guardConciergeRequest, resolveConciergeViewer } from './viewer-context';
+  conciergeCredential,
+  guardConciergeRequest,
+  resolveConciergeViewer,
+} from './viewer-context';
 
 /**
  * Thin NextRequest wrapper over the shared surface mutation guard.
@@ -15,6 +17,22 @@ import { guardConciergeRequest, resolveConciergeViewer } from './viewer-context'
 export function requireConciergeMutationAccess(req: NextRequest): NextResponse | null {
   const rateLimitResponse = guardConciergeRequest(req);
   if (rateLimitResponse) return rateLimitResponse;
+  const credential = conciergeCredential(req);
+  // A cookie rides along on cross-site requests, so a cookie-borne unsafe
+  // request must be same-origin. Header-authenticated requests skip this.
+  if (
+    credential.source === 'session-cookie' &&
+    !isSameOriginMutation({
+      method: req.method,
+      headers: req.headers,
+      expectedHost: req.headers.get('host') ?? new URL(req.url).host,
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, error: 'Forbidden. Cross-origin session request.' },
+      { status: 403 }
+    );
+  }
   const decision = authorizeSurfaceMutation({
     url: req.url,
     getHeader: (name) => req.headers.get(name),
@@ -25,8 +43,7 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
 
   // Do not let a readonly API-token success become an implicit write grant for
   // approval, setup, ingest, or mission-control routes.
-  const bearer = extractSurfaceBearerToken(req.headers.get('authorization'));
-  if (bearer) {
+  if (credential.token) {
     const viewer = resolveConciergeViewer(req);
     if (viewer.response) return viewer.response;
     if (viewer.context.role !== 'localadmin') {

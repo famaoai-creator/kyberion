@@ -117,9 +117,13 @@ export function FrontDeskRail() {
           res.status === 401 &&
           typeof window !== 'undefined' &&
           !isLoopbackHostname(window.location.hostname) &&
-          window.location.pathname !== '/signin'
+          window.location.pathname !== '/signin' &&
+          window.location.pathname !== '/login'
         ) {
-          window.location.assign('/signin');
+          const next = `${window.location.pathname}${window.location.search}`;
+          window.location.assign(
+            next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+          );
           return null;
         }
         return res.ok ? res.json() : null;
