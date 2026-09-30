@@ -174,6 +174,24 @@ describe('api guard', () => {
       expect(await res?.json()).toEqual({ error: 'Cross-origin request blocked.' });
     });
 
+    it('prefers a live browser session over a stale legacy token cookie', async () => {
+      const live = `kys1.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600 })).toString('base64url')}.sig`;
+      const expired = `kys1.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 600 })).toString('base64url')}.sig`;
+      const { resolveChronosToken } = await import('./api-guard.js');
+      expect(resolveChronosToken(makeReq({ session: live, cookie: 'legacy' }))).toBe(live);
+      // an expired/unreadable session never masks a legacy token
+      expect(resolveChronosToken(makeReq({ session: expired, cookie: 'legacy' }))).toBe('legacy');
+      expect(
+        resolveChronosToken(makeReq({ session: 'kys1.unreadable.sig', cookie: 'legacy' }))
+      ).toBe('legacy');
+      // a header still outranks both
+      expect(
+        resolveChronosToken(
+          makeReq({ session: live, cookie: 'legacy', authorization: 'Bearer hdr' })
+        )
+      ).toBe('hdr');
+    });
+
     it('resolves the access role of an OIDC browser session from the authn seam (fails closed otherwise)', async () => {
       const resolveAuthnPrincipal = vi.fn((request: { credential: { token: string } }) => {
         if (request.credential.token === session) return { principal: { role: 'readonly' } };

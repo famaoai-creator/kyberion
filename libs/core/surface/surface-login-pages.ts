@@ -28,7 +28,9 @@ export type SurfaceLoginFailureCode =
   | 'expired'
   | 'exchange_failed'
   | 'token_invalid'
-  | 'session_unavailable';
+  | 'session_unavailable'
+  | 'method_not_allowed'
+  | 'rate_limited';
 
 export function resolveLoginLocale(
   query: string | null | undefined,
@@ -75,6 +77,8 @@ const FAILURE_KEYS: Record<SurfaceLoginFailureCode, VocabularyKey> = {
   exchange_failed: 'surface_login:failed_exchange_failed',
   token_invalid: 'surface_login:failed_token_invalid',
   session_unavailable: 'surface_login:failed_session_unavailable',
+  method_not_allowed: 'surface_login:failed_method_not_allowed',
+  rate_limited: 'surface_login:failed_rate_limited',
 };
 
 function tokenLink(href: string | undefined, label: string): string {
@@ -83,10 +87,13 @@ function tokenLink(href: string | undefined, label: string): string {
 
 export function renderSurfaceLoginPage(input: {
   surfaceLabel: string;
+  /** Where "try again" / "different account" go; keeps `next` and `lang`. */
+  loginHref?: string;
   view: SurfaceLoginView;
   locale: SurfaceLoginLocale;
 }): string {
   const { locale, view } = input;
+  const loginHref = input.loginHref ?? '/login';
   const text = (key: VocabularyKey, params?: Record<string, string>): string =>
     escapeHtml(t(key, params, locale));
   let title: string;
@@ -106,15 +113,15 @@ export function renderSurfaceLoginPage(input: {
       break;
     case 'unbound':
       title = t('surface_login:unbound_title', undefined, locale);
-      body = `<h1>${text('surface_login:unbound_title')}</h1><p>${text('surface_login:unbound_lead')}</p><dl><dt>${text('surface_login:issuer')}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${text('surface_login:subject')}</dt><dd>${escapeHtml(view.subject)}</dd></dl><a class="btn" href="/login">${text('surface_login:switch_account')}</a>`;
+      body = `<h1>${text('surface_login:unbound_title')}</h1><p>${text('surface_login:unbound_lead')}</p><dl><dt>${text('surface_login:issuer')}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${text('surface_login:subject')}</dt><dd>${escapeHtml(view.subject)}</dd></dl><a class="btn" href="${escapeHtml(loginHref)}">${text('surface_login:switch_account')}</a>`;
       break;
     case 'suspended':
       title = t('surface_login:suspended_title', undefined, locale);
-      body = `<h1>${text('surface_login:suspended_title')}</h1><p>${text('surface_login:suspended_lead')}</p><a class="btn" href="/login">${text('surface_login:switch_account')}</a>`;
+      body = `<h1>${text('surface_login:suspended_title')}</h1><p>${text('surface_login:suspended_lead')}</p><a class="btn" href="${escapeHtml(loginHref)}">${text('surface_login:switch_account')}</a>`;
       break;
     case 'failed':
       title = t('surface_login:failed_title', undefined, locale);
-      body = `<h1>${text('surface_login:failed_title')}</h1><p class="err" role="alert">${text(FAILURE_KEYS[view.code])}</p><a class="btn" href="/login">${text('surface_login:retry')}</a>`;
+      body = `<h1>${text('surface_login:failed_title')}</h1><p class="err" role="alert">${text(FAILURE_KEYS[view.code])}</p><a class="btn" href="${escapeHtml(loginHref)}">${text('surface_login:retry')}</a>`;
       break;
     case 'signed-out':
       title = t('surface_login:signed_out_title', undefined, locale);

@@ -9,6 +9,7 @@ import {
   SURFACE_SESSION_COOKIE,
   SURFACE_SESSION_TOKEN_PREFIX,
   isSameOriginMutation,
+  peekSessionExpiry,
 } from '@agent/core/surface/surface-session-cookie';
 import { withExecutionContext } from '@agent/core/authority';
 import {
@@ -107,12 +108,14 @@ function checkRateLimit(ip: string): boolean {
  * Returns null if OK, or a NextResponse error if rejected.
  */
 export function resolveChronosToken(req: NextRequest): string | null {
-  return (
-    extractSurfaceBearerToken(req.headers.get('authorization')) ||
-    req.cookies.get('kyberion_token')?.value ||
-    req.cookies.get(SURFACE_SESSION_COOKIE)?.value ||
-    null
-  );
+  const header = extractSurfaceBearerToken(req.headers.get('authorization'));
+  if (header) return header;
+  const legacy = req.cookies.get('kyberion_token')?.value;
+  const session = req.cookies.get(SURFACE_SESSION_COOKIE)?.value;
+  // A live browser session wins over a stale legacy token cookie; otherwise the
+  // legacy cookie keeps its long-standing precedence (scripts replay it).
+  if (session && peekSessionExpiry(session) === 'valid') return session;
+  return legacy || session || null;
 }
 
 /**

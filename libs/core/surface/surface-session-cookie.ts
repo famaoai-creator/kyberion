@@ -221,6 +221,28 @@ export function peekSessionExpiry(
   }
 }
 
+/**
+ * Rate-limit bucket for a login-flow request. Only a peer the adapter can
+ * trust counts: the socket IP when the framework exposes one, or a forwarded
+ * header when a trusted proxy is declared (`KYBERION_TRUST_PROXY`). Anything
+ * else shares one bucket, so a spoofed `X-Forwarded-For` cannot mint fresh
+ * buckets (the whole-surface ceiling in the route handler backs this up).
+ */
+export function resolveAuthClientKey(input: {
+  ip?: string | null;
+  forwardedFor?: string | null;
+  realIp?: string | null;
+  trustProxy: boolean;
+}): string {
+  const direct = input.ip?.trim();
+  if (direct) return direct;
+  if (input.trustProxy) {
+    const forwarded = input.realIp?.trim() || input.forwardedFor?.split(',')[0]?.trim();
+    if (forwarded) return forwarded;
+  }
+  return 'shared';
+}
+
 export interface LoginRedirectInput {
   method: string;
   pathname: string;
