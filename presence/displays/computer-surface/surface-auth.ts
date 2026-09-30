@@ -1,3 +1,4 @@
+import { rateLimit } from 'express-rate-limit';
 import type { Express, Request, RequestHandler } from 'express';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import {
@@ -7,6 +8,22 @@ import {
   resolveLoginRedirect,
 } from '@agent/core/surface/surface-session-cookie';
 import { isComputerSurfaceLoopbackRequest } from './auth.js';
+
+/**
+ * Login routes and the page-navigation redirect read credentials, so they sit
+ * behind the same kind of limiter as the API: remote callers only (loopback is
+ * skipped, like the API limiter), generous enough for page + asset loads.
+ */
+export const computerSurfaceAuthRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  skip: (req) => isComputerSurfaceLoopbackRequest(req),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ ok: false, error: 'Computer Surface rate limit exceeded.' });
+  },
+});
 
 const SURFACE_ID = 'computer-surface';
 const SURFACE_LABEL = 'Computer Surface';
@@ -50,8 +67,8 @@ export function registerComputerSurfaceAuthRoutes(app: Express): void {
       next(error);
     }
   };
-  app.get([...SURFACE_AUTH_PATHS], handler);
-  app.post([...SURFACE_AUTH_PATHS], handler);
+  app.get([...SURFACE_AUTH_PATHS], computerSurfaceAuthRateLimiter, handler);
+  app.post([...SURFACE_AUTH_PATHS], computerSurfaceAuthRateLimiter, handler);
 }
 
 /** 302 -> /login?next=... for unauthenticated remote browser page navigations only. */

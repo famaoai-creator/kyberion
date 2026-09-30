@@ -11,7 +11,7 @@ import {
   Switch,
   TextField,
 } from '@agent/shared-ui';
-import { frontDeskText, ssoText } from '../../../lib/i18n';
+import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, FrontDeskMessageKey } from '../../../lib/i18n';
 import type {
   Setup,
@@ -272,8 +272,8 @@ export function MembersSection({
             member. Server enforces owner-only + uniqueness (409). */}
         <SettingsGroup
           id="settings-member-sso"
-          title={ssoText('settings_member_sso_title', locale)}
-          description={ssoText('settings_member_sso_help', locale)}
+          title={frontDeskText('settings_member_sso_title', locale)}
+          description={frontDeskText('settings_member_sso_help', locale)}
         >
           {members.map((member) => {
             const form = ssoForm(member.member_id);
@@ -285,7 +285,7 @@ export function MembersSection({
                 <div className="settings-member-sso">
                   {member.external_identities.length === 0 ? (
                     <p className="kb-text kb-text--muted">
-                      {ssoText('settings_member_sso_none', locale)}
+                      {frontDeskText('settings_member_sso_none', locale)}
                     </p>
                   ) : (
                     member.external_identities.map((identity) => (
@@ -297,7 +297,7 @@ export function MembersSection({
                           {identity.issuer} · {identity.subject}
                         </code>
                         <Button
-                          label={ssoText('settings_member_sso_unbind', locale)}
+                          label={frontDeskText('settings_member_sso_unbind', locale)}
                           variant="ghost"
                           disabled={memberBusy}
                           onClick={() =>
@@ -316,21 +316,21 @@ export function MembersSection({
                     <TextField
                       id={`member-sso-issuer-${member.member_id}`}
                       name={`member.sso_issuer.${member.member_id}`}
-                      label={ssoText('settings_member_sso_issuer', locale)}
+                      label={frontDeskText('settings_member_sso_issuer', locale)}
                       hide_label
-                      placeholder={ssoText('settings_member_sso_issuer', locale)}
+                      placeholder={frontDeskText('settings_member_sso_issuer', locale)}
                       value={form.issuer}
                     />
                     <TextField
                       id={`member-sso-subject-${member.member_id}`}
                       name={`member.sso_subject.${member.member_id}`}
-                      label={ssoText('settings_member_sso_subject', locale)}
+                      label={frontDeskText('settings_member_sso_subject', locale)}
                       hide_label
-                      placeholder={ssoText('settings_member_sso_subject', locale)}
+                      placeholder={frontDeskText('settings_member_sso_subject', locale)}
                       value={form.subject}
                     />
                     <Button
-                      label={ssoText('settings_member_sso_bind', locale)}
+                      label={frontDeskText('settings_member_sso_bind', locale)}
                       variant="secondary"
                       disabled={memberBusy || !form.issuer.trim() || !form.subject.trim()}
                       onClick={() => {

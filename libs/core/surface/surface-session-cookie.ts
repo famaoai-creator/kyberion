@@ -46,6 +46,13 @@ export function isSurfacePublicAssetPath(pathname: string): boolean {
   );
 }
 
+/** Strip trailing `/` without a backtracking regex (linear in the input). */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charAt(end - 1) === '/') end -= 1;
+  return value.slice(0, end);
+}
+
 export function parseCookieHeader(header: string | null | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!header) return out;
@@ -85,8 +92,15 @@ export function extractSurfaceCredential(input: {
   authorization?: string | null;
   cookie?: string | null;
 }): { token: string; source: SurfaceCredentialSource } {
-  const match = /^Bearer\s+(.+)$/i.exec((input.authorization ?? '').trim());
-  const bearer = match?.[1]?.trim() ?? '';
+  // Linear scan, no regex: a backtracking pattern over a caller-controlled
+  // header is a ReDoS vector (`Bearer\t\t\t…`).
+  const authorization = (input.authorization ?? '').trim();
+  const bearer =
+    authorization.length > 6 &&
+    authorization.slice(0, 6).toLowerCase() === 'bearer' &&
+    /\s/.test(authorization.charAt(6))
+      ? authorization.slice(7).trim()
+      : '';
   if (bearer) return { token: bearer, source: 'header' };
   const session = extractSurfaceSessionToken(input.cookie);
   if (session) return { token: session, source: 'session-cookie' };

@@ -65,7 +65,14 @@ function arg(argv: string[], name: string, fallback: string): string {
 function startServer(port: string): ChildProcess {
   return spawn('pnpm', ['--dir', 'presence/displays/chronos-mirror-v2', 'start', '--port', port], {
     stdio: 'ignore',
-    env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1' },
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      HOSTNAME: '127.0.0.1',
+      // The server binds loopback only; TRUST_PROXY lets Next 15+ (no NextRequest.ip)
+      // treat this local browser as loopback instead of redirecting it to /login.
+      KYBERION_TRUST_PROXY: '1',
+    },
   });
 }
 
