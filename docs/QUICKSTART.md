@@ -27,9 +27,16 @@ Prerequisites:
 - Node.js `24+` (matches `package.json` engines and `.nvmrc`)
 - `pnpm`
 
+Get the code first:
+
+```bash
+git clone https://github.com/famaoai-creator/kyberion.git
+cd kyberion
+```
+
 The canonical first-win command sequence is deliberately short:
 
-# kyberion-first-win
+<!-- kyberion-first-win -->
 
 ```bash
 pnpm install
@@ -39,19 +46,13 @@ pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-```bash
-git clone https://github.com/famaoai-creator/kyberion.git
-cd kyberion
-pnpm install
-pnpm build
-pnpm env:bootstrap --manifest kyberion-toolchain     # verifies Node 24+ floor; warns if Playwright browsers are missing
-pnpm doctor
-pnpm pipeline --input pipelines/verify-session.json
-```
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. After `pnpm build`, the `pnpm doctor` line runs the repo script. Bare `pnpm doctor` without a prior `pnpm run` / build context is pnpm's own diagnostic — use `pnpm run doctor` when you mean Kyberion.
 
-After `pnpm build`, that `pnpm doctor` line runs the repo script. Bare `pnpm doctor` without a prior `pnpm run` / build context is pnpm's own diagnostic — use `pnpm run doctor` when you mean Kyberion.
+### Day-2 setup: AI company, tenant activation (optional)
 
-### Start an AI company in one governed step
+Skip this subsection for a first look — the first-win smoke in §2 needs none of it. Come back when you want a governed company, tenant or customer context.
+
+#### Start an AI company in one governed step
 
 For a solo founder whose main workforce is AI, run the company onboarding flow after the build:
 
@@ -201,6 +202,23 @@ Kyberion should respond with one of these:
 - an approval request
 - a result or artifact
 
+### Or use one command per sense
+
+From a terminal you can skip the conversation and use a single verb (Markdown on stdout, `--json` for structure). Copy external files into `active/shared/tmp/<job>/` first.
+
+| You have                        | Command                         |
+| ------------------------------- | ------------------------------- |
+| a PDF / PPTX / DOCX / XLSX      | `pnpm kyberion read <file>`     |
+| an image                        | `pnpm kyberion see <image>`     |
+| audio                           | `pnpm kyberion listen <audio>`  |
+| a video                         | `pnpm kyberion watch <video>`   |
+| a brief to turn into a document | `pnpm kyberion write ...`       |
+| a prompt to turn into an image  | `pnpm kyberion draw ...`        |
+| text to be spoken               | `pnpm kyberion speak ...`       |
+| a request in plain words        | `pnpm kyberion ask "<request>"` |
+
+`pnpm kyberion` with no arguments shows a status digest and your next action. Details: [`capability-verb-inventory`](../knowledge/product/orchestration/capability-verb-inventory.md).
+
 ## 5. What Happens Internally
 
 You do not need to drive this manually most of the time, but this is the internal model:
@@ -256,13 +274,20 @@ Use when:
 - you want the secretary view: pending requests, approvals, deliverables, exceptions
 - you are deciding, not operating
 
-### Terminal
+### Terminal (`pnpm kyberion`, `pnpm tui`)
 
 Use when:
 
-- you are coding
-- you want diffs, tests, and patches
-- you want the fastest iteration loop
+- you live in a shell and want a status digest plus your next action (`pnpm kyberion`)
+- you want the verbs above, approvals (`pnpm kyberion approvals`) or the inbox
+- you want a resident cockpit for missions and work items (`pnpm tui`)
+
+### Capture pads (`pnpm pads`)
+
+Use when:
+
+- you have something on your desk — a sketch, meeting notes, a screenshot, a file, the clipboard, today's TODO
+- you want it captured locally (127.0.0.1 only) and handed off, without anything being sent or started on its own
 
 ### Slack
 
@@ -284,6 +309,7 @@ Use when:
 
 Use when:
 
+- you want the front desk for asking (頼む), following progress (進み具合) and today's briefing (ホーム)
 - you want voice interaction
 - you want conversational browser or task assistance
 - you want to inspect live task details and artifacts
@@ -340,6 +366,7 @@ Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next R
 ## 10. Where To Read Next
 
 - [README.md](../README.md)
+- [docs/user/](./user/README.md) — task-first guides and [troubleshooting](./user/TROUBLESHOOTING.md)
 - [docs/SURFACES.md](SURFACES.md)
 - [docs/COMPONENT_MAP.md](COMPONENT_MAP.md)
 - [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)
