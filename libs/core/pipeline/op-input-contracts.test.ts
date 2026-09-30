@@ -57,6 +57,18 @@ describe('op-input-contracts', () => {
     }
   });
 
+  it('accepts browser content capture without a selector (full page)', () => {
+    expect(validateOpInput('browser', 'content', { export_as: 'page_html' })).toEqual({
+      valid: true,
+    });
+    expect(
+      validateOpInput('browser', 'content', {
+        selector: 'main',
+        export_as: 'main_text',
+      })
+    ).toEqual({ valid: true });
+  });
+
   it('rejects file writes without a path', () => {
     const result = validateOpInput('file', 'write', { content: 'hello' });
     expect(result.valid).toBe(false);

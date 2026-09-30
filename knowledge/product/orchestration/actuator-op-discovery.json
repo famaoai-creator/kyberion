@@ -2867,9 +2867,12 @@
           "kind": "capture",
           "input_schema": {
             "type": "object",
-            "required": ["selector", "content_excerpt"],
             "properties": {
               "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
                 "type": "string",
                 "minLength": 1
               },
@@ -2883,8 +2886,11 @@
           },
           "examples": [
             {
-              "selector": "#status",
-              "content_excerpt": "Ready"
+              "export_as": "page_html"
+            },
+            {
+              "selector": "main",
+              "export_as": "main_text"
             }
           ]
         },

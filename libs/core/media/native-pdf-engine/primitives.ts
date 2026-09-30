@@ -285,7 +285,9 @@ export type FontKitCollection = {
   fonts?: FontKitFont[];
 };
 
-export const FONTKIT_REQUIRE = createRequire(import.meta.url);
+// Resolve from @agent/core's package root so inlined CLI bundles
+// (`dist/scripts/cli.js`) still find the workspace fontkit dependency.
+export const FONTKIT_REQUIRE = createRequire(pathResolver.rootResolve('libs/core/package.json'));
 export const FONTKIT = FONTKIT_REQUIRE('fontkit') as {
   openSync: (source: string) => FontKitFont | FontKitCollection;
 };
