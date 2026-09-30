@@ -40,6 +40,10 @@ the theme, layout and styles come from the design-defaults cascade.
 
 The brief and the output must be inside the repository, e.g.
   mkdir -p active/shared/tmp/<job> && pnpm kyberion write active/shared/tmp/<job>/brief.json --out active/shared/tmp/<job>/deck.pptx
+Brief shape: knowledge/product/schemas/document-brief.schema.json
+  (kind/artifact_family/document_type/document_profile/render_target/payload).
+Worked examples: libs/actuators/media-actuator/examples/assets/document-brief-*.json
+  — pipeline wrappers under examples/*.json are for media-actuator, not this verb.
 Reading a document back is \`pnpm kyberion read\`; see
 knowledge/product/orchestration/capability-verb-inventory.md.`;
 
