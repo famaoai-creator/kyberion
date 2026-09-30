@@ -90,6 +90,9 @@ describe('mission_controller argument parsing', () => {
     expect(shouldSkipReasoningBootstrap('record-evidence')).toBe(true);
     expect(shouldSkipReasoningBootstrap('help')).toBe(true);
     expect(shouldSkipReasoningBootstrap('list')).toBe(true);
+    // kickoff shares the start path and must bootstrap reasoning like start —
+    // pin the invariant so a future REASONING_FREE_ACTIONS edit can't regress it.
+    expect(shouldSkipReasoningBootstrap('kickoff')).toBe(false);
     expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
     expect(shouldSkipReasoningBootstrap('status')).toBe(false);
     expect(shouldSkipReasoningBootstrap(undefined)).toBe(false);
@@ -1647,14 +1650,127 @@ describe('mission controller router — mission ID and help guards', () => {
     );
   });
 
-  it.each(['status', 'team', 'staff', 'classify', 'workflow-select', 'plan-tasks', 'handoff'])(
-    'rejects %s without a mission ID',
-    (action) => {
-      expect(() => missionControllerRouter.assertMissionIdArgument(action, undefined)).toThrow(
-        `${action} requires a mission ID`
-      );
-    }
-  );
+  it.each([
+    'status',
+    'team',
+    'staff',
+    'classify',
+    'workflow-select',
+    'plan-tasks',
+    'handoff',
+    'kickoff',
+  ])('rejects %s without a mission ID', (action) => {
+    expect(() => missionControllerRouter.assertMissionIdArgument(action, undefined)).toThrow(
+      `${action} requires a mission ID`
+    );
+  });
+
+  it('surfaces the mission ID convention in missing/invalid ID errors', () => {
+    expect(() => missionControllerRouter.assertMissionIdArgument('kickoff', undefined)).toThrow(
+      'MSN-LOG-OPT-20260930'
+    );
+    expect(() => missionControllerRouter.assertMissionIdArgument('start', 'bad id')).toThrow(
+      '<PREFIX>-<TOPIC>-<YYYYMMDD>'
+    );
+  });
+});
+
+describe('mission controller router — kickoff verb', () => {
+  function makeKickoffContext(positional: string[], options: string[] = [], dryRun = false) {
+    const argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'kickoff',
+      ...positional,
+      ...options,
+    ];
+    const optionValue = (flag: string, args: string[]) => {
+      const index = args.indexOf(flag);
+      return index >= 0 ? args[index + 1] : undefined;
+    };
+    return {
+      argv,
+      action: 'kickoff',
+      arg1: positional[0],
+      arg2: positional[1],
+      arg3: positional[2],
+      hasRefresh: false,
+      hasDryRun: dryRun,
+      getOptionValue: optionValue,
+      parseCsvOption: () => undefined,
+      validateMissionStartCreateInput: vi.fn(() => ({ tier: 'public' })),
+      startMission: vi.fn(async () => undefined),
+      recordRoutingDecisionInMissionState: vi.fn(async () => undefined),
+      showHelp: vi.fn(),
+      print: vi.fn(),
+    } as unknown as MissionControllerRoutingContext & {
+      validateMissionStartCreateInput: ReturnType<typeof vi.fn>;
+      startMission: ReturnType<typeof vi.fn>;
+      recordRoutingDecisionInMissionState: ReturnType<typeof vi.fn>;
+      print: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it('creates-and-activates through the shared start path', async () => {
+    const context = makeKickoffContext(['MSN-KICKOFF-1'], ['--tier', 'public']);
+
+    await missionControllerRouter.runMissionControllerAction(context);
+
+    expect(context.validateMissionStartCreateInput).toHaveBeenCalledWith(
+      'kickoff',
+      'MSN-KICKOFF-1',
+      context.argv
+    );
+    expect(context.startMission).toHaveBeenCalledTimes(1);
+    const [missionId, tier] = context.startMission.mock.calls[0];
+    expect(missionId).toBe('MSN-KICKOFF-1');
+    expect(tier).toBe('public');
+    // kickoff records the START routing sync (auto-create inside startMission),
+    // not CREATE — pin the event so the audit semantics can't regress.
+    expect(context.recordRoutingDecisionInMissionState).toHaveBeenCalledWith(
+      'MSN-KICKOFF-1',
+      {},
+      'START'
+    );
+  });
+
+  it('prefixes validation errors with kickoff, not start', async () => {
+    const context = makeKickoffContext(
+      ['MSN-KICKOFF-ERR'],
+      ['--tier', 'public', '--project-id', 'PRJ-X']
+    );
+    context.validateMissionStartCreateInput = vi.fn(() => {
+      throw new Error('kickoff MSN-KICKOFF-ERR: --project-id requires --project-path');
+    });
+
+    await expect(missionControllerRouter.runMissionControllerAction(context)).rejects.toThrow(
+      /^kickoff MSN-KICKOFF-ERR:/
+    );
+    expect(context.validateMissionStartCreateInput).toHaveBeenCalledWith(
+      'kickoff',
+      'MSN-KICKOFF-ERR',
+      context.argv
+    );
+  });
+
+  it('reports kickoff as the action in --dry-run output', async () => {
+    const context = makeKickoffContext(['MSN-KICKOFF-DRY'], [], true);
+
+    await missionControllerRouter.runMissionControllerAction(context);
+
+    expect(context.startMission).not.toHaveBeenCalled();
+    expect(context.print).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(context.print.mock.calls[0][0] as string);
+    expect(payload.action).toBe('kickoff');
+    expect(payload.mission_id).toBe('MSN-KICKOFF-DRY');
+  });
+
+  it('documents kickoff, the ID convention, and the public-tier hint in help', () => {
+    const help = buildHelpText();
+    expect(help).toContain('kickoff  <ID>');
+    expect(help).toContain('<PREFIX>-<TOPIC>-<YYYYMMDD>');
+    expect(help).toContain('--tier public');
+  });
 });
 
 describe('mission controller router — runtime input boundaries', () => {
