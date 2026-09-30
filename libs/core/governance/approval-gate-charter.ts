@@ -57,6 +57,8 @@ export function runCharterGate(input: {
   intentId?: string;
   correlationId: string;
   payload?: Record<string, unknown>;
+  /** The decision-rights matrix routes this decision to a human. */
+  decisionRightsEscalates?: boolean;
   now?: Date;
 }): CharterGateOutcome {
   const { charter, agentId, operationId, correlationId } = input;
@@ -99,6 +101,14 @@ export function runCharterGate(input: {
       return {
         kind: 'require_approval',
         reason: `hardened policy '${policy.matchedRuleId ?? 'dual_key_confirmation'}' is outside what a charter can delegate`,
+      };
+    }
+    // The matrix is organizational governance: a charter stands in for it only
+    // when the accountable human explicitly, and with authority, said so.
+    if (input.decisionRightsEscalates && active.envelope.supersedes_decision_rights !== true) {
+      return {
+        kind: 'require_approval',
+        reason: `decision-rights matrix escalates this decision and charter ${active.charter_id} does not supersede it`,
       };
     }
     recordCharterConsumption(

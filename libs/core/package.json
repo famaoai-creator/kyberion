@@ -7091,6 +7091,10 @@
       "types": "./dist/governance/accountability-report.d.ts",
       "default": "./dist/governance/accountability-report.js"
     },
+    "./governance/charter-call-site": {
+      "types": "./dist/governance/charter-call-site.d.ts",
+      "default": "./dist/governance/charter-call-site.js"
+    },
     "./governance/approval-digest": {
       "types": "./dist/governance/approval-digest.d.ts",
       "default": "./dist/governance/approval-digest.js"
