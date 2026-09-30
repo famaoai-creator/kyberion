@@ -6,6 +6,7 @@ import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import type { NotificationChannelOption, NotificationTarget } from '../../../lib/settings-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+import { QuietHoursPane } from './QuietHoursPane';
 
 /** FD-06 通知設定 pane (`#setup-notifications`) — extracted from
  * settings/page.tsx; the save handler and channel list stay owned by the
@@ -100,6 +101,7 @@ export function NotificationsSection({
           </div>
         </SettingsGroup>
       </FormScope>
+      <QuietHoursPane t={t} />
     </div>
   );
 }
