@@ -304,4 +304,72 @@ describe('operator notifications (E2E-04 Task 2)', () => {
       'EXTERNAL'
     );
   });
+  describe('quiet hours', () => {
+    const slack = { surface: 'slack', target: 'C1' } as const;
+    const quiet = { start: '22:00', end: '07:00', timezone: 'Asia/Tokyo' };
+    // 2026-10-01T14:00Z = 23:00 JST (quiet); 2026-10-01T03:00Z = 12:00 JST (awake)
+    const night = new Date('2026-10-01T14:00:00.000Z');
+    const noon = new Date('2026-10-01T03:00:00.000Z');
+
+    it('wraps midnight and is evaluated in the configured timezone', () => {
+      expect(mod.isWithinQuietHours(night, quiet)).toBe(true);
+      expect(mod.isWithinQuietHours(new Date('2026-10-01T20:30:00.000Z'), quiet)).toBe(true); // 05:30 JST
+      expect(mod.isWithinQuietHours(noon, quiet)).toBe(false);
+      // Same instant, different zone: 14:00Z is 14:00 in UTC, awake.
+      expect(mod.isWithinQuietHours(night, { ...quiet, timezone: 'UTC' })).toBe(false);
+      expect(mod.isWithinQuietHours(night, { start: '09:00', end: '09:00', timezone: 'UTC' })).toBe(
+        false
+      );
+    });
+
+    it('parks non-urgent events in the inbox during quiet hours, but never urgent ones', () => {
+      const prefs = { default_channel: slack, quiet_hours: quiet };
+      expect(mod.resolveOperatorNotificationRoute('mission_completed', prefs, night)).toEqual({
+        surface: 'inbox',
+        target: 'quiet-hours',
+      });
+      expect(mod.resolveOperatorNotificationRoute('mission_completed', prefs, noon)).toEqual(slack);
+      // ops_alert (charter tripwires) is urgent by default.
+      expect(mod.resolveOperatorNotificationRoute('ops_alert', prefs, night)).toEqual(slack);
+      // Urgent list is overridable.
+      const custom = { ...prefs, urgent_events: ['approval_required' as const] };
+      expect(mod.resolveOperatorNotificationRoute('approval_required', custom, night)).toEqual(
+        slack
+      );
+      expect(mod.resolveOperatorNotificationRoute('ops_alert', custom, night)).toEqual({
+        surface: 'inbox',
+        target: 'quiet-hours',
+      });
+    });
+
+    it('never turns mute or "unconfigured" into a delivery', () => {
+      const prefs = { per_event: { question: 'mute' as const }, quiet_hours: quiet };
+      expect(mod.resolveOperatorNotificationRoute('question', prefs, night)).toBe('mute');
+      expect(mod.resolveOperatorNotificationRoute('deliverable_ready', prefs, night)).toBeNull();
+    });
+
+    it('round-trips through save/load and rejects malformed windows', () => {
+      mod.saveNotificationPreferences({
+        default_channel: slack,
+        quiet_hours: quiet,
+        urgent_events: ['ops_alert', 'question'],
+      });
+      expect(mod.loadNotificationPreferences()).toMatchObject({
+        quiet_hours: quiet,
+        urgent_events: ['ops_alert', 'question'],
+      });
+      for (const bad of [
+        { ...quiet, start: '25:00' },
+        { ...quiet, timezone: 'Mars/Olympus' },
+        { start: '22:00', end: '07:00' },
+      ]) {
+        expect(() =>
+          mod.saveNotificationPreferences({ default_channel: slack, quiet_hours: bad as never })
+        ).toThrow('Invalid notification preferences');
+      }
+      expect(() => mod.saveNotificationPreferences({ urgent_events: ['bogus'] as never })).toThrow(
+        'Invalid notification preferences'
+      );
+    });
+  });
 });

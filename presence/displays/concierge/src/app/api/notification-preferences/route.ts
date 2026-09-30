@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isSurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import { listChannelDirectoryEntries } from '@agent/core/surface/channel-directory';
 import {
+  DEFAULT_URGENT_EVENTS,
   loadNotificationPreferences,
   saveNotificationPreferences,
   type NotificationChannelTarget,
@@ -51,6 +52,14 @@ function listNotifiableChannels() {
   });
 }
 
+function publicPreferences(prefs: NotificationPreferences) {
+  return {
+    default_channel: prefs.default_channel || null,
+    quiet_hours: prefs.quiet_hours || null,
+    urgent_events: prefs.urgent_events ?? [...DEFAULT_URGENT_EVENTS],
+  };
+}
+
 export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
@@ -58,7 +67,7 @@ export function GET(req: NextRequest) {
     const preferences = withPreferences((prefs) => prefs);
     return NextResponse.json({
       ok: true,
-      preferences: { default_channel: preferences.default_channel || null },
+      preferences: publicPreferences(preferences),
       channels: listNotifiableChannels(),
     });
   } catch (error) {
@@ -78,10 +87,41 @@ export async function POST(req: NextRequest) {
       'surface',
       'channel',
       'target',
+      'quiet_hours',
+      'urgent_events',
     ]);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
+
+    // Quiet-hours update: independent of the delivery channel, so it can be
+    // saved on its own. `quiet_hours: null` turns the window off. The core
+    // validator (HH:MM, IANA timezone, known events) is the single authority;
+    // any rejection there is a 400, never a partial write.
+    if (body && ('quiet_hours' in body || 'urgent_events' in body) && !('surface' in body)) {
+      try {
+        const saved = withPreferences((prefs) => {
+          if ('quiet_hours' in body) {
+            if (body.quiet_hours === null) delete prefs.quiet_hours;
+            else prefs.quiet_hours = body.quiet_hours as NotificationPreferences['quiet_hours'];
+          }
+          if ('urgent_events' in body) {
+            prefs.urgent_events = body.urgent_events as NotificationPreferences['urgent_events'];
+          }
+          saveNotificationPreferences(prefs);
+          return prefs;
+        });
+        return NextResponse.json({ ok: true, preferences: publicPreferences(saved) });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Invalid notification preferences') {
+          return NextResponse.json(
+            { ok: false, error: t('api.notification_quiet_hours') },
+            { status: 400 }
+          );
+        }
+        throw error;
+      }
+    }
     const surface = typeof body?.surface === 'string' ? body.surface.trim() : '';
 
     if (surface === 'none') {
@@ -90,10 +130,7 @@ export async function POST(req: NextRequest) {
         saveNotificationPreferences(prefs);
         return prefs;
       });
-      return NextResponse.json({
-        ok: true,
-        preferences: { default_channel: saved.default_channel || null },
-      });
+      return NextResponse.json({ ok: true, preferences: publicPreferences(saved) });
     }
 
     const knownChannels = new Set(listChannelDirectoryEntries().map((entry) => entry.channel));
@@ -125,10 +162,7 @@ export async function POST(req: NextRequest) {
       saveNotificationPreferences(prefs);
       return prefs;
     });
-    return NextResponse.json({
-      ok: true,
-      preferences: { default_channel: saved.default_channel || null },
-    });
+    return NextResponse.json({ ok: true, preferences: publicPreferences(saved) });
   } catch (error) {
     return conciergeErrorResponse(error, 500);
   }

@@ -1,4 +1,6 @@
 /** Domain barrel — public surface for libs/core/governance */
+export * from './accountability-charter-registry.js';
+export * from './accountability-charter.js';
 export * from './approval-audit.js';
 export * from './approval-cowork-adapter.js';
 export * from './approval-gate-summary.js';

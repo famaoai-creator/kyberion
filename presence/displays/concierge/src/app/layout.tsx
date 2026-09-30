@@ -11,13 +11,19 @@ import { ConciergeHeader } from './concierge-header';
 import { ConversationDock } from './conversation-dock';
 import { CommandPalette } from './command-palette';
 import { FrontDeskRail } from './front-desk-rail';
+import { ServiceWorkerRegister } from './sw-register';
 
 // Surface identity contract: surface:concierge_surface_tagline
 
 export const metadata = {
   title: 'Concierge — Kyberion',
   description: 'Executive secretary surface for requests, approvals, outcomes, and exceptions.',
+  applicationName: 'Kyberion Concierge',
+  appleWebApp: { capable: true, title: 'Concierge', statusBarStyle: 'default' as const },
+  icons: { apple: '/icons/apple-touch-icon.png' },
 };
+
+export const viewport = { themeColor: '#1d4ed8' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // FD-00c follow-up: `RootLayout` has no `'use client'` directive, so it is
@@ -38,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
       <body>
+        <ServiceWorkerRegister />
         {/* UI-05/06: `ui:app-shell` with the shared front-desk rail
             (`ui:nav-rail`) and the surface header (`ui:page-header`). The
             secretary conversation (CS-01) and the ⌘K palette (CS-04) are

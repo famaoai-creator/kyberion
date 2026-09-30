@@ -10,28 +10,95 @@
       "additionalProperties": false,
       "required": ["surface", "target"],
       "properties": {
-        "surface": { "enum": ["slack", "imessage", "telegram", "discord", "inbox"] },
-        "target": { "type": "string", "minLength": 1 }
+        "surface": {
+          "enum": ["slack", "imessage", "telegram", "discord", "inbox"]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "eventRoute": {
-      "oneOf": [{ "$ref": "#/definitions/channelTarget" }, { "const": "mute" }]
+      "oneOf": [
+        {
+          "$ref": "#/definitions/channelTarget"
+        },
+        {
+          "const": "mute"
+        }
+      ]
+    },
+    "eventName": {
+      "enum": [
+        "question",
+        "approval_required",
+        "mission_completed",
+        "mission_failed",
+        "deliverable_ready",
+        "ops_alert",
+        "decision_digest"
+      ]
     }
   },
   "properties": {
-    "default_channel": { "$ref": "#/definitions/channelTarget" },
+    "default_channel": {
+      "$ref": "#/definitions/channelTarget"
+    },
     "per_event": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "question": { "$ref": "#/definitions/eventRoute" },
-        "approval_required": { "$ref": "#/definitions/eventRoute" },
-        "mission_completed": { "$ref": "#/definitions/eventRoute" },
-        "mission_failed": { "$ref": "#/definitions/eventRoute" },
-        "deliverable_ready": { "$ref": "#/definitions/eventRoute" },
-        "ops_alert": { "$ref": "#/definitions/eventRoute" },
-        "decision_digest": { "$ref": "#/definitions/eventRoute" }
+        "question": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "approval_required": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "mission_completed": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "mission_failed": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "deliverable_ready": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "ops_alert": {
+          "$ref": "#/definitions/eventRoute"
+        },
+        "decision_digest": {
+          "$ref": "#/definitions/eventRoute"
+        }
       }
+    },
+    "quiet_hours": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "timezone"],
+      "description": "Daily window in which non-urgent events are parked in the local inbox. start > end wraps midnight.",
+      "properties": {
+        "start": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "urgent_events": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/definitions/eventName"
+      },
+      "description": "Events that break through quiet hours (default: ops_alert)."
     }
   }
 }

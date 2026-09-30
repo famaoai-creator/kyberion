@@ -47,9 +47,65 @@ export interface NotificationChannelTarget {
   target: string;
 }
 
+/**
+ * A recurring daily window in which non-urgent events are parked in the local
+ * inbox instead of being pushed to the phone. `start` > `end` wraps midnight
+ * (e.g. 22:00–07:00). Times are wall-clock in `timezone` (IANA name).
+ */
+export interface NotificationQuietHours {
+  start: string; // HH:MM
+  end: string; // HH:MM
+  timezone: string;
+}
+
 export interface NotificationPreferences {
   default_channel?: NotificationChannelTarget;
   per_event?: Partial<Record<OperatorEvent, NotificationChannelTarget | 'mute'>>;
+  quiet_hours?: NotificationQuietHours;
+  /** Events that break through quiet hours. Defaults to {@link DEFAULT_URGENT_EVENTS}. */
+  urgent_events?: OperatorEvent[];
+}
+
+/**
+ * Stops and alarms must never wait for morning. A charter tripwire is
+ * delivered as `ops_alert`, so this default keeps "stop the world" audible.
+ */
+export const DEFAULT_URGENT_EVENTS: readonly OperatorEvent[] = ['ops_alert'];
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function isValidTimezone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: name });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function minutesOfDayIn(now: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+  return hour * 60 + minute;
+}
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function isWithinQuietHours(now: Date, quiet: NotificationQuietHours): boolean {
+  const start = toMinutes(quiet.start);
+  const end = toMinutes(quiet.end);
+  if (start === end) return false; // an empty window, not "always quiet"
+  const current = minutesOfDayIn(now, quiet.timezone);
+  return start < end ? current >= start && current < end : current >= start || current < end;
 }
 
 export interface OperatorNotificationPayload {
@@ -114,7 +170,44 @@ function parseNotificationPreferences(value: unknown): NotificationPreferences |
   } catch {
     return null;
   }
-  if (!hasOnlyKeys(record, ['default_channel', 'per_event'])) return null;
+  if (!hasOnlyKeys(record, ['default_channel', 'per_event', 'quiet_hours', 'urgent_events'])) {
+    return null;
+  }
+
+  let quietHours: NotificationQuietHours | undefined;
+  if (record.quiet_hours !== undefined) {
+    let q: Record<string, unknown>;
+    try {
+      q = parseSafeJsonObjectValue(record.quiet_hours, 'notification quiet_hours');
+    } catch {
+      return null;
+    }
+    if (!hasOnlyKeys(q, ['start', 'end', 'timezone'])) return null;
+    if (
+      typeof q.start !== 'string' ||
+      typeof q.end !== 'string' ||
+      typeof q.timezone !== 'string' ||
+      !HHMM.test(q.start) ||
+      !HHMM.test(q.end) ||
+      !isValidTimezone(q.timezone)
+    ) {
+      return null;
+    }
+    quietHours = { start: q.start, end: q.end, timezone: q.timezone };
+  }
+
+  let urgentEvents: OperatorEvent[] | undefined;
+  if (record.urgent_events !== undefined) {
+    if (
+      !Array.isArray(record.urgent_events) ||
+      !record.urgent_events.every(
+        (e) => typeof e === 'string' && OPERATOR_EVENTS.has(e as OperatorEvent)
+      )
+    ) {
+      return null;
+    }
+    urgentEvents = [...new Set(record.urgent_events as OperatorEvent[])];
+  }
 
   const defaultChannel =
     record.default_channel === undefined
@@ -146,6 +239,8 @@ function parseNotificationPreferences(value: unknown): NotificationPreferences |
   return {
     ...(defaultChannel ? { default_channel: defaultChannel } : {}),
     ...(perEvent ? { per_event: perEvent } : {}),
+    ...(quietHours ? { quiet_hours: quietHours } : {}),
+    ...(urgentEvents ? { urgent_events: urgentEvents } : {}),
   };
 }
 
@@ -267,11 +362,20 @@ function recordUndeliveredNotification(
 
 export function resolveOperatorNotificationRoute(
   event: OperatorEvent,
-  prefs: NotificationPreferences
+  prefs: NotificationPreferences,
+  now: Date = new Date()
 ): NotificationChannelTarget | 'mute' | null {
   const perEvent = prefs.per_event?.[event];
-  if (perEvent) return perEvent;
-  return prefs.default_channel || null;
+  const route = perEvent || prefs.default_channel || null;
+  // Muted stays muted and an unconfigured event stays undelivered-and-recorded;
+  // quiet hours only ever *defers* a real delivery to the local inbox.
+  if (!route || route === 'mute' || !prefs.quiet_hours) return route;
+  const urgent = prefs.urgent_events ?? DEFAULT_URGENT_EVENTS;
+  if (urgent.includes(event)) return route;
+  if (route.surface === 'inbox') return route;
+  return isWithinQuietHours(now, prefs.quiet_hours)
+    ? { surface: 'inbox', target: 'quiet-hours' }
+    : route;
 }
 
 function deliver(
