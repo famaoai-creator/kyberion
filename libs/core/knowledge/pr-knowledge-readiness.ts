@@ -466,11 +466,11 @@ function isMissionCandidateSourceRef(sourceRef: string | undefined, missionId: s
 
 /** What kind of Knowledge-section line a candidate's current state requires; `undefined` when it is not yet in a final state (see `unresolved_candidate`). */
 function expectedKnowledgeLineKind(candidate: MemoryCandidate): KnowledgeLineKind | undefined {
+  if (candidate.status === 'rejected') return 'rejected';
   if (candidate.knowledge_domain === 'organization' || candidate.knowledge_domain === 'personal') {
     return 'routed';
   }
   if (candidate.status === 'promoted') return 'promoted';
-  if (candidate.status === 'rejected') return 'rejected';
   return undefined;
 }
 
@@ -549,7 +549,11 @@ export function evaluatePrKnowledgeReadiness(
 
     if (candidate.knowledge_domain === 'product' && candidate.status === 'promoted') {
       const ref = normalizeRepoPath(candidate.promoted_ref);
-      const recordInDiff = ref ? input.changedFiles.some((file) => file.path === ref) : false;
+      const recordInDiff = ref
+        ? input.changedFiles.some(
+            (file) => file.path === ref && (file.status === 'A' || file.status === 'M')
+          )
+        : false;
       if (!ref || !recordInDiff) {
         violations.push({
           code: 'promoted_record_not_in_diff',
