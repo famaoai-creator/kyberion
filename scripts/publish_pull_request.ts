@@ -138,7 +138,7 @@ export function runPrePrReadiness(print: Print = () => undefined): void {
 /**
  * KL-03 diff base for the knowledge readiness check (distinct from `gh pr
  * create --base`, which stays a bare branch name for gh itself, see
- * `buildGhArgs`): a bare branch name (no `/`) is mapped to `origin/<base>` so
+ * `buildGhArgs`): a branch name not already qualified (`origin/…`, `refs/…`) is mapped to `origin/<base>` so
  * the diff is always computed against the fetched remote-tracking ref rather
  * than a possibly-stale local branch of the same name; `--mission-root`-style
  * ref values are validated against `GIT_REF_NAME_PATTERN` (rejects a leading
@@ -152,7 +152,9 @@ export function resolveKnowledgeDiffBase(base?: string): string {
       `--base '${trimmed}' is not a valid git ref name (no leading '-', only [A-Za-z0-9._/-]).`
     );
   }
-  return trimmed.includes('/') ? trimmed : `origin/${trimmed}`;
+  return trimmed.startsWith('origin/') || trimmed.startsWith('refs/')
+    ? trimmed
+    : `origin/${trimmed}`;
 }
 
 /** `code` is a plain string here (not KnowledgeViolationCode) so the CLI-only `missing_body_file` case can share this printer. */
