@@ -30,6 +30,7 @@ import {
   NotMeaningfulPromotionCandidateError,
 } from '../promoted-memory.js';
 import { logger } from '../core.js';
+import { resolvePromotionTargetRoot } from './memory-promotion-git.js';
 import { assessMissionMemoryCandidate } from '../mission/mission-assessment.js';
 import { listInboxEntries } from '../deliverable-inbox.js';
 import { evaluateBackgroundReviewText } from '../workforce/background-review-policy.js';
@@ -449,7 +450,14 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   ratificationNote?: string;
   supersedes?: string;
   scope?: MemoryScopeEnvelope;
-}): Promise<{ candidate: MemoryCandidate; promotedRef: string; review: PromotionReview }> {
+  /** KL-05: write the promoted record into this same-repository worktree. */
+  targetRoot?: string;
+}): Promise<{
+  candidate: MemoryCandidate;
+  promotedRef: string;
+  review: PromotionReview;
+  targetRoot?: string;
+}> {
   const candidateId = String(input.candidateId || '').trim();
   if (!candidateId) throw new Error('candidateId is required.');
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
@@ -480,6 +488,21 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     throw new Error(
       `Memory promotion candidate ${candidateId} is rejected and cannot be promoted.`
     );
+  }
+  if (input.targetRoot?.trim() && candidate.status !== 'promoted') {
+    // Fail before any distill/queue side effect; savePromotedMemoryRecord
+    // re-validates at the write boundary.
+    const target = resolvePromotionTargetRoot(input.targetRoot.trim());
+    if (!target.sameAsCurrent && domain !== 'product') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root only supports product-domain knowledge — candidate ${candidateId} is ${domain} | next: promote without --target-root`
+      );
+    }
+    if (!target.sameAsCurrent && candidate.approval_channel !== 'pr_review') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root requires approval_channel=pr_review — candidate ${candidateId} is ${candidate.approval_channel || 'steward'}; a record written into another worktree is only ratified by its PR reaching origin/main | next: re-approve with \`mission_controller memory-approve ${candidateId} --approval-channel pr_review\`, or promote without --target-root`
+      );
+    }
   }
   if (candidate.status === 'promoted') {
     const storedReview = loadDistillCandidateRecord(candidateId)?.metadata?.promotion_review;
@@ -537,6 +560,8 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   try {
     promoted = savePromotedMemoryRecord(distillCandidate, {
       executionRole: input.executionRole || 'mission_controller',
+      ...(input.targetRoot ? { targetRoot: input.targetRoot } : {}),
+      ...(candidate.approval_channel ? { approvalChannel: candidate.approval_channel } : {}),
     });
   } catch (err) {
     // The candidate failed the value threshold (e.g. test track, generic title,
@@ -583,5 +608,6 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     candidate: updated,
     promotedRef: promoted.logicalPath,
     review,
+    ...(promoted.targetRoot ? { targetRoot: promoted.targetRoot } : {}),
   };
 }
