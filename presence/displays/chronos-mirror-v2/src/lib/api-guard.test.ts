@@ -8,12 +8,19 @@ function makeReq(
     cookie?: string;
     hostname?: string;
     forwardedFor?: string;
+    method?: string;
+    session?: string;
+    headers?: Record<string, string>;
   } = {}
 ) {
   return {
     ip: options.ip,
+    method: options.method ?? 'GET',
     headers: {
       get(name: string) {
+        if (options.headers && name.toLowerCase() in options.headers) {
+          return options.headers[name.toLowerCase()];
+        }
         if (name.toLowerCase() === 'authorization') {
           return options.authorization || null;
         }
@@ -28,6 +35,7 @@ function makeReq(
         if (name === 'kyberion_token' && options.cookie) {
           return { value: options.cookie };
         }
+        if (name === 'kyberion_session' && options.session) return { value: options.session };
         return undefined;
       },
     },
@@ -132,5 +140,49 @@ describe('api guard', () => {
     const { resolveChronosAccessRole } = await import('./api-guard.js');
 
     expect(resolveChronosAccessRole(makeReq({ ip: '203.0.113.10' }))).toBe('readonly');
+  });
+
+  describe('session cookie credential', () => {
+    const session = 'kys1.payload.sig';
+    const cookie = `kyberion_session=${session}`;
+
+    it('falls back to the kyberion_session cookie after the legacy cookie', async () => {
+      const { resolveChronosToken } = await import('./api-guard.js');
+      expect(resolveChronosToken(makeReq({ session }))).toBe(session);
+      expect(resolveChronosToken(makeReq({ session, cookie: 'legacy' }))).toBe('legacy');
+      expect(resolveChronosToken(makeReq({ session, authorization: 'Bearer hdr' }))).toBe('hdr');
+    });
+
+    it('blocks a cross-origin cookie-authenticated POST with 403', async () => {
+      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', session);
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        ip: '127.0.0.1',
+        method: 'POST',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      const res = requireChronosAccess(req, 'readonly');
+      expect(res?.status).toBe(403);
+      expect(await res?.json()).toEqual({ error: 'Cross-origin request blocked.' });
+    });
+
+    it('allows a same-origin cookie POST and never checks header-authenticated requests', async () => {
+      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', session);
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const same = makeReq({
+        method: 'POST',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://chronos.example' },
+      });
+      expect(requireChronosAccess(same, 'readonly')).toBeNull();
+      const header = makeReq({
+        method: 'POST',
+        authorization: `Bearer ${session}`,
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      expect(requireChronosAccess(header, 'readonly')).toBeNull();
+    });
   });
 });

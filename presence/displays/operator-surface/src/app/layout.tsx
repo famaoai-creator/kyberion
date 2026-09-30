@@ -2,6 +2,7 @@ import * as React from 'react';
 import { getTenantScope } from '@/lib/data';
 import { operatorTranslator, operatorUiMessages } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
+import { requireOperatorViewer } from '@/lib/viewer-context';
 import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/display-preferences';
 import { OperatorShell, type OperatorNavItem } from './operator-shell';
 // Shared UI layer (UI-02): globals.css carries the generated --kb-* / --kb-ui-*
@@ -20,6 +21,8 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Server-verified page gate: loopback passes, remote needs a valid session.
+  await requireOperatorViewer();
   const scope = getTenantScope();
   const locale = await getRequestLocale();
   const t = operatorTranslator(locale);

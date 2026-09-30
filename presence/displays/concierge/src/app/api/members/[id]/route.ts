@@ -6,6 +6,7 @@ import {
   isValidMemberId,
   readMemberProfile,
   writeMemberProfile,
+  type MemberExternalIdentity,
   type MemberProfile,
 } from '@agent/core/organization/member-registry';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
@@ -38,6 +39,33 @@ function requireViewer(
   return resolveConciergeViewer(req);
 }
 
+const EXTERNAL_IDENTITY_TEXT_MAX = 512;
+
+/**
+ * Parse `{ issuer, subject, email? }` for binding an OIDC identity to a member.
+ * Returns null when malformed. Values are trimmed and bounded; `issuer` has no
+ * trailing slash so it compares equal to KYBERION_OIDC_ISSUER.
+ */
+function parseExternalIdentity(value: unknown, allowEmail: boolean): MemberExternalIdentity | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const allowed = allowEmail ? ['issuer', 'subject', 'email'] : ['issuer', 'subject'];
+  if (Object.keys(record).some((key) => !allowed.includes(key))) return null;
+  const issuer = typeof record.issuer === 'string' ? record.issuer.trim().replace(/\/+$/, '') : '';
+  const subject = typeof record.subject === 'string' ? record.subject.trim() : '';
+  if (!issuer || !subject) return null;
+  if (issuer.length > EXTERNAL_IDENTITY_TEXT_MAX || subject.length > EXTERNAL_IDENTITY_TEXT_MAX) {
+    return null;
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\s]/.test(issuer) || /[\u0000-\u001f\u007f]/.test(subject)) return null;
+  const email =
+    allowEmail && typeof record.email === 'string' && record.email.trim()
+      ? record.email.trim().slice(0, 320)
+      : undefined;
+  return { issuer, subject, ...(email ? { email } : {}) };
+}
+
 /**
  * FD-07 「役割変更」「停止」: owner-only on the tenant the write lands on.
  * No delete — `status` only ever moves between `active` and `suspended`
@@ -58,7 +86,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
     const raw: unknown = await req.json().catch(() => null);
     const body = requireRequestObject(raw, 'request body');
-    requireKnownRequestKeys(body, ['tenant_slug', 'role', 'status']);
+    requireKnownRequestKeys(body, [
+      'tenant_slug',
+      'role',
+      'status',
+      'external_identity',
+      'external_identity_remove',
+    ]);
 
     const tenantSlug = typeof body.tenant_slug === 'string' ? body.tenant_slug.trim() : undefined;
     const role = body.role;
@@ -79,7 +113,36 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         { status: 400 }
       );
     }
-    if (tenantSlug === undefined && status === undefined) {
+    // SSO binding: `external_identity` adds an OIDC iss+sub to the member,
+    // `external_identity_remove` drops one. The two are exclusive and do not
+    // ride along with a role/status change in the same request.
+    const addIdentity =
+      body.external_identity === undefined
+        ? undefined
+        : parseExternalIdentity(body.external_identity, true);
+    const removeIdentity =
+      body.external_identity_remove === undefined
+        ? undefined
+        : parseExternalIdentity(body.external_identity_remove, false);
+    if (
+      (body.external_identity !== undefined && !addIdentity) ||
+      (body.external_identity_remove !== undefined && !removeIdentity)
+    ) {
+      return NextResponse.json({ ok: false, error: 'invalid external identity' }, { status: 400 });
+    }
+    const identityRequested = Boolean(addIdentity || removeIdentity);
+    if (
+      identityRequested &&
+      (Boolean(addIdentity) === Boolean(removeIdentity) ||
+        tenantSlug !== undefined ||
+        status !== undefined)
+    ) {
+      return NextResponse.json(
+        { ok: false, error: frontDeskText('settings_member_patch_invalid', locale) },
+        { status: 400 }
+      );
+    }
+    if (tenantSlug === undefined && status === undefined && !identityRequested) {
       return NextResponse.json(
         { ok: false, error: frontDeskText('settings_member_patch_invalid', locale) },
         { status: 400 }
@@ -111,7 +174,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const roleOwnerCheckFailed =
       tenantSlug !== undefined &&
       conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug) !== 'owner';
-    const ownerCheckFailed = statusOwnerCheckFailed || roleOwnerCheckFailed;
+    // Binding an identity hands that IdP account this member's ENTIRE scope,
+    // so — like a status change — it needs owner on every tenant the member
+    // belongs to (or, for a membership-less member, the viewer's own owner role).
+    const identityOwnerCheckFailed =
+      identityRequested &&
+      (existing.memberships.length > 0
+        ? existing.memberships.some(
+            (m) => conciergeFrontDeskRoleForTenant(viewer.context, m.tenant_slug) !== 'owner'
+          )
+        : resolveConciergeFrontDeskRole(viewer.context) !== 'owner');
+    const ownerCheckFailed =
+      statusOwnerCheckFailed || roleOwnerCheckFailed || identityOwnerCheckFailed;
     if (ownerCheckFailed) {
       return NextResponse.json(
         { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
@@ -129,9 +203,30 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
             : [...memberships, { tenant_slug: tenantSlug, role }];
       }
 
+      let externalIdentities = existing.external_identities;
+      if (addIdentity) {
+        const already = (externalIdentities ?? []).some(
+          (identity) =>
+            identity.issuer === addIdentity.issuer && identity.subject === addIdentity.subject
+        );
+        if (!already) externalIdentities = [...(externalIdentities ?? []), addIdentity];
+      }
+      if (removeIdentity) {
+        externalIdentities = (externalIdentities ?? []).filter(
+          (identity) =>
+            !(
+              identity.issuer === removeIdentity.issuer &&
+              identity.subject === removeIdentity.subject
+            )
+        );
+      }
+
       const next: MemberProfile = {
         ...existing,
         memberships,
+        ...(externalIdentities !== existing.external_identities
+          ? { external_identities: externalIdentities }
+          : {}),
         ...(status !== undefined ? { status } : {}),
         updated_at: nowIso(),
       };
@@ -146,6 +241,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     }
     return NextResponse.json({ ok: true, member: updated });
   } catch (error) {
+    // writeMemberProfile refuses an iss+sub already bound to another member.
+    if (error instanceof Error && /already bound to member/.test(error.message)) {
+      return NextResponse.json(
+        { ok: false, error: 'this external identity is already bound to another member' },
+        { status: 409 }
+      );
+    }
     return conciergeErrorResponse(error, 500);
   }
 }

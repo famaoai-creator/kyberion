@@ -1,0 +1,28 @@
+import type { NextRequest } from 'next/server';
+import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
+import { isLoopbackPeer } from './loopback-peer';
+
+export const CONCIERGE_SURFACE_ID = 'concierge';
+export const CONCIERGE_SURFACE_LABEL = 'Concierge';
+export const CONCIERGE_TOKEN_SIGNIN_HREF = '/signin';
+
+/** Adapt a NextRequest to the shared browser-OIDC route handler. */
+export async function handleConciergeAuthRoute(req: NextRequest): Promise<Response> {
+  const url = new URL(req.url);
+  const result = await handleSurfaceAuthRoute({
+    surfaceId: CONCIERGE_SURFACE_ID,
+    surfaceLabel: CONCIERGE_SURFACE_LABEL,
+    method: req.method,
+    pathname: url.pathname,
+    searchParams: url.searchParams,
+    cookieHeader: req.headers.get('cookie'),
+    acceptLanguage: req.headers.get('accept-language'),
+    requestOrigin: url.origin,
+    loopback: isLoopbackPeer(req),
+    tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
+  });
+  if (!result) return new Response('Not found', { status: 404 });
+  const headers = new Headers(result.headers);
+  for (const cookie of result.setCookies) headers.append('Set-Cookie', cookie);
+  return new Response(result.body || null, { status: result.status, headers });
+}

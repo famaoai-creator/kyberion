@@ -11,7 +11,7 @@ import {
   Switch,
   TextField,
 } from '@agent/shared-ui';
-import { frontDeskText } from '../../../lib/i18n';
+import { frontDeskText, ssoText } from '../../../lib/i18n';
 import type { ConciergeLocale, FrontDeskMessageKey } from '../../../lib/i18n';
 import type {
   Setup,
@@ -74,7 +74,11 @@ export type MembersSectionProps = {
   onAddMember: () => void;
   onPatchMember: (
     memberId: string,
-    patch: { tenant_slug: string; role: SettingsRole } | { status: 'active' | 'suspended' }
+    patch:
+      | { tenant_slug: string; role: SettingsRole }
+      | { status: 'active' | 'suspended' }
+      | { external_identity: { issuer: string; subject: string } }
+      | { external_identity_remove: { issuer: string; subject: string } }
   ) => void;
   trainingTracks: TrainingTrack[];
   trainingAssignments: TrainingAssignments[];
@@ -115,6 +119,15 @@ export function MembersSection({
   onAssignTraining,
   sectionRef,
 }: MembersSectionProps) {
+  const [ssoForms, setSsoForms] = React.useState<
+    Record<string, { issuer: string; subject: string }>
+  >({});
+  const ssoForm = (memberId: string) => ssoForms[memberId] ?? { issuer: '', subject: '' };
+  const setSsoField = (memberId: string, field: 'issuer' | 'subject', value: string) =>
+    setSsoForms((current) => ({
+      ...current,
+      [memberId]: { ...(current[memberId] ?? { issuer: '', subject: '' }), [field]: value },
+    }));
   const activeTenantSlug = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
   const roleOptions = ROLES.map((role) => ({
     value: role,
@@ -132,6 +145,18 @@ export function MembersSection({
       },
     ])
   );
+  const ssoFields = Object.fromEntries(
+    members.flatMap((member) => [
+      [
+        `member.sso_issuer.${member.member_id}`,
+        (value: unknown) => setSsoField(member.member_id, 'issuer', asText(value)),
+      ],
+      [
+        `member.sso_subject.${member.member_id}`,
+        (value: unknown) => setSsoField(member.member_id, 'subject', asText(value)),
+      ],
+    ])
+  );
   return (
     <div
       className="settings-section"
@@ -142,6 +167,7 @@ export function MembersSection({
       <FormScope
         fields={{
           ...roleFields,
+          ...ssoFields,
           'training.track': (value) => setTrainingTrackId(asText(value)),
           'member.display_name': (value) =>
             setMemberForm((current) => ({ ...current, display_name: asText(value) })),
@@ -240,6 +266,91 @@ export function MembersSection({
               );
             })
           )}
+        </SettingsGroup>
+
+        {/* FD-07 SSO: bind / unbind IdP identities (issuer + subject) per
+            member. Server enforces owner-only + uniqueness (409). */}
+        <SettingsGroup
+          id="settings-member-sso"
+          title={ssoText('settings_member_sso_title', locale)}
+          description={ssoText('settings_member_sso_help', locale)}
+        >
+          {members.map((member) => {
+            const form = ssoForm(member.member_id);
+            return (
+              <SettingRow
+                key={`sso-${member.member_id}`}
+                label={`${member.display_name} (${member.member_id})`}
+              >
+                <div className="settings-member-sso">
+                  {member.external_identities.length === 0 ? (
+                    <p className="kb-text kb-text--muted">
+                      {ssoText('settings_member_sso_none', locale)}
+                    </p>
+                  ) : (
+                    member.external_identities.map((identity) => (
+                      <div
+                        key={`${identity.issuer}|${identity.subject}`}
+                        className="settings-inline-actions"
+                      >
+                        <code className="kb-text--mono">
+                          {identity.issuer} · {identity.subject}
+                        </code>
+                        <Button
+                          label={ssoText('settings_member_sso_unbind', locale)}
+                          variant="ghost"
+                          disabled={memberBusy}
+                          onClick={() =>
+                            onPatchMember(member.member_id, {
+                              external_identity_remove: {
+                                issuer: identity.issuer,
+                                subject: identity.subject,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    ))
+                  )}
+                  <div className="settings-inline-actions">
+                    <TextField
+                      id={`member-sso-issuer-${member.member_id}`}
+                      name={`member.sso_issuer.${member.member_id}`}
+                      label={ssoText('settings_member_sso_issuer', locale)}
+                      hide_label
+                      placeholder={ssoText('settings_member_sso_issuer', locale)}
+                      value={form.issuer}
+                    />
+                    <TextField
+                      id={`member-sso-subject-${member.member_id}`}
+                      name={`member.sso_subject.${member.member_id}`}
+                      label={ssoText('settings_member_sso_subject', locale)}
+                      hide_label
+                      placeholder={ssoText('settings_member_sso_subject', locale)}
+                      value={form.subject}
+                    />
+                    <Button
+                      label={ssoText('settings_member_sso_bind', locale)}
+                      variant="secondary"
+                      disabled={memberBusy || !form.issuer.trim() || !form.subject.trim()}
+                      onClick={() => {
+                        onPatchMember(member.member_id, {
+                          external_identity: {
+                            issuer: form.issuer.trim(),
+                            subject: form.subject.trim(),
+                          },
+                        });
+                        setSsoForms((current) => ({
+                          ...current,
+                          [member.member_id]: { issuer: '', subject: '' },
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+              </SettingRow>
+            );
+          })}
         </SettingsGroup>
 
         {/* HT-05/HT-06: track catalog comes from /api/training/catalog (never
