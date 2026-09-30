@@ -279,6 +279,7 @@ export interface MissionControllerRoutingContext {
       note?: string;
       supersedes?: string;
       targetRoot?: string;
+      missionId?: string;
     },
     print?: Print
   ) => Awaitable<void>;
@@ -1067,6 +1068,7 @@ export async function runMissionControllerAction(
           note: getValue('--note', context.argv),
           supersedes: getValue('--supersedes', context.argv),
           targetRoot: getValue('--target-root', context.argv),
+          missionId: getValue('--mission', context.argv),
           dryRun: context.argv.includes('--dry-run'),
         },
         context.print

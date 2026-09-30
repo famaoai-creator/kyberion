@@ -12,7 +12,10 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
-import { checkPrKnowledgeReadiness } from '@agent/core/knowledge/pr-knowledge-readiness';
+import {
+  checkPrKnowledgeReadiness,
+  GIT_REF_NAME_PATTERN,
+} from '@agent/core/knowledge/pr-knowledge-readiness';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -132,6 +135,26 @@ export function runPrePrReadiness(print: Print = () => undefined): void {
   print('[pr:publish] PR readiness gate passed.');
 }
 
+/**
+ * KL-03 diff base for the knowledge readiness check (distinct from `gh pr
+ * create --base`, which stays a bare branch name for gh itself, see
+ * `buildGhArgs`): a bare branch name (no `/`) is mapped to `origin/<base>` so
+ * the diff is always computed against the fetched remote-tracking ref rather
+ * than a possibly-stale local branch of the same name; `--mission-root`-style
+ * ref values are validated against `GIT_REF_NAME_PATTERN` (rejects a leading
+ * `-`) so a crafted `--base` can never be read as a git option downstream.
+ */
+export function resolveKnowledgeDiffBase(base?: string): string {
+  const trimmed = base?.trim();
+  if (!trimmed) return 'origin/main';
+  if (!GIT_REF_NAME_PATTERN.test(trimmed)) {
+    throw new Error(
+      `--base '${trimmed}' is not a valid git ref name (no leading '-', only [A-Za-z0-9._/-]).`
+    );
+  }
+  return trimmed.includes('/') ? trimmed : `origin/${trimmed}`;
+}
+
 /** `code` is a plain string here (not KnowledgeViolationCode) so the CLI-only `missing_body_file` case can share this printer. */
 function logKnowledgeViolation(violation: { code: string; message: string }): void {
   knowledgeLogger.error(
@@ -168,7 +191,7 @@ export function runKnowledgeReadinessGate(options: PublishOptions): void {
     body,
     repoRoot,
     missionRootInput: { explicitRoot: options.missionRoot, cwdRoot: repoRoot },
-    base: options.base,
+    base: resolveKnowledgeDiffBase(options.base),
   });
   if (!result.ok) {
     for (const violation of result.violations) logKnowledgeViolation(violation);
