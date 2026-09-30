@@ -4,7 +4,7 @@ category: Governance
 tags: [llm, policy, adapter, distillation, governance]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-04-30
+last_updated: 2026-09-30
 ---
 
 # Wisdom Policy Adapter Guide
@@ -46,7 +46,7 @@ If `adapter` is omitted, the runtime falls back to `shell-json`.
 ## Operational Notes
 
 - Keep `distill` routed through a high-confidence profile.
-- Mission distills stay in mission-local `evidence/distillation.md`; they are not published to `knowledge/product/evolution/` by default. Curated promotion requires explicit knowledge-domain classification; sensitivity tier is not a domain selector.
+- Mission distills stay in mission-local `evidence/distillation.md`; they are not published to `knowledge/product/evolution/` by default. Curated promotion requires explicit knowledge-domain classification; sensitivity tier is not a domain selector. For repository work, the curated product record is promoted into the PR branch before the PR is opened, so it ships with the code (see [review.md](./phases/review.md#product-lessons-ship-inside-the-code-pr)).
 - Use `stub` only for deterministic offline or test runs.
 - Prefer adapter additions over provider-specific branching in mission scripts.
 - Keep user-facing explanations policy-first: avoid naming a specific CLI unless it matters to the operator.

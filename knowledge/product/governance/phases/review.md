@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Review & Distillation'
 tags: [governance, lifecycle, review]
-last_updated: 2026-09-23
+last_updated: 2026-09-30
 runtime_stages: [verification, delivery, retrospective]
 ---
 
@@ -33,6 +33,18 @@ A steward must explicitly classify the durable knowledge domain before approval:
 Use memory-review, then approve with memory-approve --knowledge-domain product|organization|personal. Mission candidates also require --curation-json with title, summary, content, and evidence_refs selected from the original candidate evidence. This is the steward's explicit extraction step: do not copy distillation.md wholesale. Then run memory-promote after evidence and provenance checks. The archived distillation.md remains immutable mission evidence; the promoted record is the discoverable durable knowledge, linked by source/evidence refs and candidate promoted_ref. A candidate remains visibly queued until curated/classified/approved/promoted or rejected; do not treat mission finish as promotion. Tier answers who may see the knowledge; domain answers whose durable knowledge it is. Never downgrade sensitivity by relabeling. Legacy candidates without a domain remain organization-scoped for compatibility and must be reviewed conservatively. Only curated organization knowledge_hint records update governance HINTS.md.
 
 Example: `pnpm mission memory-approve <ID> --knowledge-domain organization --curation-json '{"title":"...","summary":"...","content":"...","evidence_refs":["active/missions/public/<ID>/evidence/distillation.md"]}' --note "Selected reusable operating lesson"`. When a public mission is archived before promotion, review resolves this stable public-mission evidence reference against its archive location.
+
+### Product lessons ship inside the code PR
+
+For repository work, distillation and product-domain promotion happen **before** the PR, not after it, so the lesson is versioned, reviewed and reverted together with the code it describes:
+
+1. `verify` → `distill` before opening the PR (verify does not require the delivery task).
+2. `memory-approve <candidate_id> --knowledge-domain product --approval-channel pr_review --curation-json '...'` — the PR reviewer, not the implementer, is the steward for this candidate.
+3. `memory-promote <candidate_id> --target-root <feature worktree>` writes the record into the PR branch (the queue stays in the mission's checkout); the record carries `source_branch` / `source_commit`. Commit it with the regenerated knowledge index.
+4. Declare every mission candidate in the PR body's `## Knowledge` section (`promoted` / `rejected` / `routed` / `none`). `pnpm kyberion pr create` refuses the PR while a candidate is unresolved or undeclared, while a promoted record is missing from the diff, or when the diff touches `knowledge/confidential/` or `knowledge/personal/`.
+5. After merge and `git fetch origin main`, `finish` ratifies each `pr_review` candidate by confirming its record exists on `origin/main` (`ratified_at`, `ratified_commit`). A record the PR review dropped is closed with `memory-reject`.
+
+Organization and personal lessons never enter a repository PR; route them with the flow above. Lessons that surface only after merge go in a small follow-up PR.
 
 ## Constraints
 
