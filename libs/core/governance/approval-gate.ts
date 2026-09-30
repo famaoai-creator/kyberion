@@ -297,6 +297,16 @@ export function enforceApprovalGate(
     params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
+  const decisionRightsContext = extractDecisionRightsContext(agentId, callerRole, payload);
+  const decisionRightsMatrix =
+    decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
+      ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
+      : null;
+  const decisionRightsEvaluation = evaluateDecisionRights(
+    decisionRightsMatrix,
+    decisionRightsContext
+  );
+
   const charterOutcome = params.charter
     ? runCharterGate({
         charter: params.charter,
@@ -305,6 +315,7 @@ export function enforceApprovalGate(
         intentId,
         correlationId,
         payload,
+        decisionRightsEscalates: decisionRightsEvaluation?.requiresEscalation === true,
       })
     : ({ kind: 'none' } as const);
   if (charterOutcome.kind === 'stop') {
@@ -317,15 +328,6 @@ export function enforceApprovalGate(
   // legacy policy would have let the action through (the charter only tightens).
   const forceApproval = charterOutcome.kind === 'require_approval';
 
-  const decisionRightsContext = extractDecisionRightsContext(agentId, callerRole, payload);
-  const decisionRightsMatrix =
-    decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
-      ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
-      : null;
-  const decisionRightsEvaluation = evaluateDecisionRights(
-    decisionRightsMatrix,
-    decisionRightsContext
-  );
   if (!forceApproval && decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
     const goldenRulePriority = resolveGoldenRulePriorityOrder(
       resolveVision(decisionRightsContext.tenantSlug ?? null)

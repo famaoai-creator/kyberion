@@ -29,7 +29,7 @@ const deny = vi.mocked(recordCharterDenial);
 const audit = vi.mocked(auditChain.record);
 const notify = vi.mocked(notifyOperator);
 
-const CHARTER = { charter_id: 'chr-acme-1' } as Charter;
+const CHARTER = { charter_id: 'chr-acme-1', envelope: {} } as unknown as Charter;
 const ACTION: CharterAction = {
   actor: agentActor('kyberion://agent/acme/worker', 'user:owner'),
   action_class: 'payment',
@@ -44,8 +44,9 @@ const decision = (over: Partial<CharterDecision>): CharterDecision => ({
   charter_id: 'chr-acme-1',
   ...over,
 });
-const run = () =>
+const run = (decisionRightsEscalates?: boolean) =>
   runCharterGate({
+    decisionRightsEscalates,
     charter: { scope: { kind: 'organization', tenant_slug: 'acme' }, action: ACTION },
     agentId: 'agent-1',
     operationId: 'payment:send',
@@ -124,6 +125,27 @@ describe('runCharterGate', () => {
       })
     );
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('the decision-rights matrix escalates: the charter stands in only when it explicitly supersedes', () => {
+    evaluate.mockReturnValue({ charter: CHARTER, decision: decision({}) });
+    // Default charter: the matrix wins — a human decides, nothing is consumed.
+    const held = run(true);
+    expect(held.kind).toBe('require_approval');
+    expect(held).toMatchObject({ reason: expect.stringContaining('does not supersede') });
+    expect(consume).not.toHaveBeenCalled();
+    // A charter whose accountable human signed off on superseding the matrix.
+    evaluate.mockReturnValue({
+      charter: { ...CHARTER, envelope: { supersedes_decision_rights: true } } as unknown as Charter,
+      decision: decision({}),
+    });
+    expect(run(true).kind).toBe('allow');
+    expect(consume).toHaveBeenCalledTimes(1);
+    // No escalation: the flag is irrelevant.
+    consume.mockClear();
+    evaluate.mockReturnValue({ charter: CHARTER, decision: decision({}) });
+    expect(run(false).kind).toBe('allow');
+    expect(run(undefined).kind).toBe('allow');
   });
 
   it('near the budget edge → allow and notify', () => {

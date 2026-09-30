@@ -63,6 +63,14 @@ export interface CharterEnvelope {
   irreversible: IrreversiblePolicy;
   /** Only consulted when irreversible === 'named_actions_only'. */
   irreversible_named_actions?: string[];
+  /**
+   * The accountable human's explicit, signed choice to let this charter stand
+   * in for a decision-rights-matrix escalation (a decision type the matrix
+   * routes to a human) when the action is inside the envelope. Default false:
+   * the matrix always wins. Needs an owner/officer authority basis, because
+   * the matrix is organizational governance, not a personal preference.
+   */
+  supersedes_decision_rights?: boolean;
 }
 
 export interface CharterAppetite {
@@ -232,6 +240,11 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
       );
     }
   }
+  if (envelope.supersedes_decision_rights === true && !basisCanCarry) {
+    violations.push(
+      'supersedes_decision_rights requires an owner/officer authority basis with evidence_ref; authority cannot be exceeded'
+    );
+  }
   if (envelope.money.per_action > 0 && effectPolicy(envelope, 'payment') === 'forbid') {
     violations.push('money.per_action > 0 requires external_effects.payment to be permitted');
   }
@@ -300,6 +313,9 @@ export function envelopeExceeds(child: CharterEnvelope, parent: CharterEnvelope)
   }
   if (IRREVERSIBLE_RANK[child.irreversible] > IRREVERSIBLE_RANK[parent.irreversible]) {
     out.push('irreversible is more permissive than the parent envelope');
+  }
+  if (child.supersedes_decision_rights === true && parent.supersedes_decision_rights !== true) {
+    out.push('supersedes_decision_rights is not granted by the parent envelope');
   }
   return out;
 }
