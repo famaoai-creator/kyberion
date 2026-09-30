@@ -132,28 +132,34 @@ export type WorktreeFileWriter = (input: {
   executionRole: string;
 }) => void;
 
-function childWriterScript(coreDistDir: string): string {
-  const moduleUrl = (name: string) =>
-    JSON.stringify(pathToFileURL(path.join(coreDistDir, name)).href);
-  return [
-    `const path = await import('node:path');`,
-    `const { withExecutionContext } = await import(${moduleUrl('authority.js')});`,
-    `const secureIo = await import(${moduleUrl('secure-io.js')});`,
-    `const pathResolver = await import(${moduleUrl('path-resolver.js')});`,
-    `let raw = '';`,
-    `for await (const chunk of process.stdin) raw += chunk;`,
-    `const payload = JSON.parse(raw);`,
-    `if (path.resolve(pathResolver.rootDir()) !== path.resolve(payload.root)) {`,
-    `  throw new Error('child Kyberion root ' + pathResolver.rootDir() + ' does not match target ' + payload.root);`,
-    `}`,
-    `const written = withExecutionContext(payload.role, () => payload.files.map((file) => {`,
-    `  const abs = pathResolver.assertSafeRepositoryPath(pathResolver.rootResolve(file.path), { allowMissingLeaf: true });`,
-    `  secureIo.safeMkdir(path.dirname(abs), { recursive: true });`,
-    `  secureIo.safeWriteFile(abs, file.content);`,
-    `  return file.path;`,
-    `}), 'ecosystem_architect');`,
-    `process.stdout.write('\\n' + JSON.stringify({ ok: true, written }) + '\\n');`,
-  ].join('\n');
+/**
+ * Constant child script: module locations and all data arrive over stdin, so
+ * no caller-derived value is ever part of the command line.
+ */
+const CHILD_WRITER_SCRIPT = [
+  `const path = await import('node:path');`,
+  `let raw = '';`,
+  `for await (const chunk of process.stdin) raw += chunk;`,
+  `const payload = JSON.parse(raw);`,
+  `const mod = (name) => import(new URL(name, payload.coreDistUrl).href);`,
+  `const { withExecutionContext } = await mod('authority.js');`,
+  `const secureIo = await mod('secure-io.js');`,
+  `const pathResolver = await mod('path-resolver.js');`,
+  `if (path.resolve(pathResolver.rootDir()) !== path.resolve(payload.root)) {`,
+  `  throw new Error('child Kyberion root ' + pathResolver.rootDir() + ' does not match target ' + payload.root);`,
+  `}`,
+  `const written = withExecutionContext(payload.role, () => payload.files.map((file) => {`,
+  `  const abs = pathResolver.assertSafeRepositoryPath(pathResolver.rootResolve(file.path), { allowMissingLeaf: true });`,
+  `  secureIo.safeMkdir(path.dirname(abs), { recursive: true });`,
+  `  secureIo.safeWriteFile(abs, file.content);`,
+  `  return file.path;`,
+  `}), 'ecosystem_architect');`,
+  `process.stdout.write('\\n' + JSON.stringify({ ok: true, written }) + '\\n');`,
+].join('\n');
+
+/** `file://…/libs/core/dist/` — directory URL (trailing slash) the child resolves modules against. */
+export function coreDistDirUrl(coreDistDir: string): string {
+  return pathToFileURL(path.join(coreDistDir, path.sep)).href;
 }
 
 /**
@@ -181,11 +187,16 @@ export const writePromotedFilesToWorktree: WorktreeFileWriter = ({
   }
   const result = safeExecResult(
     process.execPath,
-    ['--input-type=module', '-e', childWriterScript(coreDistDir)],
+    ['--input-type=module', '-e', CHILD_WRITER_SCRIPT],
     {
       cwd: root,
       env: { KYBERION_ROOT: root },
-      input: JSON.stringify({ root, role: executionRole, files }),
+      input: JSON.stringify({
+        root,
+        role: executionRole,
+        files,
+        coreDistUrl: coreDistDirUrl(coreDistDir),
+      }),
       timeoutMs: 60_000,
     }
   );

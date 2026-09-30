@@ -13,12 +13,11 @@
  * not exist in a CI checkout, so this is a local `pr create` gate only.
  */
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { safeExecResult, safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import type { GitRunner } from './memory-promotion-git.js';
-import { defaultGitRunner } from './memory-promotion-git.js';
+import { coreDistDirUrl, defaultGitRunner } from './memory-promotion-git.js';
 
 export type { GitRunner };
 export { defaultGitRunner };
@@ -58,7 +57,21 @@ const PLACEHOLDER_MISSION_ID_PATTERN = /^(n\/a|tbd|none|-|_+|<.*>)$/i;
 
 /** Strip Markdown/HTML comments (including multi-line ones) before parsing — a comment is never a declaration. */
 function stripHtmlComments(text: string): string {
-  return text.replace(/<!--[\s\S]*?-->/gu, '');
+  let out = '';
+  let cursor = 0;
+  while (cursor < text.length) {
+    const open = text.indexOf('<!--', cursor);
+    if (open === -1) {
+      out += text.slice(cursor);
+      break;
+    }
+    out += text.slice(cursor, open);
+    const close = text.indexOf('-->', open + 4);
+    // An unterminated comment hides everything after it — never a declaration.
+    if (close === -1) break;
+    cursor = close + 3;
+  }
+  return out;
 }
 
 /** Slice a `## Heading` section's body out of a Markdown document (case-insensitive heading match). */
@@ -334,22 +347,19 @@ export function listChangedFiles(input: ListChangedFilesInput): ChangedFile[] {
  * cross-worktree read has to happen inside a process rooted at that worktree
  * rather than by reading its files in-process.
  */
-function childReaderScript(coreDistDir: string): string {
-  const moduleUrl = (name: string) =>
-    JSON.stringify(pathToFileURL(path.join(coreDistDir, name)).href);
-  return [
-    `const path = await import('node:path');`,
-    `const pathResolverMod = await import(${moduleUrl('path-resolver.js')});`,
-    `const queue = await import(${moduleUrl('knowledge/memory-promotion-queue.js')});`,
-    `let raw = '';`,
-    `for await (const chunk of process.stdin) raw += chunk;`,
-    `const payload = JSON.parse(raw);`,
-    `if (path.resolve(pathResolverMod.rootDir()) !== path.resolve(payload.root)) {`,
-    `  throw new Error('child Kyberion root ' + pathResolverMod.rootDir() + ' does not match target ' + payload.root);`,
-    `}`,
-    `process.stdout.write('\\n' + JSON.stringify({ ok: true, candidates: queue.listMemoryPromotionCandidates() }) + '\\n');`,
-  ].join('\n');
-}
+const CHILD_READER_SCRIPT = [
+  `const path = await import('node:path');`,
+  `let raw = '';`,
+  `for await (const chunk of process.stdin) raw += chunk;`,
+  `const payload = JSON.parse(raw);`,
+  `const mod = (name) => import(new URL(name, payload.coreDistUrl).href);`,
+  `const pathResolverMod = await mod('path-resolver.js');`,
+  `const queue = await mod('knowledge/memory-promotion-queue.js');`,
+  `if (path.resolve(pathResolverMod.rootDir()) !== path.resolve(payload.root)) {`,
+  `  throw new Error('child Kyberion root ' + pathResolverMod.rootDir() + ' does not match target ' + payload.root);`,
+  `}`,
+  `process.stdout.write('\\n' + JSON.stringify({ ok: true, candidates: queue.listMemoryPromotionCandidates() }) + '\\n');`,
+].join('\n');
 
 /** Injectable seam: reads a mission root's memory candidates from outside the current process root. */
 export type MissionMemoryCandidateReader = (root: string) => MemoryCandidate[];
@@ -369,11 +379,11 @@ export const readMissionMemoryCandidatesFromRoot: MissionMemoryCandidateReader =
   }
   const result = safeExecResult(
     process.execPath,
-    ['--input-type=module', '-e', childReaderScript(coreDistDir)],
+    ['--input-type=module', '-e', CHILD_READER_SCRIPT],
     {
       cwd: root,
       env: { KYBERION_ROOT: root },
-      input: JSON.stringify({ root }),
+      input: JSON.stringify({ root, coreDistUrl: coreDistDirUrl(coreDistDir) }),
       timeoutMs: 60_000,
     }
   );
