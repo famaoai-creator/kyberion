@@ -1869,4 +1869,32 @@ describe('mission controller router — runtime input boundaries', () => {
     ).rejects.toThrow('enqueue priority must be an integer');
     expect(malformedPriority.enqueueMission).not.toHaveBeenCalled();
   });
+
+  it('KL-04/KL-05: validates --approval-channel and forwards --target-root', async () => {
+    const badChannel = Object.assign(
+      makeContext('memory-approve', ['MEM-1'], ['--approval-channel', 'merge_bot']),
+      { approveMemoryCandidate: vi.fn() }
+    );
+    await expect(missionControllerRouter.runMissionControllerAction(badChannel)).rejects.toThrow(
+      '--approval-channel must be one of: steward, pr_review'
+    );
+    expect(badChannel.approveMemoryCandidate).not.toHaveBeenCalled();
+
+    const prReview = Object.assign(
+      makeContext('memory-approve', ['MEM-1'], ['--approval-channel', 'pr_review']),
+      { approveMemoryCandidate: vi.fn() }
+    );
+    await missionControllerRouter.runMissionControllerAction(prReview);
+    expect(prReview.approveMemoryCandidate.mock.calls[0][7]).toBe('pr_review');
+
+    const promote = makeContext('memory-promote', ['MEM-1'], ['--target-root', '/wt/pr']);
+    await missionControllerRouter.runMissionControllerAction(promote);
+    expect(promote.promoteMemoryCandidate.mock.calls[0][5]).toBe('/wt/pr');
+
+    const pending = makeContext('memory-promote-pending', [], ['--target-root', '/wt/pr']);
+    await missionControllerRouter.runMissionControllerAction(pending);
+    expect(pending.promotePendingMemoryCandidates.mock.calls[0][0]).toMatchObject({
+      targetRoot: '/wt/pr',
+    });
+  });
 });

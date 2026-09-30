@@ -38,6 +38,11 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { transitionStatus } from './mission-status.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+  listMemoryPromotionCandidates,
+} from '../knowledge/memory-promotion-queue.js';
 import { t } from '../t.js';
 import {
   collectMissionEvidence,
@@ -577,6 +582,100 @@ describe('mission lifecycle finish gate', () => {
       satisfied: true,
       evidence_refs: expect.arrayContaining([`${missionPath}/evidence/closeout.md`]),
     });
+  });
+
+  it('KL-04: waits (status unchanged) until a pr_review record is on origin/main, then ratifies without re-queueing', async () => {
+    safeRmSync(promotionQueuePath, { force: true });
+    try {
+      prepareMissionState('completed', undefined, undefined, {
+        requested_result: 'Mission closeout complete.',
+        success_criteria: ['The closeout note is saved'],
+        deliverable_kind: 'markdown',
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+      });
+      seedMissionEvidence('closeout.md', '# Closeout\nMission closeout complete.');
+      safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+      const promotedRef = 'knowledge/product/evolution/wisdom/generated/MEM-KL04-FINISH.md';
+      enqueueMemoryPromotionCandidate({
+        ...createMemoryPromotionCandidate({
+          candidateId: 'MEM-KL04-FINISH',
+          sourceType: 'mission',
+          sourceRef: `mission:${missionId}`,
+          knowledgeDomain: 'product',
+          proposedMemoryKind: 'heuristic',
+          summary: 'Knowledge promoted inside the mission PR is ratified by its merge.',
+          evidenceRefs: [`active/missions/public/${missionId}/evidence/closeout.md`],
+          sensitivityTier: 'public',
+          status: 'promoted',
+        }),
+        approval_channel: 'pr_review',
+        promoted_ref: promotedRef,
+      });
+      const originMain = 'f'.repeat(40);
+      let merged = false;
+      const gitRunner = (gitArgs: string[]) => {
+        if (gitArgs[0] === 'rev-parse' && gitArgs.includes('origin/main^{commit}'))
+          return { status: 0, stdout: `${originMain}\n`, stderr: '' };
+        if (gitArgs[0] === 'cat-file' && gitArgs[2] === `${originMain}:${promotedRef}`)
+          return { status: merged ? 0 : 1, stdout: '', stderr: '' };
+        return { status: 1, stdout: '', stderr: `unexpected git ${gitArgs.join(' ')}` };
+      };
+      const args = {
+        archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+        agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+        getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+        sealMission: async () => undefined,
+        syncProjectLedgerIfLinked: async () => undefined,
+        transitionStatus,
+        gitRunner,
+      };
+      const stateBefore = String(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' })
+      );
+
+      await finishMission(missionId, false, args);
+
+      // Blocked as an expected wait: state untouched (no reset to active),
+      // candidate not ratified, a failing gate record explains why.
+      expect(String(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }))).toBe(
+        stateBefore
+      );
+      const blocked = listMemoryPromotionCandidates().filter(
+        (candidate) => candidate.source_ref === `mission:${missionId}`
+      );
+      expect(blocked).toHaveLength(1);
+      expect(blocked[0].ratified_commit).toBeUndefined();
+      const gateFiles = safeReaddir(`${missionPath}/gates`).filter((name) =>
+        name.startsWith('memory-ratification-')
+      );
+      expect(gateFiles).toHaveLength(1);
+      expect(
+        String(safeReadFile(`${missionPath}/gates/${gateFiles[0]}`, { encoding: 'utf8' }))
+      ).toContain('"verdict": "fail"');
+
+      // After merge + fetch, re-running finish ratifies and completes.
+      merged = true;
+      await finishMission(missionId, false, args);
+
+      const archived = JSON.parse(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+      );
+      expect(archived.status).toBe('archived');
+      const after = listMemoryPromotionCandidates().filter(
+        (candidate) => candidate.source_ref === `mission:${missionId}`
+      );
+      expect(after).toHaveLength(1);
+      expect(after[0]).toMatchObject({
+        candidate_id: 'MEM-KL04-FINISH',
+        ratified_commit: originMain,
+        ratification_target: 'origin/main',
+      });
+      expect(after[0].ratified_at).toBeTruthy();
+    } finally {
+      safeRmSync(promotionQueuePath, { force: true });
+    }
   });
 
   it('finishes a repaired validating mission through the legal distilling transition', async () => {

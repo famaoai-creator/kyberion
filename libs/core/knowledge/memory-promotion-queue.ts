@@ -30,6 +30,13 @@ export type MemoryCandidateKind =
 export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
 export type MemoryKnowledgeDomain = 'product' | 'organization' | 'personal' | 'unclassified';
+/**
+ * KL-04: who ratifies an approved candidate. `steward` (default) ratifies at
+ * approval time; `pr_review` defers ratification to the merge of the PR that
+ * carries the promoted record, confirmed at mission finish against origin/main.
+ */
+export type MemoryApprovalChannel = 'steward' | 'pr_review';
+export const MEMORY_APPROVAL_CHANNELS: readonly MemoryApprovalChannel[] = ['steward', 'pr_review'];
 
 export interface MemoryCandidate {
   candidate_id: string;
@@ -50,6 +57,12 @@ export interface MemoryCandidate {
   occurrences?: number;
   last_seen?: string;
   ratified_at?: string;
+  /** KL-04: origin/main commit that contained the promoted record (pr_review channel). */
+  ratified_commit?: string;
+  /** KL-04: ref the ratification was checked against, e.g. `origin/main`. */
+  ratification_target?: string;
+  /** KL-04: ratification channel chosen at approval; absent means `steward`. */
+  approval_channel?: MemoryApprovalChannel;
   ratification_note?: string;
   /** FD-10 wave 1b: the human member who approved/rejected this candidate. */
   decided_by?: HumanDecidedBy;
@@ -442,7 +455,19 @@ export function updateMemoryPromotionCandidateStatus(input: {
   /** FD-10 wave 1b: the human member who made this approve/reject decision. */
   decidedBy?: HumanDecidedBy;
   curation?: MemoryCandidate['curation'];
+  /** KL-04: ratification channel recorded on approval. */
+  approvalChannel?: MemoryApprovalChannel;
+  /** KL-04: merge ratification observed at mission finish (pr_review channel). */
+  ratification?: { ratifiedAt: string; ratifiedCommit: string; ratificationTarget: string };
 }): MemoryCandidate | null {
+  if (
+    input.approvalChannel !== undefined &&
+    !MEMORY_APPROVAL_CHANNELS.includes(input.approvalChannel)
+  ) {
+    throw new Error(
+      `Unknown approval channel '${String(input.approvalChannel)}'; expected one of: ${MEMORY_APPROVAL_CHANNELS.join(', ')}.`
+    );
+  }
   const requestedScopeKey = input.scope ? resolveScopeKey(input.scope) : undefined;
   const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
   const candidatePaths = input.allMatching
@@ -516,6 +541,14 @@ export function updateMemoryPromotionCandidateStatus(input: {
         ) {
           throw new Error('Product knowledge approval requires a public, unscoped candidate.');
         }
+        if (
+          (input.approvalChannel || current.approval_channel) === 'pr_review' &&
+          requestedDomain !== 'product'
+        ) {
+          throw new Error(
+            'PR-review approval (approval_channel=pr_review) is only available for product knowledge; use the steward channel for organization/personal knowledge.'
+          );
+        }
         const effectiveScope = input.scopeUpdate || current.scope;
         if (
           requestedDomain === 'personal' &&
@@ -526,6 +559,10 @@ export function updateMemoryPromotionCandidateStatus(input: {
           );
         }
       }
+      // A pr_review candidate is ratified by the PR merge, not by approval or
+      // promotion; its ratified_at is only written from input.ratification.
+      const approvalChannel = input.approvalChannel || current.approval_channel;
+      const deferRatification = approvalChannel === 'pr_review';
       const next: MemoryCandidate = {
         ...current,
         status: input.status,
@@ -534,9 +571,16 @@ export function updateMemoryPromotionCandidateStatus(input: {
         ...(input.scopeUpdate
           ? { scope: assertMemoryScope(input.scopeUpdate, input.scopeUpdate.tier) }
           : {}),
-        ...(input.status === 'approved' || input.status === 'promoted'
-          ? { ratified_at: ratifiedAt }
-          : {}),
+        ...(input.approvalChannel ? { approval_channel: input.approvalChannel } : {}),
+        ...(input.ratification
+          ? {
+              ratified_at: input.ratification.ratifiedAt,
+              ratified_commit: input.ratification.ratifiedCommit,
+              ratification_target: input.ratification.ratificationTarget,
+            }
+          : (input.status === 'approved' || input.status === 'promoted') && !deferRatification
+            ? { ratified_at: ratifiedAt }
+            : {}),
         ...(input.ratificationNote ? { ratification_note: input.ratificationNote.trim() } : {}),
         ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
         ...(input.decidedBy ? { decided_by: input.decidedBy } : {}),

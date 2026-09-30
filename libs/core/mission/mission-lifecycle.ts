@@ -26,6 +26,10 @@ import {
   listMemoryPromotionCandidates,
   queueMissionMemoryPromotionCandidate,
 } from '../knowledge/memory-promotion-queue.js';
+import {
+  ratifyPrReviewedMemoryCandidates,
+  type GitRunner,
+} from '../knowledge/memory-promotion-git.js';
 import { summarizeReviewGateVerdicts } from './mission-review-gates.js';
 import {
   assertSafeRepositoryPath,
@@ -534,6 +538,62 @@ export async function verifyMission(
   logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
 }
 
+/**
+ * KL-04: ratify this mission's promoted pr_review memory candidates against
+ * origin/main. Returns false (finish must stop) when a record is not on
+ * origin/main yet. Never changes mission status.
+ */
+function blockFinishOnUnratifiedMemory(
+  missionId: string,
+  missionDir: string,
+  gitRunner?: GitRunner
+): boolean {
+  let ratification: ReturnType<typeof ratifyPrReviewedMemoryCandidates>;
+  try {
+    ratification = ratifyPrReviewedMemoryCandidates({ missionId, gitRunner });
+  } catch (err: unknown) {
+    logger.warn(
+      `⚠️ [MEMORY_RATIFICATION] check skipped for ${missionId} — ${err instanceof Error ? err.message : String(err)} | next: inspect the memory promotion queue (mission_controller memory-queue)`
+    );
+    return true;
+  }
+  const evidenceDir = path.join(missionDir, 'gates');
+  if (ratification.missing.length > 0) {
+    const missing = ratification.missing
+      .map(
+        (item) => `${item.candidate_id} (${item.promoted_ref || 'no promoted_ref'}: ${item.reason})`
+      )
+      .join('; ');
+    const reason = `${ratification.missing.length} pr_review knowledge record(s) not found on ${ratification.target}: ${missing}`;
+    writeMissionGateRecord({
+      missionId,
+      gateId: 'memory-ratification',
+      evidenceDir,
+      payload: { verdict: 'fail', checked_at: nowIso(), reason },
+    });
+    logger.error(
+      `❌ [MEMORY_RATIFICATION] Mission ${missionId} finish waiting — ${reason} | next: merge the PR carrying the record, run \`git fetch origin main\`, then re-run finish; if the PR dropped a record, run \`mission_controller memory-reject <CANDIDATE_ID>\` | evidence: ${ratification.target}${ratification.target_commit ? `@${ratification.target_commit.slice(0, 12)}` : ' (ref missing locally)'}`
+    );
+    return false;
+  }
+  if (ratification.ratified.length > 0) {
+    writeMissionGateRecord({
+      missionId,
+      gateId: 'memory-ratification',
+      evidenceDir,
+      payload: {
+        verdict: 'pass',
+        checked_at: nowIso(),
+        reason: `ratified ${ratification.ratified.map((c) => c.candidate_id).join(', ')} at ${ratification.target}@${ratification.target_commit}`,
+      },
+    });
+    logger.info(
+      `🧠 [MEMORY_RATIFICATION] ratified ${ratification.ratified.length} pr_review candidate(s) at ${ratification.target}@${String(ratification.target_commit).slice(0, 12)}.`
+    );
+  }
+  return true;
+}
+
 export async function finishMission(
   id: string,
   seal: boolean,
@@ -544,6 +604,8 @@ export async function finishMission(
     sealMission: (missionId: string) => Promise<string | undefined>;
     syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
     transitionStatus: (current: string, next: string) => any;
+    /** KL-04 test seam: git runner for the pr_review ratification check. */
+    gitRunner?: GitRunner;
   }
 ): Promise<void> {
   if (!id) {
@@ -596,6 +658,11 @@ export async function finishMission(
     logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
     return;
   }
+  // KL-04: pr_review knowledge is ratified by its PR reaching origin/main.
+  // Checked first, before any gate mutates state: a missing record is an
+  // expected wait (PR not merged / not fetched yet), not a quality failure,
+  // so the mission status is left as-is and `finish` can simply be re-run.
+  if (!blockFinishOnUnratifiedMemory(upperId, missionDir, args.gitRunner)) return;
   const missionHead = args.getGitHash(missionDir);
   if (preState.git?.latest_commit !== missionHead) {
     const headSubject = safeExec('git', ['log', '-1', '--pretty=%s'], { cwd: missionDir }).trim();
