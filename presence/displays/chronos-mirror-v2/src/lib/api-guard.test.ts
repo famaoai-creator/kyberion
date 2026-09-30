@@ -167,6 +167,27 @@ describe('api guard', () => {
       expect(await res?.json()).toEqual({ error: 'Cross-origin request blocked.' });
     });
 
+    it('does not apply the CSRF check to the pre-existing kyberion_token cookie', async () => {
+      // plugin-views-e2e (and other scripted clients) replay the legacy token
+      // cookie on POSTs without an Origin header; that path must keep working.
+      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', 'legacy-token');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        method: 'POST',
+        cookie: 'legacy-token',
+        headers: { cookie: 'kyberion_token=legacy-token', host: 'chronos.example' },
+      });
+      expect(requireChronosAccess(req, 'readonly')).toBeNull();
+      // ...even when an (unused) session cookie is also present.
+      const both = makeReq({
+        method: 'POST',
+        cookie: 'legacy-token',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      expect(requireChronosAccess(both, 'readonly')).toBeNull();
+    });
+
     it('allows a same-origin cookie POST and never checks header-authenticated requests', async () => {
       vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', session);
       const { requireChronosAccess } = await import('./api-guard.js');
