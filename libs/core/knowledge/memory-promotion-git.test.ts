@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import * as pathResolver from './path-resolver.js';
+import * as pathResolver from '../path-resolver.js';
 import {
   safeExecResult,
   safeExistsSync,
@@ -9,20 +9,20 @@ import {
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from './secure-io.js';
+} from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   loadMemoryPromotionCandidate,
   updateMemoryPromotionCandidateStatus,
   type MemoryCandidate,
-} from './knowledge/memory-promotion-queue.js';
+} from './memory-promotion-queue.js';
 import {
   ratifyPrReviewedMemoryCandidates,
   readGitProvenance,
   resolvePromotionTargetRoot,
   writePromotedFilesToWorktree,
-} from './knowledge/memory-promotion-git.js';
+} from './memory-promotion-git.js';
 
 let base: string;
 let repo: string;
