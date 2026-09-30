@@ -6,6 +6,7 @@ vi.mock('../decision-rights.js', () => ({
   resolveDecisionRightsMatrix: vi.fn(() => null),
   evaluateDecisionRights: vi.fn(() => null),
 }));
+import { evaluateDecisionRights } from '../decision-rights.js';
 vi.mock('./approval-store.js', async (importOriginal) => ({
   isApprovalRequestExpired: (await importOriginal<typeof import('./approval-store.js')>())
     .isApprovalRequestExpired,
@@ -58,6 +59,17 @@ describe('enforceApprovalGate × accountability charter', () => {
     void _omit;
     expect(enforceApprovalGate(legacy).allowed).toBe(true);
     expect(charterGate).not.toHaveBeenCalled();
+  });
+
+  it('tells the charter branch whether the decision-rights matrix escalates this decision', () => {
+    charterGate.mockReturnValue({ kind: 'none' });
+    policy.mockReturnValue({ requiresApproval: false, missingRequirements: [] });
+    vi.mocked(evaluateDecisionRights).mockReturnValueOnce({ requiresEscalation: true } as never);
+    enforceApprovalGate({ ...params, payload: { decision_type: 'operational_spend', amount: 1 } });
+    expect(charterGate.mock.calls[0][0]).toMatchObject({ decisionRightsEscalates: true });
+    vi.mocked(evaluateDecisionRights).mockReturnValueOnce(null);
+    enforceApprovalGate({ ...params, correlationId: 'corr-2' });
+    expect(charterGate.mock.calls[1][0]).toMatchObject({ decisionRightsEscalates: false });
   });
 
   it('inside the charter: allowed without any approval request', () => {

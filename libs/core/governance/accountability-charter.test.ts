@@ -125,6 +125,27 @@ describe('validateCharter — authority cannot be exceeded', () => {
     expect(v.some((m) => m.includes('publish_public is more permissive'))).toBe(true);
     expect(validateCharter(child, ctx).some((m) => m.includes('requires the parent'))).toBe(true);
   });
+  it('supersedes_decision_rights needs an owner/officer basis with evidence, and cannot be widened by delegation', () => {
+    const c = charter();
+    c.envelope.supersedes_decision_rights = true;
+    expect(validateCharter(c, ctx)).toEqual([]);
+    c.accountable.authority_basis = { kind: 'self' };
+    // (payment is also permitted here, so both violations are reported)
+    expect(validateCharter(c, ctx).some((m) => m.includes('supersedes_decision_rights'))).toBe(
+      true
+    );
+    const parent = charter().envelope; // does not supersede
+    const child = charter();
+    child.accountable.authority_basis = { kind: 'delegated', evidence_ref: 'parent-chr' };
+    child.envelope.supersedes_decision_rights = true;
+    expect(
+      envelopeExceeds(child.envelope, parent).some((m) => m.includes('supersedes_decision_rights'))
+    ).toBe(true);
+    expect(
+      envelopeExceeds({ ...child.envelope, supersedes_decision_rights: false }, parent)
+    ).toEqual([]);
+  });
+
   it('envelopeExceeds is empty for an identical envelope', () => {
     expect(envelopeExceeds(charter().envelope, charter().envelope)).toEqual([]);
   });
