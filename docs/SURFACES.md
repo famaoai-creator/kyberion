@@ -2,6 +2,21 @@
 
 Kyberion の操作系サーフェスの役割マップ。**各サーフェスは1つの役割**を持ち、画面ヘッダに役割バッジを表示する(定義の正: [`knowledge/product/governance/surface-roles.json`](../knowledge/product/governance/surface-roles.json))。
 
+## まずどれを使う?
+
+| やりたいこと                                     | 入口                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| 何を判断すればよいか知りたい・承認したい         | **concierge**(秘書室)/ `pnpm kyberion approvals`                        |
+| 話して・書いて頼みたい、進み具合を見たい         | **presence-studio**(相棒)/ `pnpm kyberion ask "<依頼>"`                 |
+| システムの状態を見て介入したい・成果物をレビュー | **chronos-mirror-v2**(管制塔。Dialogue Room で目標カードを一緒に固める) |
+| 何が起きたかを証跡で確認したい                   | **operator-surface**(監査モニタ、読み取り専用)                          |
+| Kyberion が手元で何をしているか見たい            | **computer-surface**(ミラー)                                            |
+| シェルから状態と次の一手を知りたい               | `pnpm kyberion`(統合ホーム)/ `pnpm tui`(常駐 HUD)                       |
+| 手元の図・メモ・ファイルを取り込みたい           | `pnpm pads`([ローカル pad](#ローカル-pad127001-限定取り込み専用))       |
+| Slack / Telegram / Discord / iMessage で頼みたい | [会話チャネル](#会話チャネルui以外)                                     |
+
+迷ったら `pnpm kyberion setup report --persona first-time-user` が、今の準備状況に合わせて最初の入口を案内する。
+
 ## 5つのUIサーフェス
 
 スクリーンショット付きの一覧は [README の Surfaces](../README.md#surfaces--one-role-per-screen)(画像: `docs/assets/surfaces/`)。
@@ -57,7 +72,6 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | Voice(voice-hub / presence-studio)    | ハンズフリー会話・口述。相棒 `/work`・`/ask` と秘書室の会話ドックに口パクするアバター(`ui:talking-avatar`)。ブラウザ再生(`/api/voice/synthesize`)は音量で、ホスト再生は `speech_state` で口を動かす                                                                                                          | 一括レビューには不向き                                                                                                                                                                                                                        |
 | **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居                                                                                                                                             | 迷ったらまずこれ                                                                                                                                                                                                                              |
 | **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作、パネル 9「連携」で mission→task→agent→child agent の連携ツリーと待ち関係(承認待ち/子の完了待ち/クレーム待ち/ブロック)を表示([README](../presence/displays/terminal-hud/README.md))                                    | 常駐監視向け                                                                                                                                                                                                                                  |
-| `pnpm kyberion`                       | スクリプト向けCLI                                                                                                                                                                                                                                                                                            | 統合ホームではない                                                                                                                                                                                                                            |
 | MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign)。**discover** (`capability.*` / `skill.*` / knowledge) · **act** (allowlist pipeline / `service.*` / bounded `actuator.invoke`) · **govern** (mission / approval / audit)。モデル: [mcp-facade-model](../knowledge/product/architecture/mcp-facade-model.md) | `pnpm mcp:server`                                                                                                                                                                                                                             |
 
 ## 会議・議事録
