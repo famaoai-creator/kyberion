@@ -106,7 +106,7 @@ export interface MissionControllerRoutingContext {
   getOptionValue: typeof getOptionValue;
   parseCsvOption: typeof parseCsvOption;
   validateMissionStartCreateInput: (
-    actionName: 'create' | 'start',
+    actionName: 'create' | 'start' | 'kickoff',
     missionId?: string,
     argv?: string[]
   ) => {
@@ -492,6 +492,7 @@ export function assertMissionIdArgument(
   const missionCommands = new Set([
     'create',
     'start',
+    'kickoff',
     'status',
     'pause',
     'cancel',
@@ -508,6 +509,7 @@ export function assertMissionIdArgument(
   const requiredMissionIdCommands = new Set([
     'create',
     'start',
+    'kickoff',
     'status',
     'pause',
     'cancel',
@@ -529,7 +531,10 @@ export function assertMissionIdArgument(
     'handoff',
   ]);
   if (command && requiredMissionIdCommands.has(command) && !missionId) {
-    throw new Error(`${command} requires a mission ID: ${command} <MISSION_ID>`);
+    throw new Error(
+      `${command} requires a mission ID: ${command} <MISSION_ID>. ` +
+        `Convention: <PREFIX>-<TOPIC>-<YYYYMMDD> (e.g. MSN-LOG-OPT-20260930).`
+    );
   }
   if (
     command &&
@@ -538,7 +543,8 @@ export function assertMissionIdArgument(
     !/^[A-Za-z0-9][A-Za-z0-9._-]+$/u.test(missionId)
   ) {
     throw new Error(
-      `Invalid mission ID '${missionId}'. Use an ID containing only letters, numbers, '.', '_' or '-'.`
+      `Invalid mission ID '${missionId}'. Use an ID containing only letters, numbers, '.', '_' or '-'. ` +
+        `Convention: <PREFIX>-<TOPIC>-<YYYYMMDD> (e.g. MSN-LOG-OPT-20260930).`
     );
   }
 }
@@ -683,7 +689,7 @@ export async function runMissionControllerAction(
   assertMissionIdArgument(action, arg1);
 
   // FD-10 wave 1b: resolved once for the whole action dispatch and only
-  // consumed by the human decision verbs below (start/pause/cancel/
+  // consumed by the human decision verbs below (start/kickoff/pause/cancel/
   // memory-approve/memory-reject) — every other command ignores it.
   const decidedBy = resolveDecidedByFromArgv(context.argv);
 
@@ -749,8 +755,16 @@ export async function runMissionControllerAction(
       }
       break;
     }
+    // 'kickoff' deliberately shares the start path: startMission already
+    // creates the mission when no state exists, so the verb is a one-step
+    // create+start alias that keeps --goal/--success-condition semantics.
+    case 'kickoff':
     case 'start': {
-      let input = context.validateMissionStartCreateInput('start', arg1, context.argv);
+      let input = context.validateMissionStartCreateInput(
+        action as 'start' | 'kickoff',
+        arg1,
+        context.argv
+      );
       const intentTrack = await applyIntentTrackGate(context, input, arg1);
       input = intentTrack.input;
       const visionRefSummary = buildVisionRefRoutingSummary(
@@ -765,7 +779,7 @@ export async function runMissionControllerAction(
         context.print?.(
           JSON.stringify(
             {
-              action: 'start',
+              action,
               mission_id: arg1,
               input,
               routingDecision,
@@ -800,7 +814,7 @@ export async function runMissionControllerAction(
         auditChain.record({
           agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'mission_controller',
           action: 'mission.routing_decision_recorded',
-          operation: `start:${arg1}`,
+          operation: `${action}:${arg1}`,
           result: 'completed',
           metadata: {
             mission_id: arg1?.toUpperCase(),
