@@ -1,6 +1,6 @@
-import { createRequire } from 'node:module';
+import { createFontkitRequire } from './fontkit-require.js';
 
-const require = createRequire(import.meta.url);
-const fontkit = require('fontkit');
+// Same dual-path resolve as primitives.ts (source/@agent/core dist + bundled CLI).
+const fontkit = createFontkitRequire()('fontkit');
 
 export default fontkit;

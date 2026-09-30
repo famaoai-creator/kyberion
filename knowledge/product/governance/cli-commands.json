@@ -1534,6 +1534,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.browser.inspect",
+      "module": "scripts/inspect_browser_page.ts",
+      "command": "browser inspect",
+      "noun": "browser",
+      "verb": "inspect",
+      "audience": "operator"
+    },
+    {
       "id": "script.browser.profiles",
       "module": "scripts/browser_profiles_cli.ts",
       "args": ["profiles"],

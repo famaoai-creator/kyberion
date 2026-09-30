@@ -250,13 +250,15 @@ const INPUT_CONTRACTS: ContractCatalog = {
       },
     },
     content: {
-      summary: 'Assert that content is visible at a selector.',
-      examples: [{ selector: '#status', content_excerpt: 'Ready' }],
+      summary:
+        'Capture page HTML or element text. Omit selector for full-page content; include it to read one element.',
+      examples: [{ export_as: 'page_html' }, { selector: 'main', export_as: 'main_text' }],
       schema: {
         type: 'object',
-        required: ['selector', 'content_excerpt'],
         properties: {
           selector: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+          // Recorded on the action trail for Playwright export hints; not required input.
           content_excerpt: { type: 'string', minLength: 1 },
         },
         additionalProperties: true,
