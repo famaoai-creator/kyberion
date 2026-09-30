@@ -54,6 +54,7 @@ status: implemented
 - 複数テナント共用の Entra `/common`
 - `scripts/personal-pads` などの loopback 限定サーバー(既存のローカルトークンのまま)
 
-## 判断が要る運用事項
+## 運用上の判断(解決済み)
 
-- `knowledge/product/governance/egress-policy.json` の許可ドメインに IdP のホスト(Google: `accounts.google.com` `oauth2.googleapis.com` `www.googleapis.com` / Microsoft: `login.microsoftonline.com`)を追加するかどうか。全 tenant のガバナンス設定を広げるため、この計画では変更していない。`mode: warn` の間は警告のみ、`enforce` にすると追加するまでログインできない。
+- **egress policy**: Google(`accounts.google.com` `oauth2.googleapis.com` `www.googleapis.com`)と Microsoft(`login.microsoftonline.com`)のホストを `manual_allowed_domains` に追加した。別の IdP を使う場合は同じ一覧に追加する。
+- **ローカル利用**: Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できない(従来どおり)。トークン入力の入口は設けず、**IdP でのサインインをローカルでも使える**ようにした(`localhost` 系の origin に限り、Host から戻り先を決める)。5 面すべてを、モック IdP で実機検証済み。

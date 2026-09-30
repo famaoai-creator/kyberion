@@ -173,17 +173,35 @@ export function resolveOidcLoginConfig(deps: OidcLoginDeps = {}): OidcLoginConfi
 }
 
 /**
- * The origin the IdP redirects back to. A non-loopback surface must declare
- * its public origin: the Host header is caller-controlled and would otherwise
- * pick the redirect URI. Loopback falls back to the request origin so local
- * development needs no extra variable.
+ * True when the request origin's HOST is itself a loopback name
+ * (`localhost` / `127.0.0.1` / `[::1]`). Next.js 15+ cannot prove a
+ * same-machine peer, so `loopback` alone misses a local browser; a
+ * loopback-named origin is safe to reuse as the redirect target because the
+ * IdP sends the browser back to the user's OWN machine — an attacker cannot
+ * turn it into a redirect to a foreign host.
+ */
+function isLoopbackNamedOrigin(origin: string): boolean {
+  try {
+    return isLoopbackHost(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The origin the IdP redirects back to. A remote surface must declare its
+ * public origin: the Host header is caller-controlled and would otherwise
+ * pick the redirect URI. Local use (a proven loopback peer, or a
+ * loopback-named origin) falls back to the request origin so signing in from
+ * the same machine needs no extra variable.
  */
 export function resolveOidcRedirectOrigin(
   config: OidcLoginConfig,
   input: { surfaceId: string; requestOrigin: string; loopback: boolean }
 ): string | null {
   const declared = config.publicBaseUrlBySurface[input.surfaceId] ?? config.publicBaseUrl;
-  const raw = declared ?? (input.loopback ? input.requestOrigin : undefined);
+  const local = input.loopback || isLoopbackNamedOrigin(input.requestOrigin);
+  const raw = declared ?? (local ? input.requestOrigin : undefined);
   if (!raw) return null;
   try {
     const url = new URL(raw);
