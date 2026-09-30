@@ -285,6 +285,126 @@ describe('promoted-memory', () => {
     expect(() => savePromotedMemoryRecord(candidate)).toThrow(/explicit owner_nhi/);
   });
 
+  describe('KL-05 provenance and target root', () => {
+    const productCandidate = (overrides: Record<string, unknown> = {}) =>
+      createDistillCandidateRecord({
+        source_type: 'mission',
+        tier: 'public',
+        title: 'Knowledge-in-PR promotion pattern',
+        summary: 'Promote curated product knowledge inside the PR that carries the change.',
+        status: 'promoted',
+        target_kind: 'knowledge_hint',
+        evidence_refs: ['active/missions/public/MSN-KL-05/evidence/notes.md'],
+        metadata: {
+          knowledge_domain: 'product',
+          hint_scope: 'knowledge promotion',
+          hint_triggers: ['promote into a PR'],
+          ...overrides,
+        },
+      });
+    // Fake git: every checkout is a worktree of the same repository; the
+    // target lives on a PR branch.
+    const fakeGit = (args: string[], cwd: string) => {
+      const key = args.join(' ');
+      if (key === 'rev-parse --show-toplevel') return { status: 0, stdout: `${cwd}\n`, stderr: '' };
+      if (key === 'rev-parse --show-prefix') return { status: 0, stdout: '\n', stderr: '' };
+      if (key.endsWith('--git-common-dir'))
+        return { status: 0, stdout: '/repos/kyberion/.git\n', stderr: '' };
+      if (key === 'rev-parse --abbrev-ref HEAD')
+        return { status: 0, stdout: 'agent/kl-pr\n', stderr: '' };
+      if (key === 'rev-parse HEAD') return { status: 0, stdout: 'abc123def456\n', stderr: '' };
+      return { status: 1, stdout: '', stderr: `unexpected git ${key}` };
+    };
+
+    it('stamps source_branch/source_commit into the JSON and markdown frontmatter', () => {
+      const saved = savePromotedMemoryRecord(productCandidate(), { gitRunner: fakeGit });
+      const mdPath = pathResolver.resolve(saved.logicalPath);
+      rememberWrite(mdPath);
+      expect(saved.logicalPath).toMatch(/^knowledge\/product\/evolution\/wisdom\/generated\//);
+      expect(saved.record).toMatchObject({
+        source_branch: 'agent/kl-pr',
+        source_commit: 'abc123def456',
+      });
+      const json = JSON.parse(
+        safeReadFile(mdPath.replace(/\.md$/, '.json'), { encoding: 'utf8' }) as string
+      );
+      expect(json).toMatchObject({ source_branch: 'agent/kl-pr', source_commit: 'abc123def456' });
+      const markdown = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
+      expect(markdown).toContain('source_branch: agent/kl-pr\n');
+      expect(markdown).toContain('source_commit: abc123def456\n');
+    });
+
+    it('omits provenance when git is unavailable', () => {
+      const saved = savePromotedMemoryRecord(productCandidate(), {
+        gitRunner: () => ({ status: 128, stdout: '', stderr: 'fatal' }),
+      });
+      const mdPath = pathResolver.resolve(saved.logicalPath);
+      rememberWrite(mdPath);
+      expect(saved.record.source_branch).toBeUndefined();
+      expect(saved.record.source_commit).toBeUndefined();
+      expect(safeReadFile(mdPath, { encoding: 'utf8' }) as string).not.toContain('source_');
+    });
+
+    it('hands the record files to the worktree writer with a repo-relative promoted_ref', () => {
+      const targetRoot = '/repos/kyberion-pr';
+      const writes: Array<{ root: string; files: Array<{ path: string; content: string }> }> = [];
+      const saved = savePromotedMemoryRecord(productCandidate(), {
+        targetRoot,
+        gitRunner: fakeGit,
+        worktreeWriter: (input) => {
+          writes.push(input);
+        },
+      });
+      expect(saved.targetRoot).toBe(targetRoot);
+      expect(saved.logicalPath).toMatch(
+        /^knowledge\/product\/evolution\/wisdom\/generated\/.+\.md$/
+      );
+      expect(writes).toHaveLength(1);
+      expect(writes[0].root).toBe(targetRoot);
+      expect(writes[0].files.map((file) => file.path)).toEqual([
+        saved.logicalPath.replace(/\.md$/, '.json'),
+        saved.logicalPath,
+      ]);
+      expect(JSON.parse(writes[0].files[0].content)).toMatchObject({
+        source_branch: 'agent/kl-pr',
+      });
+      expect(writes[0].files[1].content).toContain('source_commit: abc123def456');
+      // Nothing is written into the current checkout.
+      expect(fs.existsSync(pathResolver.resolve(saved.logicalPath))).toBe(false);
+    });
+
+    it('rejects a target root from another repository and non-product knowledge', () => {
+      const foreignGit = (args: string[], cwd: string) =>
+        args.join(' ').endsWith('--git-common-dir') && cwd === '/repos/other'
+          ? { status: 0, stdout: '/repos/other/.git\n', stderr: '' }
+          : fakeGit(args, cwd);
+      expect(() =>
+        savePromotedMemoryRecord(productCandidate(), {
+          targetRoot: '/repos/other',
+          gitRunner: foreignGit,
+          worktreeWriter: () => undefined,
+        })
+      ).toThrow(/different repository/);
+      const organization = createDistillCandidateRecord({
+        source_type: 'task_session',
+        tier: 'public',
+        title: 'Organization delivery pattern',
+        summary: 'Organization-owned knowledge never travels through a product PR.',
+        status: 'promoted',
+        target_kind: 'knowledge_hint',
+        evidence_refs: ['artifact:ART-KL-ORG'],
+        metadata: { hint_scope: 'delivery', hint_triggers: ['org'] },
+      });
+      expect(() =>
+        savePromotedMemoryRecord(organization, {
+          targetRoot: '/repos/kyberion-pr',
+          gitRunner: fakeGit,
+          worktreeWriter: () => undefined,
+        })
+      ).toThrow(/only supports product-domain knowledge/);
+    });
+  });
+
   it('appends promoted knowledge hints into governance HINTS.md', () => {
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',

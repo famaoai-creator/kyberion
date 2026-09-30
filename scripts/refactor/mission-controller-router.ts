@@ -18,6 +18,7 @@ import type { MissionRelationships } from './mission-types.js';
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
 const MEMORY_QUEUE_STATUSES = ['queued', 'approved', 'rejected', 'promoted'] as const;
 const MEMORY_EXECUTION_ROLES = ['mission_controller', 'chronos_gateway'] as const;
+const MEMORY_APPROVAL_CHANNELS = ['steward', 'pr_review'] as const;
 const ACTOR_TYPES = ['agent', 'human', 'service'] as const;
 const REVIEWER_TEAM_ROLES = ['reviewer', 'qa'] as const;
 
@@ -251,6 +252,7 @@ export interface MissionControllerRoutingContext {
     ownerNhi?: string,
     curationJson?: string,
     decidedBy?: HumanDecidedBy,
+    approvalChannel?: string,
     print?: Print
   ) => Awaitable<void>;
   rejectMemoryCandidate: (
@@ -267,6 +269,7 @@ export interface MissionControllerRoutingContext {
     note?: string,
     supersedes?: string,
     tenantSlug?: string,
+    targetRoot?: string,
     print?: Print
   ) => Awaitable<void>;
   promotePendingMemoryCandidates: (
@@ -275,6 +278,7 @@ export interface MissionControllerRoutingContext {
       dryRun?: boolean;
       note?: string;
       supersedes?: string;
+      targetRoot?: string;
     },
     print?: Print
   ) => Awaitable<void>;
@@ -1018,6 +1022,11 @@ export async function runMissionControllerAction(
         getValue('--owner-nhi', context.argv),
         getValue('--curation-json', context.argv),
         decidedBy,
+        parseAllowedValue(
+          getValue('--approval-channel', context.argv),
+          '--approval-channel',
+          MEMORY_APPROVAL_CHANNELS
+        ),
         context.print
       );
       break;
@@ -1042,6 +1051,7 @@ export async function runMissionControllerAction(
         getValue('--note', context.argv),
         getValue('--supersedes', context.argv),
         getValue('--tenant-slug', context.argv),
+        getValue('--target-root', context.argv),
         context.print
       );
       break;
@@ -1056,6 +1066,7 @@ export async function runMissionControllerAction(
             ) || 'mission_controller',
           note: getValue('--note', context.argv),
           supersedes: getValue('--supersedes', context.argv),
+          targetRoot: getValue('--target-root', context.argv),
           dryRun: context.argv.includes('--dry-run'),
         },
         context.print

@@ -64,13 +64,15 @@ Queue Commands:
                                  Show readiness, blockers, and physical duplicate count
   memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
                                  Show summary, target, evidence, scope, audit, and next action
-  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
+  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>] [--approval-channel steward|pr_review]
                                  Curate mission knowledge and approve only when review preflight is clear
+                                 (pr_review: product knowledge ratified by PR merge, checked at finish against origin/main)
   memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Mark a memory candidate as rejected
-  memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
+  memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--target-root <WORKTREE>]
                                  Promote an approved candidate to governed knowledge
-  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--dry-run]
+                                 (--target-root: write the record into a worktree of this repository, e.g. the PR branch)
+  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--target-root <WORKTREE>] [--dry-run]
                                  Bulk promote approved memory candidates in queue order
 
 Visibility Commands:
