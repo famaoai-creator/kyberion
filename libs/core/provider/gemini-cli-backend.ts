@@ -458,7 +458,7 @@ export function buildGeminiCliBackendFromEnv(
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
   });
-  logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model})`);
+  logger.debug(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model})`);
   return backend;
 }
 

@@ -1146,7 +1146,7 @@ export function buildShellClaudeCliBackendFromEnv(
     ...(extraArgs ? { extraArgs } : {}),
     ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   });
-  logger.info(
+  logger.debug(
     `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`
   );
   return backend;
