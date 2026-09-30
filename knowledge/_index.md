@@ -367,6 +367,7 @@
 - [Counterfactual Simulation Protocol](./product/orchestration/counterfactual-simulation-protocol.md) (public | Ecosystem Architect)
 - [Cross-Role Directive Protocol (CRDP)](./product/orchestration/directives-protocol.md) (public | Ecosystem Architect)
 - [Cross-Tenant Brokering Protocol](./product/orchestration/cross-tenant-brokering-protocol.md) (public | Unknown)
+- [Cross-worktree governance and path-policy lessons](./product/orchestration/cross-worktree-governance-lessons.md) (public | Unknown)
 - [Data Harvesting Best Practices: URL Resolution & Secure Download](./product/orchestration/data-harvesting-best-practices.md) (public | Ecosystem Architect)
 - [Delegated Task Observability](./product/orchestration/delegated-task-observability.md) (public | Ecosystem Architect)
 - [Design Clone Delivery Flow](./product/orchestration/design-clone-delivery-flow.md) (public | Unknown)
