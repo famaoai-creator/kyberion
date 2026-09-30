@@ -197,9 +197,9 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
 }
 
 export function extractCanonicalFirstWinCommands(source: string): string[] | null {
-  const markerIndex = source.indexOf('# kyberion-first-win');
-  if (markerIndex < 0) return null;
-  const afterMarker = source.slice(markerIndex + '# kyberion-first-win'.length);
+  const marker = /# kyberion-first-win|<!-- kyberion-first-win -->/u.exec(source);
+  if (!marker) return null;
+  const afterMarker = source.slice(marker.index + marker[0].length);
   const block = afterMarker.match(/```bash\r?\n([\s\S]*?)\r?\n```/u)?.[1];
   if (!block) return null;
   return block

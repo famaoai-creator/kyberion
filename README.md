@@ -23,22 +23,28 @@
 
 <p align="center">Intent → Plan → Result</p>
 
-Every request has a visible plan, result, and next action.
+Kyberion turns a request into a visible plan and a verified result. You say `今週の進捗レポートを作って` or `この PDF をパワポにして`; it picks the tools, asks only when something is genuinely ambiguous, and hands back the result, the artifact, the evidence that future work builds on, and the next action.
 
-Kyberion turns a request into a clear plan and a verified result. You ask `今週の進捗レポートを作って` or `この PDF をパワポにして`, and it selects the right tools, asks only when something is genuinely ambiguous, and returns the result plus an artifact plus evidence that future work can build on.
+It is OSS and self-hosted: your data stays on your machine, every side effect is governed, and every run leaves an audit trail.
 
-**For people new to the repo**
+## Start here
 
-- If you want to try it quickly, start with [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
-- If you want to understand what it does, read [`docs/WHY.md`](./docs/WHY.md) and [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md).
-- If you want to extend it, jump to [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) and [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md).
-- If a term is unfamiliar, check the [`Glossary`](./docs/GLOSSARY.md) — it has three tiers: first-win, contributor, and FDE.
-
-**Why this matters**: knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model, but the engine that captures intent reliably, keeps evidence, and accumulates organizational memory. See [`docs/WHY.md`](./docs/WHY.md) for the full thesis ([日本語版](./docs/WHY.ja.md)).
+| I want to…                       | Go to                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Try it** (5 minutes)           | [Quick Start](#quick-start) → [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)                                                                        |
+| **Understand what it is**        | [What is Kyberion?](#what-is-kyberion) → [`docs/WHY.md`](./docs/WHY.md) ([日本語](./docs/WHY.ja.md))                                              |
+| **See what it can do**           | [What it can do](#what-it-can-do) → [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md) · [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md) |
+| **Use it day to day**            | [How you work with it](#how-you-work-with-it) → [`docs/SURFACES.md`](./docs/SURFACES.md) · [`docs/user/`](./docs/user/)                           |
+| **Deploy / operate it**          | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md) · [`docs/operator/`](./docs/operator/)                                             |
+| **Extend it or contribute**      | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) · [`CONTRIBUTING.md`](./CONTRIBUTING.md)                             |
+| **Look up a term**               | [`docs/GLOSSARY.md`](./docs/GLOSSARY.md) — three tiers: first-win, contributor, and FDE                                                           |
+| **Check what is actually built** | [Project Status](#project-status) → [status index](./docs/developer/improvement-plans-2026-08/README.ja.md)                                       |
 
 ---
 
-## What Makes It Different
+## What is Kyberion?
+
+Knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model but the engine that captures intent reliably, keeps evidence, and accumulates organizational memory. Full thesis: [`docs/WHY.md`](./docs/WHY.md).
 
 <p align="center">
   <img src="./docs/assets/kyberion-loop.svg" alt="The Kyberion work loop: intent → plan → execute → evidence → learn, with learning feeding the next mission's team" width="920" />
@@ -47,34 +53,44 @@ Kyberion turns a request into a clear plan and a verified result. You ask `今�
 Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 - **No evidence, no "done".** Finishing a work cycle checks every success criterion against actual artifacts and verifications. Unsatisfied gaps automatically dispatch gap-closing work — the wording of a request never substitutes for its purpose.
-- **The work loop improves itself.** Every finished work cycle runs a retrospective: deterministic execution stats ground improvement proposals (human-ratified, never auto-applied), and measured outcomes improve future staffing. Your instance gets measurably better the more you use it.
-- **Frontier-model discipline on any model.** The working philosophy — read before write, one change one verification, no retry without a new hypothesis, evidence-based completion — is codified as mechanical rules ([working-philosophy](./knowledge/product/governance/working-philosophy.md)) and injected into every worker prompt, so fast/small models inherit the habits that make frontier models reliable.
+- **The work loop improves itself.** Every finished work cycle runs a retrospective: deterministic execution stats ground improvement proposals (human-ratified, never auto-applied), and measured outcomes improve future staffing.
+- **Frontier-model discipline on any model.** The [working philosophy](./knowledge/product/governance/working-philosophy.md) — read before write, one change one verification, no retry without a new hypothesis, evidence-based completion — is injected into every worker prompt, so small models inherit the habits that make frontier models reliable.
 - **Governance by architecture, not by prompt.** Three-tier knowledge isolation is enforced at the file-IO boundary. Customer conversations are physically separated from mission state. Outbound sends always pass an approval gate. An append-only audit chain records everything.
-- **Workers get briefed, not dumped.** Each dispatched worker receives a role-scoped mission context pack — the mission goal, acceptance criteria, and the top knowledge hints distilled from previous runs — under an explicit size budget, with automatic compaction on long runs. Delegation is a briefing, not a context dump.
+- **Workers get briefed, not dumped.** Each worker receives a role-scoped context pack — mission goal, acceptance criteria, and the top hints distilled from previous runs — under an explicit size budget.
+
+### Core concepts in one minute
+
+| Concept            | What it is                                                                                                                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mission**        | One unit of work with its own git repo, state and evidence; survives 24h+ runs.                                                                                                                                       |
+| **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                        |
+| **Actuator**       | A governed capability module (browser, file, voice, code, …). 33 today — [catalog](./CAPABILITIES_GUIDE.md).                                                                                                          |
+| **Surface**        | A human-facing entrance: Chronos, Concierge, Presence Studio, terminal HUD, chat bridges, capture pads.                                                                                                               |
+| **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                       |
+| **Stance**         | `customer/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
+
+Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
 
 ---
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is a short overview; use Quickstart for the exact first-win command order. Day-2 tenant / organization / activation work is documented in [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). The category-level documentation map is [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
+> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is the short version. Day-2 tenant / organization / activation work: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). Documentation authority map: [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
 
-Kyberion's first visible result comes in three short paths:
+Kyberion's first visible result comes in three short steps:
 
 - 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
-### First-win shortest paths (one table)
+Requires Node.js 24+ (`.nvmrc` / `package.json` engines) and pnpm.
 
-| Path            | Prerequisites                                    | Time         | Command                                            | Notes                                                                                                                                 |
-| :-------------- | :----------------------------------------------- | :----------- | :------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| First-win       | Node 24+, pnpm                                   | ~5min        | Quickstart's five commands                         | Writes `active/shared/tmp/first-win-session.png` (or the governed fallback)                                                           |
-| Voice first-win | macOS only (native TTS; not available in Docker) | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json` | Run after the browser smoke                                                                                                           |
-| Docker path     | Docker Desktop                                   | ~10min build | `docker compose --profile deploy up`               | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is tracked in the ops backlog. |
+```bash
+git clone https://github.com/famaoai-creator/kyberion.git
+cd kyberion
+```
 
-The canonical first-win command sequence is:
-
-# kyberion-first-win
+<!-- kyberion-first-win -->
 
 ```bash
 pnpm install
@@ -84,87 +100,69 @@ pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-If a browser, voice, or media actuator is missing a local dependency, inspect it directly with the on-demand pull resolver:
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. The last command opens a local first-win page and writes `active/shared/tmp/first-win-session.png`. `pnpm exec playwright install chromium` is optional: without Chromium the pipeline writes its governed text fallback instead of hiding the readiness result.
 
-```bash
-pnpm deps:check --actuator browser
-pnpm deps:check --actuator voice
-pnpm deps:check --actuator media-generation
-```
+| Path            | Prerequisites                                    | Time         | Command                                            | Notes                                                                   |
+| :-------------- | :----------------------------------------------- | :----------- | :------------------------------------------------- | :---------------------------------------------------------------------- |
+| First-win       | Node 24+, pnpm                                   | ~5min        | the five commands above                            | Writes the screenshot (or the governed fallback)                        |
+| Voice first-win | macOS only (native TTS; not available in Docker) | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json` | Run after the browser smoke                                             |
+| Docker          | Docker Desktop                                   | ~10min build | `docker compose --profile deploy up`               | Headless services only — voice/GUI actuators need the native macOS path |
 
-Requires Node.js 24+ (`.nvmrc` / `package.json` engines) and pnpm.
+**Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
 
-```bash
-git clone https://github.com/famaoai-creator/kyberion.git
-cd kyberion
-pnpm install
-pnpm build
-pnpm env:bootstrap --manifest kyberion-toolchain # verifies Node 24+ floor; warns if Playwright browsers are missing
-pnpm doctor
-pnpm pipeline --input pipelines/verify-session.json
-```
+Already have onboarding JSON? Skip the wizard: `pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
 
-`pnpm exec playwright install chromium` is optional. If Chromium is unavailable, the
-pipeline writes its governed text fallback instead of hiding the readiness result.
-
-If you already have onboarding JSON, use Path B instead of the wizard:
-
-```bash
-pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
-```
-
-Copy that template, edit it for your identity, then rerun without `--dry-run` to write the onboarding artifacts.
-
-Then pick a smoke path:
-
-```bash
-# Clean browser smoke: opens a local first-win page and writes active/shared/tmp/first-win-session.png
-pnpm pipeline --input pipelines/verify-session.json
-
-# Voice smoke: browser speech in, OS-native speech out
-pnpm pipeline --input pipelines/voice-hello.json
-```
-
-To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md).
-
-If you do not know which surface to use next, `pnpm kyberion setup report --persona first-time-user` now acts as the entry guide. It tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route.
-
-Chronos API routes use a viewer principal and server-side tenant scope: every route except `/api/healthz` resolves a `ViewerContext` fail-closed, and enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce` (default `warn`; see [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)). `KYBERION_API_TOKEN` / `KYBERION_LOCALADMIN_TOKEN` remain compatible all-tenant tokens for the single-operator local workflow; scoped token registrations can restrict a viewer to selected tenants. A proper IdP-backed user session, SSO, and human user management remain follow-up items and are not implied by this boundary.
-
-For a concise map of entry points and their intended use, read [`docs/SURFACES.md`](./docs/SURFACES.md).
-For the full canonical setup, see [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md) (structure map: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
+To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md). For a server / customer deployment: [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
 ---
 
-## What It Covers
+## What it can do
 
-Kyberion currently covers:
+Every capability is a governed actuator or a ready-made pipeline — nothing here is an unbounded shell. Op-level catalog: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md) · pipelines: [`pipelines/README.md`](./pipelines/README.md).
 
-- **Browser automation**: record a web flow once, replay it reliably.
-- **Voice workflows**: browser speech, OS-native speech, and self-hosted options.
-- **File and media handling**: PDF, PPTX, XLSX, DOCX, image, and video work.
-- **Code assistance**: refactor, scaffold, and analyze codebases.
-- **Network and service actions**: governed fetch plus Slack / Google / Notion / Microsoft 365 integration.
-- **System operations**: shell, screenshots, and OS-level introspection.
-- **Knowledge and memory**: search, distill, and reuse organizational hints — including zero-LLM history search (SQLite FTS5 + CJK trigram, tier-isolated).
-- **Organization operations**: an organization operating model control plane (purpose, services, routine operations, incidents, cadences, decisions — six `work_shape` kinds beyond solution projects), governed project management, and a canonical work-item context chain (`tenant_slug → organization_id → project_id → mission_id → task_id`) projected into per-view visibility scopes.
-- **Multi-tenant foundations**: a tenant registry with isolated knowledge roots (`knowledge/confidential/{tenant-slug}/`), deny-unless-brokered cross-tenant access, and an HMAC-signed tenant peer mesh (`pnpm peer:register`).
+| Area                           | What you get                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Browser & desktop**          | Record a web flow once and replay it reliably; drive the desktop with screenshot grounding (Set-of-Marks detectors, OS accessibility on macOS / Windows); terminal (PTY) control.                                                                                                               |
+| **Documents & media**          | Read PDF / PPTX / DOCX / XLSX / HTML; generate documents and slide decks from semantic briefs; image, audio and video perception and generation; narrated video.                                                                                                                                |
+| **Voice**                      | Browser speech in, OS-native or self-hosted speech out; talking avatar; meeting join, minutes and follow-up.                                                                                                                                                                                    |
+| **Code**                       | Refactor, scaffold, analyze, review; SDLC-cycle pipelines; delegated subagent work.                                                                                                                                                                                                             |
+| **Services & network**         | Governed fetch; Slack / Google / Notion / Microsoft 365 / email / calendar integration; deployment and cloud-operation actuators.                                                                                                                                                               |
+| **Knowledge & memory**         | Search, distill and reuse organizational hints, including zero-LLM history search (SQLite FTS5 + CJK trigram, tier-isolated); working memory; volatile-knowledge GC.                                                                                                                            |
+| **Organization operations**    | Operating-model control plane (purpose, services, routine operations, incidents, cadences, decisions — six `work_shape` kinds beyond solution projects), governed project management, and the canonical context chain `tenant_slug → organization_id → project_id → mission_id → task_id`.      |
+| **Multi-tenant & multi-agent** | Tenant registry with isolated knowledge roots, deny-unless-brokered cross-tenant access, an HMAC-signed peer mesh (`pnpm peer:register`), and Co-Session coordination for several provider CLIs in one checkout ([model](./knowledge/product/architecture/agent-communication-layer-model.md)). |
+| **Governance & trust**         | Approval gate on every outbound effect, append-only audit chain, OTel-style traces, provenance-gated plugins (`pnpm plugin:install`; third-party code needs human approval), goal-driven workers with budgets and restart recovery.                                                             |
 
-Plus:
+### One verb per sense
 
-- **ADF pipeline format** — declarative, schema-validated, sub-pipeline composable. With `on_error` recovery semantics.
-- **Mission lifecycle** — each piece of work is a mission with its own git repo, state, evidence. Survives 24h+ runs.
-- **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary, with per-tenant scoping under `confidential/` and viewer-scoped surface APIs on top (staged warn→enforce).
-- **Stance overlay** — `customer/{slug}/` swaps identity, connections and policy for the entity you are currently acting as (an FDE engagement, or one of several affiliations) without forks. A stance is not a tenant and not a tenant's customer — the three are [distinguished here](./knowledge/product/architecture/stance-tenant-customer-model.md).
-- **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
-- **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
-- **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.
-- **Design-system-governed media** — PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
-- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD ([screenshots](#surfaces--one-role-per-screen)), [local capture pads](#local-pads--capture-at-your-desk-hand-off-to-kyberion), plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
+Day to day you rarely write a pipeline — you use one command per sense (Markdown on stdout, `--json` for structure):
 
-For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
+| Direction          | Command                 | Direction           | Command                   |
+| ------------------ | ----------------------- | ------------------- | ------------------------- |
+| Document → text    | `pnpm kyberion read`    | Brief → document    | `pnpm kyberion write`     |
+| Image → text       | `pnpm kyberion see`     | Prompt → image      | `pnpm kyberion draw`      |
+| Audio → text       | `pnpm kyberion listen`  | Text → audio        | `pnpm kyberion speak`     |
+| Video → timeline   | `pnpm kyberion watch`   | Document ↔ document | `pnpm kyberion diff`      |
+| Ask in plain words | `pnpm kyberion ask "…"` | Approve / reject    | `pnpm kyberion approvals` |
+
+`pnpm kyberion` with no arguments is the terminal home: a status digest plus your next move. Verb inventory: [`capability-verb-inventory`](./knowledge/product/orchestration/capability-verb-inventory.md).
+
+### Design-system-governed output
+
+PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
 
 ---
+
+## How you work with it
+
+Pick the entrance that fits the moment. All of them share the same missions, approvals and audit chain.
+
+| Entrance                        | Use it when                                                      | Start                                    |
+| ------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
+| **Terminal home / HUD**         | You live in a shell and want the next action.                    | `pnpm kyberion` · `pnpm tui`             |
+| **Concierge / Presence Studio** | You want a front desk: ask, decide, follow progress.             | `pnpm surfaces reconcile`                |
+| **Chronos**                     | You supervise: intervene, review artifacts, audit.               | `pnpm chronos:dev`                       |
+| **Chat bridges & voice**        | You are in Slack / Telegram / Discord / iMessage, or hands-free. | [`docs/SURFACES.md`](./docs/SURFACES.md) |
+| **Capture pads**                | You have something on your desk: a sketch, notes, a file.        | `pnpm pads`                              |
 
 ## Surfaces — one role per screen
 
@@ -183,6 +181,8 @@ Each surface answers one question and shows its role in the header. The two huma
   </tr>
 </table>
 
+Beyond the screens, Slack / Telegram / Discord / iMessage bridges share one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven), and voice runs through voice-hub and Presence Studio.
+
 ### Shared UI (A2UI kyberion-base)
 
 All 5 UI surfaces above render from one design system: the `kyberion-base` A2UI catalog (`ui:*` component types with JSON Schema props), one token-driven stylesheet (`kyberion-ui.css`), and two renderers — React (`@agent/shared-ui`) for the three Next.js surfaces and a dependency-free vanilla DOM renderer for the two static-HTML surfaces. Every component ships in both light/dark themes and `en`/`ja` locales. See every component at once in Presence Studio's `/ui-gallery`:
@@ -197,7 +197,9 @@ pnpm chronos:dev                     # or run the control tower alone
 pnpm tui                             # terminal HUD (pnpm tui --once for a non-interactive snapshot)
 ```
 
-Every HTTP surface resolves the viewer principal server-side and treats a client-supplied `tenant` only as a narrowing filter. On Next.js 15+ a same-machine browser is recognised as loopback only through a surface token or `KYBERION_TRUST_PROXY=1` behind a proxy that sets `x-real-ip` (see [`CHANGELOG.md`](./CHANGELOG.md) and [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)).
+### Access control
+
+Every HTTP surface resolves a viewer principal and tenant scope server-side (`ViewerContext`); a client-supplied `tenant` only narrows what the viewer may already see, never widens it. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce` (default `warn`). `KYBERION_API_TOKEN` / `KYBERION_LOCALADMIN_TOKEN` remain compatible all-tenant tokens for the single-operator local workflow; scoped token registrations can restrict a viewer to selected tenants. On Next.js 15+ a same-machine browser is recognised as loopback only through a surface token or `KYBERION_TRUST_PROXY=1` behind a proxy that sets `x-real-ip`. IdP-backed sessions, SSO and hosted user management are follow-up items and are not implied by this boundary. Operations: [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md).
 
 ---
 
@@ -256,9 +258,9 @@ What they share:
 - **Phase C'** — Make it contributable in under a week.
 - **Phase D'** — Make FDE / implementation-support engagements possible without forks.
 
-The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists. See `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list.
+The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists (see `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list).
 
-Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have since landed as engineering foundations (tenant registry, work-item context chain, shared operation permissions, `KYBERION_VIEWER_SCOPE`); productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. The scoped RBAC boundary is documented in [`SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md`](./docs/developer/improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md), and implementation status per improvement plan is tracked in the current status index: [`docs/developer/improvement-plans-2026-08/README.ja.md`](./docs/developer/improvement-plans-2026-08/README.ja.md).
+Multi-tenant isolation, the organization operating model, and viewer-scoped surface authorization have landed as engineering foundations; productized SaaS — billing, IdP/SSO, hosted user management — remains explicitly out of scope. **The README describes the product; the source of truth for what is actually implemented is the status index:** [`docs/developer/improvement-plans-2026-08/README.ja.md`](./docs/developer/improvement-plans-2026-08/README.ja.md) (release history: [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ---
 
@@ -268,32 +270,22 @@ Multi-tenant isolation, the organization operating model, and viewer-scoped surf
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Understand why this exists         | [`docs/WHY.md`](./docs/WHY.md) / [`.ja.md`](./docs/WHY.ja.md)                                                                                  |
 | Try it in 5 minutes                | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)                                                                                                   |
+| Fix a first-run problem            | [`docs/user/TROUBLESHOOTING.md`](./docs/user/TROUBLESHOOTING.md)                                                                               |
+| Browse what it can automate        | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md) · [`docs/user/USE_CASE_QUICKSTARTS.md`](./docs/user/USE_CASE_QUICKSTARTS.md)          |
+| Pick a surface / entry point       | [`docs/SURFACES.md`](./docs/SURFACES.md)                                                                                                       |
+| Run day-to-day operations          | [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md)                                                                                     |
 | Deploy it for a customer           | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md)                                                                                 |
-| Browse what it can automate        | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md)                                                                                       |
 | Understand the architecture        | [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md)                       |
 | Author a new actuator / pipeline   | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md)                                                                   |
 | Customize for a customer           | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
-| Contribute                         | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                                         |
 | Understand the data flow / privacy | [`docs/PRIVACY.md`](./docs/PRIVACY.md) / [`.ja.md`](./docs/PRIVACY.ja.md)                                                                      |
-| Pick a surface / entry point       | [`docs/SURFACES.md`](./docs/SURFACES.md)                                                                                                       |
 | Run multi-tenant isolation         | [`knowledge/product/architecture/multi-tenant-operations.md`](./knowledge/product/architecture/multi-tenant-operations.md)                     |
 | Operate viewer-scoped API access   | [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)                               |
 | Check what is actually implemented | [`docs/developer/improvement-plans-2026-08/README.ja.md`](./docs/developer/improvement-plans-2026-08/README.ja.md)                             |
+| Contribute                         | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                                         |
 | Report a security issue            | [`SECURITY.md`](./SECURITY.md)                                                                                                                 |
 
-## Community
-
-Questions, examples, and contribution paths are collected in the
-[`community guide`](./docs/COMMUNITY.md). Use GitHub Discussions for how-to
-questions and workflow showcases, Issues for reproducible bugs or focused
-feature proposals, and the private process in [`SECURITY.md`](./SECURITY.md)
-for vulnerabilities.
-
-Three audiences, three folders:
-
-- [`docs/user/`](./docs/user/) — using Kyberion to get work done.
-- [`docs/operator/`](./docs/operator/) — running Kyberion as a service.
-- [`docs/developer/`](./docs/developer/) — extending Kyberion.
+Three audiences, three folders: [`docs/user/`](./docs/user/) (using Kyberion) · [`docs/operator/`](./docs/operator/) (running it as a service) · [`docs/developer/`](./docs/developer/) (extending it). Questions and showcases: [`docs/COMMUNITY.md`](./docs/COMMUNITY.md) — GitHub Discussions for how-to, Issues for reproducible bugs, [`SECURITY.md`](./SECURITY.md) for vulnerabilities.
 
 ---
 
@@ -309,24 +301,8 @@ Three audiences, three folders:
 
 ---
 
-## License
+## Project
 
-MIT — see [`LICENSE`](./LICENSE).
-
-Third-party dependencies and their licenses are inventoried by `pnpm license:audit` (writes `docs/legal/third-party-licenses.json`; generated, not committed).
-
-## Code of Conduct
-
-We follow the [Contributor Covenant](https://www.contributor-covenant.org/) — see [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
-
-## Governance
-
-Decision-making process: [`GOVERNANCE.md`](./GOVERNANCE.md). Maintainers: [`MAINTAINERS.md`](./MAINTAINERS.md). Code owners: [`CODEOWNERS`](./CODEOWNERS).
-
-## Contributing
-
-PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Security disclosure: [`SECURITY.md`](./SECURITY.md). Roadmap context: [`docs/PRODUCTIZATION_ROADMAP.md`](./docs/PRODUCTIZATION_ROADMAP.md).
-
----
+MIT licensed — [`LICENSE`](./LICENSE); third-party licenses are inventoried by `pnpm license:audit` (generated, not committed). We follow the [Contributor Covenant](https://www.contributor-covenant.org/) ([`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)). Governance: [`GOVERNANCE.md`](./GOVERNANCE.md) · [`MAINTAINERS.md`](./MAINTAINERS.md) · [`CODEOWNERS`](./CODEOWNERS). PRs welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 > Kyberion is operator-facing in English, conceptually-authored in Japanese. Both languages are first-class. See [`docs/DOCUMENTATION_LOCALIZATION_POLICY.md`](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md).
