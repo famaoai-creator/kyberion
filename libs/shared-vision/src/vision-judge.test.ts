@@ -15,7 +15,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
     ...actual,
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
     metrics: { recordIntervention: vi.fn() },
   };
 });

@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   executeServicePreset: vi.fn(),
   spawnManagedProcess: vi.fn(),
   validateServiceAuth: vi.fn(),
-  logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
   runtimeSupervisor: { update: vi.fn(), register: vi.fn(), unregister: vi.fn() },
   pathResolver: {
     rootDir: vi.fn(() => '/tmp/kyberion'),

@@ -19,6 +19,7 @@ vi.mock('./core.js', async () => {
   return {
     ...actual,
     logger: {
+      debug: vi.fn(),
       ...actual.logger,
       warn: mocks.warn,
     },

@@ -257,7 +257,7 @@ class KillSwitchImpl {
       }
     }, intervalMs);
     this.monitorInterval.unref?.();
-    logger.info(`[KILL_SWITCH] Monitor started (${intervalMs}ms interval)`);
+    logger.debug(`[KILL_SWITCH] Monitor started (${intervalMs}ms interval)`);
   }
 
   stopMonitor(): void {

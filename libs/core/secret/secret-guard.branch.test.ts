@@ -50,7 +50,7 @@ vi.mock('../foundation/json.js', async () => {
 });
 
 vi.mock('../core.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('../ledger.js', () => ({

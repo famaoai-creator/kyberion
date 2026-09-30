@@ -46,6 +46,7 @@ vi.mock('@agent/core/core', async (importOriginal) => {
   return {
     ...actual,
     logger: {
+      debug: vi.fn(),
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),

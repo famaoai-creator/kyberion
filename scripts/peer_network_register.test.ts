@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   registerPeerNetworkPeer: vi.fn(),
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
-  logger: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('@agent/core/mesh/peer-messaging', () => ({

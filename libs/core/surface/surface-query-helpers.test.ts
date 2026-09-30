@@ -4,6 +4,7 @@ const infoMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../core.js', () => ({
   logger: {
+    debug: vi.fn(),
     info: infoMock,
   },
 }));
