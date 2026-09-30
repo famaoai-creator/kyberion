@@ -26,6 +26,7 @@ import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
+import { runCharterGate, type ApprovalGateCharterInput } from './approval-gate-charter.js';
 
 export interface ApprovalGateParams {
   /** Intent being executed. */
@@ -77,6 +78,13 @@ export interface ApprovalGateParams {
    * Must parse and lie in the future; it is clamped to MAX_APPROVAL_TTL_MS.
    */
   expiresAt?: string;
+  /**
+   * Accountability charter: facts about the action, supplied by the trusted
+   * caller (never from `payload`). With an active charter for `scope` the gate
+   * auto-allows work inside the envelope and requires a human for the rest.
+   * Omitted, or no charter for the scope: the legacy gate runs unchanged.
+   */
+  charter?: ApprovalGateCharterInput;
 }
 
 export interface ApprovalGateResult {
@@ -289,6 +297,26 @@ export function enforceApprovalGate(
     params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
+  const charterOutcome = params.charter
+    ? runCharterGate({
+        charter: params.charter,
+        agentId,
+        operationId,
+        intentId,
+        correlationId,
+        payload,
+      })
+    : ({ kind: 'none' } as const);
+  if (charterOutcome.kind === 'stop') {
+    return { allowed: false, status: 'pending', message: charterOutcome.message };
+  }
+  if (charterOutcome.kind === 'allow') {
+    return { allowed: true, status: 'not_required', message: charterOutcome.message };
+  }
+  // Outside the charter: a human decides, even where decision rights or the
+  // legacy policy would have let the action through (the charter only tightens).
+  const forceApproval = charterOutcome.kind === 'require_approval';
+
   const decisionRightsContext = extractDecisionRightsContext(agentId, callerRole, payload);
   const decisionRightsMatrix =
     decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
@@ -298,7 +326,7 @@ export function enforceApprovalGate(
     decisionRightsMatrix,
     decisionRightsContext
   );
-  if (decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
+  if (!forceApproval && decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
     const goldenRulePriority = resolveGoldenRulePriorityOrder(
       resolveVision(decisionRightsContext.tenantSlug ?? null)
     );
@@ -325,7 +353,15 @@ export function enforceApprovalGate(
   }
 
   // --- Step 1: Resolve policy ---
-  const policy = resolveApprovalPolicy({ intentId, payload });
+  const resolvedPolicy = resolveApprovalPolicy({ intentId, payload });
+  const policy =
+    forceApproval && !resolvedPolicy.requiresApproval
+      ? {
+          requiresApproval: true,
+          missingRequirements: ['approval_confirmation'],
+          matchedRuleId: 'charter-outside-envelope',
+        }
+      : resolvedPolicy;
 
   if (!policy.requiresApproval) {
     auditChain.record({

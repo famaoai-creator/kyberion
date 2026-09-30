@@ -1389,6 +1389,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/approval_inbox.ts#runCharterReport",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/approval_store_hygiene.ts#runApprovalStoreHygieneSweeps",
       "roles": ["mission_controller"],
       "unresolved": []

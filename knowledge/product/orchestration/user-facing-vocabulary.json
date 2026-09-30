@@ -21659,6 +21659,51 @@
         "ja": "ポリシーによる引き上げの記録はありません。直接の依頼として上がっています。",
         "qps-ploc": "⟦Ñő ṗőŀïƈẏ ėşƈȧŀȧŧïőñ ẇȧş řėƈőřḓėḓ; ŧħïş ẇȧş řȧïşėḓ ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
+      "charter_report_title": {
+        "en": "Accountability report — {charter} ({time})",
+        "ja": "説明責任レポート — {charter}({time})",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀïŀïŧẏ řėṗőřŧ — {charter} ({time}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_headline": {
+        "en": "Ran inside your charter: {executed} · Held for your decision: {denied}",
+        "ja": "憲章の範囲内で実行: {executed}件 ・ あなたの判断に回したもの: {denied}件",
+        "qps-ploc": "⟦Řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř: {executed} · Ħėŀḓ ƒőř ẏőůř ḓėƈïşïőñ: {denied} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_report_money_day": {
+        "en": "Spent today: {spent} / {limit} ({percent}%)",
+        "ja": "本日の支出: {spent} / {limit}({percent}%)",
+        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} / {limit} ({percent}%) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_money_month": {
+        "en": "Spent this month: {spent} / {limit} ({percent}%)",
+        "ja": "今月の支出: {spent} / {limit}({percent}%)",
+        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} / {limit} ({percent}%) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "charter_report_near_limit": {
+        "en": "Near the limit: {items}",
+        "ja": "上限が近いもの: {items}",
+        "qps-ploc": "⟦Ñėȧř ŧħė ŀïɱïŧ: {items} ŀőřėɱ ï⟧"
+      },
+      "charter_report_tripwire": {
+        "en": "STOPPED by tripwire: {items} — only you can clear this",
+        "ja": "tripwire で停止中: {items} — 解除できるのはあなただけです",
+        "qps-ploc": "⟦ŞŦŐṖṖĖḒ ƀẏ ŧřïṗẇïřė: {items} — őñŀẏ ẏőů ƈȧñ ƈŀėȧř ŧħïş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "charter_report_amendment": {
+        "en": "Asked to widen the charter: {field} ×{count}",
+        "ja": "憲章を広げてほしいと出ているもの: {field} ×{count}",
+        "qps-ploc": "⟦Ȧşķėḓ ŧő ẇïḓėñ ŧħė ƈħȧřŧėř: {field} ×{count} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_expiry": {
+        "en": "This charter expires in {days} days ({date})",
+        "ja": "この憲章の期限まであと{days}日({date})",
+        "qps-ploc": "⟦Ŧħïş ƈħȧřŧėř ėẋṗïřėş ïñ {days} ḓȧẏş ({date}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_all_clear": {
+        "en": "Nothing needed you. Everything ran inside your charter.",
+        "ja": "あなたの判断が必要なことはありませんでした。すべて憲章の範囲内で動きました。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓėḓ ẏőů. Ėṽėřẏŧħïñɠ řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "digest_title": {
         "en": "Decision digest ({time})",
         "ja": "判断ダイジェスト({time})",
