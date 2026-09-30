@@ -5,6 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 const mocks = vi.hoisted(() => ({
   installReasoningBackends: vi.fn(() => false),
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     success: vi.fn(),
     error: vi.fn(),

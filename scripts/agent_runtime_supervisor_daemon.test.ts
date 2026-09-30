@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   sendOpsAlert: vi.fn(),
   appendSupervisorEvent: vi.fn(),
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

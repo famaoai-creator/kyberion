@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<any>) => fn()),
   ledgerRecord: vi.fn(),
-  logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn() },
   fetchSecret: vi.fn(),
   storeSecret: vi.fn(),
   removeSecret: vi.fn(),

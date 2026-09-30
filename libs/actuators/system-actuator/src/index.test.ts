@@ -934,7 +934,7 @@ const pathResolver = {
   ),
 };
 
-const testLogger = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+const testLogger = { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() };
 const testCore = {
   logger: testLogger,
   runOpPreflight,

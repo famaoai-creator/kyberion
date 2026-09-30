@@ -59,7 +59,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('@agent/core/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/core')>()),
-  logger: { info: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('@agent/core/agent/agent-registry', async (importOriginal) => ({

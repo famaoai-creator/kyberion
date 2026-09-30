@@ -348,7 +348,7 @@ const mocks = vi.hoisted(() => ({
 // Keep the unit-test doubles at the same boundaries so tests do not touch the
 // repository filesystem or platform-specific voice runtimes.
 vi.mock('@agent/core/core', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: vi.fn((candidate: string) => String(candidate)),

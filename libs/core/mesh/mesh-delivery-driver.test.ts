@@ -15,7 +15,7 @@ vi.mock('./mesh-message-broker.js', () => ({
 }));
 
 vi.mock('../core.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { formatMeshDeliveryPassReport, runMeshDeliveryPass } from './mesh-delivery-driver.js';

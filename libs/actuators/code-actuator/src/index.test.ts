@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
     return candidate;
   }),
   safeExec: vi.fn().mockReturnValue(''),
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   rootDir: vi.fn().mockReturnValue('/mock/root'),
   // Real secure-io's `safeReadFile` calls `pathResolver.resolve(filePath)`
   // unconditionally, including for paths this test has already resolved to

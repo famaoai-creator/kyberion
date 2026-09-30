@@ -33,6 +33,7 @@ const iosTestDoubles = vi.hoisted(() => ({
   safeReadFile: vi.fn().mockReturnValue('{}'),
   safeWriteFile: vi.fn(),
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

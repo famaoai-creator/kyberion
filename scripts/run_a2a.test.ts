@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   executeSuperPipeline: vi.fn(),
   readJson: vi.fn(),
-  logger: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('../libs/actuators/orchestrator-actuator/src/super-nerve/index.js', () => ({

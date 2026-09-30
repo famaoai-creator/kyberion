@@ -140,6 +140,7 @@ const mocks = vi.hoisted(() => ({
   retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   resolveManagedToolPythonBin: vi.fn(() => null),
   logger: {
+    debug: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),

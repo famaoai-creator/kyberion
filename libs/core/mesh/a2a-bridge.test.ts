@@ -57,6 +57,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('../core.js', () => ({
   logger: {
+    debug: vi.fn(),
     warn: mocks.warn,
     info: mocks.info,
   },
