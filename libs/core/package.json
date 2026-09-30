@@ -7079,6 +7079,18 @@
       "types": "./dist/governance/approval-decision-card.d.ts",
       "default": "./dist/governance/approval-decision-card.js"
     },
+    "./governance/accountability-charter": {
+      "types": "./dist/governance/accountability-charter.d.ts",
+      "default": "./dist/governance/accountability-charter.js"
+    },
+    "./governance/accountability-charter-registry": {
+      "types": "./dist/governance/accountability-charter-registry.d.ts",
+      "default": "./dist/governance/accountability-charter-registry.js"
+    },
+    "./governance/accountability-report": {
+      "types": "./dist/governance/accountability-report.d.ts",
+      "default": "./dist/governance/accountability-report.js"
+    },
     "./governance/approval-digest": {
       "types": "./dist/governance/approval-digest.d.ts",
       "default": "./dist/governance/approval-digest.js"
