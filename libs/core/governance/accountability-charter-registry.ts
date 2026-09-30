@@ -114,7 +114,9 @@ export function findActiveCharter(
 ): Charter | null {
   const active = listCharterIds(scope, options)
     .map((id) => readCharter(scope, id, options))
-    .filter((c): c is Charter => c !== null && isCharterActive(c, now));
+    .filter(
+      (c): c is Charter => c !== null && isCharterActive(c, now) && !isCharterRetired(c, options)
+    );
   if (active.length > 1) {
     throw new Error(
       `[charter] scope has ${active.length} active charters; exactly one may be in force`
@@ -155,6 +157,12 @@ export interface AcceptCharterInput {
   statement: string;
   /** Must be the authenticated accountable human. */
   acceptedBy: ActorRef;
+  /**
+   * Charter id in force for this scope that this one replaces (amendments are
+   * new charters). Required when the scope already has an active charter; the
+   * old one is retired, never edited.
+   */
+  replaces?: string;
   validation: Omit<CharterValidationContext, 'now'>;
   now?: Date;
 }
@@ -194,9 +202,50 @@ export function acceptCharter(
       `[charter] '${charter.charter_id}' already exists; amendments are new charters (never edited in place)`
     );
   }
+  const inForce = findActiveCharter(charter.scope, now, options);
+  if (inForce) {
+    if (input.replaces !== inForce.charter_id) {
+      throw new Error(
+        `[charter] scope already has active charter '${inForce.charter_id}'; pass replaces to amend it`
+      );
+    }
+    // Retire the old charter first: if writing the new one then fails the scope
+    // falls back to the legacy approval gate (safe), never to two charters.
+    retireCharter(inForce, input.acceptedBy, `replaced by ${charter.charter_id}`, options, now);
+  } else if (input.replaces) {
+    throw new Error(`[charter] '${input.replaces}' is not an active charter of this scope`);
+  }
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(charter, null, 2) + '\n', { encoding: 'utf8' });
   return charter;
+}
+
+export function isCharterRetired(charter: Charter, options: CharterPathOptions = {}): boolean {
+  return readLedger(charter.scope, charter.charter_id, options).some((e) => e.kind === 'retired');
+}
+
+/**
+ * Retire a charter (append-only; the file is kept for the record). Only the
+ * accountable human or a named deputy can do it. The scope falls back to the
+ * legacy approval gate until a new charter is accepted.
+ */
+export function retireCharter(
+  charter: Charter,
+  retiredBy: ActorRef,
+  reason: string,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): void {
+  assertHumanActor(retiredBy, 'retire charter');
+  if (![charter.accountable.actor, ...charter.accountable.deputies].includes(retiredBy.id)) {
+    throw new Error(`[charter] '${retiredBy.id}' cannot retire ${charter.charter_id}`);
+  }
+  appendLedger(
+    charter.scope,
+    charter.charter_id,
+    { kind: 'retired', ts: now.toISOString(), retired_by: retiredBy.id, reason },
+    options
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +277,8 @@ export type LedgerEntry =
       correlation_id?: string;
     }
   | { kind: 'tripwire'; ts: string; tripwire: string; detail?: string }
-  | { kind: 'tripwire_clear'; ts: string; tripwire: string; cleared_by: string };
+  | { kind: 'tripwire_clear'; ts: string; tripwire: string; cleared_by: string }
+  | { kind: 'retired'; ts: string; retired_by: string; reason: string };
 
 function appendLedger(
   scope: CharterScope,

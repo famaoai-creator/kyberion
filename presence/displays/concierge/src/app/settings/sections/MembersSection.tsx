@@ -22,6 +22,7 @@ import type {
   TrainingProgressSummary,
   TrainingTrack,
 } from '../../../lib/settings-types';
+import { CharterPane } from './CharterPane';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 /** FD-06/FD-07/HT-05 組織とメンバー pane (`#settings-members`) — tenants list,
@@ -526,6 +527,7 @@ export function MembersSection({
           ) : null}
         </SettingsGroup>
       </FormScope>
+      <CharterPane t={t} />
     </div>
   );
 }
