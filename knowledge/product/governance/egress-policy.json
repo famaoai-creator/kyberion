@@ -13,7 +13,11 @@
     "api2.cursor.sh",
     "opencode.ai",
     "api.devin.ai",
-    "api.box.com"
+    "api.box.com",
+    "accounts.google.com",
+    "oauth2.googleapis.com",
+    "www.googleapis.com",
+    "login.microsoftonline.com"
   ],
   "blocked_domains": [],
   "tenant_allowed_domains": {

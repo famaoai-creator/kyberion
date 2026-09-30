@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveAuthnPrincipal } from '@agent/core/authn-principal-resolver';
 import { consumeTenantBudget } from '@agent/core/organization/tenant-rate-limiter';
 import {
   extractSurfaceBearerToken,
@@ -6,6 +7,7 @@ import {
 } from '@agent/core/surface/surface-mutation-guard';
 import {
   SURFACE_SESSION_COOKIE,
+  SURFACE_SESSION_TOKEN_PREFIX,
   isSameOriginMutation,
 } from '@agent/core/surface/surface-session-cookie';
 import { withExecutionContext } from '@agent/core/authority';
@@ -144,9 +146,26 @@ function getRateLimitKey(req: NextRequest): string {
   return `ip:${getClientIP(req)}`;
 }
 
+function resolveBrowserSessionRole(token: string): ChronosAccessRole | null {
+  try {
+    return resolveAuthnPrincipal(
+      { credential: { type: 'bearer', token } },
+      { providerIds: ['browser-session'], purpose: 'remote_human', context: { surface: 'chronos' } }
+    ).principal.role;
+  } catch {
+    // Expired / forged / unbound / suspended — all fail closed to 401.
+    return null;
+  }
+}
+
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveChronosToken(req);
   const isLocal = isChronosLoopbackRequest(req);
+  if (token && token.startsWith(SURFACE_SESSION_TOKEN_PREFIX)) {
+    // OIDC browser session: the role comes from the bound member (re-read on
+    // every request), not from a static token or registry entry.
+    return resolveBrowserSessionRole(token);
+  }
   if (token) {
     const resolution = resolveSurfaceViewerToken(token, {
       registrations: loadChronosTokenRegistrations(),
