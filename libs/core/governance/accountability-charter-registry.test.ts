@@ -11,6 +11,8 @@ import {
   decideUnderCharter,
   findActiveCharter,
   listActiveCharters,
+  isCharterRetired,
+  retireCharter,
   listCharterIds,
   readCharterLedger,
   evaluateUnderCharter,
@@ -198,5 +200,41 @@ describe('accountability-charter-registry', () => {
 
   it('listActiveCharters returns the charters in force (no tenants registered in the fixture → only person scope)', () => {
     expect(listActiveCharters(NOW, opts())).toEqual([]);
+  });
+  it('amendments replace the active charter: a second charter needs `replaces`, the old one is retired (kept, never edited)', () => {
+    const scope = { kind: 'organization', tenant_slug: 'acme-amend' } as const;
+    const base = (id: string) => ({ ...draft(id), scope });
+    const accept2 = (id: string, replaces?: string, by = humanActor('owner')) =>
+      acceptCharter(
+        {
+          draft: base(id),
+          statement: 'I am accountable.',
+          acceptedBy: by,
+          validation: { holder_role: 'owner' },
+          now: NOW,
+          ...(replaces ? { replaces } : {}),
+        },
+        opts()
+      );
+    accept2('chr-amend-1');
+    expect(() => accept2('chr-amend-2')).toThrow(/pass replaces/);
+    expect(() => accept2('chr-amend-2', 'chr-wrong')).toThrow(/pass replaces/);
+    accept2('chr-amend-2', 'chr-amend-1');
+    const old = readCharter(scope, 'chr-amend-1', opts()) as Charter;
+    expect(old).not.toBeNull(); // kept for the record
+    expect(isCharterRetired(old, opts())).toBe(true);
+    expect(findActiveCharter(scope, NOW, opts())?.charter_id).toBe('chr-amend-2');
+    // `replaces` for a scope with nothing active is refused.
+    expect(() => accept2('chr-other', 'chr-amend-1')).toThrow(/pass replaces/);
+    // Retiring: only the accountable human or a deputy, and only humans.
+    const cur = findActiveCharter(scope, NOW, opts()) as Charter;
+    expect(() => retireCharter(cur, agentActor(NHI, 'user:owner'), 'x', opts(), NOW)).toThrow(
+      /human actor/
+    );
+    expect(() => retireCharter(cur, humanActor('mallory'), 'x', opts(), NOW)).toThrow(
+      /cannot retire/
+    );
+    retireCharter(cur, humanActor('carol'), 'stop delegating', opts(), NOW);
+    expect(findActiveCharter(scope, NOW, opts())).toBeNull(); // legacy approval gate applies again
   });
 });
