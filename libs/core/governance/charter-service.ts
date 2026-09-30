@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import type { ActorRef } from '../actor.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import { t } from '../t.js';
 import type { Charter, ReputationalClass } from './accountability-charter.js';
 import {
   acceptCharter,
@@ -136,38 +137,29 @@ export function renderAcceptanceStatement(input: {
   const expires = new Date(now.getTime() + form.expires_in_days * 86_400_000)
     .toISOString()
     .slice(0, 10);
-  const lines = [
-    `私 ${displayName}(${accountableId})は、組織「${form.tenant_slug}」について、次の範囲内で AI エージェントが私の承認なしに実行することを認め、その結果について最終的な責任を負います。`,
-    `・1 回の支出の上限: ${yen(form.per_action)} / 1 日: ${yen(form.per_day)} / 1 か月: ${yen(form.per_month)}`,
-    `・1 件で引き受ける損失の上限: ${yen(form.max_loss_per_incident)}`,
-    form.allow_named_spend
-      ? '・取り消せない支出(operational_spend)を、上の範囲内で承認なしに実行させる'
-      : '・取り消せない支出は、承認なしには実行させない',
-    form.supersedes_decision_rights
-      ? '・decision-rights matrix が人の受け入れを求める判断についても、上の範囲内であればこの憲章が代わりになる'
-      : '・decision-rights matrix が人の受け入れを求める判断は、これまでどおり人が受け入れる',
-    `・私が「停止」を押したとき、または宣言した停止条件が立ったときは、全ての実行を止める。解除できるのは私と代理責任者だけ`,
-    `・代理責任者: ${form.deputies.length > 0 ? form.deputies.join(', ') : 'なし'}`,
-    `・期限: ${expires}(期限を過ぎると、従来の承認に戻る)`,
-    'この範囲を超える判断は、私(または代理責任者)が個別に行う。私が実際に持っている権限を超える委任は、この宣言では有効にならない。',
-  ];
-  const en = [
-    `I, ${displayName} (${accountableId}), authorize AI agents to act without my approval within the limits below for organization "${form.tenant_slug}", and I accept final responsibility for the result.`,
-    `- Per spend: ${yen(form.per_action)} / per day: ${yen(form.per_day)} / per month: ${yen(form.per_month)}`,
-    `- Most I accept losing on one item: ${yen(form.max_loss_per_incident)}`,
-    form.allow_named_spend
-      ? '- Irreversible spend (operational_spend) MAY run without approval within these limits'
-      : '- Irreversible spend does NOT run without approval',
-    form.supersedes_decision_rights
-      ? "- Where the decision-rights matrix requires a human's acceptance, this charter stands in for it within these limits"
-      : "- Where the decision-rights matrix requires a human's acceptance, a human still accepts, as before",
-    '- When I press "Stop", or a declared stop condition stands, everything stops; only I and my deputies can clear it',
-    `- Deputies: ${form.deputies.length > 0 ? form.deputies.join(', ') : 'none'}`,
-    `- Valid until: ${expires} (after that, per-decision approval applies again)`,
-    'Anything beyond these limits is decided by me (or a deputy) individually. A delegation beyond the authority I actually hold is not made valid by this statement.',
-  ];
+  const block = (locale: 'ja' | 'en'): string => {
+    const say = (key: string, params?: Record<string, string>) =>
+      t(`decision:charter_statement_${key}` as Parameters<typeof t>[0], params, locale);
+    return [
+      say('intro', { name: displayName, id: accountableId, tenant: form.tenant_slug }),
+      say('limits', {
+        per_action: yen(form.per_action),
+        per_day: yen(form.per_day),
+        per_month: yen(form.per_month),
+      }),
+      say('loss', { loss: yen(form.max_loss_per_incident) }),
+      say(form.allow_named_spend ? 'spend_on' : 'spend_off'),
+      say(form.supersedes_decision_rights ? 'matrix_on' : 'matrix_off'),
+      say('stop'),
+      say('deputies', {
+        deputies: form.deputies.length > 0 ? form.deputies.join(', ') : say('deputies_none'),
+      }),
+      say('expires', { date: expires }),
+      say('authority'),
+    ].join('\n');
+  };
   // Both languages are part of the signed text: the digest binds exactly what was shown.
-  return `${lines.join('\n')}\n\n${en.join('\n')}`;
+  return `${block('ja')}\n\n${block('en')}`;
 }
 
 export function statementDigest(statement: string): string {
