@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-09-27
+last_updated: 2026-09-30
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -112,8 +112,31 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      --evidence evidence/REVIEW-execution-implement.md --actor-id <reviewer_agent_id> --team-role reviewer
    ```
 
-5. Record delivery (PR URL, merge commit) and retrospective the same way, then
-   `verify <ID> verified "<note>"` → `distill <ID>` → `finish <ID>`.
+5. **Ship the learnings in the same PR as the code.** Before opening the PR, run
+   `verify <ID> verified "<note>"` → `distill <ID>`, then curate the product-domain
+   lesson and promote it into the feature worktree so it is committed on the PR branch:
+
+   ```
+   pnpm mission memory-queue queued          # find the candidate distill enqueued
+   pnpm mission memory-review <candidate_id>
+   pnpm mission memory-approve <candidate_id> --knowledge-domain product \
+     --approval-channel pr_review --curation-json '<title/summary/content/evidence_refs>'
+   pnpm mission memory-promote <candidate_id> --target-root <feature worktree>
+   # commit the generated record (+ `pnpm generate:knowledge-index`) on the PR branch
+   ```
+
+   Only the `product` domain goes into a PR. Organization / personal lessons follow the
+   review phase's promotion path and never enter the repository; a candidate with nothing
+   reusable is closed with `memory-reject <candidate_id> --note "<reason>"`. Declare every
+   candidate in the PR body's `## Knowledge` section — `pnpm kyberion pr create` blocks when
+   a mission candidate is unresolved, undeclared, or its record is missing from the diff
+   (no skip flag). The PR review is the steward review of the lesson.
+
+6. After merge, record delivery (PR URL, merge commit) and retrospective the same way,
+   `git fetch origin main`, then `finish <ID>`. `finish` ratifies each `pr_review`
+   candidate by confirming its record exists on `origin/main`; if it is not there yet,
+   `finish` stops without changing mission status — fetch and re-run. Lessons that only
+   surface after merge go in a small follow-up PR.
 
 **Do not leave recording until the end and fall back to `reconcile-work`.** That verb adopts
 work produced _outside_ a mission and is deliberately strict: every evidence file must be

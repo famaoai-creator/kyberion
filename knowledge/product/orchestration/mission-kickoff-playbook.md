@@ -25,8 +25,18 @@ pnpm mission record-evidence <ID> <task_id> "<note>" --actor-id <your-agent-id>
 pnpm mission review-task <ID> <review_task_id> <different-agent-id> --findings '<json>'
 pnpm mission verify <ID> verified "<why the success condition holds>"
 pnpm mission distill <ID>
-pnpm mission finish <ID>
+# before the PR: curate the product lesson and promote it into the PR branch
+pnpm mission memory-approve <candidate_id> --knowledge-domain product \
+  --approval-channel pr_review --curation-json '<json>'
+pnpm mission memory-promote <candidate_id> --target-root <feature worktree>
+# commit it, declare every candidate in the PR body's "## Knowledge", then pnpm kyberion pr create
+# after merge: record delivery + retrospective, git fetch origin main, then
+pnpm mission finish <ID>   # ratifies pr_review candidates against origin/main
 ```
+
+Learnings ship in the same PR as the code — see
+[execution.md step 5](../governance/phases/execution.md) and
+[review.md](../governance/phases/review.md#product-lessons-ship-inside-the-code-pr).
 
 ## 2. Pitfalls hit (and the fix)
 
