@@ -13,6 +13,7 @@ import {
   completeOidcLogin,
   loginTransactionCookieName,
   resolveOidcLoginConfig,
+  resolveOidcRedirectOrigin,
   startOidcLogin,
   type OidcLoginDeps,
 } from './oidc-browser-login.js';
@@ -108,7 +109,18 @@ export async function handleSurfaceAuthRoute(
 ): Promise<SurfaceAuthRouteResponse | null> {
   const method = req.method.toUpperCase();
   const next = sanitizeNextPath(req.searchParams.get('next'));
-  const secure = isSecureOrigin(req.requestOrigin);
+  // `Secure` follows the origin the browser actually uses: the DECLARED public
+  // origin when there is one (a TLS-terminating proxy hands the app an http
+  // request origin even though the user is on https), else the request origin.
+  const loginConfig = resolveOidcLoginConfig(deps).config;
+  const publicOrigin = loginConfig
+    ? resolveOidcRedirectOrigin(loginConfig, {
+        surfaceId: req.surfaceId,
+        requestOrigin: req.requestOrigin,
+        loopback: req.loopback,
+      })
+    : null;
+  const secure = isSecureOrigin(publicOrigin ?? req.requestOrigin);
 
   switch (req.pathname) {
     case SURFACE_LOGIN_PATH: {

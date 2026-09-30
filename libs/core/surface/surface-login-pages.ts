@@ -106,11 +106,11 @@ export function renderSurfaceLoginPage(input: {
       break;
     case 'unbound':
       title = t('surface_login:unbound_title', undefined, locale);
-      body = `<h1>${text('surface_login:unbound_title')}</h1><p>${text('surface_login:unbound_lead')}</p><dl><dt>${text('surface_login:issuer')}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${text('surface_login:subject')}</dt><dd>${escapeHtml(view.subject)}</dd></dl>`;
+      body = `<h1>${text('surface_login:unbound_title')}</h1><p>${text('surface_login:unbound_lead')}</p><dl><dt>${text('surface_login:issuer')}</dt><dd>${escapeHtml(view.issuer)}</dd><dt>${text('surface_login:subject')}</dt><dd>${escapeHtml(view.subject)}</dd></dl><a class="btn" href="/login">${text('surface_login:switch_account')}</a>`;
       break;
     case 'suspended':
       title = t('surface_login:suspended_title', undefined, locale);
-      body = `<h1>${text('surface_login:suspended_title')}</h1><p>${text('surface_login:suspended_lead')}</p>`;
+      body = `<h1>${text('surface_login:suspended_title')}</h1><p>${text('surface_login:suspended_lead')}</p><a class="btn" href="/login">${text('surface_login:switch_account')}</a>`;
       break;
     case 'failed':
       title = t('surface_login:failed_title', undefined, locale);

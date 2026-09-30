@@ -933,7 +933,16 @@ export function verifyJwtSignature(
 function claimsToPrincipal(
   claims: Record<string, unknown>,
   request: AuthnRequest,
-  deps?: AuthnResolveDeps
+  deps?: AuthnResolveDeps,
+  options?: {
+    /**
+     * Ignore claim-borne member ids (`member_id`, `sub = user:<id>`) and resolve
+     * ONLY through a registry `external_identities` binding. A browser session's
+     * `sub` is the IdP's own subject — on a self-hosted IdP a user may choose it
+     * — so it must never be able to name a member directly.
+     */
+    memberBindingOnly?: boolean;
+  }
 ): ResolvedPrincipal {
   const sub = typeof claims.sub === 'string' ? claims.sub.trim() : '';
   const memberIdClaim =
@@ -944,9 +953,10 @@ function claimsToPrincipal(
   let actor;
   let memberId: string | undefined;
   let mappedMember: MemberProfile | null = null;
-  const claimedMemberId =
-    memberIdClaim ??
-    (sub.startsWith('user:') && isValidMemberId(sub.slice(5)) ? sub.slice(5) : undefined);
+  const claimedMemberId = options?.memberBindingOnly
+    ? undefined
+    : (memberIdClaim ??
+      (sub.startsWith('user:') && isValidMemberId(sub.slice(5)) ? sub.slice(5) : undefined));
   if (claimedMemberId) {
     // Claim-borne member ids (custom-claim IdPs) are an asserted member
     // binding: the member must exist AND be active in the local registry.
@@ -1139,15 +1149,22 @@ export interface BrowserSessionPayload {
   sid: string;
 }
 
+/** Shortest accepted session key: a short key makes the HMAC forgeable offline. */
+export const BROWSER_SESSION_MIN_KEY_BYTES = 32;
+
 /** Sync key lookup shared by the signer (login callback) and the verifier. */
 export function browserSessionKey(deps?: AuthnResolveDeps): Buffer | null {
+  // A weak key is treated as "not configured" rather than silently accepted.
+  const strong = (value: string | undefined): Buffer | null =>
+    value && Buffer.byteLength(value, 'utf8') >= BROWSER_SESSION_MIN_KEY_BYTES
+      ? Buffer.from(value, 'utf8')
+      : null;
   const envKey = envText(deps, 'KYBERION_SESSION_SECRET')?.trim();
-  if (envKey) return Buffer.from(envKey, 'utf8');
+  if (envKey) return strong(envKey);
   try {
     const doc = secretGuard.loadConnectionDocument('kyberion-browser-session') as
       { hmac_key?: string } | undefined;
-    const key = doc?.hmac_key?.trim();
-    return key ? Buffer.from(key, 'utf8') : null;
+    return strong(doc?.hmac_key?.trim());
   } catch {
     return null;
   }
@@ -1263,7 +1280,8 @@ const browserSessionProvider: AuthnProvider = {
     const principal = claimsToPrincipal(
       { iss: payload.idp_iss, sub: payload.sub, exp: payload.exp },
       request,
-      deps
+      deps,
+      { memberBindingOnly: true }
     );
     // A browser session is only ever minted for a bound, active member.
     // An unbound subject would otherwise degrade to the `ext-` path (which
