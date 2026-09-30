@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   checkPrKnowledgeReadiness,
   evaluatePrKnowledgeReadiness,
@@ -13,13 +13,15 @@ import {
   resolveMissionRoot,
   type ChangedFile,
   type GitRunner,
-} from './knowledge/pr-knowledge-readiness.js';
-import type { MemoryCandidate } from './knowledge/memory-promotion-queue.js';
+} from './pr-knowledge-readiness.js';
+import type { MemoryCandidate } from './memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   listMemoryPromotionCandidates,
-} from './knowledge/memory-promotion-queue.js';
+  memoryPromotionQueuePath,
+} from './memory-promotion-queue.js';
 
 const CORE_DIST_BUILT = safeExistsSync(pathResolver.rootResolve('libs/core/dist/secure-io.js'));
 
@@ -518,6 +520,41 @@ describe('evaluatePrKnowledgeReadiness', () => {
     expect(result).toEqual({ ok: true, violations: [] });
   });
 
+  it('flags candidate_not_declared for a TENANT-scoped (organization-domain) candidate the reader returned but the PR body omits', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('none — n/a');
+    const tenantCandidate = baseCandidate({
+      candidate_id: 'MEM-TENANT-ORG',
+      status: 'approved',
+      knowledge_domain: 'organization',
+      scope: { tier: 'confidential', tenant_slug: 'acme-co' } satisfies MemoryScopeEnvelope,
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [tenantCandidate],
+      changedFiles: [],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      { code: 'candidate_not_declared', message: expect.stringContaining('MEM-TENANT-ORG') },
+    ]);
+  });
+
+  it('passes a TENANT-scoped (organization-domain) candidate once "routed:" declares it', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('routed: MEM-TENANT-ORG → organization');
+    const tenantCandidate = baseCandidate({
+      candidate_id: 'MEM-TENANT-ORG',
+      status: 'approved',
+      knowledge_domain: 'organization',
+      scope: { tier: 'confidential', tenant_slug: 'acme-co' } satisfies MemoryScopeEnvelope,
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [tenantCandidate],
+      changedFiles: [],
+    });
+    expect(result).toEqual({ ok: true, violations: [] });
+  });
+
   it('passes a routed-to-organization + declared candidate without requiring it be promoted', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE('routed: MEM-ORG → organization');
     const candidate = baseCandidate({
@@ -595,6 +632,27 @@ describe('resolveMissionRoot', () => {
       `${JSON.stringify(baseCandidate({ source_ref: 'mission:MSN-QUEUE-ONLY' }))}\n`
     );
     expect(resolveMissionRoot({ cwdRoot: base, missionId: 'msn-queue-only' })).toBe(
+      path.resolve(base)
+    );
+  });
+
+  it("returns cwdRoot when a TENANT-scoped queue's candidate names this mission, with no global queue file at all", () => {
+    safeMkdir(path.join(base, 'active/shared/runtime/tenants/acme-co/memory'), {
+      recursive: true,
+    });
+    safeWriteFile(
+      path.join(base, 'active/shared/runtime/tenants/acme-co/memory/promotion-queue.jsonl'),
+      `${JSON.stringify(
+        baseCandidate({
+          candidate_id: 'MEM-TENANT-ONLY',
+          source_ref: 'mission:MSN-TENANT-ONLY',
+        })
+      )}\n`
+    );
+    const gitRunner: GitRunner = () => {
+      throw new Error('git should not be consulted when the tenant queue already has this mission');
+    };
+    expect(resolveMissionRoot({ cwdRoot: base, missionId: 'msn-tenant-only', gitRunner })).toBe(
       path.resolve(base)
     );
   });
@@ -720,6 +778,68 @@ describe('readMissionMemoryCandidates', () => {
     const result = readMissionMemoryCandidates('/other/worktree', pathResolver.rootDir(), reader);
     expect(result).toBe(fakeCandidates);
   });
+
+  it('de-dupes an injected reader result by candidate_id, keeping the same reference when there is nothing to drop', () => {
+    const unique = [baseCandidate({ candidate_id: 'MEM-UNIQUE' })];
+    expect(
+      readMissionMemoryCandidates('/other/worktree', pathResolver.rootDir(), () => unique)
+    ).toBe(unique);
+    const duplicated = [
+      baseCandidate({ candidate_id: 'MEM-DUP', status: 'rejected' }),
+      baseCandidate({ candidate_id: 'MEM-DUP', status: 'promoted' }),
+      baseCandidate({ candidate_id: 'MEM-OTHER' }),
+    ];
+    const result = readMissionMemoryCandidates(
+      '/other/worktree',
+      pathResolver.rootDir(),
+      () => duplicated
+    );
+    expect(result.map((row) => row.candidate_id)).toEqual(['MEM-DUP', 'MEM-OTHER']);
+    expect(result[0]).toBe(duplicated[0]);
+  });
+});
+
+describe('readMissionMemoryCandidates (tenant-scoped merge, real queue paths, no override)', () => {
+  const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
+  let tenantQueuePath: string;
+
+  beforeEach(() => {
+    // Unlike the describe block above, this one must NOT override
+    // KYBERION_MEMORY_QUEUE_PATH: the override short-circuits
+    // `queuePathsForAllScopes` to a single file and skips tenant queue
+    // discovery entirely, which is exactly the production-path behavior
+    // under test here. Only a brand-new, uniquely-named tenant queue is
+    // touched — the real global queue is never written.
+    delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    tenantQueuePath = memoryPromotionQueuePath({
+      tier: 'confidential',
+      tenant_slug: `vitest-kl03-fastpath-${randomUUID().slice(0, 8)}`,
+    } satisfies MemoryScopeEnvelope);
+  });
+
+  afterEach(() => {
+    if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
+    safeRmSync(tenantQueuePath, { force: true });
+  });
+
+  it('merges a tenant-scoped queue candidate on the in-process fast path', () => {
+    const tenantCandidateId = `MEM-TENANT-FASTPATH-${randomUUID().slice(0, 8)}`;
+    safeMkdir(path.dirname(tenantQueuePath), { recursive: true });
+    safeWriteFile(
+      tenantQueuePath,
+      `${JSON.stringify(
+        baseCandidate({
+          candidate_id: tenantCandidateId,
+          source_ref: 'mission:MSN-KL03-TEST',
+          knowledge_domain: 'organization',
+        })
+      )}\n`
+    );
+    const root = pathResolver.rootDir();
+    const result = readMissionMemoryCandidates(root, root);
+    expect(result.some((row) => row.candidate_id === tenantCandidateId)).toBe(true);
+  });
 });
 
 describe.skipIf(!CORE_DIST_BUILT)(
@@ -750,6 +870,48 @@ describe.skipIf(!CORE_DIST_BUILT)(
     it('reads candidates from a different project root through a governed child process', () => {
       const candidates = readMissionMemoryCandidatesFromRoot(root);
       expect(candidates.map((row) => row.candidate_id)).toEqual(['MEM-CROSS-ROOT']);
+    }, 30_000);
+
+    it('also reads a TENANT-scoped queue candidate from that root, merged with the global one', () => {
+      safeMkdir(path.join(root, 'active/shared/runtime/tenants/acme-co/memory'), {
+        recursive: true,
+      });
+      const tenantRow: MemoryCandidate = baseCandidate({
+        candidate_id: 'MEM-TENANT-CROSS-ROOT',
+        source_ref: 'mission:MSN-CROSS-ROOT',
+        knowledge_domain: 'organization',
+      });
+      safeWriteFile(
+        path.join(root, 'active/shared/runtime/tenants/acme-co/memory/promotion-queue.jsonl'),
+        `${JSON.stringify(tenantRow)}\n`
+      );
+      const candidates = readMissionMemoryCandidatesFromRoot(root);
+      expect(candidates.map((row) => row.candidate_id).sort()).toEqual([
+        'MEM-CROSS-ROOT',
+        'MEM-TENANT-CROSS-ROOT',
+      ]);
+    }, 30_000);
+
+    it('de-dupes a candidate_id that appears in both the global and a tenant queue file, via readMissionMemoryCandidates', () => {
+      safeMkdir(path.join(root, 'active/shared/runtime/tenants/acme-co/memory'), {
+        recursive: true,
+      });
+      const duplicateRow: MemoryCandidate = baseCandidate({
+        candidate_id: 'MEM-CROSS-ROOT',
+        source_ref: 'mission:MSN-CROSS-ROOT',
+        knowledge_domain: 'organization',
+      });
+      safeWriteFile(
+        path.join(root, 'active/shared/runtime/tenants/acme-co/memory/promotion-queue.jsonl'),
+        `${JSON.stringify(duplicateRow)}\n`
+      );
+      // `readMissionMemoryCandidatesFromRoot` alone does not de-dupe (it
+      // mirrors the queue's own merged listing); the de-dupe guarantee is
+      // provided by the `readMissionMemoryCandidates` wrapper around it —
+      // exercise that wrapper here, forcing the cross-worktree path by
+      // giving it a cwdRoot different from the mission root.
+      const candidates = readMissionMemoryCandidates(root, path.dirname(root));
+      expect(candidates.filter((row) => row.candidate_id === 'MEM-CROSS-ROOT')).toHaveLength(1);
     }, 30_000);
   }
 );
