@@ -184,3 +184,15 @@ claims, which is exactly what `external_identities` is for: the member
 profile — not the token — carries tenant/role authority. Custom-claim IdPs
 (Keycloak, Auth0, Okta) can still use `kyberion_tenants`/`member_id` claims;
 explicit claims win over the external-identity lookup.
+
+## Browser sign-in (surfaces)
+
+The same `iss`+`sub` → member binding also gates the browser login
+(`docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md`). After the Authorization
+Code + PKCE exchange and id_token verification, a session (`kys1.` cookie) is
+minted **only if** the identity resolves to an active member; an unbound
+identity gets no session (it never degrades to the unregistered `ext-` actor).
+The `browser-session` provider re-runs the member lookup on every request, so
+suspension and membership changes take effect immediately. Bind an identity
+with concierge 「設定 › 組織とメンバー」 or `PATCH /api/members/<id>` with
+`external_identity` (owner on every tenant of the member).

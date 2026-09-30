@@ -12,6 +12,11 @@ import {
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  extractSurfaceCredential,
+  isSameOriginMutation,
+  SURFACE_SESSION_TOKEN_PREFIX,
+} from '@agent/core/surface/surface-session-cookie';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import type { EventScopeInput } from '@agent/core/event-scope';
 export {
@@ -89,8 +94,47 @@ export function isLoopbackOrPrivateAddress(address: string): boolean {
   return false;
 }
 
+function extractPresenceStudioCredential(req: Pick<Request, 'headers'>): {
+  token: string;
+  source: 'header' | 'session-cookie' | 'none';
+} {
+  const header = extractSurfaceBearerToken(req.headers.authorization);
+  if (header) return { token: header, source: 'header' };
+  // Authorization header wins; otherwise fall back to the browser OIDC session cookie.
+  return extractSurfaceCredential({
+    authorization: req.headers.authorization,
+    cookie: req.headers.cookie,
+  });
+}
+
 export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): string {
-  return extractSurfaceBearerToken(req.headers.authorization);
+  return extractPresenceStudioCredential(req).token;
+}
+
+/** True when a remote (non-loopback) peer could be authorized at all (else it is a flat 403). */
+export function isPresenceStudioRemoteAccessEnabled(): boolean {
+  return (
+    getRegisteredEnvText('PRESENCE_STUDIO_ALLOW_REMOTE') === 'true' ||
+    Boolean(getPresenceStudioAuthToken())
+  );
+}
+
+/** Verify a `kys1.` browser session (member scope is re-derived per request). */
+function verifyPresenceStudioBrowserSession(token: string): boolean {
+  try {
+    resolveAuthnSurfaceViewerScope({
+      token,
+      local: false,
+      serverTenant: String(getRegisteredEnvText('KYBERION_TENANT') || '').trim(),
+      configuredCredentials: [],
+      registrations: null,
+      providerIds: ['browser-session'],
+      surface: 'presence-studio',
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolvePresenceStudioCredential(presented: string) {
@@ -144,7 +188,9 @@ export function checkPresenceStudioRateLimit(
   };
 }
 
-export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 'socket'>): {
+export function authorizePresenceStudioRequest(
+  req: Pick<Request, 'headers' | 'socket'> & { method?: string }
+): {
   ok: boolean;
   status: number;
   reason: string;
@@ -154,46 +200,55 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
     return { ok: true, status: 200, reason: 'local' };
   }
 
-  if (getRegisteredEnvText('PRESENCE_STUDIO_ALLOW_REMOTE') === 'true') {
-    const token = getPresenceStudioAuthToken();
-    if (!token) {
-      return {
-        ok: false,
-        status: 401,
-        reason: 'Remote access requires PRESENCE_STUDIO_TOKEN or KYBERION_API_TOKEN.',
-      };
+  if (!isPresenceStudioRemoteAccessEnabled()) {
+    return {
+      ok: false,
+      status: 403,
+      reason:
+        'Remote access disabled. Set PRESENCE_STUDIO_ALLOW_REMOTE=true or provide PRESENCE_STUDIO_TOKEN.',
+    };
+  }
+
+  const credential = extractPresenceStudioCredential(req);
+  if (credential.source === 'session-cookie') {
+    // Cookie-borne credentials ride along on cross-site requests; header auth does not.
+    if (
+      !isSameOriginMutation({
+        method: String(req.method || 'GET'),
+        headers: req.headers,
+        expectedHost: String(req.headers.host || ''),
+      })
+    ) {
+      return { ok: false, status: 403, reason: 'Cross-origin request blocked.' };
     }
-    const presented = extractPresenceStudioToken(req);
-    const resolution = resolvePresenceStudioCredential(presented);
-    if (resolution) {
+    if (
+      credential.token.startsWith(SURFACE_SESSION_TOKEN_PREFIX) &&
+      verifyPresenceStudioBrowserSession(credential.token)
+    ) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
       ok: false,
       status: 401,
-      reason: 'Unauthorized. Provide Authorization: Bearer <token> or connect locally.',
+      reason: 'Unauthorized. Sign in again or provide Authorization: Bearer <token>.',
     };
   }
 
   const token = getPresenceStudioAuthToken();
-  if (token) {
-    const presented = extractPresenceStudioToken(req);
-    const resolution = resolvePresenceStudioCredential(presented);
-    if (resolution) {
-      return { ok: true, status: 200, reason: 'token' };
-    }
+  if (!token) {
     return {
       ok: false,
       status: 401,
-      reason: 'Unauthorized. Provide Authorization: Bearer <token> or connect locally.',
+      reason: 'Remote access requires PRESENCE_STUDIO_TOKEN or KYBERION_API_TOKEN.',
     };
   }
-
+  if (resolvePresenceStudioCredential(credential.token)) {
+    return { ok: true, status: 200, reason: 'token' };
+  }
   return {
     ok: false,
-    status: 403,
-    reason:
-      'Remote access disabled. Set PRESENCE_STUDIO_ALLOW_REMOTE=true or provide PRESENCE_STUDIO_TOKEN.',
+    status: 401,
+    reason: 'Unauthorized. Provide Authorization: Bearer <token> or connect locally.',
   };
 }
 
@@ -350,7 +405,7 @@ export class PresenceStudioViewerError extends Error {
  * bearer token and an active server tenant.
  */
 export function resolvePresenceStudioViewerContext(
-  req: Pick<Request, 'headers' | 'socket'>
+  req: Pick<Request, 'headers' | 'socket'> & { method?: string }
 ): PresenceStudioViewerContext {
   const auth = authorizePresenceStudioRequest(req);
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
