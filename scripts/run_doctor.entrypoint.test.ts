@@ -11,6 +11,7 @@ describe('doctor entrypoint', () => {
     );
 
     expect(source).toContain('function normalizeDoctorArguments(args: string[]): string[]');
+    expect(source).toContain("import '@agent/core/environment-capability-probes';");
     expect(source).toContain('export function formatDoctorReport(');
     expect(source).toContain(
       'context.print(context.json ? report : formatDoctorReport(report, argv));'
