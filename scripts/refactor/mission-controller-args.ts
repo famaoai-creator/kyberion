@@ -161,7 +161,7 @@ export function resolveMissionStartCreateInputFromArgv(
 }
 
 export function validateMissionStartCreateInput(
-  actionName: 'create' | 'start',
+  actionName: 'create' | 'start' | 'kickoff',
   missionId?: string,
   argv: string[] = currentProcessArgv()
 ): ResolvedMissionCliInput {
