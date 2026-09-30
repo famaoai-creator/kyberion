@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <title>オフライン — Concierge</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+      main { max-width: 28rem; }
+      h1 { font-size: 1.25rem; }
+      p { line-height: 1.6; }
+      button { font: inherit; padding: 0.6rem 1rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>接続できません</h1>
+      <p>判断の内容は常に最新である必要があるため、オフラインでは表示しません。接続が戻ってから開き直してください。</p>
+      <p lang="en">You are offline. Decisions are never shown from a stale copy — reconnect and reload.</p>
+      <button type="button" onclick="location.reload()">再読み込み / Reload</button>
+    </main>
+  </body>
+</html>

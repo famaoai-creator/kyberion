@@ -7,7 +7,10 @@ import {
   type DecideQueueEntry,
 } from '../src/lib/decide-view';
 
-function approval(id: string, overrides: Partial<{ reason: string }> = {}): DecideQueueEntry {
+function approval(
+  id: string,
+  overrides: Partial<{ reason: string; tenant_slug: string }> = {}
+): DecideQueueEntry {
   return {
     id,
     kind: 'approval',
@@ -94,6 +97,10 @@ describe('deriveCardFields', () => {
     expect(fields.effect).toBeUndefined();
     expect(fields.evidenceHref).toBeUndefined();
     expect(fields.tenantSlug).toBeUndefined();
+  });
+
+  it('surfaces which organization an approval belongs to (multi-organization members)', () => {
+    expect(deriveCardFields(approval('a3', { tenant_slug: 'acme' })).tenantSlug).toBe('acme');
   });
 
   it('omits why for an approval item with an empty reason (absent-field case)', () => {
