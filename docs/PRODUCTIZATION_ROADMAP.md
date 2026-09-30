@@ -1,41 +1,42 @@
 ---
-title: Kyberion OSS Hardening & FDE-Readiness Roadmap
+title: Kyberion Productization Roadmap — OSS, Managed SaaS & FDE
 category: Planning
-tags: [roadmap, oss, fde, adoption, hardening]
+tags: [roadmap, oss, saas, fde, adoption, hardening]
 importance: 10
 author: famao
-last_updated: 2026-06-05
+last_updated: 2026-09-30
 ---
 
-# Kyberion OSS Hardening & FDE-Readiness Roadmap
+# Kyberion Productization Roadmap — OSS, Managed SaaS & FDE
 
-「研究プロトタイプ」から「**OSS として頑健に使われる、その上で導入支援 / FDE が成立する**」までの距離を、実装可能な単位に分解した計画。
+「研究プロトタイプ」から「**OSS / self-hosted と managed SaaS の双方で安全に使われ、導入支援 / FDE も成立する**」までの距離を、実装可能な単位に分解した計画。
 
 ## 0. 戦略前提
 
-意図的に **やらないこと** から書く。これを書かないと優先度がブレる。
+配布形態を分けて優先順位を明確にする。OSS / self-hosted は引き続き一級の提供形態とし、SaaS は段階ゲートを持つ別レーンとして追加する。
 
-### やらないこと（少なくとも当面）
+### 2026-09-30 の提供判断と保留項目
 
-- **SaaS 化** — マネージド配布、テナント自動受け入れ、課金、利用計測。
-  _理由_: 今 SaaS 化しても土台のユースケースが固まる前に陳腐化する。SaaS は利用者数の関数として後で立てる。
-- **プロダクト化されたマルチテナント GUI** — テナント切替 UI、組織管理、hosted user management、課金と一体化したロールベース ACL。
-  _理由_: OSS の主戦場はシングルユーザ／シングル組織で動くこと。なお、self-hosted / FDE の内部データ境界を守る server-side scope と operation 認可はこの非目標とは別であり、既存 surface の安全な運用基盤として実装する。
-  _2026-09-13 追記_: hosted user management は非目標のまま。self-hosted の**最小メンバー登録簿**(ローカル自動 + オーナー発行トークン、役割 = オーナー / 承認者 / 閲覧、SSO・課金なし)と「見せる範囲を狭めるだけ」のテナント表示は内部認可の延長として [FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) で採用する。
+- **初期提供形態** — 顧客ごとの専用環境で管理運用パイロットを行う。共有ランタイムでの一般提供は、独立した隔離・運用ゲートを満たした後に判断する。詳細は[マネージド SaaS 実用化計画](./developer/improvement-plans-2026-09/SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md)。
+- **顧客要件を確認してから具体化する機能** — IdP / SSO、課金、自動受け入れ、利用計測、外部 REST API / SDK は、専用環境パイロットで顧客要件・サポート境界・採算性を確認して段階決定する。
+- **共有マルチテナント GUI** — テナント切替、hosted user management、課金連動 ACL は、対象の提供形態と隔離設計を確認してから具体化する。self-hosted / FDE の内部 scope と operation 認可は別の要件として維持する。
+- _2026-09-13 追記_: hosted user management は Front Desk 計画の対象外のまま。self-hosted の**最小メンバー登録簿**(ローカル自動 + オーナー発行トークン、役割 = オーナー / 承認者 / 閲覧、SSO・課金なし)と「見せる範囲を狭めるだけ」のテナント表示は、その計画内の UI / 内部認可スコープとして [FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) で採用する。SaaS レーン追加後もこの境界説明は有効。
   _2026-09-13 追記(FD-07)_: この最小メンバー登録簿は `libs/core/organization/member-registry.ts`(`knowledge/personal/members/{member_id}.json`)として実装済み。
-- **公開 REST API / SDK** — 外部開発者が "Kyberion を組み込む" ためのもの。
-  _理由_: そもそも内部のユーザー層がまだ薄い段階で、外向きの安定 API を背負うと内部進化が止まる。
-- **OAuth / SSO 連携 / Stripe 連携** — 上記の派生。
+- **顧客要件の確認前に公開 REST API / SDK を固定すること** — 外部開発者が "Kyberion を組み込む" 安定接面は、専用環境パイロットの利用実績と互換性方針を確認してから設計する。
+- **顧客要件の確認前に OAuth / SSO / Stripe 連携を固定すること** — IdP、認証フロー、料金・請求方式は、パイロットで合意した責任境界とサービス要件に基づいて選ぶ。
 
-### やること
+### 提供レーン
 
-> **境界の明記**: Chronos / Concierge / Presence の `ViewerContext`、tenant scope、operation permission、A2UI manifest filtering は、複数の surface とデータ境界を持つ OSS / self-hosted 環境の内部認可である。SaaS の tenant provisioning、IdP/SSO、billing、hosted user management、公開 API/SDK を意味しない。
+> **内部認可と SaaS の境界**: Chronos / Concierge / Presence の `ViewerContext`、tenant scope、operation permission、A2UI manifest filtering は self-hosted / FDE の内部認可であり、それだけでは SaaS の tenant provisioning、顧客認証、billing、hosted user management、公開 API/SDK の提供条件を満たさない。
 
-1. **OSS として導入の摩擦をゼロに近づける** — clone から first win までのコストを最小化。
-2. **手元で 30 日壊れず動く** — 使い捨てではないツールである、という信頼を作る。
-3. **READ できるリポジトリにする** — コード／ドキュメント／例が、外部の開発者の頭に 1 時間で入る。
-4. **差別化が伝わる** — 似た領域（Computer Use 系、AI 業務自動化、エージェント OS）と混同されない説明と例。
-5. **FDE / 導入支援が成立する土台** — カスタム導入の 80% を「設定とテンプレート」で吸収できる構造。fork なしで 1 案件回せる。
+1. **OSS / self-hosted を一級で維持する** — 導入の摩擦を下げ、安全・復旧・拡張品質を保つ。
+2. **管理 SaaS の専用環境パイロットを始める** — 手動 provisioning を許容し、サポートと運用負荷を計測する。
+3. **共有マルチテナントはゲート通過後に判断する** — 専用環境の実績だけで論理分離の安全性を推定しない。
+4. **FDE / 導入支援を併走する** — 顧客固有要件を設定・テンプレートで吸収し、運用知見を SaaS と self-hosted の双方へ還元する。
+
+> **リリース判断は別ゲート**: SaaS を方針として許容・計画することは、現在のチェックアウトが本番 SaaS の提供条件を満たすという判定ではない。顧客向け go-live は [production readiness G1–G7](./developer/PRODUCTION_READINESS_PLAN.ja.md)、復旧証跡、顧客契約・プライバシー、専用 / 共有各レーンの受入条件を確認して個別に判断する。
+
+従来の K1〜K6 は OSS / FDE 健全度を測る指標として維持する。SaaS の試用継続率、運用原価、復旧時間、サポート介入等は、パイロット設計後に専用指標として定義する。
 
 ### 他プロダクトから取り込む価値があるもの
 
@@ -103,7 +104,7 @@ K1〜K3 は OSS の健康度、K4 は本当に使われているか、K5〜K6 �
 
 ## 2. ギャップ全体像（再分類）
 
-旧版で挙げたうち、SaaS 文脈のギャップを除き、OSS / FDE 文脈で残るものを再構成。
+以下は OSS / self-hosted / FDE レーンのギャップである。SaaS 固有の顧客管理、制御面、契約・運用課題は[マネージド SaaS 実用化計画](./developer/improvement-plans-2026-09/SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md)で追跡する。
 
 ### 2.1 導入摩擦 (D1, D6)
 
@@ -159,7 +160,7 @@ K1〜K3 は OSS の健康度、K4 は本当に使われているか、K5〜K6 �
 
 ## 3. 4 段ホライズン（再構成）
 
-旧版から **Phase C (マルチテナント／billing) を削除**、**Phase D を OSS distribution + FDE-ready に置換**。
+Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の提供レーンを取り消すものではない。旧 Phase C の共有マルチテナント／billing はこのレーンから外し、managed SaaS は専用環境パイロットから段階化する（[実用化計画](./developer/improvement-plans-2026-09/SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md)）。
 
 優先順位: **見える形にする (Phase A) → 30 日壊れない (Phase B) → コミットされる土壌 (Phase C') → 実装支援が成立する (Phase D')**。
 
@@ -225,7 +226,7 @@ K1〜K3 は OSS の健康度、K4 は本当に使われているか、K5〜K6 �
 
 > ゴール: **外部の開発者が "1 週間で何かしら merge される" 状態 / 拡張点が安定する**。
 
-旧版 Phase C（マルチテナント／billing）を全面置換。
+この OSS / FDE レーンでは旧版 Phase C（マルチテナント／billing）を置換する。SaaS の段階とゲートは別計画に置く。
 
 | ID  | タスク                     | 完了条件                                                                           | 主要成果物                               | 該当 D |
 | --- | -------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- | ------ |
@@ -262,19 +263,23 @@ K1〜K3 は OSS の健康度、K4 は本当に使われているか、K5〜K6 �
 
 **受入条件**: 外部の SI / FDE が、Kyberion を **fork せずに** 1 件の顧客導入を完了できる。月次リリースが回る。リファレンス事例 ≥ 2 件。
 
+### Managed SaaS レーン（Phase A〜D' と並行）
+
+SaaS は専用環境の閉じたパイロットから始める。パイロットでは顧客ごとに runtime、storage、secret、backup/restore 境界を分け、provisioning は監査可能な手動運用でもよい。共有ランタイムへの移行は別の security / operations gate として扱う。各段階の受入条件は[マネージド SaaS 実用化計画](./developer/improvement-plans-2026-09/SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md)に記載する。
+
 ---
 
 ## 4. 旧版からの主な変更
 
-| 項目             | 旧版 (v1)                                                                    | 新版 (v2)                                      |
-| ---------------- | ---------------------------------------------------------------------------- | ---------------------------------------------- |
-| 北極星           | プロダクト品質の 5 条件 (D1〜D5)                                             | OSS 健康度 KPI (K1〜K6) + 接面 6 条件 (D1〜D6) |
-| Phase A          | "Beta 公開可能化"                                                            | "見える形にする" — WHY/README/デモ重視         |
-| Phase B          | "信頼性で立つ"                                                               | 同方向。ただし **クロス OS** が追加            |
-| Phase C          | "マルチテナント／billing"                                                    | **削除**、"コミットされる土壌" に置換          |
-| Phase D          | "スケールと差別化（mobile, marketplace, i18n, SOC2 等）"                     | "FDE / 導入支援が成立する" に置換              |
-| 削除した検討事項 | OAuth/SSO, Stripe, REST API, mobile companion, marketplace v2, SOC2/ISO27001 | — 利用者数が増えた時点で再検討                 |
-| 追加した検討事項 | OSS 配布, クロス OS, バーティカル seed, 拡張点 semver, FDE runbook           | —                                              |
+| 項目             | 旧版 (v1)                                                                    | 新版 (v2)                                                                       |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 北極星           | プロダクト品質の 5 条件 (D1〜D5)                                             | OSS 健康度 KPI (K1〜K6) + 接面 6 条件 (D1〜D6)                                  |
+| Phase A          | "Beta 公開可能化"                                                            | "見える形にする" — WHY/README/デモ重視                                          |
+| Phase B          | "信頼性で立つ"                                                               | 同方向。ただし **クロス OS** が追加                                             |
+| Phase C          | "マルチテナント／billing"                                                    | OSS / FDE レーンからは外し、managed SaaS は専用環境パイロットから別計画で進める |
+| Phase D          | "スケールと差別化（mobile, marketplace, i18n, SOC2 等）"                     | "FDE / 導入支援が成立する" に置換                                               |
+| 当時の検討事項   | OAuth/SSO, Stripe, REST API, mobile companion, marketplace v2, SOC2/ISO27001 | OSS / FDE 改訂時の保留。SaaS パイロットの実需と契約要件に基づき再評価           |
+| 追加した検討事項 | OSS 配布, クロス OS, バーティカル seed, 拡張点 semver, FDE runbook           | —                                                                               |
 
 ---
 
@@ -411,15 +416,15 @@ Kyberion の実務では、`project` / `track` / `mission` / `task` / `direct_re
 
 ## 6. 既存ロードマップとの結線
 
-| 既存ドキュメント                                                                 | 本ロードマップでの位置付け                                                                                                    |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 1〜4                                   | 前提。Phase B-1 / B-3 / C'-4 の足場。                                                                                         |
-| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 5                                      | Phase B-1 と一体化（ここで終わらせる）。                                                                                      |
-| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 6                                      | **本計画では遅らせる**。tier の multi-tenant 拡張は K1〜K4 が立った後に再検討。                                               |
-| `docs/developer/architecture/POST_ONBOARDING_UX_ROADMAP.md`                      | Phase A-4 / A-5 の具体実装ガイド。                                                                                            |
-| `knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md` | 5.7 の実行単位境界を、9つの mission class、standalone `task_session`、昇格条件、workflow/team/review 接続として実装する計画。 |
-| `docs/archive/CONCEPT_INTEGRATION_BACKLOG.md`                                    | アーカイブ済。主要項目は完了、残りは本ロードマップで追跡。                                                                    |
-| `docs/developer/architecture/AUTONOMY_SYSTEM_GUIDE.md` / `NERVE_SYSTEM_GUIDE.md` | Phase B-3（24h ミッション）の参照元。                                                                                         |
+| 既存ドキュメント                                                                 | 本ロードマップでの位置付け                                                                                                                  |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 1〜4                                   | 前提。Phase B-1 / B-3 / C'-4 の足場。                                                                                                       |
+| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 5                                      | Phase B-1 と一体化（ここで終わらせる）。                                                                                                    |
+| `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 6                                      | tier の multi-tenant 拡張は K1〜K4 と dedicated pilot の実績を確認して判断。SaaS 全体の停止を意味せず、共有ランタイムは別ゲートを適用する。 |
+| `docs/developer/architecture/POST_ONBOARDING_UX_ROADMAP.md`                      | Phase A-4 / A-5 の具体実装ガイド。                                                                                                          |
+| `knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md` | 5.7 の実行単位境界を、9つの mission class、standalone `task_session`、昇格条件、workflow/team/review 接続として実装する計画。               |
+| `docs/archive/CONCEPT_INTEGRATION_BACKLOG.md`                                    | アーカイブ済。主要項目は完了、残りは本ロードマップで追跡。                                                                                  |
+| `docs/developer/architecture/AUTONOMY_SYSTEM_GUIDE.md` / `NERVE_SYSTEM_GUIDE.md` | Phase B-3（24h ミッション）の参照元。                                                                                                       |
 
 ---
 
@@ -436,6 +441,7 @@ Kyberion の実務では、`project` / `track` / `mission` / `task` / `direct_re
 - [ ] Phase B — 30 日壊れない
 - [ ] Phase C' — コミットされる土壌
 - [ ] Phase D' — FDE / 導入支援が成立する
+- [ ] Managed SaaS — 専用環境パイロット。共有ランタイムは独立ゲート通過まで保留
 
 ---
 
