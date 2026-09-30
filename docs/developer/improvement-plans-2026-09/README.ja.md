@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-09]
-last_updated: 2026-09-27
+last_updated: 2026-09-30
 status: active
 ---
 
@@ -11,6 +11,7 @@ status: active
 
 ## プロダクトと利用体験
 
+- [マネージド SaaS 実用化](./SAAS_PRODUCTIZATION_PLAN_2026-09-30.ja.md) — OSS / self-hosted と並行する専用環境パイロット、production gate、共有マルチテナント移行条件を定義。
 - [フロントデスク再設計](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) — 秘書室と相棒の共有レール、テナント表示、メンバーとアクターの境界を再設計。
 - [ヒアリングとトレーニング](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md) — 依頼の要件化と、テナント単位の学習支援。
 - [Local Pads 統合](./LOCAL_PADS_UNIFICATION_PLAN_2026-09-14.ja.md) — 8つの作業場所を共通の保存・履歴・UIへ統合。
