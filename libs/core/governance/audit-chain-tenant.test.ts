@@ -64,7 +64,7 @@ vi.mock('./audit-forwarder.js', () => ({
 }));
 
 vi.mock('../core.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 describe('audit-chain — tenant mirror', () => {

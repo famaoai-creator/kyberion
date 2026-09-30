@@ -219,7 +219,7 @@ class PolicyEngineImpl {
           `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${safePolicyPath}`
         );
       }
-      logger.info(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
+      logger.debug(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
     }
   }
 

@@ -32,6 +32,7 @@ vi.mock('@agent/core/core', async (importOriginal) => {
   return {
     ...actual,
     logger: {
+      debug: vi.fn(),
       ...actual.logger,
       warn: mocks.loggerWarn,
     },

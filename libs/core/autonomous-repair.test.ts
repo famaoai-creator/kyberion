@@ -4,6 +4,7 @@ import { sendOpsAlert } from './ops-alert.js';
 
 vi.mock('./core.js', () => ({
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

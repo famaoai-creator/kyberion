@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Keep the loop fully hermetic: no disk writes from the observability recorder,
 // no real governance ledger from context-rewind, deterministic logging.
 vi.mock('../core.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 // Partial mock: keep real reads/exists (the reasoning-backend import graph
 // needs them at load time) but no-op every write so the observability recorder

@@ -198,7 +198,7 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
 }));
 vi.mock('@agent/core/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/core')>()),
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock('@agent/core/video/video-composition-compiler', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/video/video-composition-compiler')>()),
