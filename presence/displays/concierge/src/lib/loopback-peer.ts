@@ -5,13 +5,15 @@
  * never the Host header. Kept separate because viewer-context pulls in
  * Node-only modules that the edge runtime cannot load.
  */
+import { getRegisteredEnvBool } from '@agent/core/foundation/env';
+
 interface PeerRequestLike {
   ip?: string;
   headers: { get(name: string): string | null };
 }
 
 export function isLoopbackPeer(req: PeerRequestLike): boolean {
-  const trustProxy = /^(1|true|yes|on)$/i.test(process.env.KYBERION_TRUST_PROXY ?? '');
+  const trustProxy = getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true;
   const peerIp =
     req.ip ||
     (trustProxy
