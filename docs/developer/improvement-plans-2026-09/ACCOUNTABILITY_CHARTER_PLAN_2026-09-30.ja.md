@@ -1,0 +1,128 @@
+---
+title: 責任者憲章(Accountability Charter) — HITL から「誰がケツを拭くか」へ
+category: Improvement Plan
+tags: [accountability, autonomy, hitl, authority, risk-appetite, delegation, charter]
+last_updated: 2026-09-30
+status: proposal
+---
+
+# 責任者憲章(Accountability Charter)
+
+## 判断
+
+これまでの HITL(人が毎回承認する)は、AI の判断を信用できなかった時代の**品質ゲート**だった。
+ゲートは 3 つの副作用を持つ。人が律速になる、承認が形骸化する(押すだけになる)、責任の所在がぼやける(押した人 = 責任者ではない)。
+
+HITL をやめ、次の 3 つを**事前に**決める仕組みに置き換える。あとはエージェントが憲章の内側で自走する。
+
+| 決めること | 意味 |
+| ---------- | ---- |
+| **① 責任者** | 何かあったときに最後に責任を取る人間は誰か。名前と、その権限の根拠 |
+| **② 権限(envelope)** | その人が実際に持っている権限の範囲。**これを超える委任は無効**。覚悟があっても権限逸脱はできない |
+| **③ 覚悟(appetite)** | その人が「ここまでの損失・リスクは自分が引き受ける」と宣言した量。権限の内側でしか宣言できない |
+
+承認は「行為ごと」ではなく「憲章に対して一度」行う。行為ごとの人間の承認は、憲章の外に出る場合の**例外経路**に下げる。
+
+## 設計原則
+
+1. **責任は人間に帰属し、実行は誰でもよい。** 記録上の実行主体は agent、`on_behalf_of` は責任者、根拠は憲章 ID とする。
+2. **権限は縮むだけで、憲章では広がらない。** 有効範囲 = 責任者の実権限 ∩ envelope ∩ appetite。憲章は権限の付与ではなく、既存の権限の**委任範囲の宣言**である。
+3. **人は待たせない。** 範囲内は実行して事後に記録する。範囲外は「承認を求める」のではなく、拒否したうえで**憲章の変更提案**を作る。承認待ちで作業を止めない。
+4. **取り消せるものを先に使う。** 範囲内でも、可逆な手段があれば可逆な手段を選ぶ。不可逆な操作は envelope で明示的に許可された類型のみ。
+5. **覚悟は数字で書く。** 「慎重に」は書けない。金額・件数・影響範囲・評判リスクの等級で書く。
+6. **不在でも止まらない。** 責任者が不在なら代理責任者へ。代理もいなければ、可逆な操作だけを許す安全モードに落ちる(fail-closed)。
+7. **憲章は失効する。** 期限付きで、更新は責任者本人が認証を通して行う。
+
+## 憲章のデータ
+
+```jsonc
+{
+  "charter_id": "chr-acme-2026-09",
+  "scope": { "kind": "organization", "tenant_slug": "acme" }, // または { "kind": "person" }
+  "accountable": {
+    "actor": "user:owner",
+    "authority_basis": { "kind": "officer", "evidence_ref": "..." }, // owner | officer | delegated | self
+    "accepted_at": "2026-09-30T00:00:00Z",
+    "expires_at": "2026-12-31T00:00:00Z",
+    "statement_sha256": "...",           // 受諾文の hash。認証済みの本人操作でのみ書ける
+    "deputies": ["user:carol"]
+  },
+  "envelope": {
+    "money":     { "currency": "JPY", "per_action": 100000, "per_day": 500000, "per_month": 3000000 },
+    "data_tier": { "read": ["public", "confidential:acme"], "write": ["confidential:acme"] },
+    "external_effects": {
+      "send_message_external": "allow",
+      "publish_public": "allow_with_review_by_other_provider",
+      "sign_contract": "forbid",
+      "payment": "allow_within_money",
+      "credential_change": "forbid"
+    },
+    "irreversible": "named_actions_only"
+  },
+  "appetite": {
+    "max_loss_per_incident": 300000,
+    "reputational_class_max": "B",
+    "blast_radius_max": { "recipients": 50, "systems": 1 },
+    "tripwires": ["監査チェーンの欠落", "予算の 80% 到達", "同一エラーの 3 連続"]
+  }
+}
+```
+
+- `tripwires` は責任者の言う「クビになる条件」に当たる。到達したら即時に停止して責任者へ通知する。
+- 数値は例であり、既定値は決めない。**憲章が無い間の既定は今の承認ゲート**(=今までどおり)とする。憲章を作った組織・個人だけが新方式になる。
+
+## 判定(実行時)
+
+```text
+評価(action, charter)
+  1. 責任者の実権限に含まれるか            … 含まれない → deny(憲章の外。変更提案を作らない、権限がないため)
+  2. envelope に含まれるか                  … 含まれない → deny + 憲章変更提案
+  3. appetite の残量に収まるか              … 収まらない → deny + 予算/憲章の変更提案
+  4. 可逆な代替手段があるか                 … あれば代替を選ぶ
+  5. 範囲内 → 実行し、監査に (actor, on_behalf_of, charter_id, 消費した appetite) を記録
+  6. 残量が 20% 未満 / tripwire 近接 → 実行して即時通知
+  7. tripwire 到達 → 停止 + 責任者へ通知
+```
+
+## 既存資産との接続
+
+| 既存 | 役割の変化 |
+| ---- | ---------- |
+| `approval-gate` / `approval-policy` | 憲章の範囲外にだけ働く。範囲内では呼ばれない |
+| `autonomous-ops-gate`(4 軸の点数化) | 憲章の appetite を入力にする。点数のしきい値を憲章から導く |
+| `actor.ts`(human / agent / service) | 「承認は人間のみ」を「**責任は人間のみ**、決定は憲章内なら agent 可」に改める。`on_behalf_of` は必須 |
+| `kill-switch` | tripwire の停止手段として使う |
+| tenant activation の `--accept`(人間の受け入れ) | 憲章の受諾に一本化する。activation は憲章の存在を前提にする |
+| `member-registry` の membership role | 責任者の**実権限**の根拠。envelope の上限を導く |
+| 監査チェーン | 消費した appetite の集計元 |
+
+## 複数組織の兼務
+
+- 憲章は**組織ごとに 1 つ**、それとは別に**個人の憲章**を持てる。
+- ある組織で責任者でない場合、その組織の憲章が上限になる。オーナーがその組織の中で上位の権限を持たなければ、オーナーの別の会社での権限は持ち込めない。
+- Me(個人の面)は、各組織の憲章の**消費状況**(appetite の使用率、tripwire 近接)を横断して一覧にする。組織間で中身は混ぜない。
+
+## 責任者に届けるもの(HITL の代わり)
+
+承認依頼の代わりに、次だけを届ける。
+
+1. **今日の説明責任レポート**: 実行した件数、消費した appetite、取り消した件数、憲章の外で拒否した件数。
+2. **tripwire・近接通知**(即時)。
+3. **憲章の変更提案**(拒否が積み上がったとき。承認待ちで止まるものはない)。
+
+## 実装
+
+| # | 内容 |
+| - | ---- |
+| 1 | 憲章のスキーマ、registry、受諾(認証済みの本人操作)、失効 |
+| 2 | 判定エンジン `evaluateAgainstCharter`(実権限 ∩ envelope ∩ appetite)と、appetite 消費の集計 |
+| 3 | `approval-gate` / `autonomous-ops-gate` への接続(憲章がある scope だけ) |
+| 4 | `actor.ts` の決定権の改訂(`on_behalf_of` 必須、憲章 ID の記録) |
+| 5 | 責任者への説明責任レポート、tripwire 通知、憲章変更提案 |
+| 6 | Me / Org の面: 憲章の作成ウィザード、使用率の表示、受諾 |
+
+## 限界(必ず守る前提)
+
+1. **Kyberion は法的な権限を創り出せない。** 憲章は「誰がどこまで引き受けると宣言したか」の記録であり、会社法上の権限の代わりではない。契約の締結・支払いの類型は、`authority_basis` の根拠がない限り envelope に入れられない。実運用では法務の確認を推奨する。
+2. **エージェントは間違う。** 憲章は「間違わない」前提ではなく、「間違ったときの損害の上限を先に決める」ための仕組みである。上限(appetite)は、エージェントの能力ではなく責任者の耐えられる損失で決める。
+3. **憲章の緩和は遡及しない。** 緩めた後の行為にだけ効く。
