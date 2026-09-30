@@ -23,6 +23,7 @@ export {
 } from './knowledge-usage-aggregate.js';
 export * from './knowledge-weight-recalculation.js';
 export * from './memory-notebook.js';
+export * from './memory-promotion-git.js';
 export * from './memory-promotion-queue.js';
 export * from './memory-promotion-review.js';
 export * from './memory-promotion-workflow.js';
