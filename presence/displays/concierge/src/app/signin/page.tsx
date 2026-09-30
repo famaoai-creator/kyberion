@@ -66,6 +66,9 @@ export default function SignInPage() {
           {frontDeskText('signin_submit', locale)}
         </button>
       </div>
+      <p className="pane-subtitle">
+        <a href="/login">{frontDeskText('signin_sso_link', locale)}</a>
+      </p>
     </section>
   );
 }
