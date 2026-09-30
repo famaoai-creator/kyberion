@@ -48,7 +48,7 @@ vi.mock('../foundation/io.js', () => ({
   registerFoundationIo: vi.fn(),
 }));
 vi.mock('../core.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
 import { executeAdfSteps } from '../pipeline/adf-engine.js';

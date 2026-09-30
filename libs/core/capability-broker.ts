@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { auditChain } from './governance/audit-chain.js';
 import {
   PIN_FILE_VERSION,
@@ -98,7 +99,14 @@ function recordDecision(decision: ProviderDecision): void {
       decisionKey: decision.decisionKey,
       requiredCapabilities: decision.requiredCapabilities,
       unmetCapabilities: decision.unmetCapabilities,
-      availableProviders: decision.availableProviders,
+      // Compact form: the full provider list is re-derivable from the
+      // capability catalog; the digest lets two entries be compared for set
+      // equality without repeating the array on every decision.
+      availableProvidersCount: decision.availableProviders.length,
+      availableProvidersDigest: createHash('sha256')
+        .update([...decision.availableProviders].sort().join(','))
+        .digest('hex')
+        .slice(0, 12),
     },
   });
 }
