@@ -66,6 +66,22 @@ const KNOWLEDGE_SECTION_TEMPLATE = (lines: string): string =>
   ].join('\n');
 
 describe('parsePrBodyKnowledge', () => {
+  it('treats an empty Mission ID line as absent instead of reading the next line', () => {
+    const parsed = parsePrBodyKnowledge(
+      [
+        '## Coordination',
+        '',
+        '- Mission ID: ',
+        '- Workitem IDs:',
+        '',
+        '## Knowledge',
+        '',
+        '- none — follow-up without a mission',
+      ].join('\n')
+    );
+    expect(parsed.missionId).toBeUndefined();
+  });
+
   it('extracts the mission id and treats a placeholder as absent', () => {
     expect(
       parsePrBodyKnowledge(KNOWLEDGE_SECTION_TEMPLATE('none — nothing learned')).missionId

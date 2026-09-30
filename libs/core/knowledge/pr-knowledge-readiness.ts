@@ -110,7 +110,7 @@ function stripMissionIdDecoration(raw: string): string {
 function parseMissionId(sanitizedBody: string): string | undefined {
   const coordination = extractMarkdownSection(sanitizedBody, 'Coordination');
   if (coordination === null) return undefined;
-  const match = coordination.match(/^-\s*Mission ID:\s*(.*)$/imu);
+  const match = coordination.match(/^-[ \t]*Mission ID:[ \t]*(.*)$/imu);
   if (!match) return undefined;
   const stripped = stripMissionIdDecoration(match[1] || '');
   if (!stripped || PLACEHOLDER_MISSION_ID_PATTERN.test(stripped)) return undefined;
