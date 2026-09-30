@@ -402,3 +402,11 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
     vi.doUnmock('@agent/core/front-desk-nav');
   });
 });
+
+describe('token sign-in coexists with the OIDC login', () => {
+  it('the token page links back to the SSO /login', () => {
+    const signin = read('src/app/signin/page.tsx');
+    expect(signin).toContain('href="/login"');
+    expect(signin).toContain("frontDeskText('signin_sso_link', locale)");
+  });
+});
