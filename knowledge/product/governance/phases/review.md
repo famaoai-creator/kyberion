@@ -44,7 +44,7 @@ For repository work, distillation and product-domain promotion happen **before**
 4. Declare every mission candidate in the PR body's `## Knowledge` section (`promoted` / `rejected` / `routed` / `none`). `pnpm kyberion pr create` refuses the PR while a candidate is unresolved or undeclared, while a promoted record is missing from the diff, or when the diff adds files under `knowledge/confidential/` or `knowledge/personal/`. For a mission worktree, `memory-promote-pending --mission <ID> --target-root <worktree>` promotes only that mission's `pr_review` product candidates; `--target-root` to another worktree requires `--approval-channel pr_review`.
 5. After merge and `git fetch origin main`, `finish` ratifies each `pr_review` candidate by confirming its record exists on `origin/main` (`ratified_at`, `ratified_commit`). A record the PR review dropped is closed with `memory-reject`.
 
-Organization and personal lessons never enter a repository PR; route them with the flow above. Lessons that surface only after merge go in a small follow-up PR.
+The mission checkout (where the ledger, queue and audit chain live) must run code at least as new as this flow — its schemas resolve from that root — see [cross-worktree-governance-lessons](../../orchestration/cross-worktree-governance-lessons.md). Organization and personal lessons never enter a repository PR; route them with the flow above. Lessons that surface only after merge go in a small follow-up PR.
 
 ## Constraints
 
