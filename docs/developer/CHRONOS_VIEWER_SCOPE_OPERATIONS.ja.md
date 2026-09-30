@@ -6,7 +6,7 @@ last_updated: 2026-09-27
 
 # Chronos viewer scope 運用手順
 
-この機構はログイン基盤ではなく、Chronos の HTTP リクエストに viewer principal と tenant / organization / project の許可集合を付与するための境界です。IdP、SSO、人間ユーザー管理は対象外です。
+この機構はログイン基盤ではなく、Chronos の HTTP リクエストに viewer principal と tenant / organization / project の許可集合を付与するための境界です。IdP、SSO、人間ユーザー管理は対象外です(ブラウザからのサインインは別機構: [サーフェス OIDC ログイン](./SURFACE_OIDC_LOGIN_OPERATIONS.ja.md))。
 
 ## 段階導入
 

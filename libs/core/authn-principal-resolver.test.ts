@@ -137,7 +137,7 @@ function expectAuthnRejection(fn: () => unknown, status: 401 | 403, code?: strin
 // ---------------------------------------------------------------------------
 
 describe('authn seam — registry and selection', () => {
-  it('registers all seven built-in providers', () => {
+  it('registers all built-in providers (incl. browser-session)', () => {
     expect(
       listAuthnProviders()
         .map((p) => p.id)

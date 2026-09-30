@@ -34,7 +34,13 @@ import {
   ComputerSurfaceViewerError,
   isComputerSurfaceLoopbackRequest,
   resolveComputerSurfaceViewerContext,
+  assertComputerSurfaceCookieMutationSafe,
 } from './auth.js';
+import {
+  computerSurfaceLoginRedirect,
+  registerComputerSurfaceAuthRoutes,
+  computerSurfaceAuthRateLimiter,
+} from './surface-auth.js';
 import {
   getComputerSurfaceAccess,
   getComputerSurfaceGuardedSurfaceUrl,
@@ -106,6 +112,7 @@ function authorizeSurface(
 ): SurfaceAuthorizationContext | null {
   let context: SurfaceAuthorizationContext;
   try {
+    assertComputerSurfaceCookieMutationSafe(req);
     context = resolveComputerSurfaceViewerContext(req);
   } catch (error) {
     const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
@@ -243,6 +250,10 @@ if (!safeExistsSync(staticDir)) {
 }
 
 app.use(express.json({ limit: '1mb' }));
+// Browser OIDC login: routes first (unauthenticated), then the page-navigation
+// redirect, both ahead of the page/static handlers.
+registerComputerSurfaceAuthRoutes(app);
+app.use(computerSurfaceAuthRateLimiter, computerSurfaceLoginRedirect());
 // UI-09: the page template + shared vanilla renderer (fixed routes) come
 // before the static files, and the static files refuse any path that names
 // the template, so the raw template is never served unfilled.

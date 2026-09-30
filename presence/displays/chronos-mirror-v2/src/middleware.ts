@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getRegisteredEnvBool } from '@agent/core/foundation/env';
+import {
+  SURFACE_SESSION_COOKIE,
+  peekSessionExpiry,
+  resolveLoginRedirect,
+} from '@agent/core/surface/surface-session-cookie';
 
 const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
 
@@ -33,19 +38,51 @@ function resolvePeerIp(request: NextRequest): string | undefined {
  * Keep the API surface closed before a route module is evaluated. The route
  * guard performs the full token/registry/role decision; this node-free
  * boundary prevents accidental unguarded API routes and leaves /healthz as
- * the sole explicit public probe.
+ * the sole explicit public probe. Unauthenticated remote browser page
+ * navigations are redirected to the shared OIDC /login page; API calls keep
+ * returning 401 JSON and loopback is never redirected.
  */
 export function middleware(request: NextRequest): NextResponse {
-  if (request.nextUrl.pathname === '/api/healthz') return NextResponse.next();
-  const hasCredential = Boolean(
-    request.headers.get('authorization') || request.cookies.get('kyberion_token')?.value
-  );
+  const pathname = request.nextUrl.pathname;
+  if (pathname === '/api/healthz') return NextResponse.next();
+  const authorization = request.headers.get('authorization');
+  const legacyCookie = request.cookies.get('kyberion_token')?.value;
+  const sessionCookie = request.cookies.get(SURFACE_SESSION_COOKIE)?.value;
+  const hasCredential = Boolean(authorization || legacyCookie || sessionCookie);
   const peerIp = resolvePeerIp(request);
   const loopback = Boolean(peerIp && LOOPBACK_ADDRESSES.includes(peerIp));
+
+  if (!pathname.startsWith('/api/')) {
+    // UX-only: a sole session cookie that is visibly expired/malformed counts
+    // as no credential so the browser is sent to sign in again. APIs still
+    // verify the token themselves.
+    const staleSessionOnly =
+      !authorization &&
+      !legacyCookie &&
+      sessionCookie &&
+      peekSessionExpiry(sessionCookie) !== 'valid';
+    const redirect = resolveLoginRedirect({
+      method: request.method ?? 'GET',
+      pathname,
+      search: request.nextUrl.search ?? '',
+      headers: request.headers,
+      loopback,
+      hasCredential: hasCredential && !staleSessionOnly,
+    });
+    if (redirect) {
+      // Next's middleware runtime rejects a bare relative Location ("Invalid URL");
+      // resolve against the request URL like the other Next surfaces do.
+      return NextResponse.redirect(new URL(redirect, request.url), 302);
+    }
+    return NextResponse.next();
+  }
+
   if (!hasCredential && !loopback) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ['/api/:path*'] };
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};

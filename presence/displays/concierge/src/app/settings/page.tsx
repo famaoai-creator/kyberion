@@ -376,7 +376,11 @@ export default function SettingsPage() {
   const patchMember = React.useCallback(
     async (
       memberId: string,
-      patch: { tenant_slug: string; role: SettingsRole } | { status: 'active' | 'suspended' }
+      patch:
+        | { tenant_slug: string; role: SettingsRole }
+        | { status: 'active' | 'suspended' }
+        | { external_identity: { issuer: string; subject: string } }
+        | { external_identity_remove: { issuer: string; subject: string } }
     ) => {
       setMemberBusy(true);
       try {

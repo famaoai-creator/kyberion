@@ -158,6 +158,26 @@
             "external_idp": "declared",
             "synthetic": "declared"
           }
+        },
+        "browser-session": {
+          "traits": {
+            "assurance": 0.85,
+            "offline": 1,
+            "zero_config": 0.1,
+            "agent_workload": 0,
+            "human_workload": 1,
+            "external_idp": 0.8,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          }
         }
       },
       "purposes": {
