@@ -30,6 +30,20 @@ describe('concierge middleware', () => {
     );
   });
 
+  it('serves installability assets to an unauthenticated remote browser (no /login bounce)', () => {
+    for (const path of [
+      '/manifest.webmanifest',
+      '/sw.js',
+      '/offline.html',
+      '/icons/icon-192.png',
+    ]) {
+      expect(run(path, NAV).headers.get('location')).toBeNull();
+    }
+    // Lookalikes are not exempt.
+    expect(run('/sw.js.map', NAV).status).toBe(302);
+    expect(run('/iconsx/a.png', NAV).status).toBe(302);
+  });
+
   it('never redirects loopback', () => {
     expect(run('/', NAV, true).headers.get('location')).toBeNull();
   });
