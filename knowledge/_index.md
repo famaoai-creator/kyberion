@@ -385,6 +385,7 @@
 - [Meeting Operations Playbook](./product/orchestration/meeting-operations-playbook.md) (public | Unknown)
 - [Memory Snapshot Protocol](./product/orchestration/memory-snapshot-protocol.md) (public | Ecosystem Architect)
 - [Mesh Hub Inspection](./product/orchestration/mesh-hub-inspection.md) (public | Unknown)
+- [Mission Kickoff Playbook — friction-free mission start for repo-internal work](./product/orchestration/mission-kickoff-playbook.md) (public | Unknown)
 - [Mission Portability Standard (MEP v0.1)](./product/orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
 - [Mission Triage Playbook — closing missions that cannot finish](./product/orchestration/mission-triage-playbook.md) (public | Unknown)
 - [Mission Types & Categories](./product/orchestration/mission-types.md) (public | Ecosystem Architect)
