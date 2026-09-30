@@ -115,7 +115,7 @@ function baseEnv(extra: Record<string, string> = {}): Record<string, string> {
     KYBERION_OIDC_ISSUER: ISSUER,
     KYBERION_OIDC_CLIENT_ID: CLIENT_ID,
     KYBERION_OIDC_CLIENT_SECRET: 'client-secret',
-    KYBERION_SESSION_SECRET: 'session-secret-for-tests',
+    KYBERION_SESSION_SECRET: 'session-secret-for-tests-0123456789abcdef',
     KYBERION_OIDC_PUBLIC_BASE_URL: 'https://desk.example.com',
     ...extra,
   };
@@ -166,7 +166,7 @@ describe('resolveOidcLoginConfig', () => {
     expect(missing).toEqual([
       'KYBERION_OIDC_ISSUER',
       'KYBERION_OIDC_CLIENT_ID',
-      'KYBERION_SESSION_SECRET',
+      'KYBERION_SESSION_SECRET (>= 32 bytes)',
     ]);
   });
 
@@ -509,6 +509,24 @@ describe('handleSurfaceAuthRoute', () => {
     ).toBe(true);
   });
 
+  it('unbound and suspended screens offer a way out and tell the admin where to bind', async () => {
+    const { renderSurfaceLoginPage } = await import('./surface-login-pages.js');
+    const unbound = renderSurfaceLoginPage({
+      surfaceLabel: 'Concierge',
+      locale: 'en',
+      view: { kind: 'unbound', issuer: 'https://idp.example', subject: '<b>x</b>' },
+    });
+    expect(unbound).toContain('href="/login"');
+    expect(unbound).toContain('Organization and members');
+    expect(unbound).not.toContain('<b>x</b>');
+    const suspended = renderSurfaceLoginPage({
+      surfaceLabel: 'Concierge',
+      locale: 'en',
+      view: { kind: 'suspended' },
+    });
+    expect(suspended).toContain('href="/login"');
+  });
+
   it('logout clears the session cookie', async () => {
     const res = await handleSurfaceAuthRoute(req({ pathname: '/logout' }), { env: baseEnv() });
     expect(res?.status).toBe(302);
@@ -570,7 +588,7 @@ describe('browser-session authn provider', () => {
     seedMember({ issuer: ISSUER, subject: 's1' });
     const foreign = mintBrowserSessionToken(
       { idpIssuer: ISSUER, subject: 's1', ttlSeconds: 600 },
-      { env: { ...env, KYBERION_SESSION_SECRET: 'another-secret' } }
+      { env: { ...env, KYBERION_SESSION_SECRET: 'another-secret-another-secret-0123456789' } }
     ).token;
     expect(() => resolveSession(foreign)).toThrow(/invalid or expired/);
   });
@@ -658,5 +676,123 @@ describe('Google / Microsoft Entra specifics', () => {
     );
     expect(started).toMatchObject({ ok: false, view: { kind: 'failed', code: 'idp_error' } });
     expect(audited.join(' ')).toContain('tenant-specific issuer');
+  });
+});
+
+describe('review hardening', () => {
+  const env = baseEnv();
+
+  it('a session whose IdP sub looks like user:<member> cannot name a member without a binding', async () => {
+    // carol exists and is active, but bound to a DIFFERENT subject.
+    seedMember({ issuer: ISSUER, subject: 'someone-else' });
+    const token = mintBrowserSessionToken(
+      { idpIssuer: ISSUER, subject: 'user:carol', ttlSeconds: 600 },
+      { env }
+    ).token;
+    expect(() =>
+      resolveAuthnPrincipal(
+        { credential: { type: 'bearer', token } },
+        { providerIds: ['browser-session'], deps: { env, memberRegistry: { rootDir: memberRoot } } }
+      )
+    ).toThrow(/not a bound member/);
+    // ...and the login callback refuses to mint one in the first place.
+    const idp = makeIdp();
+    idp.state.tokenClaims = (nonce) => ({
+      iss: ISSUER,
+      aud: CLIENT_ID,
+      sub: 'user:carol',
+      nonce,
+      exp: Math.floor(Date.now() / 1000) + 600,
+    });
+    const { result } = await runLogin(
+      { env, fetchJson: idp.fetchJson, memberRegistry: { rootDir: memberRoot } },
+      idp
+    );
+    expect(result).toMatchObject({ ok: false, view: { kind: 'unbound' } });
+  });
+
+  it('treats a short session secret as not configured', () => {
+    const weak = baseEnv({ KYBERION_SESSION_SECRET: 'too-short' });
+    expect(resolveOidcLoginConfig({ env: weak }).missing).toContain(
+      'KYBERION_SESSION_SECRET (>= 32 bytes)'
+    );
+    expect(() =>
+      mintBrowserSessionToken({ idpIssuer: ISSUER, subject: 's', ttlSeconds: 60 }, { env: weak })
+    ).toThrow(/no browser session signing key/);
+  });
+
+  it('rejects an id_token with a foreign azp, and any non-RS256/ES256 alg', async () => {
+    seedMember({ issuer: ISSUER, subject: 'idp-subject-1' });
+    const idpAzp = makeIdp();
+    const original = idpAzp.state.tokenClaims;
+    idpAzp.state.tokenClaims = (nonce) => ({ ...original(nonce), azp: 'another-client' });
+    const azp = await runLogin(
+      { env, fetchJson: idpAzp.fetchJson, memberRegistry: { rootDir: memberRoot } },
+      idpAzp
+    );
+    expect(azp.result).toMatchObject({
+      ok: false,
+      view: { kind: 'failed', code: 'token_invalid' },
+    });
+
+    resetOidcLoginCachesForTests();
+    const idpAlg = makeIdp();
+    const hs = (nonce: string) => {
+      const head = b64({ alg: 'HS256', kid: 'k1' });
+      const body = b64(idpAlg.state.tokenClaims(nonce));
+      return `${head}.${body}.sig`;
+    };
+    const wrapped: typeof idpAlg.fetchJson = async (request) =>
+      request.url === `${ISSUER}/token`
+        ? { id_token: hs(idpAlg.state.nonceFor.get(request.form?.code ?? '') ?? '') }
+        : idpAlg.fetchJson(request);
+    const alg = await runLogin(
+      {
+        env: { ...env, KYBERION_OIDC_ALLOW_HS256: '1' },
+        fetchJson: wrapped,
+        memberRegistry: { rootDir: memberRoot },
+      },
+      idpAlg
+    );
+    expect(alg.result).toMatchObject({
+      ok: false,
+      view: { kind: 'failed', code: 'token_invalid' },
+    });
+  });
+
+  it('marks cookies Secure from the declared public origin even when the request origin is http (TLS proxy)', async () => {
+    seedMember({ issuer: ISSUER, subject: 'idp-subject-1' });
+    const idp = makeIdp();
+    const deps: OidcLoginDeps = {
+      env,
+      fetchJson: idp.fetchJson,
+      memberRegistry: { rootDir: memberRoot },
+    };
+    const start = await handleSurfaceAuthRoute(
+      {
+        surfaceId: 'concierge',
+        surfaceLabel: 'Concierge',
+        method: 'GET',
+        pathname: '/auth/start',
+        searchParams: new URLSearchParams(),
+        requestOrigin: 'http://internal-app:3050',
+        loopback: false,
+      },
+      deps
+    );
+    expect(start?.setCookies[0]).toContain('Secure');
+    const logout = await handleSurfaceAuthRoute(
+      {
+        surfaceId: 'concierge',
+        surfaceLabel: 'Concierge',
+        method: 'GET',
+        pathname: '/logout',
+        searchParams: new URLSearchParams(),
+        requestOrigin: 'http://internal-app:3050',
+        loopback: false,
+      },
+      deps
+    );
+    expect(logout?.setCookies[0]).toContain('Secure');
   });
 });

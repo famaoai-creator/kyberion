@@ -125,8 +125,11 @@ function isBlockedCookieMutation(req: NextRequest): boolean {
   const method = (req.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
   if (extractSurfaceBearerToken(req.headers.get('authorization'))) return false;
-  if (req.cookies.get('kyberion_token')?.value) return false;
-  if (!req.cookies.get(SURFACE_SESSION_COOKIE)?.value) return false;
+  // A `kys1.` value is a browser session wherever the cookie jar put it (a
+  // planted `kyberion_token=kys1.…` must not dodge the check); the pre-existing
+  // opaque kyberion_token keeps its previous behaviour.
+  const token = resolveChronosToken(req);
+  if (!token || !token.startsWith(SURFACE_SESSION_TOKEN_PREFIX)) return false;
   return !isSameOriginMutation({
     method,
     headers: req.headers,
