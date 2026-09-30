@@ -748,7 +748,7 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
       };
     },
   });
-  logger.success(`[stt-bridge] installed WhisperKit CLI bridge (${executable})`);
+  logger.debug(`[stt-bridge] installed WhisperKit CLI bridge (${executable})`);
   return true;
 }
 

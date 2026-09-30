@@ -156,7 +156,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   const configuredEndpoints = discoverReasoningEndpoints().filter(
     (endpoint) => endpoint.configured
   );
-  logger.info(
+  logger.debug(
     `[REASONING_ENDPOINT_DISCOVERY] Configured ${configuredEndpoints.length}: ${
       configuredEndpoints.map((endpoint) => endpoint.runtime).join(', ') || 'none'
     }`
@@ -222,7 +222,7 @@ function buildReasoningRuntimeBundle(
     isCliDiscoveryMode(mode) &&
     cliModeAbsentFromDiscovery(mode, provider, discoverProviders(false))
   ) {
-    logger.info(
+    logger.debug(
       `[reasoning-bootstrap] skip mode=${mode}: provider discovery reports the CLI is not installed`
     );
     return null;
@@ -296,7 +296,7 @@ function filterChainByProviderCapability(
         );
         return true;
       }
-      logger.info(
+      logger.debug(
         `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports binary_found=false (probed_at=${capability.probed_at})`
       );
       return false;
@@ -307,7 +307,7 @@ function filterChainByProviderCapability(
     // recovered. Keep the candidate in that case and let the runtime
     // provider-local auth classification fail over to the next candidate.
     if (capability.authenticated === false && !capability.probe_error) {
-      logger.info(
+      logger.debug(
         `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports authenticated=false (probed_at=${capability.probed_at})`
       );
       return false;
@@ -332,7 +332,7 @@ function refreshCapabilityRegistryIfRequested(options: InstallReasoningOptions):
   if (kyberionEnv('KYBERION_PROVIDER_CAPABILITY_ROUTING') === '0') return;
   try {
     const snapshot = loadProviderCapabilityRegistry({ forceRefresh: true });
-    logger.info(
+    logger.debug(
       `[reasoning-bootstrap] refreshed provider-capability-registry for selection (${snapshot.length} provider(s))`
     );
   } catch (error) {
@@ -424,7 +424,7 @@ export function consultCapabilityBrokerForMode(
     });
     if (decision.pinned && REASONING_BACKEND_MODES.has(decision.provider as ReasoningBackendMode)) {
       if (decision.provider !== resolvedMode) {
-        logger.info(
+        logger.debug(
           `[reasoning-bootstrap] capability-broker pin overrides mode ${resolvedMode} → ${decision.provider}`
         );
       }
@@ -533,7 +533,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   if (mode === 'stub' && !options.force) {
     installed = true;
     installedMode = 'stub';
-    logger.info('[reasoning-bootstrap] mode=stub — keeping deterministic stubs');
+    logger.debug('[reasoning-bootstrap] mode=stub — keeping deterministic stubs');
     clearReasoningDegraded();
     return false;
   }

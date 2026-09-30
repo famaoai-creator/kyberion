@@ -304,7 +304,7 @@ describe('reasoning-bootstrap', () => {
     });
 
     it('excludes an unauthenticated provider from the failover chain when a snapshot is present', () => {
-      const infoSpy = vi.spyOn(logger, 'info');
+      const infoSpy = vi.spyOn(logger, 'debug');
       mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue([
         {
           provider_id: 'codex',

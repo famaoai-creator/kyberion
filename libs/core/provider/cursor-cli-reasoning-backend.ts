@@ -793,7 +793,7 @@ export function buildCursorCliBackendFromEnv(
     ...(model ? { model } : {}),
   };
   const backend = new CursorCliReasoningBackend(options);
-  logger.info(
+  logger.debug(
     `[cursor-cli] backend ready (bin=${options.bin ?? DEFAULT_BIN}, model=${options.model ?? DEFAULT_MODEL})`
   );
   return backend;

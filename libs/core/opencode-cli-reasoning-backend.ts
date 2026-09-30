@@ -459,7 +459,7 @@ export function buildOpencodeCliBackendFromEnv(
     ...(model ? { model } : {}),
   };
   const backend = new OpencodeCliReasoningBackend(options);
-  logger.info(
+  logger.debug(
     `[opencode-cli] backend ready (bin=${options.bin ?? DEFAULT_BIN}, model=${options.model ?? DEFAULT_MODEL})`
   );
   return backend;

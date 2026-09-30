@@ -718,12 +718,12 @@ export async function runBaselineCheck() {
   try {
     janitorMaintenance = maybeSubmitJanitorMaintenanceJob();
     if (janitorMaintenance.submitted) {
-      logger.info(
-        `[BASELINE] storage janitor maintenance job submitted: ${janitorMaintenance.reason || 'storage janitor job submitted'}`
+      logger.debug(
+        `[BASELINE] storage janitor maintenance job submitted${janitorMaintenance.reason ? `: ${janitorMaintenance.reason}` : ''}`
       );
     } else if (janitorMaintenance.pending) {
-      logger.info(
-        `[BASELINE] storage janitor maintenance pending: ${janitorMaintenance.reason || 'storage janitor job is already pending'}`
+      logger.debug(
+        `[BASELINE] storage janitor maintenance pending${janitorMaintenance.reason ? `: ${janitorMaintenance.reason}` : ''}`
       );
     }
   } catch (err: any) {

@@ -26,7 +26,7 @@ export function installEmbeddingBackendIfAvailable(): boolean {
   if (isMlxAvailable()) {
     const mlxBackend = new MlxEmbeddingBackend();
     registerEmbeddingBackend(mlxBackend);
-    logger.success(
+    logger.debug(
       `[embedding-bootstrap] Installed real LLM MLX embedding backend (model=${mlxBackend.name})`
     );
     return true;
@@ -37,7 +37,7 @@ export function installEmbeddingBackendIfAvailable(): boolean {
   if (isGeminiEmbeddingAvailable()) {
     const geminiBackend = new GeminiEmbeddingBackend();
     registerEmbeddingBackend(geminiBackend);
-    logger.success(
+    logger.debug(
       `[embedding-bootstrap] Installed Gemini embedding backend (model=${geminiBackend.name})`
     );
     return true;
@@ -46,6 +46,6 @@ export function installEmbeddingBackendIfAvailable(): boolean {
   const backend = getEmbeddingBackend();
   if (!backend) return false;
   registerEmbeddingBackend(backend);
-  logger.info(`[embedding-bootstrap] Installed fallback embedding backend: ${backend.name}`);
+  logger.debug(`[embedding-bootstrap] Installed fallback embedding backend: ${backend.name}`);
   return true;
 }

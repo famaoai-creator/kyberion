@@ -422,14 +422,16 @@ function redactEventAttributes(
 
 /** Return a persistence-safe copy; the mutable TraceContext is never changed. */
 export function sanitizeTraceForPersistence(trace: Trace): Trace {
+  // Tolerate persisted-shaped input (empty collections may be absent) so a
+  // stripped record can be re-sanitized without crashing.
   const sanitizeSpan = (span: TraceSpan): TraceSpan => ({
     ...span,
     attributes: redactTraceAttributes(span.name, span.attributes),
-    events: span.events.map((event: TraceEvent) => ({
+    events: (span.events ?? []).map((event: TraceEvent) => ({
       ...event,
       attributes: redactEventAttributes(span.name, event.name, event.attributes),
     })),
-    children: span.children.map(sanitizeSpan),
+    children: (span.children ?? []).map(sanitizeSpan),
   });
   return { ...trace, rootSpan: sanitizeSpan(trace.rootSpan) };
 }
@@ -581,10 +583,13 @@ export function validateTraceReplay(
     if (span.attributes !== undefined && !isTraceRecord(span.attributes)) {
       issues.push({ path: `${path}.attributes`, message: 'attributes must be an object' });
     }
-    if (!Array.isArray(span.events)) {
+    // Persisted records omit empty collections entirely — absent is a valid
+    // empty array, a present non-array is still a schema violation.
+    const replayEvents = span.events;
+    if (replayEvents !== undefined && !Array.isArray(replayEvents)) {
       issues.push({ path: `${path}.events`, message: 'events must be an array' });
-    } else {
-      for (const [index, event] of span.events.entries()) {
+    } else if (Array.isArray(replayEvents)) {
+      for (const [index, event] of replayEvents.entries()) {
         if (!isTraceRecord(event) || typeof event.name !== 'string' || !event.name.trim()) {
           issues.push({ path: `${path}.events[${index}]`, message: 'event name is required' });
           continue;
@@ -605,10 +610,11 @@ export function validateTraceReplay(
         );
       }
     }
-    if (!Array.isArray(span.artifacts)) {
+    const replayArtifacts = span.artifacts;
+    if (replayArtifacts !== undefined && !Array.isArray(replayArtifacts)) {
       issues.push({ path: `${path}.artifacts`, message: 'artifacts must be an array' });
-    } else {
-      for (const [index, artifact] of span.artifacts.entries()) {
+    } else if (Array.isArray(replayArtifacts)) {
+      for (const [index, artifact] of replayArtifacts.entries()) {
         const artifactPath = `${path}.artifacts[${index}]`;
         if (!isTraceRecord(artifact)) {
           issues.push({ path: artifactPath, message: 'artifact must be an object' });
@@ -628,10 +634,11 @@ export function validateTraceReplay(
         }
       }
     }
-    if (!Array.isArray(span.knowledgeRefs)) {
+    const replayKnowledgeRefs = span.knowledgeRefs;
+    if (replayKnowledgeRefs !== undefined && !Array.isArray(replayKnowledgeRefs)) {
       issues.push({ path: `${path}.knowledgeRefs`, message: 'knowledgeRefs must be an array' });
-    } else {
-      for (const [index, ref] of span.knowledgeRefs.entries()) {
+    } else if (Array.isArray(replayKnowledgeRefs)) {
+      for (const [index, ref] of replayKnowledgeRefs.entries()) {
         if (typeof ref !== 'string' || !ref.trim()) {
           issues.push({
             path: `${path}.knowledgeRefs[${index}]`,
@@ -643,11 +650,12 @@ export function validateTraceReplay(
     if (span.error !== undefined && typeof span.error !== 'string') {
       issues.push({ path: `${path}.error`, message: 'error must be a string' });
     }
-    if (!Array.isArray(span.children)) {
+    const replayChildren = span.children;
+    if (replayChildren !== undefined && !Array.isArray(replayChildren)) {
       issues.push({ path: `${path}.children`, message: 'children must be an array' });
       return;
     }
-    for (const [index, child] of span.children.entries()) {
+    for (const [index, child] of (Array.isArray(replayChildren) ? replayChildren : []).entries()) {
       if (!isTraceRecord(child)) {
         issues.push({
           path: `${path}.children[${index}]`,

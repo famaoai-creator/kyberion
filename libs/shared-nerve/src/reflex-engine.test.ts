@@ -13,6 +13,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeLstat: vi.fn().mockReturnValue({ isFile: () => true }),
     assertSafeRepositoryPath: vi.fn((p: string) => p),
     logger: {
+      debug: vi.fn(),
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),

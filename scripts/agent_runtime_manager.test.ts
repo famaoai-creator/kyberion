@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
     remediation: 'Check runtime permissions.',
   })),
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     success: vi.fn(),
     error: vi.fn(),

@@ -4,7 +4,7 @@
   "title": "Worker event envelope",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "ts", "seq", "payload"],
+  "required": ["type", "ts", "seq"],
   "properties": {
     "type": {
       "enum": [

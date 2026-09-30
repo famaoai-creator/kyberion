@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   loadEnvironmentManifest: vi.fn(),
   probeManifest: vi.fn(),
-  logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {

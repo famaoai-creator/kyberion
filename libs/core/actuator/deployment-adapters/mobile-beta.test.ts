@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ execFileSync: vi.fn() }));
 vi.mock('node:child_process', () => ({ execFileSync: mocks.execFileSync }));
 vi.mock('../../core.js', () => ({
-  logger: { info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
+  logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, success: () => {} },
 }));
 
 import { MobileBetaDeploymentAdapter } from './mobile-beta.js';

@@ -22,6 +22,7 @@ const fileMocks = vi.hoisted(() => ({
   safeMoveSync: vi.fn(),
   safeRmSync: vi.fn(),
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

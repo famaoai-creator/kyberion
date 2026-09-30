@@ -419,7 +419,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
     try {
-      logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      logger.debug(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       let terminalRequested = false;
       if (step.type === 'control') {
         if (!handlers.control) {
