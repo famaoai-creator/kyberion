@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   loadServiceEndpointsCatalog: vi.fn(),
   inspectServiceAuth: vi.fn(),
-  logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
   safeExistsSync: vi.fn(),
   rootDir: vi.fn(() => '/tmp/kyberion'),
   resolveOverlay: vi.fn(),
