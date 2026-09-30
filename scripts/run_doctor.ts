@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import '@agent/core/environment-capability-probes';
 import {
   listEnvironmentManifestIds,
   loadEnvironmentManifest,
