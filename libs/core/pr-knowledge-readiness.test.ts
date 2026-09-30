@@ -399,6 +399,42 @@ describe('evaluatePrKnowledgeReadiness', () => {
     expect(codes).toContain('declaration_mismatch');
   });
 
+  it('accepts "rejected:" for a rejected organization candidate', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: MEM-ORG-R — nothing reusable');
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-ORG-R',
+      status: 'rejected',
+      knowledge_domain: 'organization',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [],
+    });
+    expect(result.violations).toEqual([]);
+  });
+
+  it('does not count a deleted .md record as present in the diff', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE(
+      'promoted: MEM-DEL → knowledge/public/generated/MEM-DEL.md'
+    );
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-DEL',
+      status: 'promoted',
+      knowledge_domain: 'product',
+      promoted_ref: 'knowledge/public/generated/MEM-DEL.md',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [
+        changed('D', 'knowledge/public/generated/MEM-DEL.md'),
+        changed('A', 'knowledge/public/generated/MEM-DEL.json'),
+      ],
+    });
+    expect(result.violations.map((v) => v.code)).toContain('promoted_record_not_in_diff');
+  });
+
   it('flags declaration_mismatch when a routed candidate is declared "promoted"', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE(
       'promoted: MEM-ORG → knowledge/public/generated/MEM-ORG.md'

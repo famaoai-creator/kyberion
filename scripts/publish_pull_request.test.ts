@@ -138,6 +138,7 @@ describe('resolveKnowledgeDiffBase (KL-03 diff-base fix)', () => {
   it('maps a bare branch name to origin/<base>', () => {
     expect(resolveKnowledgeDiffBase('main')).toBe('origin/main');
     expect(resolveKnowledgeDiffBase('release-1.2')).toBe('origin/release-1.2');
+    expect(resolveKnowledgeDiffBase('release/2026-10')).toBe('origin/release/2026-10');
   });
 
   it('leaves an already-qualified ref alone', () => {
