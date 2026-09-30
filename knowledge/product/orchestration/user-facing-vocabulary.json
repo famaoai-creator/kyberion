@@ -21869,6 +21869,66 @@
         "ja": "あなたの判断が必要なことはありませんでした。すべて憲章の範囲内で動きました。",
         "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓėḓ ẏőů. Ėṽėřẏŧħïñɠ řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
+      "charter_statement_intro": {
+        "en": "I, {name} ({id}), authorize AI agents to act without my approval within the limits below for organization \"{tenant}\", and I accept final responsibility for the result.",
+        "ja": "私 {name}({id})は、組織「{tenant}」について、次の範囲内で AI エージェントが私の承認なしに実行することを認め、その結果について最終的な責任を負います。",
+        "qps-ploc": "⟦Ï, {name} ({id}), ȧůŧħőřïẑė ȦÏ ȧɠėñŧş ŧő ȧƈŧ ẇïŧħőůŧ ɱẏ ȧṗṗřőṽȧŀ ẇïŧħïñ ŧħė ŀïɱïŧş ƀėŀőẇ ƒőř őřɠȧñïẑȧŧïőñ \"{tenant}\", ȧñḓ Ï ȧƈƈėṗŧ ƒïñȧŀ řėşṗőñşïƀïŀïŧẏ ƒőř ŧħė řėşůŀŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "charter_statement_limits": {
+        "en": "- Per spend: {per_action} / per day: {per_day} / per month: {per_month}",
+        "ja": "・1 回の支出の上限: {per_action} / 1 日: {per_day} / 1 か月: {per_month}",
+        "qps-ploc": "⟦- Ṗėř şṗėñḓ: {per_action} / ṗėř ḓȧẏ: {per_day} / ṗėř ɱőñŧħ: {per_month} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_statement_loss": {
+        "en": "- Most I accept losing on one item: {loss}",
+        "ja": "・1 件で引き受ける損失の上限: {loss}",
+        "qps-ploc": "⟦- Ɱőşŧ Ï ȧƈƈėṗŧ ŀőşïñɠ őñ őñė ïŧėɱ: {loss} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_statement_spend_on": {
+        "en": "- Irreversible spend (operational_spend) MAY run without approval within these limits",
+        "ja": "・取り消せない支出(operational_spend)を、上の範囲内で承認なしに実行させる",
+        "qps-ploc": "⟦- Ïřřėṽėřşïƀŀė şṗėñḓ (őṗėřȧŧïőñȧŀ_şṗėñḓ) ⱮȦẎ řůñ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ẇïŧħïñ ŧħėşė ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "charter_statement_spend_off": {
+        "en": "- Irreversible spend does NOT run without approval",
+        "ja": "・取り消せない支出は、承認なしには実行させない",
+        "qps-ploc": "⟦- Ïřřėṽėřşïƀŀė şṗėñḓ ḓőėş ÑŐŦ řůñ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "charter_statement_matrix_on": {
+        "en": "- Where the decision-rights matrix requires a person to accept, this charter stands in for that within these limits",
+        "ja": "・decision-rights matrix が人の受け入れを求める判断についても、上の範囲内であればこの憲章が代わりになる",
+        "qps-ploc": "⟦- Ẇħėřė ŧħė ḓėƈïşïőñ-řïɠħŧş ɱȧŧřïẋ řėɋůïřėş ȧ ṗėřşőñ ŧő ȧƈƈėṗŧ, ŧħïş ƈħȧřŧėř şŧȧñḓş ïñ ƒőř ŧħȧŧ ẇïŧħïñ ŧħėşė ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "charter_statement_matrix_off": {
+        "en": "- Where the decision-rights matrix requires a person to accept, a person still accepts, as before",
+        "ja": "・decision-rights matrix が人の受け入れを求める判断は、これまでどおり人が受け入れる",
+        "qps-ploc": "⟦- Ẇħėřė ŧħė ḓėƈïşïőñ-řïɠħŧş ɱȧŧřïẋ řėɋůïřėş ȧ ṗėřşőñ ŧő ȧƈƈėṗŧ, ȧ ṗėřşőñ şŧïŀŀ ȧƈƈėṗŧş, ȧş ƀėƒőřė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "charter_statement_stop": {
+        "en": "- When I press \"Stop\", or a declared stop condition stands, everything stops; only I and my deputies can clear it",
+        "ja": "・私が「停止」を押したとき、または宣言した停止条件が立ったときは、全ての実行を止める。解除できるのは私と代理責任者だけ",
+        "qps-ploc": "⟦- Ẇħėñ Ï ṗřėşş \"Şŧőṗ\", őř ȧ ḓėƈŀȧřėḓ şŧőṗ ƈőñḓïŧïőñ şŧȧñḓş, ėṽėřẏŧħïñɠ şŧőṗş; őñŀẏ Ï ȧñḓ ɱẏ ḓėṗůŧïėş ƈȧñ ƈŀėȧř ïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "charter_statement_deputies": {
+        "en": "- Deputies: {deputies}",
+        "ja": "・代理責任者: {deputies}",
+        "qps-ploc": "⟦- Ḓėṗůŧïėş: {deputies} ŀőřėɱ ï⟧"
+      },
+      "charter_statement_deputies_none": {
+        "en": "none",
+        "ja": "なし",
+        "qps-ploc": "⟦ñőñė ŀőř⟧"
+      },
+      "charter_statement_expires": {
+        "en": "- Valid until: {date} (after that, per-decision approval applies again)",
+        "ja": "・期限: {date}(期限を過ぎると、従来の承認に戻る)",
+        "qps-ploc": "⟦- Ṽȧŀïḓ ůñŧïŀ: {date} (ȧƒŧėř ŧħȧŧ, ṗėř-ḓėƈïşïőñ ȧṗṗřőṽȧŀ ȧṗṗŀïėş ȧɠȧïñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_statement_authority": {
+        "en": "Anything beyond these limits is decided by me (or a deputy) individually. A delegation beyond the authority I actually hold is not made valid by this statement.",
+        "ja": "この範囲を超える判断は、私(または代理責任者)が個別に行う。私が実際に持っている権限を超える委任は、この宣言では有効にならない。",
+        "qps-ploc": "⟦Ȧñẏŧħïñɠ ƀėẏőñḓ ŧħėşė ŀïɱïŧş ïş ḓėƈïḓėḓ ƀẏ ɱė (őř ȧ ḓėṗůŧẏ) ïñḓïṽïḓůȧŀŀẏ. Ȧ ḓėŀėɠȧŧïőñ ƀėẏőñḓ ŧħė ȧůŧħőřïŧẏ Ï ȧƈŧůȧŀŀẏ ħőŀḓ ïş ñőŧ ɱȧḓė ṽȧŀïḓ ƀẏ ŧħïş şŧȧŧėɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
       "digest_title": {
         "en": "Decision digest ({time})",
         "ja": "判断ダイジェスト({time})",
