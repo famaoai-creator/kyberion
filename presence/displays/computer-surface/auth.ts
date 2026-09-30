@@ -3,6 +3,10 @@ import { SurfaceViewerScopeError } from '@agent/core/surface/surface-mutation-gu
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  extractSurfaceCredential,
+  isSameOriginMutation,
+} from '@agent/core/surface/surface-session-cookie';
 
 type ComputerSurfaceRequest = Pick<Request, 'headers' | 'socket'>;
 
@@ -16,9 +20,47 @@ export class ComputerSurfaceViewerError extends Error {
   }
 }
 
+/**
+ * Credential precedence: Authorization bearer header, then the browser
+ * `kyberion_session` cookie (its kys1. value is verified by the
+ * browser-session authn provider, exactly like a bearer token).
+ */
+function requestCredential(
+  req: ComputerSurfaceRequest
+): ReturnType<typeof extractSurfaceCredential> {
+  const authorization = req.headers.authorization;
+  const cookie = req.headers.cookie;
+  return extractSurfaceCredential({
+    authorization: typeof authorization === 'string' ? authorization : null,
+    cookie: typeof cookie === 'string' ? cookie : null,
+  });
+}
+
 function bearerToken(req: ComputerSurfaceRequest): string {
-  const value = req.headers.authorization;
-  return typeof value === 'string' && value.startsWith('Bearer ') ? value.slice(7).trim() : '';
+  return requestCredential(req).token;
+}
+
+/**
+ * A cookie-borne credential on an unsafe method must be same-origin
+ * (CSRF gate). Header-authenticated and credential-less requests are exempt.
+ */
+export function assertComputerSurfaceCookieMutationSafe(
+  req: Pick<Request, 'headers' | 'socket' | 'method'>
+): void {
+  if (requestCredential(req).source !== 'session-cookie') return;
+  const host = req.headers.host;
+  if (
+    !isSameOriginMutation({
+      method: req.method,
+      headers: req.headers,
+      expectedHost: typeof host === 'string' ? host : '',
+    })
+  ) {
+    throw new ComputerSurfaceViewerError(
+      403,
+      'Cross-origin Computer Surface session request rejected.'
+    );
+  }
 }
 
 export function isComputerSurfaceLoopbackRequest(req: ComputerSurfaceRequest): boolean {

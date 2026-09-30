@@ -8,12 +8,19 @@ function makeReq(
     cookie?: string;
     hostname?: string;
     forwardedFor?: string;
+    method?: string;
+    session?: string;
+    headers?: Record<string, string>;
   } = {}
 ) {
   return {
     ip: options.ip,
+    method: options.method ?? 'GET',
     headers: {
       get(name: string) {
+        if (options.headers && name.toLowerCase() in options.headers) {
+          return options.headers[name.toLowerCase()];
+        }
         if (name.toLowerCase() === 'authorization') {
           return options.authorization || null;
         }
@@ -28,6 +35,7 @@ function makeReq(
         if (name === 'kyberion_token' && options.cookie) {
           return { value: options.cookie };
         }
+        if (name === 'kyberion_session' && options.session) return { value: options.session };
         return undefined;
       },
     },
@@ -35,6 +43,12 @@ function makeReq(
       hostname: options.hostname,
     },
   } as unknown as NextRequest;
+}
+
+function mockSessionRole(role: 'readonly' | 'localadmin') {
+  vi.doMock('@agent/core/authn-principal-resolver', () => ({
+    resolveAuthnPrincipal: () => ({ principal: { role } }),
+  }));
 }
 
 describe('api guard', () => {
@@ -45,6 +59,7 @@ describe('api guard', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.doUnmock('@agent/core/authn-principal-resolver');
   });
 
   it('does not treat forwarded headers as a local admin signal', async () => {
@@ -132,5 +147,101 @@ describe('api guard', () => {
     const { resolveChronosAccessRole } = await import('./api-guard.js');
 
     expect(resolveChronosAccessRole(makeReq({ ip: '203.0.113.10' }))).toBe('readonly');
+  });
+
+  describe('session cookie credential', () => {
+    const session = 'kys1.payload.sig';
+    const cookie = `kyberion_session=${session}`;
+
+    it('falls back to the kyberion_session cookie after the legacy cookie', async () => {
+      const { resolveChronosToken } = await import('./api-guard.js');
+      expect(resolveChronosToken(makeReq({ session }))).toBe(session);
+      expect(resolveChronosToken(makeReq({ session, cookie: 'legacy' }))).toBe('legacy');
+      expect(resolveChronosToken(makeReq({ session, authorization: 'Bearer hdr' }))).toBe('hdr');
+    });
+
+    it('blocks a cross-origin cookie-authenticated POST with 403', async () => {
+      mockSessionRole('localadmin');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        ip: '127.0.0.1',
+        method: 'POST',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      const res = requireChronosAccess(req, 'readonly');
+      expect(res?.status).toBe(403);
+      expect(await res?.json()).toEqual({ error: 'Cross-origin request blocked.' });
+    });
+
+    it('resolves the access role of an OIDC browser session from the authn seam (fails closed otherwise)', async () => {
+      const resolveAuthnPrincipal = vi.fn((request: { credential: { token: string } }) => {
+        if (request.credential.token === session) return { principal: { role: 'readonly' } };
+        throw new Error('browser session invalid or expired');
+      });
+      vi.doMock('@agent/core/authn-principal-resolver', () => ({ resolveAuthnPrincipal }));
+      const { resolveChronosAccessRole } = await import('./api-guard.js');
+      expect(resolveChronosAccessRole(makeReq({ session }))).toBe('readonly');
+      expect(resolveChronosAccessRole(makeReq({ session: 'kys1.forged.sig' }))).toBeNull();
+      // A session must not fall through to the loopback auto-admin path either.
+      expect(
+        resolveChronosAccessRole(makeReq({ ip: '127.0.0.1', session: 'kys1.forged.sig' }))
+      ).toBeNull();
+      vi.doUnmock('@agent/core/authn-principal-resolver');
+    });
+
+    it('treats a kys1. value planted in the legacy cookie as a session for the CSRF check', async () => {
+      mockSessionRole('localadmin');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        method: 'POST',
+        cookie: session,
+        headers: {
+          cookie: `kyberion_token=${session}`,
+          host: 'chronos.example',
+          origin: 'https://evil.example',
+        },
+      });
+      expect(requireChronosAccess(req, 'readonly')?.status).toBe(403);
+    });
+
+    it('does not apply the CSRF check to the pre-existing kyberion_token cookie', async () => {
+      // plugin-views-e2e (and other scripted clients) replay the legacy token
+      // cookie on POSTs without an Origin header; that path must keep working.
+      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', 'legacy-token');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        method: 'POST',
+        cookie: 'legacy-token',
+        headers: { cookie: 'kyberion_token=legacy-token', host: 'chronos.example' },
+      });
+      expect(requireChronosAccess(req, 'readonly')).toBeNull();
+      // ...even when an (unused) session cookie is also present.
+      const both = makeReq({
+        method: 'POST',
+        cookie: 'legacy-token',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      expect(requireChronosAccess(both, 'readonly')).toBeNull();
+    });
+
+    it('allows a same-origin cookie POST and never checks header-authenticated requests', async () => {
+      mockSessionRole('localadmin');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const same = makeReq({
+        method: 'POST',
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://chronos.example' },
+      });
+      expect(requireChronosAccess(same, 'readonly')).toBeNull();
+      const header = makeReq({
+        method: 'POST',
+        authorization: `Bearer ${session}`,
+        session,
+        headers: { cookie, host: 'chronos.example', origin: 'https://evil.example' },
+      });
+      expect(requireChronosAccess(header, 'readonly')).toBeNull();
+    });
   });
 });

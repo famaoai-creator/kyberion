@@ -59,6 +59,8 @@ export type SettingsMember = {
   status: 'active' | 'suspended';
   sign_in: 'local' | 'token';
   memberships: Array<{ tenant_slug: string; role: SettingsRole }>;
+  /** SSO identities bound to this member (issuer + subject). Older payloads omit it; the parser defaults to []. */
+  external_identities: Array<{ issuer: string; subject: string }>;
 };
 
 export function isSettingsRole(value: unknown): value is SettingsRole {
@@ -90,9 +92,25 @@ export function parseSettingsMe(
   };
 }
 
-export function isSettingsMember(value: unknown): value is SettingsMember {
+function isExternalIdentity(value: unknown): value is { issuer: string; subject: string } {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
+  return typeof record.issuer === 'string' && typeof record.subject === 'string';
+}
+
+/** Validates the wire shape; `external_identities` is optional there (older payloads). */
+function isSettingsMemberWire(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (
+    record.external_identities !== undefined &&
+    !(
+      Array.isArray(record.external_identities) &&
+      record.external_identities.every(isExternalIdentity)
+    )
+  ) {
+    return false;
+  }
   return (
     typeof record.member_id === 'string' &&
     typeof record.display_name === 'string' &&
@@ -109,12 +127,25 @@ export function isSettingsMember(value: unknown): value is SettingsMember {
   );
 }
 
+function normalizeSettingsMember(value: unknown): SettingsMember {
+  const record = value as Record<string, unknown>;
+  const identities = Array.isArray(record.external_identities)
+    ? (record.external_identities as Array<{ issuer: string; subject: string }>).map(
+        ({ issuer, subject }) => ({ issuer, subject })
+      )
+    : [];
+  return {
+    ...(record as Omit<SettingsMember, 'external_identities'>),
+    external_identities: identities,
+  };
+}
+
 export function parseMembersResponse(value: unknown): SettingsMember[] | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
   if (record.ok !== true || !Array.isArray(record.members)) return undefined;
-  if (!record.members.every(isSettingsMember)) return undefined;
-  return record.members;
+  if (!record.members.every(isSettingsMemberWire)) return undefined;
+  return record.members.map(normalizeSettingsMember);
 }
 
 export function parseAddMemberResponse(
@@ -122,8 +153,11 @@ export function parseAddMemberResponse(
 ): { member: SettingsMember; token: string | null } | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
-  if (record.ok !== true || !isSettingsMember(record.member)) return undefined;
-  return { member: record.member, token: typeof record.token === 'string' ? record.token : null };
+  if (record.ok !== true || !isSettingsMemberWire(record.member)) return undefined;
+  return {
+    member: normalizeSettingsMember(record.member),
+    token: typeof record.token === 'string' ? record.token : null,
+  };
 }
 
 export function parseChronosLink(value: unknown): string | undefined {

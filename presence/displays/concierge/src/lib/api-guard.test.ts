@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   authorizeSurfaceMutation: vi.fn(),
   guardConciergeRequest: vi.fn<() => GuardResponse | null>(() => null),
   resolveConciergeViewer: vi.fn(),
+  conciergeCredential: vi.fn(),
 }));
 
 vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
@@ -18,6 +19,7 @@ vi.mock('@agent/core/surface/surface-mutation-guard', () => ({
 vi.mock('./viewer-context', () => ({
   guardConciergeRequest: mocks.guardConciergeRequest,
   resolveConciergeViewer: mocks.resolveConciergeViewer,
+  conciergeCredential: mocks.conciergeCredential,
 }));
 
 import { requireConciergeMutationAccess } from './api-guard';
@@ -33,6 +35,52 @@ describe('requireConciergeMutationAccess', () => {
     vi.clearAllMocks();
     mocks.authorizeSurfaceMutation.mockReturnValue({ ok: true, status: 200, reason: 'token' });
     mocks.guardConciergeRequest.mockReturnValue(null);
+    mocks.conciergeCredential.mockImplementation((req: NextRequest) => {
+      const auth = req.headers.get('authorization');
+      if (auth) return { token: auth.replace(/^Bearer\s+/i, ''), source: 'header' };
+      if (req.headers.get('cookie')?.includes('kyberion_session='))
+        return { token: 'kys1.x.y', source: 'session-cookie' };
+      return { token: null, source: 'none' };
+    });
+  });
+
+  it('403s a cross-origin cookie-session POST before resolving the viewer', () => {
+    const req = new NextRequest('https://app.example/api/x', {
+      method: 'POST',
+      headers: {
+        cookie: 'kyberion_session=kys1.x.y',
+        host: 'app.example',
+        origin: 'https://evil.example',
+      },
+    });
+    expect(requireConciergeMutationAccess(req)?.status).toBe(403);
+    expect(mocks.resolveConciergeViewer).not.toHaveBeenCalled();
+  });
+
+  it('allows a same-origin cookie-session POST for a localadmin viewer', () => {
+    mocks.resolveConciergeViewer.mockReturnValue({ context: { role: 'localadmin' } });
+    const req = new NextRequest('https://app.example/api/x', {
+      method: 'POST',
+      headers: {
+        cookie: 'kyberion_session=kys1.x.y',
+        host: 'app.example',
+        origin: 'https://app.example',
+      },
+    });
+    expect(requireConciergeMutationAccess(req)).toBeNull();
+  });
+
+  it('rejects a same-origin cookie session whose viewer is readonly', () => {
+    mocks.resolveConciergeViewer.mockReturnValue({ context: { role: 'readonly' } });
+    const req = new NextRequest('https://app.example/api/x', {
+      method: 'POST',
+      headers: {
+        cookie: 'kyberion_session=kys1.x.y',
+        host: 'app.example',
+        origin: 'https://app.example',
+      },
+    });
+    expect(requireConciergeMutationAccess(req)?.status).toBe(403);
   });
 
   it('rejects a bearer token whose resolved role is readonly', async () => {
