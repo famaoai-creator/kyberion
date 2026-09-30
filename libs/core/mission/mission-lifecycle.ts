@@ -541,30 +541,22 @@ export async function verifyMission(
 /**
  * KL-04: ratify this mission's promoted pr_review memory candidates against
  * origin/main. Returns false (finish must stop) when a record is not on
- * origin/main yet. Never changes mission status.
+ * origin/main yet, when a pr_review candidate was approved but never promoted,
+ * or when the check itself fails (fail closed). Never changes mission status.
  */
 function blockFinishOnUnratifiedMemory(
   missionId: string,
   missionDir: string,
-  gitRunner?: GitRunner
+  gitRunner?: GitRunner,
+  ratifier: typeof ratifyPrReviewedMemoryCandidates = ratifyPrReviewedMemoryCandidates
 ): boolean {
+  const evidenceDir = path.join(missionDir, 'gates');
   let ratification: ReturnType<typeof ratifyPrReviewedMemoryCandidates>;
   try {
-    ratification = ratifyPrReviewedMemoryCandidates({ missionId, gitRunner });
+    ratification = ratifier({ missionId, gitRunner });
   } catch (err: unknown) {
-    logger.warn(
-      `⚠️ [MEMORY_RATIFICATION] check skipped for ${missionId} — ${err instanceof Error ? err.message : String(err)} | next: inspect the memory promotion queue (mission_controller memory-queue)`
-    );
-    return true;
-  }
-  const evidenceDir = path.join(missionDir, 'gates');
-  if (ratification.missing.length > 0) {
-    const missing = ratification.missing
-      .map(
-        (item) => `${item.candidate_id} (${item.promoted_ref || 'no promoted_ref'}: ${item.reason})`
-      )
-      .join('; ');
-    const reason = `${ratification.missing.length} pr_review knowledge record(s) not found on ${ratification.target}: ${missing}`;
+    const message = err instanceof Error ? err.message : String(err);
+    const reason = `pr_review ratification check failed: ${message}`;
     writeMissionGateRecord({
       missionId,
       gateId: 'memory-ratification',
@@ -572,7 +564,53 @@ function blockFinishOnUnratifiedMemory(
       payload: { verdict: 'fail', checked_at: nowIso(), reason },
     });
     logger.error(
-      `❌ [MEMORY_RATIFICATION] Mission ${missionId} finish waiting — ${reason} | next: merge the PR carrying the record, run \`git fetch origin main\`, then re-run finish; if the PR dropped a record, run \`mission_controller memory-reject <CANDIDATE_ID>\` | evidence: ${ratification.target}${ratification.target_commit ? `@${ratification.target_commit.slice(0, 12)}` : ' (ref missing locally)'}`
+      `❌ [MEMORY_RATIFICATION] Mission ${missionId} finish blocked — ${reason} | next: inspect the memory promotion queue (\`mission_controller memory-queue\`) and the local git state (\`git rev-parse origin/main\`), fix the cause, then re-run finish | evidence: ${path.join(evidenceDir, 'memory-ratification-*')}`
+    );
+    return false;
+  }
+  const unpromoted = ratification.unpromoted || [];
+  if (ratification.missing.length > 0 || unpromoted.length > 0) {
+    const reasons: string[] = [];
+    if (unpromoted.length > 0) {
+      reasons.push(
+        `${unpromoted.length} pr_review candidate(s) approved but never promoted: ${unpromoted.join(', ')}`
+      );
+    }
+    if (ratification.missing.length > 0) {
+      const missing = ratification.missing
+        .map(
+          (item) =>
+            `${item.candidate_id} (${item.promoted_ref || 'no promoted_ref'}: ${item.reason})`
+        )
+        .join('; ');
+      reasons.push(
+        `${ratification.missing.length} pr_review knowledge record(s) not found on ${ratification.target}: ${missing}`
+      );
+    }
+    const reason = reasons.join('; ');
+    writeMissionGateRecord({
+      missionId,
+      gateId: 'memory-ratification',
+      evidenceDir,
+      payload: { verdict: 'fail', checked_at: nowIso(), reason },
+    });
+    const next: string[] = [];
+    if (unpromoted.length > 0) {
+      next.push(
+        `promote each approved candidate into the PR worktree with \`mission_controller memory-promote <CANDIDATE_ID> --target-root <PR_WORKTREE>\` (or \`memory-promote-pending --mission ${missionId} --target-root <PR_WORKTREE>\`), or drop it with \`mission_controller memory-reject <CANDIDATE_ID>\``
+      );
+    }
+    if (ratification.missing.length > 0) {
+      next.push(
+        `merge the PR carrying the record, run \`git fetch origin main\`, then re-run finish; if the PR dropped a record, run \`mission_controller memory-reject <CANDIDATE_ID>\``
+      );
+    }
+    const targetEvidence =
+      ratification.missing.length > 0
+        ? `${ratification.target}${ratification.target_commit ? `@${ratification.target_commit.slice(0, 12)}` : ' (ref missing locally)'}, `
+        : '';
+    logger.error(
+      `❌ [MEMORY_RATIFICATION] Mission ${missionId} finish waiting — ${reason} | next: ${next.join('; ')} | evidence: ${targetEvidence}${path.join(evidenceDir, 'memory-ratification-*')}`
     );
     return false;
   }
@@ -606,6 +644,8 @@ export async function finishMission(
     transitionStatus: (current: string, next: string) => any;
     /** KL-04 test seam: git runner for the pr_review ratification check. */
     gitRunner?: GitRunner;
+    /** KL-04 test seam: replaces the pr_review ratification check itself. */
+    ratifyMemory?: typeof ratifyPrReviewedMemoryCandidates;
   }
 ): Promise<void> {
   if (!id) {
@@ -640,13 +680,6 @@ export async function finishMission(
     return;
   }
 
-  await emitMissionLifecycleIntentSnapshot({
-    missionId: upperId,
-    stage: 'delivery',
-    text: latestSnapshot(upperId)?.intent.goal || `Mission ${upperId} progressing through learn`,
-    source: 'mission_state',
-    traceRef: preState.correlation_id,
-  });
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
   try {
@@ -659,10 +692,19 @@ export async function finishMission(
     return;
   }
   // KL-04: pr_review knowledge is ratified by its PR reaching origin/main.
-  // Checked first, before any gate mutates state: a missing record is an
-  // expected wait (PR not merged / not fetched yet), not a quality failure,
-  // so the mission status is left as-is and `finish` can simply be re-run.
-  if (!blockFinishOnUnratifiedMemory(upperId, missionDir, args.gitRunner)) return;
+  // Checked first, before any side effect (intent snapshot, gate state): a
+  // missing record is an expected wait (PR not merged / not fetched yet), not
+  // a quality failure, so the mission status is left as-is and `finish` can
+  // simply be re-run.
+  if (!blockFinishOnUnratifiedMemory(upperId, missionDir, args.gitRunner, args.ratifyMemory))
+    return;
+  await emitMissionLifecycleIntentSnapshot({
+    missionId: upperId,
+    stage: 'delivery',
+    text: latestSnapshot(upperId)?.intent.goal || `Mission ${upperId} progressing through learn`,
+    source: 'mission_state',
+    traceRef: preState.correlation_id,
+  });
   const missionHead = args.getGitHash(missionDir);
   if (preState.git?.latest_commit !== missionHead) {
     const headSubject = safeExec('git', ['log', '-1', '--pretty=%s'], { cwd: missionDir }).trim();

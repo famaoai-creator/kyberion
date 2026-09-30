@@ -11,6 +11,7 @@ import {
   readMissionMemoryCandidates,
   readMissionMemoryCandidatesFromRoot,
   resolveMissionRoot,
+  type ChangedFile,
   type GitRunner,
 } from './knowledge/pr-knowledge-readiness.js';
 import type { MemoryCandidate } from './knowledge/memory-promotion-queue.js';
@@ -36,6 +37,10 @@ function baseCandidate(overrides: Partial<MemoryCandidate> = {}): MemoryCandidat
     queued_at: '2026-09-30T00:00:00.000Z',
     ...overrides,
   };
+}
+
+function changed(status: string, filePath: string): ChangedFile {
+  return { status, path: filePath };
 }
 
 const KNOWLEDGE_SECTION_TEMPLATE = (lines: string): string =>
@@ -70,6 +75,40 @@ describe('parsePrBodyKnowledge', () => {
       'none — no mission for this PR',
     ].join('\n');
     expect(parsePrBodyKnowledge(noMission).missionId).toBeUndefined();
+  });
+
+  it('normalizes a backticked/quoted/lowercase Mission ID', () => {
+    const body = [
+      '## Coordination',
+      '- Mission ID: `msn-kl03-test`',
+      '## Knowledge',
+      'none — n/a',
+    ].join('\n');
+    expect(parsePrBodyKnowledge(body).missionId).toBe('MSN-KL03-TEST');
+  });
+
+  it('strips HTML comments (including multi-line ones) before parsing', () => {
+    const body = [
+      '## Coordination',
+      '<!-- Fill these in when the change is part of a mission/workitem flow. -->',
+      '- Mission ID: MSN-KL03-TEST',
+      '## Knowledge',
+      '<!--',
+      'multi-line instructions',
+      '- promoted: <candidate_id> → <path>',
+      '-->',
+      '- rejected: MEM-R — duplicate of an existing SOP',
+    ].join('\n');
+    const parsed = parsePrBodyKnowledge(body);
+    expect(parsed.missionId).toBe('MSN-KL03-TEST');
+    expect(parsed.knowledgeLines).toEqual([
+      {
+        kind: 'rejected',
+        candidateId: 'MEM-R',
+        reason: 'duplicate of an existing SOP',
+        raw: '- rejected: MEM-R — duplicate of an existing SOP',
+      },
+    ]);
   });
 
   it('reports hasKnowledgeSection: false when the section is absent', () => {
@@ -143,6 +182,35 @@ describe('evaluatePrKnowledgeReadiness', () => {
     expect(result.violations.map((v) => v.code)).toEqual(['missing_knowledge_section']);
   });
 
+  it('flags knowledge_section_empty for an unedited template (only placeholder lines) even with no mission', () => {
+    const body = [
+      '## Coordination',
+      '- Mission ID:',
+      '## Knowledge',
+      '- promoted: <candidate_id> → <path>',
+      '- none — <reason>',
+    ].join('\n');
+    const result = evaluatePrKnowledgeReadiness({ body, candidates: [], changedFiles: [] });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      { code: 'knowledge_section_empty', message: expect.any(String) },
+    ]);
+  });
+
+  it('flags knowledge_section_empty for a no-mission PR that has content but no "none" line', () => {
+    const body = [
+      '## Coordination',
+      '- Mission ID:',
+      '## Knowledge',
+      'rejected: MEM-X — obsolete',
+    ].join('\n');
+    const result = evaluatePrKnowledgeReadiness({ body, candidates: [], changedFiles: [] });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      { code: 'knowledge_section_empty', message: expect.stringContaining('non-empty reason') },
+    ]);
+  });
+
   it('passes a no-mission PR that declares "none — reason"', () => {
     const body = ['## Coordination', '- Mission ID:', '## Knowledge', 'none — no learnings'].join(
       '\n'
@@ -151,12 +219,15 @@ describe('evaluatePrKnowledgeReadiness', () => {
     expect(result).toEqual({ ok: true, violations: [] });
   });
 
-  it('flags tier_leak for any confidential/personal changed file, mission or not', () => {
+  it('flags tier_leak only for an ADDED confidential/personal file, mission or not', () => {
     const body = ['## Coordination', '- Mission ID:', '## Knowledge', 'none — n/a'].join('\n');
     const result = evaluatePrKnowledgeReadiness({
       body,
       candidates: [],
-      changedFiles: ['knowledge/confidential/acme/secret.md', 'knowledge/personal/me/note.md'],
+      changedFiles: [
+        changed('A', 'knowledge/confidential/acme/secret.md'),
+        changed('A', 'knowledge/personal/me/note.md'),
+      ],
     });
     expect(result.ok).toBe(false);
     expect(result.violations).toEqual([
@@ -171,13 +242,61 @@ describe('evaluatePrKnowledgeReadiness', () => {
     ]);
   });
 
-  it('flags no_mission_candidates when the mission has none in the queue', () => {
+  it('does not flag tier_leak for a MODIFIED or DELETED file already tracked under a knowledge tier (e.g. the .gitignore-negated files)', () => {
+    const body = ['## Coordination', '- Mission ID:', '## Knowledge', 'none — n/a'].join('\n');
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [],
+      changedFiles: [
+        changed('M', 'knowledge/personal/README.md'),
+        changed('D', 'knowledge/personal/voice/config.json'),
+        changed('M', 'knowledge/confidential/acme/already-tracked.md'),
+      ],
+    });
+    expect(result).toEqual({ ok: true, violations: [] });
+  });
+
+  it('flags tier_leak for a non-ASCII added path under either tier, normalized case-insensitively', () => {
+    const body = ['## Coordination', '- Mission ID:', '## Knowledge', 'none — n/a'].join('\n');
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [],
+      changedFiles: [
+        changed('A', './Knowledge/Personal/日本語.md'),
+        changed('A', 'knowledge\\confidential\\acme\\秘密.md'),
+      ],
+    });
+    expect(result.violations.map((v) => v.code)).toEqual(['tier_leak', 'tier_leak']);
+  });
+
+  it('flags no_mission_candidates when the mission has none in the queue, mentioning --mission-root', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE('none — n/a');
     const result = evaluatePrKnowledgeReadiness({ body, candidates: [], changedFiles: [] });
     expect(result.ok).toBe(false);
     expect(result.violations).toEqual([
-      { code: 'no_mission_candidates', message: expect.stringContaining('MSN-KL03-TEST') },
+      {
+        code: 'no_mission_candidates',
+        message: expect.stringContaining('MSN-KL03-TEST'),
+      },
     ]);
+    expect(result.violations[0]!.message).toContain('--mission-root');
+    expect(result.violations[0]!.message).toContain('mission verify');
+    expect(result.violations[0]!.message).toContain('mission distill');
+  });
+
+  it('matches a mission candidate by source_ref case-insensitively and by mission:<ID>: prefix', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: MEM-R — duplicate of an existing SOP');
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-R',
+      source_ref: 'mission:msn-kl03-test:task-1',
+      status: 'rejected',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [],
+    });
+    expect(result).toEqual({ ok: true, violations: [] });
   });
 
   it('flags unresolved_candidate for a queued/approved product or unclassified candidate', () => {
@@ -219,6 +338,30 @@ describe('evaluatePrKnowledgeReadiness', () => {
     ]);
   });
 
+  it('flags promoted_record_not_in_diff when the .md record is in the diff but its .json companion is not', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE(
+      'promoted: MEM-P → knowledge/public/generated/MEM-P.md'
+    );
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-P',
+      status: 'promoted',
+      knowledge_domain: 'product',
+      promoted_ref: 'knowledge/public/generated/MEM-P.md',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [changed('A', 'knowledge/public/generated/MEM-P.md')],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toEqual([
+      {
+        code: 'promoted_record_not_in_diff',
+        message: expect.stringContaining('MEM-P.json'),
+      },
+    ]);
+  });
+
   it('flags candidate_not_declared when the id is absent from the Knowledge section', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE('none — n/a');
     const candidate = baseCandidate({
@@ -236,7 +379,68 @@ describe('evaluatePrKnowledgeReadiness', () => {
     ]);
   });
 
-  it('passes a promoted + declared product candidate whose record is in the diff', () => {
+  it('flags declaration_mismatch when a promoted candidate is declared as rejected', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: MEM-P — not needed after all');
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-P',
+      status: 'promoted',
+      knowledge_domain: 'product',
+      promoted_ref: 'knowledge/public/generated/MEM-P.md',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [
+        changed('A', 'knowledge/public/generated/MEM-P.md'),
+        changed('A', 'knowledge/public/generated/MEM-P.json'),
+      ],
+    });
+    const codes = result.violations.map((v) => v.code);
+    expect(codes).toContain('declaration_mismatch');
+  });
+
+  it('flags declaration_mismatch when a routed candidate is declared "promoted"', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE(
+      'promoted: MEM-ORG → knowledge/public/generated/MEM-ORG.md'
+    );
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-ORG',
+      status: 'approved',
+      knowledge_domain: 'organization',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [],
+    });
+    expect(result.violations).toEqual([
+      { code: 'declaration_mismatch', message: expect.stringContaining('MEM-ORG') },
+    ]);
+  });
+
+  it('flags declaration_mismatch when a "promoted:" line\'s path does not match promoted_ref', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE(
+      'promoted: MEM-P → knowledge/public/generated/WRONG-PATH.md'
+    );
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-P',
+      status: 'promoted',
+      knowledge_domain: 'product',
+      promoted_ref: 'knowledge/public/generated/MEM-P.md',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [
+        changed('A', 'knowledge/public/generated/MEM-P.md'),
+        changed('A', 'knowledge/public/generated/MEM-P.json'),
+      ],
+    });
+    const codes = result.violations.map((v) => v.code);
+    expect(codes).toContain('declaration_mismatch');
+  });
+
+  it('passes a promoted + declared product candidate whose record and companion json are in the diff', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE(
       'promoted: MEM-P → knowledge/public/generated/MEM-P.md'
     );
@@ -249,7 +453,10 @@ describe('evaluatePrKnowledgeReadiness', () => {
     const result = evaluatePrKnowledgeReadiness({
       body,
       candidates: [candidate],
-      changedFiles: ['knowledge/public/generated/MEM-P.md'],
+      changedFiles: [
+        changed('A', 'knowledge/public/generated/MEM-P.md'),
+        changed('M', 'knowledge/public/generated/MEM-P.json'),
+      ],
     });
     expect(result).toEqual({ ok: true, violations: [] });
   });
@@ -298,9 +505,52 @@ describe('resolveMissionRoot', () => {
     );
   });
 
-  it('returns cwdRoot when it already has mission records', () => {
+  it('returns cwdRoot when it already has mission records (no Mission ID given)', () => {
     safeMkdir(path.join(base, 'active/missions/MSN-X'), { recursive: true });
     expect(resolveMissionRoot({ cwdRoot: base })).toBe(path.resolve(base));
+  });
+
+  it("returns cwdRoot when it has THIS mission's directory under active/missions/<tier>/<ID>", () => {
+    safeMkdir(path.join(base, 'active/missions/public/MSN-X'), { recursive: true });
+    const gitRunner: GitRunner = () => {
+      throw new Error('git should not be consulted when cwdRoot already has this mission');
+    };
+    expect(resolveMissionRoot({ cwdRoot: base, missionId: 'MSN-X', gitRunner })).toBe(
+      path.resolve(base)
+    );
+  });
+
+  it('returns cwdRoot when it has THIS mission archived under active/archive/missions/<ID>', () => {
+    safeMkdir(path.join(base, 'active/archive/missions/MSN-Y'), { recursive: true });
+    expect(resolveMissionRoot({ cwdRoot: base, missionId: 'msn-y' })).toBe(path.resolve(base));
+  });
+
+  it("does NOT prefer cwdRoot when it only has a DIFFERENT mission's records, and falls back to the main worktree", () => {
+    safeMkdir(path.join(base, 'active/missions/public/MSN-OTHER'), { recursive: true });
+    const gitRunner: GitRunner = (args) => {
+      expect(args).toEqual(['worktree', 'list', '--porcelain']);
+      return {
+        status: 0,
+        stdout: ['worktree /main/checkout', 'HEAD abc123', '', 'worktree /feature/worktree'].join(
+          '\n'
+        ),
+        stderr: '',
+      };
+    };
+    expect(resolveMissionRoot({ cwdRoot: base, missionId: 'MSN-X', gitRunner })).toBe(
+      path.resolve('/main/checkout')
+    );
+  });
+
+  it("returns cwdRoot when a memory candidate's source_ref names this mission, even with no mission directory", () => {
+    safeMkdir(path.join(base, 'active/shared/runtime/memory'), { recursive: true });
+    safeWriteFile(
+      path.join(base, 'active/shared/runtime/memory/promotion-queue.jsonl'),
+      `${JSON.stringify(baseCandidate({ source_ref: 'mission:MSN-QUEUE-ONLY' }))}\n`
+    );
+    expect(resolveMissionRoot({ cwdRoot: base, missionId: 'msn-queue-only' })).toBe(
+      path.resolve(base)
+    );
   });
 
   it('falls back to the main worktree reported by git when cwdRoot has no records', () => {
@@ -324,26 +574,59 @@ describe('resolveMissionRoot', () => {
 });
 
 describe('listChangedFiles', () => {
-  it('parses git diff --name-only output', () => {
+  it('parses git -c core.quotePath=false diff --name-status -z output into status+path pairs', () => {
     const gitRunner: GitRunner = (args, cwd) => {
-      expect(args).toEqual(['diff', '--name-only', 'origin/main...HEAD']);
+      expect(args).toEqual([
+        '-c',
+        'core.quotePath=false',
+        'diff',
+        '--name-status',
+        '-z',
+        '--no-renames',
+        '--end-of-options',
+        'origin/main...HEAD',
+      ]);
       expect(cwd).toBe('/repo');
-      return { status: 0, stdout: 'a.ts\nb.ts\n\n', stderr: '' };
+      return { status: 0, stdout: 'M\0a.ts\0A\0b.ts\0', stderr: '' };
     };
-    expect(listChangedFiles({ repoRoot: '/repo', gitRunner })).toEqual(['a.ts', 'b.ts']);
+    expect(listChangedFiles({ repoRoot: '/repo', gitRunner })).toEqual([
+      { status: 'M', path: 'a.ts' },
+      { status: 'A', path: 'b.ts' },
+    ]);
   });
 
   it('respects an explicit base', () => {
     const gitRunner: GitRunner = (args) => {
-      expect(args).toEqual(['diff', '--name-only', 'main...HEAD']);
+      expect(args[args.length - 1]).toBe('main...HEAD');
       return { status: 0, stdout: '', stderr: '' };
     };
     expect(listChangedFiles({ repoRoot: '/repo', base: 'main', gitRunner })).toEqual([]);
   });
 
+  it('normalizes non-ASCII / backslash / leading-./ paths without relying on git C-quoting', () => {
+    const gitRunner: GitRunner = () => ({
+      status: 0,
+      stdout: ['A', './knowledge/personal/日本語.md', 'M', 'a\\b.ts', ''].join('\0'),
+      stderr: '',
+    });
+    expect(listChangedFiles({ repoRoot: '/repo', gitRunner })).toEqual([
+      { status: 'A', path: 'knowledge/personal/日本語.md' },
+      { status: 'M', path: 'a/b.ts' },
+    ]);
+  });
+
   it('throws when git fails', () => {
     const gitRunner: GitRunner = () => ({ status: 128, stdout: '', stderr: 'fatal: bad revision' });
     expect(() => listChangedFiles({ repoRoot: '/repo', gitRunner })).toThrow(/bad revision/);
+  });
+
+  it('refuses a base ref with a leading dash (argument-injection guard) without calling git', () => {
+    const gitRunner: GitRunner = () => {
+      throw new Error('git must not be invoked with an unsafe base');
+    };
+    expect(() =>
+      listChangedFiles({ repoRoot: '/repo', base: '--upload-pack=evil', gitRunner })
+    ).toThrow(/unsafe diff base/);
   });
 });
 
@@ -428,10 +711,7 @@ describe.skipIf(!CORE_DIST_BUILT)(
 describe('checkPrKnowledgeReadiness (wiring)', () => {
   it('composes resolution, reading, diffing and evaluation', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: MEM-WIRED — not reusable');
-    const gitRunner: GitRunner = (args) => {
-      if (args[0] === 'diff') return { status: 0, stdout: '', stderr: '' };
-      return { status: 0, stdout: '', stderr: '' };
-    };
+    const gitRunner: GitRunner = () => ({ status: 0, stdout: '', stderr: '' });
     const result = checkPrKnowledgeReadiness({
       body,
       repoRoot: '/repo',

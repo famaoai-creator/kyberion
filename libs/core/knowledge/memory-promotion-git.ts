@@ -204,9 +204,15 @@ export interface PrReviewRatificationResult {
   ratified: MemoryCandidate[];
   already_ratified: string[];
   missing: Array<{ candidate_id: string; promoted_ref: string; reason: string }>;
+  /**
+   * pr_review candidates of this mission that are approved but were never
+   * promoted: their record never reached a PR, so finish must wait until they
+   * are promoted (`memory-promote --target-root`) or rejected.
+   */
+  unpromoted: string[];
 }
 
-function isMissionCandidate(candidate: MemoryCandidate, missionId: string): boolean {
+export function isMissionCandidate(candidate: MemoryCandidate, missionId: string): boolean {
   const sourceRef = String(candidate.source_ref || '').trim();
   return sourceRef === `mission:${missionId}` || sourceRef.startsWith(`mission:${missionId}:`);
 }
@@ -226,7 +232,9 @@ function repoRelativeRef(ref: string | undefined): string | undefined {
  * KL-04: for this mission's promoted `pr_review` candidates, confirm the
  * promoted record exists on origin/main (local ref — no fetch) and record the
  * ratification. Candidates whose record is not on origin/main are returned in
- * `missing`; the caller blocks finish. `steward` candidates are untouched.
+ * `missing`; approved-but-never-promoted pr_review candidates are returned in
+ * `unpromoted`. The caller blocks finish on either. `steward` candidates are
+ * untouched.
  */
 export function ratifyPrReviewedMemoryCandidates(input: {
   missionId: string;
@@ -244,13 +252,16 @@ export function ratifyPrReviewedMemoryCandidates(input: {
     ratified: [],
     already_ratified: [],
     missing: [],
+    unpromoted: [],
   };
-  const candidates = listMemoryPromotionCandidates().filter(
+  const prReviewed = listMemoryPromotionCandidates().filter(
     (candidate) =>
-      isMissionCandidate(candidate, missionId) &&
-      candidate.approval_channel === 'pr_review' &&
-      candidate.status === 'promoted'
+      isMissionCandidate(candidate, missionId) && candidate.approval_channel === 'pr_review'
   );
+  result.unpromoted = prReviewed
+    .filter((candidate) => candidate.status === 'approved')
+    .map((candidate) => candidate.candidate_id);
+  const candidates = prReviewed.filter((candidate) => candidate.status === 'promoted');
   if (candidates.length === 0) return result;
   const pending = candidates.filter((candidate) => {
     if (candidate.ratified_commit) {

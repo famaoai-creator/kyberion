@@ -71,9 +71,12 @@ Queue Commands:
                                  Mark a memory candidate as rejected
   memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--target-root <WORKTREE>]
                                  Promote an approved candidate to governed knowledge
-                                 (--target-root: write the record into a worktree of this repository, e.g. the PR branch)
-  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--target-root <WORKTREE>] [--dry-run]
+                                 (--target-root: write the record into a worktree of this repository, e.g. the PR branch;
+                                 requires --approval-channel pr_review at approval)
+  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--mission <ID>] [--target-root <WORKTREE> --mission <ID>] [--dry-run]
                                  Bulk promote approved memory candidates in queue order
+                                 (--mission: only that mission's candidates; required with --target-root,
+                                 which promotes only pr_review product knowledge and skips the rest)
 
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)

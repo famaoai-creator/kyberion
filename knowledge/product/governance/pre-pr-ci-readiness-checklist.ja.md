@@ -76,13 +76,14 @@ gh pr checks <number> --watch
 - **`## Knowledge` 欄を必ず埋める**。Mission ID を書いた PR は、そのミッションの学びの候補を全件
   `promoted` / `rejected` / `routed` のどれかで宣言する。ミッションなしの PR は `none — <理由>`。
   `pr create` は、未解決・未宣言の候補、diff に入っていない昇格記録、`knowledge/confidential/`・`knowledge/personal/`
-  配下の変更があると PR を作らない。この検査は `--skip-readiness` でも迂回できない。ミッションの記録が
+  配下へのファイル追加（既に追跡済みのファイルの変更は対象外）があると PR を作らない。この検査は `--skip-readiness` でも迂回できない。ミッションの記録が
   main checkout にある場合は、主 worktree を自動で探す（明示するなら `--mission-root <path>`）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
   PR 作成が走る。オプションはこの文書で確認する。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
 - **draft がデフォルト**。レビューに出すときは `--no-draft` を付けるか、作成後に `gh pr ready <number>` を実行する。
 - **`gh pr create` を直接使うのは例外**。使う場合も手順 1〜6 と 8 は省略せず、`--title` と `--body-file` を渡す。
+  **ミッション作業の PR では使わない**。Knowledge 検査を通らないため、必ず `pnpm kyberion pr create` で作る。
 - **CI の pending を成功と数えない**。macOS smoke などが concurrency で cancel された場合は
   `gh run rerun <run-id> --failed` で再実行し、結果を待つ。
 - **レビュー修正は同じ worktree・同じ branch で行う**。マージ後は `git worktree remove` で片付ける。
