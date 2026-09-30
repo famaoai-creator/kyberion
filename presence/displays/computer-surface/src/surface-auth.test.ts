@@ -1,4 +1,4 @@
-import { request as httpRequest } from 'node:http';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -59,7 +59,11 @@ async function withApp<T>(fn: (base: string) => Promise<T>): Promise<T> {
 }
 
 function req(headers: Record<string, string>, method = 'GET') {
-  return { method, socket: { remoteAddress: '10.0.0.5' } as any, headers };
+  return {
+    method,
+    socket: { remoteAddress: '10.0.0.5' } as unknown as IncomingMessage['socket'],
+    headers,
+  };
 }
 
 afterEach(() => {
