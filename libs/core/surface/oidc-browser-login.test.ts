@@ -191,6 +191,35 @@ describe('resolveOidcLoginConfig', () => {
     ).toBe('http://127.0.0.1:3050');
   });
 
+  it('reuses a loopback-NAMED request origin even when the peer is not proven loopback (Next.js)', () => {
+    const { config } = resolveOidcLoginConfig({
+      env: { ...baseEnv(), KYBERION_OIDC_PUBLIC_BASE_URL: '' },
+    });
+    for (const origin of ['http://localhost:3050', 'http://127.0.0.1:3000', 'http://[::1]:3331']) {
+      expect(
+        resolveOidcRedirectOrigin(config!, {
+          surfaceId: 'concierge',
+          requestOrigin: origin,
+          loopback: false,
+        })
+      ).toBe(origin);
+    }
+    // A foreign Host header must never pick the redirect target.
+    for (const origin of [
+      'https://evil.example',
+      'http://localhost.evil.example',
+      'http://evil.example:3050',
+    ]) {
+      expect(
+        resolveOidcRedirectOrigin(config!, {
+          surfaceId: 'concierge',
+          requestOrigin: origin,
+          loopback: false,
+        })
+      ).toBeNull();
+    }
+  });
+
   it('prefers a per-surface public origin and rejects plain http off loopback', () => {
     const env = baseEnv({
       KYBERION_OIDC_PUBLIC_BASE_URLS:

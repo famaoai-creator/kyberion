@@ -45,6 +45,12 @@ function makeReq(
   } as unknown as NextRequest;
 }
 
+function mockSessionRole(role: 'readonly' | 'localadmin') {
+  vi.doMock('@agent/core/authn-principal-resolver', () => ({
+    resolveAuthnPrincipal: () => ({ principal: { role } }),
+  }));
+}
+
 describe('api guard', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -53,6 +59,7 @@ describe('api guard', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.doUnmock('@agent/core/authn-principal-resolver');
   });
 
   it('does not treat forwarded headers as a local admin signal', async () => {
@@ -154,7 +161,7 @@ describe('api guard', () => {
     });
 
     it('blocks a cross-origin cookie-authenticated POST with 403', async () => {
-      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', session);
+      mockSessionRole('localadmin');
       const { requireChronosAccess } = await import('./api-guard.js');
       const req = makeReq({
         ip: '127.0.0.1',
@@ -165,6 +172,22 @@ describe('api guard', () => {
       const res = requireChronosAccess(req, 'readonly');
       expect(res?.status).toBe(403);
       expect(await res?.json()).toEqual({ error: 'Cross-origin request blocked.' });
+    });
+
+    it('resolves the access role of an OIDC browser session from the authn seam (fails closed otherwise)', async () => {
+      const resolveAuthnPrincipal = vi.fn((request: { credential: { token: string } }) => {
+        if (request.credential.token === session) return { principal: { role: 'readonly' } };
+        throw new Error('browser session invalid or expired');
+      });
+      vi.doMock('@agent/core/authn-principal-resolver', () => ({ resolveAuthnPrincipal }));
+      const { resolveChronosAccessRole } = await import('./api-guard.js');
+      expect(resolveChronosAccessRole(makeReq({ session }))).toBe('readonly');
+      expect(resolveChronosAccessRole(makeReq({ session: 'kys1.forged.sig' }))).toBeNull();
+      // A session must not fall through to the loopback auto-admin path either.
+      expect(
+        resolveChronosAccessRole(makeReq({ ip: '127.0.0.1', session: 'kys1.forged.sig' }))
+      ).toBeNull();
+      vi.doUnmock('@agent/core/authn-principal-resolver');
     });
 
     it('does not apply the CSRF check to the pre-existing kyberion_token cookie', async () => {
@@ -189,7 +212,7 @@ describe('api guard', () => {
     });
 
     it('allows a same-origin cookie POST and never checks header-authenticated requests', async () => {
-      vi.stubEnv('KYBERION_LOCALADMIN_TOKEN', session);
+      mockSessionRole('localadmin');
       const { requireChronosAccess } = await import('./api-guard.js');
       const same = makeReq({
         method: 'POST',

@@ -23,6 +23,16 @@ last_updated: 2026-09-30
 
 > **注意(Next.js 系の 3 面)**: Next.js 15 以降は `NextRequest.ip` が無く、`KYBERION_TRUST_PROXY=1`(`x-real-ip` / `x-forwarded-for` を必ず上書きする信頼できるプロキシの背後)でない限り、同じマシンのブラウザでも loopback と判定されません(従来からの仕様。CHANGELOG 参照)。その場合、ローカルでもログイン画面(またはアクセストークン)が必要です。`KYBERION_TRUST_PROXY=1` をプロキシ無しで有効にすると `X-Forwarded-For: 127.0.0.1` の偽装で loopback になりすませるため、プロキシ無しでは有効にしないでください。Express 系の 2 面(presence-studio / computer-surface)はソケットの接続元で判定するため影響を受けません。
 
+### ローカルでも IdP でサインインする
+
+Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(トークン入力の入口は設けていません)。
+
+1. IdP のクライアントに、使うサーフェスのリダイレクト URI `http://localhost:<port>/auth/callback` を登録します(ポートは上の表。Google は `127.0.0.1` の IP 表記を受け付けないので `localhost`)。
+2. `KYBERION_OIDC_ISSUER` / `KYBERION_OIDC_CLIENT_ID` / `KYBERION_OIDC_CLIENT_SECRET` / `KYBERION_SESSION_SECRET` を設定して起動します。`KYBERION_OIDC_PUBLIC_BASE_URL` は不要です。
+3. ブラウザで `http://localhost:<port>/` を開くと `/login` に誘導され、ボタンから IdP へ進めます。自分の `issuer` / `subject` が member に紐付いている必要があります(初回は未登録画面に表示される値を、別の owner に紐付けてもらいます)。
+
+`localhost` 系の origin に限って Host から戻り先を決めるのは、IdP がブラウザを利用者自身のマシンへ戻すだけで、外部ホストへのリダイレクトにできないためです。`localhost.evil.example` のような名前は対象外です。
+
 対象サーフェス: `concierge` / `chronos-mirror-v2` / `operator-surface` / `presence-studio` / `computer-surface`(ログイン処理は `libs/core/surface/surface-auth-routes.ts` の 1 実装を共有)。
 
 ## 仕組み
@@ -47,17 +57,17 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 
 すべて環境変数(`knowledge/product/governance/env-registry.json` に登録済み)。**全サーフェス(プロセス/ホスト)で同じ値**にします。
 
-| 変数                             | 必須       | 内容                                                                                                                     |
-| -------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `KYBERION_OIDC_ISSUER`           | ✅         | IdP の issuer。discovery(`<issuer>/.well-known/openid-configuration`)の `issuer` と完全一致が必要                        |
-| `KYBERION_OIDC_CLIENT_ID`        | ✅         | OAuth クライアント ID                                                                                                    |
-| `KYBERION_OIDC_CLIENT_SECRET`    | IdP による | Google / Entra の Web クライアントは必須。secret store に置く                                                            |
-| `KYBERION_SESSION_SECRET`        | ✅         | セッション cookie の署名鍵(十分長いランダム値)。secret store に置く                                                      |
-| `KYBERION_OIDC_PUBLIC_BASE_URL`  | リモートで | サーフェスの公開 origin(`https://…`)。リダイレクト URI は `<origin>/auth/callback`。Host ヘッダーは信用しません          |
-| `KYBERION_OIDC_PUBLIC_BASE_URLS` | 任意       | サーフェスごとの公開 origin。`concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com` のように指定 |
-| `KYBERION_OIDC_SCOPES`           | 任意       | 既定 `openid`。`email` などが要るならここに追加(member の紐付けは `iss`+`sub` なので不要)                                |
-| `KYBERION_OIDC_PROVIDER_LABEL`   | 任意       | ボタン表示名(例 `Google` / `Microsoft`)。既定 `SSO`                                                                      |
-| `KYBERION_SESSION_TTL_SECONDS`   | 任意       | セッション寿命。既定 28800(8 時間)、最小 60                                                                              |
+| 変数                             | 必須       | 内容                                                                                                                                                                                                                                |
+| -------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_OIDC_ISSUER`           | ✅         | IdP の issuer。discovery(`<issuer>/.well-known/openid-configuration`)の `issuer` と完全一致が必要                                                                                                                                   |
+| `KYBERION_OIDC_CLIENT_ID`        | ✅         | OAuth クライアント ID                                                                                                                                                                                                               |
+| `KYBERION_OIDC_CLIENT_SECRET`    | IdP による | Google / Entra の Web クライアントは必須。secret store に置く                                                                                                                                                                       |
+| `KYBERION_SESSION_SECRET`        | ✅         | セッション cookie の署名鍵(十分長いランダム値)。secret store に置く                                                                                                                                                                 |
+| `KYBERION_OIDC_PUBLIC_BASE_URL`  | リモートで | サーフェスの公開 origin(`https://…`)。リダイレクト URI は `<origin>/auth/callback`。Host ヘッダーは信用しません。`localhost` / `127.0.0.1` / `[::1]` の origin からのアクセスは、これが無くてもその origin を使います(ローカル利用) |
+| `KYBERION_OIDC_PUBLIC_BASE_URLS` | 任意       | サーフェスごとの公開 origin。`concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com` のように指定                                                                                                            |
+| `KYBERION_OIDC_SCOPES`           | 任意       | 既定 `openid`。`email` などが要るならここに追加(member の紐付けは `iss`+`sub` なので不要)                                                                                                                                           |
+| `KYBERION_OIDC_PROVIDER_LABEL`   | 任意       | ボタン表示名(例 `Google` / `Microsoft`)。既定 `SSO`                                                                                                                                                                                 |
+| `KYBERION_SESSION_TTL_SECONDS`   | 任意       | セッション寿命。既定 28800(8 時間)、最小 60                                                                                                                                                                                         |
 
 サーフェスごとの既定ポートと、IdP に登録するリダイレクト URI(公開 origin を使う場合はそれに読み替え):
 
@@ -69,7 +79,7 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 | computer-surface  | `computer-surface`  | 3040   | `http://localhost:3040/auth/callback` |
 | operator-surface  | `operator-surface`  | 3331   | `http://localhost:3331/auth/callback` |
 
-IdP への通信は `secureFetch`(egress policy と監査)を通ります。`knowledge/product/governance/egress-policy.json` の許可ドメインに、利用する IdP のホストが含まれていることを確認してください(Google: `accounts.google.com` / `oauth2.googleapis.com` / `www.googleapis.com`、Microsoft: `login.microsoftonline.com`)。
+IdP への通信は `secureFetch`(egress policy と監査)を通ります。Google(`accounts.google.com` / `oauth2.googleapis.com` / `www.googleapis.com`)と Microsoft(`login.microsoftonline.com`)のホストは、`knowledge/product/governance/egress-policy.json` の `manual_allowed_domains` に**既定で登録済み**です。別の IdP(Keycloak、Okta など)を使う場合は、そのホストを同じ一覧に追加してください(`mode: enforce` ではこれが無いとログインできません)。
 
 ## Google
 
