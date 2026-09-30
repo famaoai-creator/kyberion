@@ -153,10 +153,10 @@ export KYBERION_VLLM_URL=http://localhost:8000/v1
 
 ### CLI debug
 
-The `logger` honors `KYBERION_LOG_LEVEL`:
+The `logger` honors `LOG_LEVEL`:
 
 ```bash
-KYBERION_LOG_LEVEL=debug pnpm pipeline --input pipelines/baseline-check.json
+LOG_LEVEL=debug pnpm pipeline --input pipelines/baseline-check.json
 ```
 
 ## Common slow-down causes

@@ -114,7 +114,9 @@ export const workerEventEnvelopeSchema = z
     ts: z.string(),
     seq: z.number().int().nonnegative(),
     source: workerEventSourceSchema.optional(),
-    payload: z.record(z.string(), z.unknown()),
+    // Empty payloads are omitted entirely — a `{}` carries no signal and
+    // bloats the jsonl stream (observability log policy: omit empty fields).
+    payload: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 
@@ -124,7 +126,7 @@ export type WorkerEventEnvelope<K extends WorkerEventType = WorkerEventType> = O
   'type' | 'payload'
 > & {
   type: K;
-  payload: WorkerEventPayloadMap[K];
+  payload?: WorkerEventPayloadMap[K];
 };
 
 export type WorkerEventListener = (event: WorkerEventEnvelope) => void;
@@ -188,7 +190,7 @@ export class WorkerEventStream {
       ts: nowIso(),
       seq: this.seq++,
       ...(mergedSource && Object.keys(mergedSource).length > 0 ? { source: mergedSource } : {}),
-      payload,
+      ...(payload && Object.keys(payload).length > 0 ? { payload } : {}),
     }) as WorkerEventEnvelope<K>;
     for (const listener of this.listeners) {
       try {
@@ -264,10 +266,13 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     safeMkdir(dir);
     const day = nowIso().slice(0, 10);
     stream.subscribe((event) => {
-      const sharedEvent = {
-        ...event,
-        payload: redactCollaborationMetadata(event.payload),
-      };
+      const redacted = redactCollaborationMetadata(event.payload);
+      const sharedEvent: Record<string, unknown> = { ...event };
+      if (Object.keys(redacted).length > 0) {
+        sharedEvent.payload = redacted;
+      } else {
+        delete sharedEvent.payload;
+      }
       const missionId = event.source?.mission_id?.trim();
       if (missionId) {
         // Mission ids are data-derived path segments. Reject rather than

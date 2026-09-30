@@ -917,7 +917,7 @@ export function buildAgyCliBackendFromEnv(
     ...(agent ? { agent } : {}),
     ...(agyProfile ? { agyProfile } : {}),
   });
-  logger.info(
+  logger.debug(
     `[agy-cli] backend ready (bin=${bin ?? 'agy'}, model=${model ?? 'agy'}${agyProfile ? `, profile=${agyProfile}` : ''})`
   );
   return backend;

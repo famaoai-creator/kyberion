@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { formatDiagnostic } from './logger.js';
 import { loadOrganizationProfile } from './organization/organization-profile.js';
 import {
   enqueueOrganizationLearningCandidate,
@@ -73,7 +74,11 @@ export function enqueueOperationalLearningSignal(
     return learningId;
   } catch (error) {
     logger.warn(
-      `[operational-learning] enqueue failed for ${learningId}: ${error instanceof Error ? error.message : String(error)}`
+      formatDiagnostic({
+        component: 'operational-learning',
+        what: `enqueue failed for ${learningId}`,
+        why: error instanceof Error ? error.message : String(error),
+      })
     );
     return null;
   }

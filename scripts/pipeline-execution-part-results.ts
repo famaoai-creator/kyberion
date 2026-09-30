@@ -128,12 +128,12 @@ async function installReasoningBackendsForSteps(
 ): Promise<boolean> {
   const needs = pipelineBootstrapNeeds(steps, normalizePipelineOp);
   if (!needs.required) {
-    logger.info(
+    logger.debug(
       '[pipeline] reasoning bootstrap skipped; no step requires reasoning, speech, or secrets'
     );
     return false;
   }
-  logger.info(`[pipeline] reasoning bootstrap required: ${needs.reasons.join(', ')}`);
+  logger.debug(`[pipeline] reasoning bootstrap required: ${needs.reasons.join(', ')}`);
   const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
   installReasoningBackends();
   return true;
@@ -519,8 +519,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
   logger.info(
     `🚀 [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
   );
-  logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
-  logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
+  if (missionId) logger.info(`   [PIPELINE] Mission ID: ${missionId}`);
+  if (autoContext.mission_evidence_dir)
+    logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir}`);
 
   const pipelineId = String(
     pipeline.pipeline_id ||

@@ -223,6 +223,7 @@
 - [Kyberion Development Practices — Hard-Won Rules for Changing This Repo](./product/governance/kyberion-development-practices.md) (public | Unknown)
 - [Kyberion Sovereign Consensus Protocol](./product/governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [LLM Invocation Rubric — どのポイントで LLM に頼むか](./product/governance/llm-invocation-rubric.md) (public | Unknown)
+- [Logging Policy: console and file logs humans and LLMs can act on](./product/governance/logging-policy.md) (public | Unknown)
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
 - [Multi-Provider Co-Execution Contract](./product/governance/multi-provider-coexecution-contract.md) (public | Unknown)
 - [Operational Hints](./product/governance/HINTS.md) (public | Unknown)

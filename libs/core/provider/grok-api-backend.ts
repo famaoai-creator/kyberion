@@ -67,7 +67,7 @@ export function buildGrokApiBackendFromEnv(
     toolsEnabled: overrides.toolsEnabled,
     allowedTools: overrides.allowedTools,
   });
-  logger.info(
+  logger.debug(
     `[grok-api] backend ready (endpoint=${baseURL}, model=${overrides.model || resolveGrokApiModel(env)})`
   );
   return backend;

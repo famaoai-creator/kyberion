@@ -720,7 +720,7 @@ export function buildShellGrokCliBackendFromEnv(
 
   const options = buildGrokCliOptionsFromEnv(env);
   const backend = new ShellGrokCliBackend(options);
-  logger.info(
+  logger.debug(
     `[shell-grok-cli] backend ready (bin=${options.bin ?? 'grok'}, model=${options.model ?? DEFAULT_MODEL})`
   );
   return backend;

@@ -374,12 +374,37 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
     throw new Error(`[TRACE_PATH] trace log must be a regular file: ${file}`);
   }
   const safeTrace = sanitizeTraceForPersistence(trace);
-  const record = { ...safeTrace, _persistedAt: nowIso() };
+  const record = {
+    ...safeTrace,
+    rootSpan: stripEmptySpanFields(safeTrace.rootSpan),
+    _persistedAt: nowIso(),
+  };
   appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
   void exportTraceOtlp(safeTrace).catch(() => undefined);
   return file;
+}
+
+/**
+ * Persisted span projection: empty arrays/objects carry no signal and bloat
+ * the jsonl record, so events/artifacts/knowledgeRefs/children (and empty
+ * attributes) are omitted at write time. Readers already treat these as
+ * optional (`Array.isArray(x) ? x : []`); in-memory shapes are unchanged.
+ */
+function stripEmptySpanFields(span: TraceSpan): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...span };
+  for (const key of ['events', 'artifacts', 'knowledgeRefs'] as const) {
+    if (Array.isArray(out[key]) && (out[key] as unknown[]).length === 0) delete out[key];
+  }
+  if (span.attributes && Object.keys(span.attributes).length === 0) delete out.attributes;
+  const children = Array.isArray(span.children) ? span.children : [];
+  if (children.length > 0) {
+    out.children = children.map(stripEmptySpanFields);
+  } else {
+    delete out.children;
+  }
+  return out;
 }
 
 function otlpId(value: string, length: number): string {

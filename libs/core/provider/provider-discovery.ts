@@ -276,8 +276,8 @@ export function loadProviderCapabilityCatalog(
   if (primary) {
     mergeCatalogInto(merged, primary, CAPABILITY_CATALOG_PATH);
   } else {
-    logger.info(
-      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using an explicit empty capability catalog'
+    logger.warn(
+      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — capability scoring runs degraded until the first probe merge'
     );
   }
   catalogCache = merged;
@@ -380,7 +380,7 @@ export function mergeProbedCapabilitiesIntoCatalog(
   cachedProviders = null;
   cacheTimestamp = 0;
 
-  logger.info(
+  logger.debug(
     `[PROVIDER_DISCOVERY] Merged probe results into ${CAPABILITY_CATALOG_PATH} for: ${Object.keys(probed).join(', ')}`
   );
   return validatedCatalog;
@@ -702,7 +702,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     if (disk) {
       cachedProviders = disk;
       cacheTimestamp = Date.now();
-      logger.info(
+      logger.debug(
         `[PROVIDER_DISCOVERY] Loaded from cache: ${disk
           .filter((p) => p.installed)
           .map((p) => p.provider)
@@ -713,7 +713,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   }
 
   // 3. Full discovery
-  logger.info('[PROVIDER_DISCOVERY] Scanning available providers...');
+  logger.debug('[PROVIDER_DISCOVERY] Scanning available providers...');
   const providers = [
     checkGemini(),
     checkClaude(),
@@ -727,7 +727,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   ];
 
   const available = providers.filter((p) => p.installed);
-  logger.info(
+  logger.debug(
     `[PROVIDER_DISCOVERY] Found ${available.length}/${providers.length}: ${available.map((p) => p.provider).join(', ')}`
   );
   cachedProviders = providers;

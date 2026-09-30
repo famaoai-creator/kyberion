@@ -17,6 +17,12 @@ import {
   rawUnlinkSync,
   rawWriteFile,
 } from './fs-primitives.js';
+import {
+  LOG_LEVELS,
+  emitConsoleLine,
+  isQuietProcess as sharedIsQuietProcess,
+  resolveLogThreshold,
+} from './logger.js';
 
 /**
  * Shared Utility Core for Kyberion (TypeScript Edition)
@@ -49,42 +55,53 @@ function missionLogPrefix(): string {
 }
 
 function isQuietProcess(): boolean {
-  return (
-    getRegisteredEnvText('LOG_LEVEL') === 'silent' ||
-    process.argv.includes('--quiet') ||
-    process.argv.includes('--json')
-  );
+  return sharedIsQuietProcess();
+}
+
+function logLevelTag(level: string): string {
+  if (level === 'error') return color('red', ' [ERROR] ');
+  if (level === 'warn') return color('yellow', ' [WARN]  ');
+  if (level === 'debug') return color('dim', ' [DEBUG] ');
+  if (level === 'success') return color('green', ' [SUCCESS] ');
+  return color('blue', ' [INFO]  ');
+}
+
+function renderLogLine(level: string, msg: string): string {
+  const ts = color('dim', nowIso());
+  const mid = missionLogPrefix();
+  if (getRegisteredEnvText('LOG_FORMAT') === 'json') {
+    const missionId = getRegisteredEnvText('MISSION_ID');
+    return JSON.stringify({
+      ts: nowIso(),
+      level,
+      msg,
+      ...(missionId ? { mission: missionId } : {}),
+    });
+  }
+  return ts + mid + logLevelTag(level) + msg;
 }
 
 export const logger = {
   _log: (level: string, msg: string) => {
     if (isQuietProcess() && level !== 'error') return;
     if (getRegisteredEnvText('NODE_ENV') === 'test' && level !== 'error') return;
-    const ts = color('dim', nowIso());
-    const mid = missionLogPrefix();
-    const prefix =
-      level === 'error'
-        ? color('red', ' [ERROR] ')
-        : level === 'warn'
-          ? color('yellow', ' [WARN]  ')
-          : color('blue', ' [INFO]  ');
-    if (level === 'error') {
-      console.error(ts + mid + prefix + msg);
-    } else if (level === 'warn') {
-      console.warn(ts + mid + prefix + msg);
-    } else {
-      console.log(ts + mid + prefix + msg);
-    }
+    const rank = LOG_LEVELS[level] ?? LOG_LEVELS.info;
+    if (rank < resolveLogThreshold()) return;
+    const line = renderLogLine(level, msg);
+    const stream = level === 'error' || level === 'warn' ? 'stderr' : 'stdout';
+    emitConsoleLine(stream, line, {
+      key: `${level} ${msg}`,
+      // Anomalies are never compressed; routine lines dedupe on the key
+      // (level+msg) so timestamps do not defeat streak detection.
+      dedup: level === 'debug' || level === 'info' || level === 'success',
+      marker: (count) => renderLogLine(level, `… (previous message repeated ×${count})`),
+    });
   },
+  debug: (msg: string) => logger._log('debug', msg),
   info: (msg: string) => logger._log('info', msg),
   warn: (msg: string) => logger._log('warn', msg),
   error: (msg: string) => logger._log('error', msg),
-  success: (msg: string) => {
-    if (isQuietProcess()) return;
-    const ts = color('dim', nowIso());
-    const mid = missionLogPrefix();
-    console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);
-  },
+  success: (msg: string) => logger._log('success', msg),
 };
 
 export const ui = {

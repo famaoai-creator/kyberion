@@ -390,7 +390,7 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
   const codexProfile = resolveCodexProfileName(env);
 
-  logger.info(
+  logger.debug(
     `[codex-cli] query helper ready (bin=${bin ?? '<deferred>'}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
   );
 

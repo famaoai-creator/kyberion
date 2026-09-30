@@ -13,6 +13,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { logger } from '../core.js';
+import { formatDiagnostic } from '../logger.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
 import { sendIMessage } from '../imessage-bridge.js';
@@ -366,7 +367,13 @@ export function notifyOperatorSync(
     return true;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    logger.warn(`[operator-notifications] delivery failed for ${event}: ${detail}`);
+    logger.warn(
+      formatDiagnostic({
+        component: 'operator-notifications',
+        what: `delivery failed for ${event}`,
+        why: detail,
+      })
+    );
     recordUndeliveredNotification(event, payload, `delivery_failed:${detail.slice(0, 200)}`);
     return false;
   }
