@@ -153,7 +153,7 @@ export function resolveOidcLoginConfig(deps: OidcLoginDeps = {}): OidcLoginConfi
   const missing: string[] = [];
   if (!issuer) missing.push('KYBERION_OIDC_ISSUER');
   if (!clientId) missing.push('KYBERION_OIDC_CLIENT_ID');
-  if (!browserSessionKey(authnDeps(deps))) missing.push('KYBERION_SESSION_SECRET');
+  if (!browserSessionKey(authnDeps(deps))) missing.push('KYBERION_SESSION_SECRET (>= 32 bytes)');
   if (!issuer || !clientId || missing.length) return { config: null, missing };
   const ttl = Number(envText(deps, 'KYBERION_SESSION_TTL_SECONDS'));
   return {
@@ -569,6 +569,11 @@ export async function completeOidcLogin(
   const header = decodeJwtPart<{ alg?: string; kid?: string }>(parts[0]);
   const claims = decodeJwtPart<Record<string, unknown>>(parts[1]);
   if (!header?.alg || !claims) return fail(deps, surfaceId, 'token_invalid', 'malformed id_token');
+  // Asymmetric algorithms only: never let an HS256 id_token (or `none`) be
+  // judged against a shared-secret key, whatever the env flags say.
+  if (header.alg !== 'RS256' && header.alg !== 'ES256') {
+    return fail(deps, surfaceId, 'token_invalid', `unsupported id_token alg '${header.alg}'`);
+  }
 
   // Signature + exp/nbf + audience. On a signature failure retry once with a
   // freshly fetched JWKS (key rotation), then give up.
@@ -601,7 +606,10 @@ export async function completeOidcLogin(
   if (typeof claims.nonce !== 'string' || !safeEqual(claims.nonce, tx.nonce)) {
     return fail(deps, surfaceId, 'token_invalid', 'nonce mismatch');
   }
-  if (Array.isArray(claims.aud) && claims.aud.length > 1 && claims.azp !== config.clientId) {
+  // OIDC Core: when `azp` is present it must be this client, regardless of how
+  // many audiences the token lists; several audiences make it mandatory.
+  const multiAudience = Array.isArray(claims.aud) && claims.aud.length > 1;
+  if ((claims.azp !== undefined || multiAudience) && claims.azp !== config.clientId) {
     return fail(deps, surfaceId, 'token_invalid', 'azp mismatch');
   }
   const subject = typeof claims.sub === 'string' ? claims.sub.trim() : '';

@@ -25,9 +25,9 @@ last_updated: 2026-09-30
 
 ### ローカルでも IdP でサインインする
 
-Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(トークン入力の入口は設けていません)。
+Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(新しいトークン入力の入口は追加していません。concierge の従来の `/signin` はそのまま使えます)。
 
-1. IdP のクライアントに、使うサーフェスのリダイレクト URI `http://localhost:<port>/auth/callback` を登録します(ポートは上の表。Google は `127.0.0.1` の IP 表記を受け付けないので `localhost`)。
+1. IdP のクライアントに、使うサーフェスのリダイレクト URI `http://localhost:<port>/auth/callback` を登録します(ポートは下の表。Google は `127.0.0.1` の IP 表記を受け付けないので `localhost`)。
 2. `KYBERION_OIDC_ISSUER` / `KYBERION_OIDC_CLIENT_ID` / `KYBERION_OIDC_CLIENT_SECRET` / `KYBERION_SESSION_SECRET` を設定して起動します。`KYBERION_OIDC_PUBLIC_BASE_URL` は不要です。
 3. ブラウザで `http://localhost:<port>/` を開くと `/login` に誘導され、ボタンから IdP へ進めます。自分の `issuer` / `subject` が member に紐付いている必要があります(初回は未登録画面に表示される値を、別の owner に紐付けてもらいます)。
 
@@ -62,7 +62,7 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 | `KYBERION_OIDC_ISSUER`           | ✅         | IdP の issuer。discovery(`<issuer>/.well-known/openid-configuration`)の `issuer` と完全一致が必要                                                                                                                                   |
 | `KYBERION_OIDC_CLIENT_ID`        | ✅         | OAuth クライアント ID                                                                                                                                                                                                               |
 | `KYBERION_OIDC_CLIENT_SECRET`    | IdP による | Google / Entra の Web クライアントは必須。secret store に置く                                                                                                                                                                       |
-| `KYBERION_SESSION_SECRET`        | ✅         | セッション cookie の署名鍵(十分長いランダム値)。secret store に置く                                                                                                                                                                 |
+| `KYBERION_SESSION_SECRET`        | ✅         | セッション cookie の署名鍵(**32 バイト以上**のランダム値。短い値は「未設定」扱い)。secret store に置く                                                                                                                              |
 | `KYBERION_OIDC_PUBLIC_BASE_URL`  | リモートで | サーフェスの公開 origin(`https://…`)。リダイレクト URI は `<origin>/auth/callback`。Host ヘッダーは信用しません。`localhost` / `127.0.0.1` / `[::1]` の origin からのアクセスは、これが無くてもその origin を使います(ローカル利用) |
 | `KYBERION_OIDC_PUBLIC_BASE_URLS` | 任意       | サーフェスごとの公開 origin。`concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com` のように指定                                                                                                            |
 | `KYBERION_OIDC_SCOPES`           | 任意       | 既定 `openid`。`email` などが要るならここに追加(member の紐付けは `iss`+`sub` なので不要)                                                                                                                                           |

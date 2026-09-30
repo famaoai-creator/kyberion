@@ -190,6 +190,21 @@ describe('api guard', () => {
       vi.doUnmock('@agent/core/authn-principal-resolver');
     });
 
+    it('treats a kys1. value planted in the legacy cookie as a session for the CSRF check', async () => {
+      mockSessionRole('localadmin');
+      const { requireChronosAccess } = await import('./api-guard.js');
+      const req = makeReq({
+        method: 'POST',
+        cookie: session,
+        headers: {
+          cookie: `kyberion_token=${session}`,
+          host: 'chronos.example',
+          origin: 'https://evil.example',
+        },
+      });
+      expect(requireChronosAccess(req, 'readonly')?.status).toBe(403);
+    });
+
     it('does not apply the CSRF check to the pre-existing kyberion_token cookie', async () => {
       // plugin-views-e2e (and other scripted clients) replay the legacy token
       // cookie on POSTs without an Origin header; that path must keep working.

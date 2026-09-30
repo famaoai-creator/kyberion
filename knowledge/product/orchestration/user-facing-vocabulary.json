@@ -21702,9 +21702,9 @@
         "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ ïş ñőŧ řėɠïşŧėřėḓ ŀőřėɱ ïṗşů⟧"
       },
       "unbound_lead": {
-        "en": "You signed in successfully, but this identity is not bound to a Kyberion member, so no access was granted. Send the identifiers below to an administrator so they can bind them to your member profile.",
-        "ja": "サインイン自体は成功しましたが、この識別子は Kyberion のメンバーに紐付いていないため、アクセスは許可されませんでした。下の識別子を管理者に伝えて、あなたのメンバープロファイルに紐付けてもらってください。",
-        "qps-ploc": "⟦Ẏőů şïɠñėḓ ïñ şůƈƈėşşƒůŀŀẏ, ƀůŧ ŧħïş ïḓėñŧïŧẏ ïş ñőŧ ƀőůñḓ ŧő ȧ Ķẏƀėřïőñ ɱėɱƀėř, şő ñő ȧƈƈėşş ẇȧş ɠřȧñŧėḓ. Şėñḓ ŧħė ïḓėñŧïƒïėřş ƀėŀőẇ ŧő ȧñ ȧḓɱïñïşŧřȧŧőř şő ŧħėẏ ƈȧñ ƀïñḓ ŧħėɱ ŧő ẏőůř ɱėɱƀėř ṗřőƒïŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+        "en": "You signed in successfully, but this identity is not bound to a Kyberion member, so no access was granted. Send the identifiers below to an administrator; they can bind them to your member profile under Settings › Organization and members › SSO.",
+        "ja": "サインイン自体は成功しましたが、この識別子は Kyberion のメンバーに紐付いていないため、アクセスは許可されませんでした。下の識別子を管理者に伝えてください。管理者は「設定 › 組織とメンバー › SSO」で、あなたのメンバープロファイルに紐付けられます。",
+        "qps-ploc": "⟦Ẏőů şïɠñėḓ ïñ şůƈƈėşşƒůŀŀẏ, ƀůŧ ŧħïş ïḓėñŧïŧẏ ïş ñőŧ ƀőůñḓ ŧő ȧ Ķẏƀėřïőñ ɱėɱƀėř, şő ñő ȧƈƈėşş ẇȧş ɠřȧñŧėḓ. Şėñḓ ŧħė ïḓėñŧïƒïėřş ƀėŀőẇ ŧő ȧñ ȧḓɱïñïşŧřȧŧőř; ŧħėẏ ƈȧñ ƀïñḓ ŧħėɱ ŧő ẏőůř ɱėɱƀėř ṗřőƒïŀė ůñḓėř Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş › ŞŞŐ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
       },
       "issuer": {
         "en": "Issuer",
@@ -21780,6 +21780,11 @@
         "en": "Your session on this surface has ended.",
         "ja": "この画面でのセッションを終了しました。",
         "qps-ploc": "⟦Ẏőůř şėşşïőñ őñ ŧħïş şůřƒȧƈė ħȧş ėñḓėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "switch_account": {
+        "en": "Sign in with a different account",
+        "ja": "別のアカウントでサインインする",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ȧ ḓïƒƒėřėñŧ ȧƈƈőůñŧ ŀőřėɱ ïṗşů⟧"
       }
     }
   }
