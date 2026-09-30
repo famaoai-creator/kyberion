@@ -9246,6 +9246,81 @@
         "ja": "通知チャネル",
         "qps-ploc": "⟦Ƈħȧññėŀ ŀőř⟧"
       },
+      "setup.quiet_hours_title": {
+        "en": "Quiet hours",
+        "ja": "おやすみ時間",
+        "qps-ploc": "⟦Ɋůïėŧ ħőůřş ŀőř⟧"
+      },
+      "setup.quiet_hours_description": {
+        "en": "During this window, non-urgent notifications are held in the local inbox instead of being pushed to your phone.",
+        "ja": "この時間帯は、緊急でない通知をスマホに送らず、受信箱にためておきます。",
+        "qps-ploc": "⟦Ḓůřïñɠ ŧħïş ẇïñḓőẇ, ñőñ-ůřɠėñŧ ñőŧïƒïƈȧŧïőñş ȧřė ħėŀḓ ïñ ŧħė ŀőƈȧŀ ïñƀőẋ ïñşŧėȧḓ őƒ ƀėïñɠ ṗůşħėḓ ŧő ẏőůř ṗħőñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "setup.quiet_hours_enabled": {
+        "en": "Use quiet hours",
+        "ja": "おやすみ時間を使う",
+        "qps-ploc": "⟦Ůşė ɋůïėŧ ħőůřş ŀőřė⟧"
+      },
+      "setup.quiet_hours_on_option": {
+        "en": "Use",
+        "ja": "使う",
+        "qps-ploc": "⟦Ůşė ŀőř⟧"
+      },
+      "setup.quiet_hours_off_option": {
+        "en": "Do not use",
+        "ja": "使わない",
+        "qps-ploc": "⟦Ḓő ñőŧ ůşė ŀőř⟧"
+      },
+      "setup.quiet_hours_start": {
+        "en": "Start (HH:MM)",
+        "ja": "開始(HH:MM)",
+        "qps-ploc": "⟦Şŧȧřŧ (ĦĦ:ⱮⱮ) ŀőřė⟧"
+      },
+      "setup.quiet_hours_end": {
+        "en": "End (HH:MM)",
+        "ja": "終了(HH:MM)",
+        "qps-ploc": "⟦Ėñḓ (ĦĦ:ⱮⱮ) ŀőř⟧"
+      },
+      "setup.quiet_hours_timezone": {
+        "en": "Time zone (e.g. Asia/Tokyo)",
+        "ja": "タイムゾーン(例: Asia/Tokyo)",
+        "qps-ploc": "⟦Ŧïɱė ẑőñė (ė.ɠ. Ȧşïȧ/Ŧőķẏő) ŀőřėɱ ïṗ⟧"
+      },
+      "setup.urgent_events_label": {
+        "en": "Notifications that still get through",
+        "ja": "おやすみ中でも通す通知",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ŧħȧŧ şŧïŀŀ ɠėŧ ŧħřőůɠħ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.urgent_alerts_only": {
+        "en": "Operations alerts only",
+        "ja": "運用アラートのみ",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ȧŀėřŧş őñŀẏ ŀőřėɱ ï⟧"
+      },
+      "setup.urgent_alerts_approvals": {
+        "en": "Operations alerts and approvals",
+        "ja": "運用アラートと承認待ち",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ȧŀėřŧş ȧñḓ ȧṗṗřőṽȧŀş ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.urgent_alerts_approvals_questions": {
+        "en": "Alerts, approvals and questions",
+        "ja": "運用アラート・承認待ち・質問",
+        "qps-ploc": "⟦Ȧŀėřŧş, ȧṗṗřőṽȧŀş ȧñḓ ɋůėşŧïőñş ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.quiet_hours_save": {
+        "en": "Save quiet hours",
+        "ja": "おやすみ時間を保存",
+        "qps-ploc": "⟦Şȧṽė ɋůïėŧ ħőůřş ŀőřėɱ⟧"
+      },
+      "setup.quiet_hours_saved": {
+        "en": "Quiet hours saved",
+        "ja": "おやすみ時間を保存しました",
+        "qps-ploc": "⟦Ɋůïėŧ ħőůřş şȧṽėḓ ŀőřėɱ⟧"
+      },
+      "setup.quiet_hours_invalid": {
+        "en": "Enter times as HH:MM and a time zone such as Asia/Tokyo.",
+        "ja": "時刻は HH:MM、タイムゾーンは Asia/Tokyo のように入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧïɱėş ȧş ĦĦ:ⱮⱮ ȧñḓ ȧ ŧïɱė ẑőñė şůƈħ ȧş Ȧşïȧ/Ŧőķẏő. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "setup.notification_off_option": {
         "en": "Do not send notifications",
         "ja": "通知しない",
@@ -10005,6 +10080,11 @@
         "en": "The notification channel is not valid.",
         "ja": "通知チャネルの指定が正しくありません。",
         "qps-ploc": "⟦Ŧħė ñőŧïƒïƈȧŧïőñ ƈħȧññėŀ ïş ñőŧ ṽȧŀïḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "api.notification_quiet_hours": {
+        "en": "Enter quiet hours as HH:MM and a valid time zone such as Asia/Tokyo.",
+        "ja": "おやすみ時間は HH:MM、タイムゾーンは Asia/Tokyo のように正しく入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ɋůïėŧ ħőůřş ȧş ĦĦ:ⱮⱮ ȧñḓ ȧ ṽȧŀïḓ ŧïɱė ẑőñė şůƈħ ȧş Ȧşïȧ/Ŧőķẏő. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "api.notification_target": {
         "en": "Enter a destination ID for the channel.",

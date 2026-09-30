@@ -15,11 +15,11 @@ status: proposal
 
 HITL をやめ、次の 3 つを**事前に**決める仕組みに置き換える。あとはエージェントが憲章の内側で自走する。
 
-| 決めること | 意味 |
-| ---------- | ---- |
-| **① 責任者** | 何かあったときに最後に責任を取る人間は誰か。名前と、その権限の根拠 |
+| 決めること           | 意味                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
+| **① 責任者**         | 何かあったときに最後に責任を取る人間は誰か。名前と、その権限の根拠                               |
 | **② 権限(envelope)** | その人が実際に持っている権限の範囲。**これを超える委任は無効**。覚悟があっても権限逸脱はできない |
-| **③ 覚悟(appetite)** | その人が「ここまでの損失・リスクは自分が引き受ける」と宣言した量。権限の内側でしか宣言できない |
+| **③ 覚悟(appetite)** | その人が「ここまでの損失・リスクは自分が引き受ける」と宣言した量。権限の内側でしか宣言できない   |
 
 承認は「行為ごと」ではなく「憲章に対して一度」行う。行為ごとの人間の承認は、憲章の外に出る場合の**例外経路**に下げる。
 
@@ -44,27 +44,27 @@ HITL をやめ、次の 3 つを**事前に**決める仕組みに置き換え�
     "authority_basis": { "kind": "officer", "evidence_ref": "..." }, // owner | officer | delegated | self
     "accepted_at": "2026-09-30T00:00:00Z",
     "expires_at": "2026-12-31T00:00:00Z",
-    "statement_sha256": "...",           // 受諾文の hash。認証済みの本人操作でのみ書ける
-    "deputies": ["user:carol"]
+    "statement_sha256": "...", // 受諾文の hash。認証済みの本人操作でのみ書ける
+    "deputies": ["user:carol"],
   },
   "envelope": {
-    "money":     { "currency": "JPY", "per_action": 100000, "per_day": 500000, "per_month": 3000000 },
+    "money": { "currency": "JPY", "per_action": 100000, "per_day": 500000, "per_month": 3000000 },
     "data_tier": { "read": ["public", "confidential:acme"], "write": ["confidential:acme"] },
     "external_effects": {
       "send_message_external": "allow",
       "publish_public": "allow_with_review_by_other_provider",
       "sign_contract": "forbid",
       "payment": "allow_within_money",
-      "credential_change": "forbid"
+      "credential_change": "forbid",
     },
-    "irreversible": "named_actions_only"
+    "irreversible": "named_actions_only",
   },
   "appetite": {
     "max_loss_per_incident": 300000,
     "reputational_class_max": "B",
     "blast_radius_max": { "recipients": 50, "systems": 1 },
-    "tripwires": ["監査チェーンの欠落", "予算の 80% 到達", "同一エラーの 3 連続"]
-  }
+    "tripwires": ["監査チェーンの欠落", "予算の 80% 到達", "同一エラーの 3 連続"],
+  },
 }
 ```
 
@@ -86,15 +86,15 @@ HITL をやめ、次の 3 つを**事前に**決める仕組みに置き換え�
 
 ## 既存資産との接続
 
-| 既存 | 役割の変化 |
-| ---- | ---------- |
-| `approval-gate` / `approval-policy` | 憲章の範囲外にだけ働く。範囲内では呼ばれない |
-| `autonomous-ops-gate`(4 軸の点数化) | 憲章の appetite を入力にする。点数のしきい値を憲章から導く |
-| `actor.ts`(human / agent / service) | 「承認は人間のみ」を「**責任は人間のみ**、決定は憲章内なら agent 可」に改める。`on_behalf_of` は必須 |
-| `kill-switch` | tripwire の停止手段として使う |
-| tenant activation の `--accept`(人間の受け入れ) | 憲章の受諾に一本化する。activation は憲章の存在を前提にする |
-| `member-registry` の membership role | 責任者の**実権限**の根拠。envelope の上限を導く |
-| 監査チェーン | 消費した appetite の集計元 |
+| 既存                                            | 役割の変化                                                                                           |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `approval-gate` / `approval-policy`             | 憲章の範囲外にだけ働く。範囲内では呼ばれない                                                         |
+| `autonomous-ops-gate`(4 軸の点数化)             | 憲章の appetite を入力にする。点数のしきい値を憲章から導く                                           |
+| `actor.ts`(human / agent / service)             | 「承認は人間のみ」を「**責任は人間のみ**、決定は憲章内なら agent 可」に改める。`on_behalf_of` は必須 |
+| `kill-switch`                                   | tripwire の停止手段として使う                                                                        |
+| tenant activation の `--accept`(人間の受け入れ) | 憲章の受諾に一本化する。activation は憲章の存在を前提にする                                          |
+| `member-registry` の membership role            | 責任者の**実権限**の根拠。envelope の上限を導く                                                      |
+| 監査チェーン                                    | 消費した appetite の集計元                                                                           |
 
 ## 複数組織の兼務
 
@@ -112,14 +112,14 @@ HITL をやめ、次の 3 つを**事前に**決める仕組みに置き換え�
 
 ## 実装
 
-| # | 内容 |
-| - | ---- |
-| 1 | 憲章のスキーマ、registry、受諾(認証済みの本人操作)、失効 |
-| 2 | 判定エンジン `evaluateAgainstCharter`(実権限 ∩ envelope ∩ appetite)と、appetite 消費の集計 |
-| 3 | `approval-gate` / `autonomous-ops-gate` への接続(憲章がある scope だけ) |
-| 4 | `actor.ts` の決定権の改訂(`on_behalf_of` 必須、憲章 ID の記録) |
-| 5 | 責任者への説明責任レポート、tripwire 通知、憲章変更提案 |
-| 6 | Me / Org の面: 憲章の作成ウィザード、使用率の表示、受諾 |
+| #   | 内容                                                                                       |
+| --- | ------------------------------------------------------------------------------------------ |
+| 1   | 憲章のスキーマ、registry、受諾(認証済みの本人操作)、失効                                   |
+| 2   | 判定エンジン `evaluateAgainstCharter`(実権限 ∩ envelope ∩ appetite)と、appetite 消費の集計 |
+| 3   | `approval-gate` / `autonomous-ops-gate` への接続(憲章がある scope だけ)                    |
+| 4   | `actor.ts` の決定権の改訂(`on_behalf_of` 必須、憲章 ID の記録)                             |
+| 5   | 責任者への説明責任レポート、tripwire 通知、憲章変更提案                                    |
+| 6   | Me / Org の面: 憲章の作成ウィザード、使用率の表示、受諾                                    |
 
 ## 限界(必ず守る前提)
 

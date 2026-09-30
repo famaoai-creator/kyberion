@@ -44,13 +44,13 @@ export interface DecideCardFields {
 /**
  * Maps a queue entry to the plain-language fields the FD-04 card renders.
  *
- * None of the item types the concierge client currently receives
+ * Only approvals carry a tenant slug today (projected from the request's
+ * event scope). None of the item types the concierge client receives
  * (`ConciergeSummary['approval_queue'|'outcome_feed'|'exception_feed']`,
  * `ConciergeHygieneInquiry`, `ConciergeMemoryQueueItem` — see
- * `summary-event.ts` / `concierge-advisory-response.ts`) carry a tenant
- * slug or a distinct "expected consequence" field separate from their one
- * explanatory string, so `tenantSlug` is always absent today and `effect`
- * is always empty (only `effectLabelKey` is set, so the column header never
+ * `summary-event.ts` / `concierge-advisory-response.ts`) carry a distinct
+ * "expected consequence" field separate from their one explanatory string,
+ * so `effect` is always empty (only `effectLabelKey` is set, so the column header never
  * renders without a field to put under it — see `hasEffectColumn`). The
  * mapping is written per-kind so a future field only needs a value here.
  *
@@ -69,6 +69,9 @@ export function deriveCardFields(entry: DecideQueueEntry): DecideCardFields {
             ? entry.item.reason
             : undefined,
         effectLabelKey: 'decide_effect_approval',
+        // Whose decision this is — a member of several organizations must see
+        // which one is asking before approving (plan: actor model, decision 3).
+        tenantSlug: entry.item.tenant_slug,
       };
     case 'hygiene':
       return {

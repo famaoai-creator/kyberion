@@ -194,6 +194,7 @@ function DecideCardFrame({
       <Section title={title} headingLevel={3}>
         <div className="decide-card-meta">
           <Badge label={kindLabel} tone={KIND_TONES[kind]} />
+          {fields.tenantSlug ? <Badge label={fields.tenantSlug} tone="info" /> : null}
           {status}
           {relative ? (
             <span className="decide-time" title={timeAbsolute || undefined}>

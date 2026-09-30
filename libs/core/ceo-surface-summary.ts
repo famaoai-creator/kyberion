@@ -35,6 +35,9 @@ export interface CeoApprovalItem {
   requested_at: string;
   expires_at?: string;
   mission_id?: string;
+  /** Whose decision this is. Lets a member of several organizations see which one is asking. */
+  tenant_slug?: string;
+  organization_id?: string;
 }
 
 export interface CeoOutcomeItem {
@@ -200,6 +203,10 @@ function toApprovalItem(
     expires_at: record.expiresAt ? String(record.expiresAt) : undefined,
     mission_id: record.requestedByContext?.missionId
       ? String(record.requestedByContext.missionId)
+      : undefined,
+    tenant_slug: record.scope?.tenant_slug ? String(record.scope.tenant_slug) : undefined,
+    organization_id: record.scope?.organization_id
+      ? String(record.scope.organization_id)
       : undefined,
   };
 }

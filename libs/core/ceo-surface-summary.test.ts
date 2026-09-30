@@ -45,6 +45,7 @@ function makeHomeSummary(): OperatorHomeSummary {
         sourceText: '提案書を顧客へ送付してよいかご確認ください',
         requestedAt: '2026-07-06T08:30:00.000Z',
         requestedByContext: { missionId: 'MSN-PITCH-001' },
+        scope: { scope_kind: 'tenant', tenant_slug: 'acme', organization_id: 'org-acme' },
       } as never,
     ],
     inboxEntries: [
@@ -119,6 +120,8 @@ describe('ceo-surface-summary', () => {
       mission_id: 'MSN-PITCH-001',
       channel: 'slack',
       storage_channel: 'slack',
+      tenant_slug: 'acme',
+      organization_id: 'org-acme',
     });
 
     expect(summary.outcome_feed).toHaveLength(1);
