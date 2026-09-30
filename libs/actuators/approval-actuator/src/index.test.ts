@@ -50,7 +50,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@agent/core/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/core')>()),
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({

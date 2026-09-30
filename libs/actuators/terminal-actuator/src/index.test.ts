@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
 
 // Mirror the terminal helper's canonical imports. The previous barrel mock
 // left the real PTY and retry implementations active after the import split.
-vi.mock('@agent/core/core', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+vi.mock('@agent/core/core', () => ({
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
 vi.mock('@agent/core/semantic-decide', () => ({
   executeLlmDecideOp: mocks.executeLlmDecideOp,
 }));

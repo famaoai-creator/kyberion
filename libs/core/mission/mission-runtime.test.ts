@@ -22,6 +22,7 @@ const coreMocks = vi.hoisted(() => ({
   enqueueMissionTeamPrewarmRequest: vi.fn(),
   startAgentRuntimeSupervisorForRequest: vi.fn(),
   logger: {
+    debug: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
   },

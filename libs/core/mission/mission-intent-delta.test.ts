@@ -12,7 +12,7 @@ vi.mock('../intent/intent-extractor.js', () => ({
   getIntentExtractor: vi.fn(),
 }));
 vi.mock('../core.js', () => ({
-  logger: { warn: vi.fn() },
+  logger: { debug: vi.fn(), warn: vi.fn() },
 }));
 
 import { emitIntentSnapshot, evaluateIntentDriftGate } from '../intent/intent-snapshot-store.js';
