@@ -6,7 +6,6 @@ import {
 } from '@agent/core/surface/surface-mutation-guard';
 import {
   SURFACE_SESSION_COOKIE,
-  extractSurfaceCredential,
   isSameOriginMutation,
 } from '@agent/core/surface/surface-session-cookie';
 import { withExecutionContext } from '@agent/core/authority';
@@ -115,23 +114,17 @@ export function resolveChronosToken(req: NextRequest): string | null {
 }
 
 /**
- * True when the credential is carried only by a browser cookie (legacy token
- * or OIDC session) and the request is an unsafe cross-origin mutation. Header
- * credentials are not cookie-borne and skip the check.
+ * True when the credential is the OIDC `kyberion_session` cookie (no header,
+ * no legacy `kyberion_token` cookie) and the request is an unsafe cross-origin
+ * mutation. Header credentials and the pre-existing `kyberion_token` cookie
+ * keep their previous behaviour and skip the check.
  */
 function isBlockedCookieMutation(req: NextRequest): boolean {
   const method = (req.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
-  const authorization = req.headers.get('authorization');
-  const cookieCredential = extractSurfaceCredential({
-    authorization,
-    cookie: req.headers.get('cookie'),
-  });
-  const cookieBorne =
-    cookieCredential.source === 'session-cookie' ||
-    (!extractSurfaceBearerToken(authorization) &&
-      Boolean(req.cookies.get('kyberion_token')?.value));
-  if (!cookieBorne) return false;
+  if (extractSurfaceBearerToken(req.headers.get('authorization'))) return false;
+  if (req.cookies.get('kyberion_token')?.value) return false;
+  if (!req.cookies.get(SURFACE_SESSION_COOKIE)?.value) return false;
   return !isSameOriginMutation({
     method,
     headers: req.headers,
