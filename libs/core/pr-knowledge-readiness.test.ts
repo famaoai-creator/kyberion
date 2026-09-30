@@ -87,6 +87,16 @@ describe('parsePrBodyKnowledge', () => {
     expect(parsePrBodyKnowledge(body).missionId).toBe('MSN-KL03-TEST');
   });
 
+  it('treats an unterminated comment as hiding the rest and stays linear on many openers', () => {
+    const hidden = parsePrBodyKnowledge(
+      ['## Knowledge', '', '<!-- unterminated', '- none — hidden reason'].join('\n')
+    );
+    expect(hidden.knowledgeLines).toEqual([]);
+    const started = Date.now();
+    parsePrBodyKnowledge(`## Knowledge\n${'<!--'.repeat(50_000)}`);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it('strips HTML comments (including multi-line ones) before parsing', () => {
     const body = [
       '## Coordination',
