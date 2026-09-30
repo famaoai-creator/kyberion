@@ -1891,10 +1891,15 @@ describe('mission controller router — runtime input boundaries', () => {
     await missionControllerRouter.runMissionControllerAction(promote);
     expect(promote.promoteMemoryCandidate.mock.calls[0][5]).toBe('/wt/pr');
 
-    const pending = makeContext('memory-promote-pending', [], ['--target-root', '/wt/pr']);
+    const pending = makeContext(
+      'memory-promote-pending',
+      [],
+      ['--target-root', '/wt/pr', '--mission', 'MSN-KL-05']
+    );
     await missionControllerRouter.runMissionControllerAction(pending);
     expect(pending.promotePendingMemoryCandidates.mock.calls[0][0]).toMatchObject({
       targetRoot: '/wt/pr',
+      missionId: 'MSN-KL-05',
     });
   });
 });

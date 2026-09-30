@@ -498,6 +498,11 @@ export async function promoteMemoryCandidateToKnowledge(input: {
         `[PROMOTION_TARGET_ROOT] --target-root only supports product-domain knowledge — candidate ${candidateId} is ${domain} | next: promote without --target-root`
       );
     }
+    if (!target.sameAsCurrent && candidate.approval_channel !== 'pr_review') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root requires approval_channel=pr_review — candidate ${candidateId} is ${candidate.approval_channel || 'steward'}; a record written into another worktree is only ratified by its PR reaching origin/main | next: re-approve with \`mission_controller memory-approve ${candidateId} --approval-channel pr_review\`, or promote without --target-root`
+      );
+    }
   }
   if (candidate.status === 'promoted') {
     const storedReview = loadDistillCandidateRecord(candidateId)?.metadata?.promotion_review;
@@ -556,6 +561,7 @@ export async function promoteMemoryCandidateToKnowledge(input: {
     promoted = savePromotedMemoryRecord(distillCandidate, {
       executionRole: input.executionRole || 'mission_controller',
       ...(input.targetRoot ? { targetRoot: input.targetRoot } : {}),
+      ...(candidate.approval_channel ? { approvalChannel: candidate.approval_channel } : {}),
     });
   } catch (err) {
     // The candidate failed the value threshold (e.g. test track, generic title,

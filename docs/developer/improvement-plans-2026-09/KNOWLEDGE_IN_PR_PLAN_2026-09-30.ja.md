@@ -75,7 +75,8 @@ status: active
    - `queued` または `approved` のまま残っている product 候補がある
    - `promoted` なのに、`promoted_ref` のファイルが `git diff origin/main...HEAD` に含まれていない
    - 候補の ID が本文の Knowledge 欄に書かれていない
-   - diff に `knowledge/confidential/` または `knowledge/personal/` 配下のファイルがある(漏洩)
+   - diff で `knowledge/confidential/` または `knowledge/personal/` 配下にファイルが追加されている(漏洩。既に追跡済みのファイルの変更は対象外)
+   - 宣言の種類が候補の状態と一致しない、または `promoted:` のパスが `promoted_ref` と一致しない
 4. 検査をスキップするフラグは作らない。`--skip-readiness` も Knowledge 検査は迂回しない。
 
 CI の `pr` スコープの gate には入れない。CI には `active/` のミッション記録が存在しないためで、この検査はローカルの `pr create` 専用とする。
@@ -116,12 +117,12 @@ CI の `pr` スコープの gate には入れない。CI には `active/` のミ
 
 ## 5. 状態
 
-| ID    | 内容                                | 状態   |
-| ----- | ----------------------------------- | ------ |
-| KL-01 | 手順書の並び替え                    | 未着手 |
-| KL-02 | PR テンプレートの Knowledge 欄      | 未着手 |
-| KL-03 | `pr create` の Knowledge 検査       | 未着手 |
-| KL-04 | pr_review 承認と finish での ratify | 未着手 |
-| KL-05 | `--target-root` と出どころの記録    | 未着手 |
-| KL-06 | テスト                              | 未着手 |
-| KL-07 | 自己適用                            | 未着手 |
+| ID    | 内容                                | 状態           |
+| ----- | ----------------------------------- | -------------- |
+| KL-01 | 手順書の並び替え                    | 実装済み(PR)   |
+| KL-02 | PR テンプレートの Knowledge 欄      | 実装済み(PR)   |
+| KL-03 | `pr create` の Knowledge 検査       | 実装済み(PR)   |
+| KL-04 | pr_review 承認と finish での ratify | 実装済み(PR)   |
+| KL-05 | `--target-root` と出どころの記録    | 実装済み(PR)   |
+| KL-06 | テスト                              | 実装済み(PR)   |
+| KL-07 | 自己適用                            | この PR で適用 |

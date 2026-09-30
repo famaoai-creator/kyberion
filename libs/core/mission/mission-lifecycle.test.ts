@@ -25,7 +25,7 @@ import {
   updateMissionMemorySidecar,
 } from './mission-lifecycle-completion.js';
 import * as customerResolver from '../customer-resolver.js';
-import { emitIntentSnapshot } from '../intent/intent-snapshot-store.js';
+import { emitIntentSnapshot, listSnapshots } from '../intent/intent-snapshot-store.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExec,
@@ -634,14 +634,17 @@ describe('mission lifecycle finish gate', () => {
       const stateBefore = String(
         safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' })
       );
+      const snapshotsBefore = listSnapshots(missionId).length;
 
       await finishMission(missionId, false, args);
 
       // Blocked as an expected wait: state untouched (no reset to active),
-      // candidate not ratified, a failing gate record explains why.
+      // no delivery intent snapshot, candidate not ratified, a failing gate
+      // record explains why.
       expect(String(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }))).toBe(
         stateBefore
       );
+      expect(listSnapshots(missionId)).toHaveLength(snapshotsBefore);
       const blocked = listMemoryPromotionCandidates().filter(
         (candidate) => candidate.source_ref === `mission:${missionId}`
       );
@@ -673,6 +676,100 @@ describe('mission lifecycle finish gate', () => {
         ratification_target: 'origin/main',
       });
       expect(after[0].ratified_at).toBeTruthy();
+    } finally {
+      safeRmSync(promotionQueuePath, { force: true });
+    }
+  });
+
+  function prepareKl04FinishFixture() {
+    prepareMissionState('completed', undefined, undefined, {
+      requested_result: 'Mission closeout complete.',
+      success_criteria: ['The closeout note is saved'],
+      deliverable_kind: 'markdown',
+      evidence_required: true,
+      expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+      verification_method: 'self_check',
+    });
+    seedMissionEvidence('closeout.md', '# Closeout\nMission closeout complete.');
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+    return {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    };
+  }
+
+  function memoryRatificationGateRecords(): string[] {
+    if (!safeExistsSync(`${missionPath}/gates`)) return [];
+    return safeReaddir(`${missionPath}/gates`)
+      .filter((name) => name.startsWith('memory-ratification-'))
+      .map((name) => String(safeReadFile(`${missionPath}/gates/${name}`, { encoding: 'utf8' })));
+  }
+
+  it('KL-04: fails closed when the ratification check throws (status unchanged, no snapshot)', async () => {
+    const args = prepareKl04FinishFixture();
+    const stateBefore = String(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' })
+    );
+    const snapshotsBefore = listSnapshots(missionId).length;
+
+    await finishMission(missionId, false, {
+      ...args,
+      ratifyMemory: () => {
+        throw new Error('promotion queue unreadable');
+      },
+    });
+
+    expect(String(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }))).toBe(
+      stateBefore
+    );
+    expect(listSnapshots(missionId)).toHaveLength(snapshotsBefore);
+    const records = memoryRatificationGateRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toContain('"verdict": "fail"');
+    expect(records[0]).toContain('promotion queue unreadable');
+  });
+
+  it('KL-04: blocks finish while a pr_review candidate is approved but never promoted', async () => {
+    safeRmSync(promotionQueuePath, { force: true });
+    try {
+      const args = prepareKl04FinishFixture();
+      enqueueMemoryPromotionCandidate({
+        ...createMemoryPromotionCandidate({
+          candidateId: 'MEM-KL04-UNPROMOTED',
+          sourceType: 'mission',
+          sourceRef: `mission:${missionId}`,
+          knowledgeDomain: 'product',
+          proposedMemoryKind: 'heuristic',
+          summary: 'Approved PR-reviewed knowledge must reach the PR before finish.',
+          evidenceRefs: [`active/missions/public/${missionId}/evidence/closeout.md`],
+          sensitivityTier: 'public',
+          status: 'approved',
+        }),
+        approval_channel: 'pr_review',
+      });
+      const stateBefore = String(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' })
+      );
+
+      await finishMission(missionId, false, {
+        ...args,
+        gitRunner: () => ({ status: 1, stdout: '', stderr: 'git must not decide this case' }),
+      });
+
+      expect(String(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }))).toBe(
+        stateBefore
+      );
+      expect(
+        listMemoryPromotionCandidates().find((c) => c.candidate_id === 'MEM-KL04-UNPROMOTED')
+      ).toMatchObject({ status: 'approved' });
+      const records = memoryRatificationGateRecords();
+      expect(records).toHaveLength(1);
+      expect(records[0]).toContain('"verdict": "fail"');
+      expect(records[0]).toContain('approved but never promoted: MEM-KL04-UNPROMOTED');
     } finally {
       safeRmSync(promotionQueuePath, { force: true });
     }

@@ -14,7 +14,7 @@
  */
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { safeExecResult, safeExistsSync } from '../secure-io.js';
+import { safeExecResult, safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import type { GitRunner } from './memory-promotion-git.js';
@@ -22,6 +22,15 @@ import { defaultGitRunner } from './memory-promotion-git.js';
 
 export type { GitRunner };
 export { defaultGitRunner };
+
+/** Repo-relative path normalization shared by diff parsing and declared-path comparisons: backslashes → `/`, strip leading `./`. */
+function normalizeRepoPath(rawPath: string | undefined): string {
+  let normalized = String(rawPath || '')
+    .trim()
+    .replace(/\\/gu, '/');
+  while (normalized.startsWith('./')) normalized = normalized.slice(2);
+  return normalized;
+}
 
 // --- PR body parsing --------------------------------------------------
 
@@ -47,6 +56,11 @@ export interface ParsedPrBodyKnowledge {
 
 const PLACEHOLDER_MISSION_ID_PATTERN = /^(n\/a|tbd|none|-|_+|<.*>)$/i;
 
+/** Strip Markdown/HTML comments (including multi-line ones) before parsing — a comment is never a declaration. */
+function stripHtmlComments(text: string): string {
+  return text.replace(/<!--[\s\S]*?-->/gu, '');
+}
+
 /** Slice a `## Heading` section's body out of a Markdown document (case-insensitive heading match). */
 function extractMarkdownSection(body: string, heading: string): string | null {
   const lines = String(body || '').split(/\r?\n/);
@@ -69,14 +83,26 @@ function extractMarkdownSection(body: string, heading: string): string | null {
   return lines.slice(start, end).join('\n');
 }
 
-function parseMissionId(body: string): string | undefined {
-  const coordination = extractMarkdownSection(body, 'Coordination');
+/** Strip surrounding backticks/quotes/whitespace a human might wrap a Mission ID in (e.g. `` `MSN-X` ``). */
+function stripMissionIdDecoration(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/^[`'"]+/u, '')
+    .replace(/[`'"]+$/u, '')
+    .trim();
+}
+
+/** `sanitizedBody` must already have HTML comments stripped (see `parsePrBodyKnowledge`). */
+function parseMissionId(sanitizedBody: string): string | undefined {
+  const coordination = extractMarkdownSection(sanitizedBody, 'Coordination');
   if (coordination === null) return undefined;
   const match = coordination.match(/^-\s*Mission ID:\s*(.*)$/imu);
   if (!match) return undefined;
-  const value = (match[1] || '').trim();
-  if (!value || PLACEHOLDER_MISSION_ID_PATTERN.test(value)) return undefined;
-  return value;
+  const stripped = stripMissionIdDecoration(match[1] || '');
+  if (!stripped || PLACEHOLDER_MISSION_ID_PATTERN.test(stripped)) return undefined;
+  // Normalized once here so every downstream comparison (mission root
+  // resolution, candidate source_ref matching) works off the same casing.
+  return stripped.toUpperCase();
 }
 
 const KNOWLEDGE_LINE_PATTERNS: ReadonlyArray<{
@@ -121,10 +147,11 @@ function parseKnowledgeLine(rawLine: string): KnowledgeLine | null {
   return null;
 }
 
-/** Parse a PR body's Coordination `Mission ID` and `## Knowledge` section lines. */
+/** Parse a PR body's Coordination `Mission ID` and `## Knowledge` section lines. HTML comments are stripped first, so a comment can never masquerade as a declaration. */
 export function parsePrBodyKnowledge(body: string): ParsedPrBodyKnowledge {
-  const missionId = parseMissionId(body);
-  const section = extractMarkdownSection(body, 'Knowledge');
+  const sanitized = stripHtmlComments(String(body || ''));
+  const missionId = parseMissionId(sanitized);
+  const section = extractMarkdownSection(sanitized, 'Knowledge');
   const hasKnowledgeSection = section !== null;
   const knowledgeLines: KnowledgeLine[] = [];
   if (section) {
@@ -143,29 +170,82 @@ export interface ResolveMissionRootInput {
   explicitRoot?: string;
   /** The current process's project root (where `pr create` runs). */
   cwdRoot: string;
+  /** The PR body's parsed Mission ID, when there is one — lets resolution prefer the root that actually has this mission's records over one that merely has *some* mission's records. */
+  missionId?: string;
   gitRunner?: GitRunner;
 }
 
 const GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const MISSIONS_RELATIVE_PATH = 'active/missions';
+const ARCHIVE_MISSIONS_RELATIVE_PATH = 'active/archive/missions';
 
-/** True when `root` itself already has mission/queue records (no need to look elsewhere). */
+/** True when `root` itself already has mission/queue records (no need to look elsewhere). Only used when no Mission ID was parsed to check against. */
 function rootHasMissionRecords(root: string): boolean {
   if (safeExistsSync(path.join(root, GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH))) return true;
   return safeExistsSync(path.join(root, MISSIONS_RELATIVE_PATH));
 }
 
+/** True when `root`'s memory promotion queue file mentions a candidate whose `source_ref` is this mission (`mission:<ID>` or `mission:<ID>:...`), matched case-insensitively on the ID. */
+function rootHasMissionCandidateRecords(root: string, missionId: string): boolean {
+  const queuePath = path.join(root, GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH);
+  if (!safeExistsSync(queuePath)) return false;
+  let raw = '';
+  try {
+    raw = String(
+      safeReadFile(queuePath, { encoding: 'utf8', label: 'memory promotion queue' }) || ''
+    );
+  } catch {
+    return false;
+  }
+  const haystack = raw.toLowerCase();
+  const idLower = missionId.toLowerCase();
+  return (
+    haystack.includes(`"source_ref":"mission:${idLower}"`) ||
+    haystack.includes(`"source_ref":"mission:${idLower}:`) ||
+    haystack.includes(`"source_ref": "mission:${idLower}"`) ||
+    haystack.includes(`"source_ref": "mission:${idLower}:`)
+  );
+}
+
+/**
+ * True when `root` actually contains this specific mission's records: a
+ * mission directory (`active/missions/<tier>/<ID>` or
+ * `active/archive/missions/<ID>`), or a memory-promotion-queue candidate
+ * whose `source_ref` names this mission.
+ */
+function rootHasMission(root: string, missionId: string): boolean {
+  if (!missionId) return false;
+  if (safeExistsSync(path.join(root, ARCHIVE_MISSIONS_RELATIVE_PATH, missionId))) return true;
+  const missionsDir = path.join(root, MISSIONS_RELATIVE_PATH);
+  if (safeExistsSync(missionsDir)) {
+    let tiers: string[] = [];
+    try {
+      tiers = safeReaddir(missionsDir);
+    } catch {
+      tiers = [];
+    }
+    if (tiers.some((tier) => safeExistsSync(path.join(missionsDir, tier, missionId)))) return true;
+  }
+  return rootHasMissionCandidateRecords(root, missionId);
+}
+
 /**
  * Resolve where mission/memory records live: the explicit `--mission-root`,
- * else the current root if it already has them, else the repository's main
- * worktree (`git worktree list --porcelain`'s first `worktree` entry — git
- * always lists the main worktree first).
+ * else the current root when it already has THIS mission's records (falling
+ * back to "has any mission records at all" only when no Mission ID was
+ * parsed), else the repository's main worktree (`git worktree list
+ * --porcelain`'s first `worktree` entry — git always lists the main worktree
+ * first).
  */
 export function resolveMissionRoot(input: ResolveMissionRootInput): string {
   const explicit = input.explicitRoot?.trim();
   if (explicit) return path.resolve(explicit);
   const resolvedCwdRoot = path.resolve(input.cwdRoot);
-  if (rootHasMissionRecords(resolvedCwdRoot)) return resolvedCwdRoot;
+  const missionId = input.missionId?.trim().toUpperCase() || undefined;
+  const cwdHasWhatWeNeed = missionId
+    ? rootHasMission(resolvedCwdRoot, missionId)
+    : rootHasMissionRecords(resolvedCwdRoot);
+  if (cwdHasWhatWeNeed) return resolvedCwdRoot;
   const runner = input.gitRunner ?? defaultGitRunner;
   let stdout = '';
   try {
@@ -180,27 +260,68 @@ export function resolveMissionRoot(input: ResolveMissionRootInput): string {
 
 // --- changed-file listing ------------------------------------------------
 
+/** A strict git ref-name check: no leading `-` (blocks a `--base`/`--mission-root` value from being read as a git option) and only characters that are ever legal in a branch/ref name. */
+export const GIT_REF_NAME_PATTERN = /^(?!-)[A-Za-z0-9._/-]+$/u;
+
+export interface ChangedFile {
+  /** git status letter for the entry (`A`, `M`, `D`, `C`, `T`, `U`, …). Renames are disabled (`--no-renames`), so a rename shows as a `D` + `A` pair. */
+  status: string;
+  /** Repo-relative path, forward slashes, no leading `./`. */
+  path: string;
+}
+
 export interface ListChangedFilesInput {
   repoRoot: string;
-  /** Defaults to `origin/main`. */
+  /** Defaults to `origin/main`. Must be a plain ref name (see `GIT_REF_NAME_PATTERN`); callers that accept a bare branch name from a user (e.g. `publish_pull_request.ts`) should map it to `origin/<base>` before calling this. */
   base?: string;
   gitRunner?: GitRunner;
 }
 
-/** `git diff --name-only <base>...HEAD`, repo-relative paths, no shell string. */
-export function listChangedFiles(input: ListChangedFilesInput): string[] {
+/**
+ * `git -c core.quotePath=false diff --name-status -z --no-renames <base>...HEAD`,
+ * NUL-split so parsing never depends on shell/locale quoting.
+ * `core.quotePath=false` stops git from C-quoting non-ASCII paths (e.g.
+ * `"knowledge/personal/\343..."`), which would otherwise defeat prefix
+ * checks like the tier-leak rule below. `--end-of-options` plus the strict
+ * `GIT_REF_NAME_PATTERN` check on `base` stop a crafted base value from being
+ * read as a git option.
+ */
+export function listChangedFiles(input: ListChangedFilesInput): ChangedFile[] {
   const runner = input.gitRunner ?? defaultGitRunner;
   const base = input.base?.trim() || 'origin/main';
-  const result = runner(['diff', '--name-only', `${base}...HEAD`], input.repoRoot);
-  if (result.status !== 0) {
+  if (!GIT_REF_NAME_PATTERN.test(base)) {
     throw new Error(
-      `[PR_KNOWLEDGE_READINESS] git diff --name-only ${base}...HEAD failed in ${input.repoRoot} — ${(result.stderr || '').trim()} | next: fetch ${base} locally, or pass --base`
+      `[PR_KNOWLEDGE_READINESS] refusing unsafe diff base '${base}' | next: pass a plain branch/ref name via --base (no leading '-')`
     );
   }
-  return result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const result = runner(
+    [
+      '-c',
+      'core.quotePath=false',
+      'diff',
+      '--name-status',
+      '-z',
+      '--no-renames',
+      '--end-of-options',
+      `${base}...HEAD`,
+    ],
+    input.repoRoot
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `[PR_KNOWLEDGE_READINESS] git diff --name-status ${base}...HEAD failed in ${input.repoRoot} — ${(result.stderr || '').trim()} | next: fetch ${base} locally, or pass --base`
+    );
+  }
+  // With -z, both the status/path separator and the record terminator are NUL.
+  const fields = result.stdout.split('\0').filter((field) => field.length > 0);
+  const changedFiles: ChangedFile[] = [];
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    changedFiles.push({
+      status: (fields[index] || '').trim(),
+      path: normalizeRepoPath(fields[index + 1]),
+    });
+  }
+  return changedFiles;
 }
 
 // --- reading mission memory candidates across worktrees ------------------
@@ -296,10 +417,12 @@ export function readMissionMemoryCandidates(
 
 export type KnowledgeViolationCode =
   | 'missing_knowledge_section'
+  | 'knowledge_section_empty'
   | 'no_mission_candidates'
   | 'unresolved_candidate'
   | 'promoted_record_not_in_diff'
   | 'candidate_not_declared'
+  | 'declaration_mismatch'
   | 'tier_leak';
 
 export interface KnowledgeViolation {
@@ -310,7 +433,7 @@ export interface KnowledgeViolation {
 export interface EvaluatePrKnowledgeReadinessInput {
   body: string;
   candidates: readonly MemoryCandidate[];
-  changedFiles: readonly string[];
+  changedFiles: readonly ChangedFile[];
 }
 
 export interface EvaluatePrKnowledgeReadinessResult {
@@ -320,16 +443,35 @@ export interface EvaluatePrKnowledgeReadinessResult {
 
 const TIER_LEAK_PREFIXES = ['knowledge/confidential/', 'knowledge/personal/'];
 
+/** Case-insensitive, `./`/backslash-normalized prefix check — a C-quoted or backslash path must not slip past this. */
 function isTierLeakPath(filePath: string): boolean {
-  const normalized = String(filePath || '')
-    .trim()
-    .replace(/\\/gu, '/');
+  const normalized = normalizeRepoPath(filePath).toLowerCase();
   return TIER_LEAK_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
 /** Product/unclassified candidates must be curated to a final state before the PR opens. */
 function isUnresolvedDomain(domain: MemoryCandidate['knowledge_domain']): boolean {
   return !domain || domain === 'product' || domain === 'unclassified';
+}
+
+/** Same predicate `ratifyPrReviewedMemoryCandidates` (memory-promotion-git.ts) uses to attribute a candidate to a mission, but case-insensitive on the ID so a PR body's casing of `Mission ID:` never causes a false miss. `missionId` must already be normalized (trim + uppercase). */
+function isMissionCandidateSourceRef(sourceRef: string | undefined, missionId: string): boolean {
+  const ref = String(sourceRef || '').trim();
+  const prefix = 'mission:';
+  if (!ref.toLowerCase().startsWith(prefix)) return false;
+  const afterPrefix = ref.slice(prefix.length);
+  const refMissionId = (afterPrefix.split(':')[0] || '').trim().toUpperCase();
+  return refMissionId === missionId;
+}
+
+/** What kind of Knowledge-section line a candidate's current state requires; `undefined` when it is not yet in a final state (see `unresolved_candidate`). */
+function expectedKnowledgeLineKind(candidate: MemoryCandidate): KnowledgeLineKind | undefined {
+  if (candidate.knowledge_domain === 'organization' || candidate.knowledge_domain === 'personal') {
+    return 'routed';
+  }
+  if (candidate.status === 'promoted') return 'promoted';
+  if (candidate.status === 'rejected') return 'rejected';
+  return undefined;
 }
 
 /**
@@ -343,6 +485,7 @@ export function evaluatePrKnowledgeReadiness(
 ): EvaluatePrKnowledgeReadinessResult {
   const parsed = parsePrBodyKnowledge(input.body);
   const violations: KnowledgeViolation[] = [];
+  let knowledgeSectionEmptyFlagged = false;
 
   if (!parsed.hasKnowledgeSection) {
     violations.push({
@@ -350,38 +493,48 @@ export function evaluatePrKnowledgeReadiness(
       message:
         'PR body has no "## Knowledge" section — add one line per mission memory candidate (promoted:/rejected:/routed:) or "none — <reason>" when there is no mission.',
     });
+  } else if (parsed.knowledgeLines.length === 0) {
+    violations.push({
+      code: 'knowledge_section_empty',
+      message:
+        'PR body\'s "## Knowledge" section has no parseable line — declare at least one promoted:/rejected:/routed: line, or "none — <reason>" when there is no mission (an unedited template placeholder does not count).',
+    });
+    knowledgeSectionEmptyFlagged = true;
   }
 
   for (const changedFile of input.changedFiles) {
-    if (isTierLeakPath(changedFile)) {
+    if (changedFile.status === 'A' && isTierLeakPath(changedFile.path)) {
       violations.push({
         code: 'tier_leak',
-        message: `Changed file '${changedFile}' is under a confidential/personal knowledge tier and must never appear in a PR diff.`,
+        message: `Added file '${changedFile.path}' is under a confidential/personal knowledge tier and must never be newly added in a PR diff.`,
       });
     }
   }
 
   if (!parsed.missionId) {
+    if (parsed.hasKnowledgeSection && !knowledgeSectionEmptyFlagged) {
+      const noneLine = parsed.knowledgeLines.find((line) => line.kind === 'none');
+      if (!noneLine || !(noneLine.reason || '').trim()) {
+        violations.push({
+          code: 'knowledge_section_empty',
+          message:
+            'No-mission PR must declare "none — <reason>" with a non-empty reason in the "## Knowledge" section.',
+        });
+      }
+    }
     return { ok: violations.length === 0, violations };
   }
 
-  const missionSourceRef = `mission:${parsed.missionId}`;
-  const missionCandidates = input.candidates.filter(
-    (candidate) => candidate.source_ref === missionSourceRef
+  const missionCandidates = input.candidates.filter((candidate) =>
+    isMissionCandidateSourceRef(candidate.source_ref, parsed.missionId!)
   );
   if (missionCandidates.length === 0) {
     violations.push({
       code: 'no_mission_candidates',
-      message: `Mission ${parsed.missionId} has no memory candidates in the queue — run "mission verify" and "mission distill" before opening the PR.`,
+      message: `Mission ${parsed.missionId} has no memory candidates in the queue — run "mission verify" and "mission distill" before opening the PR, or pass --mission-root if this mission's records live in a different worktree.`,
     });
     return { ok: violations.length === 0, violations };
   }
-
-  const declaredCandidateIds = new Set(
-    parsed.knowledgeLines
-      .map((line) => line.candidateId)
-      .filter((candidateId): candidateId is string => Boolean(candidateId))
-  );
 
   for (const candidate of missionCandidates) {
     if (
@@ -395,20 +548,55 @@ export function evaluatePrKnowledgeReadiness(
     }
 
     if (candidate.knowledge_domain === 'product' && candidate.status === 'promoted') {
-      const ref = candidate.promoted_ref?.trim();
-      if (!ref || !input.changedFiles.includes(ref)) {
+      const ref = normalizeRepoPath(candidate.promoted_ref);
+      const recordInDiff = ref ? input.changedFiles.some((file) => file.path === ref) : false;
+      if (!ref || !recordInDiff) {
         violations.push({
           code: 'promoted_record_not_in_diff',
           message: `Candidate ${candidate.candidate_id} is promoted but its record (${ref || '(no promoted_ref)'}) is not in this PR's diff — commit the promoted record with this PR.`,
         });
+      } else if (ref.endsWith('.md')) {
+        const jsonRef = `${ref.slice(0, -3)}.json`;
+        const jsonInDiff = input.changedFiles.some(
+          (file) => file.path === jsonRef && (file.status === 'A' || file.status === 'M')
+        );
+        if (!jsonInDiff) {
+          violations.push({
+            code: 'promoted_record_not_in_diff',
+            message: `Candidate ${candidate.candidate_id}'s promoted record's companion metadata file (${jsonRef}) is not added/modified in this PR's diff — commit it together with the record.`,
+          });
+        }
       }
     }
 
-    if (!declaredCandidateIds.has(candidate.candidate_id)) {
+    const declaredLines = parsed.knowledgeLines.filter(
+      (line) => line.candidateId === candidate.candidate_id
+    );
+    if (declaredLines.length === 0) {
       violations.push({
         code: 'candidate_not_declared',
         message: `Candidate ${candidate.candidate_id} is not mentioned in the PR body's "## Knowledge" section — add a promoted:/rejected:/routed: line for it.`,
       });
+      continue;
+    }
+
+    const expectedKind = expectedKnowledgeLineKind(candidate);
+    if (!expectedKind) continue;
+    const matching = declaredLines.find((line) => line.kind === expectedKind);
+    if (!matching) {
+      violations.push({
+        code: 'declaration_mismatch',
+        message: `Candidate ${candidate.candidate_id} is ${candidate.status}${candidate.knowledge_domain ? ` (${candidate.knowledge_domain})` : ''} but its PR body line says "${declaredLines[0]!.kind}:" — expected "${expectedKind}:".`,
+      });
+    } else if (expectedKind === 'promoted') {
+      const expectedPath = normalizeRepoPath(candidate.promoted_ref);
+      const declaredPath = normalizeRepoPath(matching.path);
+      if (!expectedPath || declaredPath !== expectedPath) {
+        violations.push({
+          code: 'declaration_mismatch',
+          message: `Candidate ${candidate.candidate_id}'s "promoted:" line path (${matching.path || '(empty)'}) does not match its promoted_ref (${candidate.promoted_ref || '(none)'}).`,
+        });
+      }
     }
   }
 
@@ -433,8 +621,13 @@ export interface PrKnowledgeReadinessGateInput {
 export function checkPrKnowledgeReadiness(
   input: PrKnowledgeReadinessGateInput
 ): EvaluatePrKnowledgeReadinessResult {
+  // Parsed once here (in addition to inside evaluatePrKnowledgeReadiness) so
+  // mission-root resolution can prefer the root that actually has THIS
+  // mission's records (see resolveMissionRoot).
+  const missionId = parsePrBodyKnowledge(input.body).missionId;
   const missionRoot = resolveMissionRoot({
     ...input.missionRootInput,
+    missionId,
     gitRunner: input.missionRootInput.gitRunner ?? input.gitRunner,
   });
   const candidates = readMissionMemoryCandidates(

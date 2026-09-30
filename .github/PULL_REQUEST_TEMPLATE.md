@@ -16,7 +16,7 @@
 
 ## Knowledge
 
-<!-- One line per mission memory candidate (`mission distill` queued it; see `mission-controller memory list`). Required even with no mission — use `none — <reason>`. `pnpm kyberion pr create` blocks on this section locally (KL-03); CI does not check it (no `active/` mission records in a CI checkout). -->
+<!-- One line per mission memory candidate (`mission distill` queued it; see `pnpm mission memory-queue`). Required even with no mission — use `none — <reason>`. `pnpm kyberion pr create` blocks on this section locally (KL-03); CI does not check it (no `active/` mission records in a CI checkout). -->
 
 - promoted: <candidate_id> → <path>
 - rejected: <candidate_id> — <reason>

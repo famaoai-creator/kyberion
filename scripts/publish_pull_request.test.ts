@@ -24,6 +24,7 @@ import {
   main,
   parseDefaultBranchResponse,
   parsePublishArgs,
+  resolveKnowledgeDiffBase,
   resolvePublishTitle,
   runKnowledgeReadinessGate,
 } from './publish_pull_request.js';
@@ -128,6 +129,27 @@ describe('publish_pull_request', () => {
   });
 });
 
+describe('resolveKnowledgeDiffBase (KL-03 diff-base fix)', () => {
+  it('defaults to origin/main', () => {
+    expect(resolveKnowledgeDiffBase(undefined)).toBe('origin/main');
+    expect(resolveKnowledgeDiffBase('')).toBe('origin/main');
+  });
+
+  it('maps a bare branch name to origin/<base>', () => {
+    expect(resolveKnowledgeDiffBase('main')).toBe('origin/main');
+    expect(resolveKnowledgeDiffBase('release-1.2')).toBe('origin/release-1.2');
+  });
+
+  it('leaves an already-qualified ref alone', () => {
+    expect(resolveKnowledgeDiffBase('origin/main')).toBe('origin/main');
+    expect(resolveKnowledgeDiffBase('refs/heads/main')).toBe('refs/heads/main');
+  });
+
+  it('rejects a ref with a leading dash (argument-injection guard)', () => {
+    expect(() => resolveKnowledgeDiffBase('--upload-pack=evil')).toThrow(/not a valid git ref/);
+  });
+});
+
 describe('runKnowledgeReadinessGate (KL-03)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -162,7 +184,25 @@ describe('runKnowledgeReadinessGate (KL-03)', () => {
       expect.objectContaining({
         body: '## Knowledge\nnone — no mission for this PR\n',
         missionRootInput: expect.objectContaining({ explicitRoot: '/main/checkout' }),
+        base: 'origin/main',
       })
+    );
+  });
+
+  it('maps a bare --base branch name to origin/<base> before the readiness check', () => {
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone — no mission for this PR\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+
+    runKnowledgeReadinessGate({
+      draft: true,
+      fill: true,
+      skipReadiness: false,
+      bodyFile: 'body.md',
+      base: 'release-1.2',
+    });
+
+    expect(mocks.checkPrKnowledgeReadiness).toHaveBeenCalledWith(
+      expect.objectContaining({ base: 'origin/release-1.2' })
     );
   });
 

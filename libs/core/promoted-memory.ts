@@ -17,7 +17,10 @@ import {
 import type { DistillCandidateRecord } from './knowledge/distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './workforce/work-design.js';
 import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
-import { isPublicMemoryEvidencePath } from './knowledge/memory-promotion-queue.js';
+import {
+  isPublicMemoryEvidencePath,
+  type MemoryApprovalChannel,
+} from './knowledge/memory-promotion-queue.js';
 import {
   readGitProvenance,
   resolvePromotionTargetRoot,
@@ -793,6 +796,12 @@ export interface SavePromotedMemoryRecordOptions {
    * (e.g. a PR branch checkout) instead of the current root. Product domain only.
    */
   targetRoot?: string;
+  /**
+   * Approval channel of the queue candidate. A sibling-worktree `targetRoot`
+   * requires `pr_review`: the PR merge is the only ratification that record
+   * gets (KL-04), so steward-approved knowledge must not travel that way.
+   */
+  approvalChannel?: MemoryApprovalChannel;
   /** Test seam: git runner used for target validation and provenance. */
   gitRunner?: GitRunner;
   /** Test seam: writer used for a sibling worktree target. */
@@ -840,6 +849,11 @@ export function savePromotedMemoryRecord(
     if (domain !== 'product') {
       throw new Error(
         `[PROMOTION_TARGET_ROOT] --target-root only supports product-domain knowledge — candidate ${candidate.candidate_id} is ${String(domain || 'organization')} | next: promote without --target-root`
+      );
+    }
+    if (options.approvalChannel !== 'pr_review') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root requires approval_channel=pr_review — candidate ${candidate.candidate_id} is ${options.approvalChannel || 'steward'}; a record written into another worktree is only ratified by its PR reaching origin/main | next: re-approve with \`mission_controller memory-approve <CANDIDATE_ID> --approval-channel pr_review\`, or promote without --target-root`
       );
     }
     if (typeof metadata.supersedes === 'string' && metadata.supersedes.trim()) {

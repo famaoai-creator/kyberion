@@ -220,7 +220,7 @@ describe('ratifyPrReviewedMemoryCandidates (KL-04)', () => {
     expect(again).toMatchObject({ ratified: [], missing: [], already_ratified: ['MEM-KL-PR'] });
   });
 
-  it('reports a missing record without ratifying, and leaves steward candidates untouched', () => {
+  it('reports missing records and approved-but-unpromoted pr_review candidates, leaving steward ones untouched', () => {
     git(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     seed('MEM-KL-PR-MISSING', 'mission:MSN-KL-RATIFY', {
       approval_channel: 'pr_review',
@@ -229,7 +229,13 @@ describe('ratifyPrReviewedMemoryCandidates (KL-04)', () => {
     const steward = seed('MEM-KL-STEWARD', 'mission:MSN-KL-RATIFY', {
       promoted_ref: 'knowledge/product/evolution/wisdom/generated/MEM-KL-STEWARD.md',
     });
+    seed('MEM-KL-PR-APPROVED', 'mission:MSN-KL-RATIFY:task-1', {
+      approval_channel: 'pr_review',
+      status: 'approved',
+    });
+    seed('MEM-KL-STEWARD-APPROVED', 'mission:MSN-KL-RATIFY', { status: 'approved' });
     const result = ratifyPrReviewedMemoryCandidates({ missionId: 'MSN-KL-RATIFY', repoRoot: repo });
+    expect(result.unpromoted).toEqual(['MEM-KL-PR-APPROVED']);
     expect(result.ratified).toEqual([]);
     expect(result.missing).toEqual([
       expect.objectContaining({

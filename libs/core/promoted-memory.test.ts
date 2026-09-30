@@ -350,6 +350,7 @@ describe('promoted-memory', () => {
       const writes: Array<{ root: string; files: Array<{ path: string; content: string }> }> = [];
       const saved = savePromotedMemoryRecord(productCandidate(), {
         targetRoot,
+        approvalChannel: 'pr_review',
         gitRunner: fakeGit,
         worktreeWriter: (input) => {
           writes.push(input);
@@ -381,6 +382,7 @@ describe('promoted-memory', () => {
       expect(() =>
         savePromotedMemoryRecord(productCandidate(), {
           targetRoot: '/repos/other',
+          approvalChannel: 'pr_review',
           gitRunner: foreignGit,
           worktreeWriter: () => undefined,
         })
@@ -402,6 +404,23 @@ describe('promoted-memory', () => {
           worktreeWriter: () => undefined,
         })
       ).toThrow(/only supports product-domain knowledge/);
+    });
+
+    it('rejects a sibling-worktree target for steward-channel (or unset) candidates', () => {
+      const writes: unknown[] = [];
+      for (const approvalChannel of ['steward', undefined] as const) {
+        expect(() =>
+          savePromotedMemoryRecord(productCandidate(), {
+            targetRoot: '/repos/kyberion-pr',
+            ...(approvalChannel ? { approvalChannel } : {}),
+            gitRunner: fakeGit,
+            worktreeWriter: (input) => {
+              writes.push(input);
+            },
+          })
+        ).toThrow(/requires approval_channel=pr_review — .* is steward/);
+      }
+      expect(writes).toHaveLength(0);
     });
   });
 

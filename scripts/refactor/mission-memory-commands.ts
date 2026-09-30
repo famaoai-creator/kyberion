@@ -18,7 +18,10 @@ import {
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,
 } from '@agent/core/knowledge/memory-promotion-workflow';
-import { resolvePromotionTargetRoot } from '@agent/core/knowledge/memory-promotion-git';
+import {
+  isMissionCandidate,
+  resolvePromotionTargetRoot,
+} from '@agent/core/knowledge/memory-promotion-git';
 import { logger } from '@agent/core/core';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
@@ -363,20 +366,43 @@ export async function promotePendingMemoryCandidates(
     note?: string;
     supersedes?: string;
     targetRoot?: string;
+    /** Only promote candidates sourced from this mission (`mission:<ID>[:…]`). */
+    missionId?: string;
   },
   print: Print = () => undefined
 ) {
   const executionRole = input.executionRole || 'mission_controller';
+  const missionId = input.missionId?.trim().toUpperCase() || undefined;
+  let externalTarget = false;
   if (input.targetRoot) {
+    if (!missionId) {
+      throw new ScriptExitError(
+        1,
+        '[PROMOTION_TARGET_ROOT] memory-promote-pending --target-root requires --mission <ID> — without it, approved candidates of every mission would be written into one PR worktree | next: re-run with --mission <MISSION_ID>'
+      );
+    }
     try {
-      resolvePromotionTargetRoot(input.targetRoot);
+      externalTarget = !resolvePromotionTargetRoot(input.targetRoot).sameAsCurrent;
     } catch (error) {
       throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
     }
   }
-  const pending = listMemoryPromotionCandidates()
+  const approved = listMemoryPromotionCandidates()
     .filter((row) => row.status === 'approved')
+    .filter((row) => !missionId || isMissionCandidate(row, missionId))
     .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+  // A sibling-worktree target only carries PR-reviewed product knowledge;
+  // everything else stays approved for a promotion without --target-root.
+  const pending = externalTarget
+    ? approved.filter((row) => {
+        const domain = row.knowledge_domain || 'organization';
+        if (domain === 'product' && row.approval_channel === 'pr_review') return true;
+        logger.info(
+          `⏭️ skipped ${row.candidate_id} for --target-root (${domain}, approval_channel=${row.approval_channel || 'steward'}) — only pr_review product knowledge goes into a PR worktree; promote it without --target-root.`
+        );
+        return false;
+      })
+    : approved;
 
   if (pending.length === 0) {
     logger.info('No approved memory candidates to promote.');
