@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-27
+last_updated: 2026-09-30
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -43,12 +43,16 @@ git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
 git diff --name-only origin/main...HEAD
 pnpm check -- --scope pr
 
+# 4.5 ミッション作業なら、学びを同じ PR に入れる（verify → distill → curate → promote --target-root）
+#    手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
+#    product ドメインの記録だけをこのブランチに commit する（organization / personal は入れない）
+
 # 5. PR 全体を表すタイトルを決めて検査する
 pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
 
 # 6. 本文をテンプレートから作る（一時ファイルは active/shared/tmp/ に置く）
 cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/pr-body-<topic>.md
-#    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ 該当チェック欄を埋める
+#    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ Knowledge / 該当チェック欄を埋める
 
 # 7. push してから作成する
 git push -u origin <branch>
@@ -69,6 +73,11 @@ gh pr checks <number> --watch
   PR 名になる。
 - **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
   Test plan やチェック欄が抜ける。
+- **`## Knowledge` 欄を必ず埋める**。Mission ID を書いた PR は、そのミッションの学びの候補を全件
+  `promoted` / `rejected` / `routed` のどれかで宣言する。ミッションなしの PR は `none — <理由>`。
+  `pr create` は、未解決・未宣言の候補、diff に入っていない昇格記録、`knowledge/confidential/`・`knowledge/personal/`
+  配下の変更があると PR を作らない。この検査は `--skip-readiness` でも迂回できない。ミッションの記録が
+  main checkout にある場合は、主 worktree を自動で探す（明示するなら `--mission-root <path>`）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
   PR 作成が走る。オプションはこの文書で確認する。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
@@ -119,6 +128,7 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 - [ ] PR の base が `main`（または `develop`）で、タイトルが PR 全体を表す Conventional Commit になっている。
 - [ ] `git log --oneline origin/main..HEAD` がこの作業のコミットだけを含む。別の作業用ブランチから切ってしまうと base が `main` でも無関係なコミット（とその CI 失敗）が PR に混入する — `git rebase --onto origin/main <mix-in の起点>` で切り離す。
 - [ ] PR 本文がテンプレートに沿い、Test plan に実行したコマンドと結果が書かれている。
+- [ ] ミッション作業なら、学びの昇格記録が同じ PR に入り、`## Knowledge` 欄で全候補を宣言している。
 - [ ] push 後の `gh pr checks` がすべて pass（pending 待ちは未完了）。
 
 `pnpm check -- --scope pr` は build / typecheck / lint / test matrix の代替ではない。これらは PR workflow が実行するため、ローカルで追加実行した場合だけ実測済みとして記録する。CI failure は job 名・run ID・失敗 step・ログを先に記録し、原因仮説を更新してから修正する。
