@@ -7,6 +7,8 @@ import { isDirectEntry } from '@agent/core/direct-entry';
 import * as pathResolver from '@agent/core/path-resolver';
 import { handleAction, readProcessJsonObject } from './process-actuator-helpers.js';
 import { parseProcessAction } from './process-action-input.js';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 
 async function main() {
   const processActionSchema = readProcessJsonObject(
@@ -32,5 +34,3 @@ export { handleAction, parseProcessAction };
 if (isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'process-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

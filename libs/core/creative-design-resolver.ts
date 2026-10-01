@@ -18,6 +18,14 @@ import {
   loadTenantDesignOverride,
   loadTenantDesignThemeOverlay,
 } from './organization/tenant-design-override.js';
+import {
+  SEMANTIC_ENGINE_COLOR_FORMAT,
+  type SemanticColorFormat,
+  type SemanticEngine,
+} from './semantic-design-token-fallbacks.js';
+import { createLogger } from './logger.js';
+
+const designLogger = createLogger('creative-design-resolver');
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -536,6 +544,59 @@ function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
     }
   }
   return null;
+}
+
+/**
+ * Tenant semantic-token overlay for one artifact engine
+ * (`theme.semantic_tokens.<engine>` in the tenant's theme.json, or the same
+ * path in tenant-override.json). Consumed by semantic-design-tokens.ts.
+ */
+export function readTenantSemanticTokens(
+  tenantSlug: string | undefined,
+  engine: string
+): Record<string, string> {
+  if (!tenantSlug || !isValidTenantSlug(tenantSlug)) return {};
+  const tenant = loadTenantDesign(tenantSlug);
+  if (!tenant) return {};
+  const format = Object.hasOwn(SEMANTIC_ENGINE_COLOR_FORMAT, engine)
+    ? SEMANTIC_ENGINE_COLOR_FORMAT[engine as SemanticEngine]
+    : undefined;
+  const merged: Record<string, string> = {};
+  const dropped: string[] = [];
+  for (const source of [
+    tenant.themePack?.theme?.semantic_tokens?.[engine],
+    tenant.override?.theme?.semantic_tokens?.[engine],
+    tenant.override?.semantic_tokens?.[engine],
+  ]) {
+    if (!source || typeof source !== 'object') continue;
+    for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+      // Unknown engine: no declared colour syntax, so nothing is trusted (fail closed).
+      const safe = format ? normalizeSemanticColor(value, format) : undefined;
+      if (safe) merged[key] = safe;
+      else dropped.push(key);
+    }
+  }
+  if (dropped.length) {
+    designLogger.warn(
+      `[design] dropped ${dropped.length} tenant semantic token(s) for engine "${engine}" (tenant ${tenantSlug}) — ` +
+        `${format ? `values must be ${format === 'ooxml_hex' ? 'a 6-digit hex colour (RRGGBB)' : 'a hex, rgb(a) or hsl(a) colour'}` : 'the engine declares no colour format'} | ` +
+        `fix theme.semantic_tokens.${engine} in the tenant design overlay | keys: ${dropped.slice(0, 10).join(', ')}`
+    );
+  }
+  return merged;
+}
+
+const OOXML_HEX_COLOR = /^#?[0-9A-Fa-f]{6}$/;
+const CSS_HEX_COLOR = /^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+/** rgb()/rgba()/hsl()/hsla() with numeric arguments only (no url(), var(), nested calls). */
+const CSS_FUNCTIONAL_COLOR = /^(?:rgba?|hsla?)\(\s*(?:[0-9.%\s,/+-]|deg|turn|rad)*\)$/i;
+
+function normalizeSemanticColor(value: unknown, format: SemanticColorFormat): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 64) return undefined;
+  if (format === 'ooxml_hex') return OOXML_HEX_COLOR.test(trimmed) ? trimmed : undefined;
+  return CSS_HEX_COLOR.test(trimmed) || CSS_FUNCTIONAL_COLOR.test(trimmed) ? trimmed : undefined;
 }
 
 function applyTenantColors(

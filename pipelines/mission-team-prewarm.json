@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "mission-team-prewarm",
+  "version": "1.0.0",
+  "name": "Mission Team Prewarm",
+  "description": "Queue a team prewarm request for a mission so its agent runtimes are ready before work starts (asynchronous; returns the request id).",
+  "labels": ["agent", "mission"],
+  "context": { "mission_id": "MSN-EXAMPLE" },
+  "steps": [
+    {
+      "id": "prewarm",
+      "role": "source",
+      "op": "agent:prewarm_mission",
+      "produces": { "channel": "prewarm_result", "type": "MissionPrewarmResult" },
+      "params": { "missionId": "{{mission_id}}" }
+    },
+    {
+      "id": "log_prewarm",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "prewarm_result",
+      "params": { "message": "Mission {{mission_id}} prewarm: {{prewarm_result}}" }
+    }
+  ]
+}

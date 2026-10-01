@@ -168,6 +168,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/locale.ts#resolveScopedLocale",
+      "roles": ["scope_locale_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -256,30 +261,6 @@
     },
     {
       "site": "libs/core/mesh/mesh-topic-registry.ts#clearMeshTopicRegistryNamespace",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/mesh/mesh-topic-registry.ts#recordEvent (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/mesh/mesh-topic-registry.ts#subscribeMeshTopic (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -625,6 +606,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/channel-memory-store.ts#writeFile (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["chronos_gateway", "slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/operator-notifications.ts#deliver",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -935,6 +921,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/thread-work-index.ts#writeAsSurface (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["chronos_gateway", "slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/task/task-scoped-grants.ts#appendGrantRecord",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1145,6 +1136,11 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/ingest/route.ts#POST [delegated child role]",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/invites/email-draft/route.ts#POST",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1464,6 +1460,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/background_review_mission_e2e.ts#assertActiveMission",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1564,6 +1565,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/check_orphans.ts#<module>",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/check_type_ratchet.ts#checkTypeRatchet",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -1619,6 +1625,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/encrypt_connection_documents.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1630,6 +1641,16 @@
     },
     {
       "site": "scripts/entity_governance_cleanup.ts#runCleanup",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/external_hooks.ts#buildExternalHookDiscoveryReport",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/external_hooks.ts#requestExternalHookTrust",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1776,6 +1797,16 @@
     {
       "site": "scripts/onboarding_wizard.ts#writeTextArtifact",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/operator-home-secondary-actions.ts#handleDealDocumentAction",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/operator-home-secondary-actions.ts#handleDealsIngestAudio",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -2459,6 +2490,15 @@
             "libs/core/reconcile-ops.ts#handleFileMissing"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#intentResolutionA2ui",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#POST",
@@ -2671,6 +2711,27 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
@@ -2759,6 +2820,7 @@
         "presence/displays/concierge/src/app/api/ingest-input.ts",
         "presence/displays/concierge/src/app/api/ingest-output-parser.ts",
         "presence/displays/concierge/src/app/api/ingest/route.ts",
+        "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
@@ -2851,6 +2913,7 @@
         "presence/displays/concierge/src/lib/i18n.ts",
         "presence/displays/concierge/src/lib/ingest-response.ts",
         "presence/displays/concierge/src/lib/intent-resolution-view.ts",
+        "presence/displays/concierge/src/lib/invite-email.ts",
         "presence/displays/concierge/src/lib/invite-server.ts",
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
@@ -2871,6 +2934,7 @@
         "presence/displays/concierge/src/lib/setup-response.ts",
         "presence/displays/concierge/src/lib/summary-event.ts",
         "presence/displays/concierge/src/lib/surface-auth-route.ts",
+        "presence/displays/concierge/src/lib/tenant-context.ts",
         "presence/displays/concierge/src/lib/use-concierge-i18n.ts",
         "presence/displays/concierge/src/lib/use-recording-consent.ts",
         "presence/displays/concierge/src/lib/use-training-assignments.ts",
@@ -3029,6 +3093,15 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/lib/front-desk-nav.ts#buildFrontDeskNavPayload",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "presence/displays/concierge/src/app/api/message/route.ts#POST",
@@ -3141,7 +3214,7 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3161,6 +3234,7 @@
         "ecosystem_architect": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -3173,7 +3247,7 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3193,6 +3267,7 @@
         "knowledge_steward": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -3204,6 +3279,7 @@
         "mission_controller": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -3219,9 +3295,17 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
-        "slack_bridge": {
+        "scope_locale_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3240,7 +3324,7 @@
         },
         "sovereign_concierge": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3368,6 +3452,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -3401,6 +3486,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -3414,6 +3500,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -3427,6 +3514,15 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#buildIMessageChannelAdapter",
+            "libs/core/surface/operator-identity.ts#resolveOperatorLocale",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -3636,6 +3732,21 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -3928,6 +4039,24 @@
             "libs/core/reconcile-ops.ts#handleFileMissing"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/browser-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/browser-actuator/src/browser-runtime-helpers.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -4059,6 +4188,7 @@
         "chronos_gateway",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "scope_locale_reader",
         "slack_bridge"
       ]
     },
@@ -4106,6 +4236,17 @@
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentSnapshotsPage",
+            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentResolutionSummary",
+            "libs/core/intent/intent-resolution-contract.ts#resolveIntentResolutionContract",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "sovereign_concierge": {
@@ -4249,6 +4390,15 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "scripts/personal-pads/server.ts#createPersonalPadsServer",
+            "scripts/lib/pad-ui.ts#resolvePadLocale",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4427,12 +4577,26 @@
         "mission_controller": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/front-desk-routes.ts#registerFrontDeskRoutes",
-            "libs/core/browser/browser-onboarding.ts#applyBrowserOnboarding",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityBestEffort",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityProvisioned",
-            "libs/core/agent/agent-identity.ts#issueAgentIdentity",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4641,6 +4805,15 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -4727,6 +4900,15 @@
             "scripts/surface_runtime.ts#startSurfaceById",
             "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
             "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4863,6 +5045,21 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -5002,6 +5199,7 @@
         "ecosystem_architect": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -5034,6 +5232,7 @@
         "knowledge_steward": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -5045,6 +5244,7 @@
         "mission_controller": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -5058,6 +5258,14 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -5254,6 +5462,21 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "scripts/run_mission_orchestration_event_worker.ts#main",
@@ -5425,6 +5648,14 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/voice-hub/server.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {

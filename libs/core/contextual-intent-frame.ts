@@ -6,6 +6,7 @@ import {
   resolveDefaultScheduleSource,
   type ScheduleSourceKind,
 } from './contextual-intent-memory.js';
+import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 
 const CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-frame.schema.json'
@@ -59,18 +60,8 @@ function hasJapaneseChars(text: string): boolean {
 }
 
 function inferAction(text: string): ContextualIntentAction {
-  if (
-    /(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|代わりに参加|代理参加|change|update|resched|reschedule)/i.test(
-      text
-    )
-  )
-    return 'change';
-  if (
-    /(教えて|見せて|確認|見る|空き|予定|会議|ミーティング|打ち合わせ|アポイント|agenda|available|availability|show|see)/i.test(
-      text
-    )
-  )
-    return 'read';
+  if (matchesIntentPhrase(text, 'contextual_frame.change_action')) return 'change';
+  if (matchesIntentPhrase(text, 'contextual_frame.read_action')) return 'read';
   return 'unknown';
 }
 
@@ -93,48 +84,40 @@ function scoreSubjectConfidence(subject: ContextualIntentFrame['subject']): numb
 }
 
 function inferObject(text: string): ContextualIntentFrame['object'] {
-  if (
-    /(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|calendar|schedule)/i.test(
-      text
-    )
-  )
-    return 'calendar_schedule';
-  if (
-    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|calendar|agenda|availability)/i.test(
-      text
-    )
-  )
-    return 'calendar_events';
+  if (matchesIntentPhrase(text, 'contextual_frame.schedule_object')) return 'calendar_schedule';
+  if (matchesIntentPhrase(text, 'schedule.agenda_topic')) return 'calendar_events';
   return 'unknown';
 }
 
 function inferSubject(text: string): ContextualIntentFrame['subject'] {
-  if (/(私|自分|俺|僕|私の|自分の|my|me|mine|operator|本人)/i.test(text)) return 'operator_self';
-  if (/(チーム|みんな|全員|team|our)/i.test(text)) return 'team';
-  if (
-    /(予定|スケジュール|日程|空き時間|会議|ミーティング|アポイント|打ち合わせ|カレンダー|calendar|リスケ|調整|変更|ずら|移動|修正|schedule)/i.test(
-      text
-    )
-  )
+  if (matchesIntentPhrase(text, 'contextual_frame.subject_self')) return 'operator_self';
+  if (matchesIntentPhrase(text, 'contextual_frame.subject_team')) return 'team';
+  if (matchesIntentPhrase(text, 'contextual_frame.subject_schedule_implicit'))
     return 'operator_self';
   return 'unknown';
 }
 
 function inferDateRange(text: string): ContextualIntentFrame['date_range'] | undefined {
   const timezone = 'Asia/Tokyo';
-  if (/(今日|本日|today)/i.test(text)) return { value: 'today', normalized: { timezone } };
-  if (/(明日|tomorrow)/i.test(text)) return { value: 'tomorrow', normalized: { timezone } };
-  if (/(今週|this week)/i.test(text)) return { value: 'this_week', normalized: { timezone } };
-  if (/(来週|next week)/i.test(text)) return { value: 'next_week', normalized: { timezone } };
-  if (/(今月|this month)/i.test(text)) return { value: 'this_month', normalized: { timezone } };
-  if (/(来月|next month)/i.test(text)) return { value: 'next_month', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.today'))
+    return { value: 'today', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.tomorrow'))
+    return { value: 'tomorrow', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.this_week'))
+    return { value: 'this_week', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.next_week'))
+    return { value: 'next_week', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.this_month'))
+    return { value: 'this_month', normalized: { timezone } };
+  if (matchesIntentPhrase(text, 'date_range.next_month'))
+    return { value: 'next_month', normalized: { timezone } };
   return undefined;
 }
 
 function inferSourceCandidates(text: string): ScheduleSourceKind[] {
   const candidates: ScheduleSourceKind[] = [];
-  if (/(Outlook|Microsoft 365|Microsoft|Teams)/i.test(text)) candidates.push('outlook_calendar');
-  if (/(Google Calendar|Googleカレンダー|calendar\.google\.com|Google)/i.test(text)) {
+  if (matchesIntentPhrase(text, 'calendar_source.outlook')) candidates.push('outlook_calendar');
+  if (matchesIntentPhrase(text, 'calendar_source.google')) {
     candidates.push('google_calendar');
   }
   const defaultSource = resolveDefaultScheduleSource().source;

@@ -99,3 +99,11 @@ describe('voice-actuator op input contracts cover what the handlers read', () =>
     expect(validate({ ...request, engine: { engine_id: 'auto', purpose: 'Loud!' } })).toBe(false);
   });
 });
+
+describe('voice-actuator catalog ownership', () => {
+  it('does not advertise record_interaction (owned by presence-actuator)', () => {
+    // The voice handler never accepted it through the voice-action schema, so
+    // the op was unreachable from ADF; presence:record_interaction is canonical.
+    expect(describeOps().map((entry) => entry.op)).not.toContain('record_interaction');
+  });
+});

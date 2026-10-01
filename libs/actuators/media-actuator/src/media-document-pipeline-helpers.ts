@@ -583,6 +583,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       brief.issuer?.address || '',
       brief.issuer?.contact ? `担当: ${brief.issuer.contact}` : '',
       brief.issuer?.phone ? `電話: ${brief.issuer.phone}` : '',
+      // i18n-exempt: qualified-invoice (適格請求書) is a Japan-specific document format with fixed Japanese field labels
       brief.issuer?.email ? `メール: ${brief.issuer.email}` : '',
     ].filter(Boolean);
 

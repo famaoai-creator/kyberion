@@ -1,5 +1,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { resolveLocale } from './locale.js';
+import { localeToBcp47 } from './locale-normalize.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
@@ -199,7 +201,7 @@ const APPLE_SPEECH_LOCALE_DEFAULTS: Record<string, string> = {
 };
 
 function resolveAppleSpeechLocale(language?: string): string {
-  const normalized = language?.trim() || 'ja-JP';
+  const normalized = language?.trim() || localeToBcp47(resolveLocale());
   return APPLE_SPEECH_LOCALE_DEFAULTS[normalized.toLowerCase()] || normalized;
 }
 
@@ -643,7 +645,7 @@ export async function summarizeLocallyWithAppleFm(
   options: { maxSentences?: number; language?: string; timeoutMs?: number } = {}
 ): Promise<string | null> {
   const maxSentences = options.maxSentences ?? 1;
-  const language = options.language ?? 'ja';
+  const language = options.language ?? resolveLocale();
   return appleFmPrompt(
     [
       language === 'ja'

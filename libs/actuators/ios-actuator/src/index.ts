@@ -11,6 +11,8 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 
 async function handleAction(input: IOSAction) {
   if (input.action !== 'pipeline') {
@@ -39,5 +41,3 @@ export const actuator = defineCatalogBackedActuator({
   describeOps,
   handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';
