@@ -12,7 +12,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (39)
+## secret (38)
 
 | Variable                                  | Type   | Required | Description                                                                                                                                                                                                                                                                 |
 | ----------------------------------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -51,7 +51,6 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SESSION_SECRET`                 | string | no       | HMAC key (at least 32 bytes; shorter values are treated as not configured) signing kyberion_session browser session cookies (kys1.) and pre-auth login cookies. Must be identical across every surface process/host that shares the login. Values stay in the secret store. |
 | `KYBERION_SHARE_GRANTS_HMAC_KEY`          | string | no       | HMAC key used to sign and verify share-grant records.                                                                                                                                                                                                                       |
 | `KYBERION_SMTP_PASS`                      | string | no       | SMTP password or app token used by the email actuator; provide it through the secret store and keep it out of logs and configuration artifacts.                                                                                                                             |
-| `KYBERION_SUDO_KEY`                       | string | no       | Key used by the system prelude for privileged sudo coordination; values stay in the secret store.                                                                                                                                                                           |
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | Bearer token used to authenticate the terminal bridge.                                                                                                                                                                                                                      |
 | `KYBERION_TYPESAFE_API_KEY`               | string | no       | TypeSafe API key for the typesafe-jev judgment backend. The provider is declared external-api, so personal-tier state never reaches it and confidential-tier state requires tenant approval through the provider egress policy.                                             |
 | `KYBERION_VLLM_KEY`                       | string | no       | API key for the vLLM OpenAI-compatible backend, when authentication is enabled.                                                                                                                                                                                             |

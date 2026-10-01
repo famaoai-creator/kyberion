@@ -267,8 +267,6 @@ export * from './camera-output-bridge.js';
 
 export * from './ledger.js';
 
-export * from './text-utils.js';
-
 export * from './text-escaping.js';
 
 export * from './pipeline/logic-utils.js';

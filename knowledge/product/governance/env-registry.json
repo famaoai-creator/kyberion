@@ -3629,14 +3629,6 @@
       "subsystem": "governance"
     },
     {
-      "name": "KYBERION_SUDO_KEY",
-      "category": "secret",
-      "type": "string",
-      "required": false,
-      "description": "Key used by the system prelude for privileged sudo coordination; values stay in the secret store.",
-      "documented": true
-    },
-    {
       "name": "KYBERION_SUDO_SCOPE",
       "category": "runtime",
       "type": "string",

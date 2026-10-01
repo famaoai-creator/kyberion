@@ -272,8 +272,6 @@ export * from './workforce/worker-event-stream.js';
 
 export * from './ce-adoption.js';
 
-export * from './office-snapshot.js';
-
 export * from './lifecycle-hook-engine.js';
 
 export * from './external-hook-bridge.js';

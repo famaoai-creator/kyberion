@@ -174,6 +174,30 @@ The generated `source-test-scenarios.json` may be run after review. Tests with a
 | `chaos-repair-test`       | Validate self-repair after injected fault                  |
 | `chaos-secret-missing`    | Simulate missing secret; validate secret-guard error path  |
 
+### Feature Validation Envelopes
+
+Replayable acceptance runs for one delivered feature slice: each re-runs that slice's targeted
+tests and gates in one command (`pnpm pipeline --input pipelines/<id>.json`). CI already runs the
+same tests; use an envelope when re-validating the slice after touching it.
+
+| Pipeline                        | Description                                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ce-adoption-validation`        | Claw-empire adoption slice (CE-01..12): full build, core workforce/CE tests, Chronos collaboration-stream/live-sync tests, DOM-contrast gate |
+| `cloudflare-os-validation`      | Cloudflare OS control plane (OS-01..15): core control-plane/egress/OAuth tests, service-actuator tests, operator- and computer-surface tests |
+| `project-management-validation` | Project control and mission reassignment: project tests, typecheck, package build, Chronos typecheck                                         |
+| `qm02-trigger-validation`       | QM-02 trigger unification: core build, trigger-runner/managed-process/scheduler tests, `script-integrity` gate                               |
+| `media-review-fix-validation`   | Media review gates: compile a canonical brief and fail on unapproved PPTX layout overflow (deterministic, no rendering)                      |
+| `soak-restart-e2e`              | AO-04 soak restart: boots a worker, kills it, resumes and checks that state was restored (`core:run_soak_restart_e2e`)                       |
+
+### Media Demos and Production
+
+| Pipeline                      | Description                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `media-produce-and-review`    | MP-01..07 deck flow: lock brief → design protocol → layout preflight → render → visual review → delivery gate; override `brief_path` / `mission_evidence_dir` with `--context` |
+| `generate-design-system-demo` | Diagnostic PPTX exercising all slide-layout presets and core element types; writes `active/shared/exports/design_system_demo.pptx`                                             |
+| `generate-masterclass-pptx`   | Layout sample deck from `pipelines/fragments/masterclass_design_protocol.json`; writes `active/shared/exports/all_objects_layout_sample.pptx`                                  |
+| `kyberion-product-intro`      | Local narrated product-intro video (ja; no publish). `scripts/kyberion_product_intro_render.ts` renders the same flow directly                                                 |
+
 ### Op Entry Points
 
 Minimal runnable pipelines that make an actuator op reachable (OW-05); run them with

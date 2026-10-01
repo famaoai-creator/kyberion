@@ -13,14 +13,6 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/contracts/wisdom-action.ts',
   },
   {
-    schemaPath: 'knowledge/product/schemas/bridge-request.schema.json',
-    outputPath: 'libs/core/contracts/bridge-request.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/diagram-adf.schema.json',
-    outputPath: 'libs/core/contracts/diagram-adf.ts',
-  },
-  {
     schemaPath: 'knowledge/product/schemas/mission-contract.schema.json',
     outputPath: 'libs/core/contracts/mission-contract.ts',
   },
@@ -81,20 +73,12 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/contracts/generation-schedule.ts',
   },
   {
-    schemaPath: 'knowledge/product/schemas/proposal-brief.schema.json',
-    outputPath: 'libs/core/contracts/proposal-brief.ts',
-  },
-  {
     schemaPath: 'knowledge/product/schemas/proposal-storyline-adf.schema.json',
     outputPath: 'libs/core/contracts/proposal-storyline-adf.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/corporate-design-adf.schema.json',
     outputPath: 'libs/core/contracts/corporate-design-adf.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/document-brief.schema.json',
-    outputPath: 'libs/core/contracts/document-brief.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/actuator-execution-brief.schema.json',
@@ -123,14 +107,6 @@ const targets: GenerationTarget[] = [
   {
     schemaPath: 'knowledge/product/schemas/operator-interaction-packet.schema.json',
     outputPath: 'libs/core/contracts/operator-interaction-packet.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/travel-planning-brief.schema.json',
-    outputPath: 'libs/core/contracts/travel-planning-brief.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/booking-preference-profile.schema.json',
-    outputPath: 'libs/core/contracts/booking-preference-profile.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/presentation-preference-profile.schema.json',

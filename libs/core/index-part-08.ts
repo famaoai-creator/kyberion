@@ -113,11 +113,6 @@ export {
 } from './mission/mission-journal-policy.js';
 
 export {
-  loadPilotStrategyPolicyCatalog,
-  resolvePilotStrategyPolicy,
-} from './pilot-strategy-policy.js';
-
-export {
   loadProductionEvidenceSummaryPolicyCatalog,
   resolveProductionEvidenceSummaryPolicy,
 } from './production-evidence-summary-policy.js';

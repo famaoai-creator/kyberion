@@ -8,7 +8,15 @@
  *   (c) a top-level pipelines/*.json with no schedule, no reference and no
  *       pipelines/README.md row;
  *   (d) a registered actuator op referenced nowhere outside its own actuator,
- *       the op registry / discovery catalog and manifests.
+ *       the op registry / discovery catalog and manifests — unless it is
+ *       agent-callable: advertised in the agent-facing op catalog
+ *       (actuator-op-discovery.json, rendered into CAPABILITIES_GUIDE.md) AND
+ *       named by a unit test (its own actuator's tests, or `domain:op` in any
+ *       test), or resolved at runtime by the pipeline provider bridge to a
+ *       `cli_native` harness capability (harness-capabilities/*.json).
+ *
+ * A side-effect import (`import './x.js'`) counts as a caller even inside a
+ * barrel: self-registering modules are loaded that way.
  *
  * Known exceptions live in knowledge/product/governance/orphan-baseline.json,
  * one entry per orphan with a reason. A baseline entry that is no longer an
@@ -19,6 +27,7 @@
  *
  * `--update-baseline` keeps existing reasons, drops stale entries and adds new
  * orphans with a `TODO` reason, which the check rejects until a human writes one.
+ * Placeholder "backlog" reasons are rejected too: every entry is a reviewed decision.
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -59,6 +68,8 @@ const BASELINE_SCHEMA_PATH = 'knowledge/product/schemas/orphan-baseline.schema.j
 const TODO_REASON = 'TODO: explain why this orphan is kept, or wire/retire it';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'plugins'];
+/** Test-only roots: their test files can prove an op is exercised, never that code is used. */
+const TEST_ROOTS = ['tests'];
 const DATA_ROOTS = ['pipelines', '.github', 'knowledge/product'];
 /** Markdown that may document how to run a pipeline (plans and archives excluded). */
 const DOC_ROOTS = ['docs', 'knowledge/product', 'pipelines'];
@@ -67,11 +78,14 @@ const ROOT_FILES = ['package.json'];
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/u;
 const DATA_EXT = /\.(?:json|ya?ml)$/u;
 const TEST_FILE = /(?:\.test|\.spec)\.[cm]?[jt]sx?$|(?:^|\/)__tests__\//u;
+const OP_DISCOVERY_PATH = 'knowledge/product/orchestration/actuator-op-discovery.json';
 const OP_CATALOG_FILES = new Set([
   'knowledge/product/governance/actuator-op-registry.json',
-  'knowledge/product/orchestration/actuator-op-discovery.json',
+  OP_DISCOVERY_PATH,
   ORPHAN_BASELINE_PATH,
 ]);
+const HARNESS_CAPABILITY_FILE =
+  /^knowledge\/product\/governance\/harness-capabilities\/[^/]+\.json$/u;
 
 function isSource(file: string): boolean {
   return SOURCE_EXT.test(file) && !file.endsWith('.d.ts');
@@ -87,6 +101,8 @@ function isCoreBarrel(file: string): boolean {
 
 const IMPORT_SPECIFIER =
   /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*|\bexport\s+\*\s+from\s*)['"]([^'"\n]+)['"]/gu;
+/** `import './x.js';` — loads a module for its side effect (self-registration). */
+const SIDE_EFFECT_IMPORT = /^\s*import\s*['"]([^'"\n]+)['"]/gmu;
 
 /** `@agent/core/<subpath>` → source path, from the libs/core package exports. */
 export function coreSubpathSources(packageJson: string | undefined): Map<string, string> {
@@ -172,6 +188,51 @@ class TokenIndex {
   }
 }
 
+/** `domain:op` ids the agent-facing discovery catalog advertises (CAPABILITIES_GUIDE.md source). */
+export function advertisedOps(discoveryJson: string | undefined): Set<string> {
+  const ids = new Set<string>();
+  try {
+    const discovery = JSON.parse(discoveryJson ?? '{}') as {
+      actuators?: Array<{ n?: unknown; ops?: Array<{ op?: unknown }> }>;
+    };
+    for (const actuator of discovery.actuators ?? []) {
+      const domain = String(actuator.n ?? '').replace(/-actuator$/u, '');
+      for (const entry of actuator.ops ?? []) {
+        if (domain && typeof entry.op === 'string') ids.add(`${domain}:${entry.op}`);
+      }
+    }
+  } catch {
+    // Unreadable catalog: nothing is advertised, so nothing is excused.
+  }
+  return ids;
+}
+
+/**
+ * `domain:op` ids the pipeline provider bridge resolves to a `cli_native`
+ * harness capability (mirrors `resolveProviderCapabilityId`).
+ */
+export function providerBridgeOps(files: Iterable<readonly [string, string]>): Set<string> {
+  const ids = new Set<string>();
+  for (const [file, text] of files) {
+    if (!HARNESS_CAPABILITY_FILE.test(file)) continue;
+    try {
+      const parsed = JSON.parse(text) as {
+        capabilities?: Array<{ source?: { type?: unknown; provider?: unknown; name?: unknown } }>;
+      };
+      for (const capability of parsed.capabilities ?? []) {
+        const source = capability.source;
+        if (source?.type !== 'cli_native') continue;
+        if (typeof source.provider !== 'string' || typeof source.name !== 'string') continue;
+        ids.add(`${source.provider}:${source.name}`);
+        ids.add(`${source.provider.replace('-cli', '')}:${source.name}`);
+      }
+    } catch {
+      // A malformed capability file is the catalog gate's finding.
+    }
+  }
+  return ids;
+}
+
 export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
   // The baseline names every known orphan; it must never count as a reference.
   const entries = [...snapshot.files.entries()]
@@ -188,6 +249,13 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
     for (const match of text.matchAll(IMPORT_SPECIFIER)) {
       const resolved = resolveSpecifier(file, match[1]!, coreSubpaths);
       if (resolved && resolved !== file && !isCoreBarrel(file)) importedPaths.add(resolved);
+    }
+    // A barrel's re-exports are not callers, but its side-effect imports are.
+    if (isCoreBarrel(file)) {
+      for (const match of text.matchAll(SIDE_EFFECT_IMPORT)) {
+        const resolved = resolveSpecifier(file, match[1]!, coreSubpaths);
+        if (resolved && resolved !== file) importedPaths.add(resolved);
+      }
     }
     if (isCoreBarrel(file)) continue;
     for (const identifier of new Set(text.match(IDENTIFIER) ?? [])) {
@@ -275,15 +343,29 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
       bareRefs.add(match[1]!, file);
     }
   }
+  // Agent-callable ops: advertised in the discovery catalog and named by a test.
+  const advertised = advertisedOps(snapshot.files.get(OP_DISCOVERY_PATH));
+  const bridged = providerBridgeOps(entries);
+  const testRefs = new TokenIndex();
+  for (const [file, text] of entries) {
+    if (!isTest(file)) continue;
+    for (const match of text.matchAll(/['"`]([\w-]+(?::[\w-]+)?)['"`]/gu)) {
+      testRefs.add(match[1]!, file);
+    }
+  }
   const actuatorOps: string[] = [];
   for (const [domain, kinds] of Object.entries(snapshot.opDomains)) {
     const ownPrefix = `libs/actuators/${domain}-actuator/`;
     for (const op of sortUnique(Object.values(kinds).flat())) {
+      const id = `${domain}:${op}`;
       const outside = (index: TokenIndex, token: string) =>
         index.files(token).some((file) => !file.startsWith(ownPrefix));
-      if (!outside(qualifiedRefs, `${domain}:${op}`) && !outside(bareRefs, op)) {
-        actuatorOps.push(`${domain}:${op}`);
-      }
+      if (outside(qualifiedRefs, id) || outside(bareRefs, op) || bridged.has(id)) continue;
+      const tested =
+        testRefs.files(id).length > 0 ||
+        testRefs.files(op).some((file) => file.startsWith(ownPrefix));
+      if (advertised.has(id) && tested) continue;
+      actuatorOps.push(id);
     }
   }
 
@@ -319,6 +401,10 @@ export function compareWithBaseline(
       const reason = String(entry.reason || '').trim();
       if (!reason || reason.startsWith('TODO')) {
         comparison.invalid.push(`${kind}: ${entry.id} needs a reason`);
+      } else if (/\bbacklog\b/iu.test(reason)) {
+        comparison.invalid.push(
+          `${kind}: ${entry.id} has a placeholder backlog reason — wire, retire or record the reviewed decision`
+        );
       }
     }
     const current = new Set(report[kind]);
@@ -357,6 +443,11 @@ export function loadOrphanSnapshot(): OrphanSnapshot {
   for (const root of SOURCE_ROOTS) {
     for (const file of getAllFiles(pathResolver.rootResolve(root))) {
       if (isSource(file) || DATA_EXT.test(file)) add(file);
+    }
+  }
+  for (const root of TEST_ROOTS) {
+    for (const file of getAllFiles(pathResolver.rootResolve(root))) {
+      if (isSource(file) && isTest(file)) add(file);
     }
   }
   for (const root of DATA_ROOTS) {

@@ -209,6 +209,7 @@ export const actuator = defineCatalogBackedActuator({
   id: 'blockchain-actuator',
   describeOps,
   handleAction: (input) => handleAction(input as unknown as Parameters<typeof handleAction>[0]),
+  actionInput: (op, params) => ({ action: op, params }),
 });
 import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

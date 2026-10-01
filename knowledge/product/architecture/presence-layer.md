@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, presence, layer]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-25
+last_updated: 2026-10-01
 ---
 
 # Presence Layer: Sensors, Displays, and Intervention
@@ -46,7 +46,7 @@ Channel events should also be mirrored into explainable observability streams un
 
 - `active/shared/observability/channels/<channel>/`
 
-1.  **Dynamic Context Injection**: During script execution, the `system-prelude.js` automatically reads pending stimuli and injects them into the Agent's consciousness as a "System Whisper."
+1.  **Context Injection**: The presence controller (`scripts/presence-controller.ts`) reads pending stimuli from the runtime journal for the agent session. (The legacy `system-prelude` script once claimed this role; it was retired on 2026-10-01 — see `retired/README.md`.)
 2.  **Priority Resolution**: The Agent MUST address stimuli in order of priority (Voice > Slack).
 3.  **Completion**: Once a stimulus is addressed, it is marked as `PROCESSED` via the `presence-controller.js`.
 

@@ -137,6 +137,68 @@ describe('check_orphans (OW-07)', () => {
     ]);
   });
 
+  it('treats an op advertised in the discovery catalog and named by a test as agent-callable', () => {
+    const discovery = JSON.stringify({
+      actuators: [
+        { n: 'media-actuator', ops: [{ op: 'tested' }, { op: 'untested' }, { op: 'qualified' }] },
+      ],
+    });
+    const report = findOrphans(
+      snapshot(
+        {
+          'knowledge/product/orchestration/actuator-op-discovery.json': discovery,
+          'libs/actuators/media-actuator/src/ops.test.ts': "runOp('tested', {});",
+          // A qualified `domain:op` in any test counts; a bare name elsewhere does not.
+          'tests/media.test.ts': "expect(ids).toContain('media:qualified'); run('unadvertised');",
+          'libs/actuators/other-actuator/src/x.test.ts': "run('untested');",
+        },
+        { media: { capture: ['tested', 'untested', 'qualified', 'unadvertised'] } }
+      )
+    );
+    expect(report.actuator_ops).toEqual(['media:unadvertised', 'media:untested']);
+  });
+
+  it('treats an op the provider bridge resolves to a cli_native harness capability as reachable', () => {
+    const capability = (type: string, provider: string, name: string) =>
+      JSON.stringify({
+        capabilities: [{ capability_id: `x.${name}`, source: { type, provider, name } }],
+      });
+    const report = findOrphans(
+      snapshot(
+        {
+          'knowledge/product/governance/harness-capabilities/a.json': capability(
+            'cli_native',
+            'codex-cli',
+            'cloud'
+          ),
+          'knowledge/product/governance/harness-capabilities/b.json': capability(
+            'agent_runtime',
+            'codex-cli',
+            'app-server'
+          ),
+        },
+        { codex: { capture: ['cloud', 'app-server'] } }
+      )
+    );
+    expect(report.actuator_ops).toEqual(['codex:app-server']);
+  });
+
+  it('counts side-effect imports in a barrel (self-registering modules)', () => {
+    const report = findOrphans(
+      snapshot({
+        'libs/core/provider/bundles/one.ts': "registerBundle('one');\nexport {};",
+        'libs/core/provider/bundles/two.ts': "export const two = registerBundle('two');",
+        'libs/core/provider/bundles/index.ts': "import './one.js';",
+        'libs/core/provider/index.ts': "export * from './bundles/two.js';",
+        'libs/core/reasoning/runtime.ts': "import '../provider/bundles/index.js';",
+      })
+    );
+    // `two` is only re-exported (not a caller); `one` is loaded for its side effect.
+    expect(report.libs_core_modules.filter((file) => file.includes('/bundles/'))).toEqual([
+      'libs/core/provider/bundles/two.ts',
+    ]);
+  });
+
   describe('baseline ratchet', () => {
     const baseline: OrphanBaseline = {
       version: 1,
@@ -159,6 +221,24 @@ describe('check_orphans (OW-07)', () => {
       expect(comparison.added.libs_core_modules).toEqual(['libs/core/new.ts']);
       expect(comparison.stale.scripts).toEqual(['scripts/fixed.ts']);
       expect(comparison.invalid).toEqual(['pipelines: pipelines/x.json needs a reason']);
+    });
+
+    it('rejects placeholder backlog reasons', () => {
+      const comparison = compareWithBaseline(
+        { libs_core_modules: [], scripts: ['scripts/x.ts'], pipelines: [], actuator_ops: [] },
+        {
+          version: 1,
+          libs_core_modules: [],
+          scripts: [
+            { id: 'scripts/x.ts', reason: 'No caller yet (OW-07 backlog: wire or retire).' },
+          ],
+          pipelines: [],
+          actuator_ops: [],
+        }
+      );
+      expect(comparison.invalid).toEqual([
+        'scripts: scripts/x.ts has a placeholder backlog reason — wire, retire or record the reviewed decision',
+      ]);
     });
 
     it('keeps reasons, drops stale entries and marks new ones TODO on update', () => {

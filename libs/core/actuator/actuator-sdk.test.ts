@@ -222,6 +222,39 @@ describe('actuator SDK', () => {
     expect(seen).toHaveLength(2);
   });
 
+  it('hands single-action handlers their declared input shape instead of a pipeline envelope', async () => {
+    const seen: unknown[] = [];
+    const describeOps = () => [{ op: 'ensure_dir', kind: 'apply' as const }];
+    const handleAction = (input: unknown) => {
+      seen.push(input);
+      return (input as { action?: string }).action === 'ensure_dir'
+        ? { status: 'ensured' }
+        : { status: 'failed', results: [{ status: 'failed', error: 'Unsupported: pipeline' }] };
+    };
+
+    const pipelineShaped = defineCatalogBackedActuator({
+      id: 'action-demo',
+      describeOps,
+      handleAction,
+    });
+    await expect(pipelineShaped.dispatch('ensure_dir', { dir: 'x' })).resolves.toMatchObject({
+      ok: false,
+      error: 'Unsupported: pipeline',
+    });
+
+    const actionShaped = defineCatalogBackedActuator({
+      id: 'action-demo',
+      describeOps,
+      handleAction,
+      actionInput: (op, params) => ({ action: op, params }),
+    });
+    await expect(
+      actionShaped.dispatch('ensure_dir', { dir: 'x', _step_id: 'step-1' })
+    ).resolves.toMatchObject({ ok: true, output: { status: 'ensured' } });
+    // Runner step metadata is not forwarded into the action params.
+    expect(seen.at(-1)).toEqual({ action: 'ensure_dir', params: { dir: 'x' } });
+  });
+
   it('uses the catalog-provided legacy contract for runtime pipeline operations', async () => {
     const actuator = defineCatalogBackedActuator({
       id: 'browser-actuator',

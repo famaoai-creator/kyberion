@@ -78,6 +78,7 @@ import {
   buildPptxSlideFromPattern,
 } from './media-layout-runtime.js';
 import { loadLayoutTemplateCatalogFromPath } from './media-layout-catalog.js';
+import type { ProposalStorylineADF } from '@agent/core/contracts/proposal-storyline-adf';
 import { loadDesignPattern } from './media-catalog-loaders.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
 
@@ -459,7 +460,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           toc: outline.toc,
           diagnostics: outline.diagnostics,
           slides,
-        },
+        } satisfies ProposalStorylineADF,
       };
     }
     case 'document_outline_from_brief': {
