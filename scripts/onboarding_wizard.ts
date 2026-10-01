@@ -45,7 +45,12 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
-import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
+import {
+  isExpressOnboarding,
+  ONBOARD_CLI,
+  shouldRefuseNonInteractiveOnboarding,
+} from './onboarding_mode.js';
+import { guardCliArgs } from './lib/cli-guard.js';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -1090,6 +1095,16 @@ export async function runOnboarding(
   args: string[] = [],
   print: Print = () => undefined
 ): Promise<void> {
+  // CU-01: help / unknown flags never start the wizard or write onboarding state.
+  try {
+    if (guardCliArgs(args, ONBOARD_CLI, print)) {
+      rl.close();
+      return;
+    }
+  } catch (error) {
+    rl.close();
+    throw error;
+  }
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();

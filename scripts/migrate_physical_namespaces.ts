@@ -30,6 +30,7 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
 type Print = (value: unknown) => void;
@@ -714,7 +715,18 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
   };
 }
 
+/** CU-01: `--help` / typos exit before any plan is built or applied. */
+export const MIGRATE_PHYSICAL_NAMESPACES_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion migrate physical-namespaces',
+  manifestId: 'script.migrate.physical-namespaces',
+  options: [
+    { flag: '--apply' },
+    { flag: '--kind', value: '<schedule|surface|feedback|intent|ledger|promotion|all>' },
+  ],
+};
+
 export function main(argv: string[], print: Print = () => undefined): void {
+  if (guardCliArgs(argv, MIGRATE_PHYSICAL_NAMESPACES_CLI, print)) return;
   const options = parseArgs(argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
