@@ -54,6 +54,8 @@ export interface ConversationMessageResponse {
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
   intentResolution?: IntentResolutionContract;
+  /** False means the reply ran, but its durable completion could not be saved. */
+  historySaved?: boolean;
 }
 
 export interface VoiceHubConversationResponse {
