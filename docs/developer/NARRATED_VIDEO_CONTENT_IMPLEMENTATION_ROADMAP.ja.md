@@ -88,7 +88,7 @@ video-content-brief
 
 - `knowledge/product/schemas/video-content-brief.schema.json`
 - `libs/core/video/video-content-brief-contract.ts`
-- `libs/core/video/video-content-brief-compiler.ts`
+- `libs/core/video/video-content-brief-contract.ts` の `compileVideoContentBriefToStoryboard`（旧 re-export facade `video-content-brief-compiler.ts` は 2026-10-01 に retired）
 
 想定 contract:
 

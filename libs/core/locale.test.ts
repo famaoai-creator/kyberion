@@ -164,6 +164,31 @@ describe('resolveLocale precedence chain', () => {
     expect(resolveLocale({ identityPath: missingIdentityPath() })).toBe('en');
   });
 
+  it('step 5c: without LANG, a daemon uses the process (ICU) locale before the catalog default', () => {
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(
+      () =>
+        ({
+          resolvedOptions: () => ({ locale: 'ja-JP' }),
+        }) as unknown as Intl.DateTimeFormat
+    );
+    expect(resolveLocale({ identityPath: missingIdentityPath() })).toBe('ja');
+    // LANG (even C / POSIX) is the OS locale answer; ICU is not consulted then.
+    process.env.LANG = 'C';
+    expect(resolveLocale({ identityPath: missingIdentityPath() })).toBe('en');
+  });
+
+  it('warns once when resolution reaches the catalog default', () => {
+    const warn = vi.spyOn(core.logger, 'warn');
+    process.env.LANG = 'C';
+    resolveLocale({ identityPath: missingIdentityPath() });
+    resolveLocale({ identityPath: missingIdentityPath() });
+    const fallbacks = warn.mock.calls.filter(([line]) =>
+      String(line).includes('using the catalog default')
+    );
+    expect(fallbacks).toHaveLength(1);
+    expect(String(fallbacks[0][0])).toMatch(/ — .+ \| .+ \| /);
+  });
+
   // Behavior-change pins (I18N-01): the old resolveOperatorLocale() hardcoded
   // 'ja' fallback is gone. These pin the two cases called out in the plan.
   it('behavior change: identity-absent + LANG=ja_JP.UTF-8 resolves to ja', () => {

@@ -1,6 +1,6 @@
 import type vocabulary from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
-import { createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
+import { coerceLocale, createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
 
 /**
  * CS-04 (I18N-04): concierge strings live in the shared user-facing
@@ -24,12 +24,16 @@ export type FrontDeskMessageKey = keyof (typeof vocabulary)['domains']['front_de
 type MessageParams = Record<string, string | number>;
 const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
 
+/** The front desk's own default (Japanese-first operator UX); one place, not inline literals. */
+export const CONCIERGE_DEFAULT_LOCALE: ConciergeLocale = 'ja';
+export const CONCIERGE_LOCALES: readonly ConciergeLocale[] = ['en', 'ja'];
+
 export function resolveConciergeLocale(value?: string): ConciergeLocale {
-  return value?.toLowerCase().startsWith('en') ? 'en' : 'ja';
+  return coerceLocale(value, CONCIERGE_LOCALES, CONCIERGE_DEFAULT_LOCALE);
 }
 
 export function detectConciergeLocale(): ConciergeLocale {
-  if (typeof navigator === 'undefined') return 'ja';
+  if (typeof navigator === 'undefined') return CONCIERGE_DEFAULT_LOCALE;
   return resolveConciergeLocale(navigator.language);
 }
 

@@ -43,6 +43,8 @@ import {
   foldCapture,
   normalize as normalizeBullet,
 } from '@agent/core/knowledge/memory-notebook';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 const pr = pathResolver;
 
 // ---------------------------------------------------------------------------
@@ -1033,5 +1035,3 @@ export async function handleAction(input: HandleActionInput): Promise<Record<str
   const exportAs = (params.export_as as string) ?? 'working_memory_result';
   return { ...(input.context ?? {}), [exportAs]: result };
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

@@ -17,6 +17,7 @@ import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brie
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
 import { clamp } from './foundation/text.js';
+import { findIntentPhrase, matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -78,28 +79,18 @@ function ensureExecutionBriefValidator(): ValidateFunction {
 }
 
 function isMeetingRequest(text: string): boolean {
-  return /会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i.test(
-    text
-  );
+  return matchesIntentPhrase(text, 'coordination.meeting_request');
 }
 
 function isScheduleRequest(text: string): boolean {
-  return /スケジュール|予定|日程|リスケ|resched|reschedule|calendar|カレンダー|調整|変更|空き時間|availability/i.test(
-    text
-  );
+  return matchesIntentPhrase(text, 'coordination.schedule_request');
 }
 
 function isScheduleReadAgendaRequest(text: string): boolean {
   return (
-    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(
-      text
-    ) &&
-    /(教えて|見せて|確認|見る|空き|agenda|available|availability|今週|来週|今日|明日)/i.test(
-      text
-    ) &&
-    !/(調整|変更|リスケ|ずら|移動|修正|update|change|resched|reschedule|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|整え|進め方|facilitate|preparation|準備)/i.test(
-      text
-    )
+    matchesIntentPhrase(text, 'schedule.agenda_topic') &&
+    matchesIntentPhrase(text, 'execution_brief.agenda_read_cue') &&
+    !matchesIntentPhrase(text, 'execution_brief.agenda_change_cue')
   );
 }
 
@@ -116,19 +107,15 @@ function isScheduleAgendaRead(seed: ExecutionBriefSeed): boolean {
 }
 
 function isProjectBootstrapRequest(text: string): boolean {
-  return /Webサービス|webサービス|新しいプロジェクト|新規プロジェクト|プロジェクト.*(作って|立ち上げ|始め)|新規事業|build a service|create a service/i.test(
-    text
-  );
+  return matchesIntentPhrase(text, 'project.bootstrap_request');
 }
 
 function isApprovalRequestCreation(text: string): boolean {
-  return /(承認を依頼|承認を申請|承認依頼|稟議.*依頼|request approval|approval request)/i.test(
-    text
-  );
+  return matchesIntentPhrase(text, 'approval.request_creation');
 }
 
 function isApprovalRequestResolution(text: string): boolean {
-  return /(稟議|決裁|承認して|承認し|承認待ち|approve|approved?|通して|処理して)/i.test(text);
+  return matchesIntentPhrase(text, 'approval.request_resolution');
 }
 
 function isApprovalWorkflowRequest(text: string): boolean {
@@ -141,21 +128,14 @@ function inferApprovalSystemCandidates(seed: ExecutionBriefSeed): string[] {
   if (seed.approvalSystemHint?.trim()) candidates.push(seed.approvalSystemHint.trim());
   if (seed.serviceBindings?.length) {
     for (const binding of seed.serviceBindings) {
-      if (/ringi|approval|workflow|稟議/i.test(binding)) candidates.push(binding.trim());
+      if (matchesIntentPhrase(binding, 'approval.system_binding_hint'))
+        candidates.push(binding.trim());
     }
   }
   const defaults = resolveDefaultApprovalSystem();
   if (defaults.system) candidates.push(defaults.system);
-  if (
-    /(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i.test(
-      text
-    )
-  ) {
-    const match = text.match(
-      /(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i
-    );
-    if (match?.[1]) candidates.push(match[1]);
-  }
+  const approvalSystemName = findIntentPhrase(text, 'approval.system_name');
+  if (approvalSystemName) candidates.push(approvalSystemName);
   if (candidates.length === 0) candidates.push('operator_default_approval_system');
   return uniqueStrings(candidates);
 }

@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, peer, messaging, discovery, routing, coordination, gpt-5.4-mini]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-06-24
+last_updated: 2026-10-01
 ---
 
 # Kyberion Mesh Hub Implementation Instructions for GPT-5.4 mini
@@ -252,6 +252,12 @@ Every task is one patch. Read the listed current code and tests before editing. 
 - `libs/core/mesh/mesh-router.ts`
 - `libs/core/mesh/mesh-topic-registry.ts`
 - corresponding focused tests
+
+> **Status (2026-10-01):** `mesh-router.ts` and the write/routing side of
+> `mesh-topic-registry.ts` (`subscribeMeshTopic`, `resolveMeshTopicRecipients`) were retired —
+> the broker builds its own route and nothing subscribed peers or routed topic selectors. Only
+> the read side used by `inspectMeshHub` remains. See
+> [`retired/README.md`](../../../retired/README.md) before restoring.
 
 **Required behavior:**
 

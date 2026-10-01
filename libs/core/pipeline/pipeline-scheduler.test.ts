@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { safeReadFile as readRepoFile } from '../secure-io.js';
 import {
   normalizeScheduledPipelinePath,
   resolveScheduledPipelinePath,
   type PipelineScheduleRegistry,
   type ScheduledPipeline,
   scheduleAllowedByOperator,
+  scheduleExplicitlyOptedIn,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeWriteFile } from '../secure-io.js';
@@ -390,6 +392,64 @@ describe('operator schedule allowlist', () => {
       expect(scheduleAllowedByOperator('organization-daily-digest', allowlist), allowlist).toBe(
         false
       );
+    }
+  });
+});
+
+describe('shipped-disabled (opt-in) schedules', () => {
+  const ENV = 'KYBERION_CHRONOS_SCHEDULES';
+  const previous = process.env[ENV];
+  afterEach(() => {
+    if (previous === undefined) delete process.env[ENV];
+    else process.env[ENV] = previous;
+  });
+  const at = new Date('2026-07-05T03:00:00+09:00');
+  const optIn: ScheduledPipeline = {
+    id: 'reconcile-config-fallbacks-weekly',
+    name: 'Config Fallback Reconciler',
+    pipelinePath: 'pipelines/reconcile-config-fallbacks.json',
+    actuator: 'run_pipeline',
+    enabled: false,
+    optIn: true,
+    trigger: { type: 'cron', cron: '0 3 * * *', timezone: 'Asia/Tokyo' },
+  };
+
+  it('stays off until the host lists its id', () => {
+    delete process.env[ENV];
+    expect(isScheduledPipelineDue(optIn, undefined, at)).toBe(false);
+    process.env[ENV] = 'organization-daily-digest';
+    expect(isScheduledPipelineDue(optIn, undefined, at)).toBe(false);
+    process.env[ENV] = 'organization-daily-digest, reconcile-config-fallbacks-weekly';
+    expect(isScheduledPipelineDue(optIn, undefined, at)).toBe(true);
+  });
+
+  it('never revives a schedule disabled any other way', () => {
+    process.env[ENV] = 'reconcile-config-fallbacks-weekly';
+    expect(isScheduledPipelineDue({ ...optIn, optIn: undefined }, undefined, at)).toBe(false);
+  });
+
+  it('treats an unset or blank env as no opt-in', () => {
+    expect(scheduleExplicitlyOptedIn('x', undefined)).toBe(false);
+    expect(scheduleExplicitlyOptedIn('x', '')).toBe(false);
+    expect(scheduleExplicitlyOptedIn('x', ' x ,y')).toBe(true);
+  });
+
+  it('ships the reconcile pipelines disabled and the config sweep proposal-only (B1)', () => {
+    for (const id of [
+      'reconcile-config-fallbacks',
+      'reconcile-unclassified-errors',
+      'reconcile-unhandled-intents',
+    ]) {
+      const pipeline = JSON.parse(
+        String(readRepoFile(pathResolver.rootResolve(`pipelines/${id}.json`), { encoding: 'utf8' }))
+      ) as { schedule: { enabled: boolean }; steps: Array<{ op: string; params?: object }> };
+      expect(pipeline.schedule.enabled, id).toBe(false);
+      if (id === 'reconcile-config-fallbacks') {
+        const sweep = pipeline.steps.find(
+          (step) => step.op === 'system:reconcile_config_fallbacks'
+        );
+        expect(sweep?.params).not.toHaveProperty('apply');
+      }
     }
   });
 });

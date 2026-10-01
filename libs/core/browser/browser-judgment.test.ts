@@ -11,6 +11,7 @@ import {
   browserFailureQuestion,
   classifyBrowserFailure,
   classifyBrowserFailureByRules,
+  judgeBrowserFailureKind,
   judgePageReadiness,
 } from './browser-judgment.js';
 
@@ -197,5 +198,23 @@ describe('judgePageReadiness', () => {
     });
     await judgePageReadiness('読み込み中', true, '一覧', { requireCalibrated: false });
     expect(askedId).toBe(BROWSER_READY_QUESTION);
+  });
+});
+
+describe('judgeBrowserFailureKind (browser-actuator failure path)', () => {
+  it('records nothing and asks no provider while nothing is calibrated', async () => {
+    let asked = 0;
+    registerJudgmentBackend({
+      ...provider('login_required'),
+      async judge(request) {
+        asked += 1;
+        return provider('login_required').judge(request);
+      },
+    });
+    expect(
+      await judgeBrowserFailureKind('この機能をご利用いただくには、お手続きが必要です。')
+    ).toBe(undefined);
+    expect(await judgeBrowserFailureKind('HTTP 429 Too Many Requests')).toBe(undefined);
+    expect(asked).toBe(0);
   });
 });

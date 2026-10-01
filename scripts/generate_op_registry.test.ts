@@ -110,7 +110,7 @@ describe('generate_op_registry discovery output', () => {
     // capture_photo, record_camera since this literal was last set); keep it
     // in sync by regenerating rather than hand-editing
     // knowledge/product/orchestration/actuator-op-discovery.json.
-    expect(operations).toHaveLength(589);
+    expect(operations).toHaveLength(586);
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(

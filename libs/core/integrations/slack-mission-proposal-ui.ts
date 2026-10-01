@@ -3,7 +3,7 @@ import type {
   SlackMissionProposalActionPayload,
 } from '../surface/channel-surface-types.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { resolveLocale, type SupportedLocale } from '../locale.js';
 import { t } from '../t.js';
 import {
   renderIntentAuthorityLabel,
@@ -27,7 +27,7 @@ export function buildSlackMissionProposalBlocks(
   locale?: SupportedLocale
 ): any[] {
   const contractLocale: SupportedLocale = locale ?? 'en';
-  const uiLocale: SupportedLocale = locale ?? 'ja';
+  const uiLocale: SupportedLocale = locale ?? resolveLocale();
   const summary = valueOrFallback(
     proposal.summary,
     t('bridge:mission_proposal_fallback', undefined, uiLocale)
@@ -112,7 +112,7 @@ export function slackMissionProposalFallbackText(
   locale?: SupportedLocale
 ): string {
   const contractLocale: SupportedLocale = locale ?? 'en';
-  const uiLocale: SupportedLocale = locale ?? 'ja';
+  const uiLocale: SupportedLocale = locale ?? resolveLocale();
   const summary = valueOrFallback(
     proposal.summary,
     t('bridge:mission_proposal_fallback', undefined, uiLocale)

@@ -357,24 +357,6 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
-    name: 'operator-learning-scenario-pack',
-    schemaPath: 'knowledge/product/schemas/operator-learning-scenario-pack.schema.json',
-    dataPath: 'knowledge/product/governance/operator-learning-scenario-pack.json',
-    invalidPayload: {
-      version: '1.0.0',
-      scenarios: [],
-    },
-  },
-  {
-    name: 'operator-learning-dispatch-registry',
-    schemaPath: 'knowledge/product/schemas/operator-learning-dispatch-registry.schema.json',
-    dataPath: 'knowledge/product/governance/operator-learning-dispatch-registry.json',
-    invalidPayload: {
-      version: '1.0.0',
-      rules: [],
-    },
-  },
-  {
     name: 'presentation-preference-registry',
     schemaPath: 'knowledge/product/schemas/presentation-preference-registry.schema.json',
     dataPath: 'knowledge/product/governance/presentation-preference-registry.json',
@@ -443,20 +425,6 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
-    name: 'service-bootstrap-catalog',
-    schemaPath: 'knowledge/product/schemas/service-bootstrap-catalog.schema.json',
-    dataPath: 'knowledge/product/governance/service-bootstrap-catalog.json',
-    invalidPayload: {
-      version: '1.0.0',
-      entries: [
-        {
-          id: 'broken',
-          service_id: 'slack',
-        },
-      ],
-    },
-  },
-  {
     name: 'service-onboarding-catalog',
     schemaPath: 'knowledge/product/schemas/service-onboarding-catalog.schema.json',
     dataPath: 'knowledge/product/governance/service-onboarding-catalog.json',
@@ -508,15 +476,6 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: {
       version: '1.0.0',
       entries: [{ surface: 'slack' }],
-    },
-  },
-  {
-    name: 'voice-task-profile-catalog',
-    schemaPath: 'knowledge/product/schemas/voice-task-profile-catalog.schema.json',
-    dataPath: 'knowledge/product/governance/voice-task-profile-catalog.json',
-    invalidPayload: {
-      version: '1.0.0',
-      profiles: [{ id: 'broken', task_type: 'presentation_deck' }],
     },
   },
   {
@@ -665,15 +624,6 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: {
       version: '1.0.0',
       title: 'Mission Journal: Ecosystem Evolution',
-    },
-  },
-  {
-    name: 'pilot-strategy-policy',
-    schemaPath: 'knowledge/product/schemas/pilot-strategy-policy.schema.json',
-    dataPath: 'knowledge/product/governance/pilot-strategy-policy.json',
-    invalidPayload: {
-      version: '1.0.0',
-      title: 'Kyberion AI Consulting: Go-to-Market Strategy',
     },
   },
   {

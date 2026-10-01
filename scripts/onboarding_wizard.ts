@@ -1,3 +1,4 @@
+import { pickByLocale } from '@agent/core/locale-normalize';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
@@ -98,7 +99,7 @@ function setWizardLanguage(language: string): void {
 }
 
 function t(en: string, ja: string): string {
-  return wizardLocale === 'ja' ? ja : en;
+  return pickByLocale(wizardLocale, { en, ja });
 }
 
 function pt(value: LocalizedOnboardingText): string {

@@ -64,6 +64,8 @@ export {
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
 import { getLastServedReasoningMode } from '../reasoning/reasoning-backend.js';
+import { BEST_OF_PROVIDERS_LIVE_ENV_VAR, runBestOfProviders } from '../best-of-providers.js';
+import type { TierLevel } from '../types.js';
 import { type MissionGraphRunJournalHandle } from './mission-graph-run-journal.js';
 import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';
 import {
@@ -264,11 +266,15 @@ export function isBestOfNCandidate(input: { teamRole: string; task: PlannedNextT
 }
 
 export const BEST_OF_APPROACHES = [
-  { key: 'A', directive: 'アプローチA: 最小実装優先 — deliver the smallest correct change first.' },
+  {
+    key: 'A',
+    directive:
+      'Approach A: minimal implementation first — deliver the smallest correct change first.',
+  },
   {
     key: 'B',
     directive:
-      'アプローチB: 堅牢性優先 — prioritize robustness: edge cases, failure handling, verification.',
+      'Approach B: robustness first — prioritize robustness: edge cases, failure handling, verification.',
   },
 ] as const;
 
@@ -293,6 +299,53 @@ export function parseBestOfJudgeVerdict(
       ...(mergeHints?.length ? { merge_hints: mergeHints } : {}),
     };
   } catch {
+    return null;
+  }
+}
+
+export interface BestOfProvidersJudgeOutcome {
+  verdict: { winner: 'A' | 'B'; rationale?: string; merge_hints?: string[] } | null;
+  participants: string[];
+  excluded: string[];
+}
+
+/** Most sensitive tier the judge prompt may carry; no scope reads as confidential. */
+function judgeDataTier(
+  scope?: import('../context-security-scope.js').ContextSecurityScope
+): TierLevel {
+  const tiers = scope?.read_tiers || [];
+  if (tiers.includes('personal') || scope?.write_tier === 'personal') return 'personal';
+  if (tiers.length === 0 || tiers.includes('confidential')) return 'confidential';
+  return scope?.write_tier === 'confidential' ? 'confidential' : 'public';
+}
+
+/**
+ * XP-07 wiring (opt-in via KYBERION_BEST_OF_PROVIDERS_LIVE=1): fan the MO-07
+ * judge prompt out to every provider CLI the egress gate admits for the
+ * mission's data tier, and take the plurality answer. Never throws; returns
+ * `verdict: null` so the caller keeps its single-agent judge path.
+ */
+export async function obtainBestOfProvidersJudgeVerdict(input: {
+  judgePrompt: string;
+  taskId: string;
+  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  run?: typeof runBestOfProviders;
+}): Promise<BestOfProvidersJudgeOutcome | null> {
+  if (input.securityScope?.external_egress === 'deny') return null;
+  try {
+    const result = await (input.run ?? runBestOfProviders)({
+      instruction: input.judgePrompt,
+      dataTier: judgeDataTier(input.securityScope),
+    });
+    return {
+      verdict: result.winner ? parseBestOfJudgeVerdict(result.winner.output) : null,
+      participants: result.verdictRecord.participants,
+      excluded: result.excluded.map((entry) => entry.provider),
+    };
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] best-of-providers judge failed for ${input.taskId}: ${err?.message || err}`
+    );
     return null;
   }
 }
@@ -357,34 +410,47 @@ export async function obtainBestOfTaskResultResponse(input: {
   });
 
   let verdict: { winner: 'A' | 'B'; rationale?: string; merge_hints?: string[] } | null = null;
-  try {
-    const judgeResponse = await a2aBridge.route({
-      a2a_version: '1.0',
-      header: {
-        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.task.task_id}-judge`,
-        sender: 'kyberion:mission-orchestrator',
-        receiver: input.agentId,
-        performative: 'request',
-        timestamp: nowIso(),
-      },
-      payload: {
-        intent: 'mission_task_execution',
-        text: judgePrompt,
-        objective: `Judge best-of-2 candidates for ${input.task.task_id}`,
-        context: {
-          mission_id: input.missionId,
-          team_role: 'reviewer',
-          task_id: `${input.task.task_id}-judge`,
-          execution_mode: 'task',
-          security_scope: input.securityScope,
-        },
-      },
+  // XP-07: opt-in model-diverse judge. Falls back to the single-agent judge
+  // below when the flag is off or no provider produced a usable verdict.
+  let providerJudge: BestOfProvidersJudgeOutcome | null = null;
+  if (getRegisteredEnvText(BEST_OF_PROVIDERS_LIVE_ENV_VAR) === '1') {
+    providerJudge = await obtainBestOfProvidersJudgeVerdict({
+      judgePrompt,
+      taskId: input.task.task_id,
+      securityScope: input.securityScope,
     });
-    verdict = parseBestOfJudgeVerdict(String(judgeResponse.payload?.text || ''));
-  } catch (err: any) {
-    logger.warn(
-      `[MISSION_WORKER] best-of judge failed for ${input.task.task_id}: ${err?.message || err}`
-    );
+    verdict = providerJudge?.verdict ?? null;
+  }
+  if (!verdict) {
+    try {
+      const judgeResponse = await a2aBridge.route({
+        a2a_version: '1.0',
+        header: {
+          msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.task.task_id}-judge`,
+          sender: 'kyberion:mission-orchestrator',
+          receiver: input.agentId,
+          performative: 'request',
+          timestamp: nowIso(),
+        },
+        payload: {
+          intent: 'mission_task_execution',
+          text: judgePrompt,
+          objective: `Judge best-of-2 candidates for ${input.task.task_id}`,
+          context: {
+            mission_id: input.missionId,
+            team_role: 'reviewer',
+            task_id: `${input.task.task_id}-judge`,
+            execution_mode: 'task',
+            security_scope: input.securityScope,
+          },
+        },
+      });
+      verdict = parseBestOfJudgeVerdict(String(judgeResponse.payload?.text || ''));
+    } catch (err: any) {
+      logger.warn(
+        `[MISSION_WORKER] best-of judge failed for ${input.task.task_id}: ${err?.message || err}`
+      );
+    }
   }
 
   const winnerKey = verdict?.winner || 'A';
@@ -432,6 +498,13 @@ export async function obtainBestOfTaskResultResponse(input: {
       judge_succeeded: Boolean(verdict),
       cost_multiplier: 2,
       merge_hints: verdict?.merge_hints || [],
+      ...(providerJudge
+        ? {
+            judge_mode: providerJudge.verdict ? 'best_of_providers' : 'single_agent_fallback',
+            judge_providers: providerJudge.participants,
+            judge_excluded: providerJudge.excluded,
+          }
+        : {}),
     },
   });
 

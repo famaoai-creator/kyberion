@@ -781,5 +781,6 @@ export function buildSurfaceConversationInput(
     baseInput.surfaceText = input.surfaceText;
   }
   if (input.attachments) baseInput.attachments = input.attachments;
+  if (input.workAuthority) baseInput.workAuthority = input.workAuthority;
   return baseInput;
 }

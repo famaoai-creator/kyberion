@@ -156,18 +156,6 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     required: ['text'],
     additionalProperties: false,
   },
-  record_interaction: {
-    type: 'object',
-    required: ['channel', 'org', 'person_slug', 'summary'],
-    properties: {
-      channel: { type: 'string' },
-      org: { type: 'string' },
-      person_slug: { type: 'string' },
-      summary: { type: 'string' },
-      tone_shifts: { type: 'array' },
-    },
-    additionalProperties: false,
-  },
   record_voice_sample: {
     type: 'object',
     required: ['request_id', 'sample_id'],
@@ -271,9 +259,6 @@ const VOICE_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
       delivery: { mode: 'artifact', artifact_path: 'active/shared/tmp/voice.wav' },
     },
   ],
-  record_interaction: [
-    { channel: 'voice', person_slug: 'operator', org: 'default', summary: 'Follow-up recorded.' },
-  ],
   record_voice_sample: [{ request_id: 'request-1', sample_id: 'sample-1', dry_run: true }],
   record_verify_repair_voice_sample: [
     {
@@ -307,7 +292,6 @@ export const VOICE_ACTUATOR_APPLY_OPS = [
   'generate_voice',
   'normalize_audio',
   'output_to_virtual_camera',
-  'record_interaction',
   'record_voice_sample',
   'record_verify_repair_voice_sample',
   'register_voice_profile',

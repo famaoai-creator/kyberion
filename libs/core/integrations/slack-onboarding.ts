@@ -3,6 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
+import { t } from '../t.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -42,15 +43,12 @@ function onboardingStateLogicalPath(channel: string, threadTs: string): string {
 
 function onboardingQuestions(): Record<OnboardingField, string> {
   return {
-    name: 'まず、どのようにお呼びすれば良いですか？',
-    language: '普段のやり取りで使いたい言語を教えてください。例: Japanese / English',
-    interaction_style:
-      '対話スタイルはどうしますか？ Senior Partner / Concierge / Minimalist から選んでください。',
-    primary_domain:
-      '主な活動領域を教えてください。例: Software Engineering / Data Analysis / Writing',
-    vision: 'この環境で実現したい vision を短く教えてください。',
-    agent_id:
-      '最後に、この環境のメイン Agent ID を決めます。希望名があれば教えてください。既定値を使う場合は「そのまま」「default」「おまかせ」のいずれかを送ってください。既定値は KYBERION-PRIME です。',
+    name: t('integrations:slack_onboarding_q_name'),
+    language: t('integrations:slack_onboarding_q_language'),
+    interaction_style: t('integrations:slack_onboarding_q_interaction_style'),
+    primary_domain: t('integrations:slack_onboarding_q_primary_domain'),
+    vision: t('integrations:slack_onboarding_q_vision'),
+    agent_id: t('integrations:slack_onboarding_q_agent_id'),
   };
 }
 
@@ -377,8 +375,8 @@ export function handleSlackOnboardingTurn(params: {
     return {
       completed: false,
       replyText: [
-        'この環境はまだ初期化されていないため、まずオンボーディングを進めます。',
-        '1問ずつ確認していきます。',
+        t('integrations:slack_onboarding_start'),
+        t('integrations:slack_onboarding_one_at_a_time'),
         '',
         questions.name,
       ].join('\n'),
@@ -395,14 +393,14 @@ export function handleSlackOnboardingTurn(params: {
       return {
         completed: true,
         replyText: [
-          'オンボーディング情報を保存しました。',
+          t('integrations:slack_onboarding_saved'),
           `Name: ${state.answers.name}`,
           `Language: ${state.answers.language}`,
           `Style: ${normalizeInteractionStyle(state.answers.interaction_style || 'Concierge')}`,
           `Domain: ${state.answers.primary_domain}`,
           `Agent ID: ${(state.answers.agent_id || 'KYBERION-PRIME').trim().toUpperCase()}`,
           '',
-          '初期化が完了したので、次のメッセージから通常の routing に切り替えます。',
+          t('integrations:slack_onboarding_switch_routing'),
         ].join('\n'),
       };
     }
@@ -412,6 +410,6 @@ export function handleSlackOnboardingTurn(params: {
   }
   return {
     completed: true,
-    replyText: 'オンボーディングは完了しています。通常の依頼を送ってください。',
+    replyText: t('integrations:slack_onboarding_already_done'),
   };
 }

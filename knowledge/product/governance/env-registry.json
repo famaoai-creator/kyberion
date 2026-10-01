@@ -514,6 +514,14 @@
       "subsystem": "governance"
     },
     {
+      "name": "KYBERION_AUTONOMY_DECISION_ROUTING",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 1 so scheduled gate callers (daemon watchdog restart, auto-checkpoint) route an operator-bound autonomous-ops verdict through the HITL decision loop (routeAutonomousDecision): one decision card per daemon/job, reused while pending. Unset keeps the report-only behavior.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_BACKUP_PASSPHRASE",
       "category": "secret",
       "type": "string",
@@ -534,7 +542,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Optional runtime setting for best of providers live; leave unset to use the built-in configuration.",
+      "description": "Set to 1 to opt in to XP-07 model-diverse judging: the MO-07 best-of-N judge prompt fans out to every provider CLI the egress gate admits for the mission data tier (plurality verdict, recorded under active/shared/runtime/best-of-providers/). Unset keeps the single-agent judge; no provider CLI is spawned.",
       "documented": true
     },
     {
@@ -662,7 +670,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule.",
+      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule. Listing a schedule that ships disabled (schedule.enabled false in its pipeline, e.g. reconcile-config-fallbacks-weekly) opts this host into it; once set, only listed ids run.",
       "documented": true
     },
     {
@@ -860,8 +868,9 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Optional path override for confidential operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
@@ -1297,6 +1306,14 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_EXTERNAL_HOOKS",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'project' to load project-local Claude/Codex hook configs (.claude/settings*.json, .codex/hooks.json) into the worker lifecycle hook engine — only configs with a valid hash-bound project-trust approval (pnpm kyberion hooks trust <path>, then an authenticated human approves). Unset keeps external hooks unloaded; user-level configs are never loaded.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_EXTERNAL_SERVICE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
@@ -1702,6 +1719,23 @@
       "required": false,
       "description": "Override for the governance seed used by intent-contract memory sync; tenant-scoped memory cannot be promoted into the global seed without the governed brokered path.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_JUDGMENT_ASSISTS",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'off' to disable the calibration-gated judgment assists (pipeline step error category, browser failure kind, context-pack knowledge relevance). They only consult a provider once judgment-calibration.json carries a fit for the question; until then they are inert regardless of this setting.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_JUDGMENT_PROVIDERS",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated judgment providers to register in addition to the built-in rule floor (known: laya-mlx, typesafe-jev). Unset keeps judgment-assisted call sites such as task routing inert. Unknown ids are refused with a warning; every call is still filtered by the provider egress policy.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_KI_CACHE_DIR",
@@ -2670,8 +2704,9 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Optional path override for operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_OPERATOR_SLACK_DM",
@@ -2759,8 +2794,9 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Optional path override for personal operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_PERSONAL_PADS_PLUGIN_HOST",
@@ -3384,8 +3420,9 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "Secret used by the sovereign pulse guard to sign and verify control payloads.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD",
@@ -3640,8 +3677,9 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "Key used by the system prelude for privileged sudo coordination; values stay in the secret store.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_SUDO_SCOPE",
@@ -3742,8 +3780,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Optional runtime setting for telemetry; leave unset to use the built-in configuration.",
-      "documented": true
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_TEN_VAD_PYTHON",

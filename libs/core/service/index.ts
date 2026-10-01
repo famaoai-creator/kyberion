@@ -2,7 +2,6 @@
 export * from './service-authority-map.js';
 export * from './service-binding-registry.js';
 export * from './service-binding.js';
-export * from './service-bootstrap-catalog.js';
 export * from './service-connection-readiness.js';
 export * from './service-distill-candidate.js';
 export type {

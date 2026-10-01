@@ -526,6 +526,7 @@ describe('wisdom public contract boundaries', () => {
     expect(meetingSource).toContain('export async function extractActionItemsOp');
     for (const op of [
       'conduct_1on1',
+      'conduct_1on_1',
       'extract_action_items',
       'generate_facilitation_script',
       'generate_reminder_message',
@@ -562,6 +563,44 @@ describe('wisdom public contract boundaries', () => {
           target_op: 'shell_command',
         })
       );
+    } finally {
+      resetActuatorForwardingPort();
+    }
+  });
+
+  it('runs a while pipeline while its condition holds, bounded by max_iterations', async () => {
+    const forward = vi.fn().mockResolvedValue({
+      forwarded_to: 'terminal:shell_command',
+      status: 'succeeded',
+      result: { stdout: 'tick' },
+    });
+    registerActuatorForwardingPort({ forward });
+    const loop = (polling: boolean) =>
+      handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'control',
+            op: 'while',
+            params: {
+              condition: { from: 'polling', operator: 'eq', value: true },
+              // Canonical Wisdom context is write-once, so one capture per run.
+              max_iterations: 1,
+              pipeline: [{ type: 'capture', op: 'shell', params: { cmd: 'printf tick' } }],
+            },
+          },
+        ],
+        context: { polling },
+      });
+    try {
+      const ran = await loop(true);
+      expect(ran.status).toBe('succeeded');
+      expect(ran.context.last_capture).toEqual({ stdout: 'tick' });
+      expect(forward).toHaveBeenCalledTimes(1);
+
+      const idle = await loop(false);
+      expect(idle.status).toBe('succeeded');
+      expect(forward).toHaveBeenCalledTimes(1);
     } finally {
       resetActuatorForwardingPort();
     }

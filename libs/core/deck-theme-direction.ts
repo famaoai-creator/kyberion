@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { pickByLocale } from './locale-normalize.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 
@@ -107,7 +108,7 @@ export async function draftDeckSectionBodies(
   const empty = input.sections.filter((section) => !String(section.body ?? '').trim());
   if (empty.length === 0) return {};
   const prompt = [
-    `Draft concise slide body copy (${input.locale === 'en' ? 'English' : 'Japanese'}) for these sections of "${input.title}".`,
+    `Draft concise slide body copy (${pickByLocale(input.locale, { en: 'English', ja: 'Japanese' })}) for these sections of "${input.title}".`,
     input.tone ? `Tone: ${input.tone}` : '',
     input.audience ? `Audience: ${input.audience}` : '',
     'Context sections (titles only where body is missing):',

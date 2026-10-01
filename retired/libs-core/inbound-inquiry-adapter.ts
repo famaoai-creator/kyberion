@@ -18,7 +18,7 @@ function formatMetadata(metadata?: Record<string, unknown>): string {
   }
 
   const sorted = Object.fromEntries(
-    Object.entries(metadata).sort(([left], [right]) => left.localeCompare(right)),
+    Object.entries(metadata).sort(([left], [right]) => left.localeCompare(right))
   );
   return JSON.stringify(sorted, null, 2)
     .split('\n')

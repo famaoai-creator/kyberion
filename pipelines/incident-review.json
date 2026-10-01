@@ -1,0 +1,44 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "incident-review",
+  "version": "1.0.0",
+  "name": "Incident Review",
+  "description": "List recorded incident notes under knowledge/product/incidents and run the SRE root-cause analysis over a captured failure signal.",
+  "labels": ["sre", "incident"],
+  "context": {
+    "signal_path": "active/shared/tmp/incident-signal.json"
+  },
+  "steps": [
+    {
+      "id": "list_incidents",
+      "role": "source",
+      "op": "system:list_incidents",
+      "produces": { "channel": "incident_list_data", "type": "IncidentList" },
+      "params": {}
+    },
+    {
+      "id": "read_signal",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "last_capture", "type": "IncidentSignal" },
+      "params": { "path": "{{signal_path}}", "export_as": "last_capture" }
+    },
+    {
+      "id": "analyze_root_cause",
+      "role": "transform",
+      "op": "system:sre_analyze",
+      "consumes": "last_capture",
+      "produces": { "channel": "root_cause", "type": "RootCauseAnalysis" },
+      "params": { "from": "last_capture", "export_as": "root_cause" }
+    },
+    {
+      "id": "log_root_cause",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["incident_list_data", "root_cause"],
+      "params": {
+        "message": "Incident notes: {{incident_list_data.count}}; root cause: {{root_cause}}"
+      }
+    }
+  ]
+}

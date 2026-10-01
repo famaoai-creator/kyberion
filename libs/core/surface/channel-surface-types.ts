@@ -380,6 +380,8 @@ export interface SurfaceConversationAttachment {
   size?: number;
 }
 
+export type SurfaceWorkAuthority = 'full' | 'ask_only';
+
 interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
@@ -396,6 +398,12 @@ interface SurfaceConversationInputBase {
   teamRole?: string;
   executionFeedback?: ExecutionFeedbackInput;
   scope?: EventScopeInput;
+  /**
+   * Team Channel P1: `ask_only` speakers (viewers, unregistered guests) get
+   * direct replies only — no task sessions, governed execution, mission
+   * promotion or delegation. Omitted means full authority (current behaviour).
+   */
+  workAuthority?: SurfaceWorkAuthority;
 }
 
 export type SurfaceConversationInput = SurfaceConversationInputBase & {
@@ -423,6 +431,12 @@ interface SurfaceConversationMessageInputBase {
   awaitBackgroundReviewFork?: boolean;
   executionFeedback?: ExecutionFeedbackInput;
   scope?: EventScopeInput;
+  /**
+   * Team Channel P1: `ask_only` speakers (viewers, unregistered guests) get
+   * direct replies only — no task sessions, governed execution, mission
+   * promotion or delegation. Omitted means full authority (current behaviour).
+   */
+  workAuthority?: SurfaceWorkAuthority;
 }
 
 export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBase & {

@@ -437,7 +437,8 @@
         "active/shared/coordination/orchestration/",
         "active/shared/observability/channels/slack/",
         "active/shared/observability/mission-control/",
-        "active/audit/"
+        "active/audit/",
+        "knowledge/personal/members/"
       ],
       "allow_write": [
         "presence/bridge/runtime/",
@@ -521,6 +522,10 @@
     },
     "chronos_token_registry_reader": {
       "allow_read": ["knowledge/personal/connections/chronos-access.json"],
+      "allow_write": []
+    },
+    "scope_locale_reader": {
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []
     },
     "generation_scheduler": {
