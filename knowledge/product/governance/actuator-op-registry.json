@@ -286,6 +286,7 @@
     },
     "core": {
       "capture": [
+        "accountability_report",
         "organization_digest",
         "run_first_win_lifecycle",
         "run_health_degradation_watch",
