@@ -231,8 +231,11 @@ export function handleSlackTeamChannelCommand(params: {
   const locale = resolveOperatorLocale();
   if (isThreadStatusQuery(text)) {
     const index = readThreadWork({ surface: 'slack', channel: policy.channelId, threadTs });
-    // A channel re-bound to another tenant must not list the old tenant's work.
-    const sameTenant = index && (!index.tenant_slug || index.tenant_slug === policy.tenantSlug);
+    // Legacy/unscoped indexes have no safe tenant attribution; only an exact
+    // tenant match may expose mission IDs, statuses, or confirmer identities.
+    const sameTenant = Boolean(
+      index?.tenant_slug && policy.tenantSlug && index.tenant_slug === policy.tenantSlug
+    );
     return escapeSlackText(
       formatThreadWorkStatus(resolveThreadWorkStatus(sameTenant ? index : null), locale)
     );
