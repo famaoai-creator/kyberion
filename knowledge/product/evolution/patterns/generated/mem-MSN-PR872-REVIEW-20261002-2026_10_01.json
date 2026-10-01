@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-PR872-REVIEW-20261002-2026_10_01",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bound durable transcript text after redaction",
+  "summary": "Credential redaction can expand valid input beyond storage limits and poison durable conversation history.",
+  "candidate_id": "mem-MSN-PR872-REVIEW-20261002-2026_10_01",
+  "evidence_refs": [
+    "active/missions/public/MSN-PR872-REVIEW-20261002/evidence/implementation-report.md",
+    "active/missions/public/MSN-PR872-REVIEW-20261002/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-PR872-REVIEW-20261002/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-01T17:51:11.476Z",
+  "applicability": ["mission", "mission:MSN-PR872-REVIEW-20261002"],
+  "reusable_steps": [
+    "Credential redaction can expand valid input beyond storage limits and poison durable conversation history"
+  ],
+  "expected_outcome": "Validate incoming text, redact all recognized credentials, then bound the persisted projection to the corresponding input or reply limit enforced by the history loader. Apply this order to both user requests and assistant replies. Truncating before redaction can split secret patterns, while validating only the original text lets short credential assignments grow into records the loader rejects. Regression coverage should use repeated short credential assignments near both input and reply limits, restore the result, and verify a subsequent request still completes. PR872 review reproduced this issue with password=a repeated 744 times.",
+  "source_branch": "feat/concierge-continuity-20261001",
+  "source_commit": "54628a6507797c96ea6d30df219c354082bdcfee"
+}

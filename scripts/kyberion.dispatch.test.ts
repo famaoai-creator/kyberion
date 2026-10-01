@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   spawnManagedProcess: vi.fn(),
@@ -28,9 +28,28 @@ function fakeChild(exitCode: number | null, signal: NodeJS.Signals | null = null
 }
 
 describe('kyberion script-command dispatch', () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.safeExecResultAsync.mockResolvedValue({ stdout: 'buffered\n', stderr: '', status: 0 });
+  });
+
+  it('passes existing GitHub bindings only to the registered PR publisher', async () => {
+    vi.stubEnv('GH_TOKEN', 'fake-gh-binding');
+    vi.stubEnv('GITHUB_TOKEN', 'fake-github-binding');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'fake-unrelated-binding');
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
+    await main(['pr', 'create', '--title', 'fix(pr): preserve auth'], () => undefined);
+    const publisherEnv = mocks.spawnManagedProcess.mock.calls[0][0].spawnOptions.env;
+    expect(publisherEnv.GH_TOKEN).toBe('fake-gh-binding');
+    expect(publisherEnv.GITHUB_TOKEN).toBe('fake-github-binding');
+    expect(publisherEnv.ANTHROPIC_API_KEY).toBeUndefined();
+    await main(['tui'], () => undefined);
+    const otherEnv = mocks.spawnManagedProcess.mock.calls[1][0].spawnOptions.env;
+    expect(otherEnv.GH_TOKEN).toBeUndefined();
+    expect(otherEnv.GITHUB_TOKEN).toBeUndefined();
+    await main(['customer', 'list'], () => undefined);
+    expect(mocks.safeExecResultAsync.mock.calls[0][2].env).toEqual({});
   });
 
   it('CU-02: runs interactive / long-running commands on the operator terminal without a timeout', async () => {

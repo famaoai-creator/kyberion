@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
@@ -226,8 +226,38 @@ describe('runKnowledgeReadinessGate (KL-03)', () => {
 });
 
 describe('main() wiring (KL-03)', () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  it.each(['GH_TOKEN', 'GITHUB_TOKEN'])('forwards %s only to gh subprocesses', async (name) => {
+    vi.stubEnv('GH_TOKEN', undefined);
+    vi.stubEnv('GITHUB_TOKEN', undefined);
+    vi.stubEnv(name, 'fake-github-credential');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'fake-unrelated-credential');
+    stubGhAndGit();
+    mocks.safeReadFile.mockReturnValue('## Knowledge\nnone — no mission for this test\n');
+    mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
+    await main([
+      '--title',
+      'fix(pr): preserve authentication',
+      '--body-file',
+      'body.md',
+      '--skip-readiness',
+    ]);
+    const ghCalls = mocks.safeExec.mock.calls.filter(([command]) => command === 'gh');
+    expect(ghCalls.map(([, args]) => args[0])).toEqual(['--version', 'auth', 'repo', 'pr']);
+    for (const [, , options] of ghCalls) {
+      expect(options.env).toEqual({
+        GH_TOKEN: undefined,
+        GITHUB_TOKEN: undefined,
+        [name]: 'fake-github-credential',
+      });
+    }
+    for (const [command, , options] of mocks.safeExec.mock.calls) {
+      if (command !== 'gh') expect(options.env).toBeUndefined();
+    }
   });
 
   it('runs the knowledge check even with --skip-readiness, and still calls gh when it passes', async () => {

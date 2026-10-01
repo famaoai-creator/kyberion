@@ -11,6 +11,7 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
 import {
   checkPrKnowledgeReadiness,
@@ -48,10 +49,19 @@ function readCurrentBranch(): string {
   return safeExec('git', ['branch', '--show-current'], { cwd: pathResolver.rootDir() }).trim();
 }
 
-function readDefaultBranch(): string {
-  const raw = safeExec('gh', ['repo', 'view', '--json', 'defaultBranchRef'], {
+/** Credentials are explicit overrides for gh only, never general child inheritance. */
+function runGithubCli(args: string[]): string {
+  return safeExec('gh', args, {
     cwd: pathResolver.rootDir(),
-  }).trim();
+    env: {
+      GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
+      GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
+    },
+  });
+}
+
+function readDefaultBranch(): string {
+  const raw = runGithubCli(['repo', 'view', '--json', 'defaultBranchRef']).trim();
   return parseDefaultBranchResponse(raw);
 }
 
@@ -225,8 +235,8 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   if (guarded.handled) return;
   const options = parsePublishArgs(guarded.argv);
 
-  safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
-  safeExec('gh', ['auth', 'status'], { cwd: pathResolver.rootDir() });
+  runGithubCli(['--version']);
+  runGithubCli(['auth', 'status']);
 
   if (options.skipReadiness) {
     print(
@@ -240,7 +250,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   print('[pr:publish] Knowledge readiness check passed (KL-03).');
 
   const args = buildGhArgs(options);
-  const output = safeExec('gh', args, { cwd: pathResolver.rootDir() });
+  const output = runGithubCli(args);
   if (output.trim()) print(output.trim());
 }
 
