@@ -17,6 +17,7 @@ import {
 } from '../secure-io.js';
 import { resolveSurfaceIntent } from '../router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -214,16 +215,16 @@ function resolveConfirmationCandidateIndex(
   const trimmed = utterance.trim();
   if (!trimmed || candidateCount <= 0) return null;
 
-  if (/^(それ|はい|yes|ok|そのまま|それで|お願いします)$/i.test(trimmed)) {
+  if (matchesIntentPhrase(trimmed, 'browser.confirm_affirmative')) {
     return 0;
   }
-  if (/^(最初|1つ目|一つ目|1番目|一番目|first)$/i.test(trimmed)) {
+  if (matchesIntentPhrase(trimmed, 'browser.ordinal_first')) {
     return 0;
   }
-  if (/^(2つ目|二つ目|2番目|二番目|second)$/i.test(trimmed) && candidateCount >= 2) {
+  if (matchesIntentPhrase(trimmed, 'browser.ordinal_second') && candidateCount >= 2) {
     return 1;
   }
-  if (/^(3つ目|三つ目|3番目|三番目|third)$/i.test(trimmed) && candidateCount >= 3) {
+  if (matchesIntentPhrase(trimmed, 'browser.ordinal_third') && candidateCount >= 3) {
     return 2;
   }
 
@@ -986,32 +987,28 @@ export function classifyBrowserConversationCommand(
   if (!trimmed) return null;
   const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed, options);
 
-  if (
-    /^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(
-      trimmed
-    )
-  ) {
+  if (matchesIntentPhrase(trimmed, 'browser.control_command')) {
     return {
       commandType: 'control_command',
-      action: /resume|続けて|再開/i.test(trimmed)
+      action: matchesIntentPhrase(trimmed, 'browser.control_resume')
         ? 'resume'
-        : /back|戻って/i.test(trimmed)
+        : matchesIntentPhrase(trimmed, 'browser.control_back')
           ? 'navigate'
-          : /pause/i.test(trimmed)
+          : matchesIntentPhrase(trimmed, 'browser.control_pause')
             ? 'pause'
             : 'cancel',
     };
   }
 
-  const region = /左下|bottom left/i.test(trimmed)
+  const region = matchesIntentPhrase(trimmed, 'browser.region_bottom_left')
     ? 'bottom-left'
-    : /右下|bottom right/i.test(trimmed)
+    : matchesIntentPhrase(trimmed, 'browser.region_bottom_right')
       ? 'bottom-right'
-      : /左上|top left/i.test(trimmed)
+      : matchesIntentPhrase(trimmed, 'browser.region_top_left')
         ? 'top-left'
-        : /右上|top right/i.test(trimmed)
+        : matchesIntentPhrase(trimmed, 'browser.region_top_right')
           ? 'top-right'
-          : /中央|center|真ん中/i.test(trimmed)
+          : matchesIntentPhrase(trimmed, 'browser.region_center')
             ? 'center'
             : undefined;
 
@@ -1028,7 +1025,9 @@ export function classifyBrowserConversationCommand(
     .replace(/^(左下|右下|左上|右上|中央|真ん中)\s*の?/, '')
     .replace(/(?:ボタン|button)$/i, '')
     .trim();
-  const targetRole = /ボタン|button/i.test(trimmed) ? 'button' : undefined;
+  const targetRole = matchesIntentPhrase(trimmed, 'browser.target_role_button')
+    ? 'button'
+    : undefined;
 
   if (resolvedSurfaceIntent.intentId === 'open-site') {
     return {
@@ -1042,7 +1041,10 @@ export function classifyBrowserConversationCommand(
   }
 
   if (resolvedSurfaceIntent.intentId === 'browser-step') {
-    if (/押して|press|enter/i.test(trimmed) && /(enter|return|エンター)/i.test(trimmed)) {
+    if (
+      matchesIntentPhrase(trimmed, 'browser.press_verb') &&
+      matchesIntentPhrase(trimmed, 'browser.enter_key')
+    ) {
       return {
         commandType: 'step_command',
         action: 'press',
@@ -1052,7 +1054,7 @@ export function classifyBrowserConversationCommand(
         },
       };
     }
-    if (/入力|入れて|type|fill/i.test(trimmed)) {
+    if (matchesIntentPhrase(trimmed, 'browser.fill_verb')) {
       const inputTextMatch =
         trimmed.match(/「(.+?)」を.*(?:入力|入れて)/) ||
         trimmed.match(/"(.+?)".*(?:input|type|fill)/i) ||
@@ -1067,7 +1069,7 @@ export function classifyBrowserConversationCommand(
         },
       };
     }
-    if (/スクロール|scroll/i.test(trimmed)) {
+    if (matchesIntentPhrase(trimmed, 'browser.scroll_verb')) {
       return {
         commandType: 'step_command',
         action: 'scroll',
@@ -1087,7 +1089,10 @@ export function classifyBrowserConversationCommand(
     };
   }
 
-  if (/押して|click|tap|クリック/i.test(trimmed) && !/(enter|return|エンター)/i.test(trimmed)) {
+  if (
+    matchesIntentPhrase(trimmed, 'browser.click_verb') &&
+    !matchesIntentPhrase(trimmed, 'browser.enter_key')
+  ) {
     return {
       commandType: 'step_command',
       action: 'click',
@@ -1099,7 +1104,10 @@ export function classifyBrowserConversationCommand(
     };
   }
 
-  if (/押して|press|enter/i.test(trimmed) && /(enter|return|エンター)/i.test(trimmed)) {
+  if (
+    matchesIntentPhrase(trimmed, 'browser.press_verb') &&
+    matchesIntentPhrase(trimmed, 'browser.enter_key')
+  ) {
     return {
       commandType: 'step_command',
       action: 'press',
@@ -1110,7 +1118,7 @@ export function classifyBrowserConversationCommand(
     };
   }
 
-  if (/入力|入れて|type|fill/i.test(trimmed)) {
+  if (matchesIntentPhrase(trimmed, 'browser.fill_verb')) {
     const inputTextMatch =
       trimmed.match(/「(.+?)」を.*(?:入力|入れて)/) ||
       trimmed.match(/"(.+?)".*(?:input|type|fill)/i) ||
@@ -1126,7 +1134,7 @@ export function classifyBrowserConversationCommand(
     };
   }
 
-  if (/スクロール|scroll/i.test(trimmed)) {
+  if (matchesIntentPhrase(trimmed, 'browser.scroll_verb')) {
     return {
       commandType: 'step_command',
       action: 'scroll',
@@ -1137,8 +1145,8 @@ export function classifyBrowserConversationCommand(
   }
 
   if (
-    /開いて|open|表示して|show/i.test(trimmed) &&
-    /(ページ|tab|タブ|ブラウザ|chrome|サイト|url|画面)/i.test(trimmed)
+    matchesIntentPhrase(trimmed, 'browser.open_verb') &&
+    matchesIntentPhrase(trimmed, 'browser.page_target')
   ) {
     return {
       commandType: 'task_command',

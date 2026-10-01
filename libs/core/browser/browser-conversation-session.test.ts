@@ -455,4 +455,23 @@ describe('browser conversation session helpers', () => {
     expect(loaded?.candidate_targets).toHaveLength(1);
     expect(loaded?.candidate_targets[0]?.element_id).toBe('@e1');
   });
+
+  it('classifies Japanese control commands (止めて / キャンセル / 停止 / 続けて) without an ASCII suffix', () => {
+    expect(classifyBrowserConversationCommand('止めて')).toMatchObject({
+      commandType: 'control_command',
+      action: 'cancel',
+    });
+    expect(classifyBrowserConversationCommand('キャンセル')).toMatchObject({
+      commandType: 'control_command',
+      action: 'cancel',
+    });
+    expect(classifyBrowserConversationCommand('停止')?.commandType).toBe('control_command');
+    expect(classifyBrowserConversationCommand('続けて')).toMatchObject({
+      commandType: 'control_command',
+      action: 'resume',
+    });
+    expect(classifyBrowserConversationCommand('stopping the build')?.commandType).not.toBe(
+      'control_command'
+    );
+  });
 });

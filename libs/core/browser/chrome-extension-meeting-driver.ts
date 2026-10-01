@@ -1,4 +1,6 @@
 import { appendJsonLine } from '../foundation/json.js';
+import { resolveLocale } from '../locale.js';
+import { localeToBcp47 } from '../locale-normalize.js';
 /* eslint-disable no-restricted-imports */
 /**
  * ChromeExtensionMeetingJoinDriver — browser meeting attendance driven through
@@ -252,7 +254,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
 
       const ocr = await ocrImage({
         path: pathResolver.shared(frameFile),
-        language: 'ja-JP',
+        language: localeToBcp47(resolveLocale()),
         mode: 'local_only',
       });
       if (ocr.providerDataEgress !== 'none') {

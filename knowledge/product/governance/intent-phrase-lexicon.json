@@ -1,0 +1,1333 @@
+{
+  "$schema": "../schemas/intent-phrase-lexicon.schema.json",
+  "version": "1.0.0",
+  "description": "Locale-keyed phrase lexicon for heuristic intent classification. Each concept lists literal phrases (escaped) and/or regex source patterns per locale; the matcher checks every configured locale because the input language may differ from the UI locale. Add a locale by adding a key under `locales` — no code change is required.",
+  "default_flags": "i",
+  "concepts": {
+    "approval.decision_approve": {
+      "description": "Approval decision word: approve.",
+      "locales": {
+        "ja": {
+          "phrases": ["承認", "可決"]
+        },
+        "en": {
+          "phrases": ["approve"]
+        }
+      }
+    },
+    "approval.decision_reject": {
+      "description": "Approval decision word: reject.",
+      "locales": {
+        "ja": {
+          "phrases": ["却下", "否決"]
+        },
+        "en": {
+          "phrases": ["reject"]
+        }
+      }
+    },
+    "approval.decision_word": {
+      "description": "Approval decision word (approve or reject); the leftmost match is extracted.",
+      "locales": {
+        "ja": {
+          "phrases": ["承認", "却下", "可決", "否決"]
+        },
+        "en": {
+          "phrases": ["approve", "reject"]
+        }
+      }
+    },
+    "approval.request_creation": {
+      "description": "Request to file / ask for an approval.",
+      "locales": {
+        "ja": {
+          "phrases": ["承認を依頼", "承認を申請", "承認依頼"],
+          "patterns": ["稟議.*依頼"]
+        },
+        "en": {
+          "phrases": ["request approval", "approval request"]
+        }
+      }
+    },
+    "approval.request_resolution": {
+      "description": "Request to resolve (approve / process) a pending approval.",
+      "locales": {
+        "ja": {
+          "phrases": ["稟議", "決裁", "承認して", "承認し", "承認待ち", "通して", "処理して"]
+        },
+        "en": {
+          "phrases": ["approve"],
+          "patterns": ["approved?"]
+        }
+      }
+    },
+    "approval.request_verb": {
+      "description": "Verb asking to create / request something.",
+      "locales": {
+        "ja": {
+          "phrases": ["依頼", "申請", "お願い", "作成"]
+        },
+        "en": {
+          "phrases": ["request", "create"]
+        }
+      }
+    },
+    "approval.resolve_verb": {
+      "description": "Verb asking to approve / process / pass an approval.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "決裁",
+            "承認して",
+            "承認し",
+            "approveして",
+            "処理して",
+            "通して",
+            "通しといて"
+          ]
+        },
+        "en": {
+          "phrases": ["approve"]
+        }
+      }
+    },
+    "approval.ringi_vocabulary": {
+      "description": "Japanese ringi / kessai vocabulary.",
+      "locales": {
+        "ja": {
+          "phrases": ["稟議", "決裁"]
+        }
+      }
+    },
+    "approval.system_binding_hint": {
+      "description": "Service binding name that looks like an approval workflow system.",
+      "locales": {
+        "ja": {
+          "phrases": ["稟議"]
+        },
+        "en": {
+          "phrases": ["ringi", "approval", "workflow"]
+        }
+      }
+    },
+    "approval.system_name": {
+      "description": "Named approval / workflow system mentioned in the request (extracted).",
+      "locales": {
+        "ja": {
+          "phrases": ["サイボウズ", "稟議システム", "ジョブカン"]
+        },
+        "en": {
+          "phrases": ["workflow"]
+        },
+        "und": {
+          "phrases": [
+            "kintone",
+            "cybozu",
+            "garoon",
+            "desknet's",
+            "intra-mart",
+            "SAP",
+            "oracle",
+            "freee",
+            "salesforce",
+            "notion"
+          ]
+        }
+      }
+    },
+    "approval.vocabulary": {
+      "description": "Approval / ringi vocabulary.",
+      "locales": {
+        "ja": {
+          "phrases": ["稟議", "決裁", "承認"]
+        },
+        "en": {
+          "phrases": ["approval", "approve"]
+        }
+      }
+    },
+    "approval.workflow_system_context": {
+      "description": "Workflow / system / case-list context.",
+      "locales": {
+        "ja": {
+          "phrases": ["システム", "一覧", "案件", "申請", "ワークフロー"]
+        },
+        "en": {
+          "phrases": ["workflow", "system"]
+        }
+      }
+    },
+    "booking_category.activity": {
+      "description": "Booking category: activity / tickets.",
+      "locales": {
+        "ja": {
+          "phrases": ["体験", "チケット", "イベント", "アクティビティ", "遊び", "観光"]
+        }
+      }
+    },
+    "booking_category.family": {
+      "description": "Booking category: family logistics.",
+      "locales": {
+        "ja": {
+          "phrases": ["家族", "子ども", "子供", "送迎", "学校", "習い事", "保育"]
+        }
+      }
+    },
+    "booking_category.gifts": {
+      "description": "Booking category: gifts.",
+      "locales": {
+        "ja": {
+          "phrases": ["ギフト", "プレゼント", "誕生日", "記念日", "花", "贈り物"]
+        }
+      }
+    },
+    "booking_category.home_service": {
+      "description": "Booking category: home service.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "家事代行",
+            "修理",
+            "配送",
+            "設置",
+            "片付け",
+            "清掃",
+            "水道",
+            "電気",
+            "引越し"
+          ]
+        }
+      }
+    },
+    "booking_category.hotel": {
+      "description": "Booking category: hotel / travel stay.",
+      "locales": {
+        "ja": {
+          "phrases": ["ホテル", "宿泊", "温泉", "宿", "沖縄", "旅行"]
+        }
+      }
+    },
+    "booking_category.medical": {
+      "description": "Booking category: medical appointment.",
+      "locales": {
+        "ja": {
+          "phrases": ["病院", "歯医者", "クリニック", "診療", "健診", "受診", "予約"]
+        }
+      }
+    },
+    "booking_category.restaurant": {
+      "description": "Booking category: restaurant / meal.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "レストラン",
+            "飲食",
+            "居酒屋",
+            "寿司",
+            "焼肉",
+            "ランチ",
+            "ディナー",
+            "食事",
+            "ご飯"
+          ]
+        }
+      }
+    },
+    "booking_category.shopping": {
+      "description": "Booking category: shopping.",
+      "locales": {
+        "ja": {
+          "phrases": ["買って", "購入", "日用品", "買い物", "まとめて買", "通販", "楽天"]
+        },
+        "en": {
+          "phrases": ["shopping"]
+        },
+        "und": {
+          "phrases": ["amazon"]
+        }
+      }
+    },
+    "booking_category.subscription": {
+      "description": "Booking category: subscription management.",
+      "locales": {
+        "ja": {
+          "phrases": ["サブスク", "解約", "更新", "退会", "定期"]
+        }
+      }
+    },
+    "browser.click_verb": {
+      "description": "Verb: click / tap.",
+      "locales": {
+        "ja": {
+          "phrases": ["押して", "クリック"]
+        },
+        "en": {
+          "phrases": ["click", "tap"]
+        }
+      }
+    },
+    "browser.confirm_affirmative": {
+      "description": "Whole-utterance affirmative that confirms the first candidate.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": ["それ", "はい", "そのまま", "それで", "お願いします"]
+        },
+        "en": {
+          "phrases": ["yes", "ok"]
+        }
+      }
+    },
+    "browser.control_back": {
+      "description": "Control command: go back.",
+      "locales": {
+        "ja": {
+          "phrases": ["戻って"]
+        },
+        "en": {
+          "phrases": ["back"]
+        }
+      }
+    },
+    "browser.control_command": {
+      "description": "Utterance starts with a control command (stop / pause / resume / back).",
+      "match": "prefix_word",
+      "locales": {
+        "ja": {
+          "phrases": ["止めて", "停止", "キャンセル", "やめて", "続けて", "再開", "戻って"]
+        },
+        "en": {
+          "phrases": ["stop", "cancel", "pause", "resume", "back"]
+        }
+      }
+    },
+    "browser.control_pause": {
+      "description": "Control command: pause.",
+      "locales": {
+        "en": {
+          "phrases": ["pause"]
+        }
+      }
+    },
+    "browser.control_resume": {
+      "description": "Control command: resume.",
+      "locales": {
+        "ja": {
+          "phrases": ["続けて", "再開"]
+        },
+        "en": {
+          "phrases": ["resume"]
+        }
+      }
+    },
+    "browser.enter_key": {
+      "description": "Key name: Enter / Return.",
+      "locales": {
+        "ja": {
+          "phrases": ["エンター"]
+        },
+        "en": {
+          "phrases": ["enter", "return"]
+        }
+      }
+    },
+    "browser.fill_verb": {
+      "description": "Verb: type / fill.",
+      "locales": {
+        "ja": {
+          "phrases": ["入力", "入れて"]
+        },
+        "en": {
+          "phrases": ["type", "fill"]
+        }
+      }
+    },
+    "browser.open_verb": {
+      "description": "Verb: open / show.",
+      "locales": {
+        "ja": {
+          "phrases": ["開いて", "表示して"]
+        },
+        "en": {
+          "phrases": ["open", "show"]
+        }
+      }
+    },
+    "browser.ordinal_first": {
+      "description": "Whole-utterance ordinal: first.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": ["最初", "1つ目", "一つ目", "1番目", "一番目"]
+        },
+        "en": {
+          "phrases": ["first"]
+        }
+      }
+    },
+    "browser.ordinal_second": {
+      "description": "Whole-utterance ordinal: second.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": ["2つ目", "二つ目", "2番目", "二番目"]
+        },
+        "en": {
+          "phrases": ["second"]
+        }
+      }
+    },
+    "browser.ordinal_third": {
+      "description": "Whole-utterance ordinal: third.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": ["3つ目", "三つ目", "3番目", "三番目"]
+        },
+        "en": {
+          "phrases": ["third"]
+        }
+      }
+    },
+    "browser.page_target": {
+      "description": "Navigation target: page / tab / browser / site.",
+      "locales": {
+        "ja": {
+          "phrases": ["ページ", "タブ", "ブラウザ", "サイト", "画面"]
+        },
+        "en": {
+          "phrases": ["tab", "url"]
+        },
+        "und": {
+          "phrases": ["chrome"]
+        }
+      }
+    },
+    "browser.press_verb": {
+      "description": "Verb: press.",
+      "locales": {
+        "ja": {
+          "phrases": ["押して"]
+        },
+        "en": {
+          "phrases": ["press", "enter"]
+        }
+      }
+    },
+    "browser.region_bottom_left": {
+      "description": "Screen region: bottom left.",
+      "locales": {
+        "ja": {
+          "phrases": ["左下"]
+        },
+        "en": {
+          "phrases": ["bottom left"]
+        }
+      }
+    },
+    "browser.region_bottom_right": {
+      "description": "Screen region: bottom right.",
+      "locales": {
+        "ja": {
+          "phrases": ["右下"]
+        },
+        "en": {
+          "phrases": ["bottom right"]
+        }
+      }
+    },
+    "browser.region_center": {
+      "description": "Screen region: center.",
+      "locales": {
+        "ja": {
+          "phrases": ["中央", "真ん中"]
+        },
+        "en": {
+          "phrases": ["center"]
+        }
+      }
+    },
+    "browser.region_top_left": {
+      "description": "Screen region: top left.",
+      "locales": {
+        "ja": {
+          "phrases": ["左上"]
+        },
+        "en": {
+          "phrases": ["top left"]
+        }
+      }
+    },
+    "browser.region_top_right": {
+      "description": "Screen region: top right.",
+      "locales": {
+        "ja": {
+          "phrases": ["右上"]
+        },
+        "en": {
+          "phrases": ["top right"]
+        }
+      }
+    },
+    "browser.scroll_verb": {
+      "description": "Verb: scroll.",
+      "locales": {
+        "ja": {
+          "phrases": ["スクロール"]
+        },
+        "en": {
+          "phrases": ["scroll"]
+        }
+      }
+    },
+    "browser.target_role_button": {
+      "description": "Target element role: button.",
+      "locales": {
+        "ja": {
+          "phrases": ["ボタン"]
+        },
+        "en": {
+          "phrases": ["button"]
+        }
+      }
+    },
+    "calendar_source.google": {
+      "description": "Calendar source: Google Calendar.",
+      "locales": {
+        "ja": {
+          "phrases": ["Googleカレンダー"]
+        },
+        "und": {
+          "phrases": ["Google Calendar", "calendar.google.com", "Google"]
+        }
+      }
+    },
+    "calendar_source.outlook": {
+      "description": "Calendar source: Outlook / Microsoft 365.",
+      "locales": {
+        "und": {
+          "phrases": ["Outlook", "Microsoft 365", "Microsoft", "Teams"]
+        }
+      }
+    },
+    "contextual_frame.change_action": {
+      "description": "Calendar action: change / reschedule / attend on behalf.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "調整",
+            "変更",
+            "リスケ",
+            "ずら",
+            "移動",
+            "移して",
+            "修正",
+            "入れ替え",
+            "前倒し",
+            "後ろ",
+            "見直し",
+            "再調整",
+            "詰め直し",
+            "組み直",
+            "並べ替え",
+            "再編成",
+            "再配置",
+            "整えて",
+            "代わりに参加",
+            "代理参加"
+          ]
+        },
+        "en": {
+          "phrases": ["change", "update", "resched", "reschedule"]
+        }
+      }
+    },
+    "contextual_frame.read_action": {
+      "description": "Calendar action: read / show.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "教えて",
+            "見せて",
+            "確認",
+            "見る",
+            "空き",
+            "予定",
+            "会議",
+            "ミーティング",
+            "打ち合わせ",
+            "アポイント"
+          ]
+        },
+        "en": {
+          "phrases": ["agenda", "available", "availability", "show", "see"]
+        }
+      }
+    },
+    "contextual_frame.schedule_object": {
+      "description": "Calendar object: the schedule itself (to be rearranged).",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "調整",
+            "変更",
+            "リスケ",
+            "ずら",
+            "移動",
+            "移して",
+            "修正",
+            "入れ替え",
+            "前倒し",
+            "後ろ",
+            "見直し",
+            "再調整",
+            "詰め直し",
+            "組み直",
+            "並べ替え",
+            "再編成",
+            "再配置",
+            "整えて"
+          ]
+        },
+        "en": {
+          "phrases": ["calendar", "schedule"]
+        }
+      }
+    },
+    "contextual_frame.subject_schedule_implicit": {
+      "description": "Schedule vocabulary that implies the operator as subject.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "予定",
+            "スケジュール",
+            "日程",
+            "空き時間",
+            "会議",
+            "ミーティング",
+            "アポイント",
+            "打ち合わせ",
+            "カレンダー",
+            "リスケ",
+            "調整",
+            "変更",
+            "ずら",
+            "移動",
+            "修正"
+          ]
+        },
+        "en": {
+          "phrases": ["calendar", "schedule"]
+        }
+      }
+    },
+    "execution_feedback.prefix": {
+      "description": "Leading word of an execution-feedback reply (`評価 <scenario-id>: <outcome>` / `feedback <scenario-id>: <outcome>`). Composed into the parser in libs/core/execution-feedback.ts.",
+      "locales": {
+        "ja": { "phrases": ["評価"] },
+        "en": { "phrases": ["feedback"] }
+      }
+    },
+    "contextual_frame.subject_self": {
+      "description": "Subject: the operator themself.",
+      "word_boundary": "ascii",
+      "locales": {
+        "ja": {
+          "phrases": ["私", "自分", "俺", "僕", "私の", "自分の", "本人"]
+        },
+        "en": {
+          "phrases": ["my", "me", "mine", "operator"]
+        }
+      }
+    },
+    "contextual_frame.subject_team": {
+      "description": "Subject: the team.",
+      "locales": {
+        "ja": {
+          "phrases": ["チーム", "みんな", "全員"]
+        },
+        "en": {
+          "phrases": ["team", "our"]
+        }
+      }
+    },
+    "coordination.meeting_request": {
+      "description": "Request mentions a meeting, call, facilitation or meeting minutes.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "会議",
+            "ミーティング",
+            "打ち合わせ",
+            "進行",
+            "議事録",
+            "アクションアイテム",
+            "代理参加"
+          ]
+        },
+        "en": {
+          "phrases": ["meeting", "call", "facilitate"]
+        },
+        "und": {
+          "phrases": ["Teams", "Zoom", "Meet"]
+        }
+      }
+    },
+    "coordination.schedule_request": {
+      "description": "Request mentions scheduling, calendar or rescheduling.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "スケジュール",
+            "予定",
+            "日程",
+            "リスケ",
+            "カレンダー",
+            "調整",
+            "変更",
+            "空き時間"
+          ]
+        },
+        "en": {
+          "phrases": ["resched", "reschedule", "calendar", "availability"]
+        }
+      }
+    },
+    "date_range.next_month": {
+      "description": "Relative date: next month.",
+      "locales": {
+        "ja": {
+          "phrases": ["来月"]
+        },
+        "en": {
+          "phrases": ["next month"]
+        }
+      }
+    },
+    "date_range.next_week": {
+      "description": "Relative date: next week.",
+      "locales": {
+        "ja": {
+          "phrases": ["来週"]
+        },
+        "en": {
+          "phrases": ["next week"]
+        }
+      }
+    },
+    "date_range.this_month": {
+      "description": "Relative date: this month.",
+      "locales": {
+        "ja": {
+          "phrases": ["今月"]
+        },
+        "en": {
+          "phrases": ["this month"]
+        }
+      }
+    },
+    "date_range.this_week": {
+      "description": "Relative date: this week.",
+      "locales": {
+        "ja": {
+          "phrases": ["今週"]
+        },
+        "en": {
+          "phrases": ["this week"]
+        }
+      }
+    },
+    "date_range.today": {
+      "description": "Relative date: today.",
+      "locales": {
+        "ja": {
+          "phrases": ["今日", "本日"]
+        },
+        "en": {
+          "phrases": ["today"]
+        }
+      }
+    },
+    "date_range.tomorrow": {
+      "description": "Relative date: tomorrow.",
+      "locales": {
+        "ja": {
+          "phrases": ["明日"]
+        },
+        "en": {
+          "phrases": ["tomorrow"]
+        }
+      }
+    },
+    "execution_brief.agenda_change_cue": {
+      "description": "Change cue that disqualifies a read-only agenda request.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "調整",
+            "変更",
+            "リスケ",
+            "ずら",
+            "移動",
+            "修正",
+            "入れ替え",
+            "前倒し",
+            "後ろ",
+            "見直し",
+            "再調整",
+            "詰め直し",
+            "整え",
+            "進め方",
+            "準備"
+          ]
+        },
+        "en": {
+          "phrases": ["update", "change", "resched", "reschedule", "facilitate", "preparation"]
+        }
+      }
+    },
+    "execution_brief.agenda_read_cue": {
+      "description": "Read-only cue for an agenda request (show, check, relative day).",
+      "locales": {
+        "ja": {
+          "phrases": ["教えて", "見せて", "確認", "見る", "空き", "今週", "来週", "今日", "明日"]
+        },
+        "en": {
+          "phrases": ["agenda", "available", "availability"]
+        }
+      }
+    },
+    "guided_coordination.booking": {
+      "description": "Coordination kind: booking / purchase / application.",
+      "locales": {
+        "ja": {
+          "phrases": ["予約"]
+        },
+        "en": {
+          "phrases": ["booking", "reservation", "purchase", "order", "appointment", "apply"]
+        }
+      }
+    },
+    "guided_coordination.decision_support": {
+      "description": "Coordination kind: comparison / prioritisation.",
+      "locales": {
+        "ja": {
+          "phrases": ["比較", "優先順位"]
+        },
+        "en": {
+          "phrases": ["compare", "strategy", "priorit"]
+        }
+      }
+    },
+    "guided_coordination.narrated_video": {
+      "description": "Coordination kind: narrated video.",
+      "locales": {
+        "ja": {
+          "phrases": ["動画", "ナレーション"]
+        },
+        "en": {
+          "phrases": ["video", "movie", "narrated"]
+        }
+      }
+    },
+    "guided_coordination.onboarding": {
+      "description": "Coordination kind: onboarding / setup.",
+      "locales": {
+        "ja": {
+          "phrases": ["オンボーディング", "初回設定", "初期設定"]
+        },
+        "en": {
+          "phrases": ["onboarding", "setup"]
+        }
+      }
+    },
+    "guided_coordination.presentation": {
+      "description": "Coordination kind: presentation / deck.",
+      "locales": {
+        "ja": {
+          "phrases": ["パワーポイント", "スライド", "提案書"]
+        },
+        "en": {
+          "phrases": ["ppt", "deck", "briefing pack", "presentation"]
+        },
+        "und": {
+          "phrases": ["powerpoint"]
+        }
+      }
+    },
+    "guided_coordination.proposal": {
+      "description": "Coordination kind: proposal / decision storyline.",
+      "locales": {
+        "ja": {
+          "phrases": ["提案", "ストーリー", "稟議", "意思決定"]
+        },
+        "en": {
+          "phrases": ["proposal", "storyline", "decision support"]
+        }
+      }
+    },
+    "guided_coordination.schedule": {
+      "description": "Coordination kind: schedule.",
+      "locales": {
+        "ja": {
+          "phrases": ["スケジュール", "予定", "日程", "リスケ", "調整", "変更", "空き時間"]
+        },
+        "en": {
+          "phrases": ["resched", "reschedule", "calendar", "availability"]
+        }
+      }
+    },
+    "guided_coordination.service_operation": {
+      "description": "Coordination kind: service operation / diagnosis.",
+      "locales": {
+        "ja": {
+          "phrases": ["運用"]
+        },
+        "en": {
+          "phrases": ["service", "operation", "diagnos", "inspec"]
+        }
+      }
+    },
+    "guided_coordination.travel": {
+      "description": "Coordination kind: travel.",
+      "locales": {
+        "ja": {
+          "phrases": ["旅行", "宿泊"]
+        },
+        "en": {
+          "phrases": ["travel", "trip", "tour", "hotel", "flight"]
+        }
+      }
+    },
+    "intent_contract.approval_workflow_request": {
+      "description": "Approval workflow request (create or resolve) for intent-contract shaping.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "承認を依頼",
+            "承認を申請",
+            "承認依頼",
+            "稟議",
+            "決裁",
+            "承認して",
+            "承認し",
+            "承認待ち",
+            "通して",
+            "処理して"
+          ],
+          "patterns": ["稟議.*依頼"]
+        },
+        "en": {
+          "phrases": ["approve"],
+          "patterns": ["approved?"]
+        }
+      }
+    },
+    "intent_resolution.agenda_read_verb": {
+      "description": "Read verb that raises schedule-read-agenda confidence.",
+      "locales": {
+        "ja": {
+          "phrases": ["教えて", "見せて", "確認", "見る", "空き"]
+        },
+        "en": {
+          "phrases": ["show", "see", "check"]
+        }
+      }
+    },
+    "intent_resolution.browser_field_hint": {
+      "description": "Form field vocabulary.",
+      "locales": {
+        "ja": {
+          "phrases": ["欄", "フィールド", "入力フィールド", "フォーム"]
+        },
+        "en": {
+          "phrases": ["field", "form", "input", "textbox", "email"]
+        }
+      }
+    },
+    "intent_resolution.browser_fill_verb": {
+      "description": "Verb asking to type / fill / paste into a field.",
+      "locales": {
+        "ja": {
+          "phrases": ["入力", "入れて", "記入", "貼り付け"]
+        },
+        "en": {
+          "phrases": ["type", "fill", "enter", "paste"]
+        }
+      }
+    },
+    "intent_resolution.meeting_proxy_cue": {
+      "description": "Meeting proxy / facilitation cue (routes away from schedule-coordination).",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "代わりに参加",
+            "代理参加",
+            "ファシリテート",
+            "進行",
+            "議事録",
+            "アクションアイテム"
+          ]
+        },
+        "en": {
+          "phrases": ["proxy", "facilitate"]
+        }
+      }
+    },
+    "intent_resolution.schedule_coordination_topic": {
+      "description": "Schedule / participant vocabulary for schedule-coordination.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "予定",
+            "スケジュール",
+            "日程",
+            "空き時間",
+            "会議",
+            "ミーティング",
+            "打ち合わせ",
+            "アポイント",
+            "参加者",
+            "全員",
+            "合わせて"
+          ]
+        },
+        "en": {
+          "phrases": ["calendar", "schedule"]
+        }
+      }
+    },
+    "mission_lifecycle.gap_completion": {
+      "description": "Gap text mentions completion / archive.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["完了", "終了"]
+        },
+        "en": {
+          "phrases": ["complet", "finish", "archive"]
+        }
+      }
+    },
+    "mission_lifecycle.gap_distillation": {
+      "description": "Gap text mentions distillation.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["蒸留"]
+        },
+        "en": {
+          "phrases": ["distill"]
+        }
+      }
+    },
+    "mission_lifecycle.gap_lifecycle": {
+      "description": "Gap text mentions the mission lifecycle / completion.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "patterns": ["mission.*(?:完了|終了)", "ミッション.*ライフサイクル"]
+        },
+        "en": {
+          "patterns": ["mission\\s+lifecycle"]
+        }
+      }
+    },
+    "mission_lifecycle.gap_verification": {
+      "description": "Gap text mentions verification.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["検証"]
+        },
+        "en": {
+          "phrases": ["verif"]
+        }
+      }
+    },
+    "mission_team.missing_design_system": {
+      "description": "Request needs a brand / design system reference.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["デザインシステム", "ブランド"]
+        },
+        "en": {
+          "phrases": ["brand", "design system"]
+        }
+      }
+    },
+    "mission_team.missing_reference_context": {
+      "description": "Request refers to earlier context (\"same as before\").",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["前と同じ", "それと同じ", "同様に"]
+        },
+        "en": {
+          "phrases": ["same as", "as before"]
+        }
+      }
+    },
+    "mission_team.missing_voice_profile": {
+      "description": "Request needs the operator voice profile.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["自分の声", "私の声"]
+        },
+        "en": {
+          "phrases": ["my voice", "voice clone"]
+        }
+      }
+    },
+    "mission_team.role_hint_experience_designer": {
+      "description": "Optional role hint: experience designer.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["デザイン", "画面", "体験"]
+        },
+        "en": {
+          "phrases": ["ux", "ui", "design", "experience"]
+        }
+      }
+    },
+    "mission_team.role_hint_operator": {
+      "description": "Optional role hint: operator.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["運用", "監視", "本番"]
+        },
+        "en": {
+          "phrases": ["release", "deploy", "rollback", "runtime", "runbook"]
+        }
+      }
+    },
+    "mission_team.role_hint_product_strategist": {
+      "description": "Optional role hint: product strategist.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["企画", "戦略"]
+        },
+        "en": {
+          "phrases": ["strategy", "roadmap", "product"],
+          "patterns": ["go[-\\s]?to[-\\s]?market"]
+        }
+      }
+    },
+    "mission_team.role_hint_surface_liaison": {
+      "description": "Optional role hint: surface liaison.",
+      "flags": "u",
+      "locales": {
+        "ja": {
+          "phrases": ["連絡", "通知", "報告"]
+        },
+        "en": {
+          "phrases": ["announcement", "user update"]
+        },
+        "und": {
+          "phrases": ["slack", "chronos"]
+        }
+      }
+    },
+    "organization.approval_sensitive_action": {
+      "description": "Utterance asks for an approval-sensitive action (approve, change, delete, disable, permissions).",
+      "locales": {
+        "ja": {
+          "phrases": ["承認", "決裁", "変更", "削除", "停止", "権限"]
+        },
+        "en": {
+          "phrases": ["approve", "approval", "change", "delete", "disable"]
+        }
+      }
+    },
+    "presentation.slide_count_unit": {
+      "description": "Unit word that follows a slide count (callers prefix the number capture).",
+      "locales": {
+        "ja": {
+          "phrases": ["枚"]
+        },
+        "en": {
+          "patterns": ["slides?"]
+        }
+      }
+    },
+    "procedure_repair.handoff": {
+      "description": "Failure text indicates navigation / origin hand-off.",
+      "flags": "",
+      "locales": {
+        "ja": {
+          "phrases": ["ページ遷移", "クロスオリジン"],
+          "patterns": ["別.*origin"]
+        },
+        "en": {
+          "phrases": ["handoff", "navigation"],
+          "patterns": ["origin.changed", "tab.changed"]
+        }
+      }
+    },
+    "procedure_repair.mfa": {
+      "description": "Failure text indicates an MFA / one-time-code challenge.",
+      "flags": "",
+      "locales": {
+        "ja": {
+          "phrases": ["認証コード", "二段階", "ワンタイム"]
+        },
+        "en": {
+          "phrases": ["mfa", "otp", "authenticat"],
+          "patterns": ["one.time.pass"]
+        }
+      }
+    },
+    "procedure_repair.new_popup": {
+      "description": "Failure text indicates a popup / modal / dialog.",
+      "flags": "",
+      "locales": {
+        "ja": {
+          "phrases": ["ポップアップ", "ダイアログ", "モーダル"]
+        },
+        "en": {
+          "phrases": ["popup", "modal", "dialog", "overlay", "alert"]
+        }
+      }
+    },
+    "project.bootstrap_kind_document_program": {
+      "description": "Project bootstrap kind: document program.",
+      "locales": {
+        "ja": {
+          "phrases": ["試験計画", "報告書", "資料"]
+        },
+        "en": {
+          "phrases": ["proposal", "document", "deck", "report"]
+        }
+      }
+    },
+    "project.bootstrap_kind_web_service": {
+      "description": "Project bootstrap kind: web service / app.",
+      "locales": {
+        "ja": {
+          "phrases": ["webサービス", "アプリ", "サイト"]
+        },
+        "en": {
+          "phrases": ["application", "saas"],
+          "patterns": ["web.?service"]
+        }
+      }
+    },
+    "project.bootstrap_request": {
+      "description": "Request to start a new project, service or business.",
+      "locales": {
+        "ja": {
+          "phrases": ["Webサービス", "新しいプロジェクト", "新規プロジェクト", "新規事業"],
+          "patterns": ["プロジェクト.*(?:作って|立ち上げ|始め)"]
+        },
+        "en": {
+          "phrases": ["build a service", "create a service"]
+        }
+      }
+    },
+    "schedule.agenda_topic": {
+      "description": "Text refers to an agenda, calendar events, meetings or availability.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "予定",
+            "スケジュール",
+            "日程",
+            "空き時間",
+            "会議",
+            "ミーティング",
+            "打ち合わせ",
+            "アポイント"
+          ]
+        },
+        "en": {
+          "phrases": ["agenda", "availability", "calendar"]
+        }
+      }
+    },
+    "schedule_coordination.meeting_topic": {
+      "description": "Meeting vocabulary for the meeting-operations hand-off.",
+      "locales": {
+        "ja": {
+          "phrases": ["会議", "ミーティング", "打ち合わせ"]
+        },
+        "en": {
+          "phrases": ["meeting", "call"]
+        },
+        "und": {
+          "phrases": ["Teams", "Zoom", "Meet"]
+        }
+      }
+    },
+    "schedule_coordination.mode_adjust": {
+      "description": "Schedule coordination mode: adjust.",
+      "locales": {
+        "ja": {
+          "phrases": ["変更", "修正", "直し", "調整"]
+        },
+        "en": {
+          "phrases": ["adjust"]
+        }
+      }
+    },
+    "schedule_coordination.mode_reschedule": {
+      "description": "Schedule coordination mode: reschedule.",
+      "locales": {
+        "ja": {
+          "phrases": ["リスケ"]
+        },
+        "en": {
+          "phrases": ["resched", "reschedule"]
+        }
+      }
+    },
+    "service.log_request": {
+      "description": "Service operation asks for logs.",
+      "locales": {
+        "ja": {
+          "phrases": ["ログ"]
+        },
+        "en": {
+          "patterns": ["logs?"]
+        }
+      }
+    },
+    "voice_input.core_vocabulary": {
+      "description": "Core voice-input vocabulary.",
+      "locales": {
+        "ja": {
+          "phrases": ["音声入力"]
+        },
+        "en": {
+          "phrases": ["dictation"]
+        }
+      }
+    },
+    "voice_input.enable_cue": {
+      "description": "Enable / turn-on cue.",
+      "locales": {
+        "ja": {
+          "phrases": ["オン", "有効"]
+        },
+        "en": {
+          "phrases": ["on", "enable"]
+        }
+      }
+    },
+    "voice_input.request": {
+      "description": "Voice-input / dictation toggle request.",
+      "locales": {
+        "ja": {
+          "phrases": ["音声入力", "入力モード", "マイク入力"]
+        },
+        "en": {
+          "phrases": ["dictation", "voice input"]
+        }
+      }
+    }
+  }
+}

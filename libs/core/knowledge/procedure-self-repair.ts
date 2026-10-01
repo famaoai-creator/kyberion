@@ -11,6 +11,7 @@ import {
 } from '../browser/browser-extension-bridge.js';
 import type { CompiledBrowserStep } from '../browser/browser-recording-compiler.js';
 import { type ProcedureDelta } from './procedure-types.js';
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -52,15 +53,9 @@ export function classifyFailure(
   const ctx = (step?.summary ?? '').toLowerCase();
   const combined = `${msg} ${ctx}`;
 
-  if (/mfa|otp|one.time.pass|authenticat|認証コード|二段階|ワンタイム/.test(combined)) return 'mfa';
-  if (/popup|modal|dialog|overlay|alert|ポップアップ|ダイアログ|モーダル/.test(combined))
-    return 'new_popup';
-  if (
-    /handoff|navigation|origin.changed|tab.changed|別.*origin|ページ遷移|クロスオリジン/.test(
-      combined
-    )
-  )
-    return 'handoff';
+  if (matchesIntentPhrase(combined, 'procedure_repair.mfa')) return 'mfa';
+  if (matchesIntentPhrase(combined, 'procedure_repair.new_popup')) return 'new_popup';
+  if (matchesIntentPhrase(combined, 'procedure_repair.handoff')) return 'handoff';
   return 'ambiguity';
 }
 

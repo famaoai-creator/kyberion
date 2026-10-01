@@ -88,6 +88,20 @@ describe('execution feedback loop', () => {
     });
   });
 
+  it('parses the English feedback prefix and rejects look-alikes', () => {
+    expect(
+      parseExecutionFeedbackText('feedback use-case-schedule-read-agenda: dissatisfied: wrong week')
+    ).toMatchObject({
+      scenario_id: 'use-case-schedule-read-agenda',
+      outcome: 'dissatisfied',
+      correction: 'wrong week',
+    });
+    expect(parseExecutionFeedbackText('Feedback use-case-a: satisfied')).toMatchObject({
+      outcome: 'satisfied',
+    });
+    expect(parseExecutionFeedbackText('feedbacks use-case-a: satisfied')).toBeNull();
+  });
+
   it('rejects an invalid existing feedback store instead of resetting it', () => {
     safeWriteFile(feedbackPath, '{"version":"1.0.0","entries":[{}]}\n');
 
