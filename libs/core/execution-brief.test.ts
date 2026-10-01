@@ -46,7 +46,11 @@ describe('execution-brief', () => {
       intentId: 'meeting-operations',
     });
 
-    const bindings = (brief as any).input_bindings as Array<{ id: string; type: string; label: string }>;
+    const bindings = (brief as any).input_bindings as Array<{
+      id: string;
+      type: string;
+      label: string;
+    }>;
     expect(Array.isArray(bindings)).toBe(true);
     expect(bindings.length).toBe(brief.missing_inputs.length);
 
@@ -85,7 +89,9 @@ describe('execution-brief', () => {
     });
 
     expect(brief.archetype_id).toBe('capture_photo-execution');
-    expect(brief.target_actuators).toContain('virtual-camera-bridge');
+    // The bridge is a runtime component, not an actuator (RS-07).
+    expect(brief.support_components).toContain('virtual-camera-bridge');
+    expect(brief.target_actuators).not.toContain('virtual-camera-bridge');
     expect(brief.target_actuators).toContain('vision-actuator');
     expect(brief.target_actuators).toContain('artifact-actuator');
   });

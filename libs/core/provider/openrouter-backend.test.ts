@@ -19,7 +19,12 @@ vi.mock('../secure-io.js', async (importOriginal) => {
         return actual.safeReadFile(filePath, options);
       return 'file contents';
     }),
-    safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
+    // RS-01: governed registry directories (reasoning-providers) stay real.
+    safeReaddir: vi.fn((dirPath: string) =>
+      String(dirPath).includes('/knowledge/product/')
+        ? actual.safeReaddir(dirPath)
+        : ['a.txt', 'b.txt']
+    ),
     safeWriteFile: vi.fn(),
   };
 });

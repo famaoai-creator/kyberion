@@ -37,8 +37,9 @@ export function resolveClaudeCliFallbackCandidates(
 
   const wellKnown = [
     path.join(home, '.local', 'bin', 'claude'),
-    '/opt/homebrew/bin/claude',
-    '/usr/local/bin/claude',
+    ...[env.HOMEBREW_PREFIX?.trim(), '/opt/homebrew', '/usr/local']
+      .filter((prefix): prefix is string => Boolean(prefix))
+      .map((prefix) => path.join(prefix, 'bin', 'claude')),
   ];
   const pathCandidates = (env.PATH ?? '')
     .split(path.delimiter)

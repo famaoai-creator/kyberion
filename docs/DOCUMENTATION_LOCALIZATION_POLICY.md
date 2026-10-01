@@ -85,7 +85,7 @@ are caught by a ratchet, not by hope: `pnpm check -- --only i18n`
 and fails only on an _increase_ — existing debt is allowed to shrink over time but never grow.
 `pnpm check -- --only catalogs` is the companion gate for the catalog itself (missing required-locale
 entries, undefined/unused key references, placeholder mismatches across locales).
-`pnpm report:i18n-coverage` is a related but distinct instrument: it reports per-locale,
+`pnpm i18n:report` is a related but distinct instrument: it reports per-locale,
 per-namespace coverage percentages and the specific missing keys, which is what you read when
 deciding whether a still-growing locale is ready to be promoted into `required_locales` — it is
 informational and never fails a build, unlike the two gates above.

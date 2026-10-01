@@ -58,7 +58,7 @@ export function generateOnboardingRunbookSkill(
     '',
     '- Keep credentials in the governed connection store; never copy secret values into this skill or a prompt.',
     '- Human approval remains required for contracts, payments, external publication, and authority changes.',
-    '- Use `pnpm customer:switch <slug>` before operating on a customer overlay.',
+    '- Use `pnpm stance:switch <slug>` before operating on a customer overlay.',
     '- Treat this file as a generated runbook skill: update onboarding inputs and regenerate instead of editing identity facts here.',
     '',
     `Generated at: ${generatedAt}`,

@@ -10,6 +10,7 @@
  */
 
 import { pathResolver } from './path-resolver.js';
+import { t } from './t.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnv as getFoundationRegisteredEnv } from './foundation/env.js';
 
@@ -183,10 +184,7 @@ export function formatEnvValidationReport(report: EnvValidationReport): string[]
     lines.push(`  ⚠ ${issue.name}: ${issue.issue}`);
   }
   if (report.unknown.length > 0) {
-    lines.push(
-      `  ⚠ unregistered KYBERION_* variables set: ${report.unknown.join(', ')} ` +
-        '(register via pnpm generate:env-registry)'
-    );
+    lines.push(`  ⚠ ${t('cli:cli_env_unknown_variables', { names: report.unknown.join(', ') })}`);
   }
   if (report.undocumented.length > 0) {
     lines.push(
@@ -195,4 +193,78 @@ export function formatEnvValidationReport(report: EnvValidationReport): string[]
     );
   }
   return lines;
+}
+
+export interface StartupEnvReport {
+  /** Fatal issues: required-but-missing, invalid values of known variables, or (strict) unknown names. */
+  errors: EnvValidationIssue[];
+  /** Operator-facing diagnostic lines (what — why | next | evidence) for tolerated unknown names. */
+  warnings: string[];
+  strict: boolean;
+}
+
+function editDistance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+/** Closest registered names to an unknown variable (case-insensitive, bounded distance). */
+export function suggestRegisteredEnvNames(
+  name: string,
+  registered: readonly string[],
+  limit = 3
+): string[] {
+  const needle = name.toUpperCase();
+  const maxDistance = Math.max(2, Math.floor(needle.length / 4));
+  return registered
+    .map((candidate) => ({ candidate, distance: editDistance(needle, candidate.toUpperCase()) }))
+    .filter((entry) => entry.distance <= maxDistance)
+    .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate))
+    .slice(0, limit)
+    .map((entry) => entry.candidate);
+}
+
+function isTruthyFlag(value: string | undefined): boolean {
+  return value !== undefined && value !== '' && !/^(0|false|no|off)$/i.test(value.trim());
+}
+
+/**
+ * Startup policy: an explicit KYBERION_ENV_REGISTRY_STRICT wins; otherwise
+ * strict only in CI. Outside CI, unknown KYBERION_* names become a single
+ * diagnostic warning while invalid values of known variables still fail.
+ */
+export function validateStartupEnv(
+  env: Record<string, string | undefined> = process.env,
+  entries: EnvRegistryValidationEntry[] = loadEnvRegistryEntries()
+): StartupEnvReport {
+  const explicit = env.KYBERION_ENV_REGISTRY_STRICT;
+  const strict =
+    explicit !== undefined && explicit !== '' ? isTruthyFlag(explicit) : isTruthyFlag(env.CI);
+  const report = validateEnvAgainstRegistry(entries, env, { strict: true });
+  if (strict) return { errors: report.errors, warnings: [], strict };
+  const errors = report.errors.filter((issue) => issue.issue !== 'variable is not registered');
+  // Without strict, type mismatches of known variables must still fail (they were promoted above).
+  const warnings: string[] = [];
+  if (report.unknown.length > 0) {
+    const names = entries.map((entry) => entry.name);
+    const hints = report.unknown.map((name) => {
+      const near = suggestRegisteredEnvNames(name, names);
+      return near.length > 0 ? `${name} (did you mean ${near.join(' / ')}?)` : name;
+    });
+    warnings.push(
+      `Unregistered KYBERION_* variable(s): ${hints.join(', ')} — not in the env registry, so they are ignored by validation and may be typos | ` +
+        'next: unset or fix the name, or register it with `pnpm generate:env-registry`; set KYBERION_ENV_REGISTRY_STRICT=1 to make this fatal | ' +
+        'evidence: knowledge/product/governance/env-registry.json'
+    );
+  }
+  return { errors, warnings, strict };
 }

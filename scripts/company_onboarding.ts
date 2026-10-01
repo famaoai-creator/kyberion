@@ -344,7 +344,7 @@ function flag(argv: string[], name: string): string | undefined {
 export function main(argv: string[], print: (value: unknown) => void = () => undefined): number {
   if (argv.includes('--help') || argv.length === 0) {
     print(
-      'Usage: pnpm onboard company --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
+      'Usage: pnpm onboarding company --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
     );
     return argv.length === 0 ? 1 : 0;
   }

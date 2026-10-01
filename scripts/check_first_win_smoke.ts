@@ -15,7 +15,7 @@ const CANONICAL_FIRST_WIN_COMMANDS = [
   'pnpm install',
   'pnpm build',
   'pnpm env:bootstrap --manifest kyberion-toolchain',
-  'pnpm doctor',
+  'pnpm kyberion doctor',
   'pnpm pipeline --input pipelines/verify-session.json',
 ] as const;
 
@@ -30,7 +30,7 @@ const RULES: SmokeRule[] = [
   {
     file: 'README.md',
     required: [
-      'pnpm doctor',
+      'pnpm kyberion doctor',
       'pnpm pipeline --input pipelines/voice-hello.json',
       'pnpm pipeline --input pipelines/verify-session.json',
       'active/shared/tmp/first-win-session.png',
@@ -39,7 +39,7 @@ const RULES: SmokeRule[] = [
   {
     file: 'docs/QUICKSTART.md',
     required: [
-      'pnpm doctor',
+      'pnpm kyberion doctor',
       'pnpm pipeline --input pipelines/voice-hello.json',
       'pnpm pipeline --input pipelines/verify-session.json',
       'active/shared/tmp/first-win-session.png',
@@ -54,7 +54,7 @@ const RULES: SmokeRule[] = [
     required: [
       'pnpm kyberion setup report --persona first-time-user',
       'pnpm surfaces repair',
-      'pnpm doctor',
+      'pnpm kyberion doctor',
     ],
   },
   {
