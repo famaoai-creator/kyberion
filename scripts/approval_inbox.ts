@@ -1,3 +1,5 @@
+import { coerceLocale } from '@agent/core/locale-normalize';
+import { resolveLocale } from '@agent/core/locale';
 import {
   buildDecisionDigest,
   listAutonomousActionNotices,
@@ -116,7 +118,11 @@ function runCharterReport(
   context: { argv: string[]; json: boolean; print: (text: string) => void },
   now: number
 ) {
-  const locale = readFlag(context.argv, '--locale') === 'en' ? 'en' : 'ja';
+  const locale = coerceLocale(
+    readFlag(context.argv, '--locale') ?? resolveLocale(),
+    ['en', 'ja'] as const,
+    'en'
+  );
   const hours = readHours(context.argv);
   const at = new Date(now);
   const send = context.argv.includes('--send');
@@ -159,7 +165,11 @@ export const runApprovalInbox = defineScript({
       );
     }
     const digest = collectDecisionDigest({ now, hours: readHours(context.argv) });
-    const locale = readFlag(context.argv, '--locale') === 'en' ? 'en' : 'ja';
+    const locale = coerceLocale(
+      readFlag(context.argv, '--locale') ?? resolveLocale(),
+      ['en', 'ja'] as const,
+      'en'
+    );
     const text = renderDecisionDigestText(digest, { locale, timezone: operatorTimezone() });
     let sent = false;
     if (context.argv.includes('--send')) {

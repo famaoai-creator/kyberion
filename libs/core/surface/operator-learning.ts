@@ -1,3 +1,4 @@
+import { detectTextLocale, localeToBcp47 } from '../locale-normalize.js';
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from '../foundation/ajv.js';
@@ -636,7 +637,8 @@ function inferApprovalThresholds(intent?: StandardIntentDefinition): string[] {
 }
 
 function maybeJaLocale(value: string): string | undefined {
-  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(value) ? 'ja-JP' : undefined;
+  const detected = detectTextLocale(value);
+  return detected === 'ja' ? localeToBcp47(detected) : undefined;
 }
 
 function withDefinedValues<T extends Record<string, unknown>>(value: T): Partial<T> {

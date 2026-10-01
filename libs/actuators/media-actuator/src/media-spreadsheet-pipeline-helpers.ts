@@ -12,11 +12,14 @@ import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy'
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
 import { resolveMediaToneStyle } from '@agent/core/media/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
+import { semanticToken } from '@agent/core/semantic-design-tokens';
 import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
 import { hasStructured } from './media-structured-content.js';
 import { appendStructuredXlsxSections } from './media-structured-xlsx.js';
 import { columnNumberToLetter, inferPrimitiveCellType } from './media-structured-xlsx.js';
 export { columnNumberToLetter, inferPrimitiveCellType };
+
+const tok = (name: string): string => semanticToken('spreadsheet', name);
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => MediaTheme | null;
@@ -371,12 +374,12 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 name: template?.fonts?.body || 'Aptos',
                 size: 10,
                 bold: true,
-                color: { rgb: '#166534' },
+                color: { rgb: tok('status.success.text') },
               },
               fill: {
                 patternType: 'solid',
-                fgColor: { rgb: colors.success || '#DCFCE7' },
-                bgColor: { rgb: colors.success || '#DCFCE7' },
+                fgColor: { rgb: colors.success || tok('status.success.fill') },
+                bgColor: { rgb: colors.success || tok('status.success.fill') },
               },
             });
           } else if (toneName === 'warning') {
@@ -385,12 +388,12 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 name: template?.fonts?.body || 'Aptos',
                 size: 10,
                 bold: true,
-                color: { rgb: '#92400E' },
+                color: { rgb: tok('status.warning.text') },
               },
               fill: {
                 patternType: 'solid',
-                fgColor: { rgb: colors.warning || '#FEF3C7' },
-                bgColor: { rgb: colors.warning || '#FEF3C7' },
+                fgColor: { rgb: colors.warning || tok('status.warning.fill') },
+                bgColor: { rgb: colors.warning || tok('status.warning.fill') },
               },
             });
           } else if (toneName === 'danger') {
@@ -399,12 +402,12 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 name: template?.fonts?.body || 'Aptos',
                 size: 10,
                 bold: true,
-                color: { rgb: '#991B1B' },
+                color: { rgb: tok('status.danger.text') },
               },
               fill: {
                 patternType: 'solid',
-                fgColor: { rgb: colors.danger || '#FEE2E2' },
-                bgColor: { rgb: colors.danger || '#FEE2E2' },
+                fgColor: { rgb: colors.danger || tok('status.danger.fill') },
+                bgColor: { rgb: colors.danger || tok('status.danger.fill') },
               },
             });
           } else {
@@ -413,12 +416,12 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 name: template?.fonts?.body || 'Aptos',
                 size: 10,
                 bold: true,
-                color: { rgb: '#111827' },
+                color: { rgb: tok('status.info.text') },
               },
               fill: {
                 patternType: 'solid',
-                fgColor: { rgb: colors.info || '#DBEAFE' },
-                bgColor: { rgb: colors.info || '#DBEAFE' },
+                fgColor: { rgb: colors.info || tok('status.info.fill') },
+                bgColor: { rgb: colors.info || tok('status.info.fill') },
               },
             });
           }
@@ -459,9 +462,13 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
             name: template?.fonts?.body || 'Aptos',
             size: 10,
             bold: true,
-            color: { rgb: '#7F1D1D' },
+            color: { rgb: tok('status.overdue.text') },
           },
-          fill: { patternType: 'solid', fgColor: { rgb: '#FECACA' }, bgColor: { rgb: '#FECACA' } },
+          fill: {
+            patternType: 'solid',
+            fgColor: { rgb: tok('status.overdue.fill') },
+            bgColor: { rgb: tok('status.overdue.fill') },
+          },
         });
         conditionalFormats.push({
           sqref: `A${dataStartIndex}:${lastColumnLetter}${Math.max(dataStartIndex + rows.length - 1, dataStartIndex)}`,
@@ -479,10 +486,10 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
     }
 
     const defaultTone = String(template?.tones?.default || 'info');
-    const infoTextColor = String(toneCatalog.info?.text_color || '#111827');
-    const successTextColor = String(toneCatalog.success?.text_color || '#166534');
-    const warningTextColor = String(toneCatalog.warning?.text_color || '#92400E');
-    const dangerTextColor = String(toneCatalog.danger?.text_color || '#991B1B');
+    const infoTextColor = String(toneCatalog.info?.text_color || tok('status.info.text'));
+    const successTextColor = String(toneCatalog.success?.text_color || tok('status.success.text'));
+    const warningTextColor = String(toneCatalog.warning?.text_color || tok('status.warning.text'));
+    const dangerTextColor = String(toneCatalog.danger?.text_color || tok('status.danger.text'));
     const overviewRows: any[] = [
       {
         index: 1,
@@ -683,12 +690,12 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
       theme: {
         name: 'Tracker Theme',
         colors: {
-          dk1: String(colors.primary || '#0F172A').replace('#', ''),
-          lt1: String(colors.background || '#FFFFFF').replace('#', ''),
-          dk2: String(colors.secondary || '#334155').replace('#', ''),
-          lt2: String(colors.muted || '#F8FAFC').replace('#', ''),
-          accent1: String(colors.accent || '#2563EB').replace('#', ''),
-          accent2: String(colors.secondary || '#334155').replace('#', ''),
+          dk1: String(colors.primary || tok('sheet.primary')).replace('#', ''),
+          lt1: String(colors.background || tok('sheet.background')).replace('#', ''),
+          dk2: String(colors.secondary || tok('sheet.secondary')).replace('#', ''),
+          lt2: String(colors.muted || tok('sheet.muted')).replace('#', ''),
+          accent1: String(colors.accent || tok('sheet.accent')).replace('#', ''),
+          accent2: String(colors.secondary || tok('sheet.secondary')).replace('#', ''),
           accent3: '7C3AED',
           accent4: 'EA580C',
           accent5: 'DC2626',
@@ -702,33 +709,37 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
           {
             name: template?.fonts?.body || 'Aptos',
             size: 10,
-            color: { rgb: colors.text || '#111827' },
+            color: { rgb: colors.text || tok('sheet.text') },
           },
           {
             name: template?.fonts?.heading || 'Aptos',
             size: 22,
             bold: true,
-            color: { rgb: '#FFFFFF' },
+            color: { rgb: tok('sheet.header.text') },
           },
-          { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: '#E2E8F0' } },
+          {
+            name: template?.fonts?.body || 'Aptos',
+            size: 10,
+            color: { rgb: tok('sheet.header.subtext') },
+          },
         ],
         fills: [
           { patternType: 'none' },
           { patternType: 'gray125' },
-          { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } },
-          { patternType: 'solid', fgColor: { rgb: colors.info || '#DBEAFE' } },
-          { patternType: 'solid', fgColor: { rgb: colors.success || '#DCFCE7' } },
-          { patternType: 'solid', fgColor: { rgb: colors.warning || '#FEF3C7' } },
-          { patternType: 'solid', fgColor: { rgb: colors.danger || '#FEE2E2' } },
-          { patternType: 'solid', fgColor: { rgb: colors.muted || '#F8FAFC' } },
+          { patternType: 'solid', fgColor: { rgb: colors.primary || tok('sheet.primary') } },
+          { patternType: 'solid', fgColor: { rgb: colors.info || tok('status.info.fill') } },
+          { patternType: 'solid', fgColor: { rgb: colors.success || tok('status.success.fill') } },
+          { patternType: 'solid', fgColor: { rgb: colors.warning || tok('status.warning.fill') } },
+          { patternType: 'solid', fgColor: { rgb: colors.danger || tok('status.danger.fill') } },
+          { patternType: 'solid', fgColor: { rgb: colors.muted || tok('sheet.muted') } },
         ],
         borders: [
           {},
           {
-            left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-            right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-            top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-            bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+            left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+            right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+            top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+            bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
           },
         ],
         numFmts: [],
@@ -737,14 +748,14 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
             font: {
               name: template?.fonts?.body || 'Aptos',
               size: 10,
-              color: { rgb: colors.text || '#111827' },
+              color: { rgb: colors.text || tok('sheet.text') },
             },
             fill: { patternType: 'none' },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
           },
           {
@@ -752,15 +763,25 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
               name: template?.fonts?.heading || 'Aptos',
               size: 22,
               bold: true,
-              color: { rgb: '#FFFFFF' },
+              color: { rgb: tok('sheet.header.text') },
             },
-            fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } },
+            fill: {
+              patternType: 'solid',
+              fgColor: { rgb: colors.primary || tok('sheet.primary') },
+            },
             border: {},
             alignment: { horizontal: 'left', vertical: 'center' },
           },
           {
-            font: { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: '#E2E8F0' } },
-            fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } },
+            font: {
+              name: template?.fonts?.body || 'Aptos',
+              size: 10,
+              color: { rgb: tok('sheet.header.subtext') },
+            },
+            fill: {
+              patternType: 'solid',
+              fgColor: { rgb: colors.primary || tok('sheet.primary') },
+            },
             border: {},
             alignment: { horizontal: 'left', vertical: 'center' },
           },
@@ -769,14 +790,17 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
               name: template?.fonts?.body || 'Aptos',
               size: 10,
               bold: true,
-              color: { rgb: '#FFFFFF' },
+              color: { rgb: tok('sheet.header.text') },
             },
-            fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } },
+            fill: {
+              patternType: 'solid',
+              fgColor: { rgb: colors.primary || tok('sheet.primary') },
+            },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { horizontal: 'center', vertical: 'center' },
           },
@@ -791,14 +815,16 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
               patternType: 'solid',
               fgColor: {
                 rgb:
-                  colors[String(toneCatalog.info?.fill || defaultTone)] || colors.info || '#DBEAFE',
+                  colors[String(toneCatalog.info?.fill || defaultTone)] ||
+                  colors.info ||
+                  tok('status.info.fill'),
               },
             },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },
@@ -813,14 +839,16 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
               patternType: 'solid',
               fgColor: {
                 rgb:
-                  colors[String(toneCatalog.info?.fill || defaultTone)] || colors.info || '#DBEAFE',
+                  colors[String(toneCatalog.info?.fill || defaultTone)] ||
+                  colors.info ||
+                  tok('status.info.fill'),
               },
             },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },
@@ -837,14 +865,14 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 rgb:
                   colors[String(toneCatalog.success?.fill || 'success')] ||
                   colors.success ||
-                  '#DCFCE7',
+                  tok('status.success.fill'),
               },
             },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },
@@ -861,14 +889,14 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 rgb:
                   colors[String(toneCatalog.warning?.fill || 'warning')] ||
                   colors.warning ||
-                  '#FEF3C7',
+                  tok('status.warning.fill'),
               },
             },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },
@@ -885,14 +913,14 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
                 rgb:
                   colors[String(toneCatalog.danger?.fill || 'danger')] ||
                   colors.danger ||
-                  '#FEE2E2',
+                  tok('status.danger.fill'),
               },
             },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },
@@ -900,14 +928,14 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
             font: {
               name: template?.fonts?.body || 'Aptos',
               size: 10,
-              color: { rgb: colors.secondary || '#334155' },
+              color: { rgb: colors.secondary || tok('sheet.secondary') },
             },
-            fill: { patternType: 'solid', fgColor: { rgb: colors.muted || '#F8FAFC' } },
+            fill: { patternType: 'solid', fgColor: { rgb: colors.muted || tok('sheet.muted') } },
             border: {
-              left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
-              bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+              left: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              right: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              top: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
+              bottom: { style: 'thin', color: { rgb: colors.border || tok('sheet.border') } },
             },
             alignment: { vertical: 'center' },
           },

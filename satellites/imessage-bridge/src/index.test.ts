@@ -1,3 +1,4 @@
+import { runWithReplyLocale } from '@agent/core/locale';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runChannelTurn } from '@agent/core/surface/channel-adapter';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
@@ -214,7 +215,9 @@ describe('imessage bridge processing note', () => {
   it('arms the processing note inside typing.start and cancels it on stop', async () => {
     const adapter = buildIMessageChannelAdapter(MESSAGE);
 
-    const handle = await adapter.typing?.(TURN_INPUT);
+    // The turn runs inside the user's reply locale (IT-02); pin it so the
+    // assertion is independent of the host locale.
+    const handle = await runWithReplyLocale('ja', () => adapter.typing?.(TURN_INPUT));
     await vi.advanceTimersByTimeAsync(6_000);
     expect(stubs.sent).toEqual(['処理中です。少々お待ちください…']);
 

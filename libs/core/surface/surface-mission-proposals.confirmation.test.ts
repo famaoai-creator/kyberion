@@ -17,6 +17,10 @@ afterEach(() => safeRmSync(testRoot, { recursive: true, force: true }));
 
 // UX-04 acceptance 2: numbered-choice confirmation (1=create / 2=decline)
 // with generous yes/はい acceptance and an explicit decline path.
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('mission proposal confirmation grammar (UX-04)', () => {
   it('uses the shared catalog for the confirmation prompt and contract labels', () => {
     const text = buildMissionProposalConfirmationText({

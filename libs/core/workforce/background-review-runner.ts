@@ -45,6 +45,7 @@ import {
 } from '../reasoning/reasoning-backend.js';
 import { parseStructuredJson } from '../structured-reasoning.js';
 import { logger } from '../core.js';
+import { t } from '../t.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
 import {
@@ -540,12 +541,12 @@ export async function runBackgroundReviewFork(
         if (input.approvalChannel?.trim()) {
           try {
             const noticeText = [
-              'background review の提案に人間の承認が必要です。',
-              `承認要求: ${approval.id}`,
-              `候補: ${candidateId}`,
-              `返信: appr:${approval.id}:approve または appr:${approval.id}:reject`,
-              `承認: pnpm kyberion approve ${approval.id} background-review`,
-              '承認後に候補の apply を実行してください。',
+              t('mission_ops:bg_review_notice_needs_approval'),
+              t('mission_ops:bg_review_notice_request', { id: approval.id }),
+              t('mission_ops:bg_review_notice_candidate', { id: candidateId }),
+              t('mission_ops:bg_review_notice_reply', { id: approval.id }),
+              t('mission_ops:bg_review_notice_approve_cmd', { id: approval.id }),
+              t('mission_ops:bg_review_notice_apply'),
             ].join('\n');
             if (input.surface === 'presence') {
               const notification = enqueueSurfaceNotification({
