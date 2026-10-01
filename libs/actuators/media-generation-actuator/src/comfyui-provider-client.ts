@@ -1,5 +1,5 @@
 import { secureFetch } from '@agent/core/network';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { resolveComfyBaseUrl } from '@agent/core/foundation';
 
 export interface ComfyUiFetchRequest {
   method: 'GET';
@@ -20,11 +20,7 @@ export interface ComfyUiProviderClientOptions {
 }
 
 function normalizeBaseUrl(value: string | undefined): string {
-  return (
-    value ||
-    getRegisteredEnvText('KYBERION_COMFY_BASE_URL') ||
-    'http://127.0.0.1:8188'
-  ).replace(/\/+$/u, '');
+  return resolveComfyBaseUrl(value);
 }
 
 function validateProviderJobId(providerJobId: string): string {

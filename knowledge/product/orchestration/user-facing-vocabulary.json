@@ -18700,6 +18700,16 @@
       }
     },
     "surface": {
+      "surface_enable_hint": {
+        "en": "Disabled. Enable with: pnpm surfaces enable --surface {surface}",
+        "ja": "無効です。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ. Ėñȧƀŀė ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_gateway_disabled_by_default_warning": {
+        "en": "Gateway \"{surface}\" has credentials configured but is now disabled by default, so it was not started. Enable it with: pnpm surfaces enable --surface {surface}",
+        "ja": "ゲートウェイ「{surface}」は認証情報が設定済みですが、既定で無効になったため起動していません。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ɠȧŧėẇȧẏ \"{surface}\" ħȧş ƈřėḓėñŧïȧŀş ƈőñƒïɠůřėḓ ƀůŧ ïş ñőẇ ḓïşȧƀŀėḓ ƀẏ ḓėƒȧůŀŧ, şő ïŧ ẇȧş ñőŧ şŧȧřŧėḓ. Ėñȧƀŀė ïŧ ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
+      },
       "voice_hub_error_fallback": {
         "en": "I could not process that. Please try again.",
         "ja": "うまく処理できませんでした。もう一度お願いします。",
@@ -18754,6 +18764,91 @@
         "en": "A hands-on mirror for the current browser and terminal work.",
         "ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
         "qps-ploc": "⟦Ȧ ħȧñḓş-őñ ɱïřřőř ƒőř ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "surface_notes_slack_bridge": {
+        "en": "External channel ingress. Auth readiness matters before runtime repair.",
+        "ja": "外部チャネルの受け口です。復旧の前に、まず認証の準備を確認してください。",
+        "qps-ploc": "⟦Ėẋŧėřñȧŀ ƈħȧññėŀ ïñɠřėşş. Ȧůŧħ řėȧḓïñėşş ɱȧŧŧėřş ƀėƒőřė řůñŧïɱė řėṗȧïř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "surface_notes_oauth_callback_surface": {
+        "en": "Loopback-only helper for completing OAuth handshakes into personal connections.",
+        "ja": "OAuth 認証を完了し、個人の接続情報に保存するための、ローカル専用の受け口です。",
+        "qps-ploc": "⟦Ŀőőṗƀȧƈķ-őñŀẏ ħėŀṗėř ƒőř ƈőɱṗŀėŧïñɠ ŐȦůŧħ ħȧñḓşħȧķėş ïñŧő ṗėřşőñȧŀ ƈőññėƈŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "surface_notes_chronos_mirror_v2": {
+        "en": "Primary operator control UI for mission and runtime visibility.",
+        "ja": "ミッションと実行状況を確認する、主要な運用画面です。",
+        "qps-ploc": "⟦Ṗřïɱȧřẏ őṗėřȧŧőř ƈőñŧřőŀ ŮÏ ƒőř ɱïşşïőñ ȧñḓ řůñŧïɱė ṽïşïƀïŀïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_notes_presence_studio": {
+        "en": "Best suited for expressive voice / transcript feedback during first-win demos.",
+        "ja": "最初のデモで、音声や文字起こしの反応を見せるのに向いています。",
+        "qps-ploc": "⟦Ƀėşŧ şůïŧėḓ ƒőř ėẋṗřėşşïṽė ṽőïƈė / ŧřȧñşƈřïṗŧ ƒėėḓƀȧƈķ ḓůřïñɠ ƒïřşŧ-ẇïñ ḓėɱőş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "surface_notes_voice_hub": {
+        "en": "Pairs with Presence Studio. Browser and OS permissions usually fail before the runtime itself.",
+        "ja": "スタジオと組み合わせて使います。多くの場合、本体より先にブラウザや OS の権限で止まります。",
+        "qps-ploc": "⟦Ṗȧïřş ẇïŧħ Ṗřėşėñƈė Şŧůḓïő. Ƀřőẇşėř ȧñḓ ŐŞ ṗėřɱïşşïőñş ůşůȧŀŀẏ ƒȧïŀ ƀėƒőřė ŧħė řůñŧïɱė ïŧşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "surface_notes_computer_surface": {
+        "en": "Use for governed browser or terminal walkthroughs after runtime is already healthy.",
+        "ja": "実行環境が正常になってから、ブラウザやターミナルの操作を見せるときに使います。",
+        "qps-ploc": "⟦Ůşė ƒőř ɠőṽėřñėḓ ƀřőẇşėř őř ŧėřɱïñȧŀ ẇȧŀķŧħřőůɠħş ȧƒŧėř řůñŧïɱė ïş ȧŀřėȧḓẏ ħėȧŀŧħẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "surface_notes_terminal_bridge": {
+        "en": "Background bridge. Operators usually feel breakage here indirectly through control surfaces.",
+        "ja": "裏で動く中継です。不具合は、操作画面の挙動を通じて間接的に気づくことが多いです。",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ ƀřïḓɠė. Őṗėřȧŧőřş ůşůȧŀŀẏ ƒėėŀ ƀřėȧķȧɠė ħėřė ïñḓïřėƈŧŀẏ ŧħřőůɠħ ƈőñŧřőŀ şůřƒȧƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "surface_notes_mcp_server_cowork": {
+        "en": "Desktop integration surface. Good fit when the operator already lives in an MCP client.",
+        "ja": "デスクトップ連携用の窓口です。普段から MCP クライアントを使っている人に向いています。",
+        "qps-ploc": "⟦Ḓėşķŧőṗ ïñŧėɠřȧŧïőñ şůřƒȧƈė. Ɠőőḓ ƒïŧ ẇħėñ ŧħė őṗėřȧŧőř ȧŀřėȧḓẏ ŀïṽėş ïñ ȧñ ⱮƇṖ ƈŀïėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "surface_notes_default": {
+        "en": "Managed runtime surface exposed through the surface manifest catalog.",
+        "ja": "サーフェス定義から管理されている実行画面です。",
+        "qps-ploc": "⟦Ɱȧñȧɠėḓ řůñŧïɱė şůřƒȧƈė ėẋṗőşėḓ ŧħřőůɠħ ŧħė şůřƒȧƈė ɱȧñïƒėşŧ ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "surface_best_for_presence_studio": {
+        "en": "short conversation, transcript feedback, first-run launcher",
+        "ja": "短い会話、文字起こしの確認、初回の起動画面",
+        "qps-ploc": "⟦şħőřŧ ƈőñṽėřşȧŧïőñ, ŧřȧñşƈřïṗŧ ƒėėḓƀȧƈķ, ƒïřşŧ-řůñ ŀȧůñƈħėř ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "surface_best_for_voice_hub": {
+        "en": "realtime voice ingress and spoken replies",
+        "ja": "リアルタイムの音声入力と、音声での返答",
+        "qps-ploc": "⟦řėȧŀŧïɱė ṽőïƈė ïñɠřėşş ȧñḓ şṗőķėñ řėṗŀïėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "surface_best_for_chronos_mirror_v2": {
+        "en": "durable work, mission visibility, and runtime control",
+        "ja": "継続的な作業、ミッションの確認、実行の制御",
+        "qps-ploc": "⟦ḓůřȧƀŀė ẇőřķ, ɱïşşïőñ ṽïşïƀïŀïŧẏ, ȧñḓ řůñŧïɱė ƈőñŧřőŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "surface_best_for_slack_bridge": {
+        "en": "threaded remote requests and follow-up",
+        "ja": "スレッドでの遠隔依頼とフォローアップ",
+        "qps-ploc": "⟦ŧħřėȧḓėḓ řėɱőŧė řėɋůėşŧş ȧñḓ ƒőŀŀőẇ-ůṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "surface_best_for_computer_surface": {
+        "en": "guided browser and terminal walkthroughs",
+        "ja": "ブラウザとターミナルの操作案内",
+        "qps-ploc": "⟦ɠůïḓėḓ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇȧŀķŧħřőůɠħş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "surface_best_for_oauth_callback_surface": {
+        "en": "interactive OAuth callback completion",
+        "ja": "OAuth のコールバック完了",
+        "qps-ploc": "⟦ïñŧėřȧƈŧïṽė ŐȦůŧħ ƈȧŀŀƀȧƈķ ƈőɱṗŀėŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "surface_best_for_mcp_server_cowork": {
+        "en": "desktop MCP integration",
+        "ja": "デスクトップの MCP 連携",
+        "qps-ploc": "⟦ḓėşķŧőṗ ⱮƇṖ ïñŧėɠřȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "surface_best_for_default": {
+        "en": "managed runtime access",
+        "ja": "管理された実行画面へのアクセス",
+        "qps-ploc": "⟦ɱȧñȧɠėḓ řůñŧïɱė ȧƈƈėşş ŀőřėɱ ï⟧"
       }
     },
     "computer_surface": {

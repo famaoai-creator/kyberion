@@ -11,35 +11,31 @@
 import path from 'node:path';
 import { safeExec, safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import {
-  BACKEND_CAPABILITY_PROFILES,
+  backendCapabilityProfile,
   type BackendCapabilityProfile,
 } from './backend-capability-profile.js';
 import { requireSandboxEnforcement, resolveSandboxPolicy } from './shell/sandbox-policy.js';
 import {
+  PROVIDER_IDS,
   resolveProviderPermissionArgs,
-  type ProviderId,
 } from './provider/provider-permission-profiles.js';
-import { providerCliBinary } from './provider/provider-binary-map.js';
+import {
+  listCliReasoningProviderDescriptors,
+  type ReasoningProviderCli,
+} from './reasoning/reasoning-provider-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
 
-const CLI_MODES = [
-  'claude-cli',
-  'codex-cli',
-  'gemini-cli',
-  'agy-cli',
-  'grok-cli',
-  'cursor-cli',
-  'opencode-cli',
-  'devin-cli',
-  'copilot',
-] as const satisfies readonly ReasoningBackendMode[];
-
-const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = Object.fromEntries(
-  CLI_MODES.map((mode) => [mode, providerCliBinary(mode)])
-) as Record<(typeof CLI_MODES)[number], string>;
+/**
+ * RS-01: every CLI provider, its binary, probe args, bin-override env key and
+ * sandbox probe template come from the governed provider descriptors — there
+ * is no per-provider list in this module.
+ */
+function cliProviders() {
+  return listCliReasoningProviderDescriptors();
+}
 
 const BOOLEAN_CAPABILITIES = [
   'structured_output',
@@ -127,40 +123,11 @@ export interface BackendSandboxConformanceOptions {
   };
 }
 
-const SANDBOX_PROBE_PROVIDERS = [
-  { mode: 'claude-cli', provider: 'claude', binary: 'claude' },
-  { mode: 'codex-cli', provider: 'codex', binary: 'codex' },
-  { mode: 'gemini-cli', provider: 'gemini', binary: 'gemini' },
-  { mode: 'grok-cli', provider: 'grok', binary: 'grok' },
-  { mode: 'cursor-cli', provider: 'cursor', binary: 'cursor-agent' },
-  { mode: 'opencode-cli', provider: 'opencode', binary: 'opencode' },
-  { mode: 'devin-cli', provider: 'devin', binary: 'devin' },
-  { mode: 'agy-cli', provider: 'agy', binary: 'agy' },
-  { mode: 'copilot', provider: undefined, binary: 'copilot' },
-] as const satisfies readonly {
-  mode: ReasoningBackendMode;
-  provider: ProviderId | undefined;
-  binary: string;
-}[];
-
 const SANDBOX_ATTEMPT_MARKER = 'SANDBOX_PROBE_ATTEMPTED';
 const SANDBOX_BLOCKED_MARKER = 'SANDBOX_PROBE_BLOCKED';
 const SANDBOX_TARGET_PREFIX = 'SANDBOX_PROBE_TARGET=';
 const SANDBOX_DENIAL_PATTERN =
   /(?:permission denied|read[- ]only(?: file system| filesystem| mode)?|not allowed|cannot (?:write|create)|can't (?:write|create)|operation not permitted|access denied)/iu;
-
-const SANDBOX_PROBE_BINARY_ENV_KEYS: Readonly<
-  Partial<Record<(typeof SANDBOX_PROBE_PROVIDERS)[number]['mode'], string>>
-> = {
-  'claude-cli': 'KYBERION_CLAUDE_CLI_BIN',
-  'codex-cli': 'KYBERION_CODEX_CLI_BIN',
-  'gemini-cli': 'KYBERION_GEMINI_CLI_BIN',
-  'grok-cli': 'KYBERION_GROK_CLI_BIN',
-  'cursor-cli': 'KYBERION_CURSOR_CLI_BIN',
-  'opencode-cli': 'KYBERION_OPENCODE_CLI_BIN',
-  'devin-cli': 'KYBERION_DEVIN_CLI_BIN',
-  'agy-cli': 'KYBERION_AGY_CLI_BIN',
-};
 
 function sandboxProbePrompt(sentinelPath: string): string {
   return [
@@ -194,38 +161,23 @@ function sandboxDeniedEvidence(
   return { attempted, denied };
 }
 
-function sandboxCommandArgs(
-  mode: (typeof SANDBOX_PROBE_PROVIDERS)[number]['mode'],
+/** Expand a descriptor's sandbox-probe argument template. */
+export function expandSandboxProbeArgs(
+  template: readonly string[],
   permissionArgs: readonly string[],
   prompt: string
 ): string[] {
-  switch (mode) {
-    case 'codex-cli':
-      return ['exec', ...permissionArgs, '--color', 'never', '-'];
-    case 'claude-cli':
-      return ['-p', prompt, ...permissionArgs];
-    case 'gemini-cli':
-      return ['-p', prompt, ...permissionArgs];
-    case 'grok-cli':
-      return ['-p', prompt, '--output-format', 'plain', ...permissionArgs];
-    case 'cursor-cli':
-      return ['-p', '--output-format', 'json', ...permissionArgs, prompt];
-    case 'opencode-cli':
-      return ['run', '--format', 'json', ...permissionArgs, prompt];
-    case 'devin-cli':
-      return [...permissionArgs, '--respect-workspace-trust', 'false', '-p', '--', prompt];
-    default:
-      return [];
-  }
+  return template.flatMap((token) =>
+    token === '{permission_args}' ? [...permissionArgs] : token === '{prompt}' ? [prompt] : [token]
+  );
 }
 
-function resolveSandboxProbeBinary(
-  mode: (typeof SANDBOX_PROBE_PROVIDERS)[number]['mode'],
-  binary: string,
-  env: NodeJS.ProcessEnv
-): string {
-  const envKey = SANDBOX_PROBE_BINARY_ENV_KEYS[mode];
-  return (envKey ? getRegisteredEnvText(envKey, { env })?.trim() : undefined) || binary;
+/** Explicit operator override (`cli.bin_env_key`) wins over the declared binary. */
+function resolveCliBinary(cli: ReasoningProviderCli, env: NodeJS.ProcessEnv): string {
+  return (
+    (cli.bin_env_key ? getRegisteredEnvText(cli.bin_env_key, { env })?.trim() : undefined) ||
+    cli.binary
+  );
 }
 
 function sandboxEvidence(result: BackendSandboxConformanceExecResult): string {
@@ -282,16 +234,19 @@ export function runBackendSandboxConformance(
   fs.mkdir(probeDirectory);
 
   try {
-    return SANDBOX_PROBE_PROVIDERS.map(({ mode, provider, binary: defaultBinary }) => {
-      const binary = resolveSandboxProbeBinary(mode, defaultBinary, env);
-      if (!provider) {
+    return cliProviders().map((descriptor): BackendSandboxConformanceResult => {
+      const { mode, cli } = descriptor;
+      const binary = resolveCliBinary(cli, env);
+      const sandbox = cli.sandbox;
+      const provider = PROVIDER_IDS.find((id) => id === descriptor.provider);
+      if (!sandbox || !provider) {
         return sandboxResultForUnsupported(
           mode,
           binary,
           'No provider permission profile is registered.'
         );
       }
-      if (provider === 'agy') {
+      if (sandbox.enforcement_preflight) {
         try {
           requireSandboxEnforcement(
             resolveSandboxPolicy({ provider, mode: 'read-only', networkAccess: false })
@@ -324,12 +279,12 @@ export function runBackendSandboxConformance(
       }
       const result = exec(
         binary,
-        sandboxCommandArgs(mode, resolution.args, sandboxProbePrompt(sentinel)),
+        expandSandboxProbeArgs(sandbox.args, resolution.args, sandboxProbePrompt(sentinel)),
         {
           timeoutMs: 120_000,
           maxOutputMB: 2,
           cwd: probeDirectory,
-          input: mode === 'codex-cli' ? sandboxProbePrompt(sentinel) : '',
+          input: sandbox.prompt_via_stdin ? sandboxProbePrompt(sentinel) : '',
         }
       );
       const evidence = sandboxEvidence(result);
@@ -403,11 +358,11 @@ export function runBackendConformance(
 ): BackendConformanceReport {
   const exec =
     options.exec || ((command, args, probeOptions) => safeExec(command, args, probeOptions));
-  const results = CLI_MODES.map((mode) => {
-    const binary = CLI_BINARIES[mode];
-    const profile = BACKEND_CAPABILITY_PROFILES[mode];
-    const version = runProbe(exec, binary, ['--version']);
-    const help = runProbe(exec, binary, ['--help']);
+  const results = cliProviders().map(({ mode, cli }) => {
+    const binary = cli.binary;
+    const profile = backendCapabilityProfile(mode);
+    const version = runProbe(exec, binary, [...cli.version_args]);
+    const help = runProbe(exec, binary, [...(cli.help_args ?? ['--help'])]);
     const capabilities = Object.fromEntries(
       BOOLEAN_CAPABILITIES.map((capability) => [
         capability,

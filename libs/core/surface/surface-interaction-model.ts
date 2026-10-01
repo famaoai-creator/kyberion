@@ -29,6 +29,10 @@ import type {
 import type { SupportedLocale } from '../locale-normalize.js';
 import type { ExecutionFeedbackInput } from '../execution-feedback.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  resolveChannelMessageShape,
+  type ChannelMessageShape,
+} from './channel-adapter-registry.js';
 
 export type SurfaceProviderId = SurfaceAsyncChannel;
 export type SurfaceReplyMode = 'outbox' | 'notification';
@@ -643,10 +647,10 @@ export function buildSurfaceConversationInputFromMessage(
   message: SurfaceMessage,
   options: BuildSurfaceConversationInputOptions
 ): SurfaceConversationInput {
-  const query =
-    message.surface === 'slack'
-      ? buildSlackSurfaceConversationQuery(message, options)
-      : message.text;
+  const slackThreadShape = resolveChannelMessageShape(message.surface) === 'slack-thread';
+  const query = slackThreadShape
+    ? buildSlackSurfaceConversationQuery(message, options)
+    : message.text;
   return {
     agentId: options.agentId,
     query,
@@ -657,22 +661,21 @@ export function buildSurfaceConversationInputFromMessage(
     surfaceText: message.text,
     attachments: message.attachments,
     threadContext: options.threadContext,
-    surfaceMetadata:
-      message.surface === 'slack'
-        ? ({
-            surface: 'slack',
-            user: options.slack?.user,
-            team: options.slack?.team,
-            channelType: options.slack?.channelType,
-            threadTs: message.threadTs,
-            channel: message.channel,
-          } satisfies SlackSurfaceMetadata)
-        : ({
-            surface: message.surface,
-            actorId: message.actorId,
-            threadTs: message.threadTs,
-            channel: message.channel,
-          } satisfies SurfaceConversationMetadata),
+    surfaceMetadata: slackThreadShape
+      ? ({
+          surface: 'slack',
+          user: options.slack?.user,
+          team: options.slack?.team,
+          channelType: options.slack?.channelType,
+          threadTs: message.threadTs,
+          channel: message.channel,
+        } satisfies SlackSurfaceMetadata)
+      : ({
+          surface: message.surface,
+          actorId: message.actorId,
+          threadTs: message.threadTs,
+          channel: message.channel,
+        } satisfies SurfaceConversationMetadata),
     cwd: options.cwd,
     forcedReceiver: options.forcedReceiver,
     missionId: options.missionId,
@@ -696,42 +699,45 @@ export function createSurfaceMessageFromConversationInput(
     channel,
     scope: input.scope,
   });
-  let message: SurfaceMessage;
-  if (input.surface === 'slack') {
-    message = createSlackSurfaceMessage({
-      user: input.metadata?.user || input.actorId,
-      text: input.text,
-      channel,
-      ts: receivedAt || threadTs,
-      threadTs,
-      ...(input.metadata?.team ? { team: input.metadata.team } : {}),
-      ...(input.metadata?.channelType ? { channelType: input.metadata.channelType } : {}),
-      correlationId,
-      messageId,
-    });
-  } else if (input.surface === 'chronos') {
-    message = createChronosSurfaceMessage({
-      text: input.text,
-      sessionId: input.threadTs,
-      requesterId: input.actorId,
-      correlationId,
-      messageId,
-      receivedAt,
-    });
-  } else {
-    message = createSurfaceMessage({
-      text: input.text,
-      channel,
-      threadTs,
-      surface: input.surface,
-      actorId: input.actorId,
-      correlationId,
-      messageId,
-      receivedAt,
-      attachments: input.attachments,
-      scope: ingressScope,
-    });
-  }
+  // Ingress message factories are keyed by the channel adapter registry's
+  // `message_shape` (RS-06), not by surface id.
+  const factories: Record<ChannelMessageShape, () => SurfaceMessage> = {
+    'slack-thread': () =>
+      createSlackSurfaceMessage({
+        user: input.metadata?.user || input.actorId,
+        text: input.text,
+        channel,
+        ts: receivedAt || threadTs,
+        threadTs,
+        ...(input.metadata?.team ? { team: input.metadata.team } : {}),
+        ...(input.metadata?.channelType ? { channelType: input.metadata.channelType } : {}),
+        correlationId,
+        messageId,
+      }),
+    'chronos-session': () =>
+      createChronosSurfaceMessage({
+        text: input.text,
+        sessionId: input.threadTs,
+        requesterId: input.actorId,
+        correlationId,
+        messageId,
+        receivedAt,
+      }),
+    generic: () =>
+      createSurfaceMessage({
+        text: input.text,
+        channel,
+        threadTs,
+        surface: input.surface,
+        actorId: input.actorId,
+        correlationId,
+        messageId,
+        receivedAt,
+        attachments: input.attachments,
+        scope: ingressScope,
+      }),
+  };
+  const message = factories[resolveChannelMessageShape(input.surface)]();
   if (!ingressScope || message.scope) return message;
   const scope = ingressScope;
   const space = createSurfaceSpace({
@@ -763,7 +769,7 @@ export function buildSurfaceConversationInput(
     executionFeedback: input.executionFeedback,
     scope: message.scope,
     slack:
-      input.surface === 'slack'
+      resolveChannelMessageShape(input.surface) === 'slack-thread'
         ? {
             user: input.metadata?.user || input.actorId,
             team: input.metadata?.team,

@@ -6,16 +6,19 @@
       "kind": "ui",
       "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
       "command": "node",
-      "args": [
-        "dist/presence/displays/presence-studio/server.js"
-      ],
+      "args": ["dist/presence/displays/presence-studio/server.js"],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
       "port": 3031,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_presence_studio",
+      "bestForKey": "surface:surface_best_for_presence_studio",
+      "urlEnv": "PRESENCE_STUDIO_URL",
+      "controlPlane": "presence",
+      "remediationCommand": "pnpm surfaces reconcile"
     }
   ]
 }

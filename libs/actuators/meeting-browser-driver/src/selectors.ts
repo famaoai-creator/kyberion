@@ -1,8 +1,10 @@
 /**
- * Selectors for the meeting platforms' pre-join UIs. Kept in their
- * own file so a deployment can override them without touching the
- * driver runtime — vendors update their DOM occasionally and this is
- * the brittlest layer.
+ * Selectors for the meeting platforms' pre-join and in-meeting UIs.
+ * The selector data lives in the meeting platform registry
+ * (`knowledge/product/governance/meeting-platforms.json`, RS-06) so a
+ * deployment can update them without touching the driver runtime —
+ * vendors update their DOM occasionally and this is the brittlest layer.
+ * Localized vendor UI labels carry a `locale` tag in that data.
  *
  * Each entry names a CSS / role selector. The driver tries the list
  * in order until one resolves; the first hit wins. This makes it
@@ -10,6 +12,12 @@
  */
 
 import type { MeetingPlatform } from '@agent/core/meeting/meeting-session-types';
+import {
+  defaultSelectorMeetingPlatform,
+  findMeetingPlatform,
+  resolveMeetingSelectorGroup,
+  type MeetingPlatformDescriptor,
+} from '@agent/core/meeting/meeting-platform-registry';
 
 export interface MeetingPreJoinSelectors {
   /** Optional input where the AI's display name goes (Meet for guests). */
@@ -38,199 +46,6 @@ export interface MeetingPreJoinSelectors {
   leave_button: string[];
 }
 
-export const MEET_SELECTORS: MeetingPreJoinSelectors = {
-  name_input: [
-    // jsname is stable across locales — use as primary
-    'input[jsname="YPqjbf"]',
-    'input[aria-label="Your name"]',
-    'input[placeholder="Your name"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'input[aria-label="お名前を入力"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'input[placeholder="お名前を入力"]',
-  ],
-  meeting_id_input: [],
-  meeting_passcode_input: [],
-  continue_without_audio_video_button: [
-    'button:has-text("Continue without microphone and camera")',
-    'button:has-text("Continue without audio and video")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("マイクとカメラをオフにして参加")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("マイクとカメラなしで続行")',
-    '[role="button"]:has-text("Continue without microphone and camera")',
-  ],
-  settings_button: [
-    'button[aria-label*="Settings" i]',
-    'button[aria-label*="設定" i]',
-    'button:has-text("Settings")',
-    'button:has-text("設定")',
-    '[role="button"][aria-label*="Settings" i]',
-  ],
-  microphone_device_button: [
-    'button[aria-label*="Microphone" i]',
-    'button:has-text("Microphone")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("マイク")',
-    '[role="button"][aria-label*="Microphone" i]',
-  ],
-  speaker_device_button: [
-    'button[aria-label*="Speaker" i]',
-    'button:has-text("Speaker")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("スピーカー")',
-    '[role="button"][aria-label*="Speaker" i]',
-  ],
-  camera_device_button: [
-    'button[aria-label*="Camera" i]',
-    'button:has-text("Camera")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("カメラ")',
-    '[role="button"][aria-label*="Camera" i]',
-  ],
-  device_option: [
-    '[role="option"]',
-    'button[role="menuitem"]',
-    'button[role="option"]',
-    '[role="menuitem"]',
-  ],
-  mute_mic_button: [
-    // Confirmed via live DOM inspection 2026-05-26
-    '[aria-label="Turn off microphone"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    '[aria-label="マイクをオフにする"]',
-    'button[aria-label*="Microphone" i]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    '[data-tooltip="マイクをオフにする"]',
-  ],
-  disable_camera_button: [
-    // Confirmed via live DOM inspection 2026-05-26
-    '[aria-label="Turn off camera"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    '[aria-label="カメラをオフにする"]',
-    'button[aria-label*="Camera" i]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    '[data-tooltip="カメラをオフにする"]',
-  ],
-  join_button: [
-    // "Ask to join" = guest without host present; "Join now" = host or admitted
-    'button:has-text("Ask to join")',
-    'button:has-text("Join now")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("参加をリクエスト")',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("今すぐ参加")',
-    'button[jsname="Qx7uuf"]',
-  ],
-  leave_button: [
-    'button[aria-label*="Leave call" i]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button[aria-label*="通話を終了"]',
-    '[data-tooltip*="Leave" i]',
-  ],
-};
-
-export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
-  name_input: [
-    // Confirmed via live DOM inspection 2026-05-26 (Zoom web client /wc/ endpoint)
-    '#input-for-name',
-    'input[aria-label="Your Name"]',
-  ],
-  meeting_id_input: [],
-  meeting_passcode_input: [],
-  continue_without_audio_video_button: [],
-  settings_button: [],
-  microphone_device_button: [],
-  speaker_device_button: [],
-  camera_device_button: [],
-  device_option: [],
-  mute_mic_button: [
-    // Pre-join: aria-label="Mute" = mic is ON, clicking mutes it
-    '#preview-audio-control-button',
-    'button[aria-label="Mute"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button[aria-label="マイクをミュート"]',
-  ],
-  disable_camera_button: [
-    // Pre-join: aria-label="Start Video" = video already off (no click needed)
-    // If "Stop Video", click to disable
-    '#preview-video-control-button',
-    'button[aria-label="Stop Video"]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button[aria-label="ビデオの停止"]',
-  ],
-  join_button: ['.preview-join-button', 'button:has-text("Join")'],
-  leave_button: [
-    // Post-join confirmed 2026-05-26
-    'button[aria-label="Leave"]',
-    'button:has-text("Leave")',
-    'button[aria-label="退出"]',
-  ],
-};
-
-export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
-  name_input: [
-    // Confirmed via live DOM inspection 2026-05-26 (light-meetings/launch experience)
-    'input[data-tid="prejoin-display-name-input"]',
-  ],
-  meeting_id_input: [
-    'input[aria-label*="会議 ID" i]',
-    'input[placeholder*="会議 ID" i]',
-    'input[aria-label*="Meeting ID" i]',
-    'input[placeholder*="Meeting ID" i]',
-    'input[data-tid="meeting-id-input"]',
-  ],
-  meeting_passcode_input: [
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'input[aria-label*="会議パスコード" i]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'input[placeholder*="会議パスコード" i]',
-    'input[aria-label*="passcode" i]',
-    'input[placeholder*="passcode" i]',
-    'input[data-tid="meeting-passcode-input"]',
-  ],
-  continue_without_audio_video_button: [],
-  settings_button: [],
-  microphone_device_button: [],
-  speaker_device_button: [],
-  camera_device_button: [],
-  device_option: [],
-  mute_mic_button: [
-    // checkbox input — click toggles mute state
-    'input[data-tid="toggle-mute"]',
-  ],
-  disable_camera_button: [
-    // checkbox input — click toggles camera state
-    'input[data-tid="toggle-video"]',
-  ],
-  join_button: [
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button:has-text("会議に参加する")',
-    'button:has-text("Join the meeting")',
-    'button[data-tid="prejoin-join-button"]',
-    'button[id="prejoin-join-button"]',
-  ],
-  leave_button: [
-    'button[data-tid="hangup-button"]',
-    'button[aria-label*="Leave" i]',
-    // i18n-exempt: JA DOM selector for meeting platform UI
-    'button[aria-label*="通話を終了"]',
-  ],
-};
-
-export function selectorsForPlatform(platform: MeetingPlatform): MeetingPreJoinSelectors {
-  switch (platform) {
-    case 'meet':
-      return MEET_SELECTORS;
-    case 'zoom':
-      return ZOOM_SELECTORS;
-    case 'teams':
-      return TEAMS_SELECTORS;
-    default:
-      return MEET_SELECTORS;
-  }
-}
-
 /**
  * In-meeting selectors for live-caption capture (`transcriptInput`).
  * Live-caption DOM is the brittlest layer after pre-join UI: vendors
@@ -247,83 +62,77 @@ export interface MeetingInMeetingSelectors {
   captions_container: string[];
 }
 
-export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
-  captions_toggle: [
-    // Backported from tools/meet-copilot-extension (Meet verified live)
-    'button[aria-label*="Turn on captions" i]',
-    // i18n-exempt: third-party Meet UI label to match, not app-facing text
-    'button[aria-label*="字幕をオンにする"]',
-    // i18n-exempt: third-party UI label to match, not app-facing text
-    'button[aria-label*="字幕を表示"]',
-    'button[aria-label*="captions" i]',
-    '[data-tooltip*="captions" i]',
-  ],
-  captions_container: [
-    // Backported from tools/meet-copilot-extension (Meet verified live)
-    '[aria-label*="字幕"] [jsname]',
-    'div[jsname][aria-live="polite"]',
-    '[aria-label="Captions"]',
-    '[aria-label="字幕"]',
-    'div[jsname="dsyhDe"]',
-    'div[jsname="YrF9Sd"]',
-  ],
-};
+const preJoinCache = new Map<string, MeetingPreJoinSelectors>();
+const inMeetingCache = new Map<string, MeetingInMeetingSelectors>();
 
-export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
-  captions_toggle: [
-    // Backported from tools/meet-copilot-extension (best effort)
-    // i18n-exempt: third-party UI label to match, not app-facing text
-    'button[aria-label*="字幕を表示"]',
-    'button[aria-label*="show captions" i]',
-    // i18n-exempt: third-party Zoom UI label to match, not app-facing text
-    'button[aria-label*="ライブ文字起こし"]',
-    'button[aria-label*="closed caption" i]',
-    'button[aria-label*="字幕" i]',
-  ],
-  captions_container: [
-    // Backported from tools/meet-copilot-extension (best effort)
-    '[class*="live-transcription-subtitle"]',
-    '[class*="caption" i]',
-    '.closed-caption__window',
-    '[aria-label*="closed caption" i]',
-    'div[class*="closed-caption" i]',
-  ],
-};
+/** Registered descriptor for a platform; unregistered ids (e.g. `auto`) use the registry default. */
+function selectorDescriptor(platform: string): MeetingPlatformDescriptor {
+  return findMeetingPlatform(platform) ?? defaultSelectorMeetingPlatform();
+}
 
-export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
-  captions_toggle: [
-    // Backported from tools/meet-copilot-extension (best effort)
-    // i18n-exempt: third-party Teams UI label to match, not app-facing text
-    'button[aria-label*="ライブ キャプションをオンに"]',
-    'button[aria-label*="turn on live captions" i]',
-    // i18n-exempt: third-party Teams UI label to match, not app-facing text
-    'button[aria-label*="字幕をオンに"]',
-    'button[data-tid="toggle-cc"]',
-    'button[aria-label*="captions" i]',
-    'button[aria-label*="字幕" i]',
-    'button[aria-label*="Live captions" i]',
-  ],
-  captions_container: [
-    // Backported from tools/meet-copilot-extension (best effort)
-    '[data-tid="closed-caption-v2-window-wrapper"]',
-    '[data-tid*="closed-caption"]',
-    '[data-tid*="caption" i]',
-    'div[data-tid="closed-captions-renderer"]',
-    '[aria-label*="Live captions" i]',
-    // i18n-exempt: third-party Teams UI label to match, not app-facing text
-    '[aria-label*="ライブ キャプション" i]',
-  ],
-};
+export function selectorsForPlatform(platform: MeetingPlatform | string): MeetingPreJoinSelectors {
+  const descriptor = selectorDescriptor(platform);
+  let selectors = preJoinCache.get(descriptor.id);
+  if (!selectors) {
+    selectors = resolveMeetingSelectorGroup(
+      descriptor.pre_join_selectors
+    ) as unknown as MeetingPreJoinSelectors;
+    preJoinCache.set(descriptor.id, selectors);
+  }
+  return selectors;
+}
 
 export function inMeetingSelectorsForPlatform(
-  platform: MeetingPlatform
+  platform: MeetingPlatform | string
 ): MeetingInMeetingSelectors {
-  switch (platform) {
-    case 'zoom':
-      return ZOOM_IN_MEETING_SELECTORS;
-    case 'teams':
-      return TEAMS_IN_MEETING_SELECTORS;
-    default:
-      return MEET_IN_MEETING_SELECTORS;
+  const descriptor = selectorDescriptor(platform);
+  let selectors = inMeetingCache.get(descriptor.id);
+  if (!selectors) {
+    selectors = resolveMeetingSelectorGroup(
+      descriptor.in_meeting_selectors
+    ) as unknown as MeetingInMeetingSelectors;
+    inMeetingCache.set(descriptor.id, selectors);
   }
+  return selectors;
 }
+
+/**
+ * Deprecated constants resolve on first property access, not at module import,
+ * so importing the driver never loads the meeting platform registry eagerly.
+ */
+function lazySelectors<T extends object>(resolve: () => T): T {
+  return new Proxy({} as T, {
+    get: (_target, key) => Reflect.get(resolve(), key),
+    has: (_target, key) => Reflect.has(resolve(), key),
+    ownKeys: () => Reflect.ownKeys(resolve()),
+    getOwnPropertyDescriptor: (_target, key) => {
+      const descriptor = Reflect.getOwnPropertyDescriptor(resolve(), key);
+      return descriptor ? { ...descriptor, configurable: true } : undefined;
+    },
+  });
+}
+
+/** @deprecated Per-platform constants kept for compatibility; use selectorsForPlatform(). */
+export const MEET_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('meet')
+);
+/** @deprecated Use selectorsForPlatform('zoom'). */
+export const ZOOM_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('zoom')
+);
+/** @deprecated Use selectorsForPlatform('teams'). */
+export const TEAMS_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('teams')
+);
+/** @deprecated Use inMeetingSelectorsForPlatform('meet'). */
+export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('meet')
+);
+/** @deprecated Use inMeetingSelectorsForPlatform('zoom'). */
+export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('zoom')
+);
+/** @deprecated Use inMeetingSelectorsForPlatform('teams'). */
+export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('teams')
+);

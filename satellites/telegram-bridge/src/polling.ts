@@ -1,9 +1,28 @@
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { secretGuard } from '@agent/core/secret/secret-guard';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
-const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
+
+/**
+ * Webhook of the local telegram-bridge. The bridge listens on
+ * TELEGRAM_BRIDGE_PORT when set (see index.ts), so the poller must forward to
+ * that same port; otherwise the surface registry URL applies.
+ */
+export function resolveTelegramBridgeWebhookUrl(): string {
+  const portOverride = getRegisteredEnvText('TELEGRAM_BRIDGE_PORT')?.trim();
+  if (portOverride) {
+    const port = Number(portOverride);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      throw new Error(
+        `[TelegramPolling] TELEGRAM_BRIDGE_PORT must be a TCP port number; got "${portOverride}"`
+      );
+    }
+    return `http://127.0.0.1:${port}/webhook`;
+  }
+  return `${resolveSurfaceUrl('telegram-bridge')}/webhook`;
+}
 
 export async function main(_args: string[] = []): Promise<void> {
   const connection = secretGuard.loadConnectionDocument('telegram');
@@ -20,6 +39,7 @@ export async function main(_args: string[] = []): Promise<void> {
     return;
   }
 
+  const bridgeWebhookUrl = resolveTelegramBridgeWebhookUrl();
   logger.info('🚀 [TelegramPolling] Starting Telegram Bot Long-Polling...');
   let offset = 0;
 
@@ -39,7 +59,7 @@ export async function main(_args: string[] = []): Promise<void> {
           logger.info(
             `📥 [TelegramPolling] Received update ${update.update_id}, forwarding to webhook...`
           );
-          const forwardRes = await fetch(BRIDGE_WEBHOOK_URL, {
+          const forwardRes = await fetch(bridgeWebhookUrl, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(update),

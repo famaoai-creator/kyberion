@@ -4,7 +4,7 @@ import { safeReadFile } from '../secure-io.js';
 import {
   buildGeminiApiBackendFromEnv,
   GeminiApiBackend,
-  GEMINI_API_DEFAULT_MODEL,
+  geminiApiDefaultModel,
   normalizeGeminiGenerateContentResponse,
 } from './gemini-api-backend.js';
 
@@ -60,7 +60,7 @@ describe('GeminiApiBackend', () => {
     const backend = buildGeminiApiBackendFromEnv({ GEMINI_API_KEY: 'test-gemini-key' });
 
     expect(backend).toBeInstanceOf(GeminiApiBackend);
-    expect(backend?.getModel()).toBe(GEMINI_API_DEFAULT_MODEL);
+    expect(backend?.getModel()).toBe(geminiApiDefaultModel());
     expect(backend?.name).toBe('gemini-api');
     expect(backend?.egressEndpoint).toBe('https://generativelanguage.googleapis.com/v1beta');
   });
