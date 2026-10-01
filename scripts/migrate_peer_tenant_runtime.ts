@@ -26,6 +26,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 import { readSafeJsonValueFile } from './lib/json-input.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -514,10 +515,23 @@ function parseArgs(argv: string[]): PeerTenantMigrationOptions {
   };
 }
 
+/** CU-01: `--help` / typos exit before a plan is built or persisted. */
+export const MIGRATE_PEER_TENANT_RUNTIME_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion migrate peer-tenant-runtime',
+  manifestId: 'script.migrate.peer-tenant-runtime',
+  options: [
+    { flag: '--apply' },
+    { flag: '--tenant-id', value: '<tenant-id>' },
+    { flag: '--migration-root', value: '<path>' },
+    { flag: '--plan', value: '<plan.json>' },
+  ],
+};
+
 const script = defineScript({
   name: 'migrate:peer-tenant-runtime',
   flags: [],
   run: ({ argv, print }) => {
+    if (guardCliArgs(argv, MIGRATE_PEER_TENANT_RUNTIME_CLI, print)) return undefined;
     const plan = runPeerTenantMigration(parseArgs(argv));
     print(JSON.stringify(plan, null, 2));
     return plan;

@@ -237,13 +237,19 @@ describe('CLI manifest', () => {
             noun: 'chronos',
             verb: 'uninstall',
             audience: 'operator',
+            description: 'cli_cmd_script_chronos_uninstall',
+            group: 'operate',
           },
         ],
       },
       { packageScripts: new Set() }
     );
 
-    expect(failures).toEqual(['entrypoint command missing registry entry: help']);
+    expect(failures).toEqual([
+      'command operator-home.default must declare a cli_cmd_* description vocabulary key',
+      'command operator-home.default must declare a help group (start, inspect, operate, dev)',
+      'entrypoint command missing registry entry: help',
+    ]);
   });
 
   it('enforces the package-script count ratchet', () => {
@@ -272,6 +278,137 @@ describe('CLI manifest', () => {
 
     expect(failures).toContain(
       `package scripts exceed the SX-05 ratchet: ${MAX_PACKAGE_SCRIPTS + 1} > ${MAX_PACKAGE_SCRIPTS}`
+    );
+  });
+
+  describe('CU-05 governed vs script name collisions', () => {
+    const governed = {
+      id: 'operator-home.doctor',
+      command: 'doctor',
+      noun: 'doctor',
+      verb: 'default',
+      entry: 'operator-home',
+      audience: 'user' as const,
+      description: 'cli_cmd_operator_home_doctor',
+      group: 'start' as const,
+    };
+    const base = {
+      version: 1,
+      commands: [
+        {
+          id: 'operator-home.default',
+          command: '',
+          noun: 'home',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user' as const,
+          description: 'cli_cmd_operator_home_default',
+          group: 'start' as const,
+        },
+        governed,
+      ],
+      entrypoints: [
+        { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: ['', 'doctor'] },
+        { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+      ],
+    };
+    const scriptDoctor = {
+      id: 'script.doctor',
+      script: 'doctor',
+      command: 'doctor default',
+      noun: 'doctor',
+      verb: 'default',
+      audience: 'operator' as const,
+      description: 'cli_cmd_script_doctor',
+      group: 'start' as const,
+    };
+
+    it('rejects a script-backed default shadowed by a governed command', () => {
+      const failures = checkCliManifest(
+        { ...base, script_commands: [scriptDoctor] },
+        { packageScripts: new Set(['doctor']) }
+      );
+      expect(failures).toContain(
+        'script command script.doctor is shadowed by governed command operator-home.doctor ("doctor"); rename it or declare same_target_as'
+      );
+    });
+
+    it('accepts the collision only when declared as the same target', () => {
+      const ok = checkCliManifest(
+        { ...base, script_commands: [{ ...scriptDoctor, same_target_as: 'operator-home.doctor' }] },
+        { packageScripts: new Set(['doctor']) }
+      );
+      expect(ok.filter((failure) => failure.includes('script.doctor'))).toEqual([]);
+      const wrong = checkCliManifest(
+        {
+          ...base,
+          script_commands: [{ ...scriptDoctor, same_target_as: 'operator-home.default' }],
+        },
+        { packageScripts: new Set(['doctor']) }
+      );
+      expect(wrong).toContain(
+        'script command script.doctor same_target_as must name the governed command routed as "doctor"'
+      );
+    });
+
+    it('keeps the repository free of undeclared shadowing (intent -> intent trace)', () => {
+      const manifest = loadCliManifest();
+      expect(manifest.script_commands?.find((c) => c.script === 'intent:trace')).toMatchObject({
+        command: 'intent trace',
+      });
+      expect(manifest.deprecated_script_aliases).toContainEqual({
+        script: 'intent',
+        replaced_by: 'intent:trace',
+      });
+    });
+
+    it('keeps deprecated aliases out of the ratchet and out of script_commands', () => {
+      const failures = checkCliManifest(
+        {
+          ...base,
+          script_commands: [{ ...scriptDoctor, same_target_as: 'operator-home.doctor' }],
+          deprecated_script_aliases: [
+            { script: 'old-doctor', replaced_by: 'doctor' },
+            { script: 'old-ghost', replaced_by: 'ghost' },
+          ],
+        },
+        { packageScripts: new Set(['doctor', 'old-doctor']) }
+      );
+      expect(failures).not.toContain('package script missing command registry entry: old-doctor');
+      expect(failures).toContain(
+        'deprecated script alias references missing package script: old-ghost'
+      );
+      expect(failures).toContain(
+        'deprecated script alias old-ghost must point at a registered script: ghost'
+      );
+    });
+  });
+
+  it('requires a dev help group exactly for dev-audience commands', () => {
+    const failures = checkCliManifest(
+      {
+        version: 1,
+        commands: [
+          {
+            id: 'operator-home.default',
+            command: '',
+            noun: 'home',
+            verb: 'default',
+            entry: 'operator-home',
+            audience: 'user',
+            description: 'cli_cmd_operator_home_default',
+            group: 'dev',
+          },
+        ],
+        entrypoints: [
+          { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] },
+          { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+        ],
+      },
+      { packageScripts: new Set() }
+    );
+    expect(failures).toContain(
+      'command operator-home.default must use the dev help group exactly when its audience is dev'
     );
   });
 

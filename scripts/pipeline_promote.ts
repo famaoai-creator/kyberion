@@ -46,6 +46,7 @@ import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails'
 import { withExecutionContext } from '@agent/core/governance';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 interface PromotionAdvice {
   name?: string;
@@ -342,10 +343,27 @@ async function main(args: string[] = []): Promise<void> {
   appendCatalogRow(slug, description, dryRun);
 }
 
+/** CU-01: `--help` / typos exit before a pipeline or catalog row is written. */
+export const PIPELINE_PROMOTE_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion pipeline promote',
+  manifestId: 'script.pipeline.promote',
+  options: [
+    { flag: '--input', value: '<adf.json>' },
+    { flag: '--name', value: '<slug>' },
+    { flag: '--trace', value: '<trace-id>' },
+    { flag: '--dry-run' },
+    { flag: '--no-llm' },
+    { flag: '--force' },
+  ],
+};
+
 export const runPipelinePromotion = defineScript({
   name: 'pipeline:promote',
   flags: [],
-  run: async ({ argv }) => main(argv),
+  run: async ({ argv, print }) => {
+    if (guardCliArgs(argv, PIPELINE_PROMOTE_CLI, print)) return;
+    await main(argv);
+  },
 });
 
 if (

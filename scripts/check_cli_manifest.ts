@@ -17,7 +17,21 @@ export interface CliCommand {
   verb: string;
   entry: string;
   audience: 'user' | 'operator' | 'dev';
+  /** CU-03: vocabulary key (`cli` namespace) with the one-line en/ja summary. */
+  description?: string;
+  /** CU-03: task grouping for `kyberion --help`. */
+  group?: CliCommandGroup;
+  /** CU-03: vocabulary key for a caution line shown under the summary. */
+  caution?: string;
 }
+
+export type CliCommandGroup = 'start' | 'inspect' | 'operate' | 'dev';
+export const CLI_COMMAND_GROUPS: readonly CliCommandGroup[] = [
+  'start',
+  'inspect',
+  'operate',
+  'dev',
+];
 
 export interface CliScriptCommand {
   id: string;
@@ -28,6 +42,23 @@ export interface CliScriptCommand {
   noun: string;
   verb: string;
   audience: 'user' | 'operator' | 'dev';
+  description?: string;
+  group?: CliCommandGroup;
+  caution?: string;
+  /** CU-02: needs the operator's terminal (stdin/TTY); run with inherited stdio. */
+  interactive?: boolean;
+  /** CU-02: may run for minutes or forever; stream output, no router timeout. */
+  long_running?: boolean;
+  /** CU-01: the target handles `--help` itself before any side effect. */
+  native_help?: boolean;
+  /** CU-05: a `<noun> default` entry may share a governed command name only when it is the same target. */
+  same_target_as?: string;
+}
+
+/** CU-05: renamed package scripts kept as warning aliases (outside the SX-05 ratchet). */
+export interface CliDeprecatedScriptAlias {
+  script: string;
+  replaced_by: string;
 }
 
 export interface CliManifest {
@@ -35,6 +66,7 @@ export interface CliManifest {
   commands: CliCommand[];
   entrypoints: CliEntrypoint[];
   script_commands?: CliScriptCommand[];
+  deprecated_script_aliases?: CliDeprecatedScriptAlias[];
 }
 
 const cliManifestCatalog = defineCatalog<CliManifest>({
@@ -66,14 +98,91 @@ function loadPackageScriptNames(): Set<string> {
   return new Set(Object.keys(packageJson.scripts || {}));
 }
 
+/** CU-03: every entry carries a localized summary key and a help group. */
+function checkPresentation(
+  command: { audience: string; description?: string; group?: string; caution?: string },
+  label: string,
+  failures: string[]
+): void {
+  if (!command.description || !command.description.startsWith('cli_cmd_')) {
+    failures.push(`${label} must declare a cli_cmd_* description vocabulary key`);
+  }
+  if (!command.group || !CLI_COMMAND_GROUPS.includes(command.group as CliCommandGroup)) {
+    failures.push(`${label} must declare a help group (${CLI_COMMAND_GROUPS.join(', ')})`);
+  } else if ((command.group === 'dev') !== (command.audience === 'dev')) {
+    failures.push(`${label} must use the dev help group exactly when its audience is dev`);
+  }
+  if (command.caution !== undefined && !command.caution.startsWith('cli_caution_')) {
+    failures.push(`${label} caution must be a cli_caution_* vocabulary key`);
+  }
+}
+
+/**
+ * CU-05: the router resolves governed commands first, so a script-backed
+ * `<noun> default` with the same name is unreachable through `kyberion`.
+ * Allow it only when it is explicitly declared as the same target.
+ */
+function checkGovernedShadowing(
+  command: CliScriptCommand,
+  governed: readonly CliCommand[],
+  failures: string[]
+): void {
+  const routedName = command.command.endsWith(' default')
+    ? command.command.slice(0, -' default'.length)
+    : command.command;
+  const shadow = governed.find((candidate) => candidate.command === routedName);
+  if (command.same_target_as !== undefined) {
+    const target = governed.find((candidate) => candidate.id === command.same_target_as);
+    if (!target || target.command !== routedName) {
+      failures.push(
+        `script command ${command.id} same_target_as must name the governed command routed as "${routedName}"`
+      );
+    }
+    return;
+  }
+  if (shadow) {
+    failures.push(
+      `script command ${command.id} is shadowed by governed command ${shadow.id} ("${routedName}"); rename it or declare same_target_as`
+    );
+  }
+}
+
+function checkDeprecatedScriptAliases(
+  manifest: CliManifest,
+  packageScripts: ReadonlySet<string>,
+  failures: string[]
+): Set<string> {
+  const aliases = new Set<string>();
+  const registered = new Set(
+    (manifest.script_commands ?? []).map((command) => command.script).filter(Boolean)
+  );
+  for (const alias of manifest.deprecated_script_aliases ?? []) {
+    if (!alias.script || aliases.has(alias.script)) {
+      failures.push(`deprecated script alias must be unique: ${alias.script || '<missing>'}`);
+    }
+    aliases.add(alias.script);
+    if (!packageScripts.has(alias.script)) {
+      failures.push(`deprecated script alias references missing package script: ${alias.script}`);
+    }
+    if (!registered.has(alias.replaced_by)) {
+      failures.push(
+        `deprecated script alias ${alias.script} must point at a registered script: ${alias.replaced_by}`
+      );
+    }
+  }
+  return aliases;
+}
+
 function checkScriptCommands(
   manifest: CliManifest,
   packageScripts: ReadonlySet<string>,
   failures: string[]
 ): void {
-  if (packageScripts.size > MAX_PACKAGE_SCRIPTS) {
+  const aliasScripts = checkDeprecatedScriptAliases(manifest, packageScripts, failures);
+  const ratchetedScripts = packageScripts.size - aliasScripts.size;
+  if (ratchetedScripts > MAX_PACKAGE_SCRIPTS) {
     failures.push(
-      `package scripts exceed the SX-05 ratchet: ${packageScripts.size} > ${MAX_PACKAGE_SCRIPTS}`
+      `package scripts exceed the SX-05 ratchet: ${ratchetedScripts} > ${MAX_PACKAGE_SCRIPTS}`
     );
   }
   if (manifest.script_commands === undefined) return;
@@ -141,9 +250,17 @@ function checkScriptCommands(
     if (command.command !== expectedCommand) {
       failures.push(`script command noun/verb mismatch: ${command.script} -> ${command.command}`);
     }
+    checkPresentation(command, `script command ${command.id || '<missing>'}`, failures);
+    checkGovernedShadowing(command, manifest.commands, failures);
   }
 
   for (const script of packageScripts) {
+    if (aliasScripts.has(script)) {
+      if (scripts.has(script)) {
+        failures.push(`deprecated script alias must not also be a script command: ${script}`);
+      }
+      continue;
+    }
     if (!scripts.has(script)) {
       failures.push(`package script missing command registry entry: ${script}`);
     }
@@ -184,6 +301,7 @@ export function checkCliManifest(
       if (!['user', 'operator', 'dev'].includes(command.audience)) {
         failures.push(`command ${command.id || '<missing>'} has invalid audience`);
       }
+      checkPresentation(command, `command ${command.id || '<missing>'}`, failures);
     }
   }
   for (const entrypoint of manifest.entrypoints) {

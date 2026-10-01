@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { validateEnv } from '@agent/core/env-validator';
-import { getRegisteredEnvBool } from '@agent/core/foundation';
+import { validateStartupEnv } from '@agent/core/env-validator';
+import { logger } from '@agent/core/core';
 import {
   loadCliManifest,
   resolveCliModulePath,
@@ -9,8 +9,20 @@ import {
   type CliScriptCommand,
 } from './check_cli_manifest.js';
 import { safeExecResultAsync } from '@agent/core/secure-io';
+import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
+import { t } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { hasHelpFlag } from './lib/cli-guard.js';
+import {
+  describeRegisteredCommand,
+  formatCliManifestHelp,
+  formatUnknownCommand,
+  routedCommandName,
+} from './lib/cli-help.js';
+
+export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli-help.js';
 
 interface CliEntrypoint {
   id: string;
@@ -87,35 +99,6 @@ export function resolveScriptCommand(
   return findUniqueScriptCommand(command, manifest);
 }
 
-export function formatCliManifestHelp(manifest = loadCliManifest()): string {
-  const rows = [...manifest.commands]
-    .sort((left, right) => left.command.localeCompare(right.command))
-    .map((command) => {
-      const label = command.command || '<home>';
-      return `  ${label.padEnd(28)} ${command.noun} ${command.verb} [${command.audience}]`;
-    });
-  const scriptRows = (manifest.script_commands || [])
-    .filter((command) => command.audience !== 'dev')
-    .sort((left, right) => left.command.localeCompare(right.command))
-    .map((command) => {
-      const displayCommand = command.command.endsWith(' default')
-        ? command.command.slice(0, -' default'.length)
-        : command.command;
-      return `  ${displayCommand.padEnd(28)} ${command.script ?? command.module} [${command.audience}]`;
-    });
-  return [
-    'Kyberion commands (governed registry):',
-    '',
-    ...rows,
-    '',
-    'Script-backed operator commands:',
-    '',
-    ...scriptRows,
-    '',
-    'Use `kyberion <command> --help` for command-specific options.',
-  ].join('\n');
-}
-
 async function runScriptCommand(
   command: string,
   args: string[],
@@ -123,11 +106,39 @@ async function runScriptCommand(
   print: (value: unknown) => void
 ): Promise<void> {
   const scriptCommand = resolveScriptCommand(command, manifest);
-  if (!scriptCommand) throw new Error(`Unknown kyberion command: ${command}`);
+  if (!scriptCommand) {
+    // Show what the operator typed (up to noun + verb), not just the first token.
+    const typed = args
+      .slice(0, 2)
+      .filter((arg) => !arg.startsWith('-'))
+      .join(' ');
+    throw new ScriptExitError(1, formatUnknownCommand(typed || command, manifest));
+  }
   if (scriptCommand.script === 'kyberion') {
     throw new Error('The kyberion package script cannot dispatch itself');
   }
   const commandArgs = args.slice(command.split(' ').length);
+  // CU-01: a target without its own guarded --help never runs for --help.
+  if (hasHelpFlag(commandArgs) && !scriptCommand.native_help) {
+    print(formatGuardedScriptHelp(scriptCommand));
+    return;
+  }
+  const childArgs = scriptCommand.module
+    ? [
+        '--import',
+        pathResolver.rootResolve('scripts/ts-loader.mjs'),
+        resolveCliModulePath(scriptCommand.module),
+        ...(scriptCommand.args || []),
+        ...commandArgs,
+      ]
+    : ['run', scriptCommand.script!, ...commandArgs];
+  const childCommand = scriptCommand.module ? process.execPath : 'pnpm';
+  // CU-02: terminals, servers, daemons, and multi-minute jobs get the
+  // operator's terminal and no router timeout instead of a buffered 2-minute run.
+  if (scriptCommand.interactive || scriptCommand.long_running) {
+    await runStreamingScriptCommand(childCommand, childArgs, scriptCommand.id);
+    return;
+  }
   const result = scriptCommand.module
     ? await safeExecResultAsync(
         process.execPath,
@@ -151,6 +162,53 @@ async function runScriptCommand(
   }
 }
 
+function formatGuardedScriptHelp(scriptCommand: CliScriptCommand): string {
+  const routed = routedCommandName(scriptCommand.command);
+  return [
+    t('cli:cli_guard_usage', { usage: `pnpm kyberion ${routed} [arguments]` }),
+    '',
+    ...describeRegisteredCommand(scriptCommand).map((line) => `  ${line}`),
+    '',
+    t('cli:cli_guard_help_only', { command: routed }),
+  ].join('\n');
+}
+
+/** Run a script command attached to the operator terminal (inherited stdio, no timeout). */
+async function runStreamingScriptCommand(
+  command: string,
+  args: string[],
+  commandId: string
+): Promise<void> {
+  const { child } = spawnManagedProcess({
+    resourceId: `kyberion-cli:${commandId}:${Date.now().toString(36)}`,
+    kind: 'service',
+    ownerId: 'kyberion-cli',
+    ownerType: 'script',
+    command,
+    args,
+    spawnOptions: { cwd: pathResolver.rootDir(), env: process.env, stdio: 'inherit' },
+    metadata: { source: 'kyberion-cli', commandId },
+  });
+  // Ctrl-C reaches the child through the shared terminal; the router stays
+  // alive until the child has finished its own shutdown. SIGTERM is forwarded.
+  const ignoreInterrupt = (): void => undefined;
+  const forwardTerminate = (): void => {
+    child.kill('SIGTERM');
+  };
+  process.on('SIGINT', ignoreInterrupt);
+  process.on('SIGTERM', forwardTerminate);
+  try {
+    const code = await new Promise<number>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', (exitCode) => resolve(exitCode ?? 1));
+    });
+    if (code !== 0) throw new ScriptExitError(code, '', true);
+  } finally {
+    process.off('SIGINT', ignoreInterrupt);
+    process.off('SIGTERM', forwardTerminate);
+  }
+}
+
 /** Where operators fix a startup environment failure, named in the error itself. */
 const ENV_REGISTRY_PATH = 'knowledge/product/governance/env-registry.json';
 const ENV_STRICT_FLAG = 'KYBERION_ENV_REGISTRY_STRICT';
@@ -165,7 +223,7 @@ export function assertRequiredEnvironment(report: {
     [
       `Required environment is not configured: ${details}`,
       `Register or correct each variable in ${ENV_REGISTRY_PATH} (regenerate with \`pnpm generate:env-registry\`).`,
-      `To downgrade unregistered/mistyped KYBERION_* variables back to warnings, set ${ENV_STRICT_FLAG}=0 (strict validation is on by default).`,
+      `To downgrade unregistered/mistyped KYBERION_* variables to warnings, set ${ENV_STRICT_FLAG}=0 (strict applies by default only when CI is set).`,
     ].join('\n')
   );
 }
@@ -173,12 +231,16 @@ export function assertRequiredEnvironment(report: {
 export function validateKyberionStartupEnvironment(
   env: Record<string, string | undefined> = process.env
 ): void {
-  const strict =
-    getRegisteredEnvBool(ENV_STRICT_FLAG, {
-      env,
-      defaultValue: true,
-    }) === true;
-  assertRequiredEnvironment(validateEnv(env, { strict }));
+  // Strict only in CI or when KYBERION_ENV_REGISTRY_STRICT is set explicitly; otherwise
+  // unknown names warn once and invalid values of known variables still fail.
+  const report = validateStartupEnv(env);
+  for (const warning of report.warnings) logger.warn(warning);
+  assertRequiredEnvironment(report);
+}
+
+function helpLocale(args: string[]): SupportedLocale | undefined {
+  const index = args.indexOf('--locale');
+  return index >= 0 && args[index + 1] ? resolveLocale({ explicit: args[index + 1] }) : undefined;
 }
 
 export async function main(
@@ -187,10 +249,20 @@ export async function main(
 ): Promise<void> {
   // pnpm forwards the `--` separator literally (npm strips it); drop it so
   // `pnpm run kyberion -- <command>` keeps working (legacy cli.ts behavior).
-  const normalizedArgs = args.filter((arg) => arg !== '--');
-  if (normalizedArgs[0] === '--help' || normalizedArgs[0] === '-h') {
-    print(formatCliManifestHelp());
-    return;
+  let normalizedArgs = args.filter((arg) => arg !== '--');
+  // CU-03: `kyberion --help`, `-h`, and `help` share one registry renderer;
+  // only `--detail` (per-verb argument syntax) needs the operator CLI.
+  if (['--help', '-h', 'help'].includes(normalizedArgs[0] ?? '')) {
+    if (!normalizedArgs.includes('--detail')) {
+      print(
+        formatCliManifestHelp(undefined, {
+          all: normalizedArgs.includes('--all'),
+          locale: helpLocale(normalizedArgs),
+        })
+      );
+      return;
+    }
+    normalizedArgs = ['help', ...normalizedArgs.slice(1)];
   }
   validateKyberionStartupEnvironment();
   const manifest = loadCliManifest();
@@ -210,7 +282,6 @@ export async function main(
       return;
     }
     case 'organization-model':
-    case 'organization-roles':
     case 'project-controller': {
       const { runGovernedController } = await import('./kyberion-governed-controllers.js');
       await runGovernedController(entrypoint.id, normalizedArgs.slice(1), print);

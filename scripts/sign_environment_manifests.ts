@@ -25,6 +25,7 @@ import { safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 const MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 
@@ -66,10 +67,18 @@ export async function main(argv: string[] = []): Promise<number> {
   return failures > 0 ? 1 : 0;
 }
 
+/** CU-01: `--help` and unknown flags exit before any manifest is rewritten. */
+export const SIGN_ENVIRONMENT_MANIFESTS_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion manifests sign',
+  manifestId: 'script.manifests.sign',
+  options: [{ flag: '--check' }],
+};
+
 export const runSignEnvironmentManifests = defineScript({
   name: 'manifests:sign',
   flags: [],
-  run: async ({ argv }) => {
+  run: async ({ argv, print }) => {
+    if (guardCliArgs(argv, SIGN_ENVIRONMENT_MANIFESTS_CLI, print)) return;
     try {
       const code = await main(argv);
       if (code !== 0) throw new ScriptExitError(code, '', true);

@@ -2,6 +2,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { printHelp } from './cli-presentation.js';
+import { formatCliManifestHelp } from './lib/cli-help.js';
 import { ScriptExitError } from './lib/harness.js';
 import type { SupportedLocale } from '@agent/core/locale';
 import type { ActuatorRecord } from './cli.js';
@@ -82,10 +83,20 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     runActuator,
   } = deps;
 
+  // CU-03: same registry renderer as `kyberion --help`; `--detail` appends
+  // the per-verb argument syntax reference.
   const handleHelpHelpH: CliCommandHandler = async (ctx) => {
-    const { actuators, locale } = ctx;
+    const { actuators, locale, normalizedArgs } = ctx;
 
-    printHelp(actuators, locale);
+    const help = formatCliManifestHelp(undefined, {
+      all: normalizedArgs.includes('--all'),
+      locale,
+    });
+    for (const line of help.split('\n')) printText(line);
+    if (normalizedArgs.includes('--detail')) {
+      printText('');
+      printHelp(actuators, locale);
+    }
     return;
   };
 
