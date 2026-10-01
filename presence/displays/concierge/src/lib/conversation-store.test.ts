@@ -135,6 +135,19 @@ describe('server-owned durable conversation', () => {
     expect(serialized).toContain('[REDACTED_SECRET]');
   });
 
+  it('keeps history readable when redacting short credentials expands input and replies', () => {
+    const id = beginConversationTurn(viewer, 'password=a '.repeat(744));
+    completeConversationTurn(viewer, id, 'password=b '.repeat(2978));
+    const history = readConversationHistory(viewer);
+    expect(history.pending).toBe(0);
+    expect(history.messages[0].text.length).toBeLessThanOrEqual(8192);
+    expect(history.messages[1].text.length).toBeLessThanOrEqual(32768);
+    expect(JSON.stringify([...files.values()])).not.toMatch(/password=[ab]/);
+    const next = beginConversationTurn(viewer, 'next request');
+    completeConversationTurn(viewer, next, 'next reply');
+    expect(readConversationHistory(viewer).messages.at(-1)?.text).toBe('next reply');
+  });
+
   it('recovers capacity after abandoned requests expire without replaying them', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     try {
