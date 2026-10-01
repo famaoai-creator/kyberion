@@ -6,6 +6,7 @@ import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import type { NotificationChannelOption, NotificationTarget } from '../../../lib/settings-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+import { PushPane } from './PushPane';
 import { QuietHoursPane } from './QuietHoursPane';
 
 /** FD-06 通知設定 pane (`#setup-notifications`) — extracted from
@@ -101,6 +102,7 @@ export function NotificationsSection({
           </div>
         </SettingsGroup>
       </FormScope>
+      <PushPane t={t} />
       <QuietHoursPane t={t} />
     </div>
   );
