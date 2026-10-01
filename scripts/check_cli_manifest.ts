@@ -17,7 +17,12 @@ export interface CliCommand {
   verb: string;
   entry: string;
   audience: 'user' | 'operator' | 'dev';
+  /** `cli_cmd_*` vocabulary key for the one-line help summary. */
+  description?: string;
+  group?: CliCommandGroup;
 }
+
+export type CliCommandGroup = 'start' | 'inspect' | 'operate' | 'dev';
 
 export interface CliScriptCommand {
   id: string;
@@ -28,6 +33,8 @@ export interface CliScriptCommand {
   noun: string;
   verb: string;
   audience: 'user' | 'operator' | 'dev';
+  description?: string;
+  group?: CliCommandGroup;
 }
 
 export interface CliManifest {

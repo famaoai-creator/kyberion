@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeRmSync } from '../index.js';
+import { appendGovernedArtifactJsonl, pathResolver, safeRmSync } from '../index.js';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
@@ -10,8 +10,8 @@ import {
 } from './mesh-peer-directory.js';
 import { clearMeshMessageBrokerNamespace, createMeshMessageBroker } from './mesh-message-broker.js';
 import { formatMeshHubInspectionReport, inspectMeshHub } from './mesh-hub-inspection.js';
-import { clearMeshTopicRegistryNamespace, subscribeMeshTopic } from './mesh-topic-registry.js';
-import type { MeshRequest } from './mesh-hub-contract.js';
+import { clearMeshTopicRegistryNamespace } from './mesh-topic-registry.js';
+import type { MeshRequest, MeshTopicSubscription } from './mesh-hub-contract.js';
 
 const ROOT = pathResolver.rootDir();
 const TEST_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub-inspection-tests';
@@ -117,7 +117,10 @@ describe('mesh-hub-inspection', () => {
       roles: ['notifier'],
       request_kinds: ['notification.publish'],
     });
-    subscribeMeshTopic({
+    // The subscription writer was retired with mesh-router (2026-10-01); the
+    // store is seeded directly so the read side stays covered.
+    const subscription: MeshTopicSubscription = {
+      kind: 'mesh-topic-subscription',
       subscription_id: 'sub-a1',
       tenant_id: 'tenant-acme',
       topic: 'release.review',
@@ -128,8 +131,12 @@ describe('mesh-hub-inspection', () => {
       },
       expires_at: '2026-06-24T01:03:00.000Z',
       policy_version: '1.0.0',
-      authority_role: 'infrastructure_sentinel',
-    });
+    };
+    appendGovernedArtifactJsonl(
+      'infrastructure_sentinel',
+      `${TEST_RUNTIME_ROOT}/tenants/tenant-acme/subscriptions.jsonl`,
+      subscription
+    );
 
     broker = createMeshMessageBroker({ namespace: '' });
     const accepted = await broker.acceptMeshRequest(buildRequest('meshreq-inspect'), {

@@ -207,16 +207,16 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 
 > ゴール: **手元で連続して使い続けられる / 失敗時に「次に何をすればいいか」が出る**。
 
-| ID  | タスク                 | 完了条件                                                                                    | 主要成果物                               | 該当 D |
-| --- | ---------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------- | ------ |
-| B-1 | 統一 Trace 完全展開    | Engine Phase 5.3〜5.6 を完了。全 actuator が Trace span を吐く                              | Engine 5.3〜5.6                          | D3     |
-| B-2 | クロス OS CI           | Ubuntu / macOS / Docker の 3 マトリクスで主要シナリオを CI 実行                             | `.github/workflows/cross-os.yml`         | D2     |
-| B-3 | Mission 長寿命化       | 24h 以上のミッションが checkpoint→suspend→resume で冪等。プロセス再起動を跨ぐ e2e           | mission_controller v2.1 + e2e test       | D2     |
-| B-4 | Golden output 回帰検出 | 代表 ADF 10 本の出力を golden 化、PR 時に意味差分検出                                       | `tests/golden/` + CI job                 | D2, D4 |
-| B-5 | Chaos drill 常設       | "actuator down" "network partition" "secret missing" を weekly                              | `pipelines/chaos-*.json` + scheduled job | D2     |
-| B-6 | 失敗ヒント自動蓄積     | A-7 のエラー分類を distill に連結 → `knowledge/product/incidents/` に記録 → 次回参照        | `libs/core/incident-distiller.ts`        | D3     |
-| B-7 | テレメトリ任意 opt-in  | 匿名クラッシュ・所要時間を opt-in 送信（送信先は当初 localhost 蓄積、後段で OSS dashboard） | `libs/core/telemetry.ts`                 | D2, D3 |
-| B-8 | trace viewer 同梱      | Chronos に Trace ビューアを追加（OTel 形式 dump も）                                        | Chronos 拡張                             | D3     |
+| ID  | タスク                 | 完了条件                                                                                    | 主要成果物                                                                                           | 該当 D |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------ |
+| B-1 | 統一 Trace 完全展開    | Engine Phase 5.3〜5.6 を完了。全 actuator が Trace span を吐く                              | Engine 5.3〜5.6                                                                                      | D3     |
+| B-2 | クロス OS CI           | Ubuntu / macOS / Docker の 3 マトリクスで主要シナリオを CI 実行                             | `.github/workflows/cross-os.yml`                                                                     | D2     |
+| B-3 | Mission 長寿命化       | 24h 以上のミッションが checkpoint→suspend→resume で冪等。プロセス再起動を跨ぐ e2e           | mission_controller v2.1 + e2e test                                                                   | D2     |
+| B-4 | Golden output 回帰検出 | 代表 ADF 10 本の出力を golden 化、PR 時に意味差分検出                                       | `tests/golden/` + CI job                                                                             | D2, D4 |
+| B-5 | Chaos drill 常設       | "actuator down" "network partition" "secret missing" を weekly                              | `pipelines/chaos-*.json` + scheduled job                                                             | D2     |
+| B-6 | 失敗ヒント自動蓄積     | A-7 のエラー分類を distill に連結 → `knowledge/product/incidents/` に記録 → 次回参照        | `libs/core/incident-distiller.ts` (retired 2026-10-01 → [`retired/README.md`](../retired/README.md)) | D3     |
+| B-7 | テレメトリ任意 opt-in  | 匿名クラッシュ・所要時間を opt-in 送信（送信先は当初 localhost 蓄積、後段で OSS dashboard） | `libs/core/telemetry.ts` (retired 2026-10-01 → [`retired/README.md`](../retired/README.md))          | D2, D3 |
+| B-8 | trace viewer 同梱      | Chronos に Trace ビューアを追加（OTel 形式 dump も）                                        | Chronos 拡張                                                                                         | D3     |
 
 **受入条件**: 1 ユーザ環境で 30 日無人運用、人間介入 ≤ 1 件 / 週、unknown error 率 ≤ 10%。
 

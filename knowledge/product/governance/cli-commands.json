@@ -2252,7 +2252,9 @@
       "command": "approvals digest",
       "noun": "approvals",
       "verb": "digest",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_approvals_digest",
+      "group": "inspect"
     },
     {
       "id": "script.approvals.hygiene",
@@ -2260,7 +2262,9 @@
       "command": "approvals hygiene",
       "noun": "approvals",
       "verb": "hygiene",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_approvals_hygiene",
+      "group": "operate"
     },
     {
       "id": "script.tenant.export",
@@ -2268,7 +2272,9 @@
       "command": "tenant export",
       "noun": "tenant",
       "verb": "export",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_tenant_export",
+      "group": "operate"
     },
     {
       "id": "script.release.changelog-draft",
@@ -2276,7 +2282,9 @@
       "command": "release changelog-draft",
       "noun": "release",
       "verb": "changelog-draft",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_release_changelog_draft",
+      "group": "dev"
     },
     {
       "id": "script.workflow.register",
@@ -2284,7 +2292,9 @@
       "command": "workflow register",
       "noun": "workflow",
       "verb": "register",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_workflow_register",
+      "group": "operate"
     },
     {
       "id": "script.agent-runtime.manage",
@@ -2292,7 +2302,9 @@
       "command": "agent-runtime manage",
       "noun": "agent-runtime",
       "verb": "manage",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agent_runtime_manage",
+      "group": "operate"
     },
     {
       "id": "script.surface.outbox",
@@ -2300,7 +2312,9 @@
       "command": "surface outbox",
       "noun": "surface",
       "verb": "outbox",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_surface_outbox",
+      "group": "operate"
     },
     {
       "id": "script.action-items.remind",
@@ -2308,7 +2322,9 @@
       "command": "action-items remind",
       "noun": "action-items",
       "verb": "remind",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_action_items_remind",
+      "group": "operate"
     },
     {
       "id": "script.presence.stimuli",
@@ -2316,7 +2332,9 @@
       "command": "presence stimuli",
       "noun": "presence",
       "verb": "stimuli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_presence_stimuli",
+      "group": "operate"
     },
     {
       "id": "script.a2a.run",
@@ -2324,7 +2342,9 @@
       "command": "a2a run",
       "noun": "a2a",
       "verb": "run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_a2a_run",
+      "group": "operate"
     },
     {
       "id": "script.report.team-decision-support",
@@ -2332,7 +2352,9 @@
       "command": "report team-decision-support",
       "noun": "report",
       "verb": "team-decision-support",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_report_team_decision_support",
+      "group": "inspect"
     },
     {
       "id": "script.sync.agent-profiles",
@@ -2340,7 +2362,9 @@
       "command": "sync agent-profiles",
       "noun": "sync",
       "verb": "agent-profiles",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_agent_profiles",
+      "group": "dev"
     },
     {
       "id": "script.sync.authority-roles",
@@ -2348,7 +2372,9 @@
       "command": "sync authority-roles",
       "noun": "sync",
       "verb": "authority-roles",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_authority_roles",
+      "group": "dev"
     },
     {
       "id": "script.sync.service-endpoints",
@@ -2356,7 +2382,9 @@
       "command": "sync service-endpoints",
       "noun": "sync",
       "verb": "service-endpoints",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_service_endpoints",
+      "group": "dev"
     },
     {
       "id": "script.sync.specialist-catalog",
@@ -2364,7 +2392,9 @@
       "command": "sync specialist-catalog",
       "noun": "sync",
       "verb": "specialist-catalog",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_specialist_catalog",
+      "group": "dev"
     },
     {
       "id": "script.sync.team-roles",
@@ -2372,7 +2402,9 @@
       "command": "sync team-roles",
       "noun": "sync",
       "verb": "team-roles",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_team_roles",
+      "group": "dev"
     },
     {
       "id": "script.generate.service-harness-registry",
@@ -2380,7 +2412,9 @@
       "command": "generate service-harness-registry",
       "noun": "generate",
       "verb": "service-harness-registry",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_service_harness_registry",
+      "group": "dev"
     },
     {
       "id": "script.generate.trace-docs",
@@ -2388,7 +2422,9 @@
       "command": "generate trace-docs",
       "noun": "generate",
       "verb": "trace-docs",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_trace_docs",
+      "group": "dev"
     },
     {
       "id": "script.provider-capabilities.report",
@@ -2396,7 +2432,9 @@
       "command": "provider-capabilities report",
       "noun": "provider-capabilities",
       "verb": "report",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_provider_capabilities_report",
+      "group": "dev"
     },
     {
       "id": "script.eval.harness",
@@ -2404,7 +2442,9 @@
       "command": "eval harness",
       "noun": "eval",
       "verb": "harness",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_harness",
+      "group": "dev"
     },
     {
       "id": "script.eval.intent-trace",
@@ -2412,7 +2452,9 @@
       "command": "eval intent-trace",
       "noun": "eval",
       "verb": "intent-trace",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_intent_trace",
+      "group": "dev"
     },
     {
       "id": "script.eval.japanese-intent",
@@ -2420,7 +2462,9 @@
       "command": "eval japanese-intent",
       "noun": "eval",
       "verb": "japanese-intent",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_japanese_intent",
+      "group": "dev"
     },
     {
       "id": "script.eval.mission-orchestration",
@@ -2428,7 +2472,9 @@
       "command": "eval mission-orchestration",
       "noun": "eval",
       "verb": "mission-orchestration",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_mission_orchestration",
+      "group": "dev"
     },
     {
       "id": "script.eval.model-role-fitness",
@@ -2436,7 +2482,9 @@
       "command": "eval model-role-fitness",
       "noun": "eval",
       "verb": "model-role-fitness",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_model_role_fitness",
+      "group": "dev"
     },
     {
       "id": "script.eval.learning-efficiency",
@@ -2444,7 +2492,9 @@
       "command": "eval learning-efficiency",
       "noun": "eval",
       "verb": "learning-efficiency",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_eval_learning_efficiency",
+      "group": "dev"
     },
     {
       "id": "script.check.dead-code",
@@ -2452,7 +2502,9 @@
       "command": "check dead-code",
       "noun": "check",
       "verb": "dead-code",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_dead_code",
+      "group": "dev"
     },
     {
       "id": "script.check.rt-mode",
@@ -2460,7 +2512,9 @@
       "command": "check rt-mode",
       "noun": "check",
       "verb": "rt-mode",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_rt_mode",
+      "group": "dev"
     },
     {
       "id": "script.surfaces.screenshots",
@@ -2468,7 +2522,9 @@
       "command": "surfaces screenshots",
       "noun": "surfaces",
       "verb": "screenshots",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_surfaces_screenshots",
+      "group": "dev"
     },
     {
       "id": "script.design.import-md-catalog",
@@ -2476,7 +2532,9 @@
       "command": "design import-md-catalog",
       "noun": "design",
       "verb": "import-md-catalog",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_design_import_md_catalog",
+      "group": "dev"
     },
     {
       "id": "script.design.verify-resolution",
@@ -2484,7 +2542,9 @@
       "command": "design verify-resolution",
       "noun": "design",
       "verb": "verify-resolution",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_design_verify_resolution",
+      "group": "dev"
     },
     {
       "id": "script.media.intro-scratch",
@@ -2492,7 +2552,9 @@
       "command": "media intro-scratch",
       "noun": "media",
       "verb": "intro-scratch",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_media_intro_scratch",
+      "group": "dev"
     },
     {
       "id": "script.marketing.publish-dry-run",
@@ -2500,7 +2562,9 @@
       "command": "marketing publish-dry-run",
       "noun": "marketing",
       "verb": "publish-dry-run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_marketing_publish_dry_run",
+      "group": "operate"
     },
     {
       "id": "script.marketing.review-aggregate",
@@ -2508,7 +2572,9 @@
       "command": "marketing review-aggregate",
       "noun": "marketing",
       "verb": "review-aggregate",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_marketing_review_aggregate",
+      "group": "inspect"
     },
     {
       "id": "script.pipeline.dry-run",
@@ -2516,7 +2582,9 @@
       "command": "pipeline dry-run",
       "noun": "pipeline",
       "verb": "dry-run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pipeline_dry_run",
+      "group": "operate"
     },
     {
       "id": "script.scenario.storage-governance",
@@ -2524,7 +2592,9 @@
       "command": "scenario storage-governance",
       "noun": "scenario",
       "verb": "storage-governance",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_scenario_storage_governance",
+      "group": "dev"
     },
     {
       "id": "script.smoke.agent-pane-runtime",
@@ -2532,7 +2602,9 @@
       "command": "smoke agent-pane-runtime",
       "noun": "smoke",
       "verb": "agent-pane-runtime",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_smoke_agent_pane_runtime",
+      "group": "dev"
     },
     {
       "id": "script.memory.promotion-queue",
@@ -2540,7 +2612,9 @@
       "command": "memory promotion-queue",
       "noun": "memory",
       "verb": "promotion-queue",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_memory_promotion_queue",
+      "group": "inspect"
     },
     {
       "id": "script.reconcile.config-fallbacks",
@@ -2548,7 +2622,9 @@
       "command": "reconcile config-fallbacks",
       "noun": "reconcile",
       "verb": "config-fallbacks",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_reconcile_config_fallbacks",
+      "group": "operate"
     },
     {
       "id": "script.reconcile.unhandled-intents",
@@ -2556,7 +2632,9 @@
       "command": "reconcile unhandled-intents",
       "noun": "reconcile",
       "verb": "unhandled-intents",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_reconcile_unhandled_intents",
+      "group": "operate"
     },
     {
       "id": "script.reconcile.unclassified-errors",
@@ -2564,7 +2642,9 @@
       "command": "reconcile unclassified-errors",
       "noun": "reconcile",
       "verb": "unclassified-errors",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_reconcile_unclassified_errors",
+      "group": "operate"
     },
     {
       "id": "script.chat.local",
@@ -2572,7 +2652,31 @@
       "command": "chat local",
       "noun": "chat",
       "verb": "local",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_chat_local",
+      "group": "dev"
+    },
+    {
+      "id": "script.hooks.discover",
+      "module": "scripts/external_hooks.ts",
+      "args": ["discover"],
+      "command": "hooks discover",
+      "noun": "hooks",
+      "verb": "discover",
+      "audience": "operator",
+      "description": "cli_cmd_script_hooks_discover",
+      "group": "inspect"
+    },
+    {
+      "id": "script.hooks.trust",
+      "module": "scripts/external_hooks.ts",
+      "args": ["trust"],
+      "command": "hooks trust",
+      "noun": "hooks",
+      "verb": "trust",
+      "audience": "operator",
+      "description": "cli_cmd_script_hooks_trust",
+      "group": "operate"
     }
   ]
 }

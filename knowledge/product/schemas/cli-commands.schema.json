@@ -36,8 +36,20 @@
         "noun": { "type": "string", "minLength": 1 },
         "verb": { "type": "string", "minLength": 1 },
         "entry": { "type": "string", "minLength": 1 },
-        "audience": { "type": "string", "enum": ["user", "operator", "dev"] }
+        "audience": { "type": "string", "enum": ["user", "operator", "dev"] },
+        "description": { "$ref": "#/$defs/descriptionKey" },
+        "group": { "$ref": "#/$defs/group" }
       }
+    },
+    "descriptionKey": {
+      "description": "Vocabulary key (cli namespace) with the en/ja one-line summary shown by kyberion --help.",
+      "type": "string",
+      "pattern": "^cli_cmd_[a-z0-9_]+$"
+    },
+    "group": {
+      "description": "Task grouping for kyberion --help; dev is hidden unless --all.",
+      "type": "string",
+      "enum": ["start", "inspect", "operate", "dev"]
     },
     "entrypoint": {
       "type": "object",
@@ -65,7 +77,9 @@
         "command": { "type": "string", "minLength": 1 },
         "noun": { "type": "string", "minLength": 1 },
         "verb": { "type": "string", "minLength": 1 },
-        "audience": { "type": "string", "enum": ["user", "operator", "dev"] }
+        "audience": { "type": "string", "enum": ["user", "operator", "dev"] },
+        "description": { "$ref": "#/$defs/descriptionKey" },
+        "group": { "$ref": "#/$defs/group" }
       },
       "oneOf": [{ "required": ["script"] }, { "required": ["module"] }]
     }

@@ -11,7 +11,11 @@ import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
-import { assertProjectTrustApproval } from './project/project-trust.js';
+import {
+  assertProjectTrustApproval,
+  findValidProjectTrustApproval,
+} from './project/project-trust.js';
+import { logger } from './core.js';
 import {
   registerExternalLifecycleHooks,
   type ExternalHookSource,
@@ -187,4 +191,60 @@ export function registerDiscoveredExternalLifecycleHooksOnDefaultEngine(
   options: ExternalHookDiscoveryOptions
 ): ExternalHookDiscoveryResult {
   return registerDiscoveredExternalLifecycleHooks(getDefaultLifecycleHookEngine(), options);
+}
+
+/**
+ * Opt-in runtime bootstrap (`KYBERION_EXTERNAL_HOOKS=project`): register the
+ * project-local Claude/Codex hook configs that carry a valid hash-bound
+ * project-trust approval (`pnpm kyberion hooks trust <path>` → an
+ * authenticated human approves) on the process-wide lifecycle engine, once per
+ * engine. Unset, this is inert. An unapproved or edited config is skipped, never
+ * partially registered; user-level (global) configs are never loaded here.
+ */
+export const EXTERNAL_HOOKS_ENV = 'KYBERION_EXTERNAL_HOOKS';
+
+const registeredDefaultEngines = new WeakMap<LifecycleHookEngine, ExternalHookDiscoveryResult>();
+
+export function isExternalHookBootstrapEnabled(env?: Record<string, string | undefined>): boolean {
+  return getRegisteredEnvText(EXTERNAL_HOOKS_ENV, env ? { env } : {}) === 'project';
+}
+
+/** Current hash-bound approval id per discovered project config (absent = untrusted). */
+export function resolveProjectHookTrustApprovals(
+  candidates: readonly ExternalHookConfigCandidate[]
+): Record<string, string> {
+  const approvals: Record<string, string> = {};
+  for (const candidate of candidates) {
+    if (candidate.scope !== 'project') continue;
+    try {
+      const approvalId = findValidProjectTrustApproval(candidate.path);
+      if (approvalId) approvals[candidate.path] = approvalId;
+    } catch {
+      // Outside the repository root or unreadable: stays untrusted.
+    }
+  }
+  return approvals;
+}
+
+export function ensureTrustedExternalHooksRegistered(
+  options: { rootDir?: string; env?: Record<string, string | undefined> } = {}
+): ExternalHookDiscoveryResult | null {
+  if (!isExternalHookBootstrapEnabled(options.env)) return null;
+  const engine = getDefaultLifecycleHookEngine();
+  const existing = registeredDefaultEngines.get(engine);
+  if (existing) return existing;
+  const rootDir = options.rootDir;
+  const candidates = discoverExternalHookConfigs({ ...(rootDir ? { rootDir } : {}) });
+  const result = registerDiscoveredExternalLifecycleHooks(engine, {
+    ...(rootDir ? { rootDir } : {}),
+    trustResolved: true,
+    projectTrustApprovalIds: resolveProjectHookTrustApprovals(candidates),
+  });
+  registeredDefaultEngines.set(engine, result);
+  for (const skipped of result.skipped) {
+    logger.warn(
+      `[external-hooks] skipped ${skipped.path} — ${skipped.reason} | next: pnpm kyberion hooks trust ${skipped.path}`
+    );
+  }
+  return result;
 }
