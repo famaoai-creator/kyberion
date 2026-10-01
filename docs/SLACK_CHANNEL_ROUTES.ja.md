@@ -1,7 +1,7 @@
 ---
 title: Slack 3経路の使い分け
 tags: [slack, presence, service-actuator, satellites, operator-ux]
-last_updated: 2026-09-06
+last_updated: 2026-10-01
 ---
 
 # Slack 3経路 — 会話 / 通知 / API
@@ -34,6 +34,34 @@ Kyberion には Slack へ届く道が3つある。**同じ `chat.postMessage` �
 - 流れ: Slack イベント → `runSurfaceMessageConversation` → エージェント → 同じチャネルへ返信
 - 向き: **双方向**。深い履歴閲覧には不向き([`docs/SURFACES.md`](./SURFACES.md))
 - 日常: 「Slack で Kyberion に話しかける」はこれ。アクチュエータの `dispatch` ではない
+
+### チャネルの会話モード(Team Channel)
+
+Satellite は受信チャネルごとに会話モードを決める(`libs/core/surface/channel-mode-policy.ts`)。
+
+| モード               | 宣言                                                      | 反応する条件                               | 話者                                     | 開示上限                            | 承認できる人                |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- | ----------------------------------- | --------------------------- |
+| `owner_direct`(既定) | 何もしない                                                | 全メッセージ                               | `KYBERION_SURFACE_ALLOWLISTS`(未設定=開) | personal                            | allowlist の話者            |
+| `team`               | `KYBERION_SURFACE_CHANNEL_MODES`                          | @メンション、または Bot が参加済みスレッド | allowlist 必須(未設定=**拒否**)          | `max_tier`(既定・上限 confidential) | チャネルの `approvers` のみ |
+| `customer`           | `customer/{slug}/connections/channel-bindings.json`(既存) | 顧客会話モード                             | —                                        | public catalog                      | 不可                        |
+
+```json
+{
+  "slack": {
+    "C0TEAM": {
+      "mode": "team",
+      "tenant_slug": "acme",
+      "max_tier": "confidential",
+      "approvers": ["U0LEAD"]
+    }
+  }
+}
+```
+
+- team ターンは `scope: { tier, tenant_slug }` と開示ディレクティブ(`[channel-policy]`)付きで会話層へ渡る。
+- 承認系の操作(承認・却下・変更依頼・ミッション提案の確定)は、ボタンでもテキスト返信でも `approvers` 以外を拒否する。
+- 設定が壊れている場合(不正 JSON、tenant 欠落、`customer` 指定など)は、そのチャネルを誰も使えない team として扱う(fail closed)。
+- 現時点では、話者は Slack ID の allowlist で判定する。組織メンバーへの解決と ViewerContext は Team Channel P1 で導入予定。
 
 ## 2. Presence — 人への配信ブリッジ
 
