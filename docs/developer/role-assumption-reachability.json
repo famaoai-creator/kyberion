@@ -2821,6 +2821,7 @@
         "presence/displays/concierge/src/lib/charter-view.ts",
         "presence/displays/concierge/src/lib/concierge-advisory-response.ts",
         "presence/displays/concierge/src/lib/concierge-theme.ts",
+        "presence/displays/concierge/src/lib/connection-view.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",
         "presence/displays/concierge/src/lib/front-desk-auth-token.ts",
