@@ -180,7 +180,7 @@ function waitForFile(filePath: string, timeoutMs = 5000): Promise<void> {
         reject(new Error(`Timed out waiting for ${safeFilePath}`));
       }
     }, 50);
-    timer.unref?.();
+    // Keep the loop alive while waiting: the worker child does not hold it.
   });
 }
 

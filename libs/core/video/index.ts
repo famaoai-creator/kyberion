@@ -7,7 +7,6 @@ export * from './video-composition-contract.js';
 export * from './video-composition-lint.js';
 export * from './video-composition-rendering.js';
 export * from './video-composition-template-registry.js';
-export * from './video-content-brief-compiler.js';
 export type { VideoPresentationMode } from './video-content-brief-contract.js';
 export {
   isHookSemantic,

@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "open-active-surfaces",
+  "version": "1.0.0",
+  "name": "Open Active UI Surfaces",
+  "description": "Opens one browser tab per running UI surface in a single browser instance (wraps fragments/inspect-active-surfaces.json).",
+  "labels": ["surfaces", "browser", "maintenance"],
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/inspect-active-surfaces.json"
+      }
+    }
+  ]
+}

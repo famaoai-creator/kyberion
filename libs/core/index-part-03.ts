@@ -34,16 +34,6 @@ export {
 export type { WorkCoordinationImportCatalogEntry } from './workforce/work-coordination-import-catalog.js';
 
 export {
-  getServiceBootstrapCatalogEntryByServiceId,
-  findServiceBootstrapEntriesByUtterance,
-  getDefaultServiceIdForSurface,
-  loadServiceBootstrapCatalog,
-  listServiceBootstrapCatalogEntries,
-} from './service/service-bootstrap-catalog.js';
-
-export type { ServiceBootstrapCatalogEntry } from './service/service-bootstrap-catalog.js';
-
-export {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
 } from './actuator/actuator-dependency-bundles.js';
@@ -166,10 +156,6 @@ export {
 
 // Evidence Chain (Query & Summary)
 
-export { queryEvidence, summarizeEvidence, evidenceChain } from './evidence-chain.js';
-
-export type { EvidenceQuery, EvidenceEntry } from './evidence-chain.js';
-
 // Cron Utilities
 
 export { matchCronField, getZonedDateParts, matchesCron } from './pipeline/cron-utils.js';
@@ -289,8 +275,6 @@ export * from './completion-token-budget.js';
 export * from './workforce/worker-event-stream.js';
 
 export * from './ce-adoption.js';
-
-export * from './office-snapshot.js';
 
 export * from './lifecycle-hook-engine.js';
 
