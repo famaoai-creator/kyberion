@@ -488,12 +488,12 @@
     },
     {
       "id": "i18n",
-      "scope": "full",
+      "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_i18n_hardcoding.ts"],
       "baseline": "knowledge/product/governance/i18n-baseline.json",
       "owner": "experience",
-      "rationale": "Checks internationalization hardcoding ratchets."
+      "rationale": "Checks internationalization hardcoding ratchets: Japanese literals, Japanese intent regexes, ad-hoc locale comparisons and tags, and raw colour literals in artifact engines."
     },
     {
       "id": "intent-domain-coverage",
@@ -708,6 +708,15 @@
       ],
       "owner": "quality",
       "rationale": "TC-17: fails when a declared backend utility_fit claim is contradicted by a recorded role-fitness probe, or when the governed reasoning-backend policy allows a mode no capability profile describes. Every CLI and API backend claims judge/divergent capability by default argument and nothing checked it."
+    },
+    {
+      "id": "orphans",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_orphans.ts"],
+      "baseline": "knowledge/product/governance/orphan-baseline.json",
+      "owner": "architecture",
+      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink."
     },
     {
       "id": "dep-cycles",

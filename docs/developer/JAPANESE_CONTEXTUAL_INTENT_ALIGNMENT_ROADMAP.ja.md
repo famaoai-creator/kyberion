@@ -200,12 +200,12 @@ surface utterance
 
 目的: 「予定が登録されている場所から取ってくる」を実行可能にする。
 
-| ID           | タスク                                        | 対象                                                                                       | 受入条件                                                                                                  |
-| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| JA-INTENT-30 | source binding 型を追加                       | `libs/core/context-source-binding.ts`                                                      | `operator_default_calendar`, `google_calendar`, `outlook_calendar`, `browser_calendar` の候補を表現できる |
-| JA-INTENT-31 | operator default calendar の読み取りを追加    | `knowledge/personal/` runtime profile, `libs/core/surface/operator-learning.ts`            | default がある場合は確認なしで read-only に使える                                                         |
-| JA-INTENT-32 | source 未登録時の clarification を追加        | `libs/core/intent/intent-contract.ts`, `libs/core/surface/surface-runtime-orchestrator.ts` | `どのカレンダーを見ればよいですか？` が一問だけ返る                                                       |
-| JA-INTENT-33 | connector / actuator bridge の dry-run を追加 | calendar actuator or service bridge                                                        | 実 connector がなくても dry-run artifact で source binding が検証できる                                   |
+| ID           | タスク                                        | 対象                                                                                                                                              | 受入条件                                                                                                  |
+| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| JA-INTENT-30 | source binding 型を追加                       | `libs/core/context-source-binding.ts`                                                                                                             | `operator_default_calendar`, `google_calendar`, `outlook_calendar`, `browser_calendar` の候補を表現できる |
+| JA-INTENT-31 | operator default calendar の読み取りを追加    | `knowledge/personal/` runtime profile, `libs/core/surface/operator-learning.ts`(2026-10-01 退役 → [`retired/README.md`](../../retired/README.md)) | default がある場合は確認なしで read-only に使える                                                         |
+| JA-INTENT-32 | source 未登録時の clarification を追加        | `libs/core/intent/intent-contract.ts`, `libs/core/surface/surface-runtime-orchestrator.ts`                                                        | `どのカレンダーを見ればよいですか？` が一問だけ返る                                                       |
+| JA-INTENT-33 | connector / actuator bridge の dry-run を追加 | calendar actuator or service bridge                                                                                                               | 実 connector がなくても dry-run artifact で source binding が検証できる                                   |
 
 保存先の原則:
 

@@ -11,31 +11,31 @@ import {
 
 describe('AgentCollaborationBoard attention actions (UX-07)', () => {
   it('routes human approval and mission stop/resume actions', () => {
-    expect(attentionActionForKind('approval')).toEqual({
+    expect(attentionActionForKind('approval', 'ja')).toEqual({
       mode: 'view',
       viewId: 'secret-approval-queue',
       label: '承認キューを開く',
     });
-    expect(attentionActionForKind('blocked')).toEqual({
+    expect(attentionActionForKind('blocked', 'ja')).toEqual({
       mode: 'mission',
       label: '停止・再開操作を開く',
     });
-    expect(attentionActionForKind('waiting')).toEqual({
+    expect(attentionActionForKind('waiting', 'ja')).toEqual({
       mode: 'mission',
       label: '停止・再開操作を開く',
     });
   });
 
   it('routes operational recovery and handoff inspection', () => {
-    expect(attentionActionForKind('retry')).toMatchObject({
+    expect(attentionActionForKind('retry', 'ja')).toMatchObject({
       mode: 'view',
       viewId: 'runtime-lease-doctor',
     });
-    expect(attentionActionForKind('handoff')).toMatchObject({
+    expect(attentionActionForKind('handoff', 'ja')).toMatchObject({
       mode: 'view',
       viewId: 'trace-viewer',
     });
-    expect(attentionActionForKind('completion')).toBeNull();
+    expect(attentionActionForKind('completion', 'ja')).toBeNull();
   });
 
   it('keeps collaboration labels aligned with the selected Chronos locale', () => {

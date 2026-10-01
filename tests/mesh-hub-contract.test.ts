@@ -290,6 +290,9 @@ describe('Mesh Hub contract', () => {
     expect(Object.keys(policy).sort()).toEqual([
       '$schema',
       'data_tier',
+      // The loader (mesh-router.ts) is retired; the policy is kept as a contract.
+      'documentation_note',
+      'documentation_only',
       'placement',
       'recipient_acceptance',
       'routing',

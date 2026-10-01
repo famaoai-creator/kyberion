@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "meeting-tutor-session",
+  "version": "1.0.0",
+  "name": "Guided Tutor Session",
+  "description": "Run a guided tutoring session over a material file (comprehension questions and learner feedback) and export the structured result.",
+  "labels": ["meeting", "tutor"],
+  "context": {
+    "material_path": "active/shared/tmp/meeting/material.md",
+    "learner_label": "",
+    "goal": "",
+    "language": "ja",
+    "output_path": "active/shared/tmp/meeting/tutor-result.json"
+  },
+  "steps": [
+    {
+      "id": "run_tutor",
+      "role": "source",
+      "op": "meeting:tutor_session",
+      "produces": { "channel": "tutor_result", "type": "TutorSessionResult" },
+      "params": {
+        "material_path": "{{material_path}}",
+        "learner_label": "{{learner_label}}",
+        "goal": "{{goal}}",
+        "language": "{{language}}",
+        "output_path": "{{output_path}}",
+        "export_as": "tutor_result"
+      }
+    },
+    {
+      "id": "log_tutor",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "tutor_result",
+      "params": { "message": "Tutor session result stored at {{output_path}}" }
+    }
+  ]
+}

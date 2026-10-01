@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
+import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { resolveCoordinationActuatorRoute } from './coordination-actuator-routing.js';
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
@@ -83,31 +84,23 @@ function inferCoordinationKind(
 ): GuidedCoordinationBrief['coordination_kind'] {
   if (seed.coordinationKind) return seed.coordinationKind;
   const text = seed.requestText;
-  if (
-    /会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i.test(
-      text
-    )
-  ) {
+  if (matchesIntentPhrase(text, 'coordination.meeting_request')) {
     return 'meeting';
   }
-  if (/パワーポイント|powerpoint|ppt|スライド|deck|briefing pack|presentation|提案書/i.test(text)) {
+  if (matchesIntentPhrase(text, 'guided_coordination.presentation')) {
     return 'presentation';
   }
-  if (/動画|video|movie|ナレーション|narrated/i.test(text)) return 'narrated_video';
-  if (/予約|booking|reservation|purchase|order|appointment|apply/i.test(text)) return 'booking';
-  if (/旅行|travel|trip|tour|宿泊|hotel|flight/i.test(text)) return 'travel';
-  if (
-    /スケジュール|予定|日程|リスケ|resched|reschedule|calendar|調整|変更|空き時間|availability/i.test(
-      text
-    )
-  ) {
+  if (matchesIntentPhrase(text, 'guided_coordination.narrated_video')) return 'narrated_video';
+  if (matchesIntentPhrase(text, 'guided_coordination.booking')) return 'booking';
+  if (matchesIntentPhrase(text, 'guided_coordination.travel')) return 'travel';
+  if (matchesIntentPhrase(text, 'guided_coordination.schedule')) {
     return 'schedule';
   }
-  if (/オンボーディング|onboarding|初回設定|初期設定|setup/i.test(text)) return 'onboarding';
-  if (/proposal|提案|ストーリー|storyline|稟議|decision support|意思決定/i.test(text))
-    return 'proposal';
-  if (/比較|compare|strategy|優先順位|priorit/i.test(text)) return 'decision_support';
-  if (/service|運用|operation|diagnos|inspec/i.test(text)) return 'service_operation';
+  if (matchesIntentPhrase(text, 'guided_coordination.onboarding')) return 'onboarding';
+  if (matchesIntentPhrase(text, 'guided_coordination.proposal')) return 'proposal';
+  if (matchesIntentPhrase(text, 'guided_coordination.decision_support')) return 'decision_support';
+  if (matchesIntentPhrase(text, 'guided_coordination.service_operation'))
+    return 'service_operation';
   return 'general';
 }
 

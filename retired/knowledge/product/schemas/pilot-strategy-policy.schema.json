@@ -2,7 +2,15 @@
   "$id": "https://kyberion.local/schemas/pilot-strategy-policy.schema.json",
   "title": "Pilot Strategy Policy",
   "type": "object",
-  "required": ["version", "title", "target", "value_proposition_title", "market_strategy_title", "key_benefits_title", "phase_titles"],
+  "required": [
+    "version",
+    "title",
+    "target",
+    "value_proposition_title",
+    "market_strategy_title",
+    "key_benefits_title",
+    "phase_titles"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "string" },

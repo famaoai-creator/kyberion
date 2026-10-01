@@ -14,6 +14,7 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
+import type { DeliveryPack } from '@agent/core/contracts/delivery-pack';
 
 export interface ArtifactAction {
   action:
@@ -152,7 +153,7 @@ export async function handleArtifactAction(input: ArtifactAction) {
           recommended_next_action: admittedParams.recommendedNextAction || '',
           artifacts_by_role: admittedParams.artifactsByRole || {},
           artifacts: Array.isArray(admittedParams.artifacts) ? admittedParams.artifacts : [],
-        };
+        } satisfies DeliveryPack;
         return {
           status: 'written',
           dir,

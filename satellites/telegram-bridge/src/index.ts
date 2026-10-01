@@ -10,6 +10,7 @@ import {
   readJsonLines,
 } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
@@ -575,6 +576,18 @@ export async function handleTelegramUpdate(
   update: TelegramUpdate,
   options: TelegramBridgeOptions = {}
 ): Promise<TelegramWebhookReceipt> {
+  // IT-02: replies follow the language the user wrote in (explicit locale still wins).
+  const incoming = pickMessage(update);
+  return runWithReplyLocale(
+    deriveReplyLocale({ text: incoming ? pickText(incoming) : undefined }),
+    () => handleTelegramUpdateInner(update, options)
+  );
+}
+
+async function handleTelegramUpdateInner(
+  update: TelegramUpdate,
+  options: TelegramBridgeOptions
+): Promise<TelegramWebhookReceipt> {
   if (update.callback_query) {
     return handleTelegramCallbackQuery(update.callback_query, options);
   }
@@ -744,7 +757,6 @@ export async function handleTelegramUpdate(
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'telegram',
-          locale: resolveOperatorLocale(),
           text,
           channel: chatId,
           threadTs,

@@ -64,6 +64,10 @@ function routedReasonsLine(requestId: string): string {
   return loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)!.decisionCard!.riskReasons[0];
 }
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('routeAutonomousDecision', () => {
   beforeEach(() => {
     notifications.prefs = { default_channel: { surface: 'telegram', target: CHAT } };
@@ -163,6 +167,30 @@ describe('routeAutonomousDecision', () => {
     expect(stored?.expiresAt).toBeTruthy();
     expect(stored?.veto).toBeUndefined();
     expect(routed.card?.reasons).toEqual(['重要なファイルを変更します: libs/core/secure-io.ts']);
+  });
+
+  it('parks a recurring caller on its pending request instead of ringing again', () => {
+    const input = {
+      role: 'mission_controller' as const,
+      gate: gate({ decision: 'approve', allowed: false, actionId: 'daemon_restart' }),
+      title: 'Restart scheduler',
+      question: 'Restart the scheduler daemon?',
+      recommendation: 'Approve: heartbeat stale',
+      requestedBy: 'daemon_watchdog',
+      dedupeKey: 'scheduler',
+    };
+    const first = routeAutonomousDecision(input);
+    const second = routeAutonomousDecision({ ...input, now: Date.now() + 60_000 });
+    expect(first).toMatchObject({ parked: true, notified: true });
+    expect(first.reused).toBeUndefined();
+    expect(second).toMatchObject({
+      parked: true,
+      proceed: false,
+      notified: false,
+      reused: true,
+      requestId: first.requestId,
+    });
+    expect(notifications.notifyOperatorSync).toHaveBeenCalledTimes(1);
   });
 
   it('holds a non-blocking decision for the digest', () => {

@@ -68,7 +68,7 @@
       "op": "system:log",
       "consumes": ["requirements", "design", "test_plan", "task_plan"],
       "params": {
-        "message": "Onboarding artifacts for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks). Next: pnpm pipeline --input pipelines/execute-task-plan.json"
+        "message": "Onboarding artifacts for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks). Next: pnpm pipeline --input knowledge/product/pipeline-templates/execute-task-plan.json"
       }
     }
   ]
