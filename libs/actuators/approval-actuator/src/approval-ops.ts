@@ -1,6 +1,7 @@
 import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
+import { charterInputForDecision } from '@agent/core/governance/charter-call-site';
 import { isApprovalRequestExpired } from '@agent/core/governance/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
@@ -39,7 +40,18 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     actorRole: input.caller_role,
     amount: input.amount,
   });
-  if (!evaluation || !evaluation.requiresEscalation) {
+  // An active accountability charter for the tenant takes part even when the
+  // decision-rights matrix would not escalate: the charter is a limit as well
+  // as a grant (out-of-envelope spend needs a human), and its consumption must
+  // be recorded. `undefined` (no charter / unmapped decision type) keeps the
+  // legacy behavior exactly.
+  const charter = charterInputForDecision({
+    tenantSlug: input.tenant_slug,
+    agentId: input.agent_id,
+    decisionType: input.decision_type,
+    amount: input.amount,
+  });
+  if ((!evaluation || !evaluation.requiresEscalation) && !charter) {
     return { allowed: true, status: 'not_required' };
   }
 
@@ -49,6 +61,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
     callerRole: input.caller_role,
     correlationId: input.correlation_id,
     channel: input.channel || 'mission',
+    ...(charter ? { charter } : {}),
     payload: {
       decision_type: input.decision_type,
       ...(typeof input.amount === 'number' && Number.isFinite(input.amount)

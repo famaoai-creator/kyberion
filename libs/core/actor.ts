@@ -24,6 +24,14 @@
  * human-only (plan §2.5 principle 4): {@link assertHumanActor} is the one
  * check every such seam calls, so "who may decide" is answered by this
  * module instead of being re-implemented per call site.
+ *
+ * Accountability charter: an agent still never *decides* — no approval record
+ * is ever written in an agent's name. Under an active charter the approval
+ * gate instead lets in-envelope work run without a decision, and the audit
+ * entry names the human who answers for it (`responsible`, plus the agent's
+ * `on_behalf_of`). Responsibility stays human-only; execution inside the
+ * declared envelope does not need a per-action decision
+ * (`governance/approval-gate-charter.ts`).
  */
 
 // Import the dependency-free grammar leaf modules directly (not

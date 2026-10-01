@@ -10,7 +10,14 @@ import {
   clearTripwire,
   decideUnderCharter,
   findActiveCharter,
+  listActiveCharters,
+  isCharterRetired,
+  retireCharter,
   listCharterIds,
+  readCharterLedger,
+  evaluateUnderCharter,
+  recordCharterConsumption,
+  recordCharterDenial,
   loadCharterUsage,
   readCharter,
   recordTripwire,
@@ -162,5 +169,72 @@ describe('accountability-charter-registry', () => {
     );
     clearTripwire(c, 'audit-chain-gap', humanActor('carol'), opts(), NOW);
     expect(decideUnderCharter(SCOPE, act, HERE, opts(), NOW)?.decision).toBe('allow');
+  });
+  it('consumption and denial are idempotent per correlation id (a retried gate call never double-counts)', () => {
+    const c = readCharter(SCOPE, 'chr-acme-1', opts()) as Charter;
+    const action = {
+      actor: agentActor(NHI, 'user:owner'),
+      action_class: 'payment',
+      amount: 1000,
+      currency: 'JPY',
+      reversible: true,
+    };
+    const at = new Date('2026-10-01T10:00:00.000Z');
+    const ev = evaluateUnderCharter(SCOPE, action, HERE, opts(), at);
+    expect(ev?.decision.decision).toMatch(/allow/);
+    const before = readCharterLedger(c, opts()).length;
+    expect(recordCharterConsumption(c, action, ev!.decision, opts(), at, 'corr-x')).toBe(true);
+    expect(recordCharterConsumption(c, action, ev!.decision, opts(), at, 'corr-x')).toBe(false);
+    expect(readCharterLedger(c, opts()).length).toBe(before + 1);
+    // Evaluating alone never records.
+    evaluateUnderCharter(SCOPE, action, HERE, opts(), at);
+    expect(readCharterLedger(c, opts()).length).toBe(before + 1);
+    const big = { ...action, amount: 900_000 };
+    const denial = evaluateUnderCharter(SCOPE, big, HERE, opts(), at)!;
+    expect(denial.decision.decision).toBe('deny');
+    expect(recordCharterDenial(c, big, denial.decision, opts(), at, 'corr-y')).toBe(true);
+    expect(recordCharterDenial(c, big, denial.decision, opts(), at, 'corr-y')).toBe(false);
+    // Recording an allow as a denial (or vice versa) is a no-op.
+    expect(recordCharterDenial(c, action, ev!.decision, opts(), at, 'corr-z')).toBe(false);
+  });
+
+  it('listActiveCharters returns the charters in force (no tenants registered in the fixture → only person scope)', () => {
+    expect(listActiveCharters(NOW, opts())).toEqual([]);
+  });
+  it('amendments replace the active charter: a second charter needs `replaces`, the old one is retired (kept, never edited)', () => {
+    const scope = { kind: 'organization', tenant_slug: 'acme-amend' } as const;
+    const base = (id: string) => ({ ...draft(id), scope });
+    const accept2 = (id: string, replaces?: string, by = humanActor('owner')) =>
+      acceptCharter(
+        {
+          draft: base(id),
+          statement: 'I am accountable.',
+          acceptedBy: by,
+          validation: { holder_role: 'owner' },
+          now: NOW,
+          ...(replaces ? { replaces } : {}),
+        },
+        opts()
+      );
+    accept2('chr-amend-1');
+    expect(() => accept2('chr-amend-2')).toThrow(/pass replaces/);
+    expect(() => accept2('chr-amend-2', 'chr-wrong')).toThrow(/pass replaces/);
+    accept2('chr-amend-2', 'chr-amend-1');
+    const old = readCharter(scope, 'chr-amend-1', opts()) as Charter;
+    expect(old).not.toBeNull(); // kept for the record
+    expect(isCharterRetired(old, opts())).toBe(true);
+    expect(findActiveCharter(scope, NOW, opts())?.charter_id).toBe('chr-amend-2');
+    // `replaces` for a scope with nothing active is refused.
+    expect(() => accept2('chr-other', 'chr-amend-1')).toThrow(/pass replaces/);
+    // Retiring: only the accountable human or a deputy, and only humans.
+    const cur = findActiveCharter(scope, NOW, opts()) as Charter;
+    expect(() => retireCharter(cur, agentActor(NHI, 'user:owner'), 'x', opts(), NOW)).toThrow(
+      /human actor/
+    );
+    expect(() => retireCharter(cur, humanActor('mallory'), 'x', opts(), NOW)).toThrow(
+      /cannot retire/
+    );
+    retireCharter(cur, humanActor('carol'), 'stop delegating', opts(), NOW);
+    expect(findActiveCharter(scope, NOW, opts())).toBeNull(); // legacy approval gate applies again
   });
 });
