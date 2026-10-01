@@ -29,7 +29,7 @@ describe('Release operations contract', () => {
   it('documents the release notes extractor and migration runner contract', () => {
     const packageJson = read('package.json');
     expect(packageJson).toContain(
-      '"release:notes": "node dist/scripts/extract_changelog_section.js"'
+      '"release:notes": "node scripts/run_built.mjs dist/scripts/extract_changelog_section.js"'
     );
     expect(packageJson).toContain(
       '"release:source-archive": "node --import ./scripts/ts-loader.mjs scripts/source_archive.ts"'

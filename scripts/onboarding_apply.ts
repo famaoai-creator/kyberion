@@ -296,7 +296,7 @@ export async function applyTenants(
       // Cross-tenant/public learning is an explicit brokered promotion, never
       // an onboarding default. Strict isolation must remain meaningful.
       isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
-      metadata: { onboarding_source: 'pnpm onboard apply' },
+      metadata: { onboarding_source: 'pnpm onboarding apply' },
     };
     await writeJson(
       path.join(tenantDir, `${t.tenant_slug}.json`),
@@ -433,7 +433,7 @@ export function buildApplySummary(
     'Next steps:',
     '1. Run `pnpm pipeline vital-check` to verify the live ecosystem health.',
     '2. Open Chronos to confirm the identity badge and tenant context.',
-    '3. Re-run `pnpm onboard apply --json` if you need machine-readable output.',
+    '3. Re-run `pnpm onboarding apply --json` if you need machine-readable output.',
   ];
   return lines.join('\n');
 }

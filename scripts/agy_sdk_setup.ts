@@ -146,7 +146,7 @@ export function formatAgySdkReport(report: SetupReport, apply: boolean): string[
   ];
   if (report.pythonBin) lines.push(`  python: ${report.pythonBin}`);
   if (!apply && report.status === 'needs_install') {
-    lines.push('Next step: `pnpm agy:sdk:setup --apply`');
+    lines.push('Next step: `pnpm agy:sdk-setup --apply`');
   }
   return lines;
 }
@@ -163,7 +163,7 @@ export async function main(args: string[] = []): Promise<{ report: SetupReport; 
 export { inspect as inspectAgySdkRuntime, install as installAgySdkRuntime };
 
 export const runAgySdkSetup = defineScript({
-  name: 'agy:sdk:setup',
+  name: 'agy:sdk-setup',
   flags: [],
   run: async (context) => {
     const { report, apply } = await main(context.argv);

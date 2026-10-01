@@ -6,6 +6,33 @@ import { describe, expect, it, vi } from 'vitest';
 // theme-registry.test.ts.
 import providerCapabilityRegistrySchema from '../../../knowledge/product/schemas/provider-capability-registry.schema.json';
 import type { ProbeExecFn } from './provider-capability-registry.js';
+// Probe specs are provider-descriptor data; load the governed CLI descriptors
+// statically so the secure-io/path-resolver mocks below do not hide them.
+import agyCli from '../../../knowledge/product/governance/reasoning-providers/agy-cli.json';
+import claudeCli from '../../../knowledge/product/governance/reasoning-providers/claude-cli.json';
+import codexCli from '../../../knowledge/product/governance/reasoning-providers/codex-cli.json';
+import copilotCli from '../../../knowledge/product/governance/reasoning-providers/copilot.json';
+import cursorCli from '../../../knowledge/product/governance/reasoning-providers/cursor-cli.json';
+import devinCli from '../../../knowledge/product/governance/reasoning-providers/devin-cli.json';
+import geminiCli from '../../../knowledge/product/governance/reasoning-providers/gemini-cli.json';
+import grokCli from '../../../knowledge/product/governance/reasoning-providers/grok-cli.json';
+import opencodeCli from '../../../knowledge/product/governance/reasoning-providers/opencode-cli.json';
+
+const CLI_DESCRIPTORS = [
+  claudeCli,
+  codexCli,
+  agyCli,
+  grokCli,
+  cursorCli,
+  opencodeCli,
+  devinCli,
+  geminiCli,
+  copilotCli,
+].flatMap((file) => (file as { providers: Array<{ cli?: unknown }> }).providers);
+
+vi.mock('../reasoning/reasoning-provider-registry.js', () => ({
+  listCliReasoningProviderDescriptors: () => CLI_DESCRIPTORS.filter((d) => d.cli),
+}));
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;

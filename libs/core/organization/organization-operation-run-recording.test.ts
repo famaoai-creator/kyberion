@@ -205,7 +205,7 @@ describe('organization record_run params', () => {
     ).toThrow(/requires an evidence ref.*--evidence-ref/);
   });
 
-  it('lists allowed scope prefixes and the definition-vs-evidence split for out-of-scope refs', () => {
+  it('lists allowed scope prefixes and accepts mission ids as execution refs when resolvable', () => {
     expect(() =>
       recordOrganizationOperationRun({
         organizationId: 'org-run',
@@ -220,7 +220,7 @@ describe('organization record_run params', () => {
         apply: false,
       })
     ).toThrow(
-      /Allowed prefixes.*knowledge\/confidential\/tenant-run.*operation definition's.*trace or report file/s
+      /Allowed prefixes.*knowledge\/confidential\/tenant-run.*mission id that resolves|operation definition's/s
     );
   });
 });

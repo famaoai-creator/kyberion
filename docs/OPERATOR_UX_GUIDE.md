@@ -10,6 +10,8 @@ The operator can always see the request, plan, result, and next action.
 
 This guide explains how to operate Kyberion without forcing people to think in implementation details first.
 
+> Setup and the first win live in [QUICKSTART](./QUICKSTART.md) (the single front door). Every command is listed in the generated [CLI Reference](./CLI_REFERENCE.md); task-oriented notes for the everyday ones are in the [Commands Guide](./user/COMMANDS_GUIDE.md).
+
 Surface map: [`docs/SURFACES.md`](./SURFACES.md).
 
 For enterprise role separation above the operator layer, also read:
@@ -146,11 +148,11 @@ For hands-free dictation on macOS, use `system:voice_input_toggle` as the fallba
 
 Use `pnpm env:bootstrap --manifest kyberion-toolchain` first when you want to confirm the local toolchain needed to build and run Kyberion from source. Then use `pnpm surfaces setup` when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. After that, use `pnpm surfaces reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
 
-Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs. The reasoning setup now distinguishes `claude-cli`, `anthropic`, `codex-cli`, `gemini-cli`, `nemotron-api`, `local`, and `stub`, so OpenAI-compatible Nemotron endpoints are visible before bootstrap chooses a backend.
+Use `pnpm service:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs. The reasoning setup now distinguishes `claude-cli`, `anthropic`, `codex-cli`, `gemini-cli`, `nemotron-api`, `local`, and `stub`, so OpenAI-compatible Nemotron endpoints are visible before bootstrap chooses a backend.
 
 Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
-Kyberion doctor is **`pnpm run doctor`**. Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
+Kyberion doctor is **`pnpm kyberion doctor`** (`pnpm run doctor` is equivalent). Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
 
 `pnpm run doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
@@ -231,7 +233,7 @@ Use this when you want to register a new operator voice profile before meeting w
 pnpm meeting:preflight
 ```
 
-失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
+失敗したら `pnpm kyberion doctor --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
 
 2. 初回だけ voice profile と consent をまとめて作る。
 
@@ -259,7 +261,7 @@ pnpm meeting:participate \
   --display-name "Kyberion (operator delegate)"
 ```
 
-失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
+失敗したら `pnpm kyberion doctor --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
 
 5. 会議後フォローアップで議事録と action items を作る。
 
@@ -431,7 +433,7 @@ Examples:
 
 For distillation and other structured reasoning tasks, see:
 
-- [`knowledge/product/governance/wisdom-policy-guide.md`](knowledge/product/governance/wisdom-policy-guide.md)
+- [`knowledge/product/governance/wisdom-policy-guide.md`](../knowledge/product/governance/wisdom-policy-guide.md)
 
 Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
 
@@ -499,8 +501,8 @@ Practical rules:
 ```bash
 pnpm install
 pnpm build
-pnpm onboard
-pnpm doctor
+pnpm onboarding
+pnpm kyberion doctor
 pnpm capabilities
 pnpm dashboard -- --once --focus onboarding
 ```
@@ -545,15 +547,15 @@ mission/task で実作業を進め、結果の証拠ができたら `organizatio
 ### Mission hygiene(未開始ミッションの整理)
 
 ```bash
-pnpm mission-controller hygiene            # planned 滞留の一覧+ミッション別の推奨コマンド
-pnpm mission-controller hygiene --notify   # 要対応分を ops alert + inbox に通知
+pnpm mission hygiene            # planned 滞留の一覧+ミッション別の推奨コマンド
+pnpm mission hygiene --notify   # 要対応分を ops alert + inbox に通知
 ```
 
 `planned` は「作成済み・未開始」の正規状態(start か gate 通過で active 化)。
 hygiene は滞留理由を分類する: design_missing(タスク未展開)/
 ready_not_started(タスクあり・未ディスパッチ)/ awaiting_gate(gate 未通過)。
 状態は一切変更しない — 開始(start / dispatch-workitems)か整理(cancel)は
-常にオペレーターの判断。`pnpm doctor` にも滞留サマリが1行出る。
+常にオペレーターの判断。`pnpm kyberion doctor` にも滞留サマリが1行出る。
 
 ### Virtual Office(エージェント稼働の可視化)
 

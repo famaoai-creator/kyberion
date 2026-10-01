@@ -73,7 +73,7 @@ export function buildProfileSetupNextAction(
     title: 'Complete identity and onboarding profile',
     reason: `Vital reports ${profileGaps.length} missing or invalid profile files: ${profileGaps.map((check) => check.label).join(', ')}.`,
     next_action_type: 'bootstrap_environment',
-    suggested_command: 'pnpm onboard',
+    suggested_command: 'pnpm onboarding',
   });
 }
 
@@ -99,7 +99,7 @@ export function buildFirstTimeUserNextActions(
         title: 'Repair service setup',
         reason: `${report.services.summary.authMissing} services are missing auth and ${report.services.summary.connectionMissing} are missing connections.`,
         next_action_type: 'bootstrap_environment',
-        suggested_command: 'pnpm services:setup',
+        suggested_command: 'pnpm service:setup',
       })
     );
   }
@@ -203,7 +203,7 @@ function buildRecommendedSurfaces(
         voiceReadiness === 'ready'
           ? 'pnpm pipeline --input pipelines/voice-hello.json'
           : voiceReadiness === 'needs_setup'
-            ? 'pnpm doctor --runtime browser'
+            ? 'pnpm kyberion doctor --runtime browser'
             : 'pnpm surfaces status',
     },
     {

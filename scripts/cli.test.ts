@@ -258,8 +258,16 @@ describe('Kyberion CLI helpers', () => {
     expect(lines.join('\n')).toContain('実行準備度: 追加確認が必要');
   });
 
-  it('includes the email workflow command in help output', async () => {
+  it('renders the grouped registry help shared with kyberion --help (CU-03)', async () => {
     const output = await captureMainOutput(['help', '--locale', 'en']);
+    expect(output).toContain('Kyberion commands');
+    expect(output).toContain('Start here');
+    expect(output).toMatch(/^ {2}email status +Show email connection and workflow status$/mu);
+    expect(output).not.toContain('── Actuator Management');
+  });
+
+  it('includes the email workflow command in detailed help output', async () => {
+    const output = await captureMainOutput(['help', '--detail', '--locale', 'en']);
     expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
     expect(output).toContain('pnpm kyberion email status');
     expect(output).toContain('pnpm kyberion email draft');
@@ -270,7 +278,7 @@ describe('Kyberion CLI helpers', () => {
   });
 
   it('renders help in Japanese when --locale ja is passed (UX-03)', async () => {
-    const output = await captureMainOutput(['help', '--locale', 'ja']);
+    const output = await captureMainOutput(['help', '--detail', '--locale', 'ja']);
     expect(output).toContain('使い方: pnpm kyberion <コマンド> [引数]');
     expect(output).toContain('── アクチュエータ管理 ──');
     expect(output).toContain('Gmail 認証の準備状態を確認');
@@ -398,8 +406,8 @@ describe('Kyberion CLI helpers', () => {
     expect(process.exitCode ?? 0).toBe(previousExitCode ?? 0);
   });
 
-  it('includes the offboarding command in help output', async () => {
-    const output = await captureMainOutput(['help', '--locale', 'en']);
+  it('includes the offboarding command in detailed help output', async () => {
+    const output = await captureMainOutput(['help', '--detail', '--locale', 'en']);
     expect(output).toContain('offboard <tenant|project> <id>');
     expect(output).toContain('pnpm kyberion offboard tenant acme');
   });

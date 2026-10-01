@@ -60,7 +60,7 @@ human feedback, knowledge gaps, usage aggregates, archive-advisory history, and
 promotion candidates are written below
 `active/shared/runtime/feedback-loop/tenants/{tenant-slug}/` when a tenant
 scope is resolved. The unscoped legacy lane is read-only for tenant retrieval;
-`pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --dry-run`
+`pnpm namespace:migrate-physical -- --kind <feedback|intent|ledger|promotion> --dry-run`
 plans only whole records/files whose contents carry one authoritative tenant,
 and quarantines mixed or unscoped data instead of guessing ownership. The weekly
 curation report requires two weekly low-yield plus freshness observations
@@ -217,7 +217,7 @@ explicit deferrals with their compensating controls.
 - [ ] Per-tenant SIEM endpoints configured via
       `KYBERION_AUDIT_FORWARDER_*` env variables with one runtime
       process per tenant.
-- [ ] Watchdog: `pnpm watch:tenant-drift` cron'd every 15 minutes;
+- [ ] Watchdog: `pnpm tenant:watch-drift` cron'd every 15 minutes;
       first finding paged to operator chat.
 
 ### Week 4 — staging dry-run for the first tenant
@@ -370,7 +370,7 @@ does a non-mutating dry-run for feedback, intent-contract, the DA-05 asset
 ledger, and the promotion queue, runs the semantic scope checker and tier-hygiene scan, and writes one
 operator report under `active/shared/runtime/reports/`. A record without an
 authoritative tenant is reported as `unscoped-legacy` and is eligible for
-quarantine; `pnpm migrate:physical-namespaces -- --kind <feedback|intent|ledger|promotion> --apply`
+quarantine; `pnpm namespace:migrate-physical -- --kind <feedback|intent|ledger|promotion> --apply`
 moves it to the hash-verified quarantine namespace without assigning a tenant.
 The health watcher also reports legacy-file growth and quarantine TTL breaches.
 Tenant weight changes are emitted as `approval_required` proposals below the physical
@@ -415,10 +415,10 @@ When introducing the second tenant:
 
 ## 12. Reference
 
-- [`tier-hygiene-policy.json`](knowledge/product/governance/tier-hygiene-policy.json)
-- [`path-scope-policy.json`](knowledge/product/governance/path-scope-policy.json)
-- [`tiered-consensus-and-experimental-branches.md`](knowledge/product/governance/tiered-consensus-and-experimental-branches.md)
-- [`libs/core/secure-io.ts`](libs/core/secure-io.ts)
-- [`libs/core/governance/audit-chain.ts`](libs/core/governance/audit-chain.ts)
-- [`libs/core/governance/audit-forwarder.ts`](libs/core/governance/audit-forwarder.ts)
-- [`libs/core/secret/secret-resolver.ts`](libs/core/secret/secret-resolver.ts)
+- [`tier-hygiene-policy.json`](../governance/tier-hygiene-policy.json)
+- [`path-scope-policy.json`](../governance/path-scope-policy.json)
+- [`tiered-consensus-and-experimental-branches.md`](../governance/tiered-consensus-and-experimental-branches.md)
+- [`libs/core/secure-io.ts`](../../../libs/core/secure-io.ts)
+- [`libs/core/governance/audit-chain.ts`](../../../libs/core/governance/audit-chain.ts)
+- [`libs/core/governance/audit-forwarder.ts`](../../../libs/core/governance/audit-forwarder.ts)
+- [`libs/core/secret/secret-resolver.ts`](../../../libs/core/secret/secret-resolver.ts)

@@ -20,7 +20,9 @@ const HELP = `Usage:
   pnpm reasoning:config list [--json]
   pnpm reasoning:config explain --role <role> [--json]
   pnpm reasoning:config validate [--json]
-  pnpm reasoning:config doctor [--json]
+  pnpm reasoning:config doctor [--live] [--json]
+      (default: key-presence checks only; --live also makes live credential
+       probes such as Anthropic GET /v1/models)
   pnpm reasoning:config bind-role <role> <profile|mode:model> [--dry-run]
   pnpm reasoning:config set-fallback --role <role> <profile1,profile2,...> [--dry-run]
   pnpm reasoning:config rollback [--dry-run]
@@ -196,8 +198,12 @@ function rollback(argv: string[], dryRun: boolean, print: (value: unknown) => vo
   print(`Restored ${path}`);
 }
 
-async function doctor(asJson: boolean, print: (value: unknown) => void): Promise<void> {
-  const report = await inspectReasoningRoutes();
+async function doctor(
+  asJson: boolean,
+  live: boolean,
+  print: (value: unknown) => void
+): Promise<void> {
+  const report = await inspectReasoningRoutes({ live });
   if (asJson) return print(report);
   const lines = report.entries.map(
     (entry) => `${entry.role}: ${entry.status} ${entry.mode} ${entry.profileRef} — ${entry.reason}`
@@ -221,7 +227,7 @@ export async function main(
   if (command === 'list') return listRoutes(asJson, print);
   if (command === 'explain') return explainRoute(argv, asJson, print);
   if (command === 'validate') return validateRoutes(asJson, print);
-  if (command === 'doctor') return doctor(asJson, print);
+  if (command === 'doctor') return doctor(asJson, hasFlag(argv, '--live'), print);
   if (command === 'bind-role') return bindRole(argv, dryRun, print);
   if (command === 'set-fallback') return setFallback(argv, dryRun, print);
   if (command === 'rollback') return rollback(argv, dryRun, print);

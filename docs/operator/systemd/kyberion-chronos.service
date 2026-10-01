@@ -9,7 +9,7 @@ WorkingDirectory=/home/kyberion/kyberion
 Environment=NODE_ENV=production
 Environment=KYBERION_CUSTOMER=customer-slug
 EnvironmentFile=-/etc/kyberion/env
-ExecStart=/usr/bin/pnpm chronos
+ExecStart=/usr/bin/pnpm scheduler
 Restart=on-failure
 RestartSec=10
 

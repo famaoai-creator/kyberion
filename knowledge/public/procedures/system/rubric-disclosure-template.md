@@ -30,15 +30,15 @@ validity of the underlying analysis.
 
 ### What the Rubric verifies (structural)
 
-| Check | Verifies | Does not verify |
-|---|---|---|
-| `has_branches` | At least one branch was simulated | Whether those branches are the *right* branches |
-| `failure_xor_success` | No branch reports both terminal modes | Whether the chosen terminal mode is the correct one |
-| `unique_branch_ids` | Each branch_id appears once | Whether the branches collectively cover the decision space |
-| `reaches_terminal_mode` | At least one branch reached a conclusion | Whether the conclusion is sound |
-| `outcome_balance` | Outcomes are not all-failure or all-success | Whether the outcome split reflects reality |
-| `non_trivial_termination_depth` | Branches simulated for more than zero steps | Whether the simulation steps were meaningful |
-| `mean_convergence` (ensemble) | Re-runs agree on the dominant outcome | Whether the agreed outcome is correct |
+| Check                           | Verifies                                    | Does not verify                                            |
+| ------------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| `has_branches`                  | At least one branch was simulated           | Whether those branches are the _right_ branches            |
+| `failure_xor_success`           | No branch reports both terminal modes       | Whether the chosen terminal mode is the correct one        |
+| `unique_branch_ids`             | Each branch_id appears once                 | Whether the branches collectively cover the decision space |
+| `reaches_terminal_mode`         | At least one branch reached a conclusion    | Whether the conclusion is sound                            |
+| `outcome_balance`               | Outcomes are not all-failure or all-success | Whether the outcome split reflects reality                 |
+| `non_trivial_termination_depth` | Branches simulated for more than zero steps | Whether the simulation steps were meaningful               |
+| `mean_convergence` (ensemble)   | Re-runs agree on the dominant outcome       | Whether the agreed outcome is correct                      |
 
 ### What the Rubric does **not** verify (logical / causal)
 
@@ -66,7 +66,7 @@ errors in any of them:
 3. Where the decision is **regulated** (e.g. covered by SR 11-7 or
    J-SOX), an independent validation per the Independent Validation
    Evidence Package is also required (see
-   [`../../governance/independent-validation-evidence-package.md`](knowledge/product/governance/independent-validation-evidence-package.md)).
+   [`../../governance/independent-validation-evidence-package.md`](../../../product/governance/independent-validation-evidence-package.md)).
 
 ### Mandatory companion artefacts
 
@@ -87,7 +87,7 @@ When sharing simulation output:
 2. Confirm the companion artefacts are attached or referenced.
 3. If the rubric severity is `warn` or `poor`, additionally attach the
    relevant `rubric-warn-banner` / `rubric-poor-banner` text from
-   [`../../governance/counterfactual-degradation-policy.json`](knowledge/product/governance/counterfactual-degradation-policy.json).
+   [`../../governance/counterfactual-degradation-policy.json`](../../../product/governance/counterfactual-degradation-policy.json).
 
 This disclosure is canonical and English-first. Localized labels for the
 column headers may use the governed vocabulary catalog. The body text

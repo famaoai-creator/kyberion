@@ -35,7 +35,7 @@ Domain-specific templates may layer additional checks, but they should not dupli
 
 ## Chronos / schedule pickup
 
-Templates are **not** live Chronos jobs. Chronos reads a `schedule` block (`id`, `cron`, `timezone`, `enabled`) on a pipeline that has been instantiated into `pipelines/` or `knowledge/confidential/{tenant}/pipelines/`, then registered (`pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"`) or picked up after `pnpm chronos` has started once.
+Templates are **not** live Chronos jobs. Chronos reads a `schedule` block (`id`, `cron`, `timezone`, `enabled`) on a pipeline that has been instantiated into `pipelines/` or `knowledge/confidential/{tenant}/pipelines/`, then registered (`pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"`) or picked up after `pnpm scheduler` has started once.
 
 House pattern (see `pipelines/daily-routine.json` and `pipelines/meeting-watcher.json`):
 

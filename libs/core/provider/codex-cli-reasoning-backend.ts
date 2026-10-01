@@ -47,6 +47,7 @@ import {
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from '../shell/sandbox-policy.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 
@@ -161,7 +162,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
             ? {
                 model: resolveCodexModelForTier(
                   options.model_tier,
-                  this.options.model ?? 'gpt-6-sol'
+                  this.options.model ?? resolveRuntimeModelId('codex-default')
                 ),
               }
             : {}),

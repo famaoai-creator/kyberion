@@ -972,3 +972,30 @@ describe('dispatchProcedure — service:preset', () => {
     expect(result.errors.join(' ')).toContain('unknown step unknown');
   });
 });
+
+describe('procedure executor registry (RS-07)', () => {
+  it('registers adapter executors and execution-substrate routes as data', async () => {
+    const { listProcedureExecutors, listProcedureExecutionSubstrateRoutes } =
+      await import('./procedure-dispatcher.js');
+    expect(listProcedureExecutors().sort()).toEqual(
+      ['extension_session', 'media:pipeline', 'service:preset', 'system'].sort()
+    );
+    expect(listProcedureExecutionSubstrateRoutes()).toEqual(['browser:playwright']);
+  });
+
+  it('fails closed for an unregistered executor (including prototype keys)', async () => {
+    const { dispatchProcedure } = await import('./procedure-dispatcher.js');
+    for (const executor of ['carrier-pigeon', 'toString']) {
+      const result = await dispatchProcedure({
+        procedure: {
+          substrate: 'browser',
+          adapter: { executor },
+        } as unknown as ProcedureEntry,
+        agentId: 'test-agent',
+        missionId: 'MSN-TEST',
+      });
+      expect(result.status).toBe('blocked');
+      expect(result.errors[0]).toContain(`Unknown executor: "${executor}"`);
+    }
+  });
+});

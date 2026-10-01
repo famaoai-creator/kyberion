@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const HEALTH_COMMANDS = [
   'pnpm pipeline --input pipelines/baseline-check.json',
   'pnpm pipeline --input pipelines/full-health-report.json',
-  'pnpm watch:tenant-drift',
+  'pnpm tenant:watch-drift',
   'pnpm run check -- --scope full --only contract-schemas',
 ];
 

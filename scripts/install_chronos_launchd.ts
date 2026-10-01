@@ -3,18 +3,18 @@
  * scripts/install_chronos_launchd.ts — LC-01d
  *
  * Ceremony for keeping long-lived daemons alive across logins. The chronos
- * daemon (`pnpm chronos`) is the ONLY pipeline scheduler in the system; when
+ * daemon (`pnpm scheduler`) is the ONLY pipeline scheduler in the system; when
  * it dies, every registered pipeline schedule silently stops firing. This
  * script generates a macOS LaunchAgent so launchd restarts it. Other
  * heartbeat-recording daemons from LAUNCHD_DAEMON_SPECS are installed the
  * same way via `--daemon <id>`.
  *
  * Modes:
- *   pnpm kyberion chronos install                 # dry-run: print plist + exact steps
- *   pnpm kyberion chronos install --apply         # stage plist + run launchctl
- *   pnpm kyberion chronos install --apply --daemon generation-schedule
- *   pnpm kyberion chronos uninstall               # dry-run: print bootout steps
- *   pnpm kyberion chronos uninstall --apply       # bootout + remove the plist
+ *   pnpm kyberion scheduler install                 # dry-run: print plist + exact steps
+ *   pnpm kyberion scheduler install --apply         # stage plist + run launchctl
+ *   pnpm kyberion scheduler install --apply --daemon generation-schedule
+ *   pnpm kyberion scheduler uninstall               # dry-run: print bootout steps
+ *   pnpm kyberion scheduler uninstall --apply       # bootout + remove the plist
  *
  * secure-io note: $HOME/Library/LaunchAgents is outside the secure-io write
  * roots, so --apply never writes there via file I/O. The plist is staged
@@ -286,7 +286,7 @@ function printManualSteps(
       `3. Verify: launchctl print gui/${uid}/${spec.label} | head`,
       `   (${spec.verificationHint})`,
       '',
-      'Or run: pnpm kyberion chronos install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
+      'Or run: pnpm kyberion scheduler install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
       `Uninstall later: launchctl bootout gui/${uid}/${spec.label} && rm ${target}`,
     ].join('\n')
   );
@@ -351,7 +351,7 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
           `1. launchctl bootout gui/${uid}/${spec.label}`,
           `2. rm ${target}`,
           '',
-          `Or run: pnpm kyberion chronos uninstall --apply${daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`}`,
+          `Or run: pnpm kyberion scheduler uninstall --apply${daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`}`,
         ].join('\n')
       );
       return;

@@ -83,5 +83,5 @@ All sensitive credentials, API keys, and OAuth tokens are strictly isolated in t
 外部連携に必要なシークレットや API キー、OAuth トークンなどの機密情報は、Git 管理から除外（`git-ignored`）された **Personal Tier** (`knowledge/personal/connections/`) または環境変数ファイル (`.env`) に厳密に隔離して格納されます。機密情報がパブリックリポジトリや共有ティアに流出することは決してありません。
 
 > [!TIP]
-> For step-by-step setup guides, refer to [setup_guide.md](file:///Users/famao/kyberion/knowledge/public/connections/setup_guide.md).
-> 段階的なセットアップ手順については、[setup_guide.md](file:///Users/famao/kyberion/knowledge/public/connections/setup_guide.md) をご参照ください。
+> For step-by-step setup guides, refer to [setup_guide.md](setup_guide.md).
+> 段階的なセットアップ手順については、[setup_guide.md](setup_guide.md) をご参照ください。

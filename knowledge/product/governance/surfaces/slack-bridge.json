@@ -8,9 +8,7 @@
       "service_id": "slack",
       "preset_path": "knowledge/product/orchestration/service-presets/slack.json",
       "command": "node",
-      "args": [
-        "dist/satellites/slack-bridge/src/index.js"
-      ],
+      "args": ["dist/satellites/slack-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
@@ -20,7 +18,9 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": false,
+      "operatorNotesKey": "surface:surface_notes_slack_bridge",
+      "bestForKey": "surface:surface_best_for_slack_bridge"
     }
   ]
 }

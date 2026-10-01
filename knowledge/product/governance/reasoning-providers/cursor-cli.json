@@ -13,7 +13,68 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["CURSOR_API_KEY", "CURSOR_CLI", "CURSOR_AGENT", "KYBERION_CURSOR_CLI_BIN"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "endpoint": "https://api2.cursor.sh",
+      "egress_provider_id": "cursor",
+      "model_env_keys": ["KYBERION_CURSOR_CLI_MODEL"],
+      "cli": {
+        "binary": "cursor-agent",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_CURSOR_CLI_BIN",
+        "discovery": true,
+        "sandbox": {
+          "args": ["-p", "--output-format", "json", "{permission_args}", "{prompt}"]
+        },
+        "install": {
+          "brew_formula": "cursor-cli",
+          "hint": "Use the official Cursor installer, then set KYBERION_CURSOR_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "auth_args": ["status"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox", "--mode"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--force", "--sandbox", "enabled"],
+            "notes": "Cursor Agent CLI force-allows tools inside its sandbox for implementer-tier write/exec work."
+          },
+          "explorer": {
+            "args": ["--mode", "plan"],
+            "notes": "Cursor Agent plan mode is read-only planning without edits."
+          },
+          "planner": {
+            "args": ["--mode", "ask"],
+            "notes": "Cursor Agent ask mode is Q&A-only and does not execute mutating tools."
+          }
+        }
+      },
+      "runtime_instructions": [
+        "Provider note: Cursor subagents inherit parent tools (no per-tool allowlist); honor readonly and the declared work-item scope anyway.",
+        "Provider note: prefer governed facades and pipelines over ad-hoc edits, and return artifact paths plus the verifications actually run."
+      ]
     }
   ]
 }

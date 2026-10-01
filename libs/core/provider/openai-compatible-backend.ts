@@ -1186,7 +1186,7 @@ const VLLM_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
 const LMSTUDIO_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
   baseURL: ['KYBERION_LMSTUDIO_URL', 'KYBERION_LM_STUDIO_URL', 'KYBERION_LOCAL_LLM_URL'],
   apiKey: ['KYBERION_LMSTUDIO_KEY', 'KYBERION_LOCAL_LLM_KEY'],
-  model: ['KYBERION_LMSTUDIO_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  model: ['KYBERION_LMSTUDIO_MODEL', 'KYBERION_LM_STUDIO_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
   defaultModel: 'lmstudio-model',
   unavailableReason: 'KYBERION_LMSTUDIO_URL',
   probeLabel: 'LM Studio API',
@@ -1354,5 +1354,54 @@ export async function probeNemotronBackendAvailability(
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: true,
+  });
+}
+
+/**
+ * RS-01: env/endpoint presets of the openai-compatible adapter, keyed by the
+ * descriptor's `openai_compatible_preset`. Providers on this adapter are
+ * registered in `reasoning-providers/*.json`; this table is the adapter's own
+ * configuration, not a provider list for callers.
+ */
+const OPENAI_COMPATIBLE_PRESETS: Readonly<Record<string, OpenAiCompatibleBackendEnvNames>> = {
+  local: LOCAL_OPENAI_COMPATIBLE_ENV,
+  ollama: OLLAMA_OPENAI_COMPATIBLE_ENV,
+  vllm: VLLM_OPENAI_COMPATIBLE_ENV,
+  lmstudio: LMSTUDIO_OPENAI_COMPATIBLE_ENV,
+  llamacpp: LLAMACPP_OPENAI_COMPATIBLE_ENV,
+  mlx: MLX_OPENAI_COMPATIBLE_ENV,
+  localai: LOCALAI_OPENAI_COMPATIBLE_ENV,
+  nemotron: NEMOTRON_OPENAI_COMPATIBLE_ENV,
+};
+
+export function hasOpenAiCompatiblePreset(preset: string): boolean {
+  return Object.hasOwn(OPENAI_COMPATIBLE_PRESETS, preset);
+}
+
+function requirePreset(preset: string): OpenAiCompatibleBackendEnvNames {
+  const names = OPENAI_COMPATIBLE_PRESETS[preset];
+  if (!names || !Object.hasOwn(OPENAI_COMPATIBLE_PRESETS, preset)) {
+    throw new Error(
+      `[OPENAI_COMPATIBLE_PRESET_UNSUPPORTED] ${preset} — declare a known openai_compatible_preset (${Object.keys(OPENAI_COMPATIBLE_PRESETS).join(', ')})`
+    );
+  }
+  return names;
+}
+
+export function buildOpenAiCompatibleBackendForPreset(
+  preset: string,
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, requirePreset(preset), overrides);
+}
+
+export async function probeOpenAiCompatiblePresetAvailability(
+  preset: string,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  const names = requirePreset(preset);
+  return probeBackendAvailabilityFromEnvNames(env, names, {
+    allowPublicEndpoint: names.endpointPolicy === 'public',
   });
 }

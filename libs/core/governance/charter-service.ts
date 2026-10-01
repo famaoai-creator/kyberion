@@ -46,6 +46,8 @@ export interface CharterForm {
   max_loss_per_incident: number;
   /** Let operational spend run unattended (names it in `irreversible_named_actions`). */
   allow_named_spend: boolean;
+  /** Let messages to customers go out unattended (names `customer_outbound`, allows `send_message_external`). */
+  allow_customer_outbound: boolean;
   supersedes_decision_rights: boolean;
   deputies: string[]; // user:<member_id>
   expires_in_days: number;
@@ -110,6 +112,7 @@ export function parseCharterForm(raw: unknown): ParsedForm {
       per_month: nums.per_month,
       max_loss_per_incident: nums.max_loss_per_incident,
       allow_named_spend: r.allow_named_spend === true,
+      allow_customer_outbound: r.allow_customer_outbound === true,
       supersedes_decision_rights: r.supersedes_decision_rights === true,
       deputies,
       expires_in_days: days,
@@ -149,6 +152,7 @@ export function renderAcceptanceStatement(input: {
       }),
       say('loss', { loss: yen(form.max_loss_per_incident) }),
       say(form.allow_named_spend ? 'spend_on' : 'spend_off'),
+      say(form.allow_customer_outbound ? 'outbound_on' : 'outbound_off'),
       say(form.supersedes_decision_rights ? 'matrix_on' : 'matrix_off'),
       say('stop'),
       say('deputies', {
@@ -201,6 +205,10 @@ export function acceptCharterFromForm(
       '[charter] the statement changed since it was shown (or the day rolled over); review it again before accepting'
     );
   }
+  const namedIrreversible = [
+    ...(form.allow_named_spend ? ['operational_spend'] : []),
+    ...(form.allow_customer_outbound ? ['customer_outbound'] : []),
+  ];
   const memberId = input.acceptedBy.id.replace(/^user:/, '');
   const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
   const nonce = (input.idNonce ?? Math.random().toString(36).slice(2, 6)).replace(/[^a-z0-9]/g, '');
@@ -226,9 +234,14 @@ export function acceptCharterFromForm(
             per_month: form.per_month,
           },
           data_tier: { read: [], write: [] },
-          external_effects: form.per_action > 0 ? { payment: 'allow' } : {},
-          irreversible: form.allow_named_spend ? 'named_actions_only' : 'forbid',
-          ...(form.allow_named_spend ? { irreversible_named_actions: ['operational_spend'] } : {}),
+          external_effects: {
+            ...(form.per_action > 0 ? { payment: 'allow' as const } : {}),
+            ...(form.allow_customer_outbound ? { send_message_external: 'allow' as const } : {}),
+          },
+          irreversible: namedIrreversible.length > 0 ? 'named_actions_only' : 'forbid',
+          ...(namedIrreversible.length > 0
+            ? { irreversible_named_actions: namedIrreversible }
+            : {}),
           ...(form.supersedes_decision_rights ? { supersedes_decision_rights: true } : {}),
         },
         appetite: {
@@ -258,6 +271,7 @@ export interface CharterView {
   money: { currency: string; per_action: number; per_day: number; per_month: number };
   max_loss_per_incident: number;
   allows_named_spend: boolean;
+  allows_customer_outbound: boolean;
   supersedes_decision_rights: boolean;
   report: AccountabilityReport;
   report_text: string;
@@ -285,6 +299,9 @@ export function viewCharter(
     max_loss_per_incident: charter.appetite.max_loss_per_incident,
     allows_named_spend: (charter.envelope.irreversible_named_actions ?? []).includes(
       'operational_spend'
+    ),
+    allows_customer_outbound: (charter.envelope.irreversible_named_actions ?? []).includes(
+      'customer_outbound'
     ),
     supersedes_decision_rights: charter.envelope.supersedes_decision_rights === true,
     report,

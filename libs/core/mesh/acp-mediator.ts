@@ -2,7 +2,11 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { ptyEngine } from '../shell/pty-engine.js';
 import { dispatchA2UI } from '../a2ui.js';
-import { getAgentManifest, isActuatorAllowed } from '../agent/agent-manifest.js';
+import {
+  evaluateAcpManifestToolPolicy,
+  isAcpReadOnlyTitleFragment,
+} from './acp-tool-actuator-resolver.js';
+import { getAgentManifest } from '../agent/agent-manifest.js';
 import {
   touchManagedProcess,
   spawnManagedProcess,
@@ -180,6 +184,90 @@ interface PendingAsk {
 interface CrashState {
   exitCode?: number | null;
   signal?: NodeJS.Signals | null;
+}
+
+/**
+ * ACP `session/request_permission` decision. Module-level (not a method on the
+ * client literal handed to `ClientSideConnection`) so the mediator options are
+ * passed explicitly — inside that literal `this` is the client object, not the
+ * mediator.
+ */
+export async function resolveAcpPermissionRequest(
+  params: RequestPermissionRequest,
+  mediatorOptions: Pick<ACPMediatorOptions, 'threadId' | 'hasHuman' | 'hasUI' | 'nonInteractive'>
+): Promise<RequestPermissionResponse> {
+  const threadId = mediatorOptions.threadId;
+  const selectAllowedOption = (): RequestPermissionResponse => {
+    const option = params.options.find(
+      (candidate) => candidate.kind === 'allow_once' || candidate.kind === 'allow_always'
+    );
+    return option
+      ? { outcome: { outcome: 'selected', optionId: option.optionId } }
+      : { outcome: { outcome: 'cancelled' } };
+  };
+  const cancel = (): RequestPermissionResponse => ({
+    outcome: { outcome: 'cancelled' },
+  });
+  const title = (params.toolCall?.title || '').toLowerCase();
+  const toolCallId = params.toolCall?.toolCallId.toLowerCase();
+
+  if (toolCallId.includes('ask_user') || title.includes('asking user')) {
+    logger.warn(`[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`);
+    return cancel();
+  }
+
+  // Actuator restriction: check manifest whitelist/blacklist
+  const manifest = getAgentManifest(threadId);
+  if (manifest) {
+    const verdict = evaluateAcpManifestToolPolicy(manifest, title, params.toolCall?.kind);
+    if (!verdict.allowed) {
+      logger.error(
+        `[ACP_PERMISSION] DENIED by manifest: ${threadId} ${verdict.reason} (tool: ${title})`
+      );
+      return cancel();
+    }
+  }
+
+  const shellDecision = evaluateShellCommandPolicy(title);
+  if (shellDecision.verdict === 'deny') {
+    logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
+    return cancel();
+  }
+  if (shellDecision.verdict === 'allow') {
+    return selectAllowedOption();
+  }
+
+  // Allow safe operations
+  if (isAcpReadOnlyTitleFragment(title)) {
+    return selectAllowedOption();
+  }
+
+  // SA-05 Task 3.3: single approval decision source — file a pending
+  // request the operator can approve; deny (fail-closed) until then.
+  try {
+    const approval = requireRiskyApproval({
+      opId: 'acp:tool',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'acp-session',
+      ...(mediatorOptions.hasHuman !== undefined ? { hasHuman: mediatorOptions.hasHuman } : {}),
+      ...(mediatorOptions.hasUI !== undefined ? { hasUI: mediatorOptions.hasUI } : {}),
+      ...(mediatorOptions.nonInteractive !== undefined
+        ? { nonInteractive: mediatorOptions.nonInteractive }
+        : {}),
+      payload: { title },
+      draft: {
+        title: 'ACP tool approval required',
+        summary: `${shellDecision.reason || 'Unclassified tool call.'} Tool: ${title}`,
+        severity: 'medium',
+      },
+    });
+    if (approval.allowed) {
+      return selectAllowedOption();
+    }
+  } catch (approvalErr: unknown) {
+    logger.warn(`[ACP_PERMISSION] approval routing failed: ${errorMessage(approvalErr)}`);
+  }
+  logger.warn(`[ACP_PERMISSION] Approval required (pending): ${title}`);
+  return cancel();
 }
 
 export class ACPMediator {
@@ -445,6 +533,7 @@ export class ACPMediator {
     });
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
+    const mediatorOptions = this.options;
     this.connection = new ClientSideConnection(
       (): Client => ({
         sessionUpdate: async (params: SessionNotification) => {
@@ -478,112 +567,8 @@ export class ACPMediator {
             }
           }
         },
-        async requestPermission(
-          params: RequestPermissionRequest
-        ): Promise<RequestPermissionResponse> {
-          const selectAllowedOption = (): RequestPermissionResponse => {
-            const option = params.options.find(
-              (candidate) => candidate.kind === 'allow_once' || candidate.kind === 'allow_always'
-            );
-            return option
-              ? { outcome: { outcome: 'selected', optionId: option.optionId } }
-              : { outcome: { outcome: 'cancelled' } };
-          };
-          const cancel = (): RequestPermissionResponse => ({
-            outcome: { outcome: 'cancelled' },
-          });
-          const title = (params.toolCall?.title || '').toLowerCase();
-          const toolCallId = params.toolCall?.toolCallId.toLowerCase();
-
-          if (toolCallId.includes('ask_user') || title.includes('asking user')) {
-            logger.warn(
-              `[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`
-            );
-            return cancel();
-          }
-
-          // Actuator restriction: check manifest whitelist/blacklist
-          const manifest = getAgentManifest(threadId);
-          if (manifest) {
-            // Extract actuator name from tool call title (e.g., "run_shell_command" → system, "read_file" → file)
-            const actuatorMap: Record<string, string> = {
-              shell: 'system-actuator',
-              command: 'system-actuator',
-              exec: 'system-actuator',
-              file: 'file-actuator',
-              read_file: 'file-actuator',
-              write_file: 'file-actuator',
-              browser: 'browser-actuator',
-              navigate: 'browser-actuator',
-              network: 'network-actuator',
-              fetch: 'network-actuator',
-              curl: 'network-actuator',
-            };
-            for (const [keyword, actuator] of Object.entries(actuatorMap)) {
-              if (title.includes(keyword) && !isActuatorAllowed(manifest, actuator)) {
-                logger.error(
-                  `[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`
-                );
-                return cancel();
-              }
-            }
-          }
-
-          const shellDecision = evaluateShellCommandPolicy(title);
-          if (shellDecision.verdict === 'deny') {
-            logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
-            return cancel();
-          }
-          if (shellDecision.verdict === 'allow') {
-            return selectAllowedOption();
-          }
-
-          // Allow safe operations
-          const safePatterns = [
-            'read',
-            'search',
-            'list',
-            'view',
-            'get',
-            'ls',
-            'cat',
-            'grep',
-            'find',
-            'git status',
-            'git log',
-            'git diff',
-          ];
-          if (safePatterns.some((p) => title.includes(p))) {
-            return selectAllowedOption();
-          }
-
-          // SA-05 Task 3.3: single approval decision source — file a pending
-          // request the operator can approve; deny (fail-closed) until then.
-          try {
-            const approval = requireRiskyApproval({
-              opId: 'acp:tool',
-              agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'acp-session',
-              ...(this.options.hasHuman !== undefined ? { hasHuman: this.options.hasHuman } : {}),
-              ...(this.options.hasUI !== undefined ? { hasUI: this.options.hasUI } : {}),
-              ...(this.options.nonInteractive !== undefined
-                ? { nonInteractive: this.options.nonInteractive }
-                : {}),
-              payload: { title },
-              draft: {
-                title: 'ACP tool approval required',
-                summary: `${shellDecision.reason || 'Unclassified tool call.'} Tool: ${title}`,
-                severity: 'medium',
-              },
-            });
-            if (approval.allowed) {
-              return selectAllowedOption();
-            }
-          } catch (approvalErr: unknown) {
-            logger.warn(`[ACP_PERMISSION] approval routing failed: ${errorMessage(approvalErr)}`);
-          }
-          logger.warn(`[ACP_PERMISSION] Approval required (pending): ${title}`);
-          return cancel();
-        },
+        requestPermission: (params: RequestPermissionRequest) =>
+          resolveAcpPermissionRequest(params, mediatorOptions),
         async readTextFile(params) {
           throw new Error('Not implemented');
         },

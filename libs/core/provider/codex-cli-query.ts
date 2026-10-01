@@ -271,7 +271,7 @@ export function resolveCodexModelForTier(
   tier: 'fast' | 'standard' | 'deep' | undefined,
   defaultModel: string
 ): string {
-  if (tier === 'fast') return 'gpt-6-luna';
+  if (tier === 'fast') return resolveRuntimeModelId('codex-fast');
   return defaultModel;
 }
 

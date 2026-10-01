@@ -69,6 +69,10 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "suggested_support_components": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "suggested_deliverables": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }

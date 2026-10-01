@@ -27,6 +27,7 @@ export async function handleOperatorAuthRoute(req: NextRequest): Promise<Respons
       trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
     }),
     secFetchSite: req.headers.get('sec-fetch-site'),
+    referrerOrigin: req.headers.get('origin') ?? req.headers.get('referer'),
   });
   if (!result) return new Response('Not found', { status: 404 });
   const headers = new Headers(result.headers);

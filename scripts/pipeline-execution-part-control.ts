@@ -605,6 +605,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOrganizationDigest(step, params, ctx);
   },
+  'core:accountability_report': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineAccountabilityReport(step, params, ctx);
+  },
   'core:organization_record_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 
@@ -921,7 +926,7 @@ async function dispatchResolvedActuatorOperation(
         `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
       );
       throw new Error(
-        `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`
+        `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm kyberion doctor\` to verify credential and capability prerequisites.`
       );
     }
   }

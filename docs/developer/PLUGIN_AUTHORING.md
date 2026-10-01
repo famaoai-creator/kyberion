@@ -149,7 +149,11 @@ async function handleAction(input: WeatherAction): Promise<WeatherResult> {
     logger.error(formatClassification(classified));
     return { status: 'failed', location: input.location, error: classified.detail };
   } finally {
-    try { persistTrace(trace.finalize()); } catch (_) { /* persistence best-effort */ }
+    try {
+      persistTrace(trace.finalize());
+    } catch (_) {
+      /* persistence best-effort */
+    }
   }
 }
 
@@ -161,7 +165,7 @@ if (!argv.input) {
 
 import * as fs from 'node:fs';
 const action: WeatherAction = JSON.parse(fs.readFileSync(argv.input, 'utf-8'));
-handleAction(action).then(result => {
+handleAction(action).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   if (result.status === 'failed') process.exit(1);
 });
@@ -247,7 +251,7 @@ pnpm vitest run libs/actuators/weather-actuator/
 - [ ] Errors classified via `classifyError` (see [`error-classifier.ts`](../../libs/core/error-classifier.ts)).
 - [ ] At least one unit test.
 - [ ] `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` recorded.
-- [ ] An entry added to [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) (auto-generated; see `pnpm catalog`).
+- [ ] An entry added to [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) (generated from the actuator manifests; see the `capabilities-guide` check in `pnpm check`).
 
 ## Common pitfalls
 
