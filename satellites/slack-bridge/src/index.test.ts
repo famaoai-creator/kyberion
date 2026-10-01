@@ -583,7 +583,7 @@ describe('slack team channel commands (P2)', () => {
       t('bridge:channel_memory_not_authorized', undefined, locale)
     );
     expect(run(`forget ${id}`, 'approver')).toBe(
-      t('bridge:channel_memory_forgotten', { id }, locale)
+      t('bridge:channel_memory_forgotten', { id: String(id) }, locale)
     );
     expect(run('memory', 'viewer')).toBe(t('bridge:channel_memory_empty', undefined, locale));
   });
