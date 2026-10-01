@@ -142,8 +142,8 @@ export function buildChannelMemoryContext(
 export type ChannelMemoryCommand =
   { kind: 'remember'; text: string } | { kind: 'forget'; id: string } | { kind: 'list' };
 
-const REMEMBER = /^(?:remember|覚えて(?:おいて)?|記憶して)\s*[:：]\s*([\s\S]+)$/iu;
-const FORGET = /^(?:forget|忘れて)\s*[:：]?\s*(m[a-f0-9]{8})\s*$/iu;
+const REMEMBER = /^(?:remember|覚えて(?:おいて)?|記憶して)\s*[:：]\s*(\S[\s\S]*)$/iu;
+const FORGET = /^(?:forget|忘れて)\s*(?:[:：]\s*)?(m[a-f0-9]{8})\s*$/iu;
 const LIST = /^(?:memory|memories|メモリ|メモ一覧|覚えていること)\s*[?？]?$/iu;
 
 /** Explicit memory commands only; anything else is a normal turn. */
