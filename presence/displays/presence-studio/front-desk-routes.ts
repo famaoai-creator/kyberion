@@ -8,7 +8,6 @@
 import type express from 'express';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
@@ -29,11 +28,6 @@ import {
 } from '@agent/core/personal-identity-reader';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
-import {
-  applyBrowserOnboarding,
-  getBrowserOnboardingState,
-  previewBrowserOnboarding,
-} from '@agent/core/browser/browser-onboarding';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import {
@@ -45,7 +39,6 @@ import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution'
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeMicCapture } from '@agent/core/mic-capture';
 import { isSimpleGreetingText } from '@agent/core/intent/intent-contract';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import { checkAndRepairSurfaceUxContract } from '@agent/core/surface/surface-ux-contract';
@@ -799,49 +792,5 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       shape: 'reply',
       request_id: requestId,
     });
-  });
-
-  app.get('/api/onboarding/browser-state', (_req, res) => {
-    try {
-      const mic = probeMicCapture();
-      res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
-    } catch (error: unknown) {
-      res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
-    }
-  });
-
-  app.post('/api/onboarding/preview', (req, res) => {
-    try {
-      res.json(
-        previewBrowserOnboarding(
-          parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')
-        )
-      );
-    } catch (error: any) {
-      res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
-    }
-  });
-
-  app.post('/api/onboarding/apply', async (req, res) => {
-    try {
-      const result = await applyBrowserOnboarding(
-        parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')
-      );
-      logger.info(
-        presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.complete', {
-          artifacts: result.artifacts.length,
-          status: 200,
-        })
-      );
-      res.json(result);
-    } catch (error: any) {
-      logger.warn(
-        presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.reject', {
-          status: 400,
-          error: error?.message || String(error),
-        })
-      );
-      res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
-    }
   });
 }
