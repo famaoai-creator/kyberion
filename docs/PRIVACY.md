@@ -48,7 +48,7 @@ When you configure these, Kyberion sends data **to that provider on your behalf*
 | Whisper (local)                   | STT audio → local server, no network egress         | When you opt into local voice (Phase 2)           |
 | Slack / Google Workspace / Notion | Whatever the connection is configured to read/write | When you wire those connections                   |
 
-You always know which backend is active — `pnpm doctor` and CLI logs print it on startup.
+You always know which backend is active — `pnpm kyberion doctor` and CLI logs print it on startup.
 
 ## 4. Egress Redaction
 

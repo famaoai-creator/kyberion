@@ -16,7 +16,7 @@ tags:
   ]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-09-27
+last_updated: 2026-10-01
 role_affinity: [ecosystem_architect, knowledge_steward, mission_controller, operator]
 phase_affinity: [alignment]
 ---
@@ -143,14 +143,28 @@ across three unrelated surfaces:
 | Note / recall working state | `working-memory` domain (`note`, `read`, `list`, `daily-open`, `weekly-open`, `todo-*`, `nominate-promotion`) |
 | Search stored knowledge     | `wisdom:knowledge_search` / `knowledge_read` / `knowledge_inject`, `pnpm knowledge`                           |
 | Search past sessions        | `wisdom:history_search`, `pnpm history:search`                                                                |
-| Land knowledge for a tenant | `pnpm ingest --tenant <slug> --file <file>`                                                                   |
+| Land knowledge for a tenant | `pnpm knowledge:ingest --tenant <slug> --file <file>`                                                         |
 
 There is no playbook covering this axis and no verb for "remember" or "recall", so the
 same lookup is re-improvised per mission. This is the largest unorganized area — and
 unlike §2 and §3 it needs a concept decision first (what belongs in working memory
 versus `knowledge/`), not just a CLI entry.
 
-## 6. Known non-existent capabilities
+## 6. Diagnose and set up — one verb each, narrowed by scope
+
+Diagnostics and setup grew one command per area. They now have one entry each,
+and the area is a scope that delegates to the existing implementation (the old
+commands keep working):
+
+| Verb                                 | Scope / area → existing command                                                                                                                                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion doctor [--scope <s>]` | none → health rollup (unchanged); `env` → `vital`; `service` → `service preflight`; `voice` → `doctor --runtime voice`; `meeting` → `meeting preflight`; `app` → `doctor --runtime app`; `setup` → `setup report`                                                                                       |
+| `pnpm kyberion setup <area>`         | `onboarding` → `onboarding`; `context` → `onboarding context`; `reasoning` → `reasoning setup`; `env` → `env bootstrap`; `services` → `service setup`; `tools` → `tool setup`; `provider-cli` → `provider-cli setup`; `agy-sdk` → `agy sdk-setup`; `voice` → `voice setup`; `config` → `config-mission` |
+
+The mapping lives in `knowledge/product/governance/cli-commands.json` (`scopes` on the
+`doctor` and `setup` commands); `kyberion --help` and a bare `kyberion setup` render it.
+
+## 7. Known non-existent capabilities
 
 Record these so they are not re-investigated:
 

@@ -69,7 +69,7 @@ export function printText(entries: CustomerEntry[]): string[] {
 }
 
 export const main = defineScript({
-  name: 'customer:list',
+  name: 'stance:list',
   flags: ['json'],
   run(context) {
     try {

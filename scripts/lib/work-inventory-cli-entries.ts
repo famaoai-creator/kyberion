@@ -1,5 +1,5 @@
 /**
- * WI-07: entry lifecycle command handlers for `pnpm inventory` — add / list /
+ * WI-07: entry lifecycle command handlers for `pnpm work:inventory` — add / list /
  * show / classify / override / status / candidates. See
  * scripts/work_inventory.ts for the dispatcher and
  * scripts/lib/work-inventory-cli-shared.ts for the shared argv helpers.

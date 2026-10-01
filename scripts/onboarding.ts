@@ -2,8 +2,9 @@ import { main as bootstrapCompanyMain } from './company_bootstrap.js';
 import { main as onboardCompanyMain } from './company_onboarding.js';
 import { main as applyOnboardingMain } from './onboarding_apply.js';
 import { main as resetOnboardingMain } from './onboarding_reset.js';
-import { runOnboarding as runOnboardingWizard } from './onboarding_wizard.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgs } from './lib/cli-guard.js';
+import { ONBOARD_CLI } from './onboarding_mode.js';
 
 /**
  * Single onboarding facade. The legacy implementations remain focused and
@@ -13,6 +14,11 @@ export async function main(
   args: string[] = currentProcessArgv().slice(2),
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
+  // CU-01: subcommands own their parsers; the wizard path is guarded here,
+  // before the wizard module is even loaded (it opens a readline on import).
+  if (!ONBOARD_CLI.subcommands?.includes(args[0] ?? '') && guardCliArgs(args, ONBOARD_CLI, print)) {
+    return;
+  }
   if (args[0] === 'apply') {
     await applyOnboardingMain(args.slice(1), print);
     return;
@@ -31,11 +37,12 @@ export async function main(
     if (status !== 0) throw new Error(`onboard company failed with exit code ${status}`);
     return;
   }
+  const { runOnboarding: runOnboardingWizard } = await import('./onboarding_wizard.js');
   await runOnboardingWizard(args, print);
 }
 
 export const runOnboarding = defineScript({
-  name: 'onboard',
+  name: 'onboarding',
   flags: ['json', 'dry-run', 'quiet'],
   run: ({ argv, print }) => main(argv, print),
 });

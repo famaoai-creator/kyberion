@@ -225,7 +225,7 @@
     {
       "intent_id": "inventory-work",
       "status": "implemented",
-      "entry_path": "task-session classifier / hearing (mode=hearing&scenario=work_inventory) / pnpm inventory",
+      "entry_path": "task-session classifier / hearing (mode=hearing&scenario=work_inventory) / pnpm work:inventory",
       "execution_shape": "task_session",
       "outcome_ids": ["work_inventory_entry", "work_inventory_candidate_ranking"],
       "execution_path": [

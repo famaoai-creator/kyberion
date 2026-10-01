@@ -1,5 +1,5 @@
 /**
- * WI-07: `pnpm inventory harvest` — collect Kyberion usage demand signals
+ * WI-07: `pnpm work:inventory harvest` — collect Kyberion usage demand signals
  * and attach them to matching entries (optionally draft suggestions for
  * unmatched, frequent, on-demand signals).
  */
