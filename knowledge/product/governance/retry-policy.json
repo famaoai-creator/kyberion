@@ -1,0 +1,472 @@
+{
+  "$schema": "../schemas/retry-policy.schema.json",
+  "version": "1.0.0",
+  "defaults": {
+    "maxRetries": 2,
+    "initialDelayMs": 500,
+    "maxDelayMs": 5000,
+    "factor": 2,
+    "jitter": true,
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "actuators": {
+    "browser": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "presence": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "process": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "meeting": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "calendar": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "agent-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "android-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout", "network"]
+    },
+    "approval-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 200,
+      "maxDelayMs": 1500,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "artifact-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "blockchain-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "browser-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["timeout", "network", "resource_unavailable"]
+    },
+    "build-actuator": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false,
+      "retryable_categories": []
+    },
+    "calendar-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "code-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "compute-actuator": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false,
+      "retryable_categories": []
+    },
+    "deployment-actuator": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false,
+      "retryable_categories": []
+    },
+    "email-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 8000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "file-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "ingest-actuator": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false,
+      "retryable_categories": []
+    },
+    "ios-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout", "network"]
+    },
+    "media-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "media-generation-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "meeting-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "meeting-browser-driver": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "modeling-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "network-actuator": {
+      "maxRetries": 3,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "orchestrator-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "presence-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable", "rate_limit"]
+    },
+    "process-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "secret-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "service-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    },
+    "system-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "terminal-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "video-composition-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout"]
+    },
+    "vision-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "voice-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    },
+    "wisdom-actuator": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true,
+      "retryable_categories": ["resource_unavailable", "timeout", "network"]
+    },
+    "working-memory-actuator": {
+      "maxRetries": 1,
+      "initialDelayMs": 100,
+      "maxDelayMs": 500,
+      "factor": 2,
+      "jitter": false,
+      "retryable_categories": ["resource_unavailable"]
+    },
+    "media-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "voice-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "vision-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "network-actuator:defaults": {
+      "maxRetries": 3,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "android-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "blockchain-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "terminal-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "agent-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "ios-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "service-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "wisdom-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "orchestrator-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "secret-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "file-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true
+    },
+    "artifact-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "approval-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 200,
+      "maxDelayMs": 1500,
+      "factor": 2,
+      "jitter": true
+    },
+    "modeling-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true
+    },
+    "code-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true
+    },
+    "meeting-browser-driver:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "media-generation-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "video-composition-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "system-actuator:defaults": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    }
+  }
+}

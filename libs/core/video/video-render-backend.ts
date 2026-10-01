@@ -134,7 +134,15 @@ async function renderVideoCompositionBundleImpl(
   const caps = await platform.getCapabilities();
 
   if (policy.render.backend === 'hyperframes_cli') {
+    // 'hyperframes_cli' is a governed registry alias for video.hyperframes_cli
+    // (see media-backends/video.hyperframes_cli.json); resolution stays exact
+    // even when adapter defaults override the video default.
     const backend = resolveVideoBackend(policy.render.backend);
+    if (!backend.command || !backend.args) {
+      throw new Error(
+        `Media backend record "${backend.backend_id}" carries no governed command; refusing to guess the renderer invocation`
+      );
+    }
     if (!caps.hasFFmpeg) {
       return {
         executed: false,
@@ -154,9 +162,11 @@ async function renderVideoCompositionBundleImpl(
     const execEnv = buildSafeExecEnv({
       NODE_OPTIONS: `${getRegisteredEnvText('NODE_OPTIONS') ? `${getRegisteredEnvText('NODE_OPTIONS')} ` : ''}--require=${resolveRepositoryScript('scripts/hyperframes-localhost-preload.cjs')}`,
     });
+    // Renderer invocation comes from the governed media backend record
+    // (command/args), not from hardcoded literals.
+    const launcher = backend.command;
     const command = [
-      'hyperframes',
-      'render',
+      ...backend.args,
       bundleDir,
       '--output',
       outputPath,
@@ -170,7 +180,7 @@ async function renderVideoCompositionBundleImpl(
 
     try {
       if (options.cancellable) {
-        await runCancellableCommand('npx', command, {
+        await runCancellableCommand(launcher, command, {
           timeout_ms: policy.render.command_timeout_ms,
           is_cancelled: options.isCancelled,
           poll_interval_ms: options.pollIntervalMs || 100,
@@ -178,7 +188,7 @@ async function renderVideoCompositionBundleImpl(
           cwd: rootDir,
         });
       } else {
-        safeExec('npx', command, {
+        safeExec(launcher, command, {
           timeoutMs: policy.render.command_timeout_ms,
           cwd: rootDir,
           env: execEnv,
@@ -218,7 +228,7 @@ async function renderVideoCompositionBundleImpl(
         executed: true,
         backend: 'hyperframes_cli',
         output_path: outputPath,
-        command: ['npx', ...command],
+        command: [launcher, ...command],
         backend_id: backend.backend_id,
         backend_kind: backend.kind,
         backend_provider: backend.provider,

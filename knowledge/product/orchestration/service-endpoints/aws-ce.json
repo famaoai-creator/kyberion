@@ -3,7 +3,8 @@
   "services": {
     "aws-ce": {
       "base_url": "https://ce.us-east-1.amazonaws.com",
-      "preset_path": "knowledge/product/orchestration/service-presets/aws-ce.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/aws-ce.json",
+      "auth_strategy": "AWS_SIGV4"
     }
   }
 }

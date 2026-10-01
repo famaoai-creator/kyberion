@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import {
+  startBridgePollLoop,
+  type BridgePollLoopHandle,
+} from '../../../../../../../../satellites/shared/bridge-poll-loop';
 import { NextRequest } from 'next/server';
 import { type EventScopeFilter } from '@agent/core/event-scope';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
@@ -72,14 +77,14 @@ export async function GET(req: NextRequest) {
   const requestedCursor = req.headers.get('last-event-id');
   let cursor = requestedCursor;
   let closed = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let timer: BridgePollLoopHandle | undefined;
   let ping: ReturnType<typeof setInterval> | undefined;
   let scanCursor = requestedCursor;
 
   const close = () => {
     if (closed) return;
     closed = true;
-    if (timer) clearInterval(timer);
+    if (timer) timer.stop();
     if (ping) clearInterval(ping);
   };
 
@@ -108,7 +113,12 @@ export async function GET(req: NextRequest) {
       };
       write('retry: 1500\n\n');
       poll();
-      timer = setInterval(poll, 500);
+      if (closed) return;
+      timer = startBridgePollLoop({
+        name: 'surface-sse:' + randomUUID(),
+        intervalMs: 500,
+        poll: poll,
+      });
       ping = setInterval(() => write(': keep-alive\n\n'), 15_000);
     },
     cancel() {

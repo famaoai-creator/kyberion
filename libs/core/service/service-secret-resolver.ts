@@ -1,6 +1,6 @@
 import { secretGuard } from '../secret/secret-guard.js';
 import type { SecretReference } from '../secret/secret-resolver.js';
-import { getServiceEndpointRecord } from './service-endpoint-registry.js';
+import { getServiceEndpointRecord, type CredentialSuffixMap } from './service-endpoint-registry.js';
 
 export function resolveServiceSecret(serviceId: string, suffixes: string[]): string | null {
   const upper = serviceId.toUpperCase();
@@ -50,13 +50,17 @@ export function resolveServiceSecretReferences(
     .map((suffix) => buildServiceSecretReference(serviceId, suffix, operation));
 }
 
-export function getServiceCredentialSuffixes(
-  serviceId: string
-): Partial<
-  Record<
-    'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri',
-    string[]
-  >
-> {
-  return getServiceEndpointRecord(serviceId)?.credential_suffixes || {};
+/**
+ * Catalog-governed credential suffixes. The endpoint registry guarantees every
+ * loaded record carries schema-defaulted suffixes, so an unknown service is an
+ * explicit error here instead of a silent empty fallback.
+ */
+export function getServiceCredentialSuffixes(serviceId: string): CredentialSuffixMap {
+  const record = getServiceEndpointRecord(serviceId);
+  if (!record) {
+    throw new Error(
+      `[SERVICE_BINDING_UNKNOWN_SERVICE] no service endpoint record for "${serviceId}"`
+    );
+  }
+  return record.credential_suffixes;
 }

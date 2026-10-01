@@ -1,3 +1,4 @@
+import { getRetryDefaults } from '@agent/core/async-utils';
 import {
   deepMergeCatalog,
   readJsonFilesRecursively,
@@ -21,13 +22,7 @@ import { compositionToZoneRegions, loadDesignFoundation } from '@agent/core/desi
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
-const DEFAULT_MEDIA_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_MEDIA_RETRY = getRetryDefaults('media-actuator:defaults');
 
 export interface MediaLayoutPosition {
   x?: number;

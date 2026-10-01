@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T10:20:44.581Z",
+  "generated_at": "2026-10-01T20:51:06.529Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -231,11 +231,12 @@
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.10.0",
+      "version": "1.11.0",
       "ops": [
         "audit_verify",
         "baseline_check",
         "capture_photo",
+        "collect_surface_errors",
         "computer_interaction",
         "control_media_devices",
         "cost_report",
@@ -245,7 +246,10 @@
         "list_service_runtimes",
         "list_tool_runtimes",
         "macos_automation_probe",
+        "narrated_report_preflight",
+        "partition_surface_health",
         "pipeline",
+        "provider_preflight",
         "reconcile",
         "reconcile_config_fallbacks",
         "reconcile_unclassified_errors",
@@ -253,6 +257,7 @@
         "record_audio",
         "record_camera",
         "record_screen",
+        "standard_pr_lifecycle",
         "summarize_memory_promotion_queue",
         "summarize_task_model_routing",
         "test_audio_inputs",
@@ -261,10 +266,11 @@
         "test_camera_mp4_roundtrip",
         "test_camera_stream",
         "test_screen_mp4_roundtrip",
-        "test_screen_stream"
+        "test_screen_stream",
+        "validate_audio_artifact"
       ],
       "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "3fe2047aa3ebc0fe44f02046263d70496dd9faac69ad1f86960186c7fadf5065"
+      "contract_schema_sha256": "863550fb4679c1986a5fecec9c4f8063b86f2455a73896edad9b2534a8793517"
     },
     {
       "actuator_id": "terminal-actuator",

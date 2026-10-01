@@ -3552,6 +3552,16 @@
       "audience": "operator",
       "description": "cli_cmd_script_hooks_trust",
       "group": "operate"
+    },
+    {
+      "id": "script.generate.artifact-kinds",
+      "module": "scripts/generate_artifact_kinds.ts",
+      "command": "generate artifact-kinds",
+      "noun": "generate",
+      "verb": "artifact-kinds",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_artifact_kinds",
+      "group": "dev"
     }
   ],
   "deprecated_script_aliases": [

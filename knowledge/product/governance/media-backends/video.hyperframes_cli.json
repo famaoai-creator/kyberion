@@ -22,6 +22,8 @@
       },
       "command": "npx",
       "args": ["hyperframes", "render"],
+      "aliases": ["hyperframes_cli"],
+      "probe": { "kind": "registry" },
       "cost_tier": "self_hosted",
       "data_policy": "local_only",
       "execution_locality": "local",

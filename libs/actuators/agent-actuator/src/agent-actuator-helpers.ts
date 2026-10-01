@@ -37,20 +37,14 @@ import {
 } from '@agent/core/coordinated-agent-execution-port';
 import * as pathResolver from '@agent/core/path-resolver';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { AgentProvider, AgentRecord } from '@agent/core/agent/agent-registry';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
-const DEFAULT_AGENT_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_AGENT_RETRY = getRetryDefaults('agent-actuator:defaults');
 
 export interface AgentAction {
   action:

@@ -33,6 +33,14 @@ export interface WorkItem {
   project_id: string;
   assignee_peer_id?: string;
   assignee_user_id?: string;
+  /**
+   * D2: display-only markers. Typed {@link WorkItemContext} (canonical chain
+   * `tenant_slug → organization_id → project_id → mission_id → task_id`,
+   * see `libs/core/entity-scope.ts` ENTITY_SCOPE_HIERARCHY) is the source of
+   * truth for search, restoration, and authorization — never resolve those from
+   * label strings. Allowed taxonomy namespaces and shapes are declared in
+   * `knowledge/product/schemas/workitem-label-taxonomy.schema.json`.
+   */
   labels: string[];
   dependencies: string[];
   version: number;

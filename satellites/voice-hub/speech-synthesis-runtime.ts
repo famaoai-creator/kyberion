@@ -10,11 +10,11 @@
  *   - native_tts: `say -o … --file-format=WAVE` / `espeak -w …`; other
  *     platforms → `SpeechSynthesisUnsupportedError` (HTTP 501, clients fall back).
  */
-import { spawn } from 'node:child_process';
+// C7: shared supervised spawn/stop (cmd/args/stop-signal preserved).
+import { spawnSupervisedChild, stopSupervisedChild } from '../shared/supervise-child.js';
 import { randomUUID } from 'node:crypto';
 import {
   assertSafeRepositoryPath,
-  buildSafeExecEnv,
   safeExistsSync,
   safeLstat,
   safeReadFile,
@@ -79,12 +79,14 @@ export async function runNativeTtsToFile(
   }
   try {
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(command.cmd, command.args, {
-        cwd: pathResolver.rootDir(),
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      // C7: shared supervised spawn/stop (stdio + SIGTERM timeout preserved).
+      const child = spawnSupervisedChild(command.cmd, command.args, {
         stdio: ['ignore', 'ignore', 'pipe'],
       });
-      const timer = setTimeout(() => child.kill('SIGTERM'), NATIVE_TTS_FILE_TIMEOUT_MS);
+      const timer = setTimeout(
+        () => stopSupervisedChild(child, 'SIGTERM'),
+        NATIVE_TTS_FILE_TIMEOUT_MS
+      );
       let stderr = '';
       child.stderr.on('data', (chunk) => {
         stderr += String(chunk).slice(0, 20_000);

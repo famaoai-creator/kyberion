@@ -3,6 +3,8 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { secretGuard } from '@agent/core/secret/secret-guard';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
+// C7: shared sequential poll (long-poll contract preserved; see main).
+import { startBridgeSequentialPoll } from '../../shared/bridge-poll-loop.js';
 import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
 
 /**
@@ -43,8 +45,19 @@ export async function main(_args: string[] = []): Promise<void> {
   logger.info('🚀 [TelegramPolling] Starting Telegram Bot Long-Polling...');
   let offset = 0;
 
-  while (true) {
-    try {
+  // C7: shared sequential poll. Contract preserved from the hand-written
+  // `while (true)` loop: immediate retry on success, fixed 5s delay on error
+  // (the in-body forward-failure log stays non-fatal), plus duplicate-start
+  // guard and a stop handle the old loop lacked.
+  const loop = startBridgeSequentialPoll({
+    name: 'telegram-polling',
+    errorDelayMs: 5000,
+    onError: (error: unknown) => {
+      logger.error(
+        `❌ [TelegramPolling] Error: ${error instanceof Error ? error.message : String(error)}`
+      );
+    },
+    poll: async () => {
       const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=10`;
       const response = await fetch(url);
       if (!response.ok) {
@@ -73,13 +86,9 @@ export async function main(_args: string[] = []): Promise<void> {
           }
         }
       }
-    } catch (error: unknown) {
-      logger.error(
-        `❌ [TelegramPolling] Error: ${error instanceof Error ? error.message : String(error)}`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
+    },
+  });
+  await loop.done;
 }
 
 const directEntry = isDirectScript(import.meta.url, 'satellites/telegram-bridge/src/polling.ts');

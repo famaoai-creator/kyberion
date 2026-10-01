@@ -1,6 +1,7 @@
-import { spawn } from 'node:child_process';
+// C7: shared supervised spawn/stop (cmd/args/stop-signal preserved).
+import { spawnSupervisedChild, stopSupervisedChild } from '../shared/supervise-child.js';
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile, safeRmSync, buildSafeExecEnv } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   resolveManagedToolPythonBin,
@@ -52,7 +53,8 @@ async function transcribeWithWhisperCpp(
   const workingDirectory = path.dirname(cliPath);
   return new Promise((resolve, reject) => {
     const lang = locale.toLowerCase().startsWith('ja') ? 'ja' : 'auto';
-    const child = spawn(
+    // C7: shared supervised spawn (explicit whisper cwd preserved).
+    const child = spawnSupervisedChild(
       cliPath,
       [
         '-m',
@@ -70,7 +72,6 @@ async function transcribeWithWhisperCpp(
       ],
       {
         cwd: workingDirectory,
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
@@ -108,16 +109,16 @@ async function transcribeWithManagedPythonBridge(
   );
   const safeInputPath = resolveRegularRepositoryFile(inputPath, 'STT input');
   return new Promise((resolve) => {
-    const child = spawn(pythonBin, [bridgeScript], {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+    // C7: shared supervised spawn (cmd/args/stdio preserved; cwd+env via helper defaults).
+    const child = spawnSupervisedChild(pythonBin, [bridgeScript], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => {
       stdout += String(chunk);
-      if (stdout.length > 2_000_000) child.kill('SIGTERM');
+      // C7: shared supervised stop (SIGTERM overflow guard preserved).
+      if (stdout.length > 2_000_000) stopSupervisedChild(child, 'SIGTERM');
     });
     child.stderr.on('data', (chunk) => {
       stderr += String(chunk).slice(0, 200_000);

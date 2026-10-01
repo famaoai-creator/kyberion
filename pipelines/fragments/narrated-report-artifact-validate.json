@@ -1,0 +1,23 @@
+{
+  "action": "pipeline",
+  "name": "narrated-report-artifact-validate-fragment",
+  "version": "1.0.0",
+  "description": "Validate a narrated-report audio artifact through a typed op: regular-file existence, successful ffprobe and a required audio stream. Caller supplies audio_path.",
+  "context": {
+    "audio_path": "active/shared/tmp/narration.aiff"
+  },
+  "steps": [
+    {
+      "id": "validate_audio_stream",
+      "role": "source",
+      "op": "system:validate_audio_artifact",
+      "produces": {
+        "channel": "audio_check",
+        "type": "AudioArtifactCheck"
+      },
+      "params": {
+        "path": "{{audio_path}}"
+      }
+    }
+  ]
+}
