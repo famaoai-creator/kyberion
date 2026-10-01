@@ -6,10 +6,17 @@ export const DEFAULT_COMFYUI_BASE_URL = 'http://127.0.0.1:8188';
 /** Canonical product repository URL; override with KYBERION_REPOSITORY_URL. */
 export const DEFAULT_PRODUCT_REPOSITORY_URL = 'https://github.com/famaoai-creator/kyberion';
 
+/** Linear-time trailing-slash trim (a `/\/+$/` regex is polynomial on long slash runs). */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
 export function resolveComfyBaseUrl(override?: string): string {
-  return (override || getRegisteredEnvText('KYBERION_COMFY_BASE_URL') || DEFAULT_COMFYUI_BASE_URL)
-    .trim()
-    .replace(/\/+$/u, '');
+  return stripTrailingSlashes(
+    (override || getRegisteredEnvText('KYBERION_COMFY_BASE_URL') || DEFAULT_COMFYUI_BASE_URL).trim()
+  );
 }
 
 export function resolveComfyPort(): number {
@@ -24,7 +31,7 @@ export function resolveComfyPort(): number {
 
 export function resolveProductRepositoryUrl(): string {
   return (
-    getRegisteredEnvText('KYBERION_REPOSITORY_URL')?.trim().replace(/\/+$/u, '') ||
+    stripTrailingSlashes(getRegisteredEnvText('KYBERION_REPOSITORY_URL')?.trim() ?? '') ||
     DEFAULT_PRODUCT_REPOSITORY_URL
   );
 }
