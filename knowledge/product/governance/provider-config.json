@@ -25,13 +25,20 @@
     "copilot-default": "auto",
     "cursor-default": "auto",
     "opencode-default": "opencode/muse-spark-1.3-contributor-free",
-    "devin-default": "swe"
+    "devin-default": "swe",
+    "codex-fast": "gpt-6-luna",
+    "grok-default": "grok-4.7",
+    "gemini-image": "gemini-2.5-flash-image",
+    "ollama-vision": "llama3-vision"
+  },
+  "runtime_endpoints": {
+    "ollama": "http://localhost:11434"
   },
   "lifecycle": {
     "gemini": {
       "boot_command": "gemini",
       "boot_args": ["--acp", "-y"],
-      "default_model": "gemini-3.6-flash"
+      "default_model": "gemini-3.8-flash"
     },
     "copilot": {
       "boot_command": "gh",

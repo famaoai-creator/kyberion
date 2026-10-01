@@ -12,8 +12,23 @@
         "session_continuity": false,
         "input_modalities": ["text"]
       },
-      "env_keys": ["KYBERION_OLLAMA_URL"],
-      "cost_tier": "free"
+      "env_keys": ["KYBERION_OLLAMA_URL", "OLLAMA_HOST"],
+      "cost_tier": "free",
+      "transport": "local-server",
+      "data_egress": "local-only",
+      "adapter": "openai-compatible",
+      "openai_compatible_preset": "ollama",
+      "profile": {
+        "streaming": true,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {},
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["classify", "summarize"]
+      },
+      "model_env_keys": ["KYBERION_OLLAMA_MODEL", "OLLAMA_MODEL", "KYBERION_LOCAL_LLM_MODEL"],
+      "setup_hint": "Configure KYBERION_OLLAMA_URL and confirm the selected model is loaded."
     }
   ]
 }

@@ -599,7 +599,7 @@ export function collectOperatorHomeSummary(
                 next_action_key: 'operator_home:next_action.monitor',
                 reason: t('operator_home:next_action_reason.monitor'),
                 next_action_type: 'open_docs',
-                suggested_command: 'pnpm doctor',
+                suggested_command: 'pnpm kyberion doctor',
               });
 
   return {

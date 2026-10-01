@@ -21,6 +21,15 @@ import { abortableAudioChunks } from './meeting-session-types.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioBus } from '../voice/audio-bus.js';
 import { coreSeamCatalog, createSeam } from '../seam.js';
+import {
+  findMeetingPlatform,
+  matchMeetingPlatformHost,
+  meetingHostPathAllowed,
+  resolveMeetingPlatformByHost,
+} from './meeting-platform-registry.js';
+
+/** A registered meeting platform id (see meeting-platforms.json). */
+export type MeetingJoinPlatform = Exclude<MeetingPlatform, 'in_room' | 'auto'>;
 
 export interface MeetingJoinDriver {
   readonly driver_id: string;
@@ -40,12 +49,6 @@ export interface MeetingJoinDriver {
   join(target: MeetingTarget, bus: AudioBus): Promise<MeetingSession>;
 }
 
-const ALLOWED_MEETING_HOSTS: Record<'meet' | 'zoom' | 'teams', readonly string[]> = {
-  meet: ['meet.google.com'],
-  zoom: ['zoom.us', 'zoom.com'],
-  teams: ['teams.microsoft.com', 'teams.live.com', 'microsoft.com'],
-};
-
 function normalizedMeetingHost(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -54,10 +57,6 @@ function normalizedMeetingHost(url: string): string | null {
   } catch {
     return null;
   }
-}
-
-function hostMatches(host: string, allowed: string): boolean {
-  return host === allowed || host.endsWith(`.${allowed}`);
 }
 
 export function redactMeetingUrl(url: string | undefined): string {
@@ -69,27 +68,19 @@ export function redactMeetingUrl(url: string | undefined): string {
   }
 }
 
-export function resolveMeetingPlatformFromUrl(url: string): 'meet' | 'zoom' | 'teams' | null {
+/** Resolve a registered platform id from a meeting URL's host (and entry path). */
+export function resolveMeetingPlatformFromUrl(url: string): MeetingJoinPlatform | null {
   try {
     const parsed = new URL(url);
     const host = normalizedMeetingHost(url);
     if (!host) return null;
-    const pathname = parsed.pathname.toLowerCase();
-    if (hostMatches(host, 'meet.google.com')) return 'meet';
-    if (hostMatches(host, 'zoom.us') || hostMatches(host, 'zoom.com')) return 'zoom';
-    if (hostMatches(host, 'teams.microsoft.com') || hostMatches(host, 'teams.live.com'))
-      return 'teams';
-    if (hostMatches(host, 'microsoft.com') && pathname.includes('/microsoft-teams/join-a-meeting'))
-      return 'teams';
+    return (resolveMeetingPlatformByHost(host, parsed.pathname)?.id as MeetingJoinPlatform) ?? null;
   } catch {
-    /* fall through */
+    return null;
   }
-  return null;
 }
 
-export function resolveMeetingPlatform(
-  target: MeetingTarget
-): 'meet' | 'zoom' | 'teams' | 'in_room' {
+export function resolveMeetingPlatform(target: MeetingTarget): MeetingJoinPlatform | 'in_room' {
   if (target.platform !== 'auto') return target.platform;
   const inferred = resolveMeetingPlatformFromUrl(target.url);
   if (!inferred) {
@@ -102,38 +93,33 @@ export function resolveMeetingPlatform(
 
 export function validateMeetingTarget(
   target: MeetingTarget
-): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' | 'in_room' } {
+): MeetingTarget & { platform: MeetingJoinPlatform | 'in_room' } {
   const platform = resolveMeetingPlatform(target);
-  if (
-    platform !== 'meet' &&
-    platform !== 'zoom' &&
-    platform !== 'teams' &&
-    platform !== 'in_room'
-  ) {
-    throw new Error(`[browser-driver] unsupported meeting platform: ${String(platform)}`);
-  }
   // 同席モード: the meeting happens in the physical room — there is no URL
   // host to allow-list. Accept the sentinel room:// URL as-is.
   if (platform === 'in_room') {
     return { ...target, platform, url: target.url || 'room://local' };
   }
+  // Hosts and entry-path restrictions are registry data (meeting-platforms.json).
+  const descriptor = findMeetingPlatform(platform);
+  if (!descriptor) {
+    throw new Error(`[browser-driver] unsupported meeting platform: ${String(platform)}`);
+  }
   const host = normalizedMeetingHost(target.url);
   if (!host || host === 'invalid-url' || host === 'missing-url') {
     throw new Error(`[browser-driver] invalid meeting URL host: ${redactMeetingUrl(target.url)}`);
   }
-  const allowlist = ALLOWED_MEETING_HOSTS[platform];
-  if (!allowlist.some((allowed) => hostMatches(host, allowed))) {
+  const entry = matchMeetingPlatformHost(descriptor, host);
+  if (!entry) {
     throw new Error(
-      `[browser-driver] meeting URL host '${host}' is not allow-listed for platform '${platform}'. Allowed hosts: ${allowlist.join(', ')}.`
+      `[browser-driver] meeting URL host '${host}' is not allow-listed for platform '${platform}'. Allowed hosts: ${descriptor.hosts.map((item) => item.host).join(', ')}.`
     );
   }
-  if (platform === 'teams' && host === 'microsoft.com') {
-    const pathname = new URL(target.url).pathname.toLowerCase();
-    if (!pathname.includes('/microsoft-teams/join-a-meeting')) {
-      throw new Error(
-        `[browser-driver] Teams on microsoft.com must use the join-a-meeting entry page; got path '${pathname}'.`
-      );
-    }
+  const pathname = new URL(target.url).pathname.toLowerCase();
+  if (!meetingHostPathAllowed(entry, pathname)) {
+    throw new Error(
+      `[browser-driver] ${descriptor.display_name} on ${entry.host} must use the ${entry.required_path} entry page; got path '${pathname}'.`
+    );
   }
   return { ...target, platform };
 }

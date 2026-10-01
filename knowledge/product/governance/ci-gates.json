@@ -157,6 +157,19 @@
       "rationale": "Rejects broken relative Markdown links before they become unreachable documentation."
     },
     {
+      "id": "docs-drift",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_docs_drift.ts",
+        "--skip-links"
+      ],
+      "owner": "documentation",
+      "rationale": "Rejects documented pnpm/kyberion commands that do not exist, unlisted pipelines, a stale COMPONENT_MAP, and a stale generated docs/CLI_REFERENCE.md (links are covered by documentation-links)."
+    },
+    {
       "id": "channel-adapter-adoption",
       "scope": "pr",
       "executable": "node",

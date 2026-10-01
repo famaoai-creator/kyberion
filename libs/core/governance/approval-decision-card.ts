@@ -6,6 +6,7 @@ import type { NotificationChannelTarget } from '../surface/operator-notification
 import { resolveLocale } from '../locale.js';
 import { localeToBcp47, localeUsesWordSpaces, type SupportedLocale } from '../locale-normalize.js';
 import { t, type VocabularyKey } from '../t.js';
+import { neutralizeChannelMarkup } from '../surface/channel-adapter-registry.js';
 
 export type { InterventionLevel } from './decision-card.js';
 
@@ -344,17 +345,6 @@ export function neutralizeSurfaceMarkup(
   text: string,
   surface: NotificationChannelTarget['surface']
 ): string {
-  switch (surface) {
-    case 'slack':
-      return text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
-    case 'telegram':
-      // Legacy Markdown: only these four characters can be escaped.
-      return text.replace(/[_*`[]/gu, (char) => `\\${char}`);
-    case 'discord':
-      return text
-        .replace(/[\\*_~`|[\]()<>]/gu, (char) => `\\${char}`)
-        .replace(/@(everyone|here)/giu, '@\u200b$1');
-    default:
-      return text;
-  }
+  // Escaping rules are channel-adapter registry data (RS-06), not per-caller branches.
+  return neutralizeChannelMarkup(text, surface);
 }

@@ -835,10 +835,10 @@ export async function runBaselineCheck() {
             enabled_schedule_count: schedulerHealth.enabled_schedule_count,
           },
           recommendation:
-            'Restart the scheduler (`pnpm chronos`) or install the LaunchAgent so it survives reboots (`pnpm kyberion chronos install`, then apply the printed launchctl steps).',
+            'Restart the scheduler (`pnpm scheduler`) or install the LaunchAgent so it survives reboots (`pnpm kyberion scheduler install`, then apply the printed launchctl steps).',
           options: [
-            'pnpm chronos  # foreground restart',
-            'pnpm kyberion chronos install  # print LaunchAgent install steps',
+            'pnpm scheduler  # foreground restart',
+            'pnpm kyberion scheduler install  # print LaunchAgent install steps',
             'pnpm daemon:watchdog -- --json  # confirm recovery',
           ],
           dedupe_key: 'scheduler:chronos-daemon-dead',

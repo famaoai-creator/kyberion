@@ -25,7 +25,7 @@ video have their own commands (`see` / `listen` / `watch`) — see
 | Read / answer / summarize now (nothing persisted)                  | `pnpm kyberion read <file> [--ocr]`                                                                            | Markdown on stdout (`--json` for format, title, tables, warnings) |
 | Same inside a pipeline                                             | `media:document_digest { path, ocr? }`                                                                         | Markdown in context                                               |
 | Structured data for further ops (layout, images, per-slide fields) | `media:pdf_extract`, `media:pptx_slide_text`, `media:pptx_extract`, `media:xlsx_extract`, `media:docx_extract` | design protocol / slide records in context                        |
-| Land it as tenant knowledge (governed, ledgered)                   | `pnpm ingest --tenant <slug> --file <path> [--ocr]`                                                            | knowledge card + asset ledger record                              |
+| Land it as tenant knowledge (governed, ledgered)                   | `pnpm knowledge:ingest --tenant <slug> --file <path> [--ocr]`                                                  | knowledge card + asset ledger record                              |
 
 `kyberion read`, `document_digest` and the ingest ceremony share one reader
 (`@agent/core/document-reader`), so a document reads the same everywhere.
@@ -92,7 +92,7 @@ accept a path or raw bytes.
   rendered with the cell's number format (`33.5%`, `1,234,567`, `▲28,957`,
   `2026/05/31`) instead of the raw stored value.
 
-### Ingest ceremony (`pnpm ingest`)
+### Ingest ceremony (`pnpm knowledge:ingest`)
 
 - Formats: `docx`, `pdf`, `xlsx`, `pptx`, `html`, `slack_thread`, `markdown`, `text`
   (inferred from the extension).
@@ -146,7 +146,7 @@ file to read a document.
    directly — no package extraction by hand.
 4. **Chart images OCR badly.** Record only the data labels printed on the chart and
    say that unlabeled points must be read from the source.
-5. **Identity for confidential writes.** `pnpm ingest` needs
+5. **Identity for confidential writes.** `pnpm knowledge:ingest` needs
    `KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller`. The
    ceremony now checks this up front and refuses — without a policy violation —
    with the exact command to run, so there is no reason to guess roles (three

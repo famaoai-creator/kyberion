@@ -1,19 +1,12 @@
 import { discoverProviders } from '../provider/provider-discovery.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js';
 import {
-  probeLmStudioBackendAvailability,
-  probeLlamaCppBackendAvailability,
-  probeLocalAiBackendAvailability,
-  probeMlxBackendAvailability,
-  probeNemotronBackendAvailability,
-  probeOllamaBackendAvailability,
-  probeOpenAiCompatibleBackendAvailability,
-  probeVllmBackendAvailability,
-} from '../provider/openai-compatible-backend.js';
-import { probeOpenRouterBackendAvailability } from '../provider/openrouter-backend.js';
-import { probeGeminiApiBackendAvailability } from '../provider/gemini-api-backend.js';
-import { probeGrokApiBackendAvailability } from '../provider/grok-api-backend.js';
+  probeReasoningProviderReadiness,
+  type ReasoningProviderReadinessDeps,
+} from './reasoning-provider-readiness.js';
+import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import {
   loadReasoningRoutePolicy,
   resolveReasoningRoute,
@@ -42,71 +35,70 @@ export interface ReasoningRouteDoctorReport {
   nextActions: string[];
 }
 
-function cliProviderForMode(mode: string): string | undefined {
-  return (
-    {
-      'codex-cli': 'codex',
-      'agy-cli': 'agy',
-      'claude-cli': 'claude',
-      'claude-agent': 'claude',
-      'gemini-cli': 'gemini',
-      'grok-cli': 'grok',
-      'cursor-cli': 'cursor',
-      'opencode-cli': 'opencode',
-      copilot: 'copilot',
-    } as Record<string, string>
-  )[mode];
+export interface ReasoningRouteDoctorOptions {
+  /**
+   * Perform live credential probes (e.g. Anthropic `GET /v1/models`). Off by
+   * default: the doctor runs on every operator-surface reasoning page load
+   * and `pnpm reasoning:config doctor`, so it only checks that the key is
+   * configured unless the operator asks for `--live`.
+   */
+  live?: boolean;
+  env?: NodeJS.ProcessEnv;
+  /** Test seam for the readiness probes. */
+  readinessDeps?: ReasoningProviderReadinessDeps;
 }
 
-async function probeMode(
-  mode: string
+const ANTHROPIC_KEY_PRESENT_REASON = 'ANTHROPIC_API_KEY configured; live call not consumed';
+
+/** Key-presence check used instead of a live API call when `live` is off. */
+function anthropicKeyPresenceProbe(
+  env: NodeJS.ProcessEnv
+): Promise<{ available: boolean; reason?: string }> {
+  return Promise.resolve(
+    getRegisteredEnvText('ANTHROPIC_API_KEY', { env })?.trim()
+      ? { available: true }
+      : { available: false, reason: 'ANTHROPIC_API_KEY is not configured' }
+  );
+}
+
+/** Adapters whose readiness is answered by provider discovery (no live spawn here). */
+const DISCOVERY_ADAPTERS = new Set(['provider-cli', 'claude-cli', 'claude-agent-sdk']);
+
+/**
+ * RS-03: probe selection is driven by the governed descriptor's adapter, not
+ * per-mode branches. CLI-family adapters reuse provider discovery; every
+ * other adapter uses the shared readiness probe. An unknown mode is reported
+ * as unavailable with an explicit reason.
+ */
+export async function probeReasoningRouteMode(
+  mode: string,
+  options: ReasoningRouteDoctorOptions = {}
 ): Promise<{ status: ReasoningRouteDoctorStatus; reason: string }> {
-  if (mode === 'stub') return { status: 'ready', reason: 'deterministic stub available' };
-  if (mode === 'anthropic') {
-    return getRegisteredEnvText('ANTHROPIC_API_KEY')?.trim()
-      ? { status: 'ready', reason: 'ANTHROPIC_API_KEY configured; live call not consumed' }
-      : { status: 'not_configured', reason: 'ANTHROPIC_API_KEY is not configured' };
+  const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
+  if (!descriptor) {
+    return { status: 'unavailable', reason: `No governed reasoning provider for mode ${mode}` };
   }
-  if (mode === 'gemini-api') {
-    const result = await probeGeminiApiBackendAvailability();
-    return result.available
-      ? {
-          status: 'ready',
-          reason: 'Google AI Studio API reachable; model-specific completion not consumed',
-        }
-      : { status: 'not_configured', reason: result.reason || 'Google AI Studio API probe failed' };
+  if (descriptor.adapter === 'stub') {
+    return { status: 'ready', reason: 'deterministic stub available' };
   }
-  if (mode === 'grok-api') {
-    const result = await probeGrokApiBackendAvailability();
-    return result.available
-      ? {
-          status: 'ready',
-          reason: 'xAI Grok API reachable; model-specific completion not consumed',
-        }
-      : { status: 'not_configured', reason: result.reason || 'xAI Grok API probe failed' };
-  }
-  const provider = cliProviderForMode(mode);
-  if (provider) {
+  if (DISCOVERY_ADAPTERS.has(descriptor.adapter)) {
+    const provider = descriptor.provider;
     const entry = discoverProviders(false).find((candidate) => candidate.provider === provider);
     return entry?.healthy
       ? { status: 'ready', reason: `${provider} CLI healthy` }
       : { status: 'not_configured', reason: `${provider} CLI is not installed or healthy` };
   }
-  const probes: Record<string, () => Promise<{ available: boolean; reason?: string }>> = {
-    local: probeOpenAiCompatibleBackendAvailability,
-    ollama: probeOllamaBackendAvailability,
-    vllm: probeVllmBackendAvailability,
-    lmstudio: probeLmStudioBackendAvailability,
-    llamacpp: probeLlamaCppBackendAvailability,
-    mlx: probeMlxBackendAvailability,
-    localai: probeLocalAiBackendAvailability,
-    'nemotron-api': probeNemotronBackendAvailability,
-    openrouter: probeOpenRouterBackendAvailability,
-  };
-  const probe = probes[mode];
-  if (!probe)
-    return { status: 'unavailable', reason: `No doctor probe registered for mode ${mode}` };
-  const result = await probe();
+  const deps: ReasoningProviderReadinessDeps = options.live
+    ? { ...options.readinessDeps }
+    : { ...options.readinessDeps, anthropicProbe: anthropicKeyPresenceProbe };
+  const result = await probeReasoningProviderReadiness(
+    descriptor,
+    options.env ?? process.env,
+    deps
+  );
+  if (result.available && !options.live && descriptor.adapter === 'anthropic-api') {
+    return { status: 'ready', reason: ANTHROPIC_KEY_PRESENT_REASON };
+  }
   return result.available
     ? { status: 'ready', reason: 'endpoint reachable; model-specific completion not consumed' }
     : { status: 'not_configured', reason: result.reason || 'endpoint probe failed' };
@@ -114,6 +106,7 @@ async function probeMode(
 
 async function inspectRole(
   role: string,
+  options: ReasoningRouteDoctorOptions,
   probeCache: Map<string, Promise<{ status: ReasoningRouteDoctorStatus; reason: string }>>
 ): Promise<ReasoningRouteDoctorEntry> {
   let route: ResolvedReasoningRoute;
@@ -136,7 +129,7 @@ async function inspectRole(
       const candidateRoute = resolveReasoningRoute({ role, requestedProfile: candidate });
       let pending = probeCache.get(candidateRoute.mode);
       if (!pending) {
-        pending = probeMode(candidateRoute.mode);
+        pending = probeReasoningRouteMode(candidateRoute.mode, options);
         probeCache.set(candidateRoute.mode, pending);
       }
       const probe = await pending;
@@ -176,26 +169,25 @@ async function inspectRole(
   };
 }
 
-export async function inspectReasoningRoutes(): Promise<ReasoningRouteDoctorReport> {
+export async function inspectReasoningRoutes(
+  options: ReasoningRouteDoctorOptions = {}
+): Promise<ReasoningRouteDoctorReport> {
   const roles = Object.keys(loadReasoningRoutePolicy().roles);
   const probeCache = new Map<
     string,
     Promise<{ status: ReasoningRouteDoctorStatus; reason: string }>
   >();
-  const entries = await Promise.all(roles.map((role) => inspectRole(role, probeCache)));
+  const entries = await Promise.all(roles.map((role) => inspectRole(role, options, probeCache)));
   const nextActions = Array.from(
     new Set(
       entries.flatMap((entry) => {
         if (entry.status === 'ready') return [];
         if (entry.status === 'degraded')
           return [`Review degraded primary route for role ${entry.role}: ${entry.reason}`];
-        if (entry.mode === 'ollama')
-          return ['Configure KYBERION_OLLAMA_URL and confirm the selected model is loaded.'];
-        if (entry.mode === 'vllm')
-          return ['Configure KYBERION_VLLM_URL and confirm the selected model is loaded.'];
-        if (entry.mode === 'openrouter')
-          return ['Configure OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY.'];
-        if (entry.mode === 'anthropic') return ['Configure ANTHROPIC_API_KEY.'];
+        const setupHint = entry.mode
+          ? getReasoningProviderDescriptor(entry.mode as ReasoningBackendMode)?.setup_hint
+          : undefined;
+        if (setupHint) return [setupHint];
         return [`Repair route for role ${entry.role}: ${entry.reason}`];
       })
     )

@@ -253,4 +253,4 @@ An intent is only genuinely implemented when its completion pattern is clear acr
 
 Machine-readable source:
 
-- [intent-outcome-patterns.json](/Users/famao/kyberion/knowledge/product/governance/intent-outcome-patterns.json)
+- [intent-outcome-patterns.json](../governance/intent-outcome-patterns.json)

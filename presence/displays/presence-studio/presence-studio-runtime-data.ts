@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { resolveSurfacePort, resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import {
   defineCatalog,
   getRegisteredEnvText,
@@ -453,10 +454,12 @@ export const staticDir = path.join(
   'presence/displays/presence-studio/static'
 );
 export const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-export const PORT = Number(getRegisteredEnvText('PRESENCE_STUDIO_PORT') || 3031);
+export const PORT = Number(
+  getRegisteredEnvText('PRESENCE_STUDIO_PORT') || resolveSurfacePort('presence-studio')
+);
 export const HOST = getRegisteredEnvText('PRESENCE_STUDIO_HOST') || '127.0.0.1';
 export const VOICE_HUB_URL = validateLocalServiceUrl(
-  getRegisteredEnvText('VOICE_HUB_URL') || 'http://127.0.0.1:3032',
+  resolveSurfaceUrl('voice-hub'),
   'VOICE_HUB_URL'
 );
 export const sseClients = new Set<Client>();

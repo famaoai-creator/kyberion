@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
+import { Text } from '../components/text.js';
 import { usePollWatch } from '../store/use-poll-watch.js';
 import {
   loadCoordination,

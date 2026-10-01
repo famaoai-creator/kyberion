@@ -649,10 +649,14 @@ interface PreparedExecutionContext {
 function prepareExecutionContext(
   role: string,
   persona: Persona | undefined,
-  tenantSlug: string | undefined
+  tenantSlug: string | undefined,
+  organizationId: string | undefined
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
+  if (organizationId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(organizationId)) {
+    throw new Error(`[SCOPE_CONTEXT_INVALID] organization id '${organizationId}' is invalid`);
+  }
   const resolvedPersona = persona || inferPersonaFromRole(normalizedRole);
   // Mirror the env semantics below: a known persona is bound, an unknown one
   // with no explicit persona clears it, an explicit unknown keeps the outer one.
@@ -668,6 +672,7 @@ function prepareExecutionContext(
     scope: {
       tenantBound: tenantSlug !== undefined,
       ...(tenantSlug ? { tenantSlug } : {}),
+      ...(organizationId ? { organizationId } : {}),
       assumedRole: normalizedRole,
       assumedPersona,
     },
@@ -713,6 +718,8 @@ function restoreMirroredEnv(
  * and is isolated per async context. Under SYSTEM_ROLE the role must be
  * allowed by the role assumption policy (RA-02) or this throws
  * `[ROLE_ASSUMPTION_DENIED]` before `fn` runs.
+ * Optional tenant and organization identifiers bind policy placeholders for
+ * store-writer roles; organization-bound grants fail closed without an id.
  *
  * S4: if `fn` returns a Promise, the scoped role follows that promise's
  * continuations (AsyncLocalStorage semantics) until it settles, while the env
@@ -723,9 +730,10 @@ export function withExecutionContext<T>(
   role: string,
   fn: () => T,
   persona?: Persona,
-  tenantSlug?: string
+  tenantSlug?: string,
+  organizationId?: string
 ): T {
-  const prepared = prepareExecutionContext(role, persona, tenantSlug);
+  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
@@ -750,9 +758,10 @@ export async function withExecutionContextAsync<T>(
   role: string,
   fn: () => Promise<T> | T,
   persona?: Persona,
-  tenantSlug?: string
+  tenantSlug?: string,
+  organizationId?: string
 ): Promise<T> {
-  const prepared = prepareExecutionContext(role, persona, tenantSlug);
+  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId);
   return await runInExecutionScope(prepared.scope, fn);
 }
 

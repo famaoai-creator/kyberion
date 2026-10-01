@@ -26,14 +26,16 @@ describe('Customer onboarding contract', () => {
     expect(wizard).toContain('Set up a customer overlay now?');
     expect(wizard).toContain('customer_create');
     expect(wizard).toContain('customer_switch');
-    expect(readme).toContain('pnpm customer:switch acme-corp');
-    expect(operator).toContain('pnpm customer:create customer-slug');
+    expect(readme).toContain('pnpm stance:switch acme-corp');
+    expect(operator).toContain('pnpm stance:create customer-slug');
     expect(operator).toContain(
       'interactive identity setup → active stance overlay / personal fallback'
     );
     expect(operator).toContain('/app/customer');
     expect(init).toContain('customer/{slug}/my-identity.json');
-    expect(init).toContain('`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json`');
+    expect(init).toContain(
+      'When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-identity.json`'
+    );
     expect(quickstart).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(ux).toContain('connection material goes in the active private overlay');
     expect(ux).toContain('otherwise `knowledge/personal/connections/`');

@@ -46,19 +46,13 @@ import {
 } from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from './shell/shell-claude-cli-backend.js';
 import {
-  probeNemotronBackendAvailability,
-  probeOpenAiCompatibleBackendAvailability,
-  probeOllamaBackendAvailability,
-  probeVllmBackendAvailability,
-  probeLmStudioBackendAvailability,
-  probeLlamaCppBackendAvailability,
-  probeMlxBackendAvailability,
-  probeLocalAiBackendAvailability,
-} from './provider/openai-compatible-backend.js';
-import { probeOpenRouterBackendAvailability } from './provider/openrouter-backend.js';
-import { probeGeminiApiBackendAvailability } from './provider/gemini-api-backend.js';
-import { probeGrokApiBackendAvailability } from './provider/grok-api-backend.js';
-import { probeAnthropicApiBackendAvailability } from './provider/anthropic-api-probe.js';
+  probeReasoningProviderReadiness,
+  type ReasoningProviderReadinessDeps,
+} from './reasoning/reasoning-provider-readiness.js';
+import {
+  getReasoningProviderDescriptor,
+  listReasoningProviderDescriptors,
+} from './reasoning/reasoning-provider-registry.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
@@ -91,16 +85,8 @@ export function installCoreEnvironmentProbes(): void {
 export async function probeExplicitReasoningBackend(
   backendRaw: string,
   env: NodeJS.ProcessEnv = process.env,
-  deps: {
-    binaryProbe?: (command: string, args: readonly string[]) => boolean;
-    claudeProbe?: () => { available: boolean; reason?: string };
-    anthropicProbe?: (env: NodeJS.ProcessEnv) => Promise<{ available: boolean; reason?: string }>;
-  } = {}
+  deps: ReasoningProviderReadinessDeps = {}
 ): Promise<{ available: boolean; reason?: string }> {
-  const binaryProbe = deps.binaryProbe ?? binaryAvailable;
-  const claudeProbe = deps.claudeProbe ?? (() => probeShellClaudeCliAvailability(env));
-  const anthropicProbe =
-    deps.anthropicProbe ?? ((selectedEnv) => probeAnthropicApiBackendAvailability(selectedEnv));
   const backend = normalizeReasoningBackendMode(backendRaw as ReasoningBackendMode);
 
   const unavailable = (detail: string): { available: boolean; reason: string } => ({
@@ -108,150 +94,30 @@ export async function probeExplicitReasoningBackend(
     reason: `KYBERION_REASONING_BACKEND=${backendRaw} is set but that backend is not reachable: ${detail}`,
   });
 
-  switch (backend) {
-    case 'stub':
-      return {
-        available: false,
-        reason:
-          'KYBERION_REASONING_BACKEND=stub is explicitly selected — deterministic placeholders only. Configure a real backend (see `pnpm reasoning:setup`) to clear this.',
-      };
-    case 'claude-cli': {
-      // claude-cli is a shell backend; an API key does not make the CLI
-      // executable. Probe the selected runtime rather than short-circuiting
-      // on a credential intended for the Agent/API mode.
-      const probe = claudeProbe();
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'claude CLI probe failed');
-    }
-    case 'claude-agent': {
-      if (getRegisteredEnvText('CLAUDE_API_KEY', { env })?.trim()) {
-        return { available: true };
-      }
-      const probe = claudeProbe();
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'claude CLI probe failed');
-    }
-    case 'codex-cli':
-      return binaryProbe('codex', ['--version'])
-        ? { available: true }
-        : unavailable('`codex --version` failed');
-    case 'gemini-cli':
-      return binaryProbe('gemini', ['--version'])
-        ? { available: true }
-        : unavailable('`gemini --version` failed');
-    case 'agy-cli':
-      return binaryProbe('agy', ['--version'])
-        ? { available: true }
-        : unavailable('`agy --version` failed');
-    case 'grok-cli':
-      return binaryProbe('grok', ['--version'])
-        ? { available: true }
-        : unavailable('`grok --version` failed');
-    case 'grok-api': {
-      const probe = await probeGrokApiBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'xAI Grok API probe failed');
-    }
-    case 'copilot':
-      return binaryProbe('gh', ['copilot', '--', '--help'])
-        ? { available: true }
-        : unavailable('`gh copilot -- --help` failed');
-    case 'cursor-cli':
-      return binaryProbe(
-        getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN', { env })?.trim() || 'cursor-agent',
-        ['--version']
-      )
-        ? { available: true }
-        : unavailable('`cursor-agent --version` failed');
-    case 'opencode-cli':
-      return binaryProbe(
-        getRegisteredEnvText('KYBERION_OPENCODE_CLI_BIN', { env })?.trim() || 'opencode',
-        ['--version']
-      )
-        ? { available: true }
-        : unavailable('`opencode --version` failed');
-    case 'devin-cli':
-      return binaryProbe(
-        getRegisteredEnvText('KYBERION_DEVIN_CLI_BIN', { env })?.trim() || 'devin',
-        ['--version']
-      )
-        ? { available: true }
-        : unavailable('`devin --version` failed');
-    case 'anthropic': {
-      const probe = await anthropicProbe(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'Anthropic API probe failed');
-    }
-    case 'gemini-api': {
-      const probe = await probeGeminiApiBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'Gemini API probe failed');
-    }
-    case 'openrouter': {
-      const probe = await probeOpenRouterBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'OpenRouter probe failed');
-    }
-    case 'ollama': {
-      const probe = await probeOllamaBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'Ollama probe failed');
-    }
-    case 'vllm': {
-      const probe = await probeVllmBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'vLLM probe failed');
-    }
-    case 'lmstudio': {
-      const probe = await probeLmStudioBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'LM Studio probe failed');
-    }
-    case 'llamacpp': {
-      const probe = await probeLlamaCppBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'llama.cpp probe failed');
-    }
-    case 'mlx': {
-      const probe = await probeMlxBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'MLX probe failed');
-    }
-    case 'localai': {
-      const probe = await probeLocalAiBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'LocalAI probe failed');
-    }
-    case 'local': {
-      const probe = await probeOpenAiCompatibleBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'local OpenAI-compatible probe failed');
-    }
-    case 'nemotron-api': {
-      const probe = await probeNemotronBackendAvailability(env);
-      return probe.available
-        ? { available: true }
-        : unavailable(probe.reason ?? 'Nemotron probe failed');
-    }
-    default:
-      return unavailable(
-        'unknown backend mode. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes) for the catalog.'
-      );
+  // RS-01: the probe is chosen by the governed descriptor's adapter (CLI
+  // binary/version args come from the descriptor), never by a per-mode switch.
+  const descriptor = getReasoningProviderDescriptor(backend);
+  if (!descriptor) {
+    return unavailable(
+      'unknown backend mode. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes) for the catalog.'
+    );
   }
+  if (descriptor.adapter === 'stub') {
+    return {
+      available: false,
+      reason: `KYBERION_REASONING_BACKEND=${backendRaw} is explicitly selected — deterministic placeholders only. Configure a real backend (see \`pnpm reasoning:setup\`) to clear this.`,
+    };
+  }
+  const probe = await probeReasoningProviderReadiness(descriptor, env, {
+    binaryProbe: deps.binaryProbe ?? binaryAvailable,
+    ...(deps.claudeProbe ? { claudeProbe: deps.claudeProbe } : {}),
+    ...(deps.anthropicProbe ? { anthropicProbe: deps.anthropicProbe } : {}),
+  });
+  return probe.available ? { available: true } : unavailable(probe.reason ?? 'probe failed');
 }
+
+/** Adapters whose readiness is a local binary/CLI check rather than a configured credential. */
+const LOCAL_RUNTIME_ADAPTERS = new Set(['provider-cli', 'claude-cli', 'claude-agent-sdk']);
 
 async function probeReasoningBackend(): Promise<{ available: boolean; reason?: string }> {
   // An explicitly selected backend is probed specifically — a working
@@ -260,85 +126,37 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (explicit) {
     return probeExplicitReasoningBackend(explicit, process.env);
   }
-  // CLI probes are `spawnSync` (~100-800ms each on this host). They only gate
-  // on availability — which binary answered first does not change the result,
-  // so they race in parallel and short-circuit on the first hit.
-  const cliProbes: Array<Promise<boolean>> = [
-    Promise.resolve().then(() => binaryAvailable('codex', ['--version'])),
-    Promise.resolve().then(() => binaryAvailable('gemini', ['--version'])),
-    Promise.resolve().then(() => binaryAvailable('agy', ['--version'])),
-    Promise.resolve().then(() => binaryAvailable('grok', ['--version'])),
-    Promise.resolve().then(() => binaryAvailable('devin', ['--version'])),
-  ];
-  for (const probe of cliProbes) {
-    if (await probe) {
+  // RS-01: walk the governed registry. Local CLI runtimes are probed first
+  // (cheap, no credential); hosted/local-server adapters only when one of
+  // their declared env_keys is configured. The claude shell probe is shared
+  // by the two claude adapters.
+  let claudeResult: { available: boolean; reason?: string } | undefined;
+  const deps: ReasoningProviderReadinessDeps = {
+    binaryProbe: binaryAvailable,
+    claudeProbe: () => (claudeResult ??= probeShellClaudeCliAvailability()),
+  };
+  const descriptors = listReasoningProviderDescriptors().filter(
+    (descriptor) => descriptor.adapter !== 'stub'
+  );
+  const local = descriptors.filter((descriptor) => LOCAL_RUNTIME_ADAPTERS.has(descriptor.adapter));
+  const configured = descriptors.filter(
+    (descriptor) =>
+      !LOCAL_RUNTIME_ADAPTERS.has(descriptor.adapter) &&
+      descriptor.env_keys.some((key) => Boolean(kyberionEnv(key)))
+  );
+  for (const descriptor of [...local, ...configured]) {
+    if ((await probeReasoningProviderReadiness(descriptor, process.env, deps)).available) {
       return { available: true };
     }
   }
-  if (
-    kyberionEnv('CLAUDE_API_KEY') ||
-    (await Promise.resolve().then(() => probeShellClaudeCliAvailability())).available
-  ) {
-    return { available: true };
-  }
-  if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {
-    return { available: true };
-  }
-  if (
-    kyberionEnv('KYBERION_GEMINI_API_KEY') ||
-    kyberionEnv('GEMINI_API_KEY') ||
-    kyberionEnv('GOOGLE_API_KEY')
-  ) {
-    const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
-    if (geminiProbe.available) return { available: true };
-  }
-  if (kyberionEnv('XAI_API_KEY') || kyberionEnv('KYBERION_GROK_API_KEY')) {
-    const grokApiProbe = await probeGrokApiBackendAvailability(process.env);
-    if (grokApiProbe.available) return { available: true };
-  }
-  if (kyberionEnv('OPENROUTER_API_KEY') || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
-    const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
-    if (openrouterProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(kyberionEnv('OLLAMA_HOST'))) {
-    const ollamaProbe = await probeOllamaBackendAvailability(process.env);
-    if (ollamaProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_VLLM_URL'))) {
-    const vllmProbe = await probeVllmBackendAvailability(process.env);
-    if (vllmProbe.available) return { available: true };
-  }
-  if (
-    Boolean(kyberionEnv('KYBERION_LMSTUDIO_URL')) ||
-    Boolean(kyberionEnv('KYBERION_LM_STUDIO_URL'))
-  ) {
-    const lmstudioProbe = await probeLmStudioBackendAvailability(process.env);
-    if (lmstudioProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_LLAMACPP_URL'))) {
-    const llamacppProbe = await probeLlamaCppBackendAvailability(process.env);
-    if (llamacppProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_MLX_URL'))) {
-    const mlxProbe = await probeMlxBackendAvailability(process.env);
-    if (mlxProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_LOCALAI_URL'))) {
-    const localaiProbe = await probeLocalAiBackendAvailability(process.env);
-    if (localaiProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_LOCAL_LLM_URL'))) {
-    const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
-    if (localProbe.available) return { available: true };
-  }
-  if (Boolean(kyberionEnv('KYBERION_NEMOTRON_URL'))) {
-    const nemotronProbe = await probeNemotronBackendAvailability(process.env);
-    if (nemotronProbe.available) return { available: true };
-  }
+  const options = descriptors.map((descriptor) =>
+    descriptor.cli
+      ? `${descriptor.mode} (\`${descriptor.cli.binary}\`)`
+      : `${descriptor.mode} (${descriptor.env_keys.join(' or ') || 'see setup'})`
+  );
   return {
     available: false,
-    reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), devin CLI (`devin auth login`), xAI Grok API key (XAI_API_KEY or KYBERION_GROK_API_KEY), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+    reason: `no real reasoning backend reachable. Authenticate or configure one of: ${options.join(', ')}. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.`,
   };
 }
 

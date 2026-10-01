@@ -41,7 +41,7 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   });
   if (!safeExistsSync(customerDir) || !safeLstat(customerDir).isDirectory()) {
     throw new Error(
-      `Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm customer:create first.`
+      `Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm stance:create first.`
     );
   }
 
@@ -54,7 +54,7 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   });
   if (missing.length > 0) {
     throw new Error(
-      `Customer overlay is not ready: ${path.relative(pathResolver.rootDir(), customerDir)} is missing ${missing.join(', ')}. Run pnpm customer:list to inspect readiness.`
+      `Customer overlay is not ready: ${path.relative(pathResolver.rootDir(), customerDir)} is missing ${missing.join(', ')}. Run pnpm stance:list to inspect readiness.`
     );
   }
 
@@ -95,7 +95,7 @@ if (
   isDirectScript(import.meta.url, 'customer_switch.js')
 )
   void defineScript({
-    name: 'customer:switch',
+    name: 'stance:switch',
     flags: [],
     run(context) {
       context.print(main(context.argv, context.print).join('\n'));

@@ -24,7 +24,7 @@ describe('AI company onboarding', () => {
     const print = vi.fn();
 
     expect(main(['--help'], print)).toBe(0);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('pnpm onboard company'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('pnpm onboarding company'));
   });
 
   it('dry-runs without writing and shows the complete next path', () => {

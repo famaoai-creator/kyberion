@@ -10,7 +10,7 @@ last_updated: 2026-06-24
 
 A guided tour of Kyberion's codebase. Read top-to-bottom in one sitting; you should leave with a working mental model of how it all fits together.
 
-This is **Phase C'-2**: the entry point that lets a new contributor be productive in a week.
+This is the contributor tour: the second step after [QUICKSTART](../QUICKSTART.md), which is the canonical front door and owns setup and the first win. Do the first win there, then come back here to build a mental model of the codebase.
 
 This map is kept in sync with the current first-win ladder (`docs/QUICKSTART.md`), the stable boundary contract (`docs/developer/EXTENSION_POINTS.md`), and the release path (`docs/developer/RELEASE_OPERATIONS.md`).
 

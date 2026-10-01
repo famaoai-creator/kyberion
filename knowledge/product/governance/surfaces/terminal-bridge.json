@@ -15,7 +15,8 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_terminal_bridge"
     }
   ]
 }

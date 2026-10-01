@@ -9,7 +9,7 @@
  *
  * Goals:
  * - Zero install on macOS / Windows (built into the OS).
- * - Single `apt install espeak` on Linux, surfaced by `pnpm doctor`.
+ * - Single `apt install espeak` on Linux, surfaced by `pnpm kyberion doctor`.
  * - No API key, no network call.
  *
  * This is the response side of the tier-0 voice first-win. The browser

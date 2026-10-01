@@ -1,11 +1,14 @@
 import { logger } from './core.js';
 import { formatDiagnostic } from './logger.js';
+import { resolveIdentityContext, withExecutionContext } from './authority.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
 import { loadOrganizationProfile } from './organization/organization-profile.js';
 import {
   enqueueOrganizationLearningCandidate,
   type OrganizationLearningSourceType,
   type OrganizationTier,
 } from './organization/organization-operating-model.js';
+import { resolveScopeResolution } from './scope-context.js';
 
 export interface OperationalLearningSignal {
   signalId: string;
@@ -42,7 +45,39 @@ export function enqueueOperationalLearningSignal(
   options: { now?: Date; rootDir?: string } = {}
 ): string | null {
   const tier = signal.tier || 'personal';
-  const tenantSlug = signal.tenantSlug?.trim() || undefined;
+  const profile = loadOrganizationProfile(options.rootDir);
+  const resolvedScope = resolveScopeResolution().scope;
+  const activeTenantSlug = resolveIdentityContext().tenantSlug?.trim() || undefined;
+  const activeOrganizationId =
+    currentExecutionScope()?.organizationId ||
+    resolvedScope.organization_id ||
+    profile?.organization_id ||
+    'default';
+  const requestedTenantSlug = signal.tenantSlug?.trim() || undefined;
+  const requestedOrganizationId = signal.organizationId?.trim() || undefined;
+
+  if (requestedTenantSlug && requestedTenantSlug !== activeTenantSlug) {
+    logger.warn(
+      formatDiagnostic({
+        component: 'operational-learning',
+        what: `skipped ${signal.signalId}`,
+        why: `requested tenant '${requestedTenantSlug}' does not match the active tenant scope`,
+      })
+    );
+    return null;
+  }
+  if (requestedOrganizationId && requestedOrganizationId !== activeOrganizationId) {
+    logger.warn(
+      formatDiagnostic({
+        component: 'operational-learning',
+        what: `skipped ${signal.signalId}`,
+        why: `requested organization '${requestedOrganizationId}' does not match the active organization scope`,
+      })
+    );
+    return null;
+  }
+
+  const tenantSlug = activeTenantSlug;
   if (tier === 'confidential' && !tenantSlug) {
     logger.warn(
       `[operational-learning] skipped ${signal.signalId}: confidential tenant scope is missing`
@@ -50,27 +85,33 @@ export function enqueueOperationalLearningSignal(
     return null;
   }
 
-  const profile = loadOrganizationProfile(options.rootDir);
-  const organizationId = signal.organizationId || profile?.organization_id || 'default';
+  const organizationId = activeOrganizationId;
   const now = options.now || new Date();
   const day = now.toISOString().slice(0, 10);
   const scope = tenantSlug || 'shared';
   const learningId = `ops-${day}-${slug(signal.signalId)}-${tier}-${slug(scope)}`;
 
   try {
-    enqueueOrganizationLearningCandidate({
-      learningId,
-      organizationId,
-      sourceType: signal.sourceType,
-      sourceRef: signal.sourceRef,
-      title: signal.title,
-      summary: signal.summary,
-      evidenceRefs: signal.evidenceRefs || [],
-      targetKind: signal.targetKind || 'sop_candidate',
-      tier,
-      ...(tenantSlug ? { tenantSlug } : {}),
-      ...(signal.metadata ? { metadata: signal.metadata } : {}),
-    });
+    withExecutionContext(
+      'operational_learning_writer',
+      () =>
+        enqueueOrganizationLearningCandidate({
+          learningId,
+          organizationId,
+          sourceType: signal.sourceType,
+          sourceRef: signal.sourceRef,
+          title: signal.title,
+          summary: signal.summary,
+          evidenceRefs: signal.evidenceRefs || [],
+          targetKind: signal.targetKind || 'sop_candidate',
+          tier,
+          ...(tenantSlug ? { tenantSlug } : {}),
+          ...(signal.metadata ? { metadata: signal.metadata } : {}),
+        }),
+      undefined,
+      tenantSlug,
+      organizationId
+    );
     return learningId;
   } catch (error) {
     logger.warn(

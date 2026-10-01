@@ -42,6 +42,7 @@ import {
   probeWindowsNativeImageGeneration,
 } from '../windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from '../provider/gemini-api-backend.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from '../host-image-handoff.js';
 import { isAppleSilicon } from '../platform.js';
 import { coreSeamCatalog, createSeam } from '../seam.js';
@@ -460,8 +461,13 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   }
 }
 
-/** Default Gemini image model for reference-conditioned generation (PA-10). */
-export const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+/**
+ * Default Gemini image model for reference-conditioned generation (PA-10):
+ * provider-config.json runtime_defaults['gemini-image'] (RS-02).
+ */
+export function defaultGeminiImageModel(): string {
+  return resolveRuntimeModelId('gemini-image');
+}
 /** Keeps the inline-data request under the network guardrail (2 MB by default). */
 const GEMINI_REFERENCE_MAX_BYTES = 1024 * 1024;
 const GEMINI_REFERENCE_TOTAL_MAX_BYTES = 1400 * 1024;
@@ -479,7 +485,7 @@ const GEMINI_REFERENCE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
 
 export function resolveGeminiImageModel(): string {
   const configured = getRegisteredEnvText('KYBERION_GEMINI_IMAGE_MODEL')?.trim();
-  if (!configured) return DEFAULT_GEMINI_IMAGE_MODEL;
+  if (!configured) return defaultGeminiImageModel();
   if (!/^[a-z0-9][a-z0-9.-]{0,79}$/u.test(configured)) {
     throw new Error(`KYBERION_GEMINI_IMAGE_MODEL is not a valid model id: ${configured}`);
   }

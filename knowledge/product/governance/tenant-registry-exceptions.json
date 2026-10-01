@@ -12,7 +12,7 @@
     },
     {
       "slug": "_template",
-      "reason": "customer/ scaffold template copied by pnpm customer:create — not a tenant (invalid slug format by design)."
+      "reason": "customer/ scaffold template copied by pnpm stance:create — not a tenant (invalid slug format by design)."
     },
     {
       "slug": "alpha-team",

@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
 import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import { resolveCoordinationActuatorRoute } from './coordination-actuator-routing.js';
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'
@@ -133,26 +134,6 @@ function inferExpectedOutputs(kind: GuidedCoordinationBrief['coordination_kind']
   return outputsByKind[kind] || outputsByKind.general;
 }
 
-function inferSuggestedTargetActuators(
-  kind: GuidedCoordinationBrief['coordination_kind']
-): string[] {
-  const byKind: Record<GuidedCoordinationBrief['coordination_kind'], string[]> = {
-    meeting: ['meeting-actuator', 'meeting-browser-driver'],
-    presentation: ['orchestrator-actuator', 'media-actuator'],
-    narrated_video: ['video-composition-actuator', 'voice-actuator'],
-    booking: ['browser-actuator', 'orchestrator-actuator'],
-    travel: ['browser-actuator', 'orchestrator-actuator'],
-    schedule: ['browser-actuator', 'service-actuator'],
-    onboarding: ['orchestrator-actuator', 'artifact-actuator'],
-    proposal: ['orchestrator-actuator', 'media-actuator'],
-    decision_support: ['task-session-manager', 'wisdom-actuator'],
-    service_operation: ['service-orchestrator', 'task-session-manager'],
-    general: ['orchestrator-actuator', 'intent-compiler'],
-  };
-
-  return byKind[kind] || byKind.general;
-}
-
 function inferSuggestedDeliverables(kind: GuidedCoordinationBrief['coordination_kind']): string[] {
   const byKind: Record<GuidedCoordinationBrief['coordination_kind'], string[]> = {
     meeting: ['meeting_operations_summary', 'action_items'],
@@ -272,6 +253,7 @@ export function buildGuidedCoordinationBrief(
 ): GuidedCoordinationBrief {
   const coordination_kind = inferCoordinationKind(seed);
   const missing_inputs = inferMissingInputs(coordination_kind);
+  const route = resolveCoordinationActuatorRoute(coordination_kind);
   return {
     kind: 'guided-coordination-brief',
     request_text: seed.requestText,
@@ -282,7 +264,11 @@ export function buildGuidedCoordinationBrief(
     approval_boundary: seed.approvalBoundary || inferApprovalBoundary(coordination_kind),
     missing_inputs,
     expected_outputs: inferExpectedOutputs(coordination_kind),
-    suggested_target_actuators: inferSuggestedTargetActuators(coordination_kind),
+    // Actuator routing per kind is registry data (coordination-actuator-routing.json, RS-07).
+    suggested_target_actuators: route.target_actuators,
+    ...(route.support_components.length > 0
+      ? { suggested_support_components: route.support_components }
+      : {}),
     suggested_deliverables: inferSuggestedDeliverables(coordination_kind),
     preference_profile_refs: seed.preferenceProfileRefs?.length
       ? seed.preferenceProfileRefs
@@ -366,6 +352,16 @@ export function normalizeGuidedCoordinationBrief(
       Array.isArray(raw.suggested_target_actuators) && raw.suggested_target_actuators.length > 0
         ? raw.suggested_target_actuators.map((item) => String(item).trim()).filter(Boolean)
         : fallback.suggested_target_actuators,
+    ...(Array.isArray(raw.suggested_support_components) &&
+    raw.suggested_support_components.length > 0
+      ? {
+          suggested_support_components: raw.suggested_support_components
+            .map((item) => String(item).trim())
+            .filter(Boolean),
+        }
+      : fallback.suggested_support_components
+        ? { suggested_support_components: fallback.suggested_support_components }
+        : {}),
     suggested_deliverables:
       Array.isArray(raw.suggested_deliverables) && raw.suggested_deliverables.length > 0
         ? raw.suggested_deliverables.map((item) => String(item).trim()).filter(Boolean)

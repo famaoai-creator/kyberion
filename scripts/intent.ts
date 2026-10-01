@@ -17,7 +17,8 @@ import {
 import { renderStatus, resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
 import { resolveLocale } from '@agent/core/locale';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { readJsonLines } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJsonLines } from '@agent/core/foundation';
+import { withImplicitTraceSubcommand } from './lib/intent-trace-argv.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
@@ -602,14 +603,21 @@ function serializeJsonReport(report: IntentTraceReportData): Record<string, unkn
   };
 }
 
-const INTENT_TRACE_USAGE = 'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]';
+const INTENT_TRACE_USAGE = 'Usage: pnpm intent:trace <correlation_id> [--json] [--limit <n>]';
 
 export async function main(
   argv: string[] = [],
   print: (value: unknown) => void = () => undefined,
   json = argv.includes('--json')
 ): Promise<void> {
-  const parsed = await createStandardYargs(['node', 'intent', ...stripSharedScriptFlags(argv)])
+  const parsed = await createStandardYargs([
+    'node',
+    'intent',
+    ...withImplicitTraceSubcommand(
+      stripSharedScriptFlags(argv),
+      getRegisteredEnvText('npm_lifecycle_event')
+    ),
+  ])
     .command(
       'trace <correlationId>',
       'Render the full intent timeline for a correlation id',

@@ -29,7 +29,7 @@ files (`document-hand-extraction`).
    - `--images <dir>` writes every figure (slide / page / picture) as an image file — EMF/WMF converted to PNG — so you can look at charts and pasted tables directly.
    - Act on the `> [read] …` warnings (e.g. re-run with `--ocr`).
 3. **Land it as tenant knowledge** (only when asked): ask which tenant, then
-   `pnpm ingest --tenant <slug> --file <file> [--ocr] --dry-run --propose-tier`, review, and re-run without `--dry-run`.
+   `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr] --dry-run --propose-tier`, review, and re-run without `--dry-run`.
 4. **Check figures**: OCR scrambles label ↔ value pairing in financial tables — export them with `--images`, look at the image and transcribe such tables instead of trusting OCR.
 5. Remove the staging directory when done.
 

@@ -73,7 +73,7 @@ describe('audit-chain — tenant mirror', () => {
     // EG-14: the mirror follows an existing stance overlay and never creates
     // one, so a tenant that is expected to be mirrored must have its
     // customer/{slug}/ directory provisioned first — the same thing
-    // `pnpm customer:create` does in a real checkout.
+    // `pnpm stance:create` does in a real checkout.
     for (const slug of ['sbiss', 'sbijsm']) {
       fs.mkdirSync(path.join(testRoot, 'customer', slug), { recursive: true });
     }

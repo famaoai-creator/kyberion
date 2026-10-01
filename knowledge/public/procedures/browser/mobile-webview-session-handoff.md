@@ -15,22 +15,22 @@
 ## Contracts
 
 - handoff artifact schema:
-  [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/webview-session-handoff.schema.json)
+  [`webview-session-handoff.schema.json`](../../../product/schemas/webview-session-handoff.schema.json)
 - mobile profile schema:
-  [`mobile-app-profile.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/mobile-app-profile.schema.json)
+  [`mobile-app-profile.schema.json`](../../../product/schemas/mobile-app-profile.schema.json)
 - shared mobile profiles:
-  [`mobile-app-profiles/index.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/index.json)
+  [`mobile-app-profiles/index.json`](../../../product/orchestration/mobile-app-profiles/index.json)
 
 ## Shared Templates
 
 - Android reference:
-  [`android-reference.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/android-reference.md)
+  [`android-reference.md`](../../templates/mobile-webview-handoff/android-reference.md)
 - iOS reference:
-  [`ios-reference.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/ios-reference.md)
+  [`ios-reference.md`](../../templates/mobile-webview-handoff/ios-reference.md)
 - shared stubs:
-  [`README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/README.md)
+  [`README.md`](../../templates/mobile-webview-handoff/README.md)
 - sample app skeletons:
-  [`mobile-sample-apps/README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/README.md)
+  [`mobile-sample-apps/README.md`](../../templates/mobile-sample-apps/README.md)
 
 ## Orchestration
 

@@ -6,11 +6,13 @@ import {
   resolveCommand,
   resolveCommandPath,
   resolveScriptCommand,
+  rewriteRoutedArgs,
   selectEntrypoint,
   validateKyberionStartupEnvironment,
 } from './kyberion.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
+import { loadCliManifest } from './check_cli_manifest.js';
 
 describe('kyberion command router', () => {
   it('routes operator-home commands through the home entrypoint', () => {
@@ -67,18 +69,21 @@ describe('kyberion command router', () => {
       command: 'backup default',
       audience: 'operator',
     });
-    expect(resolveCommandPath(['onboard', 'apply', '--identity', 'identity.json'])).toBe('onboard');
-    expect(resolveCommandPath(['onboard', 'reset', '--force'])).toBe('onboard');
+    expect(resolveCommandPath(['onboarding', 'apply', '--identity', 'identity.json'])).toBe(
+      'onboarding'
+    );
+    expect(resolveCommandPath(['onboarding', 'reset', '--force'])).toBe('onboarding');
+    expect(resolveCommandPath(['onboarding', 'context', '--json'])).toBe('onboarding context');
   });
 
   it('dispatches module-backed commands without a package-script alias', async () => {
-    expect(resolveScriptCommand('chronos uninstall')).toMatchObject({
+    expect(resolveScriptCommand('scheduler uninstall')).toMatchObject({
       module: 'scripts/install_chronos_launchd.ts',
       args: ['--uninstall'],
     });
 
     const output: unknown[] = [];
-    await main(['chronos', 'uninstall'], (value) => output.push(value));
+    await main(['scheduler', 'uninstall'], (value) => output.push(value));
     expect(output).toHaveLength(1);
     expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
@@ -200,7 +205,8 @@ describe('kyberion command router', () => {
     });
     expect(help).toContain('<home>');
     expect(help).toContain('ask');
-    expect(help).toContain('governed registry');
+    // Entries without a description key fall back to `noun verb`.
+    expect(help).toContain('ask default');
   });
 
   it('routes help output through the supplied harness printer', async () => {
@@ -208,7 +214,7 @@ describe('kyberion command router', () => {
     const { main } = await import('./kyberion.js');
     await main(['--help'], (value) => output.push(value));
     expect(output).toHaveLength(1);
-    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+    expect(output[0]).toEqual(expect.stringContaining('pr create'));
   });
 
   it('ignores the pnpm `--` separator pnpm forwards literally (npm strips it)', async () => {
@@ -216,7 +222,7 @@ describe('kyberion command router', () => {
     const { main } = await import('./kyberion.js');
     await main(['--', '--help'], (value) => output.push(value));
     expect(output).toHaveLength(1);
-    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+    expect(output[0]).toEqual(expect.stringContaining('pr create'));
   });
 
   it('does not write directly to stdout from the unified router', () => {
@@ -258,10 +264,23 @@ describe('kyberion command router', () => {
     ).toThrow('KYBERION_MYSTERY');
   });
 
-  it('uses strict environment validation by default', () => {
-    expect(() => validateKyberionStartupEnvironment({ KYBERION_MYSTERY: '1' })).toThrow(
+  it('is strict by default in CI', () => {
+    expect(() => validateKyberionStartupEnvironment({ CI: 'true', KYBERION_MYSTERY: '1' })).toThrow(
       'KYBERION_MYSTERY'
     );
+  });
+
+  it('warns once and continues on unknown variables outside CI', () => {
+    expect(() => validateKyberionStartupEnvironment({ KYBERION_MYSTERY: '1' })).not.toThrow();
+    expect(() =>
+      validateKyberionStartupEnvironment({ CI: 'false', KYBERION_MYSTERY: '1' })
+    ).not.toThrow();
+  });
+
+  it('still fails on invalid values of known variables outside CI', () => {
+    expect(() =>
+      validateKyberionStartupEnvironment({ KYBERION_ENV_REGISTRY_STRICT_DOCS: 'banana' })
+    ).toThrow('KYBERION_ENV_REGISTRY_STRICT_DOCS');
   });
 
   it('allows an explicit false opt-out for local compatibility', () => {
@@ -271,5 +290,127 @@ describe('kyberion command router', () => {
         KYBERION_MYSTERY: '1',
       })
     ).not.toThrow();
+  });
+});
+
+describe('CU-08 deprecated command aliases', () => {
+  const manifest = loadCliManifest();
+
+  it('routes a renamed command to its replacement with one warning line', () => {
+    const warnings: string[] = [];
+    const routed = rewriteRoutedArgs(
+      ['customer', 'create', '--slug', 'acme'],
+      manifest,
+      (message) => warnings.push(message)
+    );
+    expect(routed).toEqual(['stance', 'create', '--slug', 'acme']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('kyberion customer create');
+    expect(warnings[0]).toContain('kyberion stance create');
+  });
+
+  it('maps every old `<noun> default` name to the renamed command', () => {
+    const silent = (): void => undefined;
+    expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, silent)).toEqual([
+      'onboarding',
+      'apply',
+    ]);
+    expect(rewriteRoutedArgs(['chronos'], manifest, silent)).toEqual(['scheduler']);
+    expect(rewriteRoutedArgs(['dev'], manifest, silent)).toEqual(['verify']);
+    expect(rewriteRoutedArgs(['ingest', '--file', 'a.pdf'], manifest, silent)).toEqual([
+      'knowledge',
+      'ingest',
+      '--file',
+      'a.pdf',
+    ]);
+    // `chronos dev` (Chronos Mirror UI) is a live command, not an alias.
+    expect(rewriteRoutedArgs(['chronos', 'dev'], manifest, silent)).toEqual(['chronos', 'dev']);
+  });
+
+  it('still runs the old command name end to end', async () => {
+    const output: unknown[] = [];
+    await main(['chronos', 'uninstall'], (value) => output.push(value));
+    expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
+  });
+
+  it('leaves current command names untouched and silent', () => {
+    const warnings: string[] = [];
+    const args = ['stance', 'list', '--json'];
+    expect(rewriteRoutedArgs(args, manifest, (message) => warnings.push(message))).toEqual(args);
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('CU-09 doctor scopes and setup areas', () => {
+  const manifest = loadCliManifest();
+  const silent = (): void => undefined;
+
+  it('keeps bare doctor (and its own flags) on the doctor entrypoint', () => {
+    expect(rewriteRoutedArgs(['doctor'], manifest, silent)).toEqual(['doctor']);
+    expect(rewriteRoutedArgs(['doctor', '--runtime', 'app'], manifest, silent)).toEqual([
+      'doctor',
+      '--runtime',
+      'app',
+    ]);
+  });
+
+  it('delegates each doctor --scope to the existing diagnostic', () => {
+    const route = (...args: string[]) => rewriteRoutedArgs(['doctor', ...args], manifest, silent);
+    expect(route('--scope', 'env')).toEqual(['vital']);
+    expect(route('--scope', 'service', '--service', 'slack')).toEqual([
+      'service',
+      'preflight',
+      '--service',
+      'slack',
+    ]);
+    expect(route('--scope=meeting', '--json')).toEqual(['meeting', 'preflight', '--json']);
+    expect(route('--scope', 'voice')).toEqual(['doctor', '--runtime', 'voice']);
+    expect(route('--scope', 'app')).toEqual(['doctor', '--runtime', 'app']);
+    expect(route('--scope', 'setup')).toEqual(['setup', 'report']);
+    for (const scope of ['env', 'service', 'voice', 'meeting', 'app', 'setup']) {
+      const routed = route('--scope', scope);
+      expect(
+        resolveCommand(resolveCommandPath(routed)) ??
+          resolveScriptCommand(resolveCommandPath(routed))
+      ).toBeDefined();
+    }
+  });
+
+  it('delegates each setup area to the existing setup command', () => {
+    const route = (...args: string[]) => rewriteRoutedArgs(['setup', ...args], manifest, silent);
+    expect(route('onboarding', '--express')).toEqual(['onboarding', '--express']);
+    expect(route('context')).toEqual(['onboarding', 'context']);
+    expect(route('reasoning')).toEqual(['reasoning', 'setup']);
+    expect(route('env', '--manifest', 'x', '--apply')).toEqual([
+      'env',
+      'bootstrap',
+      '--manifest',
+      'x',
+      '--apply',
+    ]);
+    expect(route('services')).toEqual(['service', 'setup']);
+    expect(route('tools', '--list')).toEqual(['tool', 'setup', '--list']);
+    expect(route('provider-cli')).toEqual(['provider-cli', 'setup']);
+    expect(route('agy-sdk')).toEqual(['agy', 'sdk-setup']);
+    expect(route('voice', '--apply')).toEqual(['voice', 'setup', '--apply']);
+    expect(route('config')).toEqual(['config-mission']);
+    // `setup report` stays its own governed command.
+    expect(route('report', '--json')).toEqual(['setup', 'report', '--json']);
+  });
+
+  it('fails closed with the scope list on an unknown scope or area', () => {
+    expect(() => rewriteRoutedArgs(['doctor', '--scope', 'nope'], manifest, silent)).toThrow(
+      /env, service, voice, meeting, app, setup/u
+    );
+    expect(() => rewriteRoutedArgs(['doctor', '--scope'], manifest, silent)).toThrow(/<missing>/u);
+    expect(() => rewriteRoutedArgs(['setup', 'nope'], manifest, silent)).toThrow(/onboarding/u);
+  });
+
+  it('lists the setup areas for a bare `setup`', async () => {
+    const output: unknown[] = [];
+    await main(['setup', '--locale', 'en'], (value) => output.push(value));
+    const text = String(output[0]);
+    expect(text).toContain('pnpm kyberion setup <onboarding|');
+    expect(text).toContain('runs pnpm kyberion env bootstrap');
   });
 });
