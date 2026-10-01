@@ -148,33 +148,64 @@ export function handleImprovements(
 
 // Customer-path operator view: which deals are live, at what stage, and what
 // the requirements hearing has captured so far (E2E-06 follow-up).
+/**
+ * The tenant that owns a deal id: `--tenant` when given, else the single
+ * channel-bound tenant whose deals contain it. Unknown or ambiguous ids exit 1
+ * before anything is written.
+ */
+function resolveDealOwnerTenant(
+  ui: HomeUi,
+  dealId: string,
+  tenant: string | undefined,
+  print: HomePrint
+): string {
+  const tenants = tenant
+    ? [tenant]
+    : Array.from(new Set(listCustomerChannelBindings().map((binding) => binding.tenantSlug)));
+  const owners = tenants.filter((slug) => listDeals(slug).some((deal) => deal.deal_id === dealId));
+  if (owners.length === 0) {
+    print(ui('recorder:recorder_deal_not_found', { id: dealId }));
+    throw new ScriptExitError(1, '', true);
+  }
+  if (owners.length > 1) {
+    print(
+      ui('recorder:recorder_deal_tenant_ambiguous', { id: dealId, tenants: owners.join(', ') })
+    );
+    throw new ScriptExitError(1, '', true);
+  }
+  return owners[0];
+}
+
 export async function handleDealsIngestAudio(
   ui: HomeUi,
   argv: {
     ingestAudio?: string;
     audio?: string;
+    tenant?: string;
   },
   print: HomePrint = () => undefined
 ): Promise<void> {
-  const bindings = listCustomerChannelBindings();
-  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
-  const match = tenants
-    .flatMap((tenantSlug) => listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal })))
-    .find((entry) => entry.deal.deal_id === argv.ingestAudio);
-  if (!match) {
-    print(ui('recorder:recorder_deal_not_found', { id: argv.ingestAudio || '' }));
-    throw new ScriptExitError(1, '', true);
-  }
+  const dealId = argv.ingestAudio || '';
+  const tenantSlug = resolveDealOwnerTenant(ui, dealId, argv.tenant, print);
+  const deal = listDeals(tenantSlug).find((entry) => entry.deal_id === dealId)!;
+  const match = { tenantSlug, deal };
   if (!argv.audio) {
     print(ui('recorder:recorder_deal_audio_usage'));
     throw new ScriptExitError(1, '', true);
   }
-  const result = await ingestAudioIntoDealRequirements({
-    tenantSlug: match.tenantSlug,
-    dealId: match.deal.deal_id,
-    audioPath: argv.audio,
-    projectName: match.deal.summary?.slice(0, 80),
-  });
+  const audioPath = argv.audio;
+  const result = await withExecutionContext(
+    DEAL_DOCUMENT_WRITE_ROLE,
+    () =>
+      ingestAudioIntoDealRequirements({
+        tenantSlug: match.tenantSlug,
+        dealId: match.deal.deal_id,
+        audioPath,
+        projectName: match.deal.summary?.slice(0, 80),
+      }),
+    undefined,
+    match.tenantSlug
+  );
   if (!result) {
     print(ui('recorder:recorder_deal_audio_failed'));
     throw new ScriptExitError(1, '', true);
@@ -343,23 +374,7 @@ export function handleDealDocumentAction(
 ): boolean {
   if (!isDealDocumentAction(argv)) return false;
   const dealId = String(argv.quote || argv.draftContract || argv.reviewContract || argv.handoff);
-  const tenants = argv.tenant
-    ? [argv.tenant]
-    : Array.from(new Set(listCustomerChannelBindings().map((binding) => binding.tenantSlug)));
-  const owners = tenants.filter((tenant) =>
-    listDeals(tenant).some((deal) => deal.deal_id === dealId)
-  );
-  if (owners.length === 0) {
-    print(ui('recorder:recorder_deal_not_found', { id: dealId }));
-    throw new ScriptExitError(1, '', true);
-  }
-  if (owners.length > 1) {
-    print(
-      ui('recorder:recorder_deal_tenant_ambiguous', { id: dealId, tenants: owners.join(', ') })
-    );
-    throw new ScriptExitError(1, '', true);
-  }
-  const tenantSlug = owners[0];
+  const tenantSlug = resolveDealOwnerTenant(ui, dealId, argv.tenant, print);
   const governed = <T>(write: () => T): T =>
     withExecutionContext(DEAL_DOCUMENT_WRITE_ROLE, write, undefined, tenantSlug);
   const emit = (value: Record<string, unknown>, line: string) =>
