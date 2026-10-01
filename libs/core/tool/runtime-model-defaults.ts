@@ -20,6 +20,12 @@ const RUNTIME_MODEL_ENV_OVERRIDES: Readonly<Record<RuntimeModelRole, readonly st
   'cursor-default': ['KYBERION_CURSOR_CLI_MODEL'],
   'opencode-default': ['KYBERION_OPENCODE_CLI_MODEL'],
   'devin-default': ['KYBERION_DEVIN_CLI_MODEL'],
+  'codex-fast': [],
+  'grok-default': [],
+  // Validated by their callers (image-generation-bridge / ocr-bridge), which
+  // read KYBERION_GEMINI_IMAGE_MODEL / OLLAMA_VLM_MODEL through the env registry.
+  'gemini-image': [],
+  'ollama-vision': [],
 };
 
 export function resolveRuntimeModelId(

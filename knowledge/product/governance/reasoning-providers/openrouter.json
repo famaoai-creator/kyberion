@@ -13,7 +13,25 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"],
-      "cost_tier": "metered"
+      "cost_tier": "metered",
+      "transport": "api",
+      "data_egress": "external-api",
+      "adapter": "openrouter-api",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_env_keys": ["KYBERION_OPENROUTER_MODEL"],
+      "setup_hint": "Configure OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY."
     }
   ]
 }

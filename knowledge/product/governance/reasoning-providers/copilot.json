@@ -13,7 +13,33 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["GH_TOKEN"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "aliases": ["copilot-acp"],
+      "endpoint": "https://api.githubcopilot.com",
+      "egress_provider_id": "copilot",
+      "cli": {
+        "binary": "gh",
+        "version_args": ["copilot", "--", "--help"],
+        "help_args": ["copilot", "--", "--help"],
+        "bin_env_key": "KYBERION_COPILOT_CLI_BIN",
+        "discovery": true
+      }
     }
   ]
 }

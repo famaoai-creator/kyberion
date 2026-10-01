@@ -3,7 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import {
   GROK_API_DEFAULT_BASE_URL,
-  GROK_API_DEFAULT_MODEL,
+  grokDefaultModel,
   buildGrokApiBackendFromEnv,
   probeGrokApiBackendAvailability,
   resolveGrokApiKey,
@@ -40,7 +40,7 @@ describe('grok-api-backend', () => {
     const backend = buildGrokApiBackendFromEnv({ XAI_API_KEY: 'xai-test-key' });
     expect(backend?.name).toBe('openai-compatible');
     expect(backend?.egressEndpoint).toBe(`${GROK_API_DEFAULT_BASE_URL}/`);
-    expect(resolveGrokApiModel({})).toBe(GROK_API_DEFAULT_MODEL);
+    expect(resolveGrokApiModel({})).toBe(grokDefaultModel());
   });
 
   it('accepts KYBERION_GROK_API_KEY and model override', () => {
