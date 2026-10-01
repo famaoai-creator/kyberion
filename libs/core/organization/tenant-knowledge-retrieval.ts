@@ -259,11 +259,13 @@ export async function queryTenantKnowledge(
       try {
         index = await buildScopedIndex(scope, knowledgeBase);
       } catch (error) {
-        logger.debug(
-          `[DA-07] tenant knowledge scope skipped for '${input.tenantSlug}': ${
-            (error as Error)?.message || String(error)
-          }`
-        );
+        const message = `[DA-07] tenant knowledge scope ${scope.tiers.join('+')}:${
+          scope.customerId ?? '-'
+        } skipped for '${input.tenantSlug}' (fail-open): ${(error as Error)?.message || String(error)}`;
+        // Losing the tenant's own subtree is a misconfiguration worth a warning;
+        // an optional scope (overlay, common) the reader may not see is not.
+        if (scope === scopeSet.scopes[0]) warnOncePerTenant(input.tenantSlug, message);
+        else logger.debug(message);
         continue;
       }
       const results = queryKnowledge(index, input.topic, {

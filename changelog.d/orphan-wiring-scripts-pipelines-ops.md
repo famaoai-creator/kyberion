@@ -1,0 +1,5 @@
+---
+category: Changed
+---
+
+- **Orphan scripts, pipelines and ops wired or retired** — operational scripts that nothing invoked (approval digest/hygiene, tenant export, workflow register, agent-runtime manage, surface outbox, action-item reminders, presence stimuli, A2A run, sync/generate/eval/dev tools, ...) are now registered as `pnpm kyberion <noun> <verb>` commands (for example `kyberion approvals digest`, `kyberion sync agent-profiles`, `kyberion eval harness`). Superseded or stub scripts (`peer_messaging_server`, `pilot_strategy_runner`, `run_slack_mission_kickoff`, `organization_operation_refs`, `test-insession`, `process_portal_inbox`) and the customer-specific `generate-dt-security-proposal-pptx` pipeline moved to `retired/`. The three `reconcile-*` pipelines now run weekly via Chronos, and ten previously uncalled actuator ops (browser `action_trail`/`export_failure_bundle`, meeting `hearing_session`/`tutor_session`, system `list_incidents`/`sre_analyze`, agent `staff_mission`/`prewarm_mission`, modeling `terraform_to_topology_ir`/`test_inventory_to_device_pipeline`) each have an example pipeline.

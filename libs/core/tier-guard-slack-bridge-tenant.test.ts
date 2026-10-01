@@ -63,4 +63,21 @@ describe('tier-guard slack_bridge tenant-bound knowledge reads', () => {
     expect(validateReadPermission(knowledge('confidential/acme/runbook.md')).allowed).toBe(false);
     expect(validateReadPermission(knowledge('personal/tenants/acme.json')).allowed).toBe(false);
   });
+
+  it('follows the turn binding, not a different process tenant', async () => {
+    process.env.KYBERION_TENANT = 'globex';
+    await withExecutionContextAsync(
+      'slack_bridge',
+      () => {
+        expect(validateReadPermission(knowledge('confidential/acme/runbook.md')).allowed).toBe(
+          true
+        );
+        expect(validateReadPermission(knowledge('confidential/globex/plan.md')).allowed).toBe(
+          false
+        );
+      },
+      undefined,
+      'acme'
+    );
+  });
 });

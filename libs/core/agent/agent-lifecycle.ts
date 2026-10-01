@@ -401,6 +401,23 @@ class AgentLifecycleManagerImpl {
       );
     }
 
+    const runtimeBackend = resolveAgentRuntimeLaunchMode({
+      runtimeBackend: resolvedOptions.runtimeBackend,
+      runtimeMetadata,
+    });
+    // Tool lockdown is checked against the resolved (post-fallback) provider
+    // before anything is registered, so a refused spawn leaves no state behind.
+    if (
+      resolvedOptions.toolAccess === 'none' &&
+      (runtimeBackend === 'pane' ||
+        !TOOL_LOCKDOWN_PROVIDERS.has(resolvedOptions.provider) ||
+        !(await hasAgentExecAdapter(resolvedOptions.provider)))
+    ) {
+      throw new Error(
+        `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run with tools disabled`
+      );
+    }
+
     this.spawnOptions.set(agentId, resolvedOptions);
     this.ensureMetrics(agentId);
 
@@ -430,11 +447,6 @@ class AgentLifecycleManagerImpl {
     const config = lifecycleMap[resolvedOptions.provider];
 
     // Register in registry
-    const runtimeBackend = resolveAgentRuntimeLaunchMode({
-      runtimeBackend: resolvedOptions.runtimeBackend,
-      runtimeMetadata,
-    });
-
     agentRegistry.register({
       agentId,
       provider: resolvedOptions.provider,
@@ -457,6 +469,7 @@ class AgentLifecycleManagerImpl {
         },
         task_model_hint: runtimeMetadata.task_model_hint,
         scope: resolvedScope,
+        ...(resolvedOptions.toolAccess === 'none' ? { tool_access: 'none' } : {}),
       },
     });
 
@@ -501,14 +514,6 @@ class AgentLifecycleManagerImpl {
     }
 
     // Opt-in pane backend: interactive provider CLIs in visible terminal panes.
-    if (resolvedOptions.toolAccess === 'none') {
-      if (runtimeBackend === 'pane' || !TOOL_LOCKDOWN_PROVIDERS.has(resolvedOptions.provider)) {
-        agentRegistry.updateStatus(agentId, 'error');
-        throw new Error(
-          `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run with tools disabled`
-        );
-      }
-    }
 
     if (runtimeBackend === 'pane') {
       const paneBackend = await createAgentPaneRuntimeAdapter({

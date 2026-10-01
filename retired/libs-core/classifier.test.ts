@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { classifyFile } from './classifier.js';
+import { classify, classifyFile } from './classifier.js';
 
 const RULES = { policy: ['approval', 'governance'] };
 
@@ -26,5 +26,26 @@ describe('classifyFile resource boundary', () => {
     } finally {
       safeRmSync(directoryPath, { recursive: true, force: true });
     }
+  });
+});
+
+// Moved from libs/core/core.test.ts when the module was retired (wave 4).
+describe('classifier (barrel tests)', () => {
+  it('should classify text into correct categories', () => {
+    const result = classify(
+      'Deploy the API Server',
+      {
+        tech: ['API', 'Server', 'Deploy'],
+        finance: ['Budget', 'Cost'],
+      },
+      { resultKey: 'domain' }
+    );
+    expect(result.domain).toBe('tech');
+    expect(result.matches).toBe(3);
+  });
+
+  it('should return unknown for no matches', () => {
+    const result = classify('lorem ipsum', { tech: ['API'] });
+    expect(result.category).toBe('unknown');
   });
 });

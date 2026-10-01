@@ -1,3 +1,4 @@
+import { t } from '../t.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 /**
  * scripts/refactor/mission-maintenance.ts
@@ -669,17 +670,24 @@ export async function resumeMission(
     );
   } else if (replayPlan.next_event) {
     logger.info(
-      `journal から再開: 次イベント=${replayPlan.next_event.event_type} (${replayPlan.next_event.event_id}) / 回収タスク=${replayPlan.replay_count} 件`
+      t('mission_ops:resume_journal_next_event', {
+        eventType: replayPlan.next_event.event_type,
+        eventId: replayPlan.next_event.event_id,
+        count: replayPlan.replay_count,
+      })
     );
     // Restart the detached worker for the pending event. The replay plan used
     // to be display-only, so a failed chain stayed stalled until a surface
     // re-enqueued it by hand — resume is the operator's retry lever.
     const replayEventPath = startMissionOrchestrationWorker(replayPlan.next_event);
     logger.info(
-      `orchestration worker を再起動しました: ${replayPlan.next_event.event_id} (${replayEventPath})`
+      t('mission_ops:resume_worker_restarted', {
+        eventId: replayPlan.next_event.event_id,
+        path: replayEventPath,
+      })
     );
   } else {
-    logger.info('journal から再開: 再開対象の orchestration event はありません。');
+    logger.info(t('mission_ops:resume_journal_nothing'));
   }
   const recovery = recoverMissionRequestedTasks(targetId);
   logger.info(
@@ -688,7 +696,9 @@ export async function resumeMission(
   const blockedRetry = reissueBlockedMissionTasks(targetId);
   if (blockedRetry.reissued_task_ids.length > 0) {
     logger.info(
-      `blocked タスクを planned に戻しました (再preflight対象): ${blockedRetry.reissued_task_ids.join(', ')}`
+      t('mission_ops:resume_blocked_reissued', {
+        taskIds: blockedRetry.reissued_task_ids.join(', '),
+      })
     );
   }
 

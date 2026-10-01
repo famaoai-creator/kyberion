@@ -44,11 +44,6 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
     'tests/email-workflow-draft-fallback.test.ts',
     ['../libs/core/integrations/email-workflow.js', '../libs/core/service/service-engine.js'],
   ],
-  [
-    'tests/inbound-inquiry-contract.test.ts',
-    ['../libs/core/inbound-inquiry-adapter.js', '../libs/core/schema-loader.js'],
-  ],
-  ['tests/lead-score.test.ts', ['../libs/core/lead-score.js']],
   ['tests/mesh-hub-contract.test.ts', ['../libs/core/mesh/mesh-hub-contract.js']],
   ['tests/task-scenario-meeting-action-items-contract.test.ts', ['../libs/core/schema-loader.js']],
   ['tests/task-scenario-meeting-participation-contract.test.ts', ['../libs/core/schema-loader.js']],

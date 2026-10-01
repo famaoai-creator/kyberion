@@ -71,6 +71,125 @@ export function normalizeLocale(value: unknown): SupportedLocale | null {
   return null;
 }
 
+/**
+ * IT-03: BCP-47 speech / `Intl` / OOXML language tag per catalog locale. A
+ * locale without an entry (a pseudo-locale, or one added before it has
+ * speech support) degrades to the English tag, never to a hard-coded
+ * `ja-JP`. Extend this table — never a caller-side ternary — when a locale
+ * gains a real regional tag.
+ */
+const LOCALE_BCP47: Partial<Record<SupportedLocale, string>> = {
+  en: 'en-US',
+  ja: 'ja-JP',
+};
+
+/** Maps a locale-ish value to its BCP-47 tag (`ja` -> `ja-JP`, unknown -> `en-US`). */
+export function localeToBcp47(value: unknown): string {
+  const locale = normalizeLocale(value) ?? SUPPORTED_LOCALES[0];
+  return LOCALE_BCP47[locale] ?? LOCALE_BCP47.en ?? 'en-US';
+}
+
+/**
+ * Narrows a locale-ish value to the locales one surface actually ships
+ * (`allowed`), else `fallback`. Replaces `value === 'en' ? 'en' : 'ja'`
+ * ternaries in browser apps whose local locale type is a subset of
+ * {@link SupportedLocale}.
+ */
+export function coerceLocale<L extends SupportedLocale>(
+  value: unknown,
+  allowed: readonly L[],
+  fallback: L
+): L {
+  const locale = normalizeLocale(value);
+  return locale && (allowed as readonly SupportedLocale[]).includes(locale)
+    ? (locale as L)
+    : fallback;
+}
+
+/** Locales whose scripts separate words without spaces (so fragments join with ''). */
+const SPACELESS_LOCALES: readonly SupportedLocale[] = ['ja'];
+
+/** True when text in this locale joins words / sentences without a space. */
+export function localeUsesWordSpaces(value: unknown): boolean {
+  const locale = normalizeLocale(value) ?? 'en';
+  return !SPACELESS_LOCALES.includes(locale);
+}
+
+/**
+ * Picks the entry for a locale from a per-locale table, falling back to the
+ * `en` entry. Replaces ad-hoc `locale === 'ja' ? ja : en` ternaries so a
+ * third locale is a table row, not another branch.
+ */
+export function pickByLocale<T>(
+  value: unknown,
+  table: Partial<Record<SupportedLocale, T>> & { en: T }
+): T {
+  const locale = normalizeLocale(value) ?? 'en';
+  return table[locale] ?? table.en;
+}
+
+/**
+ * Script-based guess of the language a user wrote in: kana (or kana + kanji)
+ * -> `ja`; Latin text with two plain words, or one plain word that is not a
+ * language-neutral ack (not an id or acronym) -> `en`; anything else
+ * (digits, emoji, one-word acks such as "Yes" / "OK" / "Thanks", other
+ * scripts) -> `null` so the caller keeps
+ * its own default instead of flipping language on an ambiguous message.
+ */
+const TRAILING_PUNCTUATION = new Set(['.', ',', '!', '?', ';', ':']);
+
+/** Linear-time trim of trailing sentence punctuation (a `/[...]+$/` regex is polynomial). */
+function stripTrailingPunctuation(token: string): string {
+  let end = token.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(token[end - 1]!)) end -= 1;
+  return token.slice(0, end);
+}
+
+export function detectTextLocale(text: unknown): SupportedLocale | null {
+  const value = String(text ?? '');
+  if (/[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9f]/u.test(value)) return 'ja';
+  if (/[\u0400-\u04ff\u0590-\u06ff\u0e00-\u0e7f\u1100-\u11ff\uac00-\ud7af]/u.test(value))
+    return null;
+  // Prose, not an identifier: plain words of 3+ letters. All-caps tokens
+  // (REQ-123, MSN-X, API) and tokens with digits / separators are ids.
+  const plainWords = value
+    .split(/\s+/u)
+    .filter((token) => /^[A-Za-z']{3,}[.,!?;:]*$/u.test(token) && token !== token.toUpperCase())
+    .map((token) => stripTrailingPunctuation(token).toLowerCase());
+  if (plainWords.length >= 2) return 'en';
+  // A lone acknowledgement ("Yes", "Okay", "Thanks", "Done") is used by
+  // speakers of every language, so it is not a language signal.
+  if (plainWords.length === 1 && !LANGUAGE_NEUTRAL_ACKS.has(plainWords[0])) return 'en';
+  return null;
+}
+
+/**
+ * Single-word replies that operators type regardless of their language
+ * (detection input, not user-facing copy). Two or more plain words still
+ * count as English.
+ */
+const LANGUAGE_NEUTRAL_ACKS: ReadonlySet<string> = new Set([
+  'yes',
+  'yeah',
+  'yep',
+  'yup',
+  'okay',
+  'sure',
+  'done',
+  'thanks',
+  'thank',
+  'thx',
+  'fine',
+  'cool',
+  'great',
+  'nice',
+  'good',
+  'nope',
+  'noted',
+  'ack',
+  'lgtm',
+]);
+
 export type BrowserVocabularyEntry = Record<string, string>;
 
 export interface BrowserVocabularyCatalog {

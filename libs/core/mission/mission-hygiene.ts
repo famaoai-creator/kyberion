@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '../core.js';
+import { t } from '../t.js';
 import { pathResolver } from '../path-resolver.js';
 import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
@@ -157,8 +158,7 @@ function classifyPlanned(missionPath: string): {
     return {
       reason: 'design_missing',
       task_count: 0,
-      recommendation:
-        'タスク未展開。続けるなら process 設計から: pnpm mission-controller start <ID> / 不要なら: pnpm mission-controller cancel <ID>',
+      recommendation: t('mission_ops:hygiene_rec_design_missing'),
     };
   }
   const dispatched =
@@ -168,15 +168,13 @@ function classifyPlanned(missionPath: string): {
     return {
       reason: 'ready_not_started',
       task_count: tasks.length,
-      recommendation:
-        'タスクは準備済みで未着手。開始: pnpm mission-controller dispatch-workitems <ID> --mode subagent',
+      recommendation: t('mission_ops:hygiene_rec_ready_not_started'),
     };
   }
   return {
     reason: 'awaiting_gate',
     task_count: tasks.length,
-    recommendation:
-      'ディスパッチ済みだが activation gate 未通過。gate 実行または planned→active の確認を',
+    recommendation: t('mission_ops:hygiene_rec_awaiting_gate'),
   };
 }
 
@@ -210,8 +208,14 @@ export function collectMissionHygieneReport(
           task_count: tasks.length,
           lifecycle_status: status,
           recommendation: distilling
-            ? `distilling が ${staleDays}日以上継続。レビュー/finish を確認: pnpm mission-controller finish ${state.mission_id}`
-            : `active が ${staleDays}日以上継続。checkpoint と残タスクを確認: pnpm mission-controller status ${state.mission_id}`,
+            ? t('mission_ops:hygiene_rec_distilling_stale', {
+                days: staleDays,
+                missionId: state.mission_id,
+              })
+            : t('mission_ops:hygiene_rec_active_stale', {
+                days: staleDays,
+                missionId: state.mission_id,
+              }),
         };
         (distilling ? distillingStale : activeStale).push(finding);
       }
@@ -340,7 +344,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
   const top = actionable.slice(0, 10);
   const lines = top.map(
     (finding) =>
-      `- ${finding.mission_id} (${finding.age_days ?? '?'}日, ${finding.reason}): ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
+      `- ${finding.mission_id} (${t('mission_ops:hygiene_age_days', { days: finding.age_days ?? '?' })}, ${finding.reason}): ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
   );
   const notificationDay = nowIso().slice(0, 10);
   sendOpsAlert({
@@ -348,7 +352,10 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
       report.abandoned.length > 0 || (report.distilling_stale || []).length > 0
         ? 'warning'
         : 'info',
-    title: `ミッション衛生の要対応が ${actionable.length} 件あります (planned ${report.planned_total} 件)`,
+    title: t('mission_ops:hygiene_alert_title', {
+      count: actionable.length,
+      planned: report.planned_total,
+    }),
     context: {
       planned_total: report.planned_total,
       stale: report.stale.length,
@@ -362,10 +369,10 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
   });
   try {
     await notifyOperator('question', {
-      title: `未開始ミッション ${actionable.length} 件の扱いを決めてください`,
+      title: t('mission_ops:hygiene_question_title', { count: actionable.length }),
       body: [
-        `planned のまま止まっているミッションがあります(${report.thresholds.stale_days}日以上)。`,
-        '開始するか、不要なら cancel してください:',
+        t('mission_ops:hygiene_question_body_stalled', { days: report.thresholds.stale_days }),
+        t('mission_ops:hygiene_question_body_action'),
         ...lines,
       ].join('\n'),
       correlation_id: `mission-hygiene:${notificationDay}`,

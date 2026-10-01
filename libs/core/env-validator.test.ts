@@ -31,6 +31,41 @@ describe('validateEnvAgainstRegistry', () => {
     expect(report.checked).toBe(4);
   });
 
+  it('warns (never errors, even strict) when a deprecated variable is still set (S1)', () => {
+    const entries: EnvRegistryValidationEntry[] = [
+      { name: 'KYBERION_SUDO_KEY', type: 'string', required: false, deprecated: '2026-10' },
+    ];
+    const report = validateEnvAgainstRegistry(
+      entries,
+      { KYBERION_SUDO_KEY: 'secret' },
+      {
+        strict: true,
+      }
+    );
+    expect(report.errors).toEqual([]);
+    expect(report.unknown).toEqual([]);
+    expect(report.warnings).toEqual([
+      { name: 'KYBERION_SUDO_KEY', issue: 'deprecated and ignored since 2026-10; unset it' },
+    ]);
+    expect(JSON.stringify(report)).not.toContain('secret"');
+  });
+
+  it('keeps the variables removed in 2026-10 registered as deprecated', () => {
+    const registered = new Map(
+      loadEnvRegistryEntries().map((entry) => [entry.name, entry.deprecated])
+    );
+    for (const name of [
+      'KYBERION_SUDO_KEY',
+      'KYBERION_TELEMETRY',
+      'KYBERION_SOVEREIGN_SECRET',
+      'KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH',
+      'KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH',
+      'KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH',
+    ]) {
+      expect(registered.get(name), name).toBe('2026-10');
+    }
+  });
+
   it('reports missing required variables as errors', () => {
     const report = validateEnvAgainstRegistry(ENTRIES, {});
     expect(report.errors).toEqual([

@@ -462,5 +462,25 @@ describe('knowledge-index', () => {
       const sources = index.hints.map((hint) => hint.source);
       expect(sources).toContain('confidential/acme/runbook.md');
     });
+
+    it('never follows a symlink from the tenant subtree into another tenant', async () => {
+      const acme = path.join(TEST_ROOT, 'confidential/acme');
+      const globex = path.join(TEST_ROOT, 'confidential/globex');
+      ensureDir(acme);
+      ensureDir(path.join(globex, 'plans'));
+      fs.writeFileSync(
+        path.join(globex, 'plans/secret.md'),
+        '---\ntitle: Globex secret\n---\n\nGlobex secret plan.\n'
+      );
+      fs.symlinkSync(path.join(globex, 'plans/secret.md'), path.join(acme, 'leak.md'));
+      fs.symlinkSync(path.join(globex, 'plans'), path.join(acme, 'plans'));
+      deniedStat.add(path.join(TEST_ROOT, 'confidential'));
+
+      const index = await buildScopedIndex(
+        { tiers: ['confidential'], customerId: 'acme' },
+        TEST_ROOT
+      );
+      expect(index.hints.map((hint) => hint.topic)).not.toContain('Globex secret');
+    });
   });
 });

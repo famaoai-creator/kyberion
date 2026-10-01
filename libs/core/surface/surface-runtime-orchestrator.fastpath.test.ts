@@ -105,6 +105,10 @@ vi.mock('./surface-runtime-router.js', () => ({
   }),
 }));
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('surface-runtime-orchestrator fast-path', () => {
   beforeEach(() => {
     vi.resetModules();

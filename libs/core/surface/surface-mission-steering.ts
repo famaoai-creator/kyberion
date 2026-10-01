@@ -338,8 +338,8 @@ function handleStatusVerb(missionId: string): SurfaceConversationResult {
     if (!view) {
       return buildSteeringResult(
         [
-          `状態: ミッション ${missionId} の状態を取得できませんでした。`,
-          '次のアクション: ミッションIDと権限を確認してください。',
+          t('surface:steering_status_unavailable', { missionId }),
+          t('surface:steering_status_unavailable_next'),
         ].join('\n')
       );
     }
@@ -349,9 +349,13 @@ function handleStatusVerb(missionId: string): SurfaceConversationResult {
       .join('\n');
     return buildSteeringResult(
       [
-        `状態: ミッション ${missionId} は現在 ${view.state.status} です。`,
-        recentHistory ? `結果: 直近の履歴\n${recentHistory}` : '',
-        `次のアクション: ${view.nextAction || '特にありません。'}`,
+        t('surface:steering_status_current', { missionId, status: view.state.status }),
+        recentHistory
+          ? t('surface:steering_status_recent_history', { history: recentHistory })
+          : '',
+        t('surface:steering_next_action_line', {
+          action: view.nextAction || t('surface:steering_none'),
+        }),
       ]
         .filter(Boolean)
         .join('\n')
@@ -359,8 +363,8 @@ function handleStatusVerb(missionId: string): SurfaceConversationResult {
   } catch (error) {
     return buildSteeringResult(
       [
-        `状態: ミッション ${missionId} の状態取得に失敗しました(${errorMessage(error)})。`,
-        '次のアクション: しばらくしてから再度お試しください。',
+        t('surface:steering_status_failed', { missionId, error: errorMessage(error) }),
+        t('surface:steering_retry_later'),
       ].join('\n')
     );
   }
@@ -373,7 +377,9 @@ async function handleCheckpointVerb(
 ): Promise<SurfaceConversationResult> {
   const adapter = resolveLifecycleAdapter();
   const effectiveNote =
-    note && note.trim() ? note.trim() : `${surfaceTag} 経由の操縦チェックポイント`;
+    note && note.trim()
+      ? note.trim()
+      : t('surface:steering_checkpoint_default_note', { surface: surfaceTag });
   try {
     await withExecutionContext('mission_controller', () =>
       adapter.createCheckpoint(STEERING_CHECKPOINT_TASK_ID, effectiveNote, missionId, {
@@ -382,16 +388,16 @@ async function handleCheckpointVerb(
     );
     return buildSteeringResult(
       [
-        `状態: ミッション ${missionId} にチェックポイントを記録しました。`,
-        `結果: ${effectiveNote}`,
-        '次のアクション: 作業を継続してください。',
+        t('surface:steering_checkpoint_recorded', { missionId }),
+        t('surface:steering_result_line', { text: effectiveNote }),
+        t('surface:steering_continue_work'),
       ].join('\n')
     );
   } catch (error) {
     return buildSteeringResult(
       [
-        `状態: チェックポイントの記録に失敗しました(${errorMessage(error)})。`,
-        '次のアクション: ミッションの状態を確認してから再試行してください。',
+        t('surface:steering_checkpoint_failed', { error: errorMessage(error) }),
+        t('surface:steering_check_then_retry'),
       ].join('\n')
     );
   }
@@ -404,19 +410,18 @@ async function handlePauseVerb(
   const adapter = resolveLifecycleAdapter();
   try {
     await withExecutionContext('mission_controller', () =>
-      adapter.pause(missionId, `${surfaceTag} 経由の操縦一時停止`, { surface: surfaceTag })
+      adapter.pause(missionId, t('surface:steering_pause_reason', { surface: surfaceTag }), {
+        surface: surfaceTag,
+      })
     );
     return buildSteeringResult(
-      [
-        `状態: ミッション ${missionId} を一時停止しました。`,
-        '次のアクション: 再開する場合は「再開」と送信してください。',
-      ].join('\n')
+      [t('surface:steering_paused', { missionId }), t('surface:steering_paused_next')].join('\n')
     );
   } catch (error) {
     return buildSteeringResult(
       [
-        `状態: 一時停止に失敗しました(${errorMessage(error)})。`,
-        '次のアクション: ミッションの状態を確認してください。',
+        t('surface:steering_pause_failed', { error: errorMessage(error) }),
+        t('surface:steering_check_state'),
       ].join('\n')
     );
   }
@@ -432,16 +437,13 @@ async function handleResumeVerb(
       adapter.resume(missionId, { surface: surfaceTag })
     );
     return buildSteeringResult(
-      [
-        `状態: ミッション ${missionId} を再開しました。`,
-        '次のアクション: 進捗は「ステータス」で確認できます。',
-      ].join('\n')
+      [t('surface:steering_resumed', { missionId }), t('surface:steering_resumed_next')].join('\n')
     );
   } catch (error) {
     return buildSteeringResult(
       [
-        `状態: 再開に失敗しました(${errorMessage(error)})。`,
-        '次のアクション: ミッションの状態を確認してください。',
+        t('surface:steering_resume_failed', { error: errorMessage(error) }),
+        t('surface:steering_check_state'),
       ].join('\n')
     );
   }
@@ -464,14 +466,14 @@ function buildApprovalPendingText(params: {
   note?: string;
   locale?: SupportedLocale;
 }): string {
-  const locale = params.locale ?? 'ja';
+  const locale = params.locale;
   return [
     t(
       'bridge:mission_steering_approval_required',
       { missionId: params.missionId, verbLabel: params.verbLabel },
       locale
     ),
-    params.note ? `メモ: ${params.note}` : '',
+    params.note ? t('surface:steering_note_line', { note: params.note }) : '',
     t('bridge:mission_steering_approve_choice', undefined, locale),
     t('bridge:mission_steering_reject_choice', undefined, locale),
     t('bridge:mission_steering_reply_instruction', { requestId: params.requestId }, locale),
@@ -532,15 +534,15 @@ async function handleGateApprovalVerb(params: {
     key: params.key,
     verb: 'verify',
     note: params.note,
-    title: `ミッション ${params.missionId} のゲート承認`,
+    title: t('surface:steering_gate_title', { missionId: params.missionId }),
     summary: params.note
-      ? `ゲート承認要求: ${params.note}`
-      : `ミッション ${params.missionId} のゲート承認要求です。`,
+      ? t('surface:steering_gate_summary_note', { note: params.note })
+      : t('surface:steering_gate_summary', { missionId: params.missionId }),
     severity: 'medium',
   });
   return buildSteeringResult(
     buildApprovalPendingText({
-      verbLabel: 'ゲート承認',
+      verbLabel: t('surface:steering_verb_gate'),
       missionId: params.missionId,
       requestId: record.id,
       note: params.note,
@@ -582,8 +584,8 @@ async function handleFinishRequestVerb(params: {
   if (reconciliation.missingContext) {
     return buildSteeringResult(
       [
-        `状態: ミッション ${params.missionId} が見つからないため完了にできません。`,
-        '次のアクション: ミッションIDを確認してください。',
+        t('surface:steering_finish_not_found', { missionId: params.missionId }),
+        t('surface:steering_check_mission_id'),
       ].join('\n')
     );
   }
@@ -591,12 +593,12 @@ async function handleFinishRequestVerb(params: {
     const gaps =
       reconciliation.gaps.length > 0
         ? reconciliation.gaps.map((gap) => `- ${gap}`).join('\n')
-        : '- (詳細不明)';
+        : t('surface:steering_gap_unknown');
     return buildSteeringResult(
       [
-        `状態: ミッション ${params.missionId} は完了条件(IL-04)を満たしていないため完了にできません。`,
-        `結果: 未充足のギャップ\n${gaps}`,
-        '次のアクション: 上記のギャップを解消してから、再度「完了にして」と送信してください。',
+        t('surface:steering_finish_unsatisfied', { missionId: params.missionId }),
+        t('surface:steering_finish_gaps', { gaps }),
+        t('surface:steering_finish_gaps_next'),
       ].join('\n')
     );
   }
@@ -606,13 +608,13 @@ async function handleFinishRequestVerb(params: {
     key: params.key,
     verb: 'finish',
     note: params.note,
-    title: `ミッション ${params.missionId} の完了`,
-    summary: `ミッション ${params.missionId} を完了(finish)します。完了条件(IL-04)は満たされています。`,
+    title: t('surface:steering_finish_title', { missionId: params.missionId }),
+    summary: t('surface:steering_finish_summary', { missionId: params.missionId }),
     severity: 'high',
   });
   return buildSteeringResult(
     buildApprovalPendingText({
-      verbLabel: '完了(finish)',
+      verbLabel: t('surface:steering_verb_finish'),
       missionId: params.missionId,
       requestId: record.id,
       note: params.note,
@@ -662,7 +664,11 @@ export async function executeApprovedMissionSteeringApproval(
           channel: steering.channel,
           threadTs: steering.threadTs,
           text: [
-            `状態: 承認された操作(${steering.verb})は実行されませんでした — このスレッドはミッション ${steering.missionId} の所有権を失っています(${error.caseId})。`,
+            t('surface:steering_authority_lost', {
+              verb: steering.verb,
+              missionId: steering.missionId,
+              caseId: error.caseId,
+            }),
             formatSteeringRejection(error),
           ].join('\n'),
           source: 'system',
@@ -690,12 +696,12 @@ export async function executeApprovedMissionSteeringApproval(
         options
       )
     );
-    outcomeText = `ミッション ${steering.missionId} のゲートを承認しました。`;
+    outcomeText = t('surface:steering_outcome_gate_approved', { missionId: steering.missionId });
   } else if (steering.verb === 'finish') {
     await withExecutionContext('mission_controller', () =>
       adapter.finish(steering.missionId, false, options)
     );
-    outcomeText = `ミッション ${steering.missionId} を完了しました。`;
+    outcomeText = t('surface:steering_outcome_finished', { missionId: steering.missionId });
   } else {
     const exhaustiveCheck: never = steering.verb;
     throw new Error(
@@ -710,8 +716,8 @@ export async function executeApprovedMissionSteeringApproval(
       channel: steering.channel,
       threadTs: steering.threadTs,
       text: [
-        `状態: ${outcomeText}`,
-        '次のアクション: 必要であれば「ステータス」で確認してください。',
+        t('surface:steering_outcome_line', { outcome: outcomeText }),
+        t('surface:steering_check_status_next'),
       ].join('\n'),
       source: 'system',
     });
@@ -759,12 +765,12 @@ async function enqueueMissionSteeringInput(input: {
     ...(input.channel ? { channel: input.channel } : {}),
     ...(input.threadTs ? { threadTs: input.threadTs } : {}),
   });
-  const label = input.delivery === 'steer' ? '操縦指示' : '次回 turn 指示';
+  const label =
+    input.delivery === 'steer'
+      ? t('surface:steering_label_steer')
+      : t('surface:steering_label_follow_up');
   return buildSteeringResult(
-    [
-      `状態: ${label}を queue に追加しました。`,
-      '次のアクション: 実行中の turn は中断せず、次の turn boundary で worker が処理します。',
-    ].join('\n')
+    [t('surface:steering_queued', { label }), t('surface:steering_queued_next')].join('\n')
   );
 }
 
@@ -776,20 +782,14 @@ async function handleMissionSteeringTurn(
   if (!key || !match) {
     // Defensive only — matches() already guarantees both are non-null.
     return missionSteeringRejectionResult(
-      [
-        '状態: 操縦意図を解釈できませんでした。',
-        '次のアクション: 「ステータス」「チェックポイント: <メモ>」「一時停止」「再開」「承認」「完了にして」のいずれかを送信してください。',
-      ].join('\n')
+      [t('surface:steering_unparsed'), t('surface:steering_unparsed_next')].join('\n')
     );
   }
 
   const session = getSessionForThread(key.surface, key.channel, key.threadTs);
   if (!session) {
     return missionSteeringRejectionResult(
-      [
-        '状態: このスレッドのオーケストレータセッションが見つかりません。',
-        '次のアクション: セッションを再作成してから操縦してください。',
-      ].join('\n')
+      [t('surface:steering_session_missing'), t('surface:steering_session_missing_next')].join('\n')
     );
   }
 

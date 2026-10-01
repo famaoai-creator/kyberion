@@ -11,8 +11,16 @@
 // passes `rootDir`), so this file uses dedicated fictitious tenant/member
 // ids and removes them in `afterEach`.
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   createWorkInventoryEntry,
@@ -39,6 +47,23 @@ import {
   resolveWorkInventoryScopeForViewer,
   WORK_INVENTORY_VOCABULARY_KEYS,
 } from './work-inventory-routes.js';
+
+// This file's member writes create `knowledge/personal/members/` itself when it
+// is absent; an empty leftover makes later tests' member-registry scans fail
+// closed under roles that may not read it, so remove it if this file made it.
+const MEMBERS_DIR = path.join(pathResolver.rootDir(), 'knowledge/personal/members');
+let membersDirExisted = true;
+beforeAll(() => {
+  membersDirExisted = safeExistsSync(MEMBERS_DIR);
+});
+afterAll(() => {
+  if (membersDirExisted) return;
+  withExecutionContext('ecosystem_architect', () => {
+    if (safeExistsSync(MEMBERS_DIR) && safeReaddir(MEMBERS_DIR).length === 0) {
+      safeRmSync(MEMBERS_DIR, { recursive: true, force: true });
+    }
+  });
+});
 import type { PresenceStudioViewerContext } from './security.js';
 
 function readRepoFile(relativePath: string): string {

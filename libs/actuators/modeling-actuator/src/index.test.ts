@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from '@agent/core/core';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -573,5 +574,139 @@ describe('modeling-actuator web_profile_to_ui_flow_adf', () => {
       true
     );
     expect(validate(uiFlow)).toBe(true);
+  });
+});
+
+describe('modeling-actuator ui-flow → test inventory → browser pipeline', () => {
+  const WEB_PROFILE = {
+    app_id: 'sample-web-app',
+    base_url: 'https://example.com',
+    login_route: '/login',
+    logout_route: '/logout',
+    guarded_routes: ['/dashboard'],
+    debug_routes: {},
+    selectors: {
+      login: {
+        email: '[name=email]',
+        password: '[name=password]',
+        submit: 'button[type=submit]',
+      },
+      navigation: {},
+    },
+  };
+
+  it('derives test cases from transitions and compiles them into a browser pipeline', async () => {
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validateTestCases = compileSchemaFromPath(
+      ajv,
+      path.resolve(ROOT, 'knowledge/product/schemas/test-case-adf.schema.json')
+    );
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: { web_profile: WEB_PROFILE },
+      steps: [
+        {
+          type: 'transform',
+          op: 'web_profile_to_ui_flow_adf',
+          params: { from: 'web_profile', export_as: 'ui_flow_adf' },
+        },
+        {
+          type: 'transform',
+          op: 'ui_flow_to_test_inventory',
+          params: { from: 'ui_flow_adf', export_as: 'test_case_inventory' },
+        },
+        {
+          type: 'transform',
+          op: 'test_inventory_to_browser_pipeline',
+          params: { from: 'test_case_inventory', ui_flow_from: 'ui_flow_adf' },
+        },
+      ],
+    } as never);
+
+    expect(result.status).toBe('succeeded');
+    const inventory = result.context.test_case_inventory;
+    expect(inventory.kind).toBe('test-case-adf');
+    expect(inventory.cases.length).toBe(result.context.ui_flow_adf.transitions.length);
+    expect(inventory.cases[0].case_id).toBe('TC-001');
+    expect(validateTestCases(inventory)).toBe(true);
+
+    const plan = result.context.browser_execution_pipeline;
+    expect(plan).toMatchObject({ action: 'pipeline', session_id: 'sample-web-app' });
+    const ops = plan.steps.map((step: { op: string }) => step.op);
+    expect(ops[0]).toBe('goto');
+    expect(ops).toEqual(expect.arrayContaining(['fill', 'click', 'snapshot']));
+  });
+
+  it('fails ui_flow_to_test_inventory when the source is not a ui-flow-adf', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: { not_a_flow: { kind: 'other' } },
+      steps: [
+        { type: 'transform', op: 'ui_flow_to_test_inventory', params: { from: 'not_a_flow' } },
+      ],
+    } as never);
+    expect(result.status).toBe('failed');
+  });
+});
+
+describe('modeling-actuator SDLC gate evaluations', () => {
+  it('reports missing artifacts for a mission without design spec, test plan or sign-off', async () => {
+    const missionId = 'MSN-MODELING-GATES-ABSENT';
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        { type: 'apply', op: 'evaluate_architecture_ready', params: { mission_id: missionId } },
+        {
+          type: 'apply',
+          op: 'evaluate_qa_ready',
+          params: { mission_id: missionId, must_have_ids: ['FR-1'] },
+        },
+        { type: 'apply', op: 'evaluate_customer_signoff', params: { mission_id: missionId } },
+      ],
+    } as never);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.architecture_ready).toEqual({
+      passed: false,
+      reasons: ['no design-spec.json present'],
+    });
+    expect(result.context.qa_ready).toEqual({
+      passed: false,
+      reasons: ['no test-plan.json present'],
+    });
+    expect(result.context.customer_signoff.passed).toBe(false);
+  });
+});
+
+describe('modeling-actuator while control', () => {
+  it('repeats the nested pipeline until max_iterations', async () => {
+    const info = vi.spyOn(logger, 'info');
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: { polling: true },
+        steps: [
+          {
+            type: 'control',
+            op: 'while',
+            params: {
+              condition: { from: 'polling', operator: 'eq', value: true },
+              max_iterations: 2,
+              pipeline: [{ type: 'apply', op: 'log', params: { message: 'modeling-tick' } }],
+            },
+          },
+        ],
+      } as never);
+
+      expect(result.status).toBe('succeeded');
+      const ticks = info.mock.calls.filter((call) =>
+        String(call[0]).includes('[MODELING_LOG] modeling-tick')
+      );
+      expect(ticks).toHaveLength(2);
+    } finally {
+      info.mockRestore();
+    }
   });
 });

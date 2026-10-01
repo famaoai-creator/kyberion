@@ -518,6 +518,41 @@ describe('file-actuator', () => {
         expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
       });
 
+      it('while repeats its pipeline up to max_iterations and skips when the condition is false', async () => {
+        const { safeReadFile } = await import('@agent/core/secure-io');
+        vi.mocked(safeReadFile).mockImplementation((filePath: string) =>
+          String(filePath).includes('manifest.json')
+            ? JSON.stringify({ recovery_policy: {} })
+            : 'line'
+        );
+        const loop = (flag: boolean) =>
+          handleAction({
+            action: 'pipeline',
+            context: { flag },
+            steps: [
+              {
+                type: 'control',
+                op: 'while',
+                params: {
+                  condition: { from: 'flag', operator: 'eq', value: true },
+                  max_iterations: 2,
+                  pipeline: [{ type: 'capture', op: 'read', params: { path: 'poll.txt' } }],
+                },
+              },
+            ],
+          });
+
+        const ran = await loop(true);
+        expect(ran.status).toBe('succeeded');
+        const reads = vi
+          .mocked(safeReadFile)
+          .mock.calls.filter((call) => String(call[0]).endsWith('poll.txt'));
+        expect(reads).toHaveLength(2);
+
+        const skipped = await loop(false);
+        expect(skipped.results).toEqual([{ op: 'while', status: 'skipped' }]);
+      });
+
       it('nested control の失敗を親 pipeline に伝播する', async () => {
         const { safeReadFile } = await import('@agent/core/secure-io');
         vi.mocked(safeReadFile).mockImplementation((filePath: string) => {

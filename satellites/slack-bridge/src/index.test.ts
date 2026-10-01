@@ -19,6 +19,7 @@ const captured = vi.hoisted(() => ({
   conversationInputs: [] as {
     threadContext?: string;
     text: string;
+    locale?: string;
     scope?: SurfaceConversationMessageInput['scope'];
     workAuthority?: SurfaceConversationMessageInput['workAuthority'];
     isolation?: SurfaceConversationMessageInput['isolation'];
@@ -37,6 +38,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
         boundTenant: currentExecutionScope()?.tenantSlug,
         threadContext: input.threadContext,
         text: input.text,
+        locale: input.locale,
         scope: input.scope,
         workAuthority: input.workAuthority,
       });
@@ -181,6 +183,8 @@ describe('slack bridge channel turn', () => {
 
     expect(captured.conversationInputs).toHaveLength(1);
     expect(captured.conversationInputs[0].threadContext).toBe(THREAD_CONTEXT);
+    // No explicit turn locale: the orchestrator derives it (user text > scope > operator).
+    expect(captured.conversationInputs[0].locale).toBeUndefined();
     expect(result.text).toBe('ok');
     expect(sent).toEqual(['ok']);
   });
@@ -423,6 +427,7 @@ describe('slack team channel', () => {
     );
     expect(captured.conversationInputs[0].scope).toBeUndefined();
     expect(captured.conversationInputs[0].isolation).toBeUndefined();
+    expect(captured.conversationInputs[0].boundTenant).toBeUndefined();
     expect(captured.conversationInputs[0].threadContext).toBe(THREAD_CONTEXT);
   });
 
@@ -463,6 +468,9 @@ describe('slack team channel', () => {
 
   it('refuses approval-class actions from non-approvers in team channels', async () => {
     vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    // Run as the bridge's production role (start() sets it): speaker resolution
+    // reads the member registry, which the default role may not read.
+    vi.stubEnv('MISSION_ROLE', 'slack_bridge');
     const postEphemeral = vi.fn(async () => ({}));
     const client = { chat: { postEphemeral } };
     await expect(ensureSlackApprovalAuthority(client, 'C-team', '1.0', 'U-member')).resolves.toBe(
@@ -490,6 +498,9 @@ describe('slack team channel', () => {
 
   it('refuses a text approval from a team member who is not an approver', () => {
     vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    // Run as the bridge's production role (start() sets it): speaker resolution
+    // reads the member registry, which the default role may not read.
+    vi.stubEnv('MISSION_ROLE', 'slack_bridge');
     const record = createApprovalRequest('mission_controller', {
       channel: 'C-team',
       storageChannel: 'autonomy',
