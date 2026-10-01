@@ -6939,6 +6939,10 @@
       "types": "./dist/governance/accountability-charter-registry.d.ts",
       "default": "./dist/governance/accountability-charter-registry.js"
     },
+    "./governance/accountability-digest": {
+      "types": "./dist/governance/accountability-digest.d.ts",
+      "default": "./dist/governance/accountability-digest.js"
+    },
     "./governance/accountability-report": {
       "types": "./dist/governance/accountability-report.d.ts",
       "default": "./dist/governance/accountability-report.js"

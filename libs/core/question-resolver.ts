@@ -178,7 +178,7 @@ function localizeContextualReason(
     return t('question:contextual_reason_policy_defaults', undefined, locale);
   }
   if (reason.startsWith('The request can proceed with policy defaults because confidence is')) {
-    const confidence = reason.match(/(\d+(?:\.\d+)*)\./u)?.[1] || '';
+    const confidence = reason.match(/\d+(?:\.\d+)?/u)?.[0] || '';
     return t('question:contextual_reason_policy_confidence', { confidence }, locale);
   }
   return fallback;
