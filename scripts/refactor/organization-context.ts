@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
-import { rawExistsSync } from '@agent/core/fs-primitives';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 
 /**
  * Bind organization-scoped defaults for the duration of `fn`.
@@ -19,7 +19,7 @@ export function withOrganizationContext<T>(organizationId: string | undefined, f
   if (slug) {
     setRegisteredEnv('KYBERION_ORGANIZATION_ID', slug);
     const customerDir = path.join(pathResolver.rootDir(), 'customer', slug);
-    if (rawExistsSync(customerDir)) {
+    if (safeExistsSync(customerDir)) {
       setRegisteredEnv('KYBERION_CUSTOMER', slug);
     }
   }
