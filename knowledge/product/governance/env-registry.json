@@ -1283,8 +1283,8 @@
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "default": "1",
-      "description": "Strict startup validation of KYBERION_* variables; on by default. Set to 0/false to downgrade unregistered or mistyped variables to warnings. Register new names in env-registry.json via pnpm generate:env-registry.",
+      "default": null,
+      "description": "Strict startup validation of KYBERION_* variables. Unset: strict only when CI is set; outside CI unregistered names produce one warning (invalid values of registered variables still fail). Set 1 to force strict, 0/false to force warn-only. Register new names in env-registry.json via pnpm generate:env-registry.",
       "documented": true
     },
     {
