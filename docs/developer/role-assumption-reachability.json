@@ -1149,6 +1149,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/invites/join/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/invites/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/me/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1290,6 +1300,16 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/hygiene-server.ts#readMissionStateSnapshot",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/invite-server.ts#acceptInviteForViewer",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/invite-server.ts#verifiedInviteIdentity",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2724,6 +2744,8 @@
         "presence/displays/concierge/src/app/api/ingest-input.ts",
         "presence/displays/concierge/src/app/api/ingest-output-parser.ts",
         "presence/displays/concierge/src/app/api/ingest/route.ts",
+        "presence/displays/concierge/src/app/api/invites/join/route.ts",
+        "presence/displays/concierge/src/app/api/invites/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/route.ts",
         "presence/displays/concierge/src/app/api/me/route.ts",
@@ -2766,6 +2788,7 @@
         "presence/displays/concierge/src/app/dock-avatar.tsx",
         "presence/displays/concierge/src/app/front-desk-rail.tsx",
         "presence/displays/concierge/src/app/ingest/page.tsx",
+        "presence/displays/concierge/src/app/join/page.tsx",
         "presence/displays/concierge/src/app/layout.tsx",
         "presence/displays/concierge/src/app/login/route.ts",
         "presence/displays/concierge/src/app/logout/route.ts",
@@ -2777,6 +2800,7 @@
         "presence/displays/concierge/src/app/settings/sections/CharterPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/DisplaySection.tsx",
         "presence/displays/concierge/src/app/settings/sections/IntroduceSecretPanel.tsx",
+        "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
@@ -2808,6 +2832,8 @@
         "presence/displays/concierge/src/lib/i18n.ts",
         "presence/displays/concierge/src/lib/ingest-response.ts",
         "presence/displays/concierge/src/lib/intent-resolution-view.ts",
+        "presence/displays/concierge/src/lib/invite-server.ts",
+        "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
