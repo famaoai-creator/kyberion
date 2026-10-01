@@ -131,6 +131,8 @@ import type { UserIntentFlow } from '../intent/intent-contract.js';
 import { type ExecutionFeedbackRecord } from '../execution-feedback.js';
 
 export interface SurfaceRuntimeRouteHandler {
+  /** Team Channel P1: true only for routes that start no work (direct replies). */
+  askOnlySafe?: boolean;
   matches: (context: SurfaceRuntimeRouteContext) => boolean;
   handle: (context: SurfaceRuntimeRouteContext) => Promise<SurfaceConversationResult>;
 }

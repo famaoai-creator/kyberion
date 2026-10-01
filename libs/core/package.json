@@ -4467,6 +4467,10 @@
       "types": "./dist/organization/member-id-grammar.d.ts",
       "default": "./dist/organization/member-id-grammar.js"
     },
+    "./organization/member-identity-link": {
+      "types": "./dist/organization/member-identity-link.d.ts",
+      "default": "./dist/organization/member-identity-link.js"
+    },
     "./organization/member-invite": {
       "types": "./dist/organization/member-invite.d.ts",
       "default": "./dist/organization/member-invite.js"
@@ -5762,6 +5766,10 @@
     "./voice/streaming-tts-bridge": {
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
+    },
+    "./surface/channel-speaker-principal": {
+      "types": "./dist/surface/channel-speaker-principal.d.ts",
+      "default": "./dist/surface/channel-speaker-principal.js"
     },
     "./surface/channel-mode-policy": {
       "types": "./dist/surface/channel-mode-policy.d.ts",
