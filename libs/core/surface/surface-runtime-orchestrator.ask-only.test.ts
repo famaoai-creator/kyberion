@@ -99,7 +99,7 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
   });
 
   it('still opens the task session for full-authority speakers', async () => {
-    mocks.createTaskSession.mockImplementation((params: any) => ({
+    mocks.createTaskSession.mockImplementation((params: Record<string, unknown>) => ({
       session_id: 'TSK-T',
       task_type: params.taskType,
       goal: params.goal,
