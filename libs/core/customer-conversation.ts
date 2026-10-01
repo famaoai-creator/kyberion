@@ -10,6 +10,7 @@ import { normalizeLocale } from './locale-normalize.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { enforceApprovalGate } from './governance/approval-gate.js';
+import { charterInputForCustomerOutbound } from './governance/charter-call-site.js';
 import {
   composeAudienceFloor,
   evaluateAudienceEgress,
@@ -467,6 +468,13 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
     ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
+    // A message that breaches the audience egress floor always goes to a human.
+    ...(floorViolations.length === 0
+      ? (() => {
+          const charter = charterInputForCustomerOutbound({ tenantSlug: input.binding.tenantSlug });
+          return charter ? { charter } : {};
+        })()
+      : {}),
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
       summary: `${violationNote}${input.body.slice(0, 400)}`,
