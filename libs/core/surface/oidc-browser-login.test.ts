@@ -870,6 +870,21 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
     expect(last?.status).toBe(429);
   });
 
+  it('evicts the least recently used bucket, so key rotation cannot reset a hot client', async () => {
+    resetSurfaceAuthRateLimitForTests(50);
+    const hot = { ...base, clientKey: '198.51.100.7' };
+    for (let i = 0; i < 119; i++) await handleSurfaceAuthRoute(hot, { env, now: 6_000 });
+    // Rotate far more keys than the tracker holds; the hot client keeps being touched.
+    for (let i = 0; i < 400; i++) {
+      await handleSurfaceAuthRoute(
+        { ...base, surfaceId: `other-${i % 20}`, clientKey: `rot-${i}` },
+        { env, now: 6_000 }
+      );
+      if (i % 5 === 0) await handleSurfaceAuthRoute(hot, { env, now: 6_000 });
+    }
+    expect((await handleSurfaceAuthRoute(hot, { env, now: 6_000 }))?.status).toBe(429);
+  });
+
   it('does not rate-limit when the adapter supplies no client key (Express surfaces limit at the HTTP layer)', async () => {
     for (let i = 0; i < 700; i++) {
       const res = await handleSurfaceAuthRoute(base, { env, now: 3_000 });
@@ -919,7 +934,8 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
       { ...base, pathname: '/logout', secFetchSite: 'cross-site' },
       { env }
     );
-    expect(cross?.status).toBe(302);
+    expect(cross?.status).toBe(403);
+    expect(cross?.body).toContain('another site');
     expect(cross?.setCookies).toEqual([]);
     const same = await handleSurfaceAuthRoute(
       { ...base, pathname: '/logout', secFetchSite: 'same-origin' },
@@ -940,7 +956,7 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
       { ...base, pathname: '/logout', referrerOrigin: 'https://evil.example.net/page' },
       { env }
     );
-    expect(foreign?.status).toBe(302);
+    expect(foreign?.status).toBe(403);
     expect(foreign?.setCookies).toEqual([]);
     const own = await handleSurfaceAuthRoute(
       { ...base, pathname: '/logout', referrerOrigin: 'https://desk.example.com/settings' },
