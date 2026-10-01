@@ -2,7 +2,6 @@
 export * from './pty-engine.js';
 export * from './sandbox-policy.js';
 export * from './shell-claude-cli-backend.js';
-export * from './shell-claude-cli-intent-extractor.js';
 export * from './shell-command-normalize.js';
 export * from './shell-command-policy.js';
 export * from './shell-grok-cli-backend.js';

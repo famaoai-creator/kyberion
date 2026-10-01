@@ -169,6 +169,30 @@ describe('routeAutonomousDecision', () => {
     expect(routed.card?.reasons).toEqual(['重要なファイルを変更します: libs/core/secure-io.ts']);
   });
 
+  it('parks a recurring caller on its pending request instead of ringing again', () => {
+    const input = {
+      role: 'mission_controller' as const,
+      gate: gate({ decision: 'approve', allowed: false, actionId: 'daemon_restart' }),
+      title: 'Restart scheduler',
+      question: 'Restart the scheduler daemon?',
+      recommendation: 'Approve: heartbeat stale',
+      requestedBy: 'daemon_watchdog',
+      dedupeKey: 'scheduler',
+    };
+    const first = routeAutonomousDecision(input);
+    const second = routeAutonomousDecision({ ...input, now: Date.now() + 60_000 });
+    expect(first).toMatchObject({ parked: true, notified: true });
+    expect(first.reused).toBeUndefined();
+    expect(second).toMatchObject({
+      parked: true,
+      proceed: false,
+      notified: false,
+      reused: true,
+      requestId: first.requestId,
+    });
+    expect(notifications.notifyOperatorSync).toHaveBeenCalledTimes(1);
+  });
+
   it('holds a non-blocking decision for the digest', () => {
     const routed = routeAutonomousDecision({
       role: 'mission_controller',

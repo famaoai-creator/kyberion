@@ -154,6 +154,11 @@
         },
         "text": { "type": "string" },
         "key": { "type": "string" },
+        "keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered key sequence for write_terminal; takes precedence over key."
+        },
         "dictation_keycode": { "type": "integer", "minimum": 1 },
         "ref": { "type": "string" },
         "selector": { "type": "string" },

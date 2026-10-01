@@ -14,7 +14,10 @@ import { ocrImage as coreOcrImage } from '@agent/core/ocr-bridge';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
-import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import {
+  runActuatorPipeline,
+  defineCatalogBackedActuator,
+} from '../../../core/actuator/actuator-sdk.js';
 import { handleCaptureAction } from '../../media-generation-actuator/src/capture-actions.js';
 import { handleDescribeImage } from './describe-image.js';
 import { handleMarkElements } from './mark-elements.js';
@@ -26,6 +29,7 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
+import { describeOps } from './op-catalog.js';
 
 /**
  * Vision-Actuator v1.5.0 [LEGACY COMPATIBILITY FACADE]
@@ -212,5 +216,3 @@ const main = async () => {
 if (isDirectEntry(import.meta.url, 'libs/actuators/vision-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'vision-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

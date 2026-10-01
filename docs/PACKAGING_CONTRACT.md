@@ -196,7 +196,6 @@ Use extensionless subpaths only.
 - `@agent/core/pipeline-contract`
 - `@agent/core/trust-engine`
 - `@agent/core/secret-guard`
-- `@agent/core/entropy-gate`
 - `@agent/core/network`
 - `@agent/core/reflex-terminal`
 

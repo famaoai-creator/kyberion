@@ -224,7 +224,7 @@ export type { MissionContract } from './contracts/mission-contract.js';
 
 /**
  * Execution identity — 6 fixed values that determine runtime access scope.
- * Distinct from PerspectiveDefinition (27 thinking styles in persona-loader.ts).
+ * Distinct from the 27 thinking-style Perspectives in knowledge/product/personalities/matrix.md.
  *
  * system mode  → ecosystem_architect
  * mission mode → worker | mission_owner | analyst

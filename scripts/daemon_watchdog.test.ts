@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const routing = vi.hoisted(() => ({
+  routeAutonomousDecision: vi.fn((_input: unknown) => ({ requestId: 'REQ-DAEMON-1' })),
+}));
+vi.mock('@agent/core/governance/approval-decision-routing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/approval-decision-routing')>()),
+  routeAutonomousDecision: routing.routeAutonomousDecision,
+}));
 import {
   checkDaemonHeartbeats,
   checkDaemonHeartbeatsWithRecovery,
@@ -79,6 +87,49 @@ describe('daemon_watchdog', () => {
       expect(recovery.requires_operator).toBe(true);
     }
     expect(formatDaemonWatchdogReport(report).join('\n')).toContain('awaiting operator');
+  });
+
+  describe('HITL decision routing (opt-in)', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      routing.routeAutonomousDecision.mockClear();
+    });
+
+    async function unhealthyReport() {
+      safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+      return checkDaemonHeartbeatsWithRecovery({
+        daemons: ['chronos-daemon'],
+        rootDir: ROOT,
+        now: new Date('2026-07-04T00:10:00.000Z'),
+        alertLogPath: ALERT_LOG,
+        webhookUrl: '',
+        triggerStorePath: TRIGGER_STORE,
+      });
+    }
+
+    it('keeps the report-only outcome when routing is not enabled', async () => {
+      vi.stubEnv('KYBERION_AUTONOMY_DECISION_ROUTING', '');
+      const report = await unhealthyReport();
+      expect(routing.routeAutonomousDecision).not.toHaveBeenCalled();
+      expect(report.recovery?.[0]).toMatchObject({ requires_operator: true });
+      expect(report.recovery?.[0]?.decision_request_id).toBeUndefined();
+    });
+
+    it('routes an operator-bound recovery through the decision loop, once per daemon', async () => {
+      vi.stubEnv('KYBERION_AUTONOMY_DECISION_ROUTING', '1');
+      const report = await unhealthyReport();
+      expect(routing.routeAutonomousDecision).toHaveBeenCalledTimes(1);
+      expect(routing.routeAutonomousDecision.mock.calls[0]?.[0]).toMatchObject({
+        dedupeKey: 'chronos-daemon',
+        requestedBy: 'daemon_watchdog',
+        gate: expect.objectContaining({ actionId: 'daemon_restart', decision: 'approve' }),
+      });
+      expect(report.recovery?.[0]).toMatchObject({
+        requires_operator: true,
+        decision_request_id: 'REQ-DAEMON-1',
+      });
+      expect(formatDaemonWatchdogReport(report).join('\n')).toContain('decision=REQ-DAEMON-1');
+    });
   });
 
   it('records an ops alert when any heartbeat is stale or missing', () => {

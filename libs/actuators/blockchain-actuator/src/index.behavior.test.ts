@@ -80,7 +80,7 @@ vi.mock('@agent/core/recovery-policy', () => ({
   ),
 }));
 
-import { handleAction } from './index.js';
+import { actuator, handleAction } from './index.js';
 
 describe('blockchain-actuator behavior', () => {
   beforeEach(() => {
@@ -144,5 +144,14 @@ describe('blockchain-actuator behavior', () => {
       simulated: true,
       verified: true,
     });
+  });
+
+  it('serves catalog ops through SDK dispatch (pipeline / ADF path)', async () => {
+    await expect(
+      actuator.dispatch('anchor_mission', { mission_id: 'mission-3', hash: 'sha256:ghi789' })
+    ).resolves.toMatchObject({ ok: true, output: { status: 'success', simulated: true } });
+    await expect(
+      actuator.dispatch('verify_anchor', { mission_id: 'mission-3', hash: 'sha256:ghi789' })
+    ).resolves.toMatchObject({ ok: true, output: { status: 'verified', verified: true } });
   });
 });

@@ -61,20 +61,10 @@
       "layer": "Role",
       "frequency": "daily",
       "schedule": "anytime",
-      "description": "scripts/配下が標準(system-prelude等)に準拠しているか、fs直叩きがないかを自動スキャンします。",
+      "description": "scripts/配下が標準(@agent/core/secure-io 経由の I/O 等)に準拠しているか、fs直叩きがないかを自動スキャンします。",
       "skill": "knowledge-auditor",
       "args": "--input scripts",
       "required_role": "Ecosystem Architect"
-    },
-    {
-      "id": "system-test",
-      "name": "システム層の自動テスト",
-      "layer": "Role",
-      "frequency": "daily",
-      "schedule": "anytime",
-      "description": "path-resolverやsystem-preludeなどの基盤スクリプトが正常に動作するかを検証します。",
-      "cmd": "node tests/system/path-resolver.test.cjs && node tests/system/system-prelude.test.cjs",
-      "required_role": "Reliability Engineer"
     },
     {
       "id": "os-hardening-audit",
@@ -82,7 +72,7 @@
       "layer": "Base",
       "frequency": "daily",
       "schedule": "anytime",
-      "description": "システム・プレリュードによるDeep Sandboxが正しく機能しているか(物理法則の検証)を確認します。",
+      "description": "secure-io / tier-guard による保護境界が正しく機能しているか(物理法則の検証)を確認します。",
       "cmd": "node dist/scripts/kyberion.js list --check",
       "required_role": "Ecosystem Architect"
     }

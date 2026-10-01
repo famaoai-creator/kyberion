@@ -12,6 +12,7 @@ export const actuator = defineCatalogBackedActuator({
   id: 'build-actuator',
   describeOps,
   handleAction,
+  actionInput: (op, params) => ({ ...params, op }),
 });
 
 const main = async () => {

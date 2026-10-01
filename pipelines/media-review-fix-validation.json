@@ -5,7 +5,7 @@
   "action": "pipeline",
   "_refs": {
     "mission": "MSN-MEDIA-REVIEW-FIX-20260720",
-    "plan": "docs/developer/improvement-plans-2026-07/MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md"
+    "plan": "docs/developer/improvement-plans-archive/2026-07/MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md"
   },
   "steps": [
     {

@@ -28,7 +28,6 @@ import {
   safeUnlink,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { recordInteraction } from '@agent/core/relationship-graph-store';
 import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
@@ -41,7 +40,10 @@ import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
 import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import {
+  runActuatorPipeline,
+  defineCatalogBackedActuator,
+} from '../../../core/actuator/actuator-sdk.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
@@ -76,6 +78,7 @@ import {
   outputToVirtualCamera,
   renderTalkingAvatar,
 } from './voice-media-output-helpers.js';
+import { describeOps } from './op-catalog.js';
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
@@ -234,45 +237,6 @@ async function executeSingleAction(input: VoiceAction) {
   if (input.action === 'transcribe_voice_sample') {
     const payload = voiceActionPayload(input, 'transcribe_voice_sample');
     return transcribeVoiceSample(payload as Parameters<typeof transcribeVoiceSample>[0]);
-  }
-  if ((input as { action?: string }).action === 'record_interaction') {
-    const p = (input as { params?: Record<string, unknown> }).params ?? {};
-    if (
-      !p.person_slug ||
-      !p.org ||
-      !p.summary ||
-      typeof p.person_slug !== 'string' ||
-      typeof p.org !== 'string' ||
-      typeof p.summary !== 'string'
-    ) {
-      throw new Error('[VOICE] record_interaction requires person_slug, org, and summary');
-    }
-    const node = recordInteraction({
-      personSlug: p.person_slug,
-      org: p.org,
-      source: 'voice-actuator',
-      interaction: {
-        at: nowIso(),
-        summary: p.summary,
-        channel: typeof p.channel === 'string' ? p.channel : 'voice',
-        ...(Array.isArray(p.tone_shifts)
-          ? {
-              tone_shifts: p.tone_shifts.filter(
-                (entry): entry is string => typeof entry === 'string'
-              ),
-            }
-          : {}),
-      },
-    });
-    logger.info(
-      `[VOICE] recorded interaction with ${p.org}/${p.person_slug} (${node.history.length} entries)`
-    );
-    return {
-      status: 'interaction_recorded',
-      person_slug: p.person_slug,
-      org: p.org,
-      history_length: node.history.length,
-    };
   }
   throw new Error(`Unsupported voice action: ${String((input as { action?: string })?.action)}`);
 }
@@ -1358,5 +1322,3 @@ const main = async () => {
 if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'voice-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

@@ -9,7 +9,6 @@
     "analysis-config.json": ["algorithms", "auto_update", "description", "name", "version"],
     "analysis-execution-contracts.json": ["contracts", "version"],
     "autonomous-ops-policy.json": ["actions", "axis_weights", "decision_thresholds", "version"],
-    "dynamic-policies.json": ["policies", "version"],
     "ecosystem-blueprint.json": ["infrastructure", "name", "version"],
     "env-registry.json": ["description", "entries", "version"],
     "execution-boundary-profiles.json": ["profiles", "version"],

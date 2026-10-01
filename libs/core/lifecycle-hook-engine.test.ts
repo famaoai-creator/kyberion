@@ -33,7 +33,10 @@ import {
   loadLifecycleHookEngine,
   resetDefaultLifecycleHookEngine,
 } from './lifecycle-hook-engine.js';
-import { registerExternalLifecycleHooks } from './external-hook-bridge.js';
+import {
+  describeExternalHookCommands,
+  registerExternalLifecycleHooks,
+} from './external-hook-bridge.js';
 import {
   getDefaultWorkerEventStream,
   resetDefaultWorkerEventStream,
@@ -305,6 +308,51 @@ describe('LifecycleHookEngine', () => {
     expect(engine.hookCountFor('pre_tool_use')).toBe(1);
     await bridge.dispose();
     expect(engine.hookCountFor('pre_tool_use')).toBe(0);
+  });
+
+  it('registers the real nested Claude Code settings.json shape (hooks → event map)', async () => {
+    const engine = new LifecycleHookEngine();
+    const settings = {
+      permissions: { allow: ['Bash(pnpm test:*)'] },
+      hooks: {
+        PreCompact: [{ matcher: 'auto', hooks: [{ type: 'command', command: 'echo compacting' }] }],
+        PostToolUse: [
+          {
+            matcher: 'Edit|Write',
+            hooks: [{ type: 'command', command: 'pnpm lint --fix', timeout: 30 }],
+          },
+        ],
+      },
+    };
+    expect(describeExternalHookCommands(settings, 'claude-code')).toEqual([
+      { event: 'pre_compact', matcher: 'auto', command: 'echo compacting' },
+      { event: 'post_tool_use', matcher: 'Edit|Write', command: 'pnpm lint --fix' },
+    ]);
+    const register = vi.spyOn(engine, 'register');
+    const bridge = registerExternalLifecycleHooks(engine, settings, 'claude-code');
+    expect(bridge.registered).toBe(2);
+    // Claude Code's `timeout` is seconds; the engine takes milliseconds.
+    expect(register.mock.calls[1]?.[0]).toMatchObject({
+      event: 'post_tool_use',
+      matcher: 'Edit|Write',
+      timeoutMs: 30_000,
+    });
+    expect(engine.hookCountFor('pre_compact')).toBe(1);
+    expect(engine.hookCountFor('post_tool_use')).toBe(1);
+    await bridge.dispose();
+    expect(engine.hookCountFor('pre_compact')).toBe(0);
+  });
+
+  it('accepts the nested event map in a Codex hooks.json too', async () => {
+    const engine = new LifecycleHookEngine();
+    const bridge = registerExternalLifecycleHooks(
+      engine,
+      { hooks: { Stop: [{ hooks: [{ type: 'command', command: ['codex-stop'] }] }] } },
+      'codex'
+    );
+    expect(bridge.registered).toBe(1);
+    expect(engine.hookCountFor('stop')).toBe(1);
+    await bridge.dispose();
   });
 
   it('registers normalized Codex hooks with the same lifecycle vocabulary', async () => {

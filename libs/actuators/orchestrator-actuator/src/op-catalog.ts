@@ -11,10 +11,7 @@ import type { PipelineStepType } from '../../../core/actuator/actuator-op-regist
 import type { ActuatorOpDescription } from '../../../core/actuator/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
-const EMPTY_SCHEMA: InputSchema = { type: 'object', properties: {}, additionalProperties: false };
 const ORCHESTRATOR_CONTRACTS: Record<string, InputSchema> = {
-  discover_capabilities: EMPTY_SCHEMA,
-  discover_skills: EMPTY_SCHEMA,
   decompose_into_tasks: {
     type: 'object',
     properties: {
@@ -66,8 +63,6 @@ const ORCHESTRATOR_CONTRACTS: Record<string, InputSchema> = {
 };
 
 const ORCHESTRATOR_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
-  discover_capabilities: [{}],
-  discover_skills: [{}],
   decompose_into_tasks: [{ mission_id: 'MSN-20260826-001', project_name: 'kyberion' }],
   evaluate_task_plan_ready: [{ mission_id: 'MSN-20260826-001' }],
   execute_task_plan: [{ mission_id: 'MSN-20260826-001', max_tasks: 10 }],
@@ -76,10 +71,9 @@ const ORCHESTRATOR_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   task_plan_to_next_tasks: [{ mission_id: 'MSN-20260826-001' }],
 };
 
-export const ORCHESTRATOR_ACTUATOR_CAPTURE_OPS = [
-  'discover_capabilities',
-  'discover_skills',
-] as const;
+// Capability/skill discovery is code-actuator's (`code:discover_capabilities`,
+// `code:discover_skills`); the orchestrator never handled them.
+export const ORCHESTRATOR_ACTUATOR_CAPTURE_OPS = [] as const;
 
 export const ORCHESTRATOR_ACTUATOR_TRANSFORM_OPS = [] as const;
 

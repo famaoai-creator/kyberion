@@ -28,6 +28,7 @@ import { classifyError, type ErrorCategory, type ErrorClassification } from './e
 import { assistWithJudgment, choiceAnswer } from './reasoning/judgment-assist.js';
 import { listUnclassifiedErrors } from './unclassified-error-registry.js';
 import type { JudgmentQuestion } from './reasoning/judgment-backend.js';
+import { judgmentAssistReady } from './reasoning/judgment-provider-bootstrap.js';
 import type { TierLevel } from './types.js';
 
 export const ERROR_CATEGORY_QUESTION = 'error.category';
@@ -146,6 +147,27 @@ export async function classifyErrorAssisted(
     source: result.source === 'judgment' ? 'judgment' : 'rules',
     judgment_reason: result.reason,
   };
+}
+
+/**
+ * The recovery-path entry point: `classifyError()` unless a *calibrated*
+ * judgment placed an error the rules could not. Returns the deterministic
+ * classification object itself in every other case — no provider call while
+ * nothing is calibrated (`judgmentAssistReady`), and none of the assist's
+ * bookkeeping fields — so wiring it in changes nothing until a fit lands.
+ */
+export async function refineErrorClassification(
+  err: unknown,
+  options: ClassifyErrorAssistedOptions = {}
+): Promise<ErrorClassification> {
+  const baseline = classifyError(err);
+  if (baseline.category !== 'unknown' || !judgmentAssistReady(ERROR_CATEGORY_QUESTION)) {
+    return baseline;
+  }
+  const assisted = await classifyErrorAssisted(err, options);
+  if (assisted.source !== 'judgment') return baseline;
+  const { source: _source, judgment_reason: _reason, ...classification } = assisted;
+  return classification;
 }
 
 export interface ErrorJudgmentCorpusItem {

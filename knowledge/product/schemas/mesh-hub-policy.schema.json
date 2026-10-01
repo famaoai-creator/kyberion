@@ -5,6 +5,8 @@
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
+    "documentation_only": { "type": "boolean" },
+    "documentation_note": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "placement": { "type": "object" },
     "tenant_scope": { "type": "object" },
