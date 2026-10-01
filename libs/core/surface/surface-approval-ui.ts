@@ -28,6 +28,7 @@ import {
   renderDecisionCardExplanation,
   renderDecisionCardLines,
   renderDecisionCardText,
+  resolveApprovalLocale,
   viewDecisionCard,
 } from '../governance/approval-decision-card.js';
 import type { DecisionCard } from '../governance/decision-card.js';
@@ -144,7 +145,8 @@ export function formatDecisionCardLines(
   record: ApprovalRequestRecord,
   options: { locale?: SupportedLocale; now?: number } = {}
 ): string[] {
-  return renderDecisionCardLines(viewDecisionCard(record, options), options.locale);
+  const locale = resolveApprovalLocale(record, options.locale);
+  return renderDecisionCardLines(viewDecisionCard(record, { ...options, locale }), locale);
 }
 
 /** "Ask why": the stored rationale only — never a model call. */
@@ -152,7 +154,8 @@ export function explainApprovalRequest(
   record: ApprovalRequestRecord,
   options: { locale?: SupportedLocale } = {}
 ): string {
-  return renderDecisionCardExplanation(viewDecisionCard(record, options), options.locale);
+  const locale = resolveApprovalLocale(record, options.locale);
+  return renderDecisionCardExplanation(viewDecisionCard(record, { ...options, locale }), locale);
 }
 
 export function buildSurfaceApprovalText(
@@ -161,7 +164,7 @@ export function buildSurfaceApprovalText(
   intentResolution?: IntentResolutionContract,
   options: { locale?: SupportedLocale } = {}
 ): string {
-  const locale = options.locale ?? resolveLocale();
+  const locale = resolveApprovalLocale(record, options.locale);
   if (record.decisionCard) {
     return renderDecisionCardText(viewDecisionCard(record, { locale }), locale);
   }

@@ -56,6 +56,7 @@ export {
   resolveDefaultLocale,
   normalizeLocale,
   deriveReplyLocale,
+  resolveScopeLocale,
   enterReplyLocale,
   runWithReplyLocale,
   getReplyLocale,

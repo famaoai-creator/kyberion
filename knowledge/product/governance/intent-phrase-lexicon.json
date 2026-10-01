@@ -624,8 +624,12 @@
     "execution_feedback.prefix": {
       "description": "Leading word of an execution-feedback reply (`評価 <scenario-id>: <outcome>` / `feedback <scenario-id>: <outcome>`). Composed into the parser in libs/core/execution-feedback.ts.",
       "locales": {
-        "ja": { "phrases": ["評価"] },
-        "en": { "phrases": ["feedback"] }
+        "ja": {
+          "phrases": ["評価"]
+        },
+        "en": {
+          "phrases": ["feedback"]
+        }
       }
     },
     "contextual_frame.subject_self": {
@@ -1326,6 +1330,69 @@
         },
         "en": {
           "phrases": ["dictation", "voice input"]
+        }
+      }
+    },
+    "browser.target_text_extract": {
+      "description": "Extraction patterns (first capture group) for the click/press target text named in an utterance. Quoted text first, then locale phrasings. Used via captureIntentPhrase.",
+      "locales": {
+        "und": {
+          "patterns": ["「(.+?)」", "\"(.+?)\"", "『(.+?)』"]
+        },
+        "ja": {
+          "patterns": ["(.+?)を押して", "(.+?)をクリック", "(.+?)をタップ", "(.+?)ボタン"]
+        }
+      }
+    },
+    "browser.input_text_extract": {
+      "description": "Extraction patterns (first capture group) for the value to type into a field. Used via captureIntentPhrase.",
+      "locales": {
+        "ja": {
+          "patterns": ["「(.+?)」を.*(?:入力|入れて)", "(.+?)\\s*と入力"]
+        },
+        "en": {
+          "patterns": ["\"(.+?)\".*(?:input|type|fill)"]
+        }
+      }
+    },
+    "browser.target_region_prefix": {
+      "description": "Leading region qualifier stripped from an extracted target text (`左下のボタン` -> `ボタン`).",
+      "locales": {
+        "ja": {
+          "patterns": ["^(?:左下|右下|左上|右上|中央|真ん中)\\s*の?"]
+        }
+      }
+    },
+    "execution_feedback.outcome_satisfied": {
+      "description": "Execution-feedback outcome word: satisfied.",
+      "locales": {
+        "ja": {
+          "phrases": ["満足"]
+        },
+        "en": {
+          "phrases": ["satisfied"]
+        }
+      }
+    },
+    "execution_feedback.outcome_partially_satisfied": {
+      "description": "Execution-feedback outcome word: partially satisfied.",
+      "locales": {
+        "ja": {
+          "phrases": ["一部違う"]
+        },
+        "en": {
+          "phrases": ["partially_satisfied"]
+        }
+      }
+    },
+    "execution_feedback.outcome_dissatisfied": {
+      "description": "Execution-feedback outcome word: dissatisfied.",
+      "locales": {
+        "ja": {
+          "phrases": ["不満"]
+        },
+        "en": {
+          "phrases": ["dissatisfied"]
         }
       }
     }
