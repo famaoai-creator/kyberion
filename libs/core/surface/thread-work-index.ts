@@ -1,5 +1,5 @@
 import { nowIso } from '../foundation/time.js';
-import { loadMissionStateSnapshot } from '../mission/mission-orchestration-phase-gates.js';
+import { loadState } from '../mission/mission-state.js';
 import { t } from '../t.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import {
@@ -117,7 +117,7 @@ export function resolveThreadWorkStatus(
 
 function defaultMissionStatus(missionId: string): string | undefined {
   try {
-    const status = loadMissionStateSnapshot(missionId)?.status;
+    const status = loadState(missionId)?.status;
     return typeof status === 'string' ? status : undefined;
   } catch {
     return undefined;
