@@ -39,7 +39,10 @@ import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
 import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import { runActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
+import {
+  runActuatorPipeline,
+  defineCatalogBackedActuator,
+} from '../../../core/actuator/actuator-sdk.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
@@ -74,6 +77,7 @@ import {
   outputToVirtualCamera,
   renderTalkingAvatar,
 } from './voice-media-output-helpers.js';
+import { describeOps } from './op-catalog.js';
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
@@ -1314,5 +1318,3 @@ const main = async () => {
 if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'voice-actuator');
 }
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

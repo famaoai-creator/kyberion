@@ -28783,6 +28783,9 @@
               "export_as": {
                 "type": "string",
                 "minLength": 1
+              },
+              "apply": {
+                "type": "boolean"
               }
             },
             "additionalProperties": true,

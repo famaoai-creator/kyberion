@@ -16,3 +16,9 @@ Decision table: [`ORPHAN_DECISIONS_2026-10-01.md`](../../docs/developer/improvem
 | `kyberion-vtuber-narrated-demo-collect.json` | Collect half of the same one-off render (reads the submit half's job ticket from that mission's evidence directory).                                                                                        |
 | `meeting-minutes-generator.json`             | Superseded by `pipelines/meeting-followup.json` (transcript → minutes + action items + delivery pack) driven by `pnpm minutes:record`; its export step hard-coded paths and ignored its own context values. |
 | `rg-01-reasoning-governance-validation.json` | RG-01 readiness check that only probed five files for existence; the reasoning policy, registry and schema are covered by the catalog and contract-schema gates.                                            |
+
+## Entries retired by the final orphan wave (wave 4, 2026-10-01)
+
+| File                               | Reason                                                                                                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kyberion-config-provisioner.json` | Its only input, `knowledge/public/tmp-profile.md`, does not exist, so the first step fails; the README described it as "provision operator config from canonical defaults", which it never did. No caller. |

@@ -104,12 +104,11 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 
 ### Onboarding & Provisioning
 
-| Pipeline                         | pnpm shortcut  | Description                                                 |
-| -------------------------------- | -------------- | ----------------------------------------------------------- |
-| `kyberion-autonomous-onboarding` | `pnpm onboard` | Full autonomous onboarding (install → surfaces → alignment) |
-| `kyberion-config-provisioner`    | —              | Provision operator config from canonical defaults           |
-| `launch-first-run-onboarding`    | —              | Interactive first-run setup wizard                          |
-| `platform-onboarding`            | —              | Platform-level dependency bootstrap                         |
+| Pipeline                         | pnpm shortcut | Description                                                                                                                            |
+| -------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `kyberion-autonomous-onboarding` | —             | LLM-drafted organization profile and interview questions, run by hand (`pnpm onboard` runs `scripts/onboarding.ts`, not this pipeline) |
+| `launch-first-run-onboarding`    | —             | Interactive first-run setup wizard                                                                                                     |
+| `platform-onboarding`            | —             | Organization-integration artifacts: discovery transcript → requirements → design → test plan → task plan                               |
 
 ### Capability & Knowledge
 
@@ -145,7 +144,7 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 | `verify-session`             | Verify surface session lifecycle                                                                                                                                                                 |
 | `verify-session-fallback`    | Verify session fallback behaviour                                                                                                                                                                |
 | `service-lifecycle-smoke`    | Service start/stop/health smoke test                                                                                                                                                             |
-| `orchestration-jobs`         | Run scheduled orchestration batch                                                                                                                                                                |
+| `orchestration-jobs`         | Run the `orchestration-config.json` job batch by hand (no schedule is declared)                                                                                                                  |
 | `ai-audit`                   | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend)         |
 | `agentic-source-code-review` | Threat-model-first source review: deterministic reconnaissance/rule selection, human approval gate, scoped multi-perspective hypotheses, independent critique, and human-only validation handoff |
 

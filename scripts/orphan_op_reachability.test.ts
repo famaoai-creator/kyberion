@@ -9,6 +9,7 @@ import { pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 const EXAMPLE_PIPELINE_OPS: Record<string, string> = {
   'browser:action_trail': 'browser-failure-evidence',
   'browser:export_failure_bundle': 'browser-failure-evidence',
+  'browser:session_health': 'browser-failure-evidence',
   'meeting:hearing_session': 'meeting-hearing-session',
   'meeting:tutor_session': 'meeting-tutor-session',
   'system:list_incidents': 'incident-review',

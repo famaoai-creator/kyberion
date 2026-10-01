@@ -356,6 +356,66 @@ describe('external hook discovery', () => {
     }
   });
 
+  it('registers an approved real-shape Claude Code settings.json and lists its commands on the trust card', async () => {
+    const projectRoot = pathResolver.shared(`tmp/external-hook-real-shape-${process.pid}`);
+    const config = `${projectRoot}/.claude/settings.json`;
+    let approvalId = '';
+    try {
+      safeMkdir(`${projectRoot}/.claude`, { recursive: true });
+      safeWriteFile(
+        config,
+        JSON.stringify(
+          {
+            $schema: 'https://json.schemastore.org/claude-code-settings.json',
+            permissions: { allow: ['Bash(pnpm test:*)'], deny: [] },
+            hooks: {
+              PreCompact: [
+                { matcher: 'manual', hooks: [{ type: 'command', command: 'echo pre-compact' }] },
+              ],
+              PreToolUse: [
+                {
+                  matcher: 'Bash',
+                  hooks: [{ type: 'command', command: 'node scripts/guard.js', timeout: 10 }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+      const request = withExecutionContext('mission_controller', () =>
+        createProjectTrustApprovalRequest({
+          inputPath: config,
+          requestedBy: 'test-operator',
+          resource: { kind: 'external-hook-config', source: 'claude-code' },
+        })
+      );
+      approvalId = request.id;
+      expect(request.details ?? '').toContain('pre_compact [manual] → echo pre-compact');
+      expect(request.details ?? '').toContain('pre_tool_use [Bash] → node scripts/guard.js');
+      approveProjectConfig(config);
+      const engine = new LifecycleHookEngine();
+      const result = registerDiscoveredExternalLifecycleHooks(engine, {
+        rootDir: projectRoot,
+        trustResolved: true,
+        projectTrustApprovalIds: { [config]: approvalId },
+      });
+      expect(result.skipped).toEqual([]);
+      expect(result.registered).toBe(2);
+      expect(engine.hookCountFor('pre_compact')).toBe(1);
+      expect(engine.hookCountFor('pre_tool_use')).toBe(1);
+      await result.dispose();
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(projectRoot, { recursive: true, force: true });
+        if (approvalId) {
+          safeRmSync(approvalRequestLogicalPath('project-trust', approvalId), { force: true });
+        }
+      });
+    }
+  });
+
   it('skips a project hook config path replaced by a directory', () => {
     const projectRoot = pathResolver.shared(`tmp/external-hook-directory-project-${process.pid}`);
     const configPath = `${projectRoot}/.claude/settings.json`;

@@ -156,3 +156,26 @@ else; `check_orphans.ts` rejects placeholder "backlog" reasons so the end state 
 `collect_artifact`, `cancel_job`) are advertised and named by its existing `index.test.ts`, so the
 ratchet already counts them as reachable and they cannot carry a baseline entry (it would be stale).
 Their SDK/ADF path still fails with `unknown action: pipeline` until that branch adds `actionInput`.
+
+## Wave 4 — final review of the baseline (2026-10-01)
+
+Every remaining `orphan-baseline.json` entry was re-checked (98 → 85).
+
+- **libs/core modules (21 → 10).** Retired: `persona-loader.ts`, `test-utils.ts`, the barrel-only
+  `classifier.ts` / `data-utils.ts` / `detectors.ts`, and six generated contract mirrors with no
+  TypeScript consumer (rows in `retired/README.md`). Kept with a precise reason: the two
+  side-effect entries behind `@agent/core/acp-mediator` and `@agent/core/secret-guard` (listed in
+  `docs/PACKAGING_CONTRACT.md`), `skill-wrapper.ts` (EXTENSION_POINTS §2.4), the hand-run
+  `judgment-callsite-eval.ts` harness, the test harnesses, the deprecated `task-executor.ts`
+  facade, and the two modules reserved for other branches.
+- **Docs-only pipelines (33 → 32).** All 33 pass `run_pipeline_dry_run.ts` (four warn only that
+  no reasoning provider is selected), and every path they reference was checked.
+  `kyberion-config-provisioner.json` reads a file that does not exist and was retired.
+  `platform-onboarding.json` pointed at a missing `pipelines/execute-task-plan.json`; it now
+  points at `knowledge/product/pipeline-templates/execute-task-plan.json`. The README no longer
+  claims that `pnpm onboard` runs `kyberion-autonomous-onboarding` or that `orchestration-jobs`
+  is scheduled.
+- **Actuator ops (44 → 43).** `browser:session_health` is now a step of
+  `pipelines/browser-failure-evidence.json`, asserted by `scripts/orphan_op_reachability.test.ts`.
+  The template and example callers named in the kept reasons were confirmed. The "also registered
+  by" lists for generic steps were regenerated from `actuator-op-registry.json`.
