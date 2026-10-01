@@ -1284,5 +1284,89 @@
         "compiled_flow_rules": []
       }
     }
+  },
+  "channel_adapters": {
+    "slack": {
+      "surface_provider": "slack",
+      "markup": {
+        "dialect": "slack-mrkdwn",
+        "entity_escapes": {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;"
+        }
+      },
+      "operator_notification": {
+        "delivery": "surface-outbox"
+      },
+      "presence_dispatch": "slack-webclient",
+      "human_chat": true,
+      "message_shape": "slack-thread",
+      "mission_event_stream": "slack"
+    },
+    "telegram": {
+      "surface_provider": "telegram",
+      "markup": {
+        "dialect": "telegram-markdown-legacy",
+        "backslash_escape_chars": "_*`["
+      },
+      "operator_notification": {
+        "delivery": "surface-outbox"
+      },
+      "presence_dispatch": "satellite-outbox",
+      "human_chat": true,
+      "message_shape": "generic",
+      "mission_event_stream": "shared"
+    },
+    "discord": {
+      "surface_provider": "discord",
+      "markup": {
+        "dialect": "discord-markdown",
+        "backslash_escape_chars": "\\*_~`|[]()<>",
+        "mention_guards": ["everyone", "here"]
+      },
+      "operator_notification": {
+        "delivery": "surface-outbox"
+      },
+      "presence_dispatch": "satellite-outbox",
+      "human_chat": true,
+      "message_shape": "generic",
+      "mission_event_stream": "shared"
+    },
+    "imessage": {
+      "surface_provider": "imessage",
+      "markup": {
+        "dialect": "plain"
+      },
+      "operator_notification": {
+        "delivery": "imessage-direct"
+      },
+      "presence_dispatch": "satellite-outbox",
+      "human_chat": true,
+      "message_shape": "generic",
+      "mission_event_stream": "shared"
+    },
+    "chronos": {
+      "surface_provider": "chronos",
+      "markup": {
+        "dialect": "plain"
+      },
+      "human_chat": false,
+      "message_shape": "chronos-session",
+      "mission_event_stream": "chronos"
+    },
+    "inbox": {
+      "local": true,
+      "markup": {
+        "dialect": "plain"
+      },
+      "operator_notification": {
+        "delivery": "local-inbox",
+        "default_target": "operator"
+      },
+      "human_chat": false,
+      "message_shape": "generic",
+      "mission_event_stream": "shared"
+    }
   }
 }

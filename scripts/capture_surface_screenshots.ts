@@ -145,11 +145,8 @@ function parseBaseUrlMap(raw: string | undefined): Record<string, string> {
 
 /** Text that must never leak into a screenshot: absolute repo checkout paths. */
 function scrubNeedles(raw: string | undefined): string[] {
-  const needles = new Set<string>([
-    pathResolver.rootDir(),
-    '/Volumes/data/forcheck/kyberion',
-    '/Volumes/data/forcheck/kyberion-surface-ui',
-  ]);
+  // Other checkouts (sibling worktrees) are supplied by the caller via the scrub list.
+  const needles = new Set<string>([pathResolver.rootDir()]);
   if (raw) {
     for (const value of raw
       .split(',')

@@ -62,17 +62,17 @@ describe('backend conformance matrix (QM-06)', () => {
       },
     });
 
-    expect(results.map((result) => result.status)).toEqual([
-      'verified',
-      'verified',
-      'verified',
-      'verified',
-      'verified',
-      'verified',
-      'verified',
-      'unsupported',
-      'unsupported',
-    ]);
+    expect(Object.fromEntries(results.map((result) => [result.mode, result.status]))).toEqual({
+      'claude-cli': 'verified',
+      'codex-cli': 'verified',
+      'gemini-cli': 'verified',
+      'agy-cli': 'unsupported',
+      'grok-cli': 'verified',
+      copilot: 'unsupported',
+      'cursor-cli': 'verified',
+      'opencode-cli': 'verified',
+      'devin-cli': 'verified',
+    });
     expect(calls.map(({ command }) => command)).toEqual([
       'claude',
       'codex',

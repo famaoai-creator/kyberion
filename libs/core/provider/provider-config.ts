@@ -11,7 +11,11 @@ export type ProviderConfigRuntimeRole =
   | 'copilot-default'
   | 'cursor-default'
   | 'opencode-default'
-  | 'devin-default';
+  | 'devin-default'
+  | 'codex-fast'
+  | 'grok-default'
+  | 'gemini-image'
+  | 'ollama-vision';
 
 export interface ProviderLifecycleEntry {
   boot_command: string;
@@ -24,6 +28,7 @@ export interface ProviderConfigFile {
   obsolete_agent_runtime_providers: string[];
   default_models: Record<string, string>;
   runtime_defaults: Partial<Record<ProviderConfigRuntimeRole, string>>;
+  runtime_endpoints?: Record<string, string>;
   lifecycle: Record<string, ProviderLifecycleEntry>;
 }
 
@@ -50,7 +55,7 @@ export function isObsoleteAgentRuntimeProvider(provider: string | undefined): bo
   );
 }
 
-const RUNTIME_ROLE_PROVIDER_FALLBACK: Record<ProviderConfigRuntimeRole, string> = {
+const RUNTIME_ROLE_PROVIDER_FALLBACK: Partial<Record<ProviderConfigRuntimeRole, string>> = {
   'anthropic-default': 'claude',
   'anthropic-fast': 'claude',
   'gemini-default': 'gemini',
@@ -67,7 +72,22 @@ export function resolveRuntimeDefaultModelId(role: ProviderConfigRuntimeRole): s
   const config = loadProviderConfig();
   return (
     config.runtime_defaults[role] ||
-    config.default_models[RUNTIME_ROLE_PROVIDER_FALLBACK[role]] ||
+    config.default_models[RUNTIME_ROLE_PROVIDER_FALLBACK[role] ?? ''] ||
     role
   );
+}
+
+/**
+ * Default endpoint origin for a local runtime (e.g. `ollama`) from
+ * `provider-config.json` `runtime_endpoints`. Throws (fail closed) when the
+ * runtime has no governed default, so callers never invent a host.
+ */
+export function resolveRuntimeEndpoint(runtime: string): string {
+  const endpoint = loadProviderConfig().runtime_endpoints?.[runtime];
+  if (!endpoint) {
+    throw new Error(
+      `[PROVIDER_CONFIG_ENDPOINT_MISSING] ${runtime} has no runtime_endpoints entry in knowledge/product/governance/provider-config.json`
+    );
+  }
+  return endpoint.replace(/\/$/u, '');
 }

@@ -5,10 +5,12 @@ import {
 } from '../intent/intent-resolution.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
+  getSurfaceProviderManifestRecord,
   resolveSurfaceConversationReceiverForProvider,
   shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
+import { resolveChannelMessageShape } from './channel-adapter-registry.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 import type { SurfaceIntentResolution } from '../router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
@@ -107,13 +109,17 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
   text: string;
   parsedSlackPrompt: ParsedSlackSurfacePrompt | null;
 } {
-  const slackMetadata =
-    input.surface === 'slack'
-      ? (input.surfaceMetadata as SlackSurfaceMetadata | undefined)
-      : undefined;
+  // Structured thread metadata applies to surfaces whose channel adapter declares
+  // the slack-thread message shape, addressed by that surface's own agent (RS-06).
+  const surface = input.surface;
+  const slackThreadShape =
+    Boolean(surface) && resolveChannelMessageShape(surface!) === 'slack-thread';
+  const slackMetadata = slackThreadShape
+    ? (input.surfaceMetadata as SlackSurfaceMetadata | undefined)
+    : undefined;
   const hasStructuredSlackMetadata =
-    input.agentId === 'slack-surface-agent' &&
-    input.surface === 'slack' &&
+    slackThreadShape &&
+    input.agentId === getSurfaceProviderManifestRecord(surface!).agentId &&
     (typeof input.surfaceText === 'string' ||
       typeof slackMetadata?.channel === 'string' ||
       typeof slackMetadata?.threadTs === 'string' ||

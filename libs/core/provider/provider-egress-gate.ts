@@ -48,6 +48,7 @@ import { createLogger } from '../logger.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -495,48 +496,17 @@ export function highestTierForPaths(paths: string[]): TierLevel {
 }
 
 /**
- * Best-effort mode/backend-name -> provider-id mapping for the five CLI
- * providers this plan (and provider-capability-registry.ts's
- * `PROVIDER_PROBE_TABLE`) is scoped to. Covers both `ReasoningBackendMode`
- * values (`reasoning-bootstrap.ts`) and live `ReasoningBackend.name` values
- * (`shell-claude-cli-backend.ts` etc.) because the two spaces overlap for
- * CLI-backed modes and callers hold whichever one is convenient.
+ * Map a reasoning mode, runtime backend name, or provider id to the provider
+ * id known to the egress policy, when possible.
  *
- * This intentionally duplicates in miniature the private
- * `providerForReasoningMode` switch in `reasoning-bootstrap.ts`: that
- * function is not exported, and reasoning-bootstrap.ts is out of scope for
- * this change (owned by a different track this wave; see the XP-03 task
- * brief). If the two ever drift, the effect is limited to this resolver
- * mis-identifying (or failing to identify) a provider for the *default*,
- * unset-provider path — callers that know their provider should always pass
- * it explicitly, which bypasses this table entirely.
+ * RS-01: the mapping is the descriptor's `egress_provider_id`
+ * (`reasoning-providers/*.json`); `aliases` cover runtime backend names such
+ * as `shell-claude-cli` / `copilot-acp`. A provider without a declared
+ * egress id resolves to `undefined`, which callers treat as unknown (deny).
  */
-const REASONING_IDENTIFIER_TO_PROVIDER_ID: Readonly<Record<string, string>> = {
-  'claude-cli': 'claude',
-  'claude-agent': 'claude',
-  'shell-claude-cli': 'claude',
-  'codex-cli': 'codex',
-  'agy-cli': 'agy',
-  'gemini-cli': 'gemini',
-  gemini: 'gemini',
-  copilot: 'copilot',
-  'copilot-acp': 'copilot',
-  'grok-cli': 'grok',
-  'shell-grok-cli': 'grok',
-  'grok-api': 'grok',
-  grok: 'grok',
-  'cursor-cli': 'cursor',
-  cursor: 'cursor',
-  'opencode-cli': 'opencode',
-  opencode: 'opencode',
-  'devin-cli': 'devin',
-  devin: 'devin',
-};
-
-/** Map a reasoning mode or backend name to a provider id known to the egress policy, when possible. */
 export function providerIdForReasoningIdentifier(
   identifier: string | undefined | null
 ): string | undefined {
   if (!identifier) return undefined;
-  return REASONING_IDENTIFIER_TO_PROVIDER_ID[identifier];
+  return resolveReasoningProviderDescriptor(identifier)?.egress_provider_id;
 }
