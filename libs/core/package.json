@@ -5575,6 +5575,10 @@
       "types": "./dist/service/service-authority-map.d.ts",
       "default": "./dist/service/service-authority-map.js"
     },
+    "./service/service-binding-owner": {
+      "types": "./dist/service/service-binding-owner.d.ts",
+      "default": "./dist/service/service-binding-owner.js"
+    },
     "./service/service-binding-registry": {
       "types": "./dist/service/service-binding-registry.d.ts",
       "default": "./dist/service/service-binding-registry.js"
