@@ -6,10 +6,10 @@
  * tenant by inference.
  *
  * Usage:
- *   pnpm migrate:physical-namespaces -- --dry-run
- *   pnpm migrate:physical-namespaces -- --kind surface --apply
- *   pnpm migrate:physical-namespaces -- --kind intent --dry-run
- *   pnpm migrate:physical-namespaces -- --kind promotion --apply
+ *   pnpm namespace:migrate-physical -- --dry-run
+ *   pnpm namespace:migrate-physical -- --kind surface --apply
+ *   pnpm namespace:migrate-physical -- --kind intent --dry-run
+ *   pnpm namespace:migrate-physical -- --kind promotion --apply
  */
 
 import * as path from 'node:path';
@@ -717,8 +717,8 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
 
 /** CU-01: `--help` / typos exit before any plan is built or applied. */
 export const MIGRATE_PHYSICAL_NAMESPACES_CLI: CliGuardSpec = {
-  command: 'pnpm kyberion migrate physical-namespaces',
-  manifestId: 'script.migrate.physical-namespaces',
+  command: 'pnpm kyberion namespace migrate-physical',
+  manifestId: 'script.namespace.migrate-physical',
   options: [
     { flag: '--apply' },
     { flag: '--kind', value: '<schedule|surface|feedback|intent|ledger|promotion|all>' },
@@ -739,7 +739,7 @@ export function main(argv: string[], print: Print = () => undefined): void {
 }
 
 const script = defineScript({
-  name: 'migrate:physical-namespaces',
+  name: 'namespace:migrate-physical',
   flags: [],
   run: ({ argv, print }) => main(argv, print),
 });

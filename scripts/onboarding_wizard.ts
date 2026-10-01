@@ -585,9 +585,9 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       if (!continueWithStub) {
         print(
           t(
-            'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.',
+            'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboarding`.',
             // i18n-exempt: bilingual prompt pair (JA side intentional)
-            'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboard` を再実行してください。'
+            'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboarding` を再実行してください。'
           )
         );
         rl.close();
@@ -957,7 +957,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
           allow_cross_distillation: false,
         },
         metadata: {
-          onboarding_source: 'pnpm onboard',
+          onboarding_source: 'pnpm onboarding',
         },
       },
       `onboarding-tenant-${tenantSlug}`
@@ -1162,15 +1162,15 @@ export async function runOnboarding(
     print(t('\n  Options:', '\n  選択肢:'));
     print(
       t(
-        '    1. Run from a real terminal: pnpm onboard',
+        '    1. Run from a real terminal: pnpm onboarding',
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        '    1. 実ターミナルから実行する: pnpm onboard'
+        '    1. 実ターミナルから実行する: pnpm onboarding'
       )
     );
     print(
-      '    2. If you need a customer overlay, create it first with `pnpm customer:create <slug>`'
+      '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`'
     );
-    print('       and activate it with `pnpm customer:switch <slug>` before onboarding.');
+    print('       and activate it with `pnpm stance:switch <slug>` before onboarding.');
     print('    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the');
     print(`       active profile root (${profileRoot()}/...) directly per the schemas under`);
     print('       knowledge/public/{schemas,templates}.');
@@ -1200,9 +1200,9 @@ export async function runOnboarding(
   if (expressMode) {
     print(
       t(
-        'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboard`.',
+        'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboarding`.',
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        'Express モード: 安全な既定値で開始し、後から `pnpm onboard` でアイデンティティと接続を調整します。'
+        'Express モード: 安全な既定値で開始し、後から `pnpm onboarding` でアイデンティティと接続を調整します。'
       )
     );
   }

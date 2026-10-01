@@ -58,13 +58,13 @@ describe('kyberion script-command dispatch', () => {
     for (const command of [
       'tui default',
       'office default',
-      'chronos default',
+      'scheduler default',
       'dashboard default',
       'pads server',
       'mcp server',
       'telegram bridge',
       'agent-runtime daemon',
-      'onboard default',
+      'onboarding default',
       'build default',
     ]) {
       expect(streamed, command).toContain(command);

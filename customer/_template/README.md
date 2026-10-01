@@ -38,5 +38,5 @@ The `secrets.local.example.json` file shows the expected schema. Copy it to `sec
 ```bash
 export KYBERION_CUSTOMER=your-customer-slug
 pnpm kyberion doctor
-pnpm onboard
+pnpm onboarding
 ```

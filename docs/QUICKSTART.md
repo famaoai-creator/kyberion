@@ -2,7 +2,7 @@
 
 **Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order. The broader documentation source map is [`documentation-source-map.json`](./documentation-source-map.json).
 
-New to the vocabulary? Read [CORE_CONCEPTS](./CORE_CONCEPTS.md) first — the 5 concepts you need (Mission, Pipeline, Actuator, Tenant/Tier, Surface).
+New to the vocabulary? Read [CORE_CONCEPTS](./CORE_CONCEPTS.md) first — the 5 concepts you need (work, pipeline, capability, tenant/tier, surface).
 
 ---
 
@@ -22,7 +22,7 @@ At every step it makes the request, plan, result, and next action visible.
 
 > This document is the canonical first-win source. The full onboarding order after first-win — readiness, identity, getting the baseline to `all_clear`, and the optional tenant / organization / activation steps — is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md). Command-by-command detail is in [INITIALIZATION.md](./INITIALIZATION.md).
 >
-> Pick a route first: **personal only** (no tenant; stop after the baseline is `all_clear`), **AI company** (`pnpm onboard company`, below), or **add an existing tenant** (standard flow Steps 5–8).
+> Pick a route first: **personal only** (no tenant; stop after the baseline is `all_clear`), **AI company** (`pnpm onboarding company`, below), or **add an existing tenant** (standard flow Steps 5–8).
 
 Prerequisites:
 
@@ -59,15 +59,15 @@ Skip this subsection for a first look — the first-win smoke in §2 needs none 
 For a solo founder whose main workforce is AI, run the company onboarding flow after the build:
 
 ```bash
-pnpm onboard company --vertical saas-product-company --slug acme-ai \
+pnpm onboarding company --vertical saas-product-company --slug acme-ai \
   --name "ACME AI" --owner-id human:founder \
   --goal "Define the first customer outcome and launch plan" --dry-run
-pnpm onboard company --vertical saas-product-company --slug acme-ai \
+pnpm onboarding company --vertical saas-product-company --slug acme-ai \
   --name "ACME AI" --owner-id human:founder \
   --goal "Define the first customer outcome and launch plan"
 ```
 
-`pnpm onboard` uses `customer/{slug}/ preferred when KYBERION_CUSTOMER is set` for the customer stance overlay.
+`pnpm onboarding` uses `customer/{slug}/ preferred when KYBERION_CUSTOMER is set` for the customer stance overlay.
 
 The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding. Tenant activation is still a separate human-accepted gate.
 
@@ -95,7 +95,7 @@ pnpm onboarding:context first-work --customer-slug acme-ai \
 If you already have an onboarding payload, use Path B instead of the wizard:
 
 ```bash
-pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
 ```
 
 Copy the template, edit it, and rerun without `--dry-run` when you are ready to apply it.

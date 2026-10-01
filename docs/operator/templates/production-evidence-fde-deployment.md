@@ -23,10 +23,10 @@ Use this template after a real external FDE or SI completes a customer deploymen
 ## Commands
 
 ```bash
-pnpm customer:create <slug>
-pnpm customer:switch <slug>
+pnpm stance:create <slug>
+pnpm stance:switch <slug>
 source active/shared/runtime/customer.env
-pnpm onboard
+pnpm onboarding
 pnpm run doctor
 ```
 

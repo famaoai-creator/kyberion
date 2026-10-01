@@ -33,7 +33,7 @@ describe('next action builder', () => {
     const classification = classifyError('Invalid API key');
     const action = buildNextActionFromError(classification, { source: 'pipeline' });
     expect(action.next_action_type).toBe('bootstrap_environment');
-    expect(action.suggested_command).toBe('pnpm onboard');
+    expect(action.suggested_command).toBe('pnpm onboarding');
   });
 
   it('maps stale surfaces to repair commands', () => {

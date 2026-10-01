@@ -21,10 +21,10 @@
  *
  * Two CLI modes:
  *
- *   pnpm report:i18n-coverage              — human-readable coverage report
- *   pnpm report:i18n-coverage -- --json     — machine-readable report object
+ *   pnpm i18n:report              — human-readable coverage report
+ *   pnpm i18n:report -- --json     — machine-readable report object
  *
- *   pnpm report:i18n-coverage -- --alert-on-regression
+ *   pnpm i18n:report -- --alert-on-regression
  *     Additionally compares the current per-locale coverage percentage
  *     against the last recorded snapshot (`active/shared/runtime/reports/
  *     i18n-coverage-history.json`) and, if any *required*
@@ -172,9 +172,9 @@ export function formatHumanReport(
   alertOnRegression = false
 ): string {
   const lines = [
-    `[report:i18n-coverage] ${report.total_keys} key(s) across ${report.locales.length} locale(s) seen ` +
+    `[i18n:report] ${report.total_keys} key(s) across ${report.locales.length} locale(s) seen ` +
       `(default=${report.default_locale || 'n/a'}, required=${report.required_locales.join(', ') || 'none'})`,
-    '[report:i18n-coverage] this is a coverage instrument, not a gate — pnpm run check -- --scope full --only catalogs is the gate.',
+    '[i18n:report] this is a coverage instrument, not a gate — pnpm run check -- --scope full --only catalogs is the gate.',
   ];
   for (const locale of report.locales) {
     const tag = locale.is_required ? 'required' : 'not required yet (candidate)';
@@ -190,11 +190,9 @@ export function formatHumanReport(
 
   if (alertOnRegression) {
     if (regressions.length === 0) {
-      lines.push('\n[report:i18n-coverage] no coverage regression since the last recorded run.');
+      lines.push('\n[i18n:report] no coverage regression since the last recorded run.');
     } else {
-      lines.push(
-        `\n[report:i18n-coverage] ${regressions.length} regression(s) detected and alerted:`
-      );
+      lines.push(`\n[i18n:report] ${regressions.length} regression(s) detected and alerted:`);
       lines.push(
         ...regressions.map(
           (regression) =>
@@ -287,9 +285,9 @@ function buildRegressionAlert(
       regressions,
     },
     recommendation:
-      'Run pnpm report:i18n-coverage -- --json to see the newly-missing keys per locale, then either restore the translations or confirm the regression was an intentional catalog restructure.',
+      'Run pnpm i18n:report -- --json to see the newly-missing keys per locale, then either restore the translations or confirm the regression was an intentional catalog restructure.',
     options: [
-      'Run pnpm report:i18n-coverage locally to inspect the affected locale(s) and namespace(s)',
+      'Run pnpm i18n:report locally to inspect the affected locale(s) and namespace(s)',
       'Check recent commits touching knowledge/product/orchestration/user-facing-vocabulary.json',
     ],
     dedupe_key: 'i18n-translation-coverage-regression',
@@ -348,7 +346,7 @@ export function main(
 }
 
 export const runReportI18nTranslationCoverage = defineScript({
-  name: 'report:i18n-coverage',
+  name: 'i18n:report',
   run: (context) => {
     const result = main(context.argv, { writeSideEffects: !context.check && !context.dryRun });
     const output = result.alert_on_regression

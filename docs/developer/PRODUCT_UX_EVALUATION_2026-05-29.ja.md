@@ -125,7 +125,7 @@ UX Stabilization を明示した方がよい。
 | ------ | ------------------------- | ---------------------------------------------------------------------------------------------------- |
 | UX-2-1 | 3 use-case quickstarts    | meeting facilitator, report generation, browser research の 3 本を user docs から 1 click で辿れる。 |
 | UX-2-2 | Demo assets               | README から 3 つの GIF / terminal cast / screenshots が見える。                                      |
-| UX-2-3 | First-run role choice     | `pnpm onboard` が developer / operator / FDE evaluator の入口を分ける。                              |
+| UX-2-3 | First-run role choice     | `pnpm onboarding` が developer / operator / FDE evaluator の入口を分ける。                           |
 | UX-2-4 | Setup report persona mode | `pnpm kyberion setup report --persona first-time-user` が必須以外の credential noise を畳む。        |
 
 ## 5. 推奨優先順位

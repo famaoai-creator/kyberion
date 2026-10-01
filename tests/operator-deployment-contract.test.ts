@@ -11,8 +11,8 @@ function read(relPath: string): string {
 describe('Operator deployment contract', () => {
   it('uses customer commands in the FDE deployment path', () => {
     const doc = read('docs/operator/DEPLOYMENT.md');
-    expect(doc).toContain('pnpm customer:create customer-slug');
-    expect(doc).toContain('pnpm customer:switch customer-slug');
+    expect(doc).toContain('pnpm stance:create customer-slug');
+    expect(doc).toContain('pnpm stance:switch customer-slug');
     expect(doc).toContain('source active/shared/runtime/customer.env');
     expect(doc).not.toContain('cp -R customer/_template customer/customer-slug');
   });

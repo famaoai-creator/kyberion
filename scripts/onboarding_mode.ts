@@ -3,8 +3,8 @@ import type { CliGuardSpec } from './lib/cli-guard.js';
 
 /** CU-01: wizard flags; `--help` / typos exit before the wizard opens a prompt or writes state. */
 export const ONBOARD_CLI: CliGuardSpec = {
-  command: 'pnpm onboard',
-  manifestId: 'script.onboard',
+  command: 'pnpm onboarding',
+  manifestId: 'script.onboarding',
   subcommands: ['apply', 'reset', 'company'],
   options: [
     { flag: '--express' },

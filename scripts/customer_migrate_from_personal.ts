@@ -134,7 +134,7 @@ if (
   isDirectScript(import.meta.url, 'customer_migrate_from_personal.js')
 )
   void defineScript({
-    name: 'customer:migrate-from-personal',
+    name: 'stance:migrate-from-personal',
     flags: [],
     run(context) {
       context.print(main(context.argv, context.print).join('\n'));
