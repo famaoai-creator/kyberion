@@ -1,4 +1,4 @@
-import { classifyError } from '@agent/core/error-classifier';
+import { refineErrorClassification } from '@agent/core/error-classifier-judgment';
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation/text';
@@ -110,7 +110,8 @@ export async function runWithRepair(
       return await attemptOnce();
     } catch (err: any) {
       lastError = err;
-      const failure = classifyError(err);
+      // classifyError(), refined only by a calibrated judgment (inert until a fit lands).
+      const failure = await refineErrorClassification(err);
 
       // Don't repair if we already tried and the error message didn't change (prevents loops)
       if (attempt === 0 && failure.repairAction) {

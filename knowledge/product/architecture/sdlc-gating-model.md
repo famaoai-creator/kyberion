@@ -16,7 +16,7 @@ Kyberion の gate は、`文書を増やすこと` ではなく、`次の phase 
 
 - Gate Profile 一覧: `knowledge/product/governance/gate-profiles/gate-profile-registry.json`
 - Gate Profile スキーマ: `schemas/gate-profile.schema.json`
-- Gate 状態マシン: `libs/core/gate-status.ts`
+- Gate 状態マシン: 本番の呼び出し元が無いため 2026-10-01 に `retired/libs-core/gate-status.ts` へ退避（`retired/README.md` 参照）
 - Track 作成基準: `knowledge/product/governance/track-creation-policy.json`
 - AIエージェント業務の Track パターン: `knowledge/product/architecture/ai-agent-track-patterns.md`
 
@@ -44,24 +44,31 @@ Kyberion では、gate は通常 `Project` ではなく `Track` にぶら下が�
 ## Gate Sequence
 
 1. `Initiation Approval`
+
 - Why が正しいかを決める
 
 2. `Requirements Baseline`
+
 - What が十分に定義されているかを決める
 
 3. `Design Approval`
+
 - How が妥当かを決める
 
 4. `Build Readiness`
+
 - 実行統制が機能しているかを決める
 
 5. `Validation Approval`
+
 - できたと主張する根拠が揃っているかを決める
 
 6. `Release Readiness`
+
 - 本番移行と運用受け入れを許可するかを決める
 
 7. `Closure Review`
+
 - 学習と残課題処理を確認して閉じる
 
 ## Artifact Strategy

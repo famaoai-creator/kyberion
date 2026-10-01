@@ -52,16 +52,6 @@ export { Semaphore, llmSemaphore } from './semaphore.js';
 
 // Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
 
-export {
-  JSON_OUTPUT_CONSTRAINTS,
-  JSON_OBJECT_CONSTRAINTS,
-  JSON_ARRAY_CONSTRAINTS,
-  jsonOutputConstraints,
-  VALIDATOR_CHAIN_PATTERN,
-} from './reasoning/prompt-constraints.js';
-
-export type { ValidatorName } from './reasoning/prompt-constraints.js';
-
 // BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
 
 export {

@@ -39,6 +39,10 @@ const COMPLIANT_REPLY = [
   APPROVAL_BLOCK,
 ].join('\n\n');
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('surface approval wiring with the real intent and routing contracts', () => {
   beforeEach(() => {
     vi.resetModules();

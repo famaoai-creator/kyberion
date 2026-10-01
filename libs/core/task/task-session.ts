@@ -47,6 +47,12 @@ import {
 } from '../external-service-registry.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  findIntentPhrase,
+  intentPhraseFlags,
+  intentPhraseSource,
+  matchesIntentPhrase,
+} from '../intent/intent-phrase-lexicon.js';
 
 export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
 
@@ -623,18 +629,24 @@ function derivePresentationThemeHint(deckPurpose?: unknown): string {
   }
 }
 
+function deriveSlideCountHint(trimmed: string): number | undefined {
+  const unitConcept = 'presentation.slide_count_unit';
+  const slideCount = trimmed.match(
+    new RegExp(`(\\d+)\\s*${intentPhraseSource(unitConcept)}`, intentPhraseFlags(unitConcept))
+  );
+  return slideCount ? Number(slideCount[1] || 0) : undefined;
+}
+
 function deriveScheduleCoordinationMode(trimmed: string): string {
-  if (/(リスケ|resched|reschedule)/i.test(trimmed)) return 'reschedule';
-  if (/(変更|修正|直し|adjust|調整)/i.test(trimmed)) return 'adjust';
+  if (matchesIntentPhrase(trimmed, 'schedule_coordination.mode_reschedule')) return 'reschedule';
+  if (matchesIntentPhrase(trimmed, 'schedule_coordination.mode_adjust')) return 'adjust';
   return 'coordinate';
 }
 
 function isMeetingScheduleCoordination(trimmed: string): boolean {
   return (
-    /(会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call)/i.test(trimmed) &&
-    /(?:スケジュール|予定|日程|リスケ|resched|reschedule|calendar|カレンダー|調整|変更|空き時間|availability)/i.test(
-      trimmed
-    )
+    matchesIntentPhrase(trimmed, 'schedule_coordination.meeting_topic') &&
+    matchesIntentPhrase(trimmed, 'coordination.schedule_request')
   );
 }
 
@@ -644,9 +656,8 @@ function deriveScheduleCoordinationLeafIntent(trimmed: string): string | undefin
 }
 
 function deriveScheduleCalendarHint(trimmed: string): string {
-  if (/(Outlook|Microsoft 365|Microsoft|Teams)/i.test(trimmed)) return 'outlook_calendar';
-  if (/(Google Calendar|Googleカレンダー|calendar\.google\.com|Google)/i.test(trimmed))
-    return 'google_calendar';
+  if (matchesIntentPhrase(trimmed, 'calendar_source.outlook')) return 'outlook_calendar';
+  if (matchesIntentPhrase(trimmed, 'calendar_source.google')) return 'google_calendar';
   return 'browser_calendar';
 }
 
@@ -663,18 +674,15 @@ type BookingCategory =
   | 'package';
 
 function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
-  if (/(ホテル|宿泊|温泉|宿|沖縄|旅行)/i.test(trimmed)) return 'hotel';
-  if (/(レストラン|飲食|居酒屋|寿司|焼肉|ランチ|ディナー|食事|ご飯)/i.test(trimmed))
-    return 'restaurant';
-  if (/(体験|チケット|イベント|アクティビティ|遊び|観光)/i.test(trimmed)) return 'activity';
-  if (/(買って|購入|日用品|shopping|買い物|まとめて買|通販|amazon|楽天)/i.test(trimmed))
-    return 'shopping';
-  if (/(病院|歯医者|クリニック|診療|健診|受診|予約)/i.test(trimmed)) return 'medical';
-  if (/(サブスク|解約|更新|退会|定期)/i.test(trimmed)) return 'subscription';
-  if (/(家事代行|修理|配送|設置|片付け|清掃|水道|電気|引越し)/i.test(trimmed))
-    return 'home_service';
-  if (/(家族|子ども|子供|送迎|学校|習い事|保育)/i.test(trimmed)) return 'family';
-  if (/(ギフト|プレゼント|誕生日|記念日|花|贈り物)/i.test(trimmed)) return 'gifts';
+  if (matchesIntentPhrase(trimmed, 'booking_category.hotel')) return 'hotel';
+  if (matchesIntentPhrase(trimmed, 'booking_category.restaurant')) return 'restaurant';
+  if (matchesIntentPhrase(trimmed, 'booking_category.activity')) return 'activity';
+  if (matchesIntentPhrase(trimmed, 'booking_category.shopping')) return 'shopping';
+  if (matchesIntentPhrase(trimmed, 'booking_category.medical')) return 'medical';
+  if (matchesIntentPhrase(trimmed, 'booking_category.subscription')) return 'subscription';
+  if (matchesIntentPhrase(trimmed, 'booking_category.home_service')) return 'home_service';
+  if (matchesIntentPhrase(trimmed, 'booking_category.family')) return 'family';
+  if (matchesIntentPhrase(trimmed, 'booking_category.gifts')) return 'gifts';
   return 'default';
 }
 
@@ -761,7 +769,7 @@ registerTaskIntentBuilder('inspect-service', (trimmed, resolvedPacket) => {
     payload: {
       ...(base.payload || {}),
       service_name: serviceMatch,
-      log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
+      log_tail_lines: matchesIntentPhrase(trimmed, 'service.log_request') ? 100 : undefined,
     },
   };
   const approvalApplied = applyApprovalPolicy(
@@ -889,9 +897,7 @@ registerTaskIntentBuilder('generate-presentation', (trimmed) => {
     ...base,
     payload: {
       ...(base.payload || {}),
-      slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
-        ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
-        : undefined,
+      slide_count_hint: deriveSlideCountHint(trimmed),
       theme_hint: derivePresentationThemeHint(base.payload?.deck_purpose),
     },
   };
@@ -924,12 +930,12 @@ registerTaskIntentBuilder('schedule-coordination', (trimmed) => {
 
 registerTaskIntentBuilder('resolve-approval', (trimmed) => {
   const base = buildPolicyBackedIntent('resolve-approval', trimmed);
-  const decisionMatch = trimmed.match(/(承認|却下|可決|否決|approve|reject)/i);
+  const decisionWord = findIntentPhrase(trimmed, 'approval.decision_word');
   let decision: 'approved' | 'rejected' | undefined = undefined;
-  if (decisionMatch) {
-    const val = decisionMatch[1].toLowerCase();
-    if (/(承認|可決|approve)/i.test(val)) decision = 'approved';
-    else if (/(却下|否決|reject)/i.test(val)) decision = 'rejected';
+  if (decisionWord) {
+    const val = decisionWord.toLowerCase();
+    if (matchesIntentPhrase(val, 'approval.decision_approve')) decision = 'approved';
+    else if (matchesIntentPhrase(val, 'approval.decision_reject')) decision = 'rejected';
   }
   const idMatch =
     trimmed.match(/(?:REQ|req|id|ID|案件|番号)-?(\d+)/i) || trimmed.match(/([A-Z0-9]{8,10})/i);

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import type { AudioChunk } from '../meeting/meeting-session-types.js';
 import { pathResolver } from '../path-resolver.js';
 import { logger } from '../core.js';
+import { t } from '../t.js';
 import { createVirtualAudioInputRecordingBridge } from '../virtual/virtual-audio-input-recording-bridge.js';
 import { createVirtualDeviceInventoryBridge } from '../virtual/virtual-device-inventory-bridge.js';
 import {
@@ -163,16 +164,16 @@ async function prepareRecording(
   displayHoldMs: number
 ): Promise<void> {
   if (!promptText) return;
-  logger.info(`[VOICE] 📖 読み上げる文章:\n「${promptText}」`);
+  logger.info(`[VOICE] 📖 ${t('voice:recorder_prompt_text', { text: promptText })}`);
   if (displayHoldMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, displayHoldMs));
   }
   const seconds = Math.max(0, Math.floor(countdownSec));
   for (let remaining = seconds; remaining > 0; remaining -= 1) {
-    logger.info(`[VOICE] 🎙️ マイク ON まで ${remaining} 秒...`);
+    logger.info(`[VOICE] 🎙️ ${t('voice:recorder_countdown', { seconds: remaining })}`);
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  logger.info(`[VOICE] 🔴 録音開始。次の文章をそのまま読み上げてください:\n「${promptText}」`);
+  logger.info(`[VOICE] 🔴 ${t('voice:recorder_start', { text: promptText })}`);
 }
 
 function interpolateCommand(template: string, values: Record<string, string>): string {

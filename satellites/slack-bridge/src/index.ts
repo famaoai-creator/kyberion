@@ -7,6 +7,7 @@ import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 installProcessGuards('slack-bridge');
 import { logger } from '@agent/core/core';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { appendStimulus } from '@agent/core/stimuli-journal';
 import {
   emitChannelSurfaceEvent,
@@ -95,6 +96,9 @@ import {
 import {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
+  answerSlackTeamChannelCommand,
+  issueSlackThreadMission,
+  slackTextConfirmer,
   evaluateSlackChannelActorAccess,
   isSlackOwnerOnboardingActor,
   slackBotParticipatesInThread,
@@ -104,6 +108,7 @@ import {
 export {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
+  handleSlackTeamChannelCommand,
   evaluateSlackChannelActorAccess,
   isSlackOwnerOnboardingActor,
   slackBotParticipatesInThread,
@@ -303,7 +308,6 @@ export function runSlackChannelTurn(
     ({ threadContext }) =>
       runSurfaceMessageConversation({
         surface: 'slack',
-        locale: resolveOperatorLocale(),
         text: request.text,
         channel: request.channel,
         threadTs: request.threadTs,
@@ -681,376 +685,258 @@ async function start(_args: string[] = []) {
   outboxTimer.unref?.();
 
   // 1. Listen for messages
-  app.message(async ({ message, client }) => {
-    // Only process text messages (ignore edits, deletes, etc. for now)
-    if (!('text' in message) || !message.text) return;
-    if (message.subtype) return; // Ignore bot messages or other subtypes
-    const threadTs =
-      'thread_ts' in message && typeof message.thread_ts === 'string'
-        ? message.thread_ts
-        : message.ts;
-    const team = 'team' in message && typeof message.team === 'string' ? message.team : undefined;
-    const channelType =
-      'channel_type' in message && typeof message.channel_type === 'string'
-        ? message.channel_type
-        : undefined;
-    const artifact = prepareSlackSurfaceArtifact({
-      user: message.user,
-      text: message.text,
-      channel: message.channel,
-      ts: message.ts,
-      threadTs,
-      team,
-      channelType,
-    });
-
-    // E2E-06: bound customer channels run in customer mode BEFORE any operator
-    // processing — customers must never reach the operator brain.
-    const customerBinding = resolveCustomerBinding('slack', message.channel);
-    if (customerBinding) {
-      try {
-        const conversation = await runCustomerConversation({
-          binding: customerBinding,
+  app.message(async ({ message, client }) =>
+    // IT-02: replies follow the language the user wrote in (explicit locale still wins).
+    runWithReplyLocale(
+      deriveReplyLocale({ text: 'text' in message ? message.text : undefined }),
+      async () => {
+        // Only process text messages (ignore edits, deletes, etc. for now)
+        if (!('text' in message) || !message.text) return;
+        if (message.subtype) return; // Ignore bot messages or other subtypes
+        const threadTs =
+          'thread_ts' in message && typeof message.thread_ts === 'string'
+            ? message.thread_ts
+            : message.ts;
+        const team =
+          'team' in message && typeof message.team === 'string' ? message.team : undefined;
+        const channelType =
+          'channel_type' in message && typeof message.channel_type === 'string'
+            ? message.channel_type
+            : undefined;
+        const artifact = prepareSlackSurfaceArtifact({
+          user: message.user,
           text: message.text,
-          actorId: message.user,
-          threadTs,
-          correlationId: `slack-${message.ts}`,
-        });
-        if (conversation.text) {
-          await postSlackText(client, {
-            channel: message.channel,
-            thread_ts: threadTs,
-            text: conversation.text,
-          });
-        }
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        logger.error(`❌ [SlackBridge] Customer conversation failed: ${detail}`);
-        await postBridgeError({
-          conversationKey: `slack-customer:${message.channel}:${threadTs}`,
-          err,
-          surface: 'slack',
-          locale: customerBinding.binding.language || 'ja',
-          post: (text) =>
-            postSlackText(client, { channel: message.channel, thread_ts: threadTs, text }),
-        });
-      }
-      return;
-    }
-
-    const { policy: channelPolicy, access } = evaluateSlackChannelActorAccess(
-      message.channel,
-      message.user || ''
-    );
-    if (!access.allowed) {
-      logger.warn(
-        `[SlackBridge] Ignored unauthorized message from sender: ${message.user || 'unknown'} (${access.reason}, mode=${channelPolicy.mode})`
-      );
-      return;
-    }
-    const botUserId = channelPolicy.rules.requireMention ? await resolveBotUserId() : undefined;
-    const engagement = await decideChannelEngagement(channelPolicy, {
-      text: message.text,
-      agentUserId: botUserId,
-      isThreadReply: threadTs !== message.ts,
-      agentParticipatesInThread: () =>
-        slackBotParticipatesInThread(client, message.channel, threadTs, botUserId),
-    });
-    if (!engagement.respond) return;
-    const channelSpeaker = access.speaker;
-    const messageText = engagement.text;
-    if (!messageText) return;
-
-    try {
-      const approvalReply = resolveSlackApprovalText({
-        channel: message.channel,
-        threadTs,
-        text: messageText,
-        actorId: message.user || 'unknown',
-        channelPolicy,
-        ...(channelSpeaker ? { channelSpeaker } : {}),
-      });
-      if (approvalReply !== null) {
-        await postSlackText(client, {
           channel: message.channel,
-          thread_ts: threadTs,
-          text: approvalReply,
-        });
-        return;
-      }
-    } catch (err) {
-      logger.error(`❌ [SlackBridge] Approval reply handling failed: ${errorDetail(err)}`);
-      return;
-    }
-
-    // 3. Physical Ingestion (Evidence-as-State)
-    try {
-      logger.info(
-        `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
-      );
-      recordSlackSurfaceArtifact(artifact);
-      // SB-02: written as the journal's store-writer role (infrastructure_sentinel),
-      // so the append keeps working inside any other in-process assumption.
-      appendStimulus(artifact.stimulus);
-
-      const initialized = isEnvironmentInitialized();
-      // Operator onboarding shapes the owner's identity: never from a team channel.
-      if (!initialized && channelPolicy.mode !== 'owner_direct') {
-        logger.warn(
-          `[SlackBridge] Workspace not initialized — team channel ${message.channel} stays silent | complete onboarding in the owner channel`
-        );
-        return;
-      }
-
-      if (artifact.shouldAck || !initialized) {
-        await client.chat.postMessage({
-          channel: message.channel,
-          thread_ts: threadTs,
-          text: initialized
-            ? artifact.ackText
-            : 'Received. This workspace is not initialized yet, so I will switch to onboarding mode.',
-        });
-      }
-
-      if (!initialized) {
-        const onboarding = handleSlackOnboardingTurn({
-          channel: message.channel,
+          ts: message.ts,
           threadTs,
-          text: messageText,
+          team,
+          channelType,
         });
 
-        const response = await postOnboardingReply(
-          client,
-          message.channel,
-          threadTs,
-          onboarding.replyText,
-          onboarding.completed
-        );
-        recordSlackDelivery(
-          artifact.correlationId,
-          message.channel,
-          threadTs,
-          response.ts,
-          'system'
-        );
-        return;
-      }
-
-      const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
-      const mayDecideProposal = () =>
-        evaluateChannelApprovalAuthority(channelPolicy, message.user || '', {
-          ...(channelSpeaker ? { speaker: channelSpeaker } : {}),
-        }).allowed;
-      const isProposalDecision =
-        pendingMissionProposal &&
-        (isSlackMissionRejection(messageText) || isSlackMissionConfirmation(messageText));
-      // Confirming or cancelling a mission proposal is approval-class: team
-      // channels need an approver.
-      if (isProposalDecision && !mayDecideProposal()) {
-        await postSlackText(client, {
-          channel: message.channel,
-          thread_ts: threadTs,
-          text: t('bridge:mission_proposal_not_authorized', undefined, resolveOperatorLocale()),
-        });
-        return;
-      }
-      if (pendingMissionProposal && isSlackMissionRejection(messageText)) {
-        clearSlackMissionProposalState(message.channel, threadTs);
-        const response = await client.chat.postMessage({
-          channel: message.channel,
-          thread_ts: threadTs,
-          text: t('bridge:mission_proposal_cancelled', undefined, resolveOperatorLocale()),
-        });
-        recordSlackDelivery(
-          artifact.correlationId,
-          message.channel,
-          threadTs,
-          response.ts,
-          'system'
-        );
-        return;
-      }
-      if (pendingMissionProposal && isSlackMissionConfirmation(messageText)) {
-        const issued = await issueSlackMissionFromProposal({
-          channel: message.channel,
-          threadTs,
-          proposal: pendingMissionProposal.proposal,
-          sourceText: pendingMissionProposal.sourceText,
-          routingDecision: pendingMissionProposal.routingDecision,
-        });
-        clearSlackMissionProposalState(message.channel, threadTs);
-        const response = await client.chat.postMessage({
-          channel: message.channel,
-          thread_ts: threadTs,
-          text: formatSlackMissionIssuedReply(issued),
-        });
-        recordSlackDelivery(
-          artifact.correlationId,
-          message.channel,
-          threadTs,
-          response.ts,
-          'system'
-        );
-        return;
-      }
-
-      const forcedReceiver = deriveSlackDelegationReceiver(messageText);
-      const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
-      await reflectSlackPresence({
-        status: 'thinking',
-        expression: 'thinking',
-        subtitle: 'Slack Surface is preparing a reply.',
-        transcript: [{ speaker: 'Slack User', text: messageText }],
-      });
-      const channelAdapter: ChannelAdapter = {
-        channel: 'slack',
-        actorId: message.user,
-        threadContext: () =>
-          collectSlackThreadContext(client, message.channel, threadTs, message.ts),
-        typing: () => createSlackTypingHandle(client, message.channel, message.ts),
-        shouldSend: ({ result }) =>
-          !result.missionProposals?.length && result.approvalRequests.length === 0,
-        send: async ({ text }) => {
-          const response = await postSlackText(client, {
-            channel: message.channel,
-            thread_ts: threadTs,
-            text,
-          });
-          if (!response) throw new Error('Slack delivery returned no response.');
-          recordSlackDelivery(
-            artifact.correlationId,
-            message.channel,
-            threadTs,
-            response.ts,
-            route
-          );
-        },
-      };
-      // The `'text' in message` narrowing above is lost inside the afterTurn
-      // closure under the per-package strict tsconfig; capture the text once.
-      const sourceText = messageText;
-      await runSlackChannelTurn(
-        channelAdapter,
-        {
-          text: sourceText,
-          channel: message.channel,
-          threadTs,
-          correlationId: artifact.correlationId,
-          receivedAt: message.ts,
-          actorId: message.user,
-          forcedReceiver,
-          metadata: {
-            user: message.user,
-            team,
-            channelType,
-            channel_mode: channelPolicy.mode,
-            ...(channelSpeaker?.principalId
-              ? { speaker_principal: channelSpeaker.principalId, speaker_role: channelSpeaker.role }
-              : {}),
-          },
-          channelPolicy,
-          ...(channelSpeaker ? { channelSpeaker } : {}),
-        },
-        {
-          // UX-02: the 👀 typing reaction must outlive the proposal and
-          // approval envelopes this bridge posts itself — stopping typing
-          // in runChannelTurn would clear it while work is still pending.
-          afterTurn: async (conversation) => {
-            // Team Channel P1: ask-only speakers (viewers, unregistered guests)
-            // never open missions or approval requests.
-            const requestsWork =
-              conversation.approvalRequests.length > 0 ||
-              (conversation.missionProposals?.length ?? 0) > 0;
-            if (requestsWork && channelSpeaker && !speakerCan(channelSpeaker, 'request_work')) {
+        // E2E-06: bound customer channels run in customer mode BEFORE any operator
+        // processing — customers must never reach the operator brain.
+        const customerBinding = resolveCustomerBinding('slack', message.channel);
+        if (customerBinding) {
+          try {
+            const conversation = await runCustomerConversation({
+              binding: customerBinding,
+              text: message.text,
+              actorId: message.user,
+              threadTs,
+              correlationId: `slack-${message.ts}`,
+            });
+            if (conversation.text) {
               await postSlackText(client, {
                 channel: message.channel,
                 thread_ts: threadTs,
-                text: t('bridge:work_request_not_authorized', undefined, resolveOperatorLocale()),
+                text: conversation.text,
               });
-              return;
             }
-            if (conversation.approvalRequests.length > 0) {
-              await reflectSlackPresence({
-                status: 'thinking',
-                expression: 'listening',
-                subtitle: 'Slack Surface is waiting for approval.',
-                transcript: [
-                  {
-                    speaker: 'Slack Surface',
-                    text:
-                      conversation.text ||
-                      t('bridge:approval_required_fallback', undefined, resolveOperatorLocale()),
-                  },
-                ],
-              });
-              recordSlackConversationOutcome({
-                correlationId: artifact.correlationId,
-                channel: message.channel,
-                threadTs,
-                sourceText,
-                route,
-                outcome: 'approval_request',
-                approvalCount: conversation.approvalRequests.length,
-                missionProposalCount: conversation.missionProposals?.length || 0,
-              });
-              for (const approval of conversation.approvalRequests) {
-                await postApprovalRequest(client, {
-                  channel: message.channel,
-                  threadTs,
-                  correlationId: artifact.correlationId,
-                  requestedBy: SLACK_SURFACE_AGENT_ID,
-                  draft: approval,
-                  sourceText,
-                  intentResolution: conversation.intentResolution,
-                });
-              }
-              return;
-            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error(`❌ [SlackBridge] Customer conversation failed: ${detail}`);
+            await postBridgeError({
+              conversationKey: `slack-customer:${message.channel}:${threadTs}`,
+              err,
+              surface: 'slack',
+              locale: customerBinding.binding.language || 'ja',
+              post: (text) =>
+                postSlackText(client, { channel: message.channel, thread_ts: threadTs, text }),
+            });
+          }
+          return;
+        }
 
-            if (conversation.missionProposals && conversation.missionProposals.length > 0) {
-              const proposal = conversation.missionProposals[0];
-              await reflectSlackPresence({
-                status: 'speaking',
-                expression: 'thinking',
-                subtitle: conversation.text || 'Slack Surface prepared a mission proposal.',
-                transcript: [
-                  {
-                    speaker: 'Slack Surface',
-                    text: conversation.text || 'I can turn this into a mission.',
-                  },
-                ],
-              });
-              recordSlackConversationOutcome({
-                correlationId: artifact.correlationId,
-                channel: message.channel,
-                threadTs,
-                sourceText,
-                route,
-                outcome: 'mission_proposal',
-                approvalCount: conversation.approvalRequests.length,
-                missionProposalCount: conversation.missionProposals.length,
-              });
-              saveSlackMissionProposalState({
-                channel: message.channel,
-                threadTs,
-                proposal,
-                sourceText,
-                routingDecision: conversation.routingDecision,
-              });
-              const response = await postSlackTextWithBlocks(client, {
+        const { policy: channelPolicy, access } = evaluateSlackChannelActorAccess(
+          message.channel,
+          message.user || ''
+        );
+        if (!access.allowed) {
+          logger.warn(
+            `[SlackBridge] Ignored unauthorized message from sender: ${message.user || 'unknown'} (${access.reason}, mode=${channelPolicy.mode})`
+          );
+          return;
+        }
+        const botUserId = channelPolicy.rules.requireMention ? await resolveBotUserId() : undefined;
+        const engagement = await decideChannelEngagement(channelPolicy, {
+          text: message.text,
+          agentUserId: botUserId,
+          isThreadReply: threadTs !== message.ts,
+          agentParticipatesInThread: () =>
+            slackBotParticipatesInThread(client, message.channel, threadTs, botUserId),
+        });
+        if (!engagement.respond) return;
+        const channelSpeaker = access.speaker;
+        const messageText = engagement.text;
+        if (!messageText) return;
+
+        // Team Channel P2: thread commands are answered before approvals or the model.
+        const commandParams = { policy: channelPolicy, speaker: channelSpeaker, threadTs };
+        const postReply = (text: string) =>
+          postSlackText(client, { channel: message.channel, thread_ts: threadTs, text });
+        if (await answerSlackTeamChannelCommand({ ...commandParams, text: messageText }, postReply))
+          return;
+
+        try {
+          const approvalReply = resolveSlackApprovalText({
+            channel: message.channel,
+            threadTs,
+            text: messageText,
+            actorId: message.user || 'unknown',
+            channelPolicy,
+            ...(channelSpeaker ? { channelSpeaker } : {}),
+          });
+          if (approvalReply !== null) {
+            await postSlackText(client, {
+              channel: message.channel,
+              thread_ts: threadTs,
+              text: approvalReply,
+            });
+            return;
+          }
+        } catch (err) {
+          logger.error(`❌ [SlackBridge] Approval reply handling failed: ${errorDetail(err)}`);
+          return;
+        }
+
+        // 3. Physical Ingestion (Evidence-as-State)
+        try {
+          logger.info(
+            `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
+          );
+          recordSlackSurfaceArtifact(artifact);
+          // SB-02: written as the journal's store-writer role (infrastructure_sentinel),
+          // so the append keeps working inside any other in-process assumption.
+          appendStimulus(artifact.stimulus);
+
+          const initialized = isEnvironmentInitialized();
+          // Operator onboarding shapes the owner's identity: never from a team channel.
+          if (!initialized && channelPolicy.mode !== 'owner_direct') {
+            logger.warn(
+              `[SlackBridge] Workspace not initialized — team channel ${message.channel} stays silent | complete onboarding in the owner channel`
+            );
+            return;
+          }
+
+          if (artifact.shouldAck || !initialized) {
+            await client.chat.postMessage({
+              channel: message.channel,
+              thread_ts: threadTs,
+              text: initialized
+                ? artifact.ackText
+                : 'Received. This workspace is not initialized yet, so I will switch to onboarding mode.',
+            });
+          }
+
+          if (!initialized) {
+            const onboarding = handleSlackOnboardingTurn({
+              channel: message.channel,
+              threadTs,
+              text: messageText,
+            });
+
+            const response = await postOnboardingReply(
+              client,
+              message.channel,
+              threadTs,
+              onboarding.replyText,
+              onboarding.completed
+            );
+            recordSlackDelivery(
+              artifact.correlationId,
+              message.channel,
+              threadTs,
+              response.ts,
+              'system'
+            );
+            return;
+          }
+
+          const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
+          const mayDecideProposal = () =>
+            evaluateChannelApprovalAuthority(channelPolicy, message.user || '', {
+              ...(channelSpeaker ? { speaker: channelSpeaker } : {}),
+            }).allowed;
+          const isProposalDecision =
+            pendingMissionProposal &&
+            (isSlackMissionRejection(messageText) || isSlackMissionConfirmation(messageText));
+          // Confirming or cancelling a mission proposal is approval-class: team
+          // channels need an approver.
+          if (isProposalDecision && !mayDecideProposal()) {
+            await postSlackText(client, {
+              channel: message.channel,
+              thread_ts: threadTs,
+              text: t('bridge:mission_proposal_not_authorized', undefined, resolveOperatorLocale()),
+            });
+            return;
+          }
+          if (pendingMissionProposal && isSlackMissionRejection(messageText)) {
+            clearSlackMissionProposalState(message.channel, threadTs);
+            const response = await client.chat.postMessage({
+              channel: message.channel,
+              thread_ts: threadTs,
+              text: t('bridge:mission_proposal_cancelled', undefined, resolveOperatorLocale()),
+            });
+            recordSlackDelivery(
+              artifact.correlationId,
+              message.channel,
+              threadTs,
+              response.ts,
+              'system'
+            );
+            return;
+          }
+          if (pendingMissionProposal && isSlackMissionConfirmation(messageText)) {
+            const confirmedBy = slackTextConfirmer(
+              channelPolicy,
+              message.user || '',
+              channelSpeaker
+            );
+            const issued = await issueSlackThreadMission(
+              message.channel,
+              threadTs,
+              pendingMissionProposal,
+              confirmedBy
+            );
+            clearSlackMissionProposalState(message.channel, threadTs);
+            const response = await client.chat.postMessage({
+              channel: message.channel,
+              thread_ts: threadTs,
+              text: formatSlackMissionIssuedReply(issued),
+            });
+            recordSlackDelivery(
+              artifact.correlationId,
+              message.channel,
+              threadTs,
+              response.ts,
+              'system'
+            );
+            return;
+          }
+
+          const forcedReceiver = deriveSlackDelegationReceiver(messageText);
+          const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
+          await reflectSlackPresence({
+            status: 'thinking',
+            expression: 'thinking',
+            subtitle: 'Slack Surface is preparing a reply.',
+            transcript: [{ speaker: 'Slack User', text: messageText }],
+          });
+          const channelAdapter: ChannelAdapter = {
+            channel: 'slack',
+            actorId: message.user,
+            threadContext: () =>
+              collectSlackThreadContext(client, message.channel, threadTs, message.ts),
+            typing: () => createSlackTypingHandle(client, message.channel, message.ts),
+            shouldSend: ({ result }) =>
+              !result.missionProposals?.length && result.approvalRequests.length === 0,
+            send: async ({ text }) => {
+              const response = await postSlackText(client, {
                 channel: message.channel,
                 thread_ts: threadTs,
-                text: slackMissionProposalFallbackText(
-                  proposal,
-                  conversation.intentResolution,
-                  resolveOperatorLocale()
-                ),
-                blocks: buildSlackMissionProposalBlocks(
-                  proposal,
-                  conversation.intentResolution,
-                  resolveOperatorLocale()
-                ),
+                text,
               });
+              if (!response) throw new Error('Slack delivery returned no response.');
               recordSlackDelivery(
                 artifact.correlationId,
                 message.channel,
@@ -1058,63 +944,210 @@ async function start(_args: string[] = []) {
                 response.ts,
                 route
               );
-              return;
-            }
-
-            // Match the shared delivery gate in channel-adapter: a whitespace-only
-            // reply is silence, so it must take the empty-reply path.
-            if (conversation.text.trim()) {
-              await reflectSlackPresence({
-                status: 'speaking',
-                expression: 'joy',
-                subtitle: conversation.text,
-                transcript: [{ speaker: 'Slack Surface', text: conversation.text }],
-              });
-              recordSlackConversationOutcome({
-                correlationId: artifact.correlationId,
-                channel: message.channel,
-                threadTs,
-                sourceText,
-                route,
-                outcome: 'plain_reply',
-                approvalCount: conversation.approvalRequests.length,
-                missionProposalCount: conversation.missionProposals?.length || 0,
-              });
-              return;
-            }
-
-            recordSlackConversationOutcome({
-              correlationId: artifact.correlationId,
+            },
+          };
+          // The `'text' in message` narrowing above is lost inside the afterTurn
+          // closure under the per-package strict tsconfig; capture the text once.
+          const sourceText = messageText;
+          await runSlackChannelTurn(
+            channelAdapter,
+            {
+              text: sourceText,
               channel: message.channel,
               threadTs,
-              sourceText,
-              route,
-              outcome: 'empty_reply',
-              approvalCount: conversation.approvalRequests.length,
-              missionProposalCount: conversation.missionProposals?.length || 0,
-            });
-            // UX-01: an empty agent reply must not read as silence.
-            await postSlackText(client, {
-              channel: message.channel,
-              thread_ts: threadTs,
-              text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }),
-            });
-          },
+              correlationId: artifact.correlationId,
+              receivedAt: message.ts,
+              actorId: message.user,
+              forcedReceiver,
+              metadata: {
+                user: message.user,
+                team,
+                channelType,
+                channel_mode: channelPolicy.mode,
+                ...(channelSpeaker?.principalId
+                  ? {
+                      speaker_principal: channelSpeaker.principalId,
+                      speaker_role: channelSpeaker.role,
+                    }
+                  : {}),
+              },
+              channelPolicy,
+              ...(channelSpeaker ? { channelSpeaker } : {}),
+            },
+            {
+              // UX-02: the 👀 typing reaction must outlive the proposal and
+              // approval envelopes this bridge posts itself — stopping typing
+              // in runChannelTurn would clear it while work is still pending.
+              afterTurn: async (conversation) => {
+                // Team Channel P1: ask-only speakers (viewers, unregistered guests)
+                // never open missions or approval requests.
+                const requestsWork =
+                  conversation.approvalRequests.length > 0 ||
+                  (conversation.missionProposals?.length ?? 0) > 0;
+                if (requestsWork && channelSpeaker && !speakerCan(channelSpeaker, 'request_work')) {
+                  await postSlackText(client, {
+                    channel: message.channel,
+                    thread_ts: threadTs,
+                    text: t(
+                      'bridge:work_request_not_authorized',
+                      undefined,
+                      resolveOperatorLocale()
+                    ),
+                  });
+                  return;
+                }
+                if (conversation.approvalRequests.length > 0) {
+                  await reflectSlackPresence({
+                    status: 'thinking',
+                    expression: 'listening',
+                    subtitle: 'Slack Surface is waiting for approval.',
+                    transcript: [
+                      {
+                        speaker: 'Slack Surface',
+                        text:
+                          conversation.text ||
+                          t(
+                            'bridge:approval_required_fallback',
+                            undefined,
+                            resolveOperatorLocale()
+                          ),
+                      },
+                    ],
+                  });
+                  recordSlackConversationOutcome({
+                    correlationId: artifact.correlationId,
+                    channel: message.channel,
+                    threadTs,
+                    sourceText,
+                    route,
+                    outcome: 'approval_request',
+                    approvalCount: conversation.approvalRequests.length,
+                    missionProposalCount: conversation.missionProposals?.length || 0,
+                  });
+                  for (const approval of conversation.approvalRequests) {
+                    await postApprovalRequest(client, {
+                      channel: message.channel,
+                      threadTs,
+                      correlationId: artifact.correlationId,
+                      requestedBy: SLACK_SURFACE_AGENT_ID,
+                      draft: approval,
+                      sourceText,
+                      intentResolution: conversation.intentResolution,
+                    });
+                  }
+                  return;
+                }
+
+                if (conversation.missionProposals && conversation.missionProposals.length > 0) {
+                  const proposal = conversation.missionProposals[0];
+                  await reflectSlackPresence({
+                    status: 'speaking',
+                    expression: 'thinking',
+                    subtitle: conversation.text || 'Slack Surface prepared a mission proposal.',
+                    transcript: [
+                      {
+                        speaker: 'Slack Surface',
+                        text: conversation.text || 'I can turn this into a mission.',
+                      },
+                    ],
+                  });
+                  recordSlackConversationOutcome({
+                    correlationId: artifact.correlationId,
+                    channel: message.channel,
+                    threadTs,
+                    sourceText,
+                    route,
+                    outcome: 'mission_proposal',
+                    approvalCount: conversation.approvalRequests.length,
+                    missionProposalCount: conversation.missionProposals.length,
+                  });
+                  saveSlackMissionProposalState({
+                    channel: message.channel,
+                    threadTs,
+                    proposal,
+                    sourceText,
+                    routingDecision: conversation.routingDecision,
+                  });
+                  const response = await postSlackTextWithBlocks(client, {
+                    channel: message.channel,
+                    thread_ts: threadTs,
+                    text: slackMissionProposalFallbackText(
+                      proposal,
+                      conversation.intentResolution,
+                      resolveOperatorLocale()
+                    ),
+                    blocks: buildSlackMissionProposalBlocks(
+                      proposal,
+                      conversation.intentResolution,
+                      resolveOperatorLocale()
+                    ),
+                  });
+                  recordSlackDelivery(
+                    artifact.correlationId,
+                    message.channel,
+                    threadTs,
+                    response.ts,
+                    route
+                  );
+                  return;
+                }
+
+                // Match the shared delivery gate in channel-adapter: a whitespace-only
+                // reply is silence, so it must take the empty-reply path.
+                if (conversation.text.trim()) {
+                  await reflectSlackPresence({
+                    status: 'speaking',
+                    expression: 'joy',
+                    subtitle: conversation.text,
+                    transcript: [{ speaker: 'Slack Surface', text: conversation.text }],
+                  });
+                  recordSlackConversationOutcome({
+                    correlationId: artifact.correlationId,
+                    channel: message.channel,
+                    threadTs,
+                    sourceText,
+                    route,
+                    outcome: 'plain_reply',
+                    approvalCount: conversation.approvalRequests.length,
+                    missionProposalCount: conversation.missionProposals?.length || 0,
+                  });
+                  return;
+                }
+
+                recordSlackConversationOutcome({
+                  correlationId: artifact.correlationId,
+                  channel: message.channel,
+                  threadTs,
+                  sourceText,
+                  route,
+                  outcome: 'empty_reply',
+                  approvalCount: conversation.approvalRequests.length,
+                  missionProposalCount: conversation.missionProposals?.length || 0,
+                });
+                // UX-01: an empty agent reply must not read as silence.
+                await postSlackText(client, {
+                  channel: message.channel,
+                  thread_ts: threadTs,
+                  text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }),
+                });
+              },
+            }
+          );
+        } catch (err: unknown) {
+          logger.error(`❌ [SlackBridge] Ingestion failed: ${errorDetail(err)}`);
+          // UX-01: surface a vocabulary-based error to the user (rate-limited per thread).
+          await postBridgeError({
+            conversationKey: `slack:${message.channel}:${threadTs}`,
+            err,
+            surface: 'slack',
+            locale: resolveOperatorLocale(),
+            post: (text) =>
+              postSlackText(client, { channel: message.channel, thread_ts: threadTs, text }),
+          });
         }
-      );
-    } catch (err: unknown) {
-      logger.error(`❌ [SlackBridge] Ingestion failed: ${errorDetail(err)}`);
-      // UX-01: surface a vocabulary-based error to the user (rate-limited per thread).
-      await postBridgeError({
-        conversationKey: `slack:${message.channel}:${threadTs}`,
-        err,
-        surface: 'slack',
-        locale: resolveOperatorLocale(),
-        post: (text) =>
-          postSlackText(client, { channel: message.channel, thread_ts: threadTs, text }),
-      });
-    }
-  });
+      }
+    )
+  );
 
   app.event('reaction_added', async ({ event, client }) => {
     const actorId = readStringAt(event, ['user']);
@@ -1209,10 +1242,13 @@ async function start(_args: string[] = []) {
       await client.chat.postMessage({
         channel: updated.channel,
         thread_ts: updated.threadTs,
-        text:
+        text: t(
           payload.decision === 'approved'
-            ? `Approved by <@${actorId}>: ${updated.title}`
-            : `Rejected by <@${actorId}>: ${updated.title}`,
+            ? 'bridge:approval_action_approved'
+            : 'bridge:approval_action_rejected',
+          { actor: `<@${actorId}>`, title: updated.title },
+          resolveOperatorLocale()
+        ),
       });
       // LC-10 ask-why: one skippable follow-up on rejection. Buttons keep
       // the reply deterministic — no pending-conversation state needed.
@@ -1246,7 +1282,8 @@ async function start(_args: string[] = []) {
       }
       if (!channel || !threadTs)
         throw new Error('Slack mission proposal action is missing channel/thread');
-      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
+      const confirmedBy = await ensureSlackApprovalAuthority(client, channel, threadTs, actorId);
+      if (!confirmedBy) return;
 
       const pending = getSlackMissionProposalState(channel, threadTs);
       if (!pending) {
@@ -1272,13 +1309,7 @@ async function start(_args: string[] = []) {
         return;
       }
 
-      const issued = await issueSlackMissionFromProposal({
-        channel,
-        threadTs,
-        proposal: pending.proposal,
-        sourceText: pending.sourceText,
-        routingDecision: pending.routingDecision,
-      });
+      const issued = await issueSlackThreadMission(channel, threadTs, pending, confirmedBy);
       await client.chat.postMessage({
         channel,
         thread_ts: threadTs,

@@ -334,12 +334,6 @@ export * from './reasoning/reasoning-provider-readiness.js';
 export * from './reasoning/reasoning-failure-taxonomy.js';
 
 export {
-  loadVoiceTaskProfileCatalog,
-  resolveVoiceTaskDistillTargetKind,
-  resolveVoiceTaskProfile,
-} from './voice/voice-task-profile-catalog.js';
-
-export {
   loadMediaToneStyleMapCatalog,
   resolveMediaToneStyle,
 } from './media/media-tone-style-map.js';

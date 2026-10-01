@@ -1,0 +1,353 @@
+{
+  "$schema": "../schemas/orphan-baseline.schema.json",
+  "version": 1,
+  "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
+  "libs_core_modules": [
+    {
+      "id": "libs/core/mesh/acp-mediator-entry.ts",
+      "reason": "Public subpath @agent/core/acp-mediator, listed in docs/PACKAGING_CONTRACT.md (\"Agent runtime and orchestration\") and libs/core/package.json exports: a side-effect bootstrap that imports risky-op-registry so a package-name consumer gets the governed approval handler, then re-exports acp-mediator. Consumed by package name only; in-repo code imports mesh/acp-mediator directly."
+    },
+    {
+      "id": "libs/core/plugin/skill-wrapper.ts",
+      "reason": "Documented extension point: docs/developer/EXTENSION_POINTS.md §2.4 (Skill Format, Beta) declares the runSkill(name, fn) / runAsyncSkill(name, fn) signatures as the contract for external skills, published as @agent/core/skill-wrapper and via the barrel. No in-repo caller imports it; core.test.ts covers it."
+    },
+    {
+      "id": "libs/core/reasoning/judgment-callsite-eval.ts",
+      "reason": "Per-call-site calibration harness (evaluateCallSite / recommendRequireCalibrated), published as @agent/core/judgment-callsite-eval. Run by hand: its caller is the measurement script active/missions/public/JUDGMENT-SEAM-20260921/evidence/eval_callsites.ts (gitignored mission evidence), and the requireCalibrated settings in browser/browser-judgment.ts and knowledge/knowledge-relevance-judgment.ts cite its recommendation. No committed module imports it."
+    },
+    {
+      "id": "libs/core/secret/secret-guard-entry.ts",
+      "reason": "Public subpath @agent/core/secret-guard, listed in docs/PACKAGING_CONTRACT.md (\"Contracts and policy helpers\") and libs/core/package.json exports: registers the risky-op approval handler before re-exporting secret-guard. In-repo callers import @agent/core/secret/secret-guard directly; this entry serves package-name consumers."
+    },
+    {
+      "id": "libs/core/store-contract.ts",
+      "reason": "QM-10 test harness: exerciseJsonRecordStoreContract is the reusable JSON-store contract that libs/core/store-contract.test.ts runs against the approval store and the surface outbox store. Tests are its intended consumers."
+    },
+    {
+      "id": "libs/core/task/task-executor.ts",
+      "reason": "Deprecated facade by design: returns an explicit routing error to legacy callers; declared seam consumer in scripts/generate_capability_seams.ts and asserted by the wisdom contract-boundary test (ORPHAN_DECISIONS OW-02: keep)."
+    },
+    {
+      "id": "libs/core/test-governance-payload.ts",
+      "reason": "Test helper (withoutSchemaMetadata) shared by the governance contract tests; tests are its only intended consumers (ORPHAN_DECISIONS OW-02: keep)."
+    },
+    {
+      "id": "libs/core/tool/tool-actuator-routing.ts",
+      "reason": "Loader for knowledge/product/governance/tool-actuator-routing-policy.json, reserved for the ACP mediator tool routing being built on another branch (ORPHAN_DECISIONS OW-02: keep by instruction); retire with the policy file if that work lands without it."
+    },
+    {
+      "id": "libs/core/voice/voice-workbench.ts",
+      "reason": "EV-07 regression harness: replays tests/fixtures/voice-workbench/*.json through VoiceTurnTakingMachine on a fake clock; its designed consumer is the fixture-replay test (ORPHAN_DECISIONS OW-02: keep)."
+    },
+    {
+      "id": "libs/core/windows-local-assist-bridge.ts",
+      "reason": "Windows (Foundry Local) counterpart of apple-intelligence-bridge, unit-tested. Its natural call site is the doctor local-capability section next to probeAppleIntelligence in scripts/run_doctor.ts, which is owned by another branch; wire it there (opt-in probe, silent off Windows) when that branch lands."
+    }
+  ],
+  "scripts": [],
+  "pipelines": [],
+  "documented_only": [
+    {
+      "id": "pipelines/agent-provider-check.json",
+      "reason": "Operator diagnostic 'Verify AI provider availability' (pipelines/README.md row; intent catalog and scenario coverage docs); run by hand with `pnpm pipeline --input`, nothing schedules or invokes it."
+    },
+    {
+      "id": "pipelines/browser-failure-evidence.json",
+      "reason": "OW-05 example pipeline: the runnable caller of browser:action_trail / export_failure_bundle (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/ce-adoption-validation.json",
+      "reason": "Validation bundle for the claw-empire adoption slice (CE-01..12), run by hand per pipelines/README.md when that slice changes; not a CI gate."
+    },
+    {
+      "id": "pipelines/ceo-strategic-report.json",
+      "reason": "Scenario pipeline documented in docs/SCENARIOS.md and the ADF pipeline strategy/validation reports; run by hand, nothing schedules or invokes it."
+    },
+    {
+      "id": "pipelines/chaos-actuator-down.json",
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (actuator failure → fallback); intentionally not scheduled."
+    },
+    {
+      "id": "pipelines/chaos-network-partition.json",
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (network partition → retry/circuit-breaker); intentionally not scheduled."
+    },
+    {
+      "id": "pipelines/chaos-secret-missing.json",
+      "reason": "Chaos drill run by hand per docs/developer/CHAOS_DRILLS.md (missing secret → secret-guard error path); intentionally not scheduled."
+    },
+    {
+      "id": "pipelines/cloudflare-os-validation.json",
+      "reason": "Validation bundle for the Cloudflare OS control plane (OS-01..15), run by hand per pipelines/README.md when that area changes; not a CI gate."
+    },
+    {
+      "id": "pipelines/generate-design-system-demo.json",
+      "reason": "Diagnostic deck exercising every slide-layout preset (pipelines/README.md); run by hand when the design system changes."
+    },
+    {
+      "id": "pipelines/generate-masterclass-pptx.json",
+      "reason": "Layout sample deck from pipelines/fragments/masterclass_design_protocol.json (pipelines/README.md); run by hand."
+    },
+    {
+      "id": "pipelines/incident-review.json",
+      "reason": "OW-05 example pipeline: the runnable caller of system:list_incidents / sre_analyze (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/inspect-system-hardware.json",
+      "reason": "Operator diagnostic 'Hardware and resource inventory' (pipelines/README.md); run by hand."
+    },
+    {
+      "id": "pipelines/kyberion-autonomous-onboarding.json",
+      "reason": "LLM-drafted organization profile and interview questions (pipelines/README.md 'Onboarding & Provisioning' row); run by hand. `pnpm onboard` runs scripts/onboarding.ts and never loads this pipeline (README corrected 2026-10-01)."
+    },
+    {
+      "id": "pipelines/kyberion-product-intro.json",
+      "reason": "Local narrated product-intro video (pipelines/README.md); scripts/kyberion_product_intro_render.ts renders the same flow directly, the pipeline is the ADF form run by hand."
+    },
+    {
+      "id": "pipelines/media-produce-and-review.json",
+      "reason": "MP-01..07 deck flow (brief → protocol → preflight → render → review → delivery gate) run by hand per pipelines/README.md with --context overrides."
+    },
+    {
+      "id": "pipelines/media-review-fix-validation.json",
+      "reason": "Deterministic media review gate (brief compile + PPTX overflow check) run by hand per pipelines/README.md; not a CI gate."
+    },
+    {
+      "id": "pipelines/meeting-hearing-session.json",
+      "reason": "OW-05 example pipeline: the runnable caller of meeting:hearing_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/meeting-tutor-session.json",
+      "reason": "OW-05 example pipeline: the runnable caller of meeting:tutor_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/mission-team-prewarm.json",
+      "reason": "OW-05 example pipeline: the runnable caller of agent:prewarm_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/mission-team-staff.json",
+      "reason": "OW-05 example pipeline: the runnable caller of agent:staff_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/open-active-surfaces.json",
+      "reason": "Operator convenience: open one browser tab per running UI surface (pipelines/README.md); run by hand."
+    },
+    {
+      "id": "pipelines/orchestration-jobs.json",
+      "reason": "Runs each job in knowledge/product/governance/orchestration-config.json via orchestrator:run_execution_plan_set (pipelines/README.md row); declares no schedule and nothing invokes it, so it runs only by hand (README no longer calls it scheduled, 2026-10-01)."
+    },
+    {
+      "id": "pipelines/platform-onboarding.json",
+      "reason": "Organization-integration artifact flow (discovery transcript → requirements → design → test plan → task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding, then knowledge/product/pipeline-templates/execute-task-plan.json executes the plan."
+    },
+    {
+      "id": "pipelines/project-management-validation.json",
+      "reason": "Validation bundle for project control / mission reassignment, run by hand per pipelines/README.md; not a CI gate."
+    },
+    {
+      "id": "pipelines/qm02-trigger-validation.json",
+      "reason": "Validation bundle for QM-02 trigger unification, run by hand per pipelines/README.md; not a CI gate."
+    },
+    {
+      "id": "pipelines/setup-oauth.json",
+      "reason": "OAuth setup flow run by hand per docs/OAUTH_SETUP.md."
+    },
+    {
+      "id": "pipelines/soak-restart-e2e.json",
+      "reason": "AO-04 soak restart check (boot, kill, resume) run by hand per pipelines/README.md; the scheduled soak-endurance pipelines cover unattended runs."
+    },
+    {
+      "id": "pipelines/source-to-engineering-artifacts.json",
+      "reason": "Source analysis → design doc / test inventory / proposal-only IaC, run by hand per pipelines/README.md and docs/developer/SOURCE_ENGINEERING_ARTIFACTS.ja.md."
+    },
+    {
+      "id": "pipelines/surface-capability-check.json",
+      "reason": "Operator diagnostic for the governed surface capability layer (pipelines/README.md); run by hand."
+    },
+    {
+      "id": "pipelines/terraform-topology-ir.json",
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_to_topology_ir (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/test-inventory-device-pipeline.json",
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:test_inventory_to_device_pipeline (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+    },
+    {
+      "id": "pipelines/trial-narrated-report.json",
+      "reason": "Trial narrated report quickstart (docs/user/USE_CASE_QUICKSTARTS.md and the ADF simplification proposals); run by hand."
+    }
+  ],
+  "actuator_ops": [
+    {
+      "id": "android:capture_runtime_session_handoff",
+      "reason": "Step of its own examples/android-runtime-webview-handoff-template.json (own-actuator files do not count) and of mobile-device-pipeline.schema.json; the name is shared with ios, so bare literals elsewhere cannot be attributed. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "android:llm_decide",
+      "reason": "Generic pipeline step `llm_decide` (also registered by browser, network, system and terminal) that the android runner accepts inside actuator-scoped ADFs; no ADF or android test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make android ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "artifact:list",
+      "reason": "Generic pipeline step `list` (also registered by agent, file, process, secret, terminal and working-memory) that the artifact runner accepts inside actuator-scoped ADFs; no ADF or artifact test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make artifact ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "browser:extract_text_ref",
+      "reason": "Browser v3 surface op (browser-actuator-v3.md, browser-automation-pipeline.schema.json, browser-recording.schema.json): the step handler is in browser-pipeline-helpers.ts and recorded flows compile their text reads to it (browser-execution-substrate-howto.md). It needs a snapshot ref, so no static example ADF can call it; tests only list it in the catalog (browser-phase3.test.ts)."
+    },
+    {
+      "id": "browser:json_query",
+      "reason": "Generic pipeline step `json_query` (also registered by modeling, network, system and wisdom) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "browser:regex_extract",
+      "reason": "Generic pipeline step `regex_extract` (also registered by network, system and wisdom) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "browser:scroll_ref",
+      "reason": "Browser v3 surface op listed in browser-automation-pipeline.schema.json: the step handler is in browser-pipeline-helpers.ts and browser-interaction-helpers.ts records a scroll on a ref target as `scroll_ref`. It needs a snapshot ref, so no static example ADF can call it; tests only list it in the catalog (browser-phase3.test.ts)."
+    },
+    {
+      "id": "code:regex_replace",
+      "reason": "Generic pipeline step `regex_replace` (also registered by file and wisdom) that the code runner accepts inside actuator-scoped ADFs; no ADF or code test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make code ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "file:write_artifact",
+      "reason": "Generic pipeline step `write_artifact` (also registered by code, modeling, network, system and wisdom) that the file runner accepts inside actuator-scoped ADFs; no ADF or file test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make file ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "gemini:log",
+      "reason": "Generic pipeline step `log` (also registered by android, browser, code, ios, media, modeling, network, system and wisdom) that the gemini runner accepts inside actuator-scoped ADFs; no ADF or gemini test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make gemini ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "ios:capture_runtime_session_handoff",
+      "reason": "Step of its own examples/ios-runtime-webview-handoff-template.json (own-actuator files do not count) and of mobile-device-pipeline.schema.json; the name is shared with android, so bare literals elsewhere cannot be attributed. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "media:find_slides_by_owner",
+      "reason": "Bare step of knowledge/product/pipeline-templates/pptx-template-inherit.json; the name is shared with the wisdom forwarding alias, so that bare literal cannot be attributed to media. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "media:log",
+      "reason": "Generic pipeline step `log` (also registered by android, browser, code, gemini, ios, modeling, network, system and wisdom) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "media:pptx_diff",
+      "reason": "Bare step of knowledge/product/pipeline-templates/pptx-template-inherit.json; the name is shared with the wisdom forwarding alias, so that bare literal cannot be attributed to media. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "media:set",
+      "reason": "Generic pipeline step `set` (also registered by android, ios and secret) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "modeling:glob_files",
+      "reason": "Generic pipeline step `glob_files` (also registered by code, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "modeling:if",
+      "reason": "Generic pipeline step `if` (also registered by browser, code, file, network, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "modeling:read_file",
+      "reason": "Generic pipeline step `read_file` (also registered by code, file, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "network:llm_decide",
+      "reason": "Generic pipeline step `llm_decide` (also registered by android, browser, system and terminal) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "network:write_artifact",
+      "reason": "Generic pipeline step `write_artifact` (also registered by code, file, modeling, system and wisdom) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "service:mcp",
+      "reason": "MCP apply op of service-actuator (executeMcp); advertised in the op catalog but no ADF or dispatch test uses it — reachable only through hand-written service ADFs. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:audit_speaker_fairness",
+      "reason": "Forwarding alias wisdom → meeting:audit_speaker_fairness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:audit_speaker_fairness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:conduct_1on1",
+      "reason": "Deprecated spelling of wisdom:conduct_1on_1 (libs/actuators/wisdom-actuator/src/compatibility/legacy-aliases.ts), itself forwarded to meeting:conduct_1on_1; kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:conduct_1on_1",
+      "reason": "Forwarding alias wisdom → meeting:conduct_1on_1 (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:conduct_1on_1. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_architecture_ready",
+      "reason": "Forwarding alias wisdom → modeling:evaluate_architecture_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_architecture_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_customer_signoff",
+      "reason": "Forwarding alias wisdom → modeling:evaluate_customer_signoff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_customer_signoff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_decision_rights_approval",
+      "reason": "Forwarding alias wisdom → approval:evaluate_decision_rights (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use approval:evaluate_decision_rights. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_qa_ready",
+      "reason": "Forwarding alias wisdom → modeling:evaluate_qa_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_qa_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_requirements_completeness",
+      "reason": "Forwarding alias wisdom → modeling:evaluate_requirements_completeness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use modeling:evaluate_requirements_completeness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:evaluate_task_plan_ready",
+      "reason": "Forwarding alias wisdom → orchestrator:evaluate_task_plan_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:evaluate_task_plan_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:execute_task_plan",
+      "reason": "Forwarding alias wisdom → orchestrator:execute_task_plan (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:execute_task_plan. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:extract_action_items",
+      "reason": "Forwarding alias wisdom → meeting:extract_action_items (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:extract_action_items. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:find_slides_by_owner",
+      "reason": "Forwarding alias wisdom → media:find_slides_by_owner (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:find_slides_by_owner. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:generate_facilitation_script",
+      "reason": "Forwarding alias wisdom → meeting:generate_facilitation_script (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_facilitation_script. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:generate_reminder_message",
+      "reason": "Forwarding alias wisdom → meeting:generate_reminder_message (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:generate_reminder_message. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:pptx_diff",
+      "reason": "Forwarding alias wisdom → media:pptx_diff (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use media:pptx_diff. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:propose_tool_calls",
+      "reason": "Agent-callable tool-call proposal op (canonical for the legacy `tool_use` alias) advertised in the op catalog and implemented in decision-ops.ts; only catalog-shape tests reference it. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:react_loop",
+      "reason": "Deprecated alias of wisdom:reasoning_loop (libs/actuators/wisdom-actuator/src/compatibility/legacy-aliases.ts); kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:read_json",
+      "reason": "Forwarding alias wisdom → file:read_json (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:read_json. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:reasoning_loop",
+      "reason": "Agent-callable reasoning loop advertised in the op catalog and implemented in decision-ops.ts; only catalog-shape tests (contract-boundary.test.ts) reference it — no pipeline or dispatch test exercises it yet. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:regex_extract",
+      "reason": "Generic pipeline step `regex_extract` (also registered by browser, network and system) that the wisdom runner accepts inside actuator-scoped ADFs; no ADF or wisdom test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make wisdom ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:task_plan_to_next_tasks",
+      "reason": "Forwarding alias wisdom → orchestrator:task_plan_to_next_tasks (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:task_plan_to_next_tasks. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    },
+    {
+      "id": "wisdom:write_artifact",
+      "reason": "Forwarding alias wisdom → file:write_artifact (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use file:write_artifact. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+    }
+  ]
+}

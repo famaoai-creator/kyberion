@@ -1,3 +1,4 @@
+import { coerceLocale } from '@agent/core/locale-normalize';
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureDiscussionRunning } from '@agent/core/discussion/discussion-engine';
 import {
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
         scope,
         created_by: viewer.principalId ?? viewer.role,
         config: {
-          locale: body.locale === 'en' ? 'en' : 'ja',
+          locale: coerceLocale(body.locale, ['en', 'ja'] as const, 'ja'),
           speaker,
           mode: body.mode === 'dialogue' ? 'dialogue' : 'panel',
           ...(clampNumber(body.max_rounds, 1, 8)

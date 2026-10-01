@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { t, type VocabularyKey } from './t.js';
 import { assertSafeRepositoryPath, safeLstat, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { loadPipelineAdfAtPath } from './pipeline/pipeline-contract.js';
@@ -137,12 +138,12 @@ export interface AutomationBlueprintCatalogEntry {
 }
 
 const CRON_FIELD_NAMES = ['minute', 'hour', 'day_of_month', 'month', 'day_of_week'] as const;
-const CRON_FIELD_LABELS: Record<(typeof CRON_FIELD_NAMES)[number], string> = {
-  minute: '分',
-  hour: '時',
-  day_of_month: '日',
-  month: '月',
-  day_of_week: '曜日',
+const CRON_FIELD_LABEL_KEYS: Record<(typeof CRON_FIELD_NAMES)[number], VocabularyKey> = {
+  minute: 'automation:cron_field_minute',
+  hour: 'automation:cron_field_hour',
+  day_of_month: 'automation:cron_field_day_of_month',
+  month: 'automation:cron_field_month',
+  day_of_week: 'automation:cron_field_day_of_week',
 };
 const CRON_FIELD_RANGES: Record<(typeof CRON_FIELD_NAMES)[number], [number, number]> = {
   minute: [0, 59],
@@ -272,8 +273,8 @@ function numericSlot(
   }
   return {
     id,
-    label: CRON_FIELD_LABELS[id],
-    prompt: `${CRON_FIELD_LABELS[id]}を指定してください`,
+    label: t(CRON_FIELD_LABEL_KEYS[id]),
+    prompt: t('automation:cron_field_prompt', { field: t(CRON_FIELD_LABEL_KEYS[id]) }),
     type: 'number',
     required: true,
     default_value: numeric,
@@ -324,8 +325,8 @@ export function createAutomationBlueprintFromPipeline(
   if (delivery) {
     slots.push({
       id: delivery.channel_slot!,
-      label: '配信先 channel',
-      prompt: '結果を届ける channel を指定してください',
+      label: t('automation:slot_delivery_label'),
+      prompt: t('automation:slot_delivery_prompt'),
       type: 'text',
       required: true,
       default_value: delivery.fixed_channel,
@@ -358,7 +359,7 @@ export function buildAutomationQuestionSeed(
 ): AutomationQuestionSeed {
   return {
     blueprint_id: blueprint.blueprint_id,
-    intro: `${blueprint.name} の実行条件を指定してください。`,
+    intro: t('automation:question_intro', { name: blueprint.name }),
     questions: blueprint.slots.map((slot) => ({
       slot_id: slot.id,
       prompt: slot.prompt,
@@ -374,7 +375,7 @@ export function buildAutomationSlashCommand(
 ): AutomationSlashCommandMetadata {
   return {
     command: `/kyberion schedule ${blueprint.blueprint_id}`,
-    description: `${blueprint.name} の schedule を slot 入力から登録します。`,
+    description: t('automation:slash_description', { name: blueprint.name }),
     options: blueprint.slots.map((slot) => ({
       name: slot.id,
       description: slot.prompt,

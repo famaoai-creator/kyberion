@@ -4,6 +4,7 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
 import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
+import { announceTenantChange } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
@@ -169,6 +170,7 @@ export function FrontDeskRail() {
       if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
       storeTenant(payload.value);
       fetchMe(payload.value);
+      announceTenantChange(payload.value);
     },
     [fetchMe]
   );

@@ -66,7 +66,17 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "proposal": { "type": "object" }
+        "proposal": { "type": "object" },
+        "confirmedBy": { "type": "string", "minLength": 1 },
+        "scope": {
+          "type": "object",
+          "required": ["tenant_slug"],
+          "properties": {
+            "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+            "tier": { "type": "string", "enum": ["personal", "confidential", "public"] }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": true
     }

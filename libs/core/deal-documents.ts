@@ -141,7 +141,7 @@ export function loadContractReviewAtPath(
 
 function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: number): string {
   return [
-    `# お見積書 (${deal.deal_id} v${version})`,
+    `# お見積書 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     '',
     `- 宛先: ${deal.channel.surface}:${deal.channel.channel_id}`,
     `- 通貨: ${quote.currency}`,
@@ -155,7 +155,7 @@ function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: numb
     '',
     `**合計: ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}(税別)**`,
     '',
-    '> 金額は price book の決定論ルールで算出されています。',
+    '> 金額は price book の決定論ルールで算出されています。', // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
   ].join('\n');
 }
 
@@ -181,7 +181,7 @@ export function generateQuoteForDeal(input: {
   if (!quote.ok) {
     // Unknown work never gets an invented price — it goes to the operator.
     void notifyOperator('question', {
-      title: `見積不能項目あり (${input.tenantSlug} / ${deal.deal_id})`,
+      title: `見積不能項目あり (${input.tenantSlug} / ${deal.deal_id})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
       body: quote.unquotable.map((entry) => `- ${entry.task_kind}: ${entry.reason}`).join('\n'),
       correlation_id: `${deal.deal_id}:unquotable`,
     });
@@ -212,8 +212,8 @@ export function generateQuoteForDeal(input: {
     refs: { quote_ref: quoteRef },
   });
   void notifyOperator('approval_required', {
-    title: `見積書ドラフト完成 (${deal.deal_id} v${version})`,
-    body: `合計 ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}。送付には承認が必要です。`,
+    title: `見積書ドラフト完成 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    body: `合計 ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}。送付には承認が必要です。`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     link_hint: quoteRef,
     correlation_id: `${deal.deal_id}:quote-v${version}`,
   });
@@ -260,9 +260,9 @@ export function draftContractForDeal(input: {
     .split('{{CURRENCY}}')
     .join(deal.agreed.amount.currency)
     .split('{{DUE_DATE}}')
-    .join(deal.agreed.due_date || '(個別契約で定める)')
+    .join(deal.agreed.due_date || '(個別契約で定める)') // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     .split('{{SUCCESS_CONDITION}}')
-    .join(deal.agreed.success_condition || '(検収条件を個別契約で定める)')
+    .join(deal.agreed.success_condition || '(検収条件を個別契約で定める)') // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     .split('{{QUOTE_REF}}')
     .join(deal.quote_ref || '(未発行)');
   const dir = dealDocsDir(input.tenantSlug, input.dealId);
@@ -284,8 +284,8 @@ export function draftContractForDeal(input: {
     refs: { contract_ref: contractRef },
   });
   void notifyOperator('approval_required', {
-    title: `契約書ドラフト完成 (${deal.deal_id} v${version})`,
-    body: 'contract-review パイプラインのレビュー記録(approve)が無い限り送付できません。',
+    title: `契約書ドラフト完成 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    body: 'contract-review パイプラインのレビュー記録(approve)が無い限り送付できません。', // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     link_hint: contractRef,
     correlation_id: `${deal.deal_id}:contract-v${version}`,
   });
@@ -378,7 +378,7 @@ export async function sendDealDocumentToCustomer(input: {
   const body = readTextFile(docPath);
   const result = await sendToCustomer({
     binding: input.binding,
-    title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`,
+    title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     body,
     correlationId: `${input.dealId}:${input.kind}-v${input.version}`,
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
@@ -391,7 +391,7 @@ export async function sendDealDocumentToCustomer(input: {
       tenantSlug,
       dealId: input.dealId,
       role: 'kyberion',
-      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${nowIso()})`,
+      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${nowIso()})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     });
   }
   return result;

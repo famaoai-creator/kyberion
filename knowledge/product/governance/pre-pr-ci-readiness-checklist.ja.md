@@ -151,6 +151,7 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 | Node／OS／native capability                           | Cross-OS Smoke の対象 gate と、必要なら `pnpm run build`／該当 suite を実行する。macOS／Windows 固有の結果を Linux の結果で代用しない。                                                                                                                                                                  |
 | user-visible behavior                                 | `changelog.d/<short-slug>.md` fragment を追加し（`CHANGELOG.md` は直接編集しない。形式は `changelog.d/README.md`）、public terminology を更新して `pnpm check -- --scope pr --only changelog-fragments` と `--only ux-contract-docs` を確認する。                                                        |
 | 大規模変更、release、CI failure repair                | `pnpm run validate` または `pnpm check -- --scope full` を実行し、全 test suite と未実行項目を PR 本文へ記録する。                                                                                                                                                                                       |
+| locale 解決・語彙文字列の変更                         | CI と同じ環境 `env -u KYBERION_LOCALE LANG=C.UTF-8 LC_ALL=C.UTF-8 CI=true ./node_modules/.bin/vitest run` でも全 suite を流す（日本語ロケールの開発機は locale 未固定の test を隠す）。→ [multi-branch-audit-delivery-lessons](../orchestration/multi-branch-audit-delivery-lessons.md)                  |     |
 
 ## よく落ちる gate（実測パターン）
 

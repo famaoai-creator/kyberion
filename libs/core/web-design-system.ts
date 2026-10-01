@@ -599,8 +599,8 @@ export function createConciergeWebThemePack(): WebThemePack {
         'Calm executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed.',
       hero: {
         title: '秘書室',
-        subtitle: 'CEO秘書 — 依頼・承認・成果・例外',
-        cta: '本日のご確認事項へ',
+        subtitle: 'CEO秘書 — 依頼・承認・成果・例外', // i18n-exempt: brand hero copy of the Japanese-first concierge/companion surfaces; this module is import-free so it cannot call t()
+        cta: '本日のご確認事項へ', // i18n-exempt: brand hero copy of the Japanese-first concierge/companion surfaces; this module is import-free so it cannot call t()
       },
     },
   };
@@ -633,8 +633,8 @@ export function createCompanionWebThemePack(): WebThemePack {
         'Warm companion workbench: voice, minutes, email, approvals, quick actions.',
       hero: {
         title: 'Presence Studio',
-        subtitle: '相棒 — いっしょに作業するワークベンチ',
-        cta: 'できることを見る',
+        subtitle: '相棒 — いっしょに作業するワークベンチ', // i18n-exempt: brand hero copy of the Japanese-first concierge/companion surfaces; this module is import-free so it cannot call t()
+        cta: 'できることを見る', // i18n-exempt: brand hero copy of the Japanese-first concierge/companion surfaces; this module is import-free so it cannot call t()
       },
     },
   };

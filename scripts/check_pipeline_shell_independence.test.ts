@@ -182,14 +182,10 @@ describe('check_pipeline_shell_independence', () => {
         'knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json'
       )
     );
-    const vtuberSubmit = loadJson<PipelineFixture>(
-      pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json')
-    );
     const selectedFiles = [
       pathResolver.rootResolve(
         'knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json'
       ),
-      pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json'),
     ];
 
     expect(promoNarratedDemo.steps.find((step) => step.id === 'generate_voice')).toMatchObject({
@@ -197,9 +193,6 @@ describe('check_pipeline_shell_independence', () => {
     });
     expect(promoNarratedDemo.steps.find((step) => step.id === 'generate_video')).toMatchObject({
       op: 'video-composition:create_narrated_video_from_content_brief',
-    });
-    expect(vtuberSubmit.steps.find((step) => step.id === 'generate_voice')).toMatchObject({
-      op: 'voice:generate_voice',
     });
 
     expect(resolveActuatorOperation('voice', 'generate_voice')).toMatchObject({

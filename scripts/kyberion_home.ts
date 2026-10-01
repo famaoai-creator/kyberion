@@ -78,6 +78,9 @@ import type { NotificationChannelTarget } from '@agent/core/surface/operator-not
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runDoctor } from './run_doctor.js';
 import {
+  DEAL_DOCUMENT_OPTIONS,
+  dealDocumentArgsFromArgv,
+  handleDealDocumentAction,
   handleDealsIngestAudio,
   handleDealsSubcommand,
   handleFeedbackSubcommand,
@@ -1354,6 +1357,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       description: 'deals: transcribe a call recording into the requirements draft',
     })
     .option('audio', { type: 'string', description: 'deals: audio file path for --ingest-audio' })
+    .options(DEAL_DOCUMENT_OPTIONS)
     .parseSync();
 
   cliLocale = resolveLocale({ explicit: argv.locale ? String(argv.locale) : undefined });
@@ -1382,11 +1386,13 @@ async function mainImpl(args: string[] = []): Promise<void> {
           {
             ingestAudio: String(argv['ingest-audio']),
             audio: argv.audio ? String(argv.audio) : undefined,
+            tenant: argv.tenant ? String(argv.tenant) : undefined,
           },
           activePrint
         );
         return;
       }
+      if (handleDealDocumentAction(ui, dealDocumentArgsFromArgv(argv), activePrint)) return;
       handleDealsSubcommand(ui, argv as { requirements?: string; json?: boolean }, activePrint);
       return;
     case 'ask':
