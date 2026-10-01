@@ -1,13 +1,16 @@
 # Procedure: Generate a Report From Document Brief
 
 ## 1. Goal
+
 Generate a DOCX or PDF report from the canonical `document-brief` contract.
 
 ## 2. Dependencies
+
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 
 ## 3. Principle
+
 Separate the report into:
 
 - canonical document contract: `document-brief`
@@ -17,6 +20,7 @@ Separate the report into:
 - output engine target: `docx | pdf`
 
 ## 4. Step-by-Step Instructions
+
 1. Prepare a `document-brief` JSON file.
 2. Set:
    - `artifact_family: document`
@@ -37,5 +41,6 @@ Separate the report into:
 7. `document_report_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Examples
-- [`document-brief-report-docx.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-report-docx.json)
-- [`document-brief-report-pdf.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-report-pdf.json)
+
+- [`document-brief-report-docx.json`](../../../../libs/actuators/media-actuator/examples/document-brief-report-docx.json)
+- [`document-brief-report-pdf.json`](../../../../libs/actuators/media-actuator/examples/document-brief-report-pdf.json)

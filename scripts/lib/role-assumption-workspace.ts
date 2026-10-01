@@ -241,12 +241,32 @@ function nextAppEntries(ws: Workspace, appDir: string): string[] {
   });
 }
 
+/** Root package.json script body for `pnpm <script>` surface commands. */
+function rootPackageScript(ws: Workspace, name: string): string | null {
+  const manifestPath = ws.abs('package.json');
+  if (!ws.isFile(manifestPath)) return null;
+  const manifest = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    manifestPath,
+    'root package manifest'
+  );
+  const script = manifest.scripts?.[name];
+  return typeof script === 'string' ? script : null;
+}
+
 function entriesForCommand(ws: Workspace, entry: SurfaceManifestEntry): string[] {
   const args = entry.args ?? [];
   if (entry.command === 'pnpm') {
     const dirIndex = args.indexOf('--dir');
     if (dirIndex >= 0 && args[dirIndex + 1]) {
       return nextAppEntries(ws, ws.abs(args[dirIndex + 1]));
+    }
+    // `pnpm <script>`: follow the root package.json script to its entry file.
+    const script = args[0] ? rootPackageScript(ws, args[0]) : null;
+    if (script) {
+      return script
+        .split(/\s+/u)
+        .map((token) => sourceForScriptReference(ws, token))
+        .filter((source): source is string => Boolean(source));
     }
   }
   const files: string[] = [];
@@ -257,12 +277,20 @@ function entriesForCommand(ws: Workspace, entry: SurfaceManifestEntry): string[]
   return files;
 }
 
-/** `dist/x/y.js`, `x/y.ts`, `./x/y.js` → the TypeScript source, when it exists. */
+/**
+ * `dist/x/y.js`, `x/y.ts`, `./x/y.js`, `pkg/dist/y.js` → the TypeScript
+ * source, when it exists (a workspace package's `dist/` maps to its `src/`).
+ */
 export function sourceForScriptReference(ws: Workspace, reference: string): string | null {
   const cleaned = reference.replace(/^\.\//, '').replace(/^dist\//, '');
   if (!/\.(m?[jt]s|tsx)$/.test(cleaned)) return null;
-  const found = tryFile(ws, ws.abs(cleaned));
-  return found && isProjectSource(ws, found) ? found : null;
+  const candidates = [cleaned];
+  if (cleaned.includes('/dist/')) candidates.push(cleaned.replace('/dist/', '/src/'));
+  for (const candidate of candidates) {
+    const found = tryFile(ws, ws.abs(candidate));
+    if (found && isProjectSource(ws, found)) return found;
+  }
+  return null;
 }
 
 export function collectSystemRoleEntries(ws: Workspace): Map<string, string[]> {

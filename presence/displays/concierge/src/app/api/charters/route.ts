@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { resolveConciergeLocale } from '../../../lib/i18n';
 import {
   acceptCharterForViewer,
   previewCharter,
@@ -26,7 +27,7 @@ export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
+    const locale = resolveConciergeLocale(req.nextUrl.searchParams.get('locale') ?? undefined);
     const overview = asContext(() =>
       readCharterOverview(
         resolved.context,

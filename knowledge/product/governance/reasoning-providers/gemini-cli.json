@@ -13,7 +13,69 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["GEMINI_CLI_BIN"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "aliases": ["gemini", "google"],
+      "model_vendor": "gemini",
+      "endpoint": "https://generativelanguage.googleapis.com",
+      "egress_provider_id": "gemini",
+      "cli": {
+        "binary": "gemini",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_GEMINI_CLI_BIN",
+        "discovery": true,
+        "sandbox": {
+          "args": ["-p", "{prompt}", "{permission_args}"]
+        },
+        "install": {
+          "npm_package": "@google/gemini-cli",
+          "brew_formula": "gemini-cli",
+          "hint": "npm install --prefix <managed-env> --no-save @google/gemini-cli"
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox", "--approval-mode"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--sandbox", "--approval-mode", "yolo"],
+            "notes": "Gemini CLI yolo mode remains inside its provider sandbox for workspace-write work."
+          },
+          "explorer": {
+            "args": ["--sandbox", "--approval-mode", "plan"],
+            "notes": "Gemini CLI plan mode is the provider read-only projection."
+          },
+          "planner": {
+            "args": ["--sandbox", "--approval-mode", "plan"],
+            "notes": "Gemini CLI plan mode is the provider no-write projection."
+          }
+        }
+      },
+      "runtime_instructions": [
+        "Provider note: this provider is retained only for compatibility; do not assume personal Gemini availability.",
+        "Provider note: fail closed when the configured Gemini runtime or credentials are unavailable."
+      ]
     }
   ]
 }

@@ -78,6 +78,7 @@ export * from './surface/surface-ingress-contract.js';
 
 export * from './surface/surface-interaction-model.js';
 
+export * from './surface/surface-url.js';
 export * from './surface/surface-ux.js';
 
 export * from './surface/surface-provider-manifest.js';
@@ -205,6 +206,8 @@ export * from './governance/approval-policy.js';
 export * from './router-contract.js';
 
 export * from './intent/intent-outcome-patterns.js';
+
+export * from './intent/intent-phrase-lexicon.js';
 
 export * from './workforce/work-design.js';
 

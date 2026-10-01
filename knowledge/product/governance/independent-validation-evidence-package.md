@@ -42,54 +42,54 @@ the validator.
 
 ### 2.1 The output under review
 
-| Artefact | Location |
-|---|---|
-| `simulation-summary.json` | mission `evidence/` |
-| `simulation-quality.json` | mission `evidence/` |
+| Artefact                                  | Location            |
+| ----------------------------------------- | ------------------- |
+| `simulation-summary.json`                 | mission `evidence/` |
+| `simulation-quality.json`                 | mission `evidence/` |
 | `simulation-ensemble.json` (if multi-run) | mission `evidence/` |
-| `hypothesis-tree.json` (if applicable) | mission `evidence/` |
-| `dissent-log.json` | mission `evidence/` |
-| Final Markdown report | mission `evidence/` |
+| `hypothesis-tree.json` (if applicable)    | mission `evidence/` |
+| `dissent-log.json`                        | mission `evidence/` |
+| Final Markdown report                     | mission `evidence/` |
 
 ### 2.2 The reasoning context
 
-| Artefact | Source |
-|---|---|
+| Artefact                                     | Source                                                  |
+| -------------------------------------------- | ------------------------------------------------------- |
 | Full prompt(s) sent to the reasoning backend | mission `evidence/prompts/` (export from `audit-chain`) |
-| Full system prompt(s) | same |
-| All persona definitions used in the run | snapshot from `team-role-index.json` at run time |
-| `intent-snapshot` chain for the mission | `intent-snapshot-store` |
-| Mission state at each checkpoint | mission's independent Git history |
+| Full system prompt(s)                        | same                                                    |
+| All persona definitions used in the run      | snapshot from `team-role-index.json` at run time        |
+| `intent-snapshot` chain for the mission      | `intent-snapshot-store`                                 |
+| Mission state at each checkpoint             | mission's independent Git history                       |
 
 ### 2.3 The reasoning environment
 
-| Artefact | Source |
-|---|---|
-| Reasoning backend mode and model id | `reasoning-bootstrap` log; `claude-opus-4-7` etc. |
-| Backend version (SDK / CLI) | `package.json` + `pnpm-lock.yaml` snapshot |
-| Effort / thinking parameters | run config |
-| Ensemble run count and convergence threshold | `simulation-ensemble.json` |
-| Reasoning rate-limits / quotas at run time | provider account snapshot if available |
+| Artefact                                     | Source                                            |
+| -------------------------------------------- | ------------------------------------------------- |
+| Reasoning backend mode and model id          | `reasoning-bootstrap` log; `claude-opus-4-7` etc. |
+| Backend version (SDK / CLI)                  | `package.json` + `pnpm-lock.yaml` snapshot        |
+| Effort / thinking parameters                 | run config                                        |
+| Ensemble run count and convergence threshold | `simulation-ensemble.json`                        |
+| Reasoning rate-limits / quotas at run time   | provider account snapshot if available            |
 
 ### 2.4 The audit story
 
-| Artefact | Source |
-|---|---|
+| Artefact                                                    | Source                                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------- |
 | Full hash-chained audit-chain excerpt covering this mission | `active/audit/system-ledger.jsonl` filtered by mission_id |
-| All `rubric.override_accepted` events | same, filtered by action |
-| All re-execution events (`counterfactual.rerun_*`) | same |
-| Tenant scope events (`tenant.scope_violation` if any) | same |
-| Hash-chain integrity proof (parent_hash continuity) | computable from the excerpt |
+| All `rubric.override_accepted` events                       | same, filtered by action                                  |
+| All re-execution events (`counterfactual.rerun_*`)          | same                                                      |
+| Tenant scope events (`tenant.scope_violation` if any)       | same                                                      |
+| Hash-chain integrity proof (parent_hash continuity)         | computable from the excerpt                               |
 
 ### 2.5 Governance artefacts
 
-| Artefact | Reference |
-|---|---|
-| `counterfactual-degradation-policy.json` (version at run time) | `knowledge/product/governance/` |
-| `mission-classification-policy.json` (version at run time) | `knowledge/product/governance/` |
-| `tier-hygiene-policy.json` (version at run time) | `knowledge/product/governance/` |
-| `tenant-scope-policy.json` (when multi-tenant) | tenant config |
-| `rubric-disclosure-template.md` filled in for this output | `knowledge/public/procedures/system/` |
+| Artefact                                                       | Reference                             |
+| -------------------------------------------------------------- | ------------------------------------- |
+| `counterfactual-degradation-policy.json` (version at run time) | `knowledge/product/governance/`       |
+| `mission-classification-policy.json` (version at run time)     | `knowledge/product/governance/`       |
+| `tier-hygiene-policy.json` (version at run time)               | `knowledge/product/governance/`       |
+| `tenant-scope-policy.json` (when multi-tenant)                 | tenant config                         |
+| `rubric-disclosure-template.md` filled in for this output      | `knowledge/public/procedures/system/` |
 
 ### 2.6 Operator attestations (signed)
 
@@ -97,12 +97,12 @@ Each of the following must be signed by the named role. Signatures live
 in `bundle/attestations/` as `*.signed.json` files, each carrying the
 operator's identity, the mission_id, and a short statement.
 
-| Attestation | Signer |
-|---|---|
-| "All artefacts in §2.1–§2.5 are unmodified copies of the production run." | mission_owner |
-| "No `audit-chain` entries pertaining to this mission have been redacted from the bundle." | knowledge_steward |
-| "All `rubric.override_accepted` events are accompanied by their original reason text and are unaltered." | tenant_risk_officer (or equivalent) |
-| "The reasoning backend identified in §2.3 is the one that produced the output, and no post-hoc backend swap occurred." | ecosystem_architect |
+| Attestation                                                                                                            | Signer                              |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| "All artefacts in §2.1–§2.5 are unmodified copies of the production run."                                              | mission_owner                       |
+| "No `audit-chain` entries pertaining to this mission have been redacted from the bundle."                              | knowledge_steward                   |
+| "All `rubric.override_accepted` events are accompanied by their original reason text and are unaltered."               | tenant_risk_officer (or equivalent) |
+| "The reasoning backend identified in §2.3 is the one that produced the output, and no post-hoc backend swap occurred." | ecosystem_architect                 |
 
 ## 3. What the validator should be able to do with the bundle
 
@@ -148,7 +148,7 @@ Until the dedicated command exists, assemble the bundle by hand following
 
 ## 6. Related
 
-- [`counterfactual-degradation-policy.json`](knowledge/product/governance/counterfactual-degradation-policy.json)
-- [`../procedures/system/rubric-disclosure-template.md`](knowledge/public/procedures/system/rubric-disclosure-template.md)
-- [`../architecture/multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)
-- [`../architecture/operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md)
+- [`counterfactual-degradation-policy.json`](counterfactual-degradation-policy.json)
+- [`../procedures/system/rubric-disclosure-template.md`](../../public/procedures/system/rubric-disclosure-template.md)
+- [`../architecture/multi-tenant-operations.md`](../architecture/multi-tenant-operations.md)
+- [`../architecture/operator-surface-strategy.md`](../architecture/operator-surface-strategy.md)

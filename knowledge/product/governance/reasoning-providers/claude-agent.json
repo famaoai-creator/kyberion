@@ -13,7 +13,30 @@
         "input_modalities": ["text", "image"]
       },
       "env_keys": ["CLAUDECODE", "ANTHROPIC_API_KEY"],
-      "cost_tier": "metered"
+      "cost_tier": "metered",
+      "transport": "sdk",
+      "data_egress": "external-api",
+      "adapter": "claude-agent-sdk",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": true,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": true,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_vendor": "anthropic",
+      "endpoint": "https://api.anthropic.com",
+      "egress_provider_id": "claude",
+      "runtime_instructions": [
+        "Provider note: treat Kyberion secure-io and mission contracts as authoritative; do not use direct filesystem APIs.",
+        "Provider note: keep tool effects within the declared work-item scope and return evidence for every completed action."
+      ]
     }
   ]
 }

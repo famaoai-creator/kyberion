@@ -497,7 +497,7 @@ export function suggestedCommand(opts: {
     case 'finish':
       return `node dist/scripts/mission_controller.js finish ${opts.missionId}`;
     case 'export-bundle':
-      return `pnpm export:validation-bundle ${opts.missionId}`;
+      return `pnpm validation-bundle:export ${opts.missionId}`;
     case 'view-evidence':
       return `ls active/missions/*/${opts.missionId}/evidence/`;
   }

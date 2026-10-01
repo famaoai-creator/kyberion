@@ -16,7 +16,7 @@ vi.mock('@slack/bolt', () => ({
 }));
 
 const captured = vi.hoisted(() => ({
-  conversationInputs: [] as { threadContext?: string; text: string }[],
+  conversationInputs: [] as { threadContext?: string; text: string; locale?: string }[],
 }));
 
 vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
@@ -27,6 +27,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
       captured.conversationInputs.push({
         threadContext: input.threadContext,
         text: input.text,
+        locale: input.locale,
       });
       return {
         text: 'ok',
@@ -158,6 +159,8 @@ describe('slack bridge channel turn', () => {
 
     expect(captured.conversationInputs).toHaveLength(1);
     expect(captured.conversationInputs[0].threadContext).toBe(THREAD_CONTEXT);
+    // No explicit turn locale: the orchestrator derives it (user text > scope > operator).
+    expect(captured.conversationInputs[0].locale).toBeUndefined();
     expect(result.text).toBe('ok');
     expect(sent).toEqual(['ok']);
   });

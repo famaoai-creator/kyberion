@@ -36,11 +36,11 @@ last_updated: 2026-03-21
 
 推奨 blueprint:
 
-- [`requirements-definition.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/requirements-definition.md)
-- [`detailed-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/detailed-design.md)
-- [`architecture-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/architecture-design.md)
-- [`test-validation-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-validation-report.md)
-- [`operation-runbook.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/operation-runbook.md)
+- [`requirements-definition.md`](../../templates/blueprints/requirements-definition.md)
+- [`detailed-design.md`](../../templates/blueprints/detailed-design.md)
+- [`architecture-design.md`](../../templates/blueprints/architecture-design.md)
+- [`test-validation-report.md`](../../templates/blueprints/test-validation-report.md)
+- [`operation-runbook.md`](../../templates/blueprints/operation-runbook.md)
 
 ## Artifact Strategy
 

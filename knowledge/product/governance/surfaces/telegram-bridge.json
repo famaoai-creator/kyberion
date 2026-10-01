@@ -6,9 +6,7 @@
       "kind": "gateway",
       "description": "Telegram ingress gateway and surface-agent host",
       "command": "node",
-      "args": [
-        "dist/satellites/telegram-bridge/src/index.js"
-      ],
+      "args": ["dist/satellites/telegram-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
@@ -20,7 +18,7 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3035,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": false
     }
   ]
 }

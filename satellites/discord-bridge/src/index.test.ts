@@ -22,7 +22,7 @@ vi.mock('discord.js', () => ({
 }));
 
 const captured = vi.hoisted(() => ({
-  conversationInputs: [] as { threadContext?: string; text: string }[],
+  conversationInputs: [] as { threadContext?: string; text: string; locale?: string }[],
 }));
 
 vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
@@ -33,6 +33,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
       captured.conversationInputs.push({
         threadContext: input.threadContext,
         text: input.text,
+        locale: input.locale,
       });
       return {
         text: 'ok',
@@ -198,6 +199,11 @@ describe('discord bridge thread context', () => {
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
+    // No explicit turn locale: the orchestrator derives it (user text > scope > operator).
+    expect(captured.conversationInputs.map((input) => input.locale)).toEqual([
+      undefined,
+      undefined,
+    ]);
     expect(captured.conversationInputs[1].threadContext).toContain(
       t('bridge:thread_user', { author: 'alice#0001', text: '最初の相談' }, resolveOperatorLocale())
     );

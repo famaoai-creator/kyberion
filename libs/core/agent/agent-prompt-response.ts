@@ -26,6 +26,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { safeExistsSync } from '../secure-io.js';
 import { createLogger } from '../logger.js';
+import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
 
 const logger = createLogger('agent-prompt-response');
 
@@ -156,19 +157,25 @@ export function resolveAgentLaunchArgs(
 }
 
 /**
- * Per-kind model-override args. Only Claude CLI takes `--model`; a model id
- * equal to the provider name or the literal 'claude' is already implied and
- * must not be forwarded.
+ * Per-kind model-override args. The flag is the CLI descriptor's
+ * `cli.model_flag` (reasoning-providers/*.json, RS-03); a kind whose CLI
+ * declares none takes no model args. A model id equal to the provider name or
+ * the kind's own provider id is already implied and must not be forwarded.
  */
 export function resolveAgentModelArgs(
   provider: string,
   kind: string | undefined,
   modelId?: string
 ): string[] {
-  if (!modelId || kind !== 'claude') return [];
+  if (!modelId || !kind) return [];
+  const descriptor = resolveReasoningProviderDescriptor(kind);
+  const flag = descriptor?.cli?.model_flag;
+  if (!flag) return [];
   const normalized = modelId.trim().toLowerCase();
-  if (!normalized || normalized === 'claude' || normalized === provider.toLowerCase()) return [];
-  return ['--model', modelId];
+  if (!normalized || normalized === descriptor.provider || normalized === provider.toLowerCase()) {
+    return [];
+  }
+  return [flag, modelId];
 }
 
 export interface AgentPromptContext {

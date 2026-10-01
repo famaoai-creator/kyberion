@@ -1,5 +1,11 @@
 import * as fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { primeReasoningProviderRegistryForTests } from '../reasoning/reasoning-provider-registry.js';
+import { governedReasoningProviderEntries } from '../reasoning/__tests__/governed-reasoning-provider-entries.js';
+
+// RS-01: discovery resolves CLI binaries through the provider registry; this
+// suite mocks path-resolver/secure-io, so seed the registry from the governed JSON.
+primeReasoningProviderRegistryForTests(governedReasoningProviderEntries());
 
 const mocks = vi.hoisted(() => ({
   spawnSync: vi.fn(),
