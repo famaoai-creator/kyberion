@@ -59,6 +59,8 @@ export interface SurfaceAuthRouteRequest {
   clientKey?: string;
   /** `Sec-Fetch-Site` of the request, when the client sent one. */
   secFetchSite?: string | null;
+  /** Origin (or Referer origin) header, consulted only when `Sec-Fetch-Site` is absent. */
+  referrerOrigin?: string | null;
   /** Where a surface that supports pasted access tokens (concierge `/signin`) offers that path. */
   tokenSignInHref?: string;
 }
@@ -139,12 +141,43 @@ function takeRateToken(key: string, limit: number, now: number): boolean {
   return bucket.count <= limit;
 }
 
-/** True when this request may proceed. Only applies when the adapter gave a clientKey. */
+/** Client key the adapter returns when it cannot tell callers apart (no trusted peer IP). */
+const SHARED_CLIENT_KEY = 'shared';
+
+/**
+ * True when this request may proceed. Only applies when the adapter gave a
+ * clientKey. Loopback is exempt (matches the Express surfaces). When callers
+ * cannot be told apart (`shared`), a per-client cap would let one anonymous
+ * flood lock every user out, so only the whole-surface ceiling applies.
+ */
 function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
-  if (req.clientKey === undefined) return true;
+  if (req.clientKey === undefined || req.loopback) return true;
   const surfaceOk = takeRateToken(`s:${req.surfaceId}`, RATE_LIMIT_PER_SURFACE, now);
+  if (req.clientKey === SHARED_CLIENT_KEY) return surfaceOk;
   const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, RATE_LIMIT_PER_CLIENT, now);
   return surfaceOk && clientOk;
+}
+
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A GET/POST /logout that a third party triggered. Browsers tag fetches with
+ * `Sec-Fetch-Site`; only `same-origin` and `none` (typed URL) may sign out.
+ * Without the header (older browsers) fall back to Origin/Referer: a present
+ * origin whose host is not ours is rejected; an absent one is allowed.
+ */
+function isForeignLogout(req: SurfaceAuthRouteRequest, ownOrigins: string[]): boolean {
+  if (req.secFetchSite) return req.secFetchSite !== 'same-origin' && req.secFetchSite !== 'none';
+  if (!req.referrerOrigin) return false;
+  const host = originHost(req.referrerOrigin);
+  if (host === null) return true;
+  return !ownOrigins.some((o) => originHost(o) === host);
 }
 
 function redirect(location: string, setCookies: string[] = []): SurfaceAuthRouteResponse {
@@ -278,9 +311,11 @@ export async function handleSurfaceAuthRoute(
 
     case SURFACE_LOGOUT_PATH: {
       if (method !== 'GET' && method !== 'POST') return notAllowed(req);
-      // A cross-site request (an <img>, a link on another origin) must not be
-      // able to sign the user out; browsers tag it with Sec-Fetch-Site.
-      if (req.secFetchSite === 'cross-site') return redirect(loginHrefFor(req));
+      // An <img> or link on another origin (or a sibling subdomain) must not be
+      // able to sign the user out.
+      if (isForeignLogout(req, [req.requestOrigin, ...(publicOrigin ? [publicOrigin] : [])])) {
+        return redirect(loginHrefFor(req));
+      }
       return redirect(`${SURFACE_LOGIN_PATH}?signedout=1`, [
         serializeClearedCookie(SURFACE_SESSION_COOKIE, secure),
       ]);

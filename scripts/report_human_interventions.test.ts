@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/governance/approval-store', () => ({
   listApprovalRequests: mocks.listApprovalRequests,
 }));
-vi.mock('@agent/core/secure-io', () => ({ safeExecResult: mocks.safeExecResult }));
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeExecResult: mocks.safeExecResult,
+}));
 vi.mock('@agent/core/mission/mission-state', () => ({
   listMissionsInSearchDirs: mocks.listMissionsInSearchDirs,
   loadStateAtPath: mocks.loadStateAtPath,

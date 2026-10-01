@@ -31,6 +31,21 @@ describe('unified personal pads server', () => {
     expect(output).toHaveLength(1);
   });
 
+  it('explains how to proceed when a non-public tier has no tenant', async () => {
+    const previous = process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_TENANT;
+    try {
+      await expect(runPersonalPadsServer(['--dry-run'], { dryRun: true })).rejects.toThrow(
+        '--tier public'
+      );
+      await expect(runPersonalPadsServer(['--dry-run'], { dryRun: true })).rejects.toThrow(
+        'pnpm tenant list'
+      );
+    } finally {
+      if (previous !== undefined) process.env.KYBERION_TENANT = previous;
+    }
+  });
+
   it('renders the menu, scope context, and token-bound shell on the shared kit', () => {
     const context = createLocalPadContext({
       serviceId: 'personal-pads',

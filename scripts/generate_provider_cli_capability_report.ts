@@ -201,6 +201,7 @@ function render(args: string[]): GeneratedFile[] {
 
 export const runGenerateProviderCliCapabilityReport = defineGenerator({
   id: 'provider-cli-capability-report',
+  flags: ['--out'],
   outputs: (context) => [
     assertSafeRepositoryPath(
       pathResolver.resolve(parseArg(context.argv, '--out', DEFAULT_REPORT_PATH)),

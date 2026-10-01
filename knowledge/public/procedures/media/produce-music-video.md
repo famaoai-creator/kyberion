@@ -27,12 +27,12 @@ Use this procedure when the task is:
 
 If you only need the music artifact itself, use:
 
-- [`generate-music-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/generate-music-from-adf.md)
+- [`generate-music-from-adf.md`](generate-music-from-adf.md)
 
 If you only need the final visual render contract, use:
 
-- [`create-music-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-music-video-from-adf.md)
-- [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+- [`create-music-video-from-adf.md`](create-music-video-from-adf.md)
+- [`compose-video-from-adf.md`](compose-video-from-adf.md)
 
 ## 3. Inputs
 
@@ -160,7 +160,7 @@ This step requires an active media-generation service endpoint. If the endpoint 
 
 For a service-free smoke test of the background render path, use:
 
-- [`music-video-from-brief-smoke.json`](/Users/famao/kyberion/knowledge/product/pipeline-templates/music-video-from-brief-smoke.json)
+- [`music-video-from-brief-smoke.json`](../../../product/pipeline-templates/music-video-from-brief-smoke.json)
 
 ### 5.3 Render The Music Video
 
@@ -179,8 +179,8 @@ For longer music-video renders, use the same submit/collect pattern as narrated 
 
 The current reusable reference lives here:
 
-- [`music-video-from-brief-submit.json`](/Users/famao/kyberion/knowledge/product/pipeline-templates/music-video-from-brief-submit.json)
-- [`music-video-from-brief-collect.json`](/Users/famao/kyberion/knowledge/product/pipeline-templates/music-video-from-brief-collect.json)
+- [`music-video-from-brief-submit.json`](../../../product/pipeline-templates/music-video-from-brief-submit.json)
+- [`music-video-from-brief-collect.json`](../../../product/pipeline-templates/music-video-from-brief-collect.json)
 
 These templates can be copied into a tenant-specific runnable pipeline or executed directly in dev/testing with `pnpm pipeline --input ...`. They keep the music job and the video render separate, then collect through the saved `job-state.json`.
 

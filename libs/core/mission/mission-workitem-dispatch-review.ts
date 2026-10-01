@@ -91,15 +91,9 @@ export function resolveRuntimeSecurityScope(
       : {}),
   });
   if (!providerDecision.allowed) return scope;
-  const endpointBackend =
-    provider === 'claude'
-      ? 'claude-cli'
-      : provider === 'agy'
-        ? 'agy-cli'
-        : provider === 'grok'
-          ? 'grok-cli'
-          : provider;
-  const endpointDecision = evaluateEgressPolicy(reasoningBackendEndpoint(endpointBackend), {
+  // RS-03: the provider id resolves to its governed descriptor endpoint; an
+  // unknown provider resolves to an invalid host and stays denied.
+  const endpointDecision = evaluateEgressPolicy(reasoningBackendEndpoint(provider), {
     tier: dataTier,
     tenant_slug: scope.tenant_slug || scope.tenant_id,
     purpose: scope.purpose,

@@ -1143,7 +1143,7 @@ Kyberion がブラウザを起動し、あなたの操作を `action_trail` と�
 | 31  | 動画制作・YouTube公開 | content_and_media       | multi_artifact_pipeline | coordinated-multi-track | approval_required |
 | 32  | Teams 会議運営        | operations_and_release  | real_time_coordination  | coordinated-multi-track | high_stakes       |
 
-**判断支援系（別表）**：合意形成・仮説検証・リハーサル・交渉準備・直観記録は `mission_class: decision_support` にルーティングされます（[CEO_SCENARIOS.md §判断支援系シナリオ](docs/CEO_SCENARIOS.md) 参照）。
+**判断支援系（別表）**：合意形成・仮説検証・リハーサル・交渉準備・直観記録は `mission_class: decision_support` にルーティングされます（[CEO_SCENARIOS.md §判断支援系シナリオ](CEO_SCENARIOS.md) 参照）。
 
 # Governed Marketing And Video Workloads
 

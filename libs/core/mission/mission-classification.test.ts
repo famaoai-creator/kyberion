@@ -86,6 +86,15 @@ describe('mission-classification', () => {
     expect(byIntent.mission_class).toBe('operations_and_release');
   });
 
+  it('routes operations_report hints into operations_and_release with a single-artifact shape', () => {
+    const classification = resolveMissionClassification({ missionTypeHint: 'operations_report' });
+    expect(classification.mission_class).toBe('operations_and_release');
+    expect(classification.delivery_shape).toBe('single_artifact');
+    expect(classification.matched_rules.mission_class_rule_id).toBe(
+      'class-operations-release-ops-report'
+    );
+  });
+
   it('routes presentation utterances into content_and_media (MO-01)', () => {
     const classification = resolveMissionClassification({
       utterance: '顧客向けの提案書パワーポイントを作成したい',

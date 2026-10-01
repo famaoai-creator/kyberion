@@ -24,6 +24,7 @@ import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/co
 import { withExecutionContext } from '@agent/core/governance';
 import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 export function migrateConnectionDocuments(input: { decrypt: boolean; connectionsDir?: string }): {
   encrypted: number;
@@ -95,10 +96,18 @@ async function main(argv: string[] = []): Promise<number> {
   return 0;
 }
 
+/** CU-01: `--help` and unknown flags exit before any connection document is touched. */
+export const ENCRYPT_CONNECTION_DOCUMENTS_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion secrets encrypt',
+  manifestId: 'script.secrets.encrypt',
+  options: [{ flag: '--decrypt' }],
+};
+
 export const runEncryptConnectionDocuments = defineScript({
   name: 'secrets:encrypt',
   flags: [],
-  run: async ({ argv }) => {
+  run: async ({ argv, print }) => {
+    if (guardCliArgs(argv, ENCRYPT_CONNECTION_DOCUMENTS_CLI, print)) return;
     try {
       const code = await main(argv);
       if (code !== 0) throw new ScriptExitError(code, '', true);

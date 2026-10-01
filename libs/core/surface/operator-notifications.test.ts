@@ -4,6 +4,8 @@ import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
+
 const realFsSecureIo = vi.hoisted(() => ({
   assertSafeRepositoryPath: (
     filePath: string,
@@ -119,6 +121,14 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-notify-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    // Notification channels come from the channel adapter registry (RS-06).
+    for (const rel of [
+      'knowledge/product/governance/surface-provider-manifests.json',
+      'knowledge/product/schemas/surface-provider-manifests.schema.json',
+    ]) {
+      fs.mkdirSync(path.dirname(path.join(tmpRoot, rel)), { recursive: true });
+      fs.copyFileSync(path.join(REPO_ROOT, rel), path.join(tmpRoot, rel));
+    }
     process.env.KYBERION_ROOT = tmpRoot;
     vi.resetModules();
     mod = await import('./operator-notifications.js');

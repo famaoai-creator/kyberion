@@ -8,7 +8,9 @@
       "noun": "home",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_default",
+      "group": "start"
     },
     {
       "id": "operator-home.ask",
@@ -16,7 +18,9 @@
       "noun": "ask",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_ask",
+      "group": "start"
     },
     {
       "id": "operator-home.procedure",
@@ -24,7 +28,9 @@
       "noun": "procedure",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_procedure",
+      "group": "operate"
     },
     {
       "id": "operator-home.feedback",
@@ -32,7 +38,9 @@
       "noun": "feedback",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_feedback",
+      "group": "operate"
     },
     {
       "id": "operator-home.improvements",
@@ -40,7 +48,9 @@
       "noun": "improvements",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_improvements",
+      "group": "inspect"
     },
     {
       "id": "operator-home.record",
@@ -48,7 +58,9 @@
       "noun": "record",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_record",
+      "group": "operate"
     },
     {
       "id": "operator-home.recording",
@@ -56,7 +68,9 @@
       "noun": "recording",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_recording",
+      "group": "inspect"
     },
     {
       "id": "operator-home.inbox",
@@ -64,7 +78,9 @@
       "noun": "inbox",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_inbox",
+      "group": "inspect"
     },
     {
       "id": "operator-home.approvals",
@@ -72,7 +88,9 @@
       "noun": "approvals",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_approvals",
+      "group": "operate"
     },
     {
       "id": "operator-home.notify",
@@ -80,7 +98,9 @@
       "noun": "notify",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_notify",
+      "group": "operate"
     },
     {
       "id": "operator-home.deals",
@@ -88,7 +108,9 @@
       "noun": "deals",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_deals",
+      "group": "inspect"
     },
     {
       "id": "operator-home.doctor",
@@ -96,7 +118,42 @@
       "noun": "doctor",
       "verb": "default",
       "entry": "operator-home",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_home_doctor",
+      "group": "start",
+      "scope_selector": "flag",
+      "scopes": [
+        {
+          "id": "env",
+          "routes_to": ["vital"],
+          "description": "cli_scope_doctor_env"
+        },
+        {
+          "id": "service",
+          "routes_to": ["service", "preflight"],
+          "description": "cli_scope_doctor_service"
+        },
+        {
+          "id": "voice",
+          "routes_to": ["doctor", "--runtime", "voice"],
+          "description": "cli_scope_doctor_voice"
+        },
+        {
+          "id": "meeting",
+          "routes_to": ["meeting", "preflight"],
+          "description": "cli_scope_doctor_meeting"
+        },
+        {
+          "id": "app",
+          "routes_to": ["doctor", "--runtime", "app"],
+          "description": "cli_scope_doctor_app"
+        },
+        {
+          "id": "setup",
+          "routes_to": ["setup", "report"],
+          "description": "cli_scope_doctor_setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.help",
@@ -104,7 +161,9 @@
       "noun": "help",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_help",
+      "group": "start"
     },
     {
       "id": "operator-cli.list",
@@ -112,7 +171,9 @@
       "noun": "list",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_list",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.search",
@@ -120,7 +181,9 @@
       "noun": "search",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_search",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.info",
@@ -128,7 +191,9 @@
       "noun": "info",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_info",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.examples",
@@ -136,7 +201,9 @@
       "noun": "examples",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_examples",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.mobile-profiles",
@@ -144,7 +211,9 @@
       "noun": "mobile-profiles",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_mobile_profiles",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.web-profiles",
@@ -152,7 +221,9 @@
       "noun": "web-profiles",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_web_profiles",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.artifact",
@@ -160,7 +231,9 @@
       "noun": "artifact",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_artifact",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.open-artifact",
@@ -168,7 +241,9 @@
       "noun": "open-artifact",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_open_artifact",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.packet",
@@ -176,7 +251,9 @@
       "noun": "packet",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_packet",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.accept-next-action",
@@ -184,7 +261,9 @@
       "noun": "accept-next-action",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_accept_next_action",
+      "group": "operate"
     },
     {
       "id": "operator-cli.approve",
@@ -192,7 +271,9 @@
       "noun": "approve",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_approve",
+      "group": "operate"
     },
     {
       "id": "operator-cli.reject",
@@ -200,7 +281,9 @@
       "noun": "reject",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_reject",
+      "group": "operate"
     },
     {
       "id": "operator-cli.email",
@@ -208,7 +291,9 @@
       "noun": "email",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_email",
+      "group": "operate"
     },
     {
       "id": "operator-cli.email.status",
@@ -216,7 +301,9 @@
       "noun": "email",
       "verb": "status",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_email_status",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.email.latest-draft",
@@ -224,7 +311,9 @@
       "noun": "email",
       "verb": "latest-draft",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_email_latest_draft",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.email.draft",
@@ -232,7 +321,9 @@
       "noun": "email",
       "verb": "draft",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_email_draft",
+      "group": "operate"
     },
     {
       "id": "operator-cli.email.deliver",
@@ -240,7 +331,9 @@
       "noun": "email",
       "verb": "deliver",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_email_deliver",
+      "group": "operate"
     },
     {
       "id": "operator-cli.email.archive-inbox",
@@ -248,7 +341,9 @@
       "noun": "email",
       "verb": "archive-inbox",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_email_archive_inbox",
+      "group": "operate"
     },
     {
       "id": "operator-cli.calendar",
@@ -256,7 +351,9 @@
       "noun": "calendar",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar",
+      "group": "operate"
     },
     {
       "id": "operator-cli.calendar.status",
@@ -264,7 +361,9 @@
       "noun": "calendar",
       "verb": "status",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar_status",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.calendar.list-calendars",
@@ -272,7 +371,9 @@
       "noun": "calendar",
       "verb": "list-calendars",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar_list_calendars",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.calendar.agenda",
@@ -280,7 +381,9 @@
       "noun": "calendar",
       "verb": "agenda",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar_agenda",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.calendar.freebusy",
@@ -288,7 +391,9 @@
       "noun": "calendar",
       "verb": "freebusy",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar_freebusy",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.calendar.create-event",
@@ -296,7 +401,9 @@
       "noun": "calendar",
       "verb": "create-event",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_calendar_create_event",
+      "group": "operate"
     },
     {
       "id": "operator-cli.memory",
@@ -304,7 +411,9 @@
       "noun": "memory",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_memory",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.task",
@@ -312,7 +421,9 @@
       "noun": "task",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_task",
+      "group": "operate"
     },
     {
       "id": "operator-cli.task.plan",
@@ -320,7 +431,9 @@
       "noun": "task",
       "verb": "plan",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_task_plan",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.task.start",
@@ -328,7 +441,9 @@
       "noun": "task",
       "verb": "start",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_task_start",
+      "group": "operate"
     },
     {
       "id": "operator-cli.task.scenario",
@@ -336,7 +451,9 @@
       "noun": "task",
       "verb": "scenario",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_task_scenario",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.offboard",
@@ -344,7 +461,9 @@
       "noun": "offboard",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_offboard",
+      "group": "operate"
     },
     {
       "id": "operator-cli.read",
@@ -352,7 +471,9 @@
       "noun": "read",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_read",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.write",
@@ -360,7 +481,9 @@
       "noun": "write",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_write",
+      "group": "operate"
     },
     {
       "id": "operator-cli.diff",
@@ -368,7 +491,9 @@
       "noun": "diff",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_diff",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.see",
@@ -376,7 +501,9 @@
       "noun": "see",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_see",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.listen",
@@ -384,7 +511,9 @@
       "noun": "listen",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_listen",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.watch",
@@ -392,7 +521,9 @@
       "noun": "watch",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_watch",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.speak",
@@ -400,7 +531,9 @@
       "noun": "speak",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_speak",
+      "group": "operate"
     },
     {
       "id": "operator-cli.draw",
@@ -408,7 +541,9 @@
       "noun": "draw",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_draw",
+      "group": "operate"
     },
     {
       "id": "operator-cli.capture",
@@ -416,7 +551,9 @@
       "noun": "capture",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_capture",
+      "group": "operate"
     },
     {
       "id": "operator-cli.record.screen",
@@ -424,7 +561,9 @@
       "noun": "record",
       "verb": "screen",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_record_screen",
+      "group": "operate"
     },
     {
       "id": "operator-cli.record.audio",
@@ -432,7 +571,9 @@
       "noun": "record",
       "verb": "audio",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_record_audio",
+      "group": "operate"
     },
     {
       "id": "operator-cli.record.camera",
@@ -440,7 +581,9 @@
       "noun": "record",
       "verb": "camera",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_record_camera",
+      "group": "operate"
     },
     {
       "id": "operator-cli.run",
@@ -448,7 +591,9 @@
       "noun": "run",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_run",
+      "group": "operate"
     },
     {
       "id": "operator-cli.preview",
@@ -456,7 +601,9 @@
       "noun": "preview",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_preview",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.intent",
@@ -464,7 +611,9 @@
       "noun": "intent",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_intent",
+      "group": "start"
     },
     {
       "id": "operator-cli.schedule",
@@ -472,7 +621,9 @@
       "noun": "schedule",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_schedule",
+      "group": "operate"
     },
     {
       "id": "operator-cli.schedule.list",
@@ -480,7 +631,9 @@
       "noun": "schedule",
       "verb": "list",
       "entry": "operator-cli",
-      "audience": "user"
+      "audience": "user",
+      "description": "cli_cmd_operator_cli_schedule_list",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.schedule.register",
@@ -488,7 +641,9 @@
       "noun": "schedule",
       "verb": "register",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_schedule_register",
+      "group": "operate"
     },
     {
       "id": "operator-cli.schedule.remove",
@@ -496,7 +651,9 @@
       "noun": "schedule",
       "verb": "remove",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_schedule_remove",
+      "group": "operate"
     },
     {
       "id": "operator-cli.project-trust",
@@ -504,7 +661,9 @@
       "noun": "project-trust",
       "verb": "default",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_project_trust",
+      "group": "inspect"
     },
     {
       "id": "operator-cli.project-trust.request",
@@ -512,7 +671,9 @@
       "noun": "project-trust",
       "verb": "request",
       "entry": "operator-cli",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_project_trust_request",
+      "group": "operate"
     },
     {
       "id": "pipeline-runner.default",
@@ -520,7 +681,9 @@
       "noun": "pipeline",
       "verb": "default",
       "entry": "pipeline-runner",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_pipeline_runner_default",
+      "group": "operate"
     },
     {
       "id": "operator-readiness.vital",
@@ -528,7 +691,9 @@
       "noun": "vital",
       "verb": "default",
       "entry": "operator-readiness",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_readiness_vital",
+      "group": "start"
     },
     {
       "id": "operator-setup.report",
@@ -536,7 +701,72 @@
       "noun": "setup",
       "verb": "report",
       "entry": "operator-setup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_setup_report",
+      "group": "start"
+    },
+    {
+      "id": "operator-setup.default",
+      "command": "setup",
+      "noun": "setup",
+      "verb": "default",
+      "entry": "operator-setup",
+      "audience": "operator",
+      "description": "cli_cmd_operator_setup_default",
+      "group": "start",
+      "scope_selector": "positional",
+      "scopes": [
+        {
+          "id": "onboarding",
+          "routes_to": ["onboarding"],
+          "description": "cli_scope_setup_onboarding"
+        },
+        {
+          "id": "context",
+          "routes_to": ["onboarding", "context"],
+          "description": "cli_scope_setup_context"
+        },
+        {
+          "id": "reasoning",
+          "routes_to": ["reasoning", "setup"],
+          "description": "cli_scope_setup_reasoning"
+        },
+        {
+          "id": "env",
+          "routes_to": ["env", "bootstrap"],
+          "description": "cli_scope_setup_env"
+        },
+        {
+          "id": "services",
+          "routes_to": ["service", "setup"],
+          "description": "cli_scope_setup_services"
+        },
+        {
+          "id": "tools",
+          "routes_to": ["tool", "setup"],
+          "description": "cli_scope_setup_tools"
+        },
+        {
+          "id": "provider-cli",
+          "routes_to": ["provider-cli", "setup"],
+          "description": "cli_scope_setup_provider_cli"
+        },
+        {
+          "id": "agy-sdk",
+          "routes_to": ["agy", "sdk-setup"],
+          "description": "cli_scope_setup_agy_sdk"
+        },
+        {
+          "id": "voice",
+          "routes_to": ["voice", "setup"],
+          "description": "cli_scope_setup_voice"
+        },
+        {
+          "id": "config",
+          "routes_to": ["config-mission"],
+          "description": "cli_scope_setup_config"
+        }
+      ]
     },
     {
       "id": "operator-voice.setup",
@@ -544,7 +774,9 @@
       "noun": "voice",
       "verb": "setup",
       "entry": "operator-voice",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_operator_voice_setup",
+      "group": "start"
     },
     {
       "id": "organization-model.default",
@@ -552,7 +784,9 @@
       "noun": "organization",
       "verb": "default",
       "entry": "organization-model",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_organization_model_default",
+      "group": "operate"
     },
     {
       "id": "project-controller.default",
@@ -560,7 +794,9 @@
       "noun": "project",
       "verb": "default",
       "entry": "project-controller",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_project_controller_default",
+      "group": "operate"
     }
   ],
   "entrypoints": [
@@ -663,7 +899,7 @@
     {
       "id": "operator-setup",
       "module": "scripts/setup_report.ts",
-      "commands": ["setup report"]
+      "commands": ["setup report", "setup"]
     },
     {
       "id": "operator-voice",
@@ -678,7 +914,10 @@
       "command": "pads server",
       "noun": "pads",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pads",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.test",
@@ -686,7 +925,10 @@
       "command": "test default",
       "noun": "test",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_test",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.test.unit",
@@ -694,7 +936,10 @@
       "command": "test unit",
       "noun": "test",
       "verb": "unit",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_test_unit",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.lint",
@@ -702,7 +947,10 @@
       "command": "lint default",
       "noun": "lint",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_lint",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.format",
@@ -710,7 +958,10 @@
       "command": "format default",
       "noun": "format",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_format",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build",
@@ -718,7 +969,10 @@
       "command": "build default",
       "noun": "build",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build.packages",
@@ -726,7 +980,10 @@
       "command": "build packages",
       "noun": "build",
       "verb": "packages",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build_packages",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build.actuators",
@@ -734,7 +991,10 @@
       "command": "build actuators",
       "noun": "build",
       "verb": "actuators",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build_actuators",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build.bundle",
@@ -742,7 +1002,10 @@
       "command": "build bundle",
       "noun": "build",
       "verb": "bundle",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build_bundle",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build.repo",
@@ -750,7 +1013,10 @@
       "command": "build repo",
       "noun": "build",
       "verb": "repo",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build_repo",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.build.ui",
@@ -758,7 +1024,10 @@
       "command": "build ui",
       "noun": "build",
       "verb": "ui",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_build_ui",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.audit.mirror-reconcile",
@@ -766,7 +1035,10 @@
       "command": "audit mirror-reconcile",
       "noun": "audit",
       "verb": "mirror-reconcile",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_audit_mirror_reconcile",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.generate.op-registry",
@@ -774,7 +1046,9 @@
       "command": "generate op-registry",
       "noun": "generate",
       "verb": "op-registry",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_op_registry",
+      "group": "dev"
     },
     {
       "id": "script.generate.vocabulary-types",
@@ -782,7 +1056,9 @@
       "command": "generate vocabulary-types",
       "noun": "generate",
       "verb": "vocabulary-types",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_vocabulary_types",
+      "group": "dev"
     },
     {
       "id": "script.generate.pseudo-locale",
@@ -790,7 +1066,9 @@
       "command": "generate pseudo-locale",
       "noun": "generate",
       "verb": "pseudo-locale",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_pseudo_locale",
+      "group": "dev"
     },
     {
       "id": "script.service.harness",
@@ -798,7 +1076,10 @@
       "command": "service harness",
       "noun": "service",
       "verb": "harness",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_service_harness",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.check.chronos-perf",
@@ -806,7 +1087,10 @@
       "command": "check chronos-perf",
       "noun": "check",
       "verb": "chronos-perf",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_chronos_perf",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.check.plugin-views-e2e",
@@ -814,7 +1098,10 @@
       "command": "check plugin-views-e2e",
       "noun": "check",
       "verb": "plugin-views-e2e",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_plugin_views_e2e",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.service.recording",
@@ -822,7 +1109,30 @@
       "command": "service recording",
       "noun": "service",
       "verb": "recording",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_service_recording",
+      "group": "operate"
+    },
+    {
+      "id": "script.generate.cli-reference",
+      "script": "generate:cli-reference",
+      "command": "generate cli-reference",
+      "noun": "generate",
+      "verb": "cli-reference",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_cli_reference",
+      "group": "dev"
+    },
+    {
+      "id": "script.docs.check",
+      "module": "scripts/check_docs_drift.ts",
+      "command": "docs check",
+      "noun": "docs",
+      "verb": "check",
+      "audience": "dev",
+      "description": "cli_cmd_script_docs_check",
+      "group": "dev",
+      "native_help": true
     },
     {
       "id": "script.generate.env-registry",
@@ -830,7 +1140,9 @@
       "command": "generate env-registry",
       "noun": "generate",
       "verb": "env-registry",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_env_registry",
+      "group": "dev"
     },
     {
       "id": "script.config.report",
@@ -838,7 +1150,10 @@
       "command": "config report",
       "noun": "config",
       "verb": "report",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_config_report",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.agents.generate",
@@ -846,7 +1161,9 @@
       "command": "agents generate",
       "noun": "agents",
       "verb": "generate",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agents_generate",
+      "group": "operate"
     },
     {
       "id": "script.check.apple-fm",
@@ -854,7 +1171,9 @@
       "command": "check apple-fm",
       "noun": "check",
       "verb": "apple-fm",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_apple_fm",
+      "group": "dev"
     },
     {
       "id": "script.auth.check",
@@ -862,7 +1181,9 @@
       "command": "auth check",
       "noun": "auth",
       "verb": "check",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_auth_check",
+      "group": "inspect"
     },
     {
       "id": "script.check.backend-conformance",
@@ -870,7 +1191,10 @@
       "command": "check backend-conformance",
       "noun": "check",
       "verb": "backend-conformance",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_backend_conformance",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.inventory.resource-loaders",
@@ -878,7 +1202,9 @@
       "command": "inventory resource-loaders",
       "noun": "inventory",
       "verb": "resource-loaders",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_inventory_resource_loaders",
+      "group": "dev"
     },
     {
       "id": "script.check.script-integrity",
@@ -886,7 +1212,9 @@
       "command": "check script-integrity",
       "noun": "check",
       "verb": "script-integrity",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_script_integrity",
+      "group": "dev"
     },
     {
       "id": "script.check.improvement-plan-metadata",
@@ -894,15 +1222,19 @@
       "command": "check improvement-plan-metadata",
       "noun": "check",
       "verb": "improvement-plan-metadata",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_improvement_plan_metadata",
+      "group": "dev"
     },
     {
-      "id": "script.report.i18n-coverage",
-      "script": "report:i18n-coverage",
-      "command": "report i18n-coverage",
-      "noun": "report",
-      "verb": "i18n-coverage",
-      "audience": "dev"
+      "id": "script.i18n.report",
+      "script": "i18n:report",
+      "command": "i18n report",
+      "noun": "i18n",
+      "verb": "report",
+      "audience": "dev",
+      "description": "cli_cmd_script_report_i18n_coverage",
+      "group": "dev"
     },
     {
       "id": "script.sync.component-inventory",
@@ -910,7 +1242,10 @@
       "command": "sync component-inventory",
       "noun": "sync",
       "verb": "component-inventory",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_sync_component_inventory",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.sync.model-registry",
@@ -918,7 +1253,9 @@
       "command": "sync model-registry",
       "noun": "sync",
       "verb": "model-registry",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_sync_model_registry",
+      "group": "operate"
     },
     {
       "id": "script.tenant",
@@ -926,7 +1263,10 @@
       "command": "tenant default",
       "noun": "tenant",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_tenant",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.tenant.activation",
@@ -934,23 +1274,31 @@
       "command": "tenant activation",
       "noun": "tenant",
       "verb": "activation",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_tenant_activation",
+      "group": "operate"
     },
     {
-      "id": "script.migrate.physical-namespaces",
-      "script": "migrate:physical-namespaces",
-      "command": "migrate physical-namespaces",
-      "noun": "migrate",
-      "verb": "physical-namespaces",
-      "audience": "operator"
+      "id": "script.namespace.migrate-physical",
+      "script": "namespace:migrate-physical",
+      "command": "namespace migrate-physical",
+      "noun": "namespace",
+      "verb": "migrate-physical",
+      "audience": "operator",
+      "description": "cli_cmd_script_migrate_physical_namespaces",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.migrate.peer-tenant-runtime",
-      "script": "migrate:peer-tenant-runtime",
-      "command": "migrate peer-tenant-runtime",
-      "noun": "migrate",
-      "verb": "peer-tenant-runtime",
-      "audience": "operator"
+      "id": "script.peer.migrate-tenant-runtime",
+      "script": "peer:migrate-tenant-runtime",
+      "command": "peer migrate-tenant-runtime",
+      "noun": "peer",
+      "verb": "migrate-tenant-runtime",
+      "audience": "operator",
+      "description": "cli_cmd_script_migrate_peer_tenant_runtime",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.peer.runtime-recovery",
@@ -958,7 +1306,10 @@
       "command": "peer runtime-recovery",
       "noun": "peer",
       "verb": "runtime-recovery",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_runtime_recovery",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.organization",
@@ -966,7 +1317,10 @@
       "command": "organization default",
       "noun": "organization",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_organization",
+      "group": "operate",
+      "same_target_as": "organization-model.default"
     },
     {
       "id": "script.knowledge.rank",
@@ -974,7 +1328,9 @@
       "command": "knowledge rank",
       "noun": "knowledge",
       "verb": "rank",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_rank",
+      "group": "inspect"
     },
     {
       "id": "script.knowledge",
@@ -982,15 +1338,19 @@
       "command": "knowledge default",
       "noun": "knowledge",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge",
+      "group": "operate"
     },
     {
-      "id": "script.knowledge-feedback",
-      "script": "knowledge-feedback",
-      "command": "knowledge-feedback default",
-      "noun": "knowledge-feedback",
-      "verb": "default",
-      "audience": "operator"
+      "id": "script.knowledge.feedback",
+      "script": "knowledge:feedback",
+      "command": "knowledge feedback",
+      "noun": "knowledge",
+      "verb": "feedback",
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_feedback",
+      "group": "operate"
     },
     {
       "id": "script.knowledge.scope-health",
@@ -998,7 +1358,10 @@
       "command": "knowledge scope-health",
       "noun": "knowledge",
       "verb": "scope-health",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_scope_health",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.knowledge.scope-reconcile",
@@ -1006,7 +1369,10 @@
       "command": "knowledge scope-reconcile",
       "noun": "knowledge",
       "verb": "scope-reconcile",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_scope_reconcile",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.scope",
@@ -1014,7 +1380,9 @@
       "command": "scope default",
       "noun": "scope",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_scope",
+      "group": "inspect"
     },
     {
       "id": "script.bindings",
@@ -1022,7 +1390,9 @@
       "command": "bindings default",
       "noun": "bindings",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_bindings",
+      "group": "inspect"
     },
     {
       "id": "script.generate.capability-seams",
@@ -1030,7 +1400,9 @@
       "command": "generate capability-seams",
       "noun": "generate",
       "verb": "capability-seams",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_capability_seams",
+      "group": "dev"
     },
     {
       "id": "script.check",
@@ -1038,7 +1410,10 @@
       "command": "check default",
       "noun": "check",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.knowledge.sync",
@@ -1046,7 +1421,10 @@
       "command": "knowledge sync",
       "noun": "knowledge",
       "verb": "sync",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_sync",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.check.contract-semver",
@@ -1054,7 +1432,10 @@
       "command": "check contract-semver",
       "noun": "check",
       "verb": "contract-semver",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_contract_semver",
+      "group": "dev",
+      "native_help": true
     },
     {
       "id": "script.check.pr-title",
@@ -1062,7 +1443,10 @@
       "command": "check pr-title",
       "noun": "check",
       "verb": "pr-title",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_pr_title",
+      "group": "dev",
+      "native_help": true
     },
     {
       "id": "script.pr.create",
@@ -1070,7 +1454,12 @@
       "command": "pr create",
       "noun": "pr",
       "verb": "create",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pr_create",
+      "group": "operate",
+      "caution": "cli_caution_pr_create",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.check.commit-subject",
@@ -1078,7 +1467,9 @@
       "command": "check commit-subject",
       "noun": "check",
       "verb": "commit-subject",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_commit_subject",
+      "group": "dev"
     },
     {
       "id": "script.task.list",
@@ -1086,7 +1477,9 @@
       "command": "task list",
       "noun": "task",
       "verb": "list",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_task_list",
+      "group": "inspect"
     },
     {
       "id": "script.task.init",
@@ -1094,7 +1487,10 @@
       "command": "task init",
       "noun": "task",
       "verb": "init",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_task_init",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.task.run",
@@ -1102,7 +1498,11 @@
       "command": "task run",
       "noun": "task",
       "verb": "run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_task_run",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.task.smoke",
@@ -1110,15 +1510,21 @@
       "command": "task smoke",
       "noun": "task",
       "verb": "smoke",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_task_smoke",
+      "group": "operate",
+      "long_running": true
     },
     {
-      "id": "script.intent",
-      "script": "intent",
-      "command": "intent default",
+      "id": "script.intent.trace",
+      "script": "intent:trace",
+      "command": "intent trace",
       "noun": "intent",
-      "verb": "default",
-      "audience": "operator"
+      "verb": "trace",
+      "audience": "operator",
+      "description": "cli_cmd_script_intent_trace",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.onboarding.context",
@@ -1126,7 +1532,9 @@
       "command": "onboarding context",
       "noun": "onboarding",
       "verb": "context",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_onboarding_context",
+      "group": "start"
     },
     {
       "id": "script.minutes.record",
@@ -1134,7 +1542,11 @@
       "command": "minutes record",
       "noun": "minutes",
       "verb": "record",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_minutes_record",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.license.audit",
@@ -1142,7 +1554,10 @@
       "command": "license audit",
       "noun": "license",
       "verb": "audit",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_license_audit",
+      "group": "dev",
+      "native_help": true
     },
     {
       "id": "script.voice.upgrade",
@@ -1150,7 +1565,11 @@
       "command": "voice upgrade",
       "noun": "voice",
       "verb": "upgrade",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_upgrade",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.generate.pii-rules",
@@ -1158,7 +1577,9 @@
       "command": "generate pii-rules",
       "noun": "generate",
       "verb": "pii-rules",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_pii_rules",
+      "group": "dev"
     },
     {
       "id": "script.meeting.preflight",
@@ -1166,15 +1587,22 @@
       "command": "meeting preflight",
       "noun": "meeting",
       "verb": "preflight",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_meeting_preflight",
+      "group": "inspect",
+      "native_help": true
     },
     {
-      "id": "script.dev.watch",
-      "script": "dev:watch",
-      "command": "dev watch",
-      "noun": "dev",
+      "id": "script.test.watch",
+      "script": "test:watch",
+      "command": "test watch",
+      "noun": "test",
       "verb": "watch",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_dev_watch",
+      "group": "dev",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.smoke.intent",
@@ -1182,15 +1610,22 @@
       "command": "smoke intent",
       "noun": "smoke",
       "verb": "intent",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_smoke_intent",
+      "group": "dev",
+      "long_running": true,
+      "native_help": true
     },
     {
-      "id": "script.watch.tenant-drift",
-      "script": "watch:tenant-drift",
-      "command": "watch tenant-drift",
-      "noun": "watch",
-      "verb": "tenant-drift",
-      "audience": "operator"
+      "id": "script.tenant.watch-drift",
+      "script": "tenant:watch-drift",
+      "command": "tenant watch-drift",
+      "noun": "tenant",
+      "verb": "watch-drift",
+      "audience": "operator",
+      "description": "cli_cmd_script_watch_tenant_drift",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.pipeline.promote",
@@ -1198,15 +1633,20 @@
       "command": "pipeline promote",
       "noun": "pipeline",
       "verb": "promote",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pipeline_promote",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.inventory",
-      "script": "inventory",
-      "command": "inventory manage",
-      "noun": "inventory",
-      "verb": "manage",
-      "audience": "user"
+      "id": "script.work.inventory",
+      "script": "work:inventory",
+      "command": "work inventory",
+      "noun": "work",
+      "verb": "inventory",
+      "audience": "user",
+      "description": "cli_cmd_script_inventory",
+      "group": "operate"
     },
     {
       "id": "script.patch.dependency",
@@ -1214,7 +1654,11 @@
       "command": "patch dependency",
       "noun": "patch",
       "verb": "dependency",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_patch_dependency",
+      "group": "dev",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.manifests.sign",
@@ -1222,7 +1666,10 @@
       "command": "manifests sign",
       "noun": "manifests",
       "verb": "sign",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_manifests_sign",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.secrets.encrypt",
@@ -1230,7 +1677,10 @@
       "command": "secrets encrypt",
       "noun": "secrets",
       "verb": "encrypt",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_secrets_encrypt",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.workspace.list",
@@ -1239,7 +1689,9 @@
       "noun": "workspace",
       "verb": "list",
       "audience": "operator",
-      "args": ["list"]
+      "args": ["list"],
+      "description": "cli_cmd_script_workspace_list",
+      "group": "inspect"
     },
     {
       "id": "script.workspace.gc",
@@ -1248,7 +1700,9 @@
       "noun": "workspace",
       "verb": "gc",
       "audience": "operator",
-      "args": ["gc"]
+      "args": ["gc"],
+      "description": "cli_cmd_script_workspace_gc",
+      "group": "operate"
     },
     {
       "id": "script.secret.introduce",
@@ -1257,7 +1711,11 @@
       "noun": "secret",
       "verb": "introduce",
       "audience": "operator",
-      "args": ["introduce"]
+      "args": ["introduce"],
+      "description": "cli_cmd_script_secret_introduce",
+      "group": "operate",
+      "interactive": true,
+      "native_help": true
     },
     {
       "id": "script.secret.status",
@@ -1266,7 +1724,10 @@
       "noun": "secret",
       "verb": "status",
       "audience": "operator",
-      "args": ["status"]
+      "args": ["status"],
+      "description": "cli_cmd_script_secret_status",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.secret.apply",
@@ -1275,7 +1736,11 @@
       "noun": "secret",
       "verb": "apply",
       "audience": "operator",
-      "args": ["apply"]
+      "args": ["apply"],
+      "description": "cli_cmd_script_secret_apply",
+      "group": "operate",
+      "interactive": true,
+      "native_help": true
     },
     {
       "id": "script.cost.report",
@@ -1283,7 +1748,10 @@
       "command": "cost report",
       "noun": "cost",
       "verb": "report",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_cost_report",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.egress.report",
@@ -1291,7 +1759,10 @@
       "command": "egress report",
       "noun": "egress",
       "verb": "report",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_egress_report",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.daemon.watchdog",
@@ -1299,7 +1770,10 @@
       "command": "daemon watchdog",
       "noun": "daemon",
       "verb": "watchdog",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_daemon_watchdog",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.mesh.deliver",
@@ -1307,7 +1781,10 @@
       "command": "mesh deliver",
       "noun": "mesh",
       "verb": "deliver",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mesh_deliver",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.campaign.suite",
@@ -1315,7 +1792,11 @@
       "command": "campaign suite",
       "noun": "campaign",
       "verb": "suite",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_campaign_suite",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.audit.verify",
@@ -1323,7 +1804,10 @@
       "command": "audit verify",
       "noun": "audit",
       "verb": "verify",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_audit_verify",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.ai-test",
@@ -1331,7 +1815,11 @@
       "command": "ai-test default",
       "noun": "ai-test",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_ai_test",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.generate.knowledge-index",
@@ -1339,7 +1827,9 @@
       "command": "generate knowledge-index",
       "noun": "generate",
       "verb": "knowledge-index",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_knowledge_index",
+      "group": "dev"
     },
     {
       "id": "script.history.search",
@@ -1347,7 +1837,10 @@
       "command": "history search",
       "noun": "history",
       "verb": "search",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_history_search",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.scenario",
@@ -1355,7 +1848,10 @@
       "command": "scenario run",
       "noun": "scenario",
       "verb": "run",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_scenario",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.plugin.install",
@@ -1363,7 +1859,10 @@
       "command": "plugin install",
       "noun": "plugin",
       "verb": "install",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_plugin_install",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.background-review",
@@ -1371,7 +1870,9 @@
       "command": "background-review default",
       "noun": "background-review",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_background_review",
+      "group": "operate"
     },
     {
       "id": "script.background-review.mission-e2e",
@@ -1379,7 +1880,10 @@
       "command": "background-review mission-e2e",
       "noun": "background-review",
       "verb": "mission-e2e",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_background_review_mission_e2e",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.automation.blueprint",
@@ -1387,7 +1891,9 @@
       "command": "automation blueprint",
       "noun": "automation",
       "verb": "blueprint",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_automation_blueprint",
+      "group": "inspect"
     },
     {
       "id": "script.mesh-hub.inspect",
@@ -1395,15 +1901,22 @@
       "command": "mesh-hub inspect",
       "noun": "mesh-hub",
       "verb": "inspect",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mesh_hub_inspect",
+      "group": "inspect",
+      "native_help": true
     },
     {
-      "id": "script.export.validation-bundle",
-      "script": "export:validation-bundle",
-      "command": "export validation-bundle",
-      "noun": "export",
-      "verb": "validation-bundle",
-      "audience": "operator"
+      "id": "script.validation-bundle.export",
+      "script": "validation-bundle:export",
+      "command": "validation-bundle export",
+      "noun": "validation-bundle",
+      "verb": "export",
+      "audience": "operator",
+      "description": "cli_cmd_script_export_validation_bundle",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.meeting.run",
@@ -1411,7 +1924,12 @@
       "command": "meeting run",
       "noun": "meeting",
       "verb": "run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_meeting_run",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.meeting.participate",
@@ -1419,7 +1937,12 @@
       "command": "meeting participate",
       "noun": "meeting",
       "verb": "participate",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_meeting_participate",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.gws.meet.create",
@@ -1427,7 +1950,10 @@
       "command": "gws meet-create",
       "noun": "gws",
       "verb": "meet-create",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_gws_meet_create",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.env.bootstrap",
@@ -1435,7 +1961,11 @@
       "command": "env bootstrap",
       "noun": "env",
       "verb": "bootstrap",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_env_bootstrap",
+      "group": "start",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.meeting.consent",
@@ -1443,7 +1973,11 @@
       "command": "meeting consent",
       "noun": "meeting",
       "verb": "consent",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_meeting_consent",
+      "group": "operate",
+      "interactive": true,
+      "native_help": true
     },
     {
       "id": "script.voice.route",
@@ -1451,7 +1985,10 @@
       "command": "voice route",
       "noun": "voice",
       "verb": "route",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_route",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.voice.conversation-config",
@@ -1459,7 +1996,10 @@
       "command": "voice conversation-config",
       "noun": "voice",
       "verb": "conversation-config",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_conversation_config",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.typecheck",
@@ -1467,7 +2007,10 @@
       "command": "typecheck default",
       "noun": "typecheck",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_typecheck",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.validate",
@@ -1475,7 +2018,10 @@
       "command": "validate default",
       "noun": "validate",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_validate",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.doctor",
@@ -1483,7 +2029,11 @@
       "command": "doctor default",
       "noun": "doctor",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_doctor",
+      "group": "start",
+      "native_help": true,
+      "same_target_as": "operator-home.doctor"
     },
     {
       "id": "script.office",
@@ -1491,7 +2041,12 @@
       "command": "office default",
       "noun": "office",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_office",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.tui",
@@ -1499,7 +2054,12 @@
       "command": "tui default",
       "noun": "tui",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_tui",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.deps.check",
@@ -1507,7 +2067,10 @@
       "command": "deps check",
       "noun": "deps",
       "verb": "check",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_deps_check",
+      "group": "dev",
+      "native_help": true
     },
     {
       "id": "script.media.visual-proof.ds04",
@@ -1515,7 +2078,10 @@
       "command": "media visual-proof-ds04",
       "noun": "media",
       "verb": "visual-proof-ds04",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_media_visual_proof_ds04",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.service.preflight",
@@ -1523,7 +2089,10 @@
       "command": "service preflight",
       "noun": "service",
       "verb": "preflight",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_service_preflight",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.browser.run",
@@ -1531,7 +2100,11 @@
       "command": "browser run",
       "noun": "browser",
       "verb": "run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_run",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.browser.inspect",
@@ -1539,7 +2112,10 @@
       "command": "browser inspect",
       "noun": "browser",
       "verb": "inspect",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_inspect",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.browser.profiles",
@@ -1548,7 +2124,10 @@
       "command": "browser profiles",
       "noun": "browser",
       "verb": "profiles",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_profiles",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.browser.open",
@@ -1557,7 +2136,10 @@
       "command": "browser open",
       "noun": "browser",
       "verb": "open",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_open",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.browser.create",
@@ -1566,7 +2148,10 @@
       "command": "browser create",
       "noun": "browser",
       "verb": "create",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_create",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.vault.mount",
@@ -1575,7 +2160,10 @@
       "command": "vault mount",
       "noun": "vault",
       "verb": "mount",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_vault_mount",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.vault.unmount",
@@ -1584,7 +2172,10 @@
       "command": "vault unmount",
       "noun": "vault",
       "verb": "unmount",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_vault_unmount",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.vault.list",
@@ -1593,7 +2184,10 @@
       "command": "vault list",
       "noun": "vault",
       "verb": "list",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_vault_list",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.vault.cleanup",
@@ -1602,7 +2196,10 @@
       "command": "vault cleanup",
       "noun": "vault",
       "verb": "cleanup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_vault_cleanup",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.kyberion",
@@ -1610,7 +2207,10 @@
       "command": "kyberion default",
       "noun": "kyberion",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_kyberion",
+      "group": "start",
+      "native_help": true
     },
     {
       "id": "script.email.workflow",
@@ -1618,7 +2218,10 @@
       "command": "email workflow",
       "noun": "email",
       "verb": "workflow",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_email_workflow",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.mission",
@@ -1626,7 +2229,10 @@
       "command": "mission default",
       "noun": "mission",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mission",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.project",
@@ -1634,7 +2240,11 @@
       "command": "project default",
       "noun": "project",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_project",
+      "group": "operate",
+      "native_help": true,
+      "same_target_as": "project-controller.default"
     },
     {
       "id": "script.create.actuator",
@@ -1642,7 +2252,10 @@
       "command": "create actuator",
       "noun": "create",
       "verb": "actuator",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_create_actuator",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.review.stamp",
@@ -1650,7 +2263,9 @@
       "command": "review stamp",
       "noun": "review",
       "verb": "stamp",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_review_stamp",
+      "group": "operate"
     },
     {
       "id": "script.sketch-input.server",
@@ -1658,7 +2273,10 @@
       "command": "sketch-input server",
       "noun": "sketch-input",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_sketch_input_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.meeting-notepad.server",
@@ -1666,7 +2284,10 @@
       "command": "meeting-notepad server",
       "noun": "meeting-notepad",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_meeting_notepad_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.memory-capture.server",
@@ -1674,7 +2295,10 @@
       "command": "memory-capture server",
       "noun": "memory-capture",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_memory_capture_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.screenshot-annotate.server",
@@ -1682,7 +2306,10 @@
       "command": "screenshot-annotate server",
       "noun": "screenshot-annotate",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_screenshot_annotate_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.clipboard-inbox.server",
@@ -1690,7 +2317,10 @@
       "command": "clipboard-inbox server",
       "noun": "clipboard-inbox",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_clipboard_inbox_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.daily-desk.server",
@@ -1698,7 +2328,10 @@
       "command": "daily-desk server",
       "noun": "daily-desk",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_daily_desk_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.doc-drop.server",
@@ -1706,7 +2339,10 @@
       "command": "doc-drop server",
       "noun": "doc-drop",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_doc_drop_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.personal-workbench.server",
@@ -1714,7 +2350,10 @@
       "command": "personal-workbench server",
       "noun": "personal-workbench",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_personal_workbench_server",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.model.feedback",
@@ -1722,7 +2361,10 @@
       "command": "model feedback",
       "noun": "model",
       "verb": "feedback",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_model_feedback",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.agent-runtime.supervisor",
@@ -1730,7 +2372,10 @@
       "command": "agent-runtime supervisor",
       "noun": "agent-runtime",
       "verb": "supervisor",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agent_runtime_supervisor",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.agent-runtime.daemon",
@@ -1738,7 +2383,10 @@
       "command": "agent-runtime daemon",
       "noun": "agent-runtime",
       "verb": "daemon",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agent_runtime_daemon",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.peer.conversation-server",
@@ -1746,7 +2394,11 @@
       "command": "peer conversation-server",
       "noun": "peer",
       "verb": "conversation-server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_conversation_server",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.peer.register",
@@ -1754,7 +2406,10 @@
       "command": "peer register",
       "noun": "peer",
       "verb": "register",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_register",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.peer.conversation",
@@ -1762,7 +2417,12 @@
       "command": "peer conversation",
       "noun": "peer",
       "verb": "conversation",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_conversation",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.peer.collaboration",
@@ -1770,7 +2430,10 @@
       "command": "peer collaboration",
       "noun": "peer",
       "verb": "collaboration",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_collaboration",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.peer.send",
@@ -1778,7 +2441,10 @@
       "command": "peer send",
       "noun": "peer",
       "verb": "send",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_send",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.work",
@@ -1786,7 +2452,10 @@
       "command": "work default",
       "noun": "work",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_work",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.mission.orchestrator",
@@ -1794,15 +2463,23 @@
       "command": "mission orchestrator",
       "noun": "mission",
       "verb": "orchestrator",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mission_orchestrator",
+      "group": "operate",
+      "long_running": true
     },
     {
-      "id": "script.onboard",
-      "script": "onboard",
-      "command": "onboard default",
-      "noun": "onboard",
+      "id": "script.onboarding",
+      "script": "onboarding",
+      "command": "onboarding default",
+      "noun": "onboarding",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_onboard",
+      "group": "start",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.mission.journal",
@@ -1810,15 +2487,21 @@
       "command": "mission journal",
       "noun": "mission",
       "verb": "journal",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mission_journal",
+      "group": "inspect"
     },
     {
-      "id": "script.ingest",
-      "script": "ingest",
-      "command": "ingest default",
-      "noun": "ingest",
-      "verb": "default",
-      "audience": "operator"
+      "id": "script.knowledge.ingest",
+      "script": "knowledge:ingest",
+      "command": "knowledge ingest",
+      "noun": "knowledge",
+      "verb": "ingest",
+      "audience": "operator",
+      "description": "cli_cmd_script_ingest",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.dashboard",
@@ -1826,7 +2509,11 @@
       "command": "dashboard default",
       "noun": "dashboard",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_dashboard",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.control",
@@ -1834,7 +2521,10 @@
       "command": "control default",
       "noun": "control",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_control",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.surfaces",
@@ -1842,7 +2532,11 @@
       "command": "surfaces default",
       "noun": "surfaces",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_surfaces",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.config-mission",
@@ -1850,15 +2544,23 @@
       "command": "config-mission default",
       "noun": "config-mission",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_config_mission",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.services.setup",
-      "script": "services:setup",
-      "command": "services setup",
-      "noun": "services",
+      "id": "script.service.setup",
+      "script": "service:setup",
+      "command": "service setup",
+      "noun": "service",
       "verb": "setup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_services_setup",
+      "group": "start",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.channels.list",
@@ -1866,7 +2568,10 @@
       "command": "channels list",
       "noun": "channels",
       "verb": "list",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_channels_list",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.generation.schedule",
@@ -1874,32 +2579,44 @@
       "command": "generation schedule",
       "noun": "generation",
       "verb": "schedule",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_generation_schedule",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.chronos",
-      "script": "chronos",
-      "command": "chronos default",
-      "noun": "chronos",
+      "id": "script.scheduler",
+      "script": "scheduler",
+      "command": "scheduler default",
+      "noun": "scheduler",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos",
+      "group": "operate",
+      "long_running": true
     },
     {
-      "id": "script.chronos.install",
+      "id": "script.scheduler.install",
       "module": "scripts/install_chronos_launchd.ts",
-      "command": "chronos install",
-      "noun": "chronos",
+      "command": "scheduler install",
+      "noun": "scheduler",
       "verb": "install",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_install",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.chronos.uninstall",
+      "id": "script.scheduler.uninstall",
       "module": "scripts/install_chronos_launchd.ts",
       "args": ["--uninstall"],
-      "command": "chronos uninstall",
-      "noun": "chronos",
+      "command": "scheduler uninstall",
+      "noun": "scheduler",
       "verb": "uninstall",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_uninstall",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.ops.alerts",
@@ -1907,7 +2624,10 @@
       "command": "ops alerts",
       "noun": "ops",
       "verb": "alerts",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_ops_alerts",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.voice.conversation.turn",
@@ -1915,7 +2635,12 @@
       "command": "voice conversation-turn",
       "noun": "voice",
       "verb": "conversation-turn",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_conversation_turn",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.voice.profile.promote",
@@ -1923,15 +2648,21 @@
       "command": "voice profile-promote",
       "noun": "voice",
       "verb": "profile-promote",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_profile_promote",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.agy.sdk.setup",
-      "script": "agy:sdk:setup",
+      "id": "script.agy.sdk-setup",
+      "script": "agy:sdk-setup",
       "command": "agy sdk-setup",
       "noun": "agy",
       "verb": "sdk-setup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agy_sdk_setup",
+      "group": "start",
+      "native_help": true
     },
     {
       "id": "script.tool.setup",
@@ -1939,15 +2670,23 @@
       "command": "tool setup",
       "noun": "tool",
       "verb": "setup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_tool_setup",
+      "group": "start",
+      "long_running": true,
+      "native_help": true
     },
     {
-      "id": "script.managed.env",
-      "script": "managed-env",
-      "command": "managed env",
-      "noun": "managed",
-      "verb": "env",
-      "audience": "operator"
+      "id": "script.provider-cli.setup",
+      "script": "provider-cli:setup",
+      "command": "provider-cli setup",
+      "noun": "provider-cli",
+      "verb": "setup",
+      "audience": "operator",
+      "description": "cli_cmd_script_managed_env",
+      "group": "start",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.seam.select",
@@ -1955,7 +2694,10 @@
       "command": "seam select",
       "noun": "seam",
       "verb": "select",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_seam_select",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.reasoning.setup",
@@ -1963,7 +2705,12 @@
       "command": "reasoning setup",
       "noun": "reasoning",
       "verb": "setup",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_reasoning_setup",
+      "group": "start",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.reasoning.config",
@@ -1971,39 +2718,53 @@
       "command": "reasoning config",
       "noun": "reasoning",
       "verb": "config",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_reasoning_config",
+      "group": "inspect",
+      "native_help": true
     },
     {
-      "id": "script.customer.create",
-      "script": "customer:create",
-      "command": "customer create",
-      "noun": "customer",
+      "id": "script.stance.create",
+      "script": "stance:create",
+      "command": "stance create",
+      "noun": "stance",
       "verb": "create",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_create",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.customer.list",
-      "script": "customer:list",
-      "command": "customer list",
-      "noun": "customer",
+      "id": "script.stance.list",
+      "script": "stance:list",
+      "command": "stance list",
+      "noun": "stance",
       "verb": "list",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_list",
+      "group": "inspect"
     },
     {
-      "id": "script.customer.migrate-from-personal",
-      "script": "customer:migrate-from-personal",
-      "command": "customer migrate-from-personal",
-      "noun": "customer",
+      "id": "script.stance.migrate-from-personal",
+      "script": "stance:migrate-from-personal",
+      "command": "stance migrate-from-personal",
+      "noun": "stance",
       "verb": "migrate-from-personal",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_migrate_from_personal",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.customer.switch",
-      "script": "customer:switch",
-      "command": "customer switch",
-      "noun": "customer",
+      "id": "script.stance.switch",
+      "script": "stance:switch",
+      "command": "stance switch",
+      "noun": "stance",
       "verb": "switch",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_switch",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.backup",
@@ -2011,7 +2772,10 @@
       "command": "backup default",
       "noun": "backup",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_backup",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.telegram.bridge",
@@ -2019,7 +2783,10 @@
       "command": "telegram bridge",
       "noun": "telegram",
       "verb": "bridge",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_telegram_bridge",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.chronos.dev",
@@ -2027,7 +2794,11 @@
       "command": "chronos dev",
       "noun": "chronos",
       "verb": "dev",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_dev",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.capabilities",
@@ -2035,7 +2806,9 @@
       "command": "capabilities default",
       "noun": "capabilities",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_capabilities",
+      "group": "inspect"
     },
     {
       "id": "script.playground",
@@ -2043,7 +2816,11 @@
       "command": "playground default",
       "noun": "playground",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_playground",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.provider-capabilities.scan",
@@ -2051,15 +2828,20 @@
       "command": "provider-capabilities scan",
       "noun": "provider-capabilities",
       "verb": "scan",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_provider_capabilities_scan",
+      "group": "inspect",
+      "native_help": true
     },
     {
       "id": "script.examples",
       "script": "examples",
-      "command": "examples default",
+      "command": "examples discover",
       "noun": "examples",
-      "verb": "default",
-      "audience": "dev"
+      "verb": "discover",
+      "audience": "dev",
+      "description": "cli_cmd_script_examples",
+      "group": "dev"
     },
     {
       "id": "script.system.upgrade",
@@ -2067,7 +2849,10 @@
       "command": "system upgrade",
       "noun": "system",
       "verb": "upgrade",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_system_upgrade",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.pipeline",
@@ -2075,7 +2860,11 @@
       "command": "pipeline default",
       "noun": "pipeline",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pipeline",
+      "group": "operate",
+      "long_running": true,
+      "same_target_as": "pipeline-runner.default"
     },
     {
       "id": "script.pipeline.super",
@@ -2083,7 +2872,11 @@
       "command": "pipeline super",
       "noun": "pipeline",
       "verb": "super",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_pipeline_super",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.intent.run",
@@ -2091,7 +2884,11 @@
       "command": "intent run",
       "noun": "intent",
       "verb": "run",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_intent_run",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.release.notes",
@@ -2099,7 +2896,10 @@
       "command": "release notes",
       "noun": "release",
       "verb": "notes",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_release_notes",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.release.source-archive",
@@ -2107,7 +2907,11 @@
       "command": "release source-archive",
       "noun": "release",
       "verb": "source-archive",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_release_source_archive",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.changelog.assemble",
@@ -2115,7 +2919,10 @@
       "command": "changelog assemble",
       "noun": "changelog",
       "verb": "assemble",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_changelog_assemble",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.resolve.install-driver",
@@ -2123,7 +2930,9 @@
       "command": "resolve install-driver",
       "noun": "resolve",
       "verb": "install-driver",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_resolve_install_driver",
+      "group": "operate"
     },
     {
       "id": "script.resolve.generated",
@@ -2131,7 +2940,11 @@
       "command": "resolve generated",
       "noun": "resolve",
       "verb": "generated",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_resolve_generated",
+      "group": "dev",
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.release.install-smoke",
@@ -2140,7 +2953,10 @@
       "command": "release install-smoke",
       "noun": "release",
       "verb": "install-smoke",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_release_install_smoke",
+      "group": "operate",
+      "long_running": true
     },
     {
       "id": "script.migration",
@@ -2148,15 +2964,21 @@
       "command": "migration default",
       "noun": "migration",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_migration",
+      "group": "operate",
+      "native_help": true
     },
     {
-      "id": "script.dev",
-      "script": "dev",
-      "command": "dev default",
-      "noun": "dev",
+      "id": "script.verify",
+      "script": "verify",
+      "command": "verify default",
+      "noun": "verify",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_dev",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.ci",
@@ -2164,7 +2986,10 @@
       "command": "ci default",
       "noun": "ci",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_ci",
+      "group": "dev",
+      "long_running": true
     },
     {
       "id": "script.generate.types",
@@ -2172,7 +2997,9 @@
       "command": "generate types",
       "noun": "generate",
       "verb": "types",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_types",
+      "group": "dev"
     },
     {
       "id": "script.project-os.init",
@@ -2180,7 +3007,9 @@
       "command": "project-os init",
       "noun": "project-os",
       "verb": "init",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_project_os_init",
+      "group": "operate"
     },
     {
       "id": "script.prepare",
@@ -2188,7 +3017,9 @@
       "command": "prepare default",
       "noun": "prepare",
       "verb": "default",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_prepare",
+      "group": "dev"
     },
     {
       "id": "script.skill.install",
@@ -2196,7 +3027,10 @@
       "command": "skill install",
       "noun": "skill",
       "verb": "install",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_skill_install",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.mcp.server",
@@ -2204,7 +3038,11 @@
       "command": "mcp server",
       "noun": "mcp",
       "verb": "server",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_mcp_server",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true
     },
     {
       "id": "script.knowledge.cowork-sync",
@@ -2212,7 +3050,10 @@
       "command": "knowledge cowork-sync",
       "noun": "knowledge",
       "verb": "cowork-sync",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_cowork_sync",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.co-session",
@@ -2220,7 +3061,10 @@
       "command": "co-session default",
       "noun": "co-session",
       "verb": "default",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_co_session",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.agy.profile",
@@ -2228,7 +3072,10 @@
       "command": "agy profile",
       "noun": "agy",
       "verb": "profile",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_agy_profile",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.codex.profile",
@@ -2236,7 +3083,10 @@
       "command": "codex profile",
       "noun": "codex",
       "verb": "profile",
-      "audience": "operator"
+      "audience": "operator",
+      "description": "cli_cmd_script_codex_profile",
+      "group": "operate",
+      "native_help": true
     },
     {
       "id": "script.check.dep-cycles",
@@ -2244,7 +3094,173 @@
       "command": "check dep-cycles",
       "noun": "check",
       "verb": "dep-cycles",
-      "audience": "dev"
+      "audience": "dev",
+      "description": "cli_cmd_script_check_dep_cycles",
+      "group": "dev"
+    }
+  ],
+  "deprecated_script_aliases": [
+    {
+      "script": "intent",
+      "replaced_by": "intent:trace"
+    },
+    {
+      "script": "dev",
+      "replaced_by": "verify"
+    },
+    {
+      "script": "chronos",
+      "replaced_by": "scheduler"
+    },
+    {
+      "script": "inventory",
+      "replaced_by": "work:inventory"
+    },
+    {
+      "script": "customer:create",
+      "replaced_by": "stance:create"
+    },
+    {
+      "script": "customer:list",
+      "replaced_by": "stance:list"
+    },
+    {
+      "script": "customer:migrate-from-personal",
+      "replaced_by": "stance:migrate-from-personal"
+    },
+    {
+      "script": "customer:switch",
+      "replaced_by": "stance:switch"
+    },
+    {
+      "script": "report:i18n-coverage",
+      "replaced_by": "i18n:report"
+    },
+    {
+      "script": "migrate:physical-namespaces",
+      "replaced_by": "namespace:migrate-physical"
+    },
+    {
+      "script": "migrate:peer-tenant-runtime",
+      "replaced_by": "peer:migrate-tenant-runtime"
+    },
+    {
+      "script": "watch:tenant-drift",
+      "replaced_by": "tenant:watch-drift"
+    },
+    {
+      "script": "export:validation-bundle",
+      "replaced_by": "validation-bundle:export"
+    },
+    {
+      "script": "dev:watch",
+      "replaced_by": "test:watch"
+    },
+    {
+      "script": "agy:sdk:setup",
+      "replaced_by": "agy:sdk-setup"
+    },
+    {
+      "script": "managed-env",
+      "replaced_by": "provider-cli:setup"
+    },
+    {
+      "script": "onboard",
+      "replaced_by": "onboarding"
+    },
+    {
+      "script": "ingest",
+      "replaced_by": "knowledge:ingest"
+    },
+    {
+      "script": "knowledge-feedback",
+      "replaced_by": "knowledge:feedback"
+    },
+    {
+      "script": "services:setup",
+      "replaced_by": "service:setup"
+    }
+  ],
+  "deprecated_command_aliases": [
+    {
+      "command": "dev",
+      "replaced_by": "verify"
+    },
+    {
+      "command": "chronos",
+      "replaced_by": "scheduler"
+    },
+    {
+      "command": "inventory manage",
+      "replaced_by": "work inventory"
+    },
+    {
+      "command": "customer create",
+      "replaced_by": "stance create"
+    },
+    {
+      "command": "customer list",
+      "replaced_by": "stance list"
+    },
+    {
+      "command": "customer migrate-from-personal",
+      "replaced_by": "stance migrate-from-personal"
+    },
+    {
+      "command": "customer switch",
+      "replaced_by": "stance switch"
+    },
+    {
+      "command": "report i18n-coverage",
+      "replaced_by": "i18n report"
+    },
+    {
+      "command": "migrate physical-namespaces",
+      "replaced_by": "namespace migrate-physical"
+    },
+    {
+      "command": "migrate peer-tenant-runtime",
+      "replaced_by": "peer migrate-tenant-runtime"
+    },
+    {
+      "command": "watch tenant-drift",
+      "replaced_by": "tenant watch-drift"
+    },
+    {
+      "command": "export validation-bundle",
+      "replaced_by": "validation-bundle export"
+    },
+    {
+      "command": "dev watch",
+      "replaced_by": "test watch"
+    },
+    {
+      "command": "managed env",
+      "replaced_by": "provider-cli setup"
+    },
+    {
+      "command": "onboard",
+      "replaced_by": "onboarding"
+    },
+    {
+      "command": "ingest",
+      "replaced_by": "knowledge ingest"
+    },
+    {
+      "command": "knowledge-feedback",
+      "replaced_by": "knowledge feedback"
+    },
+    {
+      "command": "services setup",
+      "replaced_by": "service setup"
+    },
+    {
+      "command": "chronos install",
+      "replaced_by": "scheduler install"
+    },
+    {
+      "command": "chronos uninstall",
+      "replaced_by": "scheduler uninstall"
     }
   ]
 }

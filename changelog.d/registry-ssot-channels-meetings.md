@@ -1,0 +1,6 @@
+---
+category: Changed
+---
+
+- **Channel adapter registry (RS-06)** — `surface-provider-manifests.json` gains a `channel_adapters` section that declares each delivery channel's markup dialect and escaping rules, operator-notification delivery (`surface-outbox` / `imessage-direct` / `local-inbox`), presence dispatch, ingress message shape and mission-event stream. Operator-notification channels (`pnpm kyberion notify --set`), human-chat channels in the intervention report, presence `<channel>:<id>` prefixes, decision-card markup neutralization, notification delivery, Slack/Chronos ingress message factories and mission-event streams are derived from it; an unregistered channel fails closed with a registration hint.
+- **Meeting platform registry (RS-06)** — new `knowledge/product/governance/meeting-platforms.json` declares Meet / Zoom / Teams URL hosts (including the Teams `microsoft.com` join-page restriction), provider aliases and the browser driver's pre-join / caption selectors, with localized vendor UI labels tagged by `locale`. URL detection, target validation, calendar target resolution, provider adapters and selector lookup read it. A `www.microsoft.com` Teams URL must now use the join-a-meeting entry page in validation too (previously only bare `microsoft.com` was checked there).

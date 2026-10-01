@@ -6,6 +6,7 @@
  * launch in the governed secure-io wrapper gives both shells identical
  * behaviour without requiring a shell or a third-party dependency.
  */
+import { logger } from '@agent/core/core';
 import { safeExec } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -21,6 +22,10 @@ export function main(argv: string[] = []): void {
 
   const command = argv[index];
   if (!command) throw new Error('Usage: run_with_env.ts [NAME=value ...] command [args ...]');
+  // Debug-level only (quiet by default): names, never values, since wrappers may carry secrets.
+  const injected = Object.keys(assignments);
+  if (injected.length > 0)
+    logger.debug(`run_with_env: injecting ${injected.join(', ')} for \`${command}\``);
   // LC-14: this wrapper is used by `surfaces:*` package scripts. Forward the
   // child stdout so status/reconcile results remain visible to the operator.
   const output = safeExec(command, argv.slice(index + 1), { env: assignments });

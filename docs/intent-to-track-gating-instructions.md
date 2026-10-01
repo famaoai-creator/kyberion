@@ -37,7 +37,7 @@ User Request (NL)
 
 ### 3.1 Extension of `intent-routing-map.json`
 
-Update [knowledge/product/governance/intent-routing-map.json](file:///Users/famao/kyberion/knowledge/product/governance/intent-routing-map.json) to contain the `"track_intent_policy_map"` configuration:
+Update [knowledge/product/governance/intent-routing-map.json](../knowledge/product/governance/intent-routing-map.json) to contain the `"track_intent_policy_map"` configuration:
 
 ```json
 {
@@ -70,7 +70,7 @@ Update [knowledge/product/governance/intent-routing-map.json](file:///Users/fama
 
 The resolver must load policies in the following sequence and deep-merge them:
 
-1. **Global Default**: [knowledge/product/governance/track-creation-policy.json](file:///Users/famao/kyberion/knowledge/product/governance/track-creation-policy.json)
+1. **Global Default**: [knowledge/product/governance/track-creation-policy.json](../knowledge/product/governance/track-creation-policy.json)
 2. **Tenant Override**: `knowledge/personal/connections/track-policy-override.json` (or context-specific tenant folder, e.g., `confidential/{tenant_id}/governance/track-policy-override.json`).
 
 _Merge Strategy_: Sub-keys (like `entry_criteria`, `exit_criteria`, `phases`) specified in the override file will overwrite or append to the global default values.
@@ -85,7 +85,7 @@ Every task must be implemented as a separate step, verified with focused unit te
 
 - **Target Files**:
   - `schemas/track-policy-override.schema.json` (Create)
-  - [knowledge/product/governance/intent-routing-map.json](file:///Users/famao/kyberion/knowledge/product/governance/intent-routing-map.json) (Modify)
+  - [knowledge/product/governance/intent-routing-map.json](../knowledge/product/governance/intent-routing-map.json) (Modify)
 - **Goal**:
   Define valid schema for tenant-specific policy overrides and add `track_intent_policy_map` to the routing map.
 - **Verification**: `pnpm run check -- --scope full --only contract-schemas` passes.
@@ -114,7 +114,7 @@ Every task must be implemented as a separate step, verified with focused unit te
 ### Task 4: Connect to `mission_controller.ts` & CLI
 
 - **Target Files**:
-  - [scripts/mission_controller.ts](file:///Users/famao/kyberion/scripts/mission_controller.ts)
+  - [scripts/mission_controller.ts](../scripts/mission_controller.ts)
   - CLI orchestration commands.
 - **Required Integration**:
   - When executing an intent with `execution_shape = "project_bootstrap"` or `"mission"`, the controller must call the resolver.

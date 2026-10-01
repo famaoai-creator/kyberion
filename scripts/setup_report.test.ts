@@ -14,7 +14,7 @@ describe('setup report onboarding action', () => {
 
     expect(action).toMatchObject({
       title: 'Complete identity and onboarding profile',
-      suggested_command: 'pnpm onboard',
+      suggested_command: 'pnpm onboarding',
     });
     expect(action?.reason).toContain('2 missing or invalid profile files');
   });

@@ -94,7 +94,7 @@ export interface CollectKyberionDemandSignalsOptions {
 
 /**
  * WI-13: trace-scan bookkeeping surfaced alongside `DemandSignal[]` so
- * `pnpm inventory harvest` can report hygiene, not just counts. Both figures
+ * `pnpm work:inventory harvest` can report hygiene, not just counts. Both figures
  * are about individual *traces* scanned, not signals: `excluded_test_or_ci`
  * traces never touch any signal at all (see `collectTraceSignals`);
  * `untagged` traces (no `metadata.origin` — pre-WI-13) still count normally,

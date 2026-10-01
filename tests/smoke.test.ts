@@ -28,10 +28,18 @@ describe('Ecosystem Smoke Tests', () => {
     // governed-printer pass) rather than calling console.log directly, so
     // help text must be captured through that sink.
     const output: string[] = [];
-    await runCli(['help'], (value) => output.push(String(value)));
+    const previousLocale = process.env.KYBERION_LOCALE;
+    process.env.KYBERION_LOCALE = 'en'; // keep the assertion locale-hermetic
+    try {
+      await runCli(['help'], (value) => output.push(String(value)));
+    } finally {
+      if (previousLocale === undefined) delete process.env.KYBERION_LOCALE;
+      else process.env.KYBERION_LOCALE = previousLocale;
+    }
 
     const rendered = output.join('\n');
-    expect(rendered).toContain('KYBERION CONSOLE');
+    expect(rendered).toContain('Kyberion commands');
+    expect(rendered).toContain('Usage: pnpm kyberion <command>');
     expect(rendered).toContain('list');
     expect(rendered).toContain('run');
   });

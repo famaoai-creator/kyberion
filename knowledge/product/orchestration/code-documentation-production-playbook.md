@@ -1,7 +1,7 @@
 # Code Documentation And Video Production Playbook
 
 Use this playbook when the user asks to analyze source code and turn the result into manuals, design documents, or a narrated video manual.
-It specializes the shared [Guided Coordination Protocol](knowledge/product/orchestration/guided-coordination-protocol.md) for code-to-documentation work.
+It specializes the shared [Guided Coordination Protocol](guided-coordination-protocol.md) for code-to-documentation work.
 
 ## Kyberion Fit
 

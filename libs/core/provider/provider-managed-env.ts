@@ -3,6 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveToolRuntimeRoot } from '../tool/tool-runtime-policy.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
+import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 
 export interface ManagedProviderCliDefinition {
   provider: string;
@@ -14,86 +15,40 @@ export interface ManagedProviderCliDefinition {
   install_hint: string;
 }
 
-const DEFINITIONS: Readonly<Record<string, ManagedProviderCliDefinition>> = {
-  codex: {
-    provider: 'codex',
-    binary: 'codex',
-    env_key: 'KYBERION_CODEX_CLI_BIN',
-    npm_package: '@openai/codex',
-    brew_formula: 'codex',
-    version_args: ['--version'],
-    install_hint: 'npm install --prefix <managed-env> --no-save @openai/codex',
-  },
-  claude: {
-    provider: 'claude',
-    binary: 'claude',
-    env_key: 'KYBERION_CLAUDE_CLI_BIN',
-    npm_package: '@anthropic-ai/claude-code',
-    version_args: ['--version'],
-    install_hint: 'npm install --prefix <managed-env> --no-save @anthropic-ai/claude-code',
-  },
-  gemini: {
-    provider: 'gemini',
-    binary: 'gemini',
-    env_key: 'KYBERION_GEMINI_CLI_BIN',
-    npm_package: '@google/gemini-cli',
-    brew_formula: 'gemini-cli',
-    version_args: ['--version'],
-    install_hint: 'npm install --prefix <managed-env> --no-save @google/gemini-cli',
-  },
-  agy: {
-    provider: 'agy',
-    binary: 'agy',
-    env_key: 'KYBERION_AGY_CLI_BIN',
-    brew_formula: 'antigravity-cli',
-    version_args: ['--version'],
-    install_hint: 'Use the official Antigravity installer, then set KYBERION_AGY_CLI_BIN.',
-  },
-  grok: {
-    provider: 'grok',
-    binary: 'grok',
-    env_key: 'KYBERION_GROK_CLI_BIN',
-    brew_formula: 'grok-build',
-    version_args: ['--version'],
-    install_hint: 'Install the official Grok Build CLI, then set KYBERION_GROK_CLI_BIN.',
-  },
-  cursor: {
-    provider: 'cursor',
-    binary: 'cursor-agent',
-    env_key: 'KYBERION_CURSOR_CLI_BIN',
-    brew_formula: 'cursor-cli',
-    version_args: ['--version'],
-    install_hint: 'Use the official Cursor installer, then set KYBERION_CURSOR_CLI_BIN.',
-  },
-  opencode: {
-    provider: 'opencode',
-    binary: 'opencode',
-    env_key: 'KYBERION_OPENCODE_CLI_BIN',
-    npm_package: 'opencode-ai',
-    brew_formula: 'opencode',
-    version_args: ['--version'],
-    install_hint: 'npm install --prefix <managed-env> --no-save opencode-ai',
-  },
-  devin: {
-    provider: 'devin',
-    binary: 'devin',
-    env_key: 'KYBERION_DEVIN_CLI_BIN',
-    brew_formula: 'devin-cli',
-    version_args: ['--version'],
-    install_hint: 'Install the official Devin CLI, then set KYBERION_DEVIN_CLI_BIN.',
-  },
-};
+/**
+ * RS-01: managed provider CLIs are the descriptors with a `cli.install`
+ * block (`reasoning-providers/*.json`), keyed by provider id. Binary, override
+ * env key, version args and install metadata are declared there once.
+ */
+function managedDefinitions(): ManagedProviderCliDefinition[] {
+  const byProvider = new Map<string, ManagedProviderCliDefinition>();
+  for (const { provider, cli } of listCliReasoningProviderDescriptors()) {
+    if (!cli.install || !cli.bin_env_key || byProvider.has(provider)) continue;
+    byProvider.set(provider, {
+      provider,
+      binary: cli.binary,
+      env_key: cli.bin_env_key,
+      ...(cli.install.npm_package ? { npm_package: cli.install.npm_package } : {}),
+      ...(cli.install.brew_formula ? { brew_formula: cli.install.brew_formula } : {}),
+      version_args: [...cli.version_args],
+      install_hint: cli.install.hint,
+    });
+  }
+  return [...byProvider.values()];
+}
 
-export const MANAGED_PROVIDER_CLI_IDS = Object.freeze(Object.keys(DEFINITIONS));
+export function listManagedProviderCliIds(): string[] {
+  return managedDefinitions().map((definition) => definition.provider);
+}
 
 export function getManagedProviderCliDefinition(
   provider: string
 ): ManagedProviderCliDefinition | null {
-  return DEFINITIONS[provider] ?? null;
+  return managedDefinitions().find((definition) => definition.provider === provider) ?? null;
 }
 
 export function listManagedProviderCliDefinitions(): ManagedProviderCliDefinition[] {
-  return MANAGED_PROVIDER_CLI_IDS.map((provider) => DEFINITIONS[provider]!);
+  return managedDefinitions();
 }
 
 export function resolveManagedProviderCliEnvPath(provider: string): string {

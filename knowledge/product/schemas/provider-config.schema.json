@@ -12,7 +12,9 @@
     "lifecycle"
   ],
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "version": {
       "type": "string",
       "minLength": 1
@@ -89,7 +91,11 @@
         "gemini-fast",
         "openai-vision",
         "codex-default",
-        "copilot-default"
+        "copilot-default",
+        "codex-fast",
+        "grok-default",
+        "gemini-image",
+        "ollama-vision"
       ],
       "properties": {
         "anthropic-default": {
@@ -129,6 +135,22 @@
           "minLength": 1
         },
         "devin-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "codex-fast": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grok-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gemini-image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ollama-vision": {
           "type": "string",
           "minLength": 1
         }
@@ -182,6 +204,14 @@
         }
       },
       "additionalProperties": true
+    },
+    "runtime_endpoints": {
+      "type": "object",
+      "description": "Default local runtime endpoints by runtime id (origin only, no path). Operator env overrides (e.g. OLLAMA_HOST) win.",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^https?://[A-Za-z0-9.\\-\\[\\]:]+$"
+      }
     }
   },
   "additionalProperties": false

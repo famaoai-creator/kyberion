@@ -18,6 +18,7 @@ import {
 } from '@agent/core/knowledge/pr-knowledge-readiness';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 
 type Print = (value: unknown) => void;
 
@@ -65,6 +66,23 @@ export function parseDefaultBranchResponse(raw: string): string {
     ? String((refRecord as Record<string, unknown>).name)
     : 'main';
 }
+
+/** CU-01: every flag `parsePublishArgs` understands; anything else is rejected before gh runs. */
+export const PUBLISH_PR_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion pr create',
+  manifestId: 'script.pr.create',
+  options: [
+    { flag: '--title', value: '<conventional title>' },
+    { flag: '--body-file', value: '<path>' },
+    { flag: '--base', value: '<branch>' },
+    { flag: '--mission-root', value: '<path>' },
+    { flag: '--draft' },
+    { flag: '--no-draft' },
+    { flag: '--fill' },
+    { flag: '--no-fill' },
+    { flag: '--skip-readiness' },
+  ],
+};
 
 export function parsePublishArgs(argv: string[]): PublishOptions {
   const options: PublishOptions = { draft: true, fill: true, skipReadiness: false };
@@ -202,7 +220,10 @@ export function runKnowledgeReadinessGate(options: PublishOptions): void {
 }
 
 export async function main(argv: string[], print: Print = () => undefined): Promise<void> {
-  const options = parsePublishArgs(argv);
+  // CU-01: `--help` and typos must never reach gh / the readiness gate.
+  const guarded = guardCliArgsNormalized(argv, PUBLISH_PR_CLI, print);
+  if (guarded.handled) return;
+  const options = parsePublishArgs(guarded.argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
   safeExec('gh', ['auth', 'status'], { cwd: pathResolver.rootDir() });

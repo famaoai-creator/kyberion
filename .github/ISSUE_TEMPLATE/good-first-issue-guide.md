@@ -1,7 +1,7 @@
 ---
-name: "Good First Issue (maintainer template)"
-about: "(For maintainers) Template to scaffold a well-scoped good-first-issue"
-title: "[good-first-issue] "
+name: 'Good First Issue (maintainer template)'
+about: '(For maintainers) Template to scaffold a well-scoped good-first-issue'
+title: '[good-first-issue] '
 labels: good-first-issue, help-wanted
 ---
 
@@ -32,7 +32,7 @@ contributors to take on. The pattern below makes them low-friction to pick up.
 
 ## Example slices
 
-- Add a troubleshooting note for `pnpm doctor`.
+- Add a troubleshooting note for `pnpm kyberion doctor`.
 - Split one section from `docs/user/meeting-facilitator.md` into a smaller page.
 - Add one rule to `libs/core/error-classifier.ts` and a matching test.
 - Reword one release workflow step and update the contract test.

@@ -31,7 +31,7 @@ import { nowIso } from '@agent/core/foundation/time';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-export const TENANT_DRIFT_USAGE = 'Usage: pnpm watch:tenant-drift [--json] [--quiet] [--alert]';
+export const TENANT_DRIFT_USAGE = 'Usage: pnpm tenant:watch-drift [--json] [--quiet] [--alert]';
 
 interface DriftFinding {
   path: string;
@@ -60,7 +60,7 @@ function buildTenantDriftAlert(report: DriftReport): OpsAlertInput {
     recommendation:
       'Stop unattended processing for the affected tenant scope, inspect the confidential mission state paths locally, and repair the tenant_slug metadata before resuming.',
     options: [
-      'Run pnpm watch:tenant-drift -- --json on the host to inspect full findings',
+      'Run pnpm tenant:watch-drift -- --json on the host to inspect full findings',
       'Repair or quarantine the affected mission directories under active/missions/confidential',
       'Escalate if the finding crosses tenant boundaries or cannot be repaired immediately',
     ],
@@ -235,7 +235,7 @@ if (
   isDirectScript(import.meta.url, 'watch_tenant_drift.js')
 ) {
   void defineScript({
-    name: 'watch:tenant-drift',
+    name: 'tenant:watch-drift',
     flags: ['json', 'quiet'],
     run: ({ argv, json, quiet, print }) => {
       const result = main(argv);

@@ -3,6 +3,10 @@ import { createLogger } from '../logger.js';
 import { evaluateEgressPolicy } from '../egress-policy.js';
 import { isLocalOnlyReasoningBackend } from '../backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from '../shell/sandbox-policy.js';
+import {
+  isLocalReasoningEndpoint,
+  resolveReasoningProviderDescriptor,
+} from './reasoning-provider-registry.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -59,32 +63,18 @@ function reasoningDataPolicy(backendName: string): ReasoningTrainingUse {
 /**
  * Where a named backend sends data.
  *
- * An unrecognized backend resolves to an invalid placeholder host, which the
- * tenant rule denies — the safe direction when an unknown provider would be
- * handed tenant material.
+ * RS-01: the destination is the provider descriptor's `endpoint`
+ * (`reasoning-providers/*.json`), resolved from a mode, a runtime backend
+ * alias, or a provider id. An unrecognized backend — or one without a static
+ * endpoint (configurable adapters use the endpoint-aware check below) —
+ * resolves to an invalid placeholder host, which the tenant rule denies: the
+ * safe direction when an unknown provider would be handed tenant material.
  */
 export function reasoningBackendEndpoint(backendName: string): string {
-  const endpoints: Record<string, string> = {
-    anthropic: 'https://api.anthropic.com',
-    'claude-agent': 'https://api.anthropic.com',
-    'claude-cli': 'https://api.anthropic.com',
-    'shell-claude-cli': 'https://api.anthropic.com',
-    openai: 'https://api.openai.com',
-    'codex-cli': 'https://api.openai.com',
-    gemini: 'https://generativelanguage.googleapis.com',
-    'gemini-api': 'https://generativelanguage.googleapis.com',
-    'gemini-cli': 'https://generativelanguage.googleapis.com',
-    copilot: 'https://api.githubcopilot.com',
-    'copilot-acp': 'https://api.githubcopilot.com',
-    'grok-cli': 'https://api.x.ai',
-    'shell-grok-cli': 'https://api.x.ai',
-    'grok-api': 'https://api.x.ai',
-    'cursor-cli': 'https://api2.cursor.sh',
-    'opencode-cli': 'https://opencode.ai',
-    'devin-cli': 'https://api.devin.ai',
-    'agy-cli': 'https://generativelanguage.googleapis.com',
-  };
-  return endpoints[backendName] ?? `https://${backendName}.unknown-provider.invalid`;
+  return (
+    resolveReasoningProviderDescriptor(backendName)?.endpoint ??
+    `https://${backendName}.unknown-provider.invalid`
+  );
 }
 
 export class ReasoningEgressDeniedError extends Error {
@@ -166,24 +156,5 @@ export function assertReasoningEgressAllowedAtEndpoint(
       `[EGRESS] blocked a ${scope.tier} payload from reaching ${backendName}: ${decision.reason}`
     );
     throw new ReasoningEgressDeniedError(decision.reason);
-  }
-}
-
-function isLocalReasoningEndpoint(endpoint: string): boolean {
-  try {
-    const hostname = new URL(endpoint).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
-    return (
-      hostname === 'localhost' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::' ||
-      hostname === '::1' ||
-      /^127\./u.test(hostname) ||
-      /^10\./u.test(hostname) ||
-      /^192\.168\./u.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./u.test(hostname) ||
-      /^fd[0-9a-f]{2}:/u.test(hostname)
-    );
-  } catch {
-    return false;
   }
 }
