@@ -274,6 +274,9 @@ export type LedgerEntry =
       reasons: string[];
       /** Which charter field the agent asks to widen, when the denial has an amendment. */
       amendment_field?: string;
+      /** The limit in force and the value the denied action needed, so a proposal needs no re-evaluation. */
+      amendment_current?: unknown;
+      amendment_requested?: unknown;
       correlation_id?: string;
     }
   | { kind: 'tripwire'; ts: string; tripwire: string; detail?: string }
@@ -461,7 +464,13 @@ export function recordCharterDenial(
       ...(action.actor.on_behalf_of ? { on_behalf_of: action.actor.on_behalf_of } : {}),
       action_class: action.action_class,
       reasons: decision.reasons,
-      ...(decision.amendment ? { amendment_field: decision.amendment.field } : {}),
+      ...(decision.amendment
+        ? {
+            amendment_field: decision.amendment.field,
+            amendment_current: decision.amendment.current,
+            amendment_requested: decision.amendment.requested,
+          }
+        : {}),
       ...(correlationId ? { correlation_id: correlationId } : {}),
     },
     options
