@@ -518,6 +518,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/operational-learning.ts#enqueueOperationalLearningSignal",
+      "roles": ["operational_learning_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-managed-install.ts#ensurePluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -612,6 +617,11 @@
     {
       "site": "libs/core/storage-janitor.ts#sweepStatusRules",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/operator-notifications.ts#deliver",
+      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
@@ -1654,6 +1664,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/work-inventory-cli-shared.ts#governedTenant",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/license_audit.ts#writeReport",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -2357,6 +2372,23 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "operational_learning_writer": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#handleCaptureAction",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleSystemAction",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#executePipeline",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
           ]
         },
         "reconcile_config_fallbacks": {
@@ -3789,6 +3821,25 @@
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
             "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
+          ]
+        },
+        "operational_learning_writer": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleSystemAction",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#executePipeline",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
           ]
         },
         "reconcile_config_fallbacks": {
