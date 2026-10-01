@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react';
-import { Text } from 'ink';
+import { Text } from './text.js';
 import { theme } from '../theme.js';
 
 interface PanelBoundaryProps {
