@@ -33,7 +33,9 @@ describe('Customer onboarding contract', () => {
     );
     expect(operator).toContain('/app/customer');
     expect(init).toContain('customer/{slug}/my-identity.json');
-    expect(init).toContain('`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json`');
+    expect(init).toContain(
+      'When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-identity.json`'
+    );
     expect(quickstart).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(ux).toContain('connection material goes in the active private overlay');
     expect(ux).toContain('otherwise `knowledge/personal/connections/`');

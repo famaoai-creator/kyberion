@@ -160,6 +160,7 @@
         "tools/adf-replay-extension/",
         "tools/meet-copilot-extension/",
         "docs/developer/",
+        "docs/CLI_REFERENCE.md",
         "package.json",
         "pnpm-lock.yaml",
         "README.md",

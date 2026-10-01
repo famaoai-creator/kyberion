@@ -7233,6 +7233,16 @@
         "ja": "サービス記録フローを実行",
         "qps-ploc": "⟦Řůñ ŧħė şėřṽïƈė řėƈőřḓïñɠ ƒŀőẇ ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_generate_cli_reference": {
+        "en": "Regenerate the CLI command reference page",
+        "ja": "CLI コマンドリファレンスのページを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ƇĿÏ ƈőɱɱȧñḓ řėƒėřėñƈė ṗȧɠė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_docs_check": {
+        "en": "Check docs for stale commands, broken links and unlisted pipelines",
+        "ja": "docs の存在しないコマンド・リンク切れ・未掲載パイプラインを検査",
+        "qps-ploc": "⟦Ƈħėƈķ ḓőƈş ƒőř şŧȧŀė ƈőɱɱȧñḓş, ƀřőķėñ ŀïñķş ȧñḓ ůñŀïşŧėḓ ṗïṗėŀïñėş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
       "cli_cmd_script_generate_env_registry": {
         "en": "Regenerate the environment variable registry",
         "ja": "環境変数レジストリを再生成",
