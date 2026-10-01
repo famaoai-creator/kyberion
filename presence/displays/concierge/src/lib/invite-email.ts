@@ -9,7 +9,6 @@
  * owner or approver of the tenant the code names.
  */
 
-import { emailBackendRegistry } from '@agent/core/integrations/email-bridge';
 import { t } from '@agent/core/t';
 import { resolveConciergeDecidedBy } from './front-desk-member';
 import { charterTenants } from './charter-server';
@@ -33,15 +32,11 @@ export interface InviteEmailDeps {
 }
 
 const defaultDeps: InviteEmailDeps = {
-  createDraft: async (params) => {
-    try {
-      const adapter = await emailBackendRegistry.resolve('auto', 'create_draft');
-      const result = await adapter.createDraft(params);
-      return result.status === 'succeeded';
-    } catch {
-      return false;
-    }
-  },
+  // The available email bridge adapters are process-wide (Mail.app / SMTP)
+  // and do not prove which human account owns the resulting draft. Do not
+  // fall back to a host account for a member's invitation; an owner-bound
+  // adapter can be wired here once the integration exposes that identity.
+  createDraft: async () => false,
 };
 
 export async function createInviteEmailDraft(

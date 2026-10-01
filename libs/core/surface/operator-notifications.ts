@@ -457,8 +457,10 @@ export async function notifyOperator(
 /** Fire-and-forget Web Push; true when a push was attempted (never throws). */
 function fanOutWebPush(event: OperatorEvent, dedupeKey: string): boolean {
   try {
-    if (!webPushWouldDeliver(event) || !shouldNotifyOperator(dedupeKey)) return false;
-    void sendWebPushForEvent(event).catch(() => undefined);
+    if (!webPushWouldDeliver(event, {}, 'operator') || !shouldNotifyOperator(dedupeKey)) {
+      return false;
+    }
+    void sendWebPushForEvent(event, { audience: 'operator' }).catch(() => undefined);
     return true;
   } catch {
     return false;
