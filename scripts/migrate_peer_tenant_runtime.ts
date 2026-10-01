@@ -26,7 +26,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import { readSafeJsonValueFile } from './lib/json-input.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -531,8 +531,9 @@ const script = defineScript({
   name: 'peer:migrate-tenant-runtime',
   flags: [],
   run: ({ argv, print }) => {
-    if (guardCliArgs(argv, MIGRATE_PEER_TENANT_RUNTIME_CLI, print)) return undefined;
-    const plan = runPeerTenantMigration(parseArgs(argv));
+    const guarded = guardCliArgsNormalized(argv, MIGRATE_PEER_TENANT_RUNTIME_CLI, print);
+    if (guarded.handled) return undefined;
+    const plan = runPeerTenantMigration(parseArgs(guarded.argv));
     print(JSON.stringify(plan, null, 2));
     return plan;
   },

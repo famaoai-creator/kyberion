@@ -18,7 +18,7 @@ import {
 } from '@agent/core/knowledge/pr-knowledge-readiness';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 
 type Print = (value: unknown) => void;
 
@@ -221,8 +221,9 @@ export function runKnowledgeReadinessGate(options: PublishOptions): void {
 
 export async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   // CU-01: `--help` and typos must never reach gh / the readiness gate.
-  if (guardCliArgs(argv, PUBLISH_PR_CLI, print)) return;
-  const options = parsePublishArgs(argv);
+  const guarded = guardCliArgsNormalized(argv, PUBLISH_PR_CLI, print);
+  if (guarded.handled) return;
+  const options = parsePublishArgs(guarded.argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
   safeExec('gh', ['auth', 'status'], { cwd: pathResolver.rootDir() });

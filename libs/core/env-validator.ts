@@ -10,6 +10,7 @@
  */
 
 import { pathResolver } from './path-resolver.js';
+import { t } from './t.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnv as getFoundationRegisteredEnv } from './foundation/env.js';
 
@@ -183,10 +184,7 @@ export function formatEnvValidationReport(report: EnvValidationReport): string[]
     lines.push(`  ⚠ ${issue.name}: ${issue.issue}`);
   }
   if (report.unknown.length > 0) {
-    lines.push(
-      `  ⚠ unregistered KYBERION_* variables set: ${report.unknown.join(', ')} ` +
-        '(register via pnpm generate:env-registry)'
-    );
+    lines.push(`  ⚠ ${t('cli:cli_env_unknown_variables', { names: report.unknown.join(', ') })}`);
   }
   if (report.undocumented.length > 0) {
     lines.push(

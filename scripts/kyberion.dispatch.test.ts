@@ -16,12 +16,12 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeExecResultAsync: mocks.safeExecResultAsync,
 }));
 
-import { main } from './kyberion.js';
+import { main, pnpmExecutable, runStreamingScriptCommand } from './kyberion.js';
 import { loadCliManifest } from './check_cli_manifest.js';
 
-function fakeChild(exitCode: number) {
+function fakeChild(exitCode: number | null, signal: NodeJS.Signals | null = null) {
   const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
-  setTimeout(() => child.emit('exit', exitCode, null), 0);
+  setTimeout(() => child.emit('exit', exitCode, signal), 0);
   return child;
 }
 
@@ -97,5 +97,64 @@ describe('kyberion script-command dispatch', () => {
     await expect(main(['doctr'], () => undefined)).rejects.toThrow(/kyberion doctor/u);
     expect(mocks.safeExecResultAsync).not.toHaveBeenCalled();
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+  });
+
+  it('CU-02: re-raises a signal that killed the streamed child instead of mapping it to exit 1', async () => {
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(null, 'SIGINT') }));
+    const raise = vi.fn();
+    const before = process.listenerCount('SIGINT');
+    await expect(
+      runStreamingScriptCommand('pnpm', ['run', 'tui'], 'tui', raise)
+    ).rejects.toMatchObject({
+      code: 130,
+    });
+    expect(raise).toHaveBeenCalledWith('SIGINT');
+    // handlers are restored before the signal is re-raised
+    expect(process.listenerCount('SIGINT')).toBe(before);
+  });
+
+  it('CU-02: forwards SIGTERM and SIGHUP to the streamed child', async () => {
+    const child = Object.assign(new EventEmitter(), { kill: vi.fn() });
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child }));
+    const running = runStreamingScriptCommand('pnpm', ['run', 'tui'], 'tui', vi.fn());
+    process.emit('SIGHUP', 'SIGHUP');
+    process.emit('SIGTERM', 'SIGTERM');
+    expect(child.kill).toHaveBeenCalledWith('SIGHUP');
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    child.emit('exit', 0, null);
+    await expect(running).resolves.toBeUndefined();
+  });
+
+  it('runs the streamed spawn through the exec policy with an allowlisted env', async () => {
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
+    await expect(
+      runStreamingScriptCommand('sh', ['-c', 'echo hi'], 'bad', vi.fn())
+    ).rejects.toThrow(/SECURITY/u);
+    expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+
+    const original = process.env.SECRET_TOKEN_FOR_TEST;
+    process.env.SECRET_TOKEN_FOR_TEST = 'x';
+    try {
+      await main(['tui'], () => undefined);
+    } finally {
+      if (original === undefined) delete process.env.SECRET_TOKEN_FOR_TEST;
+      else process.env.SECRET_TOKEN_FOR_TEST = original;
+    }
+    const env = mocks.spawnManagedProcess.mock.calls[0]?.[0].spawnOptions.env;
+    expect(env).not.toHaveProperty('SECRET_TOKEN_FOR_TEST');
+    expect(env).toHaveProperty('PATH');
+  });
+
+  it('uses pnpm.cmd on Windows in both the buffered and streamed paths', () => {
+    expect(pnpmExecutable('win32')).toBe('pnpm.cmd');
+    expect(pnpmExecutable('linux')).toBe('pnpm');
+    expect(pnpmExecutable('darwin')).toBe('pnpm');
+  });
+
+  it('routes a deprecated alias with its passthrough arguments (onboard apply --identity x)', async () => {
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
+    await main(['onboard', 'apply', '--identity', 'x'], () => undefined);
+    const spec = mocks.spawnManagedProcess.mock.calls[0]?.[0];
+    expect(spec.args.slice(-3)).toEqual(['apply', '--identity', 'x']);
   });
 });

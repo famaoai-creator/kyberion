@@ -73,6 +73,49 @@ export function formatCliUsage(spec: CliGuardSpec): string {
 }
 
 /**
+ * Rewrite `--flag=value` to the two-token `--flag value` form for flags that
+ * declare a value. The guard accepts both spellings, but legacy hand-rolled
+ * parsers only read the two-token form; callers pass the normalized argv on.
+ * Tokens after a literal `--` are left untouched.
+ */
+export function normalizeInlineValueFlags(
+  argv: readonly string[],
+  spec: Pick<CliGuardSpec, 'options'>
+): string[] {
+  const valued = new Set(spec.options.filter((option) => option.value).map((o) => o.flag));
+  const out: string[] = [];
+  let passthrough = false;
+  for (const arg of argv) {
+    if (passthrough) {
+      out.push(arg);
+      continue;
+    }
+    if (arg === '--') {
+      passthrough = true;
+      out.push(arg);
+      continue;
+    }
+    const match = /^(--[^=]+)=(.*)$/su.exec(arg);
+    if (match && valued.has(match[1] as string)) out.push(match[1] as string, match[2] as string);
+    else out.push(arg);
+  }
+  return out;
+}
+
+/**
+ * Like `guardCliArgs`, but also returns the argv with `--flag=value`
+ * normalized to `--flag value`. Use the returned `argv` for legacy parsers.
+ */
+export function guardCliArgsNormalized(
+  argv: readonly string[],
+  spec: CliGuardSpec,
+  print: (value: unknown) => void
+): { handled: boolean; argv: string[] } {
+  const handled = guardCliArgs(argv, spec, print);
+  return { handled, argv: normalizeInlineValueFlags(argv, spec) };
+}
+
+/**
  * Validate argv against the declared flags before any side effect.
  * Returns `true` when help was printed and the caller must return.
  */
