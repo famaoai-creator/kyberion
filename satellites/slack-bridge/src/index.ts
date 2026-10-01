@@ -820,7 +820,7 @@ async function start(_args: string[] = []) {
         await postSlackText(client, {
           channel: message.channel,
           thread_ts: threadTs,
-          text: 'このミッション提案を判断する権限がありません。承認者に依頼してください。',
+          text: t('bridge:mission_proposal_not_authorized', undefined, resolveOperatorLocale()),
         });
         return;
       }

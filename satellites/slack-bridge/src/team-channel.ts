@@ -1,4 +1,6 @@
 import { logger } from '@agent/core/core';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { t } from '@agent/core/t';
 import {
   buildChannelDisclosureDirective,
   evaluateChannelActorAccess,
@@ -110,7 +112,7 @@ export async function ensureSlackApprovalAuthority(
       channel,
       user: actorId,
       thread_ts: threadTs,
-      text: 'この操作を行う権限がありません。承認者に依頼してください。',
+      text: t('bridge:approval_action_not_authorized', undefined, resolveOperatorLocale()),
     });
   } catch (error: unknown) {
     logger.warn(`[SlackBridge] Refusal notice failed: ${errorDetail(error)}`);

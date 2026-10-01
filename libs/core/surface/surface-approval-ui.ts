@@ -613,7 +613,7 @@ export function resolveSurfaceApprovalReply(params: {
   const text = params.text.trim();
   const unauthorized: SurfaceApprovalReply = {
     handled: true,
-    reply: 'この承認要求を判断する権限がありません。承認者に依頼してください。',
+    reply: t('bridge:approval_not_authorized', undefined, params.locale ?? 'ja'),
   };
   const mayDecide = () => (params.canDecide ? params.canDecide() : true);
   const cardToken = text.match(CARD_TOKEN);
