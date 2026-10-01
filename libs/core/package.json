@@ -4471,6 +4471,10 @@
       "types": "./dist/organization/member-id-grammar.d.ts",
       "default": "./dist/organization/member-id-grammar.js"
     },
+    "./organization/member-invite": {
+      "types": "./dist/organization/member-invite.d.ts",
+      "default": "./dist/organization/member-invite.js"
+    },
     "./organization/member-registry": {
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
