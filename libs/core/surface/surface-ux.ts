@@ -16,6 +16,7 @@ import {
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from '../next-action.js';
 import type { SupportedLocale } from '../locale-normalize.js';
+import { t } from '../t.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
 export interface SurfaceDirectoryRow {
@@ -549,17 +550,15 @@ export function formatSurfaceRecoveryAction(
   action: SurfaceRecoveryAction,
   language: SupportedLocale
 ): string {
-  if (language === 'ja') {
-    const parts = [action.reason];
-    if (action.next_step) parts.push(`次の一手: ${action.next_step}`);
-    if (action.command) parts.push(`実行コマンド: ${action.command}`);
-    if (action.fallback) parts.push(`代替手段: ${action.fallback}`);
-    return parts.join(' ');
-  }
   const parts = [action.reason];
-  if (action.next_step) parts.push(`Next step: ${action.next_step}`);
-  if (action.command) parts.push(`Command: ${action.command}`);
-  if (action.fallback) parts.push(`Fallback: ${action.fallback}`);
+  if (action.next_step) {
+    parts.push(t('surface:recovery_next_step', { value: action.next_step }, language));
+  }
+  if (action.command)
+    parts.push(t('surface:recovery_command', { value: action.command }, language));
+  if (action.fallback) {
+    parts.push(t('surface:recovery_fallback', { value: action.fallback }, language));
+  }
   return parts.join(' ');
 }
 
@@ -568,8 +567,9 @@ export function buildSurfaceAsyncAcceptedReply(params: {
   receiver: string;
   language: SupportedLocale;
 }): string {
-  if (params.language === 'ja') {
-    return `依頼を受け付けました。${params.receiver} に回しています。リクエストIDは ${params.requestId} です。進行状況は Presence Studio の async requests で確認でき、完了したらこの surface に通知します。`;
-  }
-  return `Accepted. Routing this to ${params.receiver}. The request id is ${params.requestId}. You can track it in Presence Studio async requests, and I will notify this surface when it completes.`;
+  return t(
+    'surface:async_accepted',
+    { receiver: params.receiver, requestId: params.requestId },
+    params.language
+  );
 }

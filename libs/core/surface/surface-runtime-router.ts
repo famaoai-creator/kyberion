@@ -1,4 +1,5 @@
 import { classifyTaskSessionIntent } from '../task/task-session.js';
+import { detectTextLocale } from '../locale-normalize.js';
 import {
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
@@ -62,7 +63,7 @@ export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt
     channel: readLine('Channel'),
     thread: readLine('Thread'),
     user: readLine('User'),
-    derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(userMessage) ? 'ja' : 'en',
+    derivedLanguage: detectTextLocale(userMessage) ?? 'en',
     executionMode: readLine('Execution mode') as SlackExecutionMode | undefined,
     userMessage,
   };
@@ -129,7 +130,7 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
         channel: typeof slackMetadata?.channel === 'string' ? slackMetadata.channel : undefined,
         thread: typeof slackMetadata?.threadTs === 'string' ? slackMetadata.threadTs : undefined,
         user: typeof slackMetadata?.user === 'string' ? slackMetadata.user : undefined,
-        derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(input.surfaceText || input.query) ? 'ja' : 'en',
+        derivedLanguage: detectTextLocale(input.surfaceText || input.query) ?? 'en',
         executionMode:
           slackMetadata?.execution_mode === 'conversation' ||
           slackMetadata?.execution_mode === 'task'

@@ -25,7 +25,7 @@
       "trend_window_ms",
       "version"
     ],
-    "i18n-baseline.json": ["files", "generated_at", "scan_roots", "version"],
+    "i18n-baseline.json": ["files", "generated_at", "locale_tokens", "scan_roots", "version"],
     "ingest-quota-policy.json": [
       "description",
       "max_bytes_per_day",

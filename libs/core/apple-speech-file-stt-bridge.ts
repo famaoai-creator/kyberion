@@ -15,6 +15,8 @@
 import * as path from 'node:path';
 
 import { logger } from './core.js';
+import { resolveLocale } from './locale.js';
+import { localeToBcp47 } from './locale-normalize.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
@@ -64,7 +66,7 @@ export function normalizeAppleSpeechFilePayload(value: unknown): NativeSttPayloa
 /** BCP-47 in, BCP-47 out; bare language tags get a sensible region. */
 export function resolveAppleSpeechFileLocale(language?: string): string {
   const raw = String(language || '').trim();
-  if (!raw) return 'ja-JP';
+  if (!raw) return localeToBcp47(resolveLocale());
   if (raw.includes('-')) return raw;
   const map: Record<string, string> = { ja: 'ja-JP', en: 'en-US', zh: 'zh-CN', ko: 'ko-KR' };
   return map[raw.toLowerCase()] || raw;
