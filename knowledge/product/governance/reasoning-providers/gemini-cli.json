@@ -47,6 +47,29 @@
           "npm_package": "@google/gemini-cli",
           "brew_formula": "gemini-cli",
           "hint": "npm install --prefix <managed-env> --no-save @google/gemini-cli"
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox", "--approval-mode"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--sandbox", "--approval-mode", "yolo"],
+            "notes": "Gemini CLI yolo mode remains inside its provider sandbox for workspace-write work."
+          },
+          "explorer": {
+            "args": ["--sandbox", "--approval-mode", "plan"],
+            "notes": "Gemini CLI plan mode is the provider read-only projection."
+          },
+          "planner": {
+            "args": ["--sandbox", "--approval-mode", "plan"],
+            "notes": "Gemini CLI plan mode is the provider no-write projection."
+          }
         }
       },
       "runtime_instructions": [

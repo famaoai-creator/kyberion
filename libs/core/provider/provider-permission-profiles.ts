@@ -1,4 +1,5 @@
 import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 import {
   getActiveSandboxPolicy,
   requireSandboxEnforcement,
@@ -21,7 +22,8 @@ import {
  * every backend has to remember to encode on its own.
  *
  * Registration ceremony: to declare a profile × provider permission
- * mapping, add ONE entry to {@link PROVIDER_PERMISSION_MATRIX} below.
+ * mapping, declare it in the provider descriptor's `cli.permission_profiles`
+ * (`knowledge/product/governance/reasoning-providers/*.json`).
  * Undefined combinations fail closed: {@link resolveProviderPermissionArgs}
  * returns a typed {@link ProviderPermissionRefusal} rather than throwing or
  * silently granting full access.
@@ -135,133 +137,50 @@ function refused(reason: string): ProviderPermissionRefusal {
   return { kind: 'refused', reason };
 }
 
-/** Claude CLI tools a read-only delegation may use (mirrors explorer's file:read* + network:fetch allowlist). */
-const CLAUDE_READ_ONLY_TOOLS = ['Read', 'Glob', 'Grep', 'WebFetch'] as const;
-/** Claude CLI tools that mutate state or execute — never granted below `implementer`. */
-const CLAUDE_WRITE_EXEC_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'Bash', 'KillShell'] as const;
-
 /**
- * Single-module mapping table: KD-05 profile × provider → provider
- * permission projection. Every cell is either an explicit grant or an
- * explicit refusal — there is no implicit "undefined means allow."
+ * KD-05 profile × provider → provider permission projection, derived from the
+ * governed provider descriptors (`reasoning-providers/*.json`
+ * `cli.permission_profiles`). Every declared cell is an explicit grant or an
+ * explicit refusal — there is no implicit "undefined means allow"; a cell the
+ * descriptor does not declare fails closed in
+ * {@link resolveProviderPermissionArgs}.
  */
-export const PROVIDER_PERMISSION_MATRIX: Readonly<
-  Record<ProviderPermissionProfileName, Readonly<Record<ProviderId, ProviderPermissionResolution>>>
-> = {
-  implementer: {
-    claude: ok(
-      ['--permission-mode', 'bypassPermissions'],
-      'Full read/write/exec tier: no tool restriction beyond what the CLI session already grants.'
-    ),
-    codex: ok(
-      ['--sandbox', 'workspace-write'],
-      'Full read/write tier within the workspace sandbox.'
-    ),
-    agy: ok(
-      ['--sandbox'],
-      'agy always runs sandboxed; implementer gets the full sandboxed tool set.'
-    ),
-    grok: ok(
-      ['--permission-mode', 'bypassPermissions'],
-      'Grok Build full auto-approve path for implementer-tier write/exec work.'
-    ),
-    gemini: ok(
-      ['--sandbox', '--approval-mode', 'yolo'],
-      'Gemini CLI yolo mode remains inside its provider sandbox for workspace-write work.'
-    ),
-    cursor: ok(
-      ['--force', '--sandbox', 'enabled'],
-      'Cursor Agent CLI force-allows tools inside its sandbox for implementer-tier write/exec work.'
-    ),
-    opencode: ok(
-      ['--agent', 'build'],
-      'OpenCode CLI implementer tier runs on the build agent with the full tool set.'
-    ),
-    devin: ok(
-      ['--permission-mode', 'bypass'],
-      'Devin CLI bypass mode auto-approves every tool call for implementer-tier write/exec work.'
-    ),
-  },
-  explorer: {
-    claude: ok(
-      [
-        '--permission-mode',
-        'default',
-        '--allowedTools',
-        ...CLAUDE_READ_ONLY_TOOLS,
-        '--disallowedTools',
-        ...CLAUDE_WRITE_EXEC_TOOLS,
-      ],
-      'Read-only: only Read/Glob/Grep/WebFetch allowed, Write/Edit/NotebookEdit/Bash/KillShell explicitly denied.'
-    ),
-    codex: ok(
-      ['--sandbox', 'read-only'],
-      'codex read-only sandbox forbids filesystem writes for the duration of the delegation.'
-    ),
-    agy: ok(
-      ['--sandbox'],
-      'agy sandbox flag is the closest read-only-leaning primitive this CLI exposes.'
-    ),
-    grok: ok(
-      [
-        '--permission-mode',
-        'default',
-        '--disallowed-tools',
-        'run_terminal_command,write,search_replace',
-      ],
-      'Read-leaning: deny shell/write tools; remaining read/search tools stay available under default permission mode.'
-    ),
-    gemini: ok(
-      ['--sandbox', '--approval-mode', 'plan'],
-      'Gemini CLI plan mode is the provider read-only projection.'
-    ),
-    cursor: ok(['--mode', 'plan'], 'Cursor Agent plan mode is read-only planning without edits.'),
-    opencode: ok(
-      ['--agent', 'plan'],
-      'OpenCode CLI explorer tier runs on the read-only-leaning plan agent.'
-    ),
-    devin: ok(
-      ['--permission-mode', 'normal'],
-      'Devin CLI normal mode auto-approves read-only tools; write/exec approval prompts have no one to answer under `-p` and fail closed.'
-    ),
-  },
-  planner: {
-    claude: ok(
-      ['--permission-mode', 'plan'],
-      'plan mode produces a plan without executing any tool — matches "no tool execution at all."'
-    ),
-    codex: refused(
-      'codex CLI has no text-only / no-exec headless mode: even --sandbox read-only still lets the ' +
-        "model run shell commands, which would violate the planner tier's no-exec invariant. Refusing " +
-        'delegation rather than granting an under-restricted approximation.'
-    ),
-    agy: refused(
-      'agy CLI headless invocations always pass --dangerously-skip-permissions and have no verified ' +
-        'no-exec mode. Refusing delegation rather than granting an under-restricted approximation.'
-    ),
-    grok: ok(
-      ['--permission-mode', 'plan'],
-      'Grok Build plan mode produces a plan without executing tools.'
-    ),
-    gemini: ok(
-      ['--sandbox', '--approval-mode', 'plan'],
-      'Gemini CLI plan mode is the provider no-write projection.'
-    ),
-    cursor: ok(
-      ['--mode', 'ask'],
-      'Cursor Agent ask mode is Q&A-only and does not execute mutating tools.'
-    ),
-    opencode: ok(
-      ['--agent', 'plan'],
-      'OpenCode CLI planner tier runs on the plan agent without --auto approval.'
-    ),
-    devin: refused(
-      'Devin CLI has no headless no-tools mode: the Plan/Ask agent modes are interactive-only ' +
-        "(`/plan`, `/ask`), so a `-p` invocation cannot enforce the planner tier's no-execution " +
-        'invariant. Refusing delegation rather than granting an under-restricted approximation.'
-    ),
-  },
-} as const;
+export function loadProviderPermissionMatrix(): Readonly<
+  Record<
+    ProviderPermissionProfileName,
+    Readonly<Partial<Record<string, ProviderPermissionResolution>>>
+  >
+> {
+  const matrix: Record<
+    ProviderPermissionProfileName,
+    Partial<Record<string, ProviderPermissionResolution>>
+  > = { implementer: {}, explorer: {}, planner: {} };
+  for (const { provider, cli } of listCliReasoningProviderDescriptors()) {
+    for (const [tier, projection] of Object.entries(cli.permission_profiles ?? {})) {
+      const row = matrix[tier as ProviderPermissionProfileName];
+      if (!row || row[provider] || !projection) continue;
+      row[provider] =
+        'refused' in projection
+          ? refused(projection.refused)
+          : ok([...projection.args], projection.notes);
+    }
+  }
+  return matrix;
+}
+
+/** Descriptor cells that require full sandbox enforcement before the grant applies. */
+function requiresFullSandboxEnforcement(
+  tier: ProviderPermissionProfileName,
+  provider: ProviderId
+): boolean {
+  for (const descriptor of listCliReasoningProviderDescriptors()) {
+    if (descriptor.provider !== provider) continue;
+    const projection = descriptor.cli.permission_profiles?.[tier];
+    if (projection)
+      return 'args' in projection && projection.requires_full_sandbox_enforcement === true;
+  }
+  return false;
+}
 
 /**
  * Resolve the provider-specific permission projection for a KD-05 tier.
@@ -279,29 +198,34 @@ export function resolveProviderPermissionArgs(
 ): ProviderPermissionResolution {
   // Validates the tier exists at all; throws SUBAGENT_PROFILE_UNKNOWN otherwise.
   const profile = getSubagentCapabilityProfile(profileName);
-  const row = (PROVIDER_PERMISSION_MATRIX as Record<string, unknown>)[profile.name] as
-    Readonly<Record<ProviderId, ProviderPermissionResolution>> | undefined;
+  const row = (loadProviderPermissionMatrix() as Record<string, unknown>)[profile.name] as
+    Readonly<Partial<Record<string, ProviderPermissionResolution>>> | undefined;
   if (!row) {
     return refused(
       `No provider permission mapping is registered for KD-05 tier "${profile.name}". ` +
-        'Fail-closed: refusing delegation until a mapping is added to PROVIDER_PERMISSION_MATRIX.'
+        'Fail-closed: refusing delegation until a mapping is declared in the provider descriptor cli.permission_profiles.'
     );
   }
   const resolution = row[provider];
   if (!resolution) {
     return refused(
       `No provider permission mapping is registered for tier "${profile.name}" × provider "${provider}". ` +
-        'Fail-closed: refusing delegation until a mapping is added to PROVIDER_PERMISSION_MATRIX.'
+        'Fail-closed: refusing delegation until a mapping is declared in the provider descriptor cli.permission_profiles.'
     );
   }
-  // DH-11: an advertised CLI flag is not enough to claim a full sandbox.
-  // agy has no verified read-only filesystem mode, so its explorer mapping
-  // must refuse rather than silently presenting a partial policy as safe.
-  if (profile.name === 'explorer' && provider === 'agy' && resolution.kind === 'ok') {
-    const policy = resolveSandboxPolicy({ provider: 'agy', mode: 'read-only' });
+  // DH-11: an advertised CLI flag is not enough to claim a full sandbox. A
+  // descriptor cell marked `requires_full_sandbox_enforcement` (agy explorer:
+  // no verified read-only filesystem mode) must refuse rather than silently
+  // presenting a partial policy as safe.
+  if (
+    resolution.kind === 'ok' &&
+    requiresFullSandboxEnforcement(profile.name as ProviderPermissionProfileName, provider)
+  ) {
+    const mode = profile.name === 'implementer' ? 'workspace-write' : 'read-only';
+    const policy = resolveSandboxPolicy({ provider, mode });
     if (policy.enforcement !== 'full') {
       return refused(
-        `Provider "agy" cannot satisfy the explorer read-only sandbox contract: ${policy.enforcement_reason}`
+        `Provider "${provider}" cannot satisfy the ${profile.name} ${mode} sandbox contract: ${policy.enforcement_reason}`
       );
     }
   }

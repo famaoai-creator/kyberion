@@ -38,7 +38,13 @@
         "version_args": ["copilot", "--", "--help"],
         "help_args": ["copilot", "--", "--help"],
         "bin_env_key": "KYBERION_COPILOT_CLI_BIN",
-        "discovery": true
+        "discovery": true,
+        "capability_probe": {
+          "binary_args": ["copilot", "--", "--help"],
+          "auth_args": ["auth", "status"],
+          "headless": true,
+          "structured_output": true
+        }
       }
     }
   ]

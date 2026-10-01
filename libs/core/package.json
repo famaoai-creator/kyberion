@@ -1711,6 +1711,10 @@
       "types": "./dist/agent/agent-execution-port.d.ts",
       "default": "./dist/agent/agent-execution-port.js"
     },
+    "./coordination-actuator-routing": {
+      "types": "./dist/coordination-actuator-routing.d.ts",
+      "default": "./dist/coordination-actuator-routing.js"
+    },
     "./coordinated-agent-execution-port": {
       "types": "./dist/coordinated-agent-execution-port.d.ts",
       "default": "./dist/coordinated-agent-execution-port.js"
@@ -3903,6 +3907,10 @@
       "types": "./dist/surface/channel-adapter.d.ts",
       "default": "./dist/surface/channel-adapter.js"
     },
+    "./surface/channel-adapter-registry": {
+      "types": "./dist/surface/channel-adapter-registry.d.ts",
+      "default": "./dist/surface/channel-adapter-registry.js"
+    },
     "./surface/channel-directory": {
       "types": "./dist/surface/channel-directory.d.ts",
       "default": "./dist/surface/channel-directory.js"
@@ -4434,6 +4442,10 @@
     "./meeting/meeting-join-driver": {
       "types": "./dist/meeting/meeting-join-driver.d.ts",
       "default": "./dist/meeting/meeting-join-driver.js"
+    },
+    "./meeting/meeting-platform-registry": {
+      "types": "./dist/meeting/meeting-platform-registry.d.ts",
+      "default": "./dist/meeting/meeting-platform-registry.js"
     },
     "./meeting/meeting-operations-profile": {
       "types": "./dist/meeting/meeting-operations-profile.d.ts",

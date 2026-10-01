@@ -45,6 +45,29 @@
         "install": {
           "brew_formula": "antigravity-cli",
           "hint": "Use the official Antigravity installer, then set KYBERION_AGY_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--help"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--sandbox"],
+            "notes": "agy always runs sandboxed; implementer gets the full sandboxed tool set."
+          },
+          "explorer": {
+            "args": ["--sandbox"],
+            "notes": "agy sandbox flag is the closest read-only-leaning primitive this CLI exposes.",
+            "requires_full_sandbox_enforcement": true
+          },
+          "planner": {
+            "refused": "agy CLI headless invocations always pass --dangerously-skip-permissions and have no verified no-exec mode. Refusing delegation rather than granting an under-restricted approximation."
+          }
         }
       },
       "runtime_instructions": [

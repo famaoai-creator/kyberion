@@ -47,6 +47,34 @@
         "install": {
           "brew_formula": "grok-build",
           "hint": "Install the official Grok Build CLI, then set KYBERION_GROK_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--allow", "--deny"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--permission-mode", "bypassPermissions"],
+            "notes": "Grok Build full auto-approve path for implementer-tier write/exec work."
+          },
+          "explorer": {
+            "args": [
+              "--permission-mode",
+              "default",
+              "--disallowed-tools",
+              "run_terminal_command,write,search_replace"
+            ],
+            "notes": "Read-leaning: deny shell/write tools; remaining read/search tools stay available under default permission mode."
+          },
+          "planner": {
+            "args": ["--permission-mode", "plan"],
+            "notes": "Grok Build plan mode produces a plan without executing tools."
+          }
         }
       }
     }

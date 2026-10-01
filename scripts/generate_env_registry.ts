@@ -257,6 +257,42 @@ export function discoverEnvNames(rootDir: string): string[] {
       }
     }
   }
+  for (const name of discoverProviderDescriptorEnvNames(rootDir)) names.add(name);
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+// Provider descriptors declare env names as data (wave 1 / RS-01..03): those
+// names may no longer appear in any source file, so they are discovered from
+// the descriptor fields that name environment variables.
+const PROVIDER_DESCRIPTOR_DIRS = ['knowledge/product/governance/reasoning-providers'];
+const PROVIDER_ENV_FIELDS = new Set(['env_keys', 'model_env_keys', 'bin_env_key']);
+
+function collectDescriptorEnvNames(value: unknown, field: string | null, names: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectDescriptorEnvNames(item, field, names);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      collectDescriptorEnvNames(child, key, names);
+    }
+    return;
+  }
+  if (typeof value === 'string' && field && PROVIDER_ENV_FIELDS.has(field)) {
+    if (ENV_NAME_RE.test(value) && !value.endsWith('_')) names.add(value);
+  }
+}
+
+export function discoverProviderDescriptorEnvNames(rootDir: string): string[] {
+  const names = new Set<string>();
+  for (const dir of PROVIDER_DESCRIPTOR_DIRS) {
+    const absolute = path.join(rootDir, dir);
+    if (!safeExistsSync(absolute)) continue;
+    for (const filePath of getAllFiles(absolute)) {
+      if (path.extname(filePath) !== '.json') continue;
+      collectDescriptorEnvNames(JSON.parse(readEnvRegistryTextFile(filePath)), null, names);
+    }
+  }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 

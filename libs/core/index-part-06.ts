@@ -308,6 +308,8 @@ export {
   validateMeetingTarget,
 } from './meeting/meeting-join-driver.js';
 
+export * from './meeting/meeting-platform-registry.js';
+
 export {
   installObsVirtualCameraOutputBridge,
   OBS_VIRTUAL_CAMERA_BRIDGE_ID,

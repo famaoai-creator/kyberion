@@ -13,6 +13,7 @@ import { isRecord } from '@agent/core/foundation/text';
 import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
 import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
+import { listPresenceDispatchChannels } from '@agent/core/surface/channel-adapter-registry';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { WebClient } from '@slack/web-api';
 
@@ -71,41 +72,46 @@ const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
-export type PresenceSatelliteSurface = 'telegram' | 'discord' | 'imessage';
+/** A channel whose presence dispatch goes through its satellite outbox. */
+export type PresenceSatelliteSurface = string;
 
 export interface PresenceDispatchRoute {
-  surface: 'slack' | PresenceSatelliteSurface;
+  surface: string;
   channel: string;
   via: 'slack' | 'satellite-outbox';
 }
 
-const SATELLITE_SURFACES = new Set<PresenceSatelliteSurface>(['telegram', 'discord', 'imessage']);
-
 /**
- * Slack is the default presence backend.
- * Prefix the channel to forward through an existing satellite outbox:
+ * Slack is the default presence backend (the channel whose adapter declares
+ * `presence_dispatch: slack-webclient`). Prefix the channel to forward through
+ * an existing satellite outbox — the accepted prefixes are the channel adapter
+ * registry entries that declare `presence_dispatch` (RS-06), e.g.
  * `telegram:<chatId>`, `discord:<channelId>`, `imessage:<chatId>`.
  * Optional `slack:<id>` keeps the Slack WebClient path.
  */
 export function resolvePresenceDispatchRoute(channel: string): PresenceDispatchRoute {
   const trimmed = channel.trim();
-  const match = /^(slack|telegram|discord|imessage):(.*)$/i.exec(trimmed);
+  const channels = listPresenceDispatchChannels();
+  const webclient = channels.find((entry) => entry.via === 'slack-webclient');
+  if (!webclient) {
+    throw new Error(
+      '[PRESENCE] no channel adapter declares presence_dispatch "slack-webclient" — register one in surface-provider-manifests.json channel_adapters'
+    );
+  }
+  const separator = trimmed.indexOf(':');
+  const prefix = separator > 0 ? trimmed.slice(0, separator).toLowerCase() : '';
+  const match = channels.find((entry) => entry.id === prefix);
   if (!match) {
-    return { surface: 'slack', channel: trimmed, via: 'slack' };
+    return { surface: webclient.id, channel: trimmed, via: 'slack' };
   }
-  const surface = match[1].toLowerCase() as PresenceDispatchRoute['surface'];
-  const dest = match[2].trim();
+  const dest = trimmed.slice(separator + 1).trim();
   if (!dest) {
-    throw new Error(`[PRESENCE] ${surface} channel id is empty. Use ${surface}:<id>.`);
+    throw new Error(`[PRESENCE] ${match.id} channel id is empty. Use ${match.id}:<id>.`);
   }
-  if (SATELLITE_SURFACES.has(surface as PresenceSatelliteSurface)) {
-    return {
-      surface: surface as PresenceSatelliteSurface,
-      channel: dest,
-      via: 'satellite-outbox',
-    };
+  if (match.via === 'satellite-outbox') {
+    return { surface: match.id, channel: dest, via: 'satellite-outbox' };
   }
-  return { surface: 'slack', channel: dest, via: 'slack' };
+  return { surface: match.id, channel: dest, via: 'slack' };
 }
 
 export function normalizeTimelineDispatchResponse(value: unknown): Record<string, unknown> {

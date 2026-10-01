@@ -48,6 +48,28 @@
           "npm_package": "@openai/codex",
           "brew_formula": "codex",
           "hint": "npm install --prefix <managed-env> --no-save @openai/codex"
+        },
+        "capability_probe": {
+          "binary_args": ["--help"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--sandbox", "workspace-write"],
+            "notes": "Full read/write tier within the workspace sandbox."
+          },
+          "explorer": {
+            "args": ["--sandbox", "read-only"],
+            "notes": "codex read-only sandbox forbids filesystem writes for the duration of the delegation."
+          },
+          "planner": {
+            "refused": "codex CLI has no text-only / no-exec headless mode: even --sandbox read-only still lets the model run shell commands, which would violate the planner tier's no-exec invariant. Refusing delegation rather than granting an under-restricted approximation."
+          }
         }
       },
       "runtime_instructions": [

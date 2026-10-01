@@ -58,6 +58,29 @@
         "install": {
           "brew_formula": "devin-cli",
           "hint": "Install the official Devin CLI, then set KYBERION_DEVIN_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "auth_args": ["auth", "status"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--permission-mode", "--sandbox"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--permission-mode", "bypass"],
+            "notes": "Devin CLI bypass mode auto-approves every tool call for implementer-tier write/exec work."
+          },
+          "explorer": {
+            "args": ["--permission-mode", "normal"],
+            "notes": "Devin CLI normal mode auto-approves read-only tools; write/exec approval prompts have no one to answer under `-p` and fail closed."
+          },
+          "planner": {
+            "refused": "Devin CLI has no headless no-tools mode: the Plan/Ask agent modes are interactive-only (`/plan`, `/ask`), so a `-p` invocation cannot enforce the planner tier's no-execution invariant. Refusing delegation rather than granting an under-restricted approximation."
+          }
         }
       },
       "runtime_instructions": [
