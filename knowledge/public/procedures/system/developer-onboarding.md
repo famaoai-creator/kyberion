@@ -13,7 +13,7 @@ For engineers joining a Kyberion deployment. The aim is to get from
 without bypassing the governance the rest of the system depends on.
 
 This is a procedure (not architecture). Architecture lives under
-[`knowledge/product/architecture/`](knowledge/product/architecture).
+[`knowledge/product/architecture/`](../../../product/architecture).
 
 ## Day 1 — local environment + first read
 
@@ -33,10 +33,10 @@ This is a procedure (not architecture). Architecture lives under
    pnpm build
    ```
 2. Read in this order, ≤ 5 minutes each:
-   - [`AGENTS.md`](AGENTS.md) — operator rules, especially the canonical work-scope policy
-   - [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
-   - [`knowledge/product/architecture/kyberion-canonical-concept-index.md`](knowledge/product/architecture/kyberion-canonical-concept-index.md)
-   - [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
+   - [`AGENTS.md`](../../../../AGENTS.md) — operator rules, especially the canonical work-scope policy
+   - [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../../docs/USER_EXPERIENCE_CONTRACT.md)
+   - [`knowledge/product/architecture/kyberion-canonical-concept-index.md`](../../../product/architecture/kyberion-canonical-concept-index.md)
+   - [`docs/INTENT_LOOP_CONCEPT.md`](../../../../docs/INTENT_LOOP_CONCEPT.md)
 3. Run baseline:
    ```bash
    pnpm pipeline --input pipelines/baseline-check.json
@@ -117,13 +117,13 @@ This is a procedure (not architecture). Architecture lives under
 Read each doc once, then come back to whichever maps closest to the
 work you actually do.
 
-1. [`kyberion-concept-evaluation-2026-04-26.md`](knowledge/product/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
-2. [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) — what users can ask for
-3. [`kyberion-scenario-coverage-matrix.md`](knowledge/product/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
-4. [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md) — multi-tenant operations
-5. [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md) — UI strategy
-6. [`mission-team-composition-model.md`](knowledge/product/architecture/mission-team-composition-model.md) — how teams form
-7. [`agent-mission-control-model.md`](knowledge/product/architecture/agent-mission-control-model.md) — agent control plane
+1. [`kyberion-concept-evaluation-2026-04-26.md`](../../../product/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
+2. [`kyberion-intent-catalog.md`](../../../product/architecture/kyberion-intent-catalog.md) — what users can ask for
+3. [`kyberion-scenario-coverage-matrix.md`](../../../product/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
+4. [`multi-tenant-operations.md`](../../../product/architecture/multi-tenant-operations.md) — multi-tenant operations
+5. [`operator-surface-strategy.md`](../../../product/architecture/operator-surface-strategy.md) — UI strategy
+6. [`mission-team-composition-model.md`](../../../product/architecture/mission-team-composition-model.md) — how teams form
+7. [`agent-mission-control-model.md`](../../../product/architecture/agent-mission-control-model.md) — agent control plane
 
 ### Anti-patterns to recognize and avoid
 
@@ -142,7 +142,7 @@ work you actually do.
    most "is the system OK?" questions.
 2. `pnpm pipeline --input pipelines/agent-provider-check.json` — checks
    reasoning-backend wiring.
-3. `pnpm watch:tenant-drift` — multi-tenant integrity.
+3. `pnpm tenant:watch-drift` — multi-tenant integrity.
 4. `git log` on a related actuator's `examples/*.json` — learn by
    imitation.
 5. `knowledge/product/evolution/distill_*.md` — distilled lessons from prior
@@ -164,8 +164,8 @@ wasn't, the rule of thumb: **add the test before fixing the bug.**
 
 ## Reference
 
-- [`AGENTS.md`](AGENTS.md) — operator rules
-- [`docs/INITIALIZATION.md`](docs/INITIALIZATION.md) — first-time setup
-- [`docs/QUICKSTART.md`](docs/QUICKSTART.md) — quick start
-- [`docs/COMPONENT_MAP.md`](docs/COMPONENT_MAP.md) — directory structure
-- [`CAPABILITIES_GUIDE.md`](CAPABILITIES_GUIDE.md) — actuator catalog
+- [`AGENTS.md`](../../../../AGENTS.md) — operator rules
+- [`docs/INITIALIZATION.md`](../../../../docs/INITIALIZATION.md) — first-time setup
+- [`docs/QUICKSTART.md`](../../../../docs/QUICKSTART.md) — quick start
+- [`docs/COMPONENT_MAP.md`](../../../../docs/COMPONENT_MAP.md) — directory structure
+- [`CAPABILITIES_GUIDE.md`](../../../../CAPABILITIES_GUIDE.md) — actuator catalog

@@ -18,9 +18,9 @@ describe('services setup guidance', () => {
 
   it('routes connection completion through the services-only onboarding phase', () => {
     expect(buildServiceConnectionSetupCommand('voice')).toBe(
-      'pnpm onboard -- --services-only --service voice'
+      'pnpm onboarding -- --services-only --service voice'
     );
-    expect(buildServiceConnectionSetupCommand('voice')).not.toBe('pnpm services:setup');
+    expect(buildServiceConnectionSetupCommand('voice')).not.toBe('pnpm service:setup');
   });
 
   it('routes OAuth-backed auth to the governed setup script', () => {

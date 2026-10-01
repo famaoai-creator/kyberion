@@ -8,6 +8,7 @@ import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from '../scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
+import { reasoningProviderModelEnvKeys } from './reasoning-provider-registry.js';
 import { loadLlmSelectionPreferences } from '../llm-selection-state.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
@@ -277,25 +278,8 @@ function parseBinding(binding: string): { profile?: string; mode?: string; model
 }
 
 function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | undefined {
-  const keys: Record<string, string[]> = {
-    anthropic: ['KYBERION_ANTHROPIC_MODEL', 'KYBERION_CLAUDE_MODEL'],
-    'gemini-api': ['KYBERION_GEMINI_MODEL'],
-    'grok-api': ['KYBERION_GROK_API_MODEL'],
-    'grok-cli': ['KYBERION_GROK_CLI_MODEL'],
-    'cursor-cli': ['KYBERION_CURSOR_CLI_MODEL'],
-    'opencode-cli': ['KYBERION_OPENCODE_CLI_MODEL'],
-    'devin-cli': ['KYBERION_DEVIN_CLI_MODEL'],
-    openrouter: ['KYBERION_OPENROUTER_MODEL'],
-    'nemotron-api': ['KYBERION_NEMOTRON_MODEL'],
-    ollama: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    vllm: ['KYBERION_VLLM_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    lmstudio: ['KYBERION_LMSTUDIO_MODEL', 'KYBERION_LM_STUDIO_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    llamacpp: ['KYBERION_LLAMACPP_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    mlx: ['KYBERION_MLX_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    localai: ['KYBERION_LOCALAI_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
-    local: ['KYBERION_LOCAL_LLM_MODEL'],
-  };
-  return [...(keys[mode] || []), 'KYBERION_REASONING_MODEL']
+  // RS-01: per-mode model env keys are declared on the provider descriptor.
+  return [...reasoningProviderModelEnvKeys(mode), 'KYBERION_REASONING_MODEL']
     .map((key) => envText(env, key)?.trim())
     .find(Boolean);
 }

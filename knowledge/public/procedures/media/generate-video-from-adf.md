@@ -1,6 +1,7 @@
 # Procedure: Generate Video From ADF
 
 ## 1. Goal
+
 Generate a governed video artifact from a `video-generation-adf` contract while keeping backend workflow details internal to the compiler and actuator.
 
 This is the procedure behind the `generate-video` intent and its default execution profile:
@@ -10,11 +11,13 @@ This is the procedure behind the `generate-video` intent and its default executi
 - capability bundle: `video-generation-governed`
 
 ## 2. Dependencies
+
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with a compatible video workflow
-- **Schema**: [`video-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-generation-adf.schema.json)
+- **Schema**: [`video-generation-adf.schema.json`](../../../product/schemas/video-generation-adf.schema.json)
 
 ## 3. Contract Shape
+
 `video-generation-adf` is the stable public interface.
 
 - `prompt` / `negative_prompt`: shot intent and exclusions
@@ -25,10 +28,11 @@ This is the procedure behind the `generate-video` intent and its default executi
 Current implementation hydrates typed placeholders into a named or embedded workflow template, then submits the resolved workflow to ComfyUI.
 
 ## 4. Execution
+
 Example inputs:
 
-- [`video-adf-drive-clip.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json)
-- [`submit-video-generation-job.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json)
+- [`video-adf-drive-clip.json`](../../../../libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json)
+- [`submit-video-generation-job.json`](../../../../libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json)
 
 Run the direct example:
 
@@ -52,11 +56,12 @@ Follow-up job actions:
 
 Orchestrator-ready bundle:
 
-- [`video-generation-pipeline-bundle.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-generation-pipeline-bundle.json)
-- [`video-bundle-to-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-execution-plan-set.json)
-- [`video-bundle-to-run-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-run-execution-plan-set.json)
+- [`video-generation-pipeline-bundle.json`](../../../../libs/actuators/orchestrator-actuator/examples/video-generation-pipeline-bundle.json)
+- [`video-bundle-to-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/video-bundle-to-execution-plan-set.json)
+- [`video-bundle-to-run-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/video-bundle-to-run-execution-plan-set.json)
 
 ## 5. Expected Output
+
 - ComfyUI `prompt_id`
 - `generation-job` when submitted asynchronously
 - generated video artifact metadata
@@ -64,6 +69,7 @@ Orchestrator-ready bundle:
 - optional governed copy at `output.target_path`
 
 ## 6. Design Rule
+
 Treat the `video-generation-adf` as the public contract and the embedded workflow only as a current backend strategy.  
 Do not let orchestration couple itself directly to Comfy node graphs.
 
@@ -75,4 +81,4 @@ not the user-facing contract.
 
 - `generate-narrated-video` uses the narrated-video composition flow instead of this prompt-based video generation path.
 - `create-music-video-from-adf` intentionally keeps music-specific composition semantics out of this procedure.
-- Hermes absorption notes: [`hermes-agent-absorption-plan-2026-06.md`](/Users/famao/kyberion/knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md)
+- Hermes absorption notes: [`hermes-agent-absorption-plan-2026-06.md`](../../external-wisdom/hermes-agent-absorption-plan-2026-06.md)

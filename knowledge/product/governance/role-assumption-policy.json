@@ -70,6 +70,19 @@
       "may_assume": ["sovereign_concierge"],
       "rationale": "scripts/oauth_callback_surface.ts. sovereign_concierge: completeOAuthCallback resolves tool binaries through libs/core tool-runtime-policy (getToolRuntimePolicy). RN-03 removed ecosystem_architect and mission_controller: docs/developer/role-assumption-reachability.json proves neither reachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic smoke of the built surface, oauth_callback_surface vitest suites under SYSTEM_ROLE) only observed surface_runtime (the surface's own callback write, a shared core role)."
     },
+    "operator_surface": {
+      "may_assume": ["chronos_token_registry_reader", "sovereign_concierge"],
+      "rationale": "Read-only audit monitor (presence/displays/operator-surface), operator-launched through surface_runtime with SYSTEM_ROLE=operator_surface. sovereign_concierge and chronos_token_registry_reader: reachable per docs/developer/role-assumption-reachability.json via libs/core surface-authn -> authn-providers (module providers and loadRegistrations). The surface also has unresolved sites (provider-discovery memoized CLI spawn, a computed import in src/lib/view.ts), so the analysis treats every role as reachable and nothing here is removable."
+    },
+    "personal_pads": {
+      "may_assume": [
+        "chronos_token_registry_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
+      "rationale": "Personal capture pads (pnpm pads -> scripts/personal-pads/server.ts), operator-launched through surface_runtime with SYSTEM_ROLE=personal_pads. chronos_token_registry_reader via libs/core authn-providers loadRegistrations; ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned, ecosystem_architect via libs/core deployment-adapter, sovereign_concierge via libs/core authn-providers / surface-authn). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
+    },
     "presence_studio": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
       "rationale": "Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts ensureOwnerMember), mission_controller in hearing-mission-routes.ts. the same broad roles: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: the Presence Studio vitest suite and a hermetic smoke under SYSTEM_ROLE=presence_studio observed ecosystem_architect, mission_controller and sovereign_concierge. chronos_token_registry_reader is deliberately absent: presence-studio/security.ts passes `registrations: null` (TR-01), recorded as reviewed-infeasible in the report."
@@ -98,6 +111,10 @@
     "terminal_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
       "rationale": "presence/bridge/terminal/server.ts. The bridge assumes no role itself, but its PTY sessions (libs/core pty-engine) start interactive shells with process.env, so SYSTEM_ROLE=terminal_bridge reaches every Kyberion command run in them; the report treats that as an unresolved (any-role) site, so ecosystem_architect, mission_controller and sovereign_concierge stay."
+    },
+    "terminal_hud": {
+      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "rationale": "Interactive terminal HUD (presence/displays/terminal-hud), operator-launched through surface_runtime with SYSTEM_ROLE=terminal_hud. ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned, ecosystem_architect via libs/core deployment-adapter, sovereign_concierge via libs/core authn-providers / surface-authn). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "voice_hub": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],

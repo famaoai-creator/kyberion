@@ -10,7 +10,7 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 export const runKnowledgeFeedback = defineScript({
-  name: 'knowledge-feedback',
+  name: 'knowledge:feedback',
   flags: [],
   run(context) {
     const documentPath = flag(context.argv, '--path');
@@ -22,7 +22,7 @@ export const runKnowledgeFeedback = defineScript({
       !['useful', 'stale', 'wrong', 'not_useful'].includes(verdict)
     ) {
       throw new Error(
-        'Usage: pnpm knowledge-feedback --path <knowledge-relative-path> --verdict <useful|stale|wrong|not_useful> [--reason <text>]'
+        'Usage: pnpm knowledge:feedback --path <knowledge-relative-path> --verdict <useful|stale|wrong|not_useful> [--reason <text>]'
       );
     }
     const target = recordHumanKnowledgeFeedback({

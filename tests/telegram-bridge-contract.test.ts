@@ -19,7 +19,7 @@ describe('Telegram bridge contract', () => {
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
 
     expect(pkg.scripts['telegram:bridge']).toBe(
-      'node dist/satellites/telegram-bridge/src/index.js'
+      'node scripts/run_built.mjs dist/satellites/telegram-bridge/src/index.js'
     );
     // SX-05 (script ratchet, commit a877d9c12) pruned every per-demo
     // `*:demo` package script alias, including `telegram:demo` — the demo

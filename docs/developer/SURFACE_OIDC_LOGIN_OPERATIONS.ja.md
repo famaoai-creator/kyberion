@@ -23,6 +23,8 @@ last_updated: 2026-09-30
 
 > **注意(Next.js 系の 3 面)**: Next.js 15 以降は `NextRequest.ip` が無く、`KYBERION_TRUST_PROXY=1`(`x-real-ip` / `x-forwarded-for` を必ず上書きする信頼できるプロキシの背後)でない限り、同じマシンのブラウザでも loopback と判定されません(従来からの仕様。CHANGELOG 参照)。その場合、ローカルでもログイン画面(またはアクセストークン)が必要です。`KYBERION_TRUST_PROXY=1` をプロキシ無しで有効にすると `X-Forwarded-For: 127.0.0.1` の偽装で loopback になりすませるため、プロキシ無しでは有効にしないでください。Express 系の 2 面(presence-studio / computer-surface)はソケットの接続元で判定するため影響を受けません。
 
+> **レート制限と `/logout`**: Next.js 系の 3 面は `/login` と `/auth/*` をクライアント毎 120 回/分・面全体 600 回/分で制限します(超過は 429 + `Retry-After`)。クライアントを区別できる接続元 IP は `KYBERION_TRUST_PROXY=1` のとき(または Express 系の 2 面)だけ得られます。それが無いと全員が同一の `shared` とみなされ、**面全体の上限(600 回/分)だけ**が適用されます(1 人の連打で全員が締め出されないため)。loopback は制限対象外です。`/logout` は `Sec-Fetch-Site` が `same-origin` / `none` のときだけセッションを破棄します(`cross-site` と `same-site`=兄弟サブドメインは無視)。ヘッダが無い古いブラウザでは `Origin` / `Referer` が自分以外のホストなら無視します。
+
 ### ローカルでも IdP でサインインする
 
 Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(新しいトークン入力の入口は追加していません。concierge の従来の `/signin` はそのまま使えます)。

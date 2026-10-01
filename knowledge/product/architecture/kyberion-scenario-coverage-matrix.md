@@ -10,7 +10,7 @@ last_updated: 2026-04-27
 
 This document audits which user-story scenarios Kyberion currently
 covers end-to-end, partially, or not at all. It complements
-[`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) (which
+[`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) (which
 maps intents to surfaces) by approaching from the user-story angle and
 producing a matrix that maintainers can scan for gaps.
 
@@ -61,7 +61,7 @@ the canonical surface(s) involved.
 | C1  | First paying-tenant launch (8 weeks) | `multi-tenant-operations.md` §5b                                                                                 | ✅     |
 | C2  | Tenant-scoped mission creation       | `mission_controller create --tenant-slug <slug>`                                                                 | ✅     |
 | C3  | Cross-tenant access denial           | `tier-guard.checkTenantScope` + `tenant.scope_violation` event                                                   | ✅     |
-| C4  | Tenant drift watchdog                | `pnpm watch:tenant-drift`                                                                                        | ✅     |
+| C4  | Tenant drift watchdog                | `pnpm tenant:watch-drift`                                                                                        | ✅     |
 | C5  | Per-tenant SIEM routing              | `TenantFilteringAuditForwarder`                                                                                  | ✅     |
 | C6  | Per-tenant rate limit                | `tenant-rate-limit-policy.json` + `consumeTenantBudget`                                                          | ✅     |
 | C7  | Cross-tenant knowledge promotion     | `mission_controller memory-promote` + tier-hygiene gate                                                          | ✅     |
@@ -114,7 +114,7 @@ the canonical surface(s) involved.
 
 | #   | Scenario                                | Mechanism                                                                               | Status                      |
 | --- | --------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------- |
-| H1  | Validation bundle export                | `pnpm export:validation-bundle <MSN-ID>`                                                | ✅                          |
+| H1  | Validation bundle export                | `pnpm validation-bundle:export <MSN-ID>`                                                | ✅                          |
 | H2  | Operator attestations                   | `attestations/README.md` shape                                                          | ✅ (manual signing process) |
 | H3  | Independent reproducibility from bundle | bundle includes prompts / model versions / governance / audit excerpt / sha256 manifest | ✅                          |
 
@@ -150,7 +150,7 @@ the canonical surface(s) involved.
 
 | #   | Surface                             | Coverage                                                                                                                                                                                                                                                                                                                                     | Status |
 | --- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| K1  | CLI (primary)                       | `mission_controller` / `pnpm pipeline` / `pnpm run validate` / `pnpm export:validation-bundle` / `pnpm watch:tenant-drift`                                                                                                                                                                                                                   | ✅     |
+| K1  | CLI (primary)                       | `mission_controller` / `pnpm pipeline` / `pnpm run validate` / `pnpm validation-bundle:export` / `pnpm tenant:watch-drift`                                                                                                                                                                                                                   | ✅     |
 | K2  | MOS read-only Web                   | 5 pages + `mos.read` events + tenant scope                                                                                                                                                                                                                                                                                                   | ✅     |
 | K3  | Chronos-mirror-v2 (ambient display) | existing presence app                                                                                                                                                                                                                                                                                                                        | ✅     |
 | K4  | Mobile (handoff target)             | iOS / Android WebView                                                                                                                                                                                                                                                                                                                        | ✅     |
@@ -158,13 +158,13 @@ the canonical surface(s) involved.
 
 ## L. Developer / Platform engineer
 
-| #   | Scenario                      | Entry                                                                                   | Status |
-| --- | ----------------------------- | --------------------------------------------------------------------------------------- | ------ |
-| L1  | New actuator                  | `libs/actuators/<name>/` + schema + examples + tests                                    | ✅     |
-| L2  | New pipeline                  | `pipelines/<name>.json` + new `wisdom:` op when needed                                  | ✅     |
-| L3  | Reasoning backend extension   | `libs/core/<backend>-reasoning-backend.ts` + bootstrap                                  | ✅     |
-| L4  | Developer onboarding workflow | [`developer-onboarding.md`](knowledge/public/procedures/system/developer-onboarding.md) | ✅     |
-| L5  | Tier-hygiene safety net       | `pnpm check -- --only tier-hygiene`                                                     | ✅     |
+| #   | Scenario                      | Entry                                                                               | Status |
+| --- | ----------------------------- | ----------------------------------------------------------------------------------- | ------ |
+| L1  | New actuator                  | `libs/actuators/<name>/` + schema + examples + tests                                | ✅     |
+| L2  | New pipeline                  | `pipelines/<name>.json` + new `wisdom:` op when needed                              | ✅     |
+| L3  | Reasoning backend extension   | `libs/core/<backend>-reasoning-backend.ts` + bootstrap                              | ✅     |
+| L4  | Developer onboarding workflow | [`developer-onboarding.md`](../../public/procedures/system/developer-onboarding.md) | ✅     |
+| L5  | Tier-hygiene safety net       | `pnpm check -- --only tier-hygiene`                                                 | ✅     |
 
 ## M. CISO / Security lead
 
@@ -204,9 +204,9 @@ in `meeting-proxy-workflow.json` with real ops (`wisdom:extract_requirements`
 
 ## Cross-references
 
-- [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) — what to ask for
-- [`kyberion-canonical-concept-index.md`](knowledge/product/architecture/kyberion-canonical-concept-index.md) — primitives and vocabulary
-- [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md) — multi-tenant operational baseline
-- [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md) — UI strategy
-- [`../procedures/system/developer-onboarding.md`](knowledge/public/procedures/system/developer-onboarding.md) — developer first month
-- [`../orchestration/cross-tenant-brokering-protocol.md`](knowledge/product/orchestration/cross-tenant-brokering-protocol.md) — brokering protocol
+- [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) — what to ask for
+- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md) — primitives and vocabulary
+- [`multi-tenant-operations.md`](multi-tenant-operations.md) — multi-tenant operational baseline
+- [`operator-surface-strategy.md`](operator-surface-strategy.md) — UI strategy
+- [`../procedures/system/developer-onboarding.md`](../../public/procedures/system/developer-onboarding.md) — developer first month
+- [`../orchestration/cross-tenant-brokering-protocol.md`](../orchestration/cross-tenant-brokering-protocol.md) — brokering protocol

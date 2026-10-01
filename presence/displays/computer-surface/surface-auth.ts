@@ -55,6 +55,7 @@ export function registerComputerSurfaceAuthRoutes(app: Express): void {
         requestOrigin: `${req.protocol}://${req.headers.host ?? ''}`,
         loopback: isComputerSurfaceLoopbackRequest(req),
         secFetchSite: first(req.headers['sec-fetch-site']) ?? null,
+        referrerOrigin: first(req.headers.origin) ?? first(req.headers.referer) ?? null,
       });
       if (!result) {
         next();

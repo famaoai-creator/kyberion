@@ -25,6 +25,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 import {
   resolveUserLoginShell,
   safeExec,
+  assertGovernedExec,
   safeExecResult,
   safeExecResultAsync,
   safeExecShellScript,
@@ -199,6 +200,7 @@ describe('generic exec helpers reject shell-script invocations', () => {
     expect(() => safeExecResult(cmd, args)).toThrow(/safeExecShellScript/);
     expect(() => safeExecResultAsync(cmd, args)).toThrow(/safeExecShellScript/);
     expect(() => safeSpawn(cmd, args)).toThrow(/safeExecShellScript/);
+    expect(() => assertGovernedExec(cmd, args)).toThrow(/safeExecShellScript/);
     expect(childProcessSpies.execFileSync).not.toHaveBeenCalled();
     expect(childProcessSpies.spawnSync).not.toHaveBeenCalled();
   });

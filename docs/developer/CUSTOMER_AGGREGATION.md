@@ -112,7 +112,7 @@ For users who already have a `knowledge/personal/` filled in:
 2. To convert to a customer-overlay structure:
 
    ```bash
-   pnpm customer:create my-org
+   pnpm stance:create my-org
    # Copies knowledge/personal/* into customer/my-org/* with appropriate renames.
    export KYBERION_CUSTOMER=my-org
    ```
@@ -140,7 +140,7 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 
 ## 6. Out of Scope (Future Work)
 
-- **Live customer switching within a session** — currently requires restarting the process. A `pnpm customer:switch` command is a Phase D'-1 follow-up.
+- **Live customer switching within a session** — currently requires restarting the process. A `pnpm stance:switch` command is a Phase D'-1 follow-up.
 - **Concurrent multi-customer execution** — the current model assumes one active customer per process. Concurrent runs require separate processes with different env vars.
 - **Customer-scoped trace storage** — trace files currently land under `active/shared/logs/`. Phase B-1 will extend this to `customer/{slug}/logs/` when a customer is active.
 - **Stance-scoped `confidential/` tier** — this document covers the overlay only. Confidential data is separated by **tenant**, not by stance: that is the existing `knowledge/confidential/{tenant-slug}/` mechanism, and it is unchanged. A stance selects which tenants you can see; it never becomes a confidentiality boundary of its own.
@@ -164,11 +164,11 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] Directory structure (`customer/`, `customer/_template/`, `.gitignore` rules)
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
 - [x] Resolver tests (`libs/core/customer-resolver.test.ts`)
-- [x] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
-- [x] CLI: `pnpm customer:list`
-- [x] CLI: `pnpm customer:switch <slug>` (validates + writes `active/shared/runtime/customer.env`)
+- [x] CLI: `pnpm stance:create <slug>` (copies from `_template/`)
+- [x] CLI: `pnpm stance:list`
+- [x] CLI: `pnpm stance:switch <slug>` (validates + writes `active/shared/runtime/customer.env`)
 - [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
-- [x] Migration helper: `pnpm customer:migrate-from-personal`
+- [x] Migration helper: `pnpm stance:migrate-from-personal`
 - [ ] Integration in `path-resolver.ts` consumers
   - [x] Connections consumer (`libs/core/service/service-engine.ts`)
   - [x] Policy consumer (`libs/core/governance/approval-policy.ts`)

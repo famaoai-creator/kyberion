@@ -6,9 +6,7 @@
       "kind": "service",
       "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
       "command": "node",
-      "args": [
-        "dist/satellites/voice-hub/server.js"
-      ],
+      "args": ["dist/satellites/voice-hub/server.js"],
       "env": {
         "KYBERION_PERSONA": "sovereign",
         "MISSION_ROLE": "surface_runtime"
@@ -19,7 +17,10 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3032,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_voice_hub",
+      "bestForKey": "surface:surface_best_for_voice_hub",
+      "urlEnv": "VOICE_HUB_URL"
     }
   ]
 }

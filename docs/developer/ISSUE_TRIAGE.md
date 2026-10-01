@@ -18,11 +18,11 @@ How incoming issues are processed. Phase C'-8 of `docs/PRODUCTIZATION_ROADMAP.md
 
 ## Roles
 
-| Role | Owner | Time commitment |
-|---|---|---|
-| Weekly triager | Rotates among triagers + area committers | ≤ 30 min/week |
-| Monthly sync host | Core maintainer | ≤ 1 hr/month |
-| Quarterly reviewer | All core maintainers | ≤ 1 hr/quarter |
+| Role               | Owner                                    | Time commitment |
+| ------------------ | ---------------------------------------- | --------------- |
+| Weekly triager     | Rotates among triagers + area committers | ≤ 30 min/week   |
+| Monthly sync host  | Core maintainer                          | ≤ 1 hr/month    |
+| Quarterly reviewer | All core maintainers                     | ≤ 1 hr/quarter  |
 
 If you'd like to join the triage rotation, see `MAINTAINERS.md` "Becoming a Maintainer" §1.
 
@@ -74,19 +74,19 @@ Thanks for the report. To investigate I need a minimal reproduction:
 - [ ] OS + version
 - [ ] Steps to reproduce, ideally a `pipelines/*.json` or `pnpm <command>` invocation
 - [ ] What you expected vs. what happened
-- [ ] `pnpm doctor` output
+- [ ] `pnpm kyberion doctor` output
 
 This helps us fix it without guessing. If the issue stops being reproducible, please close.
 ```
 
 ## Severity guide (bugs)
 
-| Severity | Definition |
-|---|---|
+| Severity     | Definition                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | **critical** | Breaks core flow for all users (build fails, mission-state corrupted, secrets leaked). Patch released within 7 days. |
-| **high** | Breaks a major flow for many users (an actuator can't run, a primary surface is broken). Targeted for next minor. |
-| **medium** | Reproducible bug with workaround, OR intermittent without clear repro. Targeted for next 2 minors. |
-| **low** | Cosmetic, very-rare-edge-case, or works-as-designed-but-unintuitive. Best-effort. |
+| **high**     | Breaks a major flow for many users (an actuator can't run, a primary surface is broken). Targeted for next minor.    |
+| **medium**   | Reproducible bug with workaround, OR intermittent without clear repro. Targeted for next 2 minors.                   |
+| **low**      | Cosmetic, very-rare-edge-case, or works-as-designed-but-unintuitive. Best-effort.                                    |
 
 ## Triage SLA
 

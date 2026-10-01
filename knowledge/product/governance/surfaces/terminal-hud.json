@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "terminal-hud",
+      "kind": "service",
+      "description": "Interactive full-screen terminal HUD (Ink TUI, no listening port). Operator-launched in a terminal; not started by reconcile.",
+      "command": "node",
+      "args": ["presence/displays/terminal-hud/dist/index.js"],
+      "cwd": ".",
+      "shutdownPolicy": "manual",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": false
+    }
+  ]
+}

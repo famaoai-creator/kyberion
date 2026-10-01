@@ -1,6 +1,6 @@
 # Use-Case Quickstarts
 
-Three short paths for users who want to try Kyberion by outcome instead of by subsystem.
+Three short paths for users who want to try Kyberion by outcome instead of by subsystem. Do the [QUICKSTART](../QUICKSTART.md) first win before these; the full scenario catalog is [USE_CASES](../USE_CASES.md) ([how the scenario docs relate](../README.md#scenario-and-use-case-documents)).
 
 ## 1. Meeting facilitator
 
