@@ -1779,6 +1779,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_member.ts#runOrganizationMember",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/peer_network_register.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []

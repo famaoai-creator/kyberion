@@ -9859,6 +9859,11 @@
         "ja": "この操作を行う権限がありません。承認者に依頼してください。",
         "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ṗėřƒőřɱ ŧħïş ȧƈŧïőñ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "work_request_not_authorized": {
+        "en": "You can ask questions here, but starting work (missions, approvals) needs a registered team member with an operator role or higher.",
+        "ja": "このチャンネルでは質問にはお答えできますが、ミッションや承認を伴う作業の依頼には、オペレーター以上の役割を持つ登録メンバーが必要です。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ ȧşķ ɋůėşŧïőñş ħėřė, ƀůŧ şŧȧřŧïñɠ ẇőřķ (ɱïşşïőñş, ȧṗṗřőṽȧŀş) ñėėḓş ȧ řėɠïşŧėřėḓ ŧėȧɱ ɱėɱƀėř ẇïŧħ ȧñ őṗėřȧŧőř řőŀė őř ħïɠħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
       "mission_proposal_not_authorized": {
         "en": "You are not authorized to decide this mission proposal. Please ask an approver.",
         "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",

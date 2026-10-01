@@ -1,6 +1,7 @@
 /** Domain barrel — public surface for libs/core/organization */
 export * from './authority-role-registry.js';
 export * from './member-id-grammar.js';
+export * from './member-identity-link.js';
 export type {
   MemberRole,
   MemberStatus,

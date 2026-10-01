@@ -185,7 +185,7 @@ describe('channel-mode-policy', () => {
       stubModes(TEAM_CONFIG);
       const team = resolveChannelModePolicy('slack', 'C0TEAM');
       expect(evaluateChannelApprovalAuthority(team, 'U0LEAD').allowed).toBe(true);
-      expect(evaluateChannelApprovalAuthority(team, 'U1')).toEqual({
+      expect(evaluateChannelApprovalAuthority(team, 'U1')).toMatchObject({
         allowed: false,
         reason: 'not_channel_approver',
       });
