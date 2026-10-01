@@ -89,6 +89,7 @@ import type {
   IntentDeliveryMode,
   UserIntentFlow,
 } from './intent-contract-types.js';
+import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
 
 export type {
   AgentRoutingAutonomy,
@@ -556,9 +557,7 @@ function toWorkflowShape(shape?: string): WorkflowExecutionShape {
 }
 
 function isApprovalWorkflowRequest(text: string): boolean {
-  return /(承認を依頼|承認を申請|承認依頼|稟議.*依頼|稟議|決裁|承認して|承認し|承認待ち|approve|approved?|通して|処理して)/i.test(
-    text
-  );
+  return matchesIntentPhrase(text, 'intent_contract.approval_workflow_request');
 }
 
 function loadIntentPolicy(): IntentPolicyFile {

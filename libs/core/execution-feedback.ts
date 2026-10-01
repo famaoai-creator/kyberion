@@ -10,6 +10,7 @@ import {
   updateDistillCandidateRecord,
   type DistillCandidateRecord,
 } from './knowledge/distill-candidate-registry.js';
+import { intentPhraseSource } from './intent/intent-phrase-lexicon.js';
 import { t } from './t.js';
 
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
@@ -167,12 +168,17 @@ export function materializeExecutionFeedbackCandidate(input: {
   return { summary, candidate };
 }
 
+/** `<feedback prefix> <scenario-id>: <outcome>[: detail]` — prefixes come from the intent phrase lexicon. */
+function feedbackReplyPattern(): RegExp {
+  const prefix = intentPhraseSource('execution_feedback.prefix');
+  return new RegExp(
+    `^${prefix}\\s+(use-case-[a-z0-9_-]+)\\s*[:：]\\s*(満足|一部違う|不満|satisfied|partially_satisfied|dissatisfied)(?:\\s*[:：]\\s*(\\S.*))?$`,
+    'iu'
+  );
+}
+
 export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput | null {
-  const match = text
-    .trim()
-    .match(
-      /^評価\s+(use-case-[a-z0-9_-]+)\s*[:：]\s*(満足|一部違う|不満|satisfied|partially_satisfied|dissatisfied)(?:\s*[:：]\s*(\S.*))?$/iu
-    );
+  const match = text.trim().match(feedbackReplyPattern());
   if (!match) return null;
   const outcomeByLabel: Record<string, ExecutionFeedbackOutcome> = {
     満足: 'satisfied',

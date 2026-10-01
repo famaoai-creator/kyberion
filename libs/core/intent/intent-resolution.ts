@@ -13,6 +13,7 @@ import {
   type ContextualIntentFrame,
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
+import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
 
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/standard-intents.schema.json'
@@ -471,10 +472,7 @@ function scoreScheduleReadAgendaIntent(
   frame: ContextualIntentFrame = buildContextualIntentFrame(utterance)
 ): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
-  const calendarHint =
-    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(
-      normalized
-    );
+  const calendarHint = matchesIntentPhrase(normalized, 'schedule.agenda_topic');
   const readHint = frame.action === 'read';
   if (!calendarHint || !readHint) return null;
 
@@ -492,7 +490,7 @@ function scoreScheduleReadAgendaIntent(
     confidence += 0.04;
     reasons.push('subject inferred as operator self');
   }
-  if (/(教えて|見せて|確認|見る|空き|show|see|check)/i.test(normalized)) {
+  if (matchesIntentPhrase(normalized, 'intent_resolution.agenda_read_verb')) {
     confidence += 0.04;
     reasons.push('read verb matched');
   }
@@ -516,15 +514,12 @@ function scoreScheduleCoordinationIntent(
   frame: ContextualIntentFrame = buildContextualIntentFrame(utterance)
 ): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
-  const scheduleHint =
-    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|参加者|全員|合わせて|calendar|schedule)/i.test(
-      normalized
-    );
+  const scheduleHint = matchesIntentPhrase(
+    normalized,
+    'intent_resolution.schedule_coordination_topic'
+  );
   const changeHint = frame.action === 'change';
-  const meetingProxyHint =
-    /(代わりに参加|代理参加|ファシリテート|進行|議事録|アクションアイテム|proxy|facilitate)/i.test(
-      normalized
-    );
+  const meetingProxyHint = matchesIntentPhrase(normalized, 'intent_resolution.meeting_proxy_cue');
   if (!scheduleHint || !changeHint || meetingProxyHint) return null;
 
   let confidence = 0.8;
@@ -559,13 +554,11 @@ function scoreScheduleCoordinationIntent(
 
 function scoreApprovalWorkflowIntent(utterance: string): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
-  const approvalHint = /(稟議|決裁|承認|approval|approve)/i.test(normalized);
+  const approvalHint = matchesIntentPhrase(normalized, 'approval.vocabulary');
   if (!approvalHint) return null;
 
-  const requestHint = /(依頼|申請|お願い|作成|request|create)/i.test(normalized);
-  const resolveHint = /(決裁|承認して|承認し|approveして|approve|処理して|通して|通しといて)/i.test(
-    normalized
-  );
+  const requestHint = matchesIntentPhrase(normalized, 'approval.request_verb');
+  const resolveHint = matchesIntentPhrase(normalized, 'approval.resolve_verb');
 
   const reasons: string[] = ['approval workflow request'];
   let intentId = 'resolve-approval';
@@ -578,11 +571,11 @@ function scoreApprovalWorkflowIntent(utterance: string): IntentResolutionCandida
   } else {
     reasons.push('approval resolution phrasing matched');
   }
-  if (/(稟議|決裁)/i.test(normalized)) {
+  if (matchesIntentPhrase(normalized, 'approval.ringi_vocabulary')) {
     confidence += 0.08;
     reasons.push('ringi vocabulary matched');
   }
-  if (/(システム|一覧|案件|申請|ワークフロー|workflow|system)/i.test(normalized)) {
+  if (matchesIntentPhrase(normalized, 'approval.workflow_system_context')) {
     confidence += 0.04;
     reasons.push('workflow/system context matched');
   }
@@ -603,16 +596,16 @@ function scoreApprovalWorkflowIntent(utterance: string): IntentResolutionCandida
 
 function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
-  const voiceInputHint = /(音声入力|dictation|voice input|入力モード|マイク入力)/i.test(normalized);
+  const voiceInputHint = matchesIntentPhrase(normalized, 'voice_input.request');
   if (!voiceInputHint) return null;
 
   let confidence = 0.84;
   const reasons: string[] = ['voice input toggle request'];
-  if (/(音声入力|dictation)/i.test(normalized)) {
+  if (matchesIntentPhrase(normalized, 'voice_input.core_vocabulary')) {
     confidence += 0.08;
     reasons.push('voice input vocabulary matched');
   }
-  if (/(オン|on|enable|有効)/i.test(normalized)) {
+  if (matchesIntentPhrase(normalized, 'voice_input.enable_cue')) {
     confidence += 0.03;
     reasons.push('enable phrasing matched');
   }
@@ -634,10 +627,8 @@ function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | n
 
 function scoreBrowserFillIntent(utterance: string): IntentResolutionCandidate | null {
   const normalized = normalizeForTriggerMatch(utterance);
-  const fillVerb = /(入力|入れて|記入|貼り付け|type|fill|enter|paste)/i.test(normalized);
-  const fieldHint = /(欄|フィールド|入力フィールド|フォーム|field|form|input|textbox|email)/i.test(
-    normalized
-  );
+  const fillVerb = matchesIntentPhrase(normalized, 'intent_resolution.browser_fill_verb');
+  const fieldHint = matchesIntentPhrase(normalized, 'intent_resolution.browser_field_hint');
   if (!fillVerb || !fieldHint) return null;
 
   return {
