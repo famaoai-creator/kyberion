@@ -89,8 +89,6 @@ export * from './media/image-description-types.js';
 
 export * from './media/image-description-bridge.js';
 
-export * from './local-assist-bridge.js';
-
 export {
   evaluateQualityContract,
   evaluateDefinitionOfReady,

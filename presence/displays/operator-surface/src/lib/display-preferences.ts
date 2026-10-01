@@ -6,7 +6,7 @@
  * cookie is also what the server pages read to render in the viewer's
  * language. Every storage access is best-effort (try/catch).
  */
-import type { OperatorLocale } from './i18n';
+import { normalizeOperatorLocale, type OperatorLocale } from './i18n';
 
 export type OperatorThemePreference = 'system' | 'light' | 'dark';
 
@@ -44,7 +44,7 @@ export function readThemePreference(): OperatorThemePreference {
 
 export function readStoredLocale(): OperatorLocale | null {
   const value = readKey(DISPLAY_STORAGE_KEYS.locale);
-  return value === 'ja' || value === 'en' ? value : null;
+  return normalizeOperatorLocale(value);
 }
 
 export function hasLocaleCookie(): boolean {

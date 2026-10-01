@@ -8,7 +8,12 @@ import {
   parseSafeJsonInput,
   setRegisteredEnv,
 } from '@agent/core/foundation';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import {
+  detectTextLocale,
+  localeToBcp47,
+  pickByLocale,
+  type SupportedLocale,
+} from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -45,6 +50,7 @@ import {
 } from '@agent/core/voice/voice-stt';
 import { formatChannelTurnText } from '@agent/core/surface/channel-adapter';
 import { t } from '@agent/core/t';
+import { resolveLocale } from '@agent/core/locale';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
@@ -946,7 +952,7 @@ function buildPresenceSurfaceConversationMessageInput(
 }
 
 function detectReplyLanguage(text: string): 'ja' | 'en' {
-  return /[ぁ-んァ-ン一-龯]/.test(text) ? 'ja' : 'en';
+  return detectTextLocale(text) === 'ja' ? 'ja' : 'en';
 }
 
 function normalizeTextForTts(text: string, language: SupportedLocale): string {
@@ -955,15 +961,17 @@ function normalizeTextForTts(text: string, language: SupportedLocale): string {
     .replace(/\s+/g, ' ')
     .replace(
       /REQ-[A-Z0-9-]+/g,
-      // i18n-exempt: bilingual inline label (JA branch intentional)
-      profile.requestIdToken || (language === 'ja' ? 'リクエストID' : 'request id')
+      profile.requestIdToken || t('surface:voice_tts_request_id_token', undefined, language)
     )
-    .replace(/https?:\/\/\S+/g, profile.urlToken || (language === 'ja' ? 'URL' : 'link'))
+    .replace(
+      /https?:\/\/\S+/g,
+      profile.urlToken || t('surface:voice_tts_url_token', undefined, language)
+    )
     .trim();
 
   if (!compact) return text;
 
-  if (language === 'ja') {
+  if (pickByLocale(language, { en: false, ja: true })) {
     return compact
       .replace(/([。！？])/g, '$1 ')
       .replace(/、/g, '、 ')
@@ -992,7 +1000,7 @@ function buildVoiceFallbackReply(userText: string): string {
   const trimmed = userText.trim();
   const normalized = trimmed.toLowerCase();
 
-  if (language === 'ja') {
+  if (pickByLocale(language, { en: false, ja: true })) {
     if (/^(こんにちは|こんばんは|おはよう|やあ|もしもし)/.test(trimmed)) {
       return t('surface:voice_hub_greeting', undefined, language);
     }
@@ -1125,7 +1133,9 @@ app.post('/api/listen-once', async (req, res) => {
       ? body.request_id.trim()
       : randomUUID();
   const locale =
-    typeof body.locale === 'string' && body.locale.trim() ? body.locale.trim() : 'ja-JP';
+    typeof body.locale === 'string' && body.locale.trim()
+      ? body.locale.trim()
+      : localeToBcp47(resolveLocale());
   const timeoutSeconds = Number.isFinite(body.timeout_seconds) ? Number(body.timeout_seconds) : 8;
   const intent = typeof body.intent === 'string' ? body.intent : 'conversation';
   const speaker = typeof body.speaker === 'string' ? body.speaker : 'User';

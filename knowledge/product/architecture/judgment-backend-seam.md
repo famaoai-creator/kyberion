@@ -1,7 +1,7 @@
 ---
 title: Judgment Backend Seam
 tags: [architecture, seam, judgment, calibration, confidence, tier, egress, classification]
-last_updated: 2026-09-21
+last_updated: 2026-10-01
 ---
 
 # Judgment Backend Seam
@@ -190,6 +190,17 @@ Neither has been measured against a call site here, so neither is
 registered: per the evaluation rule above, an unmeasured provider is treated
 exactly like a bad one.
 
+## Turning providers on
+
+`ensureJudgmentBackendsRegistered()` (`libs/core/reasoning/judgment-provider-bootstrap.ts`)
+is the setup step. It always registers the built-in rule floor, and registers
+the opt-in providers listed in `KYBERION_JUDGMENT_PROVIDERS` (comma separated:
+`laya-mlx`, `typesafe-jev`). An unknown id is refused with a warning. Work-item
+dispatch calls it before the task-routing judgment, so with the variable unset
+that call site stays inert (the floor cannot answer the tier question), and
+`KYBERION_JUDGMENT_PROVIDERS=laya-mlx` is what makes it live. Registration does
+not widen egress: every call is still filtered by the provider egress policy.
+
 ## Adding a provider
 
 1. Implement `JudgmentBackend`: `judgment_id`, an honest `egress` label,
@@ -199,7 +210,8 @@ exactly like a bad one.
    directly. A thinking model measured on this task took 21–62 s per call and
    spent its whole token budget on a reasoning preamble; the same model with
    thinking off answered in 294 ms, and in 0.79 s including model load.
-3. Register it with `registerJudgmentBackend()` and add a `local-only` or
+3. Register it with `registerJudgmentBackend()`, add its id to the opt-in
+   table in `judgment-provider-bootstrap.ts`, and add a `local-only` or
    tenant-approved entry to the provider egress policy.
 4. Run the separation bench before claiming an improvement. **Accuracy is
    not the metric** — the defect was ambiguous input scoring high, so what

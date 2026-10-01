@@ -80,6 +80,59 @@ describe('working-memory-actuator', () => {
     expect(readResult.working_memory_result).toMatchObject({ sidecar: null });
   });
 
+  it('set-now writes the NOW face for the scope', async () => {
+    const result = await handleAction({
+      action: 'set-now',
+      params: {
+        scope: 'session',
+        scope_ref: TEST_SCOPE_REF,
+        focus: 'Ship the orphan triage',
+        nextAction: 'Run the checker',
+      },
+    });
+    const nowPath = `${TEST_ROOT}/NOW.md`;
+    expect(result.working_memory_result).toMatchObject({ path: nowPath });
+    const text = String(safeReadFile(nowPath, { encoding: 'utf8' }));
+    expect(text).toContain('## Current Focus\n\nShip the orphan triage');
+    expect(text).toContain('## Next Action\n\nRun the checker');
+  });
+
+  it('complete-action-item checks off an exact open item only', async () => {
+    await handleAction({
+      action: 'add-action-item',
+      params: { scope: 'session', scope_ref: TEST_SCOPE_REF, item: 'Buy milk' },
+    });
+    await handleAction({
+      action: 'add-action-item',
+      params: { scope: 'session', scope_ref: TEST_SCOPE_REF, item: 'Buy milk chocolate' },
+    });
+    const done = await handleAction({
+      action: 'complete-action-item',
+      params: { scope: 'session', scope_ref: TEST_SCOPE_REF, item: 'Buy milk' },
+    });
+    expect(done.working_memory_result).toMatchObject({ found: true });
+    const text = String(safeReadFile(`${TEST_ROOT}/MEMORY.md`, { encoding: 'utf8' }));
+    expect(text).toContain('- [x] Buy milk\n');
+    expect(text).toContain('- [ ] Buy milk chocolate');
+
+    const missing = await handleAction({
+      action: 'complete-action-item',
+      params: { scope: 'session', scope_ref: TEST_SCOPE_REF, item: 'Not on the list' },
+    });
+    expect(missing.working_memory_result).toMatchObject({ found: false });
+  });
+
+  it("todo-done reports an item that is not on today's list without writing", async () => {
+    const result = await handleAction({
+      action: 'todo-done',
+      params: { item: `working-memory-actuator-test-absent-${process.pid}` },
+    });
+    expect(result.working_memory_result).toMatchObject({
+      path: expect.stringMatching(/today\/TODO\.md$/u),
+      found: false,
+    });
+  });
+
   it('rejects traversal-shaped daily and weekly period keys', async () => {
     await expect(
       handleAction({ action: 'daily-open', params: { date: '../confidential/escape' } })

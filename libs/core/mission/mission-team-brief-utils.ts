@@ -1,3 +1,4 @@
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 function normalizeRoleHintText(value: string | undefined): string {
   return String(value || '')
     .trim()
@@ -12,11 +13,12 @@ export function summarizeRequestText(request: string): string {
 export function inferOptionalRoleHints(request: string): string[] {
   const text = normalizeRoleHintText(request);
   const hints = new Set<string>();
-  if (/(ux|ui|design|experience|デザイン|画面|体験)/u.test(text)) hints.add('experience_designer');
-  if (/(strategy|roadmap|go[-\s]?to[-\s]?market|product|企画|戦略)/u.test(text))
+  if (matchesIntentPhrase(text, 'mission_team.role_hint_experience_designer'))
+    hints.add('experience_designer');
+  if (matchesIntentPhrase(text, 'mission_team.role_hint_product_strategist'))
     hints.add('product_strategist');
-  if (/(release|deploy|rollback|runtime|runbook|運用|監視|本番)/u.test(text)) hints.add('operator');
-  if (/(slack|chronos|announcement|user update|連絡|通知|報告)/u.test(text))
+  if (matchesIntentPhrase(text, 'mission_team.role_hint_operator')) hints.add('operator');
+  if (matchesIntentPhrase(text, 'mission_team.role_hint_surface_liaison'))
     hints.add('surface_liaison');
   return Array.from(hints);
 }
@@ -27,16 +29,16 @@ export function inferMissingInputs(request: string, artifactPaths: string[] | un
   const missing: string[] = [];
 
   if (!text) missing.push('request_text');
-  if (/(same as|前と同じ|それと同じ|同様に|as before)/u.test(text)) {
+  if (matchesIntentPhrase(text, 'mission_team.missing_reference_context')) {
     missing.push('reference_context');
   }
-  if (/(my voice|自分の声|私の声|voice clone)/u.test(text)) {
+  if (matchesIntentPhrase(text, 'mission_team.missing_voice_profile')) {
     const hasVoiceProfile = artifacts.some(
       (entry) => entry.includes('voice-profile') || entry.includes('voice_profile')
     );
     if (!hasVoiceProfile) missing.push('voice_profile_id');
   }
-  if (/(brand|design system|デザインシステム|ブランド)/u.test(text)) {
+  if (matchesIntentPhrase(text, 'mission_team.missing_design_system')) {
     const hasDesignInput = artifacts.some(
       (entry) =>
         entry.includes('design-system') ||

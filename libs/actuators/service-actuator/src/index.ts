@@ -5,6 +5,8 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 
 // Slack streaming ingress belongs to the Slack gateway.
 
@@ -27,5 +29,3 @@ export const actuator = defineCatalogBackedActuator({
   describeOps,
   handleAction: (input) => handleAction(input as unknown as Parameters<typeof handleAction>[0]),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

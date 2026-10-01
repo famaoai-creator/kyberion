@@ -376,3 +376,84 @@ describe('scanHtmlForKanaLiterals (static surface pages)', () => {
     expect(isGeneratedFileText('/*\n * home.js — hand written\n */\n')).toBe(false);
   });
 });
+
+describe('checkI18nHardcoding locale/colour token ratchet (IT-05)', () => {
+  afterEach(() => {
+    if (safeExistsSync(FIXTURE_DIR)) {
+      safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
+    }
+  });
+
+  const source = [
+    "export const tag = 'ja-JP';",
+    "export const isJa = (locale: string) => locale === 'ja';",
+    'export const hasMeeting = (text: string) => /会議/.test(text);',
+    '',
+  ].join('\n');
+
+  function runWith(tokens: Record<string, Record<string, number>> | undefined) {
+    const filePath = writeFixture('src/tokens.ts', source);
+    const relativeFile = path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
+    const baselinePath = writeFixture(
+      'baseline.json',
+      JSON.stringify({
+        version: 1,
+        generated_at: '2026-10-01T00:00:00.000Z',
+        scan_roots: ['active/shared/tmp/check-i18n-hardcoding/src'],
+        files: {},
+        ...(tokens
+          ? {
+              locale_tokens: Object.fromEntries(
+                Object.entries(tokens).map(([rule, count]) => [
+                  rule,
+                  Object.fromEntries(Object.entries(count).map(([, n]) => [relativeFile, n])),
+                ])
+              ),
+            }
+          : {}),
+      })
+    );
+    return checkI18nHardcoding({
+      baselinePath,
+      scanRoots: [pathResolver.sharedTmp('check-i18n-hardcoding/src')],
+    });
+  }
+
+  it('fails on new ad-hoc locale tags, comparisons and Japanese intent regexes', () => {
+    const report = runWith(undefined);
+    expect(report.status).toBe('fail');
+    expect(report.violations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('[locale_literal] new file with 1 violation'),
+        expect.stringContaining('[locale_compare] new file with 1 violation'),
+        expect.stringContaining('[intent_regex] new file with 1 violation'),
+      ])
+    );
+  });
+
+  it('passes when the counts match the frozen baseline', () => {
+    const report = runWith({
+      locale_literal: { x: 1 },
+      locale_compare: { x: 1 },
+      intent_regex: { x: 1 },
+    });
+    expect(report.status).toBe('pass');
+    expect(report.locale_token_totals).toMatchObject({
+      locale_literal: 1,
+      locale_compare: 1,
+      intent_regex: 1,
+    });
+  });
+
+  it('asks for a baseline update when a rule count went down (ratchet only goes down)', () => {
+    const report = runWith({
+      locale_literal: { x: 3 },
+      locale_compare: { x: 1 },
+      intent_regex: { x: 1 },
+    });
+    expect(report.status).toBe('fail');
+    expect(report.stale_entries).toEqual([
+      expect.stringContaining('[locale_literal] decreased from 3 to 1'),
+    ]);
+  });
+});

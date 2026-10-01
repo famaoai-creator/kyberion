@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 33
-Last updated: 2026-09-27
+Last updated: 2026-10-01
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 
@@ -77,8 +77,8 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `cost_report`                      | system                                                           |
 | `describe_image`                   | vision                                                           |
 | `describe_screen_delta`            | vision                                                           |
-| `discover_capabilities`            | code, orchestrator                                               |
-| `discover_skills`                  | code, orchestrator                                               |
+| `discover_capabilities`            | code                                                             |
+| `discover_skills`                  | code                                                             |
 | `distill_dom`                      | browser                                                          |
 | `document_digest`                  | media                                                            |
 | `docx_extract`                     | media                                                            |
@@ -442,7 +442,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `receive_event`                            | presence                                                              |
 | `recommend`                                | wisdom                                                                |
 | `reconcile`                                | service                                                               |
-| `record_interaction`                       | presence, voice                                                       |
+| `record_interaction`                       | presence                                                              |
 | `record_verify_repair_voice_sample`        | voice                                                                 |
 | `record_voice_sample`                      | voice                                                                 |
 | `refresh`                                  | agent                                                                 |

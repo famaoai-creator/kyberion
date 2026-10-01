@@ -90,11 +90,11 @@ const MISSION_STATUS_JA: Record<string, string> = {
   planned: '準備中',
   active: '進行中',
   validating: '検証中',
-  distilling: '仕上げ中',
+  distilling: '仕上げ中', // i18n-exempt: status_ja is a Japanese-named contract field of the CEO surface
   completed: '完了',
   paused: '一時停止',
   failed: '要対応',
-  archived: '完了（保管済み）',
+  archived: '完了（保管済み）', // i18n-exempt: status_ja is a Japanese-named contract field of the CEO surface
 };
 
 const ATTENTION_STATUSES = new Set(['paused', 'failed', 'validating']);
@@ -195,7 +195,9 @@ function toApprovalItem(
     id: String(record.id || ''),
     channel: String(record.channel || 'chronos'),
     storage_channel: String(record.storageChannel || record.channel || 'chronos'),
-    title: String(record.title || record.sourceText || '承認のご依頼'),
+    title: String(
+      record.title || record.sourceText || t('ceo_summary:approval_title_fallback', undefined, 'ja')
+    ),
     reason: String(
       record.justification?.summary || record.summary || record.sourceText || record.title || ''
     ),
@@ -239,7 +241,9 @@ export function composeCeoSurfaceSummary(input: {
     .slice(0, 20)
     .map((notification, index) => ({
       id: String(notification.request_id || notification.id || `exception-${index + 1}`),
-      title: String(notification.title || '要確認の事象'),
+      title: String(
+        notification.title || t('ceo_summary:exception_title_fallback', undefined, 'ja')
+      ),
       text: String(notification.text || ''),
       surface: String(notification.surface || 'presence'),
       created_at: String(notification.created_at || ''),
