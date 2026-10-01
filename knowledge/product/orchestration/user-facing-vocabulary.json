@@ -22219,6 +22219,76 @@
         "ja": "業務に取り込みました。",
         "qps-ploc": "⟦Ȧŧŧȧƈħėḓ ŧő ŧħė ẇőřķ ïŧėɱ. ŀőřėɱ ïṗ⟧"
       },
+      "review_updated_at": {
+        "en": "Last checked {time}",
+        "ja": "最終点検：{time}",
+        "qps-ploc": "⟦Ŀȧşŧ ƈħėƈķėḓ {time} ŀőřėɱ ⟧"
+      },
+      "review_title": {
+        "en": "Personal review",
+        "ja": "自分の記録を点検",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ řėṽïėẇ ŀőřė⟧"
+      },
+      "review_explanation": {
+        "en": "Read-only counts from your consented summaries from the last seven days. No operations are performed. Checks run only while this page stays open; consent is verified on every check.",
+        "ja": "過去7日間の同意済み要約を読み取り専用で点検します。操作は実行しません。この画面を開いている間だけ点検し、毎回同意を確認します。",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ ƈőůñŧş ƒřőɱ ẏőůř ƈőñşėñŧėḓ şůɱɱȧřïėş ƒřőɱ ŧħė ŀȧşŧ şėṽėñ ḓȧẏş. Ñő őṗėřȧŧïőñş ȧřė ṗėřƒőřɱėḓ. Ƈħėƈķş řůñ őñŀẏ ẇħïŀė ŧħïş ṗȧɠė şŧȧẏş őṗėñ; ƈőñşėñŧ ïş ṽėřïƒïėḓ őñ ėṽėřẏ ƈħėƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "review_tenant_required": {
+        "en": "Select one organization in the navigation to review your records.",
+        "ja": "ナビゲーションで所属先を1つ選ぶと点検できます。",
+        "qps-ploc": "⟦Şėŀėƈŧ őñė őřɠȧñïẑȧŧïőñ ïñ ŧħė ñȧṽïɠȧŧïőñ ŧő řėṽïėẇ ẏőůř řėƈőřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "review_error": {
+        "en": "Review stopped. Check your membership, selected organization and recording consent, then try again.",
+        "ja": "点検を停止しました。会員情報・選択した所属先・記録への同意を確認して、もう一度お試しください。",
+        "qps-ploc": "⟦Řėṽïėẇ şŧőṗṗėḓ. Ƈħėƈķ ẏőůř ɱėɱƀėřşħïṗ, şėŀėƈŧėḓ őřɠȧñïẑȧŧïőñ ȧñḓ řėƈőřḓïñɠ ƈőñşėñŧ, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "review_checking": {
+        "en": "Checking your summaries…",
+        "ja": "自分の要約を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ẏőůř şůɱɱȧřïėş… ŀőřėɱ ï⟧"
+      },
+      "review_counts": {
+        "en": "Pending summaries: {pending}. Includes operations needing attention: {attention}.",
+        "ja": "確認待ちの要約：{pending}件。送信・削除など注意が必要な操作を含む要約：{attention}件。",
+        "qps-ploc": "⟦Ṗėñḓïñɠ şůɱɱȧřïėş: {pending}. Ïñƈŀůḓėş őṗėřȧŧïőñş ñėėḓïñɠ ȧŧŧėñŧïőñ: {attention}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "review_idle": {
+        "en": "Checks are off. Start when you want a review.",
+        "ja": "点検は停止中です。必要なときに開始できます。",
+        "qps-ploc": "⟦Ƈħėƈķş ȧřė őƒƒ. Şŧȧřŧ ẇħėñ ẏőů ẇȧñŧ ȧ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "review_limited": {
+        "en": "Showing counts for the most recent 100 eligible summaries.",
+        "ja": "条件に合う最新100件までの件数です。",
+        "qps-ploc": "⟦Şħőẇïñɠ ƈőůñŧş ƒőř ŧħė ɱőşŧ řėƈėñŧ 100 ėŀïɠïƀŀė şůɱɱȧřïėş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "review_watching": {
+        "en": "Checking every five minutes for up to one hour. Stops when you leave this page or change organization.",
+        "ja": "最大1時間、5分ごとに点検中です。画面を閉じるか所属先を変えると停止します。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ėṽėřẏ ƒïṽė ɱïñůŧėş ƒőř ůṗ ŧő őñė ħőůř. Şŧőṗş ẇħėñ ẏőů ŀėȧṽė ŧħïş ṗȧɠė őř ƈħȧñɠė őřɠȧñïẑȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "review_now": {
+        "en": "Check now",
+        "ja": "今すぐ点検",
+        "qps-ploc": "⟦Ƈħėƈķ ñőẇ ŀőř⟧"
+      },
+      "review_start": {
+        "en": "Enable checks for one hour",
+        "ja": "1時間の定期点検を開始",
+        "qps-ploc": "⟦Ėñȧƀŀė ƈħėƈķş ƒőř őñė ħőůř ŀőřėɱ ïṗ⟧"
+      },
+      "review_stop": {
+        "en": "Stop",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "review_settings": {
+        "en": "Recording consent and summaries",
+        "ja": "記録への同意と要約を確認",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ƈőñşėñŧ ȧñḓ şůɱɱȧřïėş ŀőřėɱ ïṗşů⟧"
+      },
       "settings_recording_member_not_found": {
         "en": "We could not verify your member account. Complete onboarding first.",
         "ja": "会員情報を確認できませんでした。先にオンボーディングを完了してください。",
