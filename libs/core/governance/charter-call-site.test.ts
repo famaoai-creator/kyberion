@@ -5,7 +5,8 @@ import * as pathResolver from '../path-resolver.js';
 import { humanActor } from '../actor.js';
 import { safeRmSync } from '../secure-io.js';
 import { acceptCharter } from './accountability-charter-registry.js';
-import { charterInputForDecision } from './charter-call-site.js';
+import { charterInputForCustomerOutbound, charterInputForDecision } from './charter-call-site.js';
+import { evaluateUnderCharter } from './accountability-charter-registry.js';
 
 const NOW = new Date('2026-10-01T09:00:00.000Z');
 
@@ -130,5 +131,39 @@ describe('charterInputForDecision', () => {
         new Date('2027-01-01T00:00:00.000Z')
       )
     ).toBeUndefined();
+  });
+
+  it('maps a customer message to an irreversible send_message_external naming customer_outbound', () => {
+    const c = charterInputForCustomerOutbound({ tenantSlug: 'acme' }, opts(), NOW);
+    expect(c?.action).toMatchObject({
+      action_class: 'send_message_external',
+      reversible: false,
+      irreversible_action_name: 'customer_outbound',
+      reputational_class: 'B',
+      blast_radius: { recipients: 1 },
+    });
+    expect(c?.action.actor).toMatchObject({
+      id: 'kyberion://agent/acme/customer-conversation',
+      on_behalf_of: 'user:owner',
+    });
+    expect(charterInputForCustomerOutbound({}, opts(), NOW)).toBeUndefined();
+    expect(
+      charterInputForCustomerOutbound({ tenantSlug: 'other-co' }, opts(), NOW)
+    ).toBeUndefined();
+  });
+
+  it('a charter that does not delegate customer messages denies them (a human decides)', () => {
+    const c = charterInputForCustomerOutbound({ tenantSlug: 'acme' }, opts(), NOW)!;
+    const evaluated = evaluateUnderCharter(
+      c.scope,
+      c.action,
+      { accountable_available: true, available_deputies: [] },
+      opts(),
+      NOW
+    );
+    expect(evaluated?.decision.decision).toBe('deny');
+    expect(evaluated?.decision.amendment?.field).toBe(
+      'envelope.external_effects.send_message_external'
+    );
   });
 });
