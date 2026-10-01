@@ -5,7 +5,6 @@ import type { SupportedLocale } from '../locale-normalize.js';
 import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-  type GovernedArtifactRole,
 } from '../workforce/artifact-store.js';
 
 /**
@@ -44,11 +43,19 @@ export interface ThreadRef {
   threadTs: string;
 }
 
-/** Writer role per surface; surfaces without one cannot record thread work. */
-const THREAD_WORK_WRITER: Partial<Record<string, GovernedArtifactRole>> = {
-  slack: 'slack_bridge',
-  chronos: 'chronos_gateway',
-};
+/** Writes as the surface's coordination role; surfaces without one cannot record. */
+function writeAsSurface(surface: string, logicalPath: string, value: unknown): void {
+  switch (surface) {
+    case 'slack':
+      writeGovernedArtifactJson('slack_bridge', logicalPath, value);
+      return;
+    case 'chronos':
+      writeGovernedArtifactJson('chronos_gateway', logicalPath, value);
+      return;
+    default:
+      throw new Error(`[THREAD_WORK] surface '${surface}' has no thread-work writer`);
+  }
+}
 
 const MAX_ENTRIES = 50;
 
@@ -72,8 +79,9 @@ export function recordThreadWork(
   entry: Omit<ThreadWorkEntry, 'created_at'> & { created_at?: string },
   options: { tenantSlug?: string } = {}
 ): ThreadWorkIndex {
-  const role = THREAD_WORK_WRITER[ref.surface];
-  if (!role) throw new Error(`[THREAD_WORK] surface '${ref.surface}' has no thread-work writer`);
+  if (ref.surface !== 'slack' && ref.surface !== 'chronos') {
+    throw new Error(`[THREAD_WORK] surface '${ref.surface}' has no thread-work writer`);
+  }
   const existing = readThreadWork(ref);
   const entries = (existing?.entries ?? []).filter(
     (item) => !(item.kind === entry.kind && item.id === entry.id)
@@ -88,7 +96,7 @@ export function recordThreadWork(
       : {}),
     entries: entries.slice(-MAX_ENTRIES),
   };
-  writeGovernedArtifactJson(role, threadWorkLogicalPath(ref), index);
+  writeAsSurface(ref.surface, threadWorkLogicalPath(ref), index);
   return index;
 }
 
