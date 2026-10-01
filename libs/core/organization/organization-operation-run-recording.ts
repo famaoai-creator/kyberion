@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { auditChain } from '../governance/audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { pathResolver } from '../path-resolver.js';
+import { loadState } from '../mission/mission-state.js';
+import { findMissionPath, pathResolver } from '../path-resolver.js';
 import { safeExistsSync } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 import {
@@ -26,12 +27,52 @@ import type {
   OrganizationTier,
 } from './organization-operating-model.js';
 
+const MISSION_ID_REF = /^[A-Za-z][A-Za-z0-9_-]{1,63}$/;
+
+/**
+ * Resolve a run/evidence ref. Bare mission IDs (no `/`) resolve to that
+ * mission's `mission-state.json` when the mission exists in scope — operators
+ * commonly pass the mission id from `--execution-kind mission`.
+ */
+export function resolveScopedOperationRunRef(
+  ref: string,
+  operation: OrganizationOperationRecord,
+  rootDir?: string
+): string {
+  const trimmed = ref.trim();
+  if (
+    !trimmed ||
+    trimmed.includes('/') ||
+    trimmed.includes('\\') ||
+    !MISSION_ID_REF.test(trimmed)
+  ) {
+    return trimmed;
+  }
+  if (!loadState(trimmed, { rootDir })) return trimmed;
+  const missionDir = findMissionPath(trimmed);
+  if (!missionDir) return trimmed;
+  const root = rootDir || pathResolver.rootDir();
+  const statePath = path.join(missionDir, 'mission-state.json');
+  const relative = path.relative(root, statePath).split(path.sep).join('/');
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return trimmed;
+  // Keep confidential missions under the operation's tenant prefix.
+  if (
+    operation.tier === 'confidential' &&
+    operation.tenant_slug &&
+    !relative.startsWith(`active/missions/confidential/${operation.tenant_slug}/`)
+  ) {
+    return trimmed;
+  }
+  return relative;
+}
+
 export function assertScopedOperationRunRef(
   ref: string,
   operation: OrganizationOperationRecord,
   label: string,
   rootDir?: string
 ): void {
+  const resolved = resolveScopedOperationRunRef(ref, operation, rootDir);
   const tenant = operation.tenant_slug;
   const scopeRoots =
     operation.tier === 'confidential' && tenant
@@ -64,16 +105,17 @@ export function assertScopedOperationRunRef(
             ]
           : ['knowledge/product/'];
   if (
-    ref.includes('\\') ||
-    ref.split('/').includes('..') ||
-    !scopeRoots.some((prefix) => ref.startsWith(prefix)) ||
-    !safeExistsSync(rootDir ? path.resolve(rootDir, ref) : pathResolver.rootResolve(ref))
+    resolved.includes('\\') ||
+    resolved.split('/').includes('..') ||
+    !scopeRoots.some((prefix) => resolved.startsWith(prefix)) ||
+    !safeExistsSync(rootDir ? path.resolve(rootDir, resolved) : pathResolver.rootResolve(resolved))
   ) {
     throw new Error(
       `${label} must be an existing path within the operation scope: ${ref}. ` +
         `Allowed prefixes for this ${operation.tier} operation: ${scopeRoots.join(', ')}. ` +
-        `Hint: the operation's executable (e.g. pipelines/...) belongs in the operation definition's ` +
-        `--execution-ref, not in run evidence — cite a trace or report file such as active/shared/logs/traces/<date>.jsonl instead.`
+        `Hint: pass a report/trace path under those prefixes, or a mission id that resolves to ` +
+        `active/missions/.../mission-state.json. Pipeline executables belong on the operation ` +
+        `definition's --execution-ref, not on run evidence.`
     );
   }
 }
@@ -153,13 +195,11 @@ export function recordOrganizationOperationRun(
     assertScopedOperationRunRef(ref, operation, 'Operation evidence ref', input.rootDir);
   for (const ref of exceptionRefs)
     assertScopedOperationRunRef(ref, operation, 'Operation exception ref', input.rootDir);
-  if (input.executionRef)
-    assertScopedOperationRunRef(
-      input.executionRef,
-      operation,
-      'Operation execution ref',
-      input.rootDir
-    );
+  const executionRef = input.executionRef
+    ? resolveScopedOperationRunRef(input.executionRef, operation, input.rootDir)
+    : undefined;
+  if (executionRef)
+    assertScopedOperationRunRef(executionRef, operation, 'Operation execution ref', input.rootDir);
   const now = nowIso();
   const startedAt = input.startedAt || now;
   const completedAt = input.completedAt || now;
@@ -186,7 +226,7 @@ export function recordOrganizationOperationRun(
     status: input.runStatus,
     started_at: startedAt,
     completed_at: completedAt,
-    ...(input.executionRef ? { execution_ref: input.executionRef } : {}),
+    ...(executionRef ? { execution_ref: executionRef } : {}),
     result_summary: input.resultSummary,
     evidence_refs: evidenceRefs,
     exception_refs: exceptionRefs,

@@ -10916,6 +10916,11 @@
         "ja": "取り消せない支出を、承認なしで実行させる",
         "qps-ploc": "⟦Ŀėŧ ïřřėṽėřşïƀŀė şṗėñḓ řůñ ẇïŧħőůŧ ȧşķïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "setup.charter_outbound": {
+        "en": "Let messages to customers go out without asking",
+        "ja": "顧客宛のメッセージを、承認なしで送らせる",
+        "qps-ploc": "⟦Ŀėŧ ɱėşşȧɠėş ŧő ƈůşŧőɱėřş ɠő őůŧ ẇïŧħőůŧ ȧşķïñɠ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "setup.charter_supersedes": {
         "en": "Stand in for the decision-rights matrix within these limits",
         "ja": "decision-rights matrix の人の受け入れを、この範囲で代わりにする",
@@ -23473,6 +23478,16 @@
         "en": "- Irreversible spend does NOT run without approval",
         "ja": "・取り消せない支出は、承認なしには実行させない",
         "qps-ploc": "⟦- Ïřřėṽėřşïƀŀė şṗėñḓ ḓőėş ÑŐŦ řůñ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "charter_statement_outbound_on": {
+        "en": "- Messages to customers (customer_outbound, one recipient per message) MAY be sent without approval, unless the audience egress floor is violated",
+        "ja": "・顧客宛のメッセージ(customer_outbound。1 通につき宛先 1 件)を、承認なしで送らせる。ただし送信先の制限に違反する場合を除く",
+        "qps-ploc": "⟦- Ɱėşşȧɠėş ŧő ƈůşŧőɱėřş (ƈůşŧőɱėř_őůŧƀőůñḓ, őñė řėƈïṗïėñŧ ṗėř ɱėşşȧɠė) ⱮȦẎ ƀė şėñŧ ẇïŧħőůŧ ȧṗṗřőṽȧŀ, ůñŀėşş ŧħė ȧůḓïėñƈė ėɠřėşş ƒŀőőř ïş ṽïőŀȧŧėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "charter_statement_outbound_off": {
+        "en": "- Messages to customers are NOT sent without approval",
+        "ja": "・顧客宛のメッセージは、承認なしには送らせない",
+        "qps-ploc": "⟦- Ɱėşşȧɠėş ŧő ƈůşŧőɱėřş ȧřė ÑŐŦ şėñŧ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "charter_statement_matrix_on": {
         "en": "- Where the decision-rights matrix requires a person to accept, this charter stands in for that within these limits",
