@@ -10976,6 +10976,46 @@
         "ja": "組織: {tenant}",
         "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
       },
+      "setup.org_ready_title": {
+        "en": "Setting up an organization",
+        "ja": "組織の立ち上げ",
+        "qps-ploc": "⟦Şėŧŧïñɠ ůṗ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "setup.org_ready_description": {
+        "en": "What is done and where to do the rest. Each step opens the section that does it.",
+        "ja": "済んでいることと、残りをどこで進めるかです。各手順は、それを行うセクションを開きます。",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ḓőñė ȧñḓ ẇħėřė ŧő ḓő ŧħė řėşŧ. Ėȧƈħ şŧėṗ őṗėñş ŧħė şėƈŧïőñ ŧħȧŧ ḓőėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "setup.org_ready_progress": {
+        "en": "{tenant}: {done} of {total} steps done",
+        "ja": "{tenant}: {total} 手順のうち {done} 手順が完了",
+        "qps-ploc": "⟦{tenant}: {done} őƒ {total} şŧėṗş ḓőñė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_organization": {
+        "en": "The organization is active",
+        "ja": "組織が有効になっている",
+        "qps-ploc": "⟦Ŧħė őřɠȧñïẑȧŧïőñ ïş ȧƈŧïṽė ŀőřėɱ ïṗ⟧"
+      },
+      "setup.org_ready_members": {
+        "en": "Someone besides you has joined, or an invite is out",
+        "ja": "あなた以外のメンバーが参加した(または招待を出した)",
+        "qps-ploc": "⟦Şőɱėőñė ƀėşïḓėş ẏőů ħȧş ĵőïñėḓ, őř ȧñ ïñṽïŧė ïş őůŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.org_ready_connections": {
+        "en": "A connection owned by the organization",
+        "ja": "組織の連携を 1 つ以上つないだ",
+        "qps-ploc": "⟦Ȧ ƈőññėƈŧïőñ őẇñėḓ ƀẏ ŧħė őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_charter": {
+        "en": "An accountability charter is in force",
+        "ja": "責任者憲章が有効になっている",
+        "qps-ploc": "⟦Ȧñ ȧƈƈőůñŧȧƀïŀïŧẏ ƈħȧřŧėř ïş ïñ ƒőřƈė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_go": {
+        "en": "Go to it",
+        "ja": "進める",
+        "qps-ploc": "⟦Ɠő ŧő ïŧ ŀőř⟧"
+      },
       "setup.charter_usage_day": {
         "en": "Spent today: {spent} of {limit}",
         "ja": "本日の使用額: {limit} のうち {spent}",
