@@ -28,6 +28,8 @@ export interface GuidedCoordinationBrief {
   missing_inputs: string[];
   expected_outputs: string[];
   suggested_target_actuators: string[];
+  /** Non-actuator runtime components the coordination relies on (RS-07). */
+  suggested_support_components?: string[];
   suggested_deliverables: string[];
   preference_profile_refs?: string[];
   service_binding_refs?: string[];

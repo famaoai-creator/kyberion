@@ -91,6 +91,26 @@ export interface ReasoningProviderCliInstall {
   hint: string;
 }
 
+/** XP-01 cheap capability probe declared per CLI descriptor (RS follow-up b). */
+export interface ReasoningProviderCliCapabilityProbe {
+  binary_args: readonly string[];
+  auth_args?: readonly string[];
+  /** Named auth-result interpreter; default is exit-status success. */
+  auth_interpreter?: 'claude-auth-status';
+  /** Named placeholder-shim detector + fallback binary resolver. */
+  placeholder_fallback?: 'claude-cli-shim';
+  headless: boolean;
+  structured_output: boolean;
+  sandbox_flags?: { args: readonly string[]; expected_flags: readonly string[] };
+}
+
+export type ReasoningProviderPermissionTier = 'implementer' | 'explorer' | 'planner';
+
+/** XP-02 tier projection: an explicit grant (`args`) or an explicit refusal. */
+export type ReasoningProviderPermissionProjection =
+  | { args: readonly string[]; notes?: string; requires_full_sandbox_enforcement?: boolean }
+  | { refused: string };
+
 export interface ReasoningProviderCli {
   binary: string;
   version_args: readonly string[];
@@ -100,6 +120,10 @@ export interface ReasoningProviderCli {
   model_flag?: string;
   sandbox?: ReasoningProviderCliSandbox;
   install?: ReasoningProviderCliInstall;
+  capability_probe?: ReasoningProviderCliCapabilityProbe;
+  permission_profiles?: Partial<
+    Record<ReasoningProviderPermissionTier, ReasoningProviderPermissionProjection>
+  >;
 }
 
 export interface ReasoningProviderDescriptor {
@@ -352,6 +376,76 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
       hint: raw.hint.trim(),
     };
   }
+  let capabilityProbe: ReasoningProviderCliCapabilityProbe | undefined;
+  if (value.capability_probe !== undefined) {
+    const raw = value.capability_probe;
+    if (!isRecord(raw) || !isStringArray(raw.binary_args)) {
+      return 'cli.capability_probe.binary_args must be a string array';
+    }
+    if (raw.auth_args !== undefined && !isStringArray(raw.auth_args)) {
+      return 'cli.capability_probe.auth_args must be a string array';
+    }
+    if (typeof raw.headless !== 'boolean' || typeof raw.structured_output !== 'boolean') {
+      return 'cli.capability_probe.headless/structured_output must be booleans';
+    }
+    if (raw.auth_interpreter !== undefined && raw.auth_interpreter !== 'claude-auth-status') {
+      return 'cli.capability_probe.auth_interpreter is not a registered interpreter';
+    }
+    if (raw.placeholder_fallback !== undefined && raw.placeholder_fallback !== 'claude-cli-shim') {
+      return 'cli.capability_probe.placeholder_fallback is not a registered fallback';
+    }
+    let sandboxFlags: ReasoningProviderCliCapabilityProbe['sandbox_flags'];
+    if (raw.sandbox_flags !== undefined) {
+      const flags = raw.sandbox_flags;
+      if (
+        !isRecord(flags) ||
+        !isStringArray(flags.args) ||
+        !isStringArray(flags.expected_flags) ||
+        flags.expected_flags.length === 0
+      ) {
+        return 'cli.capability_probe.sandbox_flags needs args and expected_flags';
+      }
+      sandboxFlags = { args: [...flags.args], expected_flags: [...flags.expected_flags] };
+    }
+    capabilityProbe = {
+      binary_args: [...raw.binary_args],
+      ...(raw.auth_args ? { auth_args: [...(raw.auth_args as string[])] } : {}),
+      ...(raw.auth_interpreter ? { auth_interpreter: 'claude-auth-status' as const } : {}),
+      ...(raw.placeholder_fallback ? { placeholder_fallback: 'claude-cli-shim' as const } : {}),
+      headless: raw.headless,
+      structured_output: raw.structured_output,
+      ...(sandboxFlags ? { sandbox_flags: sandboxFlags } : {}),
+    };
+  }
+  let permissionProfiles: ReasoningProviderCli['permission_profiles'];
+  if (value.permission_profiles !== undefined) {
+    const raw = value.permission_profiles;
+    if (!isRecord(raw)) return 'cli.permission_profiles must be an object';
+    permissionProfiles = {};
+    for (const [tier, entry] of Object.entries(raw)) {
+      if (tier !== 'implementer' && tier !== 'explorer' && tier !== 'planner') {
+        return `cli.permission_profiles.${tier} is not a KD-05 tier`;
+      }
+      if (!isRecord(entry)) return `cli.permission_profiles.${tier} must be an object`;
+      if (typeof entry.refused === 'string' && entry.refused.trim()) {
+        if (entry.args !== undefined) {
+          return `cli.permission_profiles.${tier} cannot both grant and refuse`;
+        }
+        permissionProfiles[tier] = { refused: entry.refused };
+        continue;
+      }
+      if (!Array.isArray(entry.args) || !entry.args.every((arg) => typeof arg === 'string')) {
+        return `cli.permission_profiles.${tier} needs args or refused`;
+      }
+      permissionProfiles[tier] = {
+        args: [...(entry.args as string[])],
+        ...(typeof entry.notes === 'string' ? { notes: entry.notes } : {}),
+        ...(entry.requires_full_sandbox_enforcement === true
+          ? { requires_full_sandbox_enforcement: true }
+          : {}),
+      };
+    }
+  }
   return {
     binary: value.binary,
     version_args: [...value.version_args],
@@ -361,6 +455,8 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
     ...(modelFlag.value ? { model_flag: modelFlag.value } : {}),
     ...(sandbox ? { sandbox } : {}),
     ...(install ? { install } : {}),
+    ...(capabilityProbe ? { capability_probe: capabilityProbe } : {}),
+    ...(permissionProfiles ? { permission_profiles: permissionProfiles } : {}),
   };
 }
 

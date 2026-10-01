@@ -45,6 +45,30 @@
         "install": {
           "brew_formula": "cursor-cli",
           "hint": "Use the official Cursor installer, then set KYBERION_CURSOR_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "auth_args": ["status"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox", "--mode"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--force", "--sandbox", "enabled"],
+            "notes": "Cursor Agent CLI force-allows tools inside its sandbox for implementer-tier write/exec work."
+          },
+          "explorer": {
+            "args": ["--mode", "plan"],
+            "notes": "Cursor Agent plan mode is read-only planning without edits."
+          },
+          "planner": {
+            "args": ["--mode", "ask"],
+            "notes": "Cursor Agent ask mode is Q&A-only and does not execute mutating tools."
+          }
         }
       },
       "runtime_instructions": [

@@ -2,7 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Actuator Execution Brief",
   "type": "object",
-  "required": ["kind", "request_text", "archetype_id", "target_actuators", "deliverables", "missing_inputs"],
+  "required": [
+    "kind",
+    "request_text",
+    "archetype_id",
+    "target_actuators",
+    "deliverables",
+    "missing_inputs"
+  ],
   "properties": {
     "kind": {
       "type": "string",
@@ -28,6 +35,10 @@
       "items": { "type": "string" }
     },
     "target_actuators": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "support_components": {
       "type": "array",
       "items": { "type": "string" }
     },
@@ -65,7 +76,14 @@
           "actuator": { "type": "string" },
           "phase": {
             "type": "string",
-            "enum": ["resolve_system", "authenticate", "list_pending", "review_item", "decide", "summarize"]
+            "enum": [
+              "resolve_system",
+              "authenticate",
+              "list_pending",
+              "review_item",
+              "decide",
+              "summarize"
+            ]
           },
           "requires_confirmation": { "type": "boolean" },
           "input_refs": {
@@ -101,7 +119,12 @@
     },
     "readiness": {
       "type": "string",
-      "enum": ["fully_automatable", "needs_clarification", "needs_external_asset", "blocked_by_runtime"]
+      "enum": [
+        "fully_automatable",
+        "needs_clarification",
+        "needs_external_asset",
+        "blocked_by_runtime"
+      ]
     },
     "readiness_reason": {
       "type": "string"
