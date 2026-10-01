@@ -848,6 +848,28 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
     expect(denied).toBeGreaterThan(0);
   });
 
+  it('exempts loopback and, for an indistinguishable "shared" caller, applies only the surface ceiling', async () => {
+    for (let i = 0; i < 700; i++) {
+      const res = await handleSurfaceAuthRoute(
+        { ...base, loopback: true, clientKey: '127.0.0.1' },
+        { env, now: 4_000 }
+      );
+      expect(res?.status).toBe(200);
+    }
+    resetSurfaceAuthRateLimitForTests();
+    // 121st shared request is still served (no per-client cap on an unknown caller)...
+    let last;
+    for (let i = 0; i < 121; i++) {
+      last = await handleSurfaceAuthRoute({ ...base, clientKey: 'shared' }, { env, now: 5_000 });
+    }
+    expect(last?.status).toBe(200);
+    // ...until the whole-surface ceiling.
+    for (let i = 0; i < 600; i++) {
+      last = await handleSurfaceAuthRoute({ ...base, clientKey: 'shared' }, { env, now: 5_000 });
+    }
+    expect(last?.status).toBe(429);
+  });
+
   it('does not rate-limit when the adapter supplies no client key (Express surfaces limit at the HTTP layer)', async () => {
     for (let i = 0; i < 700; i++) {
       const res = await handleSurfaceAuthRoute(base, { env, now: 3_000 });
@@ -906,5 +928,29 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
     expect(same?.setCookies[0]).toContain('Max-Age=0');
     const none = await handleSurfaceAuthRoute({ ...base, pathname: '/logout' }, { env });
     expect(none?.setCookies[0]).toContain('Max-Age=0');
+  });
+
+  it('rejects a same-site (sibling subdomain) logout and falls back to Origin/Referer without Sec-Fetch-Site', async () => {
+    const sibling = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', secFetchSite: 'same-site' },
+      { env }
+    );
+    expect(sibling?.setCookies).toEqual([]);
+    const foreign = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', referrerOrigin: 'https://evil.example.net/page' },
+      { env }
+    );
+    expect(foreign?.status).toBe(302);
+    expect(foreign?.setCookies).toEqual([]);
+    const own = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', referrerOrigin: 'https://desk.example.com/settings' },
+      { env }
+    );
+    expect(own?.setCookies[0]).toContain('Max-Age=0');
+    const typed = await handleSurfaceAuthRoute(
+      { ...base, pathname: '/logout', secFetchSite: 'none' },
+      { env }
+    );
+    expect(typed?.setCookies[0]).toContain('Max-Age=0');
   });
 });

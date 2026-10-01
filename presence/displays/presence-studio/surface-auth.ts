@@ -64,6 +64,7 @@ export function registerPresenceStudioAuthRoutes(app: Express): void {
         requestOrigin: `${req.protocol}://${req.get('host') || ''}`,
         loopback: isLoopbackPeer(req),
         secFetchSite: req.headers['sec-fetch-site'] ? String(req.headers['sec-fetch-site']) : null,
+        referrerOrigin: req.headers.origin ?? req.headers.referer ?? null,
       });
       if (!result) return next();
       res.status(result.status);
