@@ -8,6 +8,7 @@ const viewer = vi.hoisted(() => ({
   projectIds: [],
   tierAccess: ['public'] as Array<'public'>,
   source: 'token' as const,
+  principalId: 'human:test-reader',
 }));
 
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
