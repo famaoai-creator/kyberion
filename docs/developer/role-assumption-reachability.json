@@ -1290,6 +1290,21 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#asStore",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#beginConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/front-desk-member.ts#resolveConciergeMembership",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2908,6 +2923,8 @@
         "presence/displays/concierge/src/lib/concierge-advisory-response.ts",
         "presence/displays/concierge/src/lib/concierge-theme.ts",
         "presence/displays/concierge/src/lib/connection-view.ts",
+        "presence/displays/concierge/src/lib/conversation-history.ts",
+        "presence/displays/concierge/src/lib/conversation-store.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",
         "presence/displays/concierge/src/lib/front-desk-auth-token.ts",
