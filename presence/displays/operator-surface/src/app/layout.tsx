@@ -39,6 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       icon: 'clock',
     },
     { id: 'knowledge', label: t('nav_knowledge'), href: '/knowledge', icon: 'book' },
+    { id: 'inbox', label: t('inbox_title'), href: '/inbox', icon: 'mail' },
   ];
   return (
     // `data-theme` (a pinned light/dark choice) is set before paint by the
