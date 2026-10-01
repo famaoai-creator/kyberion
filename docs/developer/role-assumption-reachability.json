@@ -1674,6 +1674,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/migrate_binding_owners.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/migrate_peer_tenant_runtime.ts#applyPeerTenantMigrationPlan",
       "roles": ["physical_namespace_migration"],
       "unresolved": []
