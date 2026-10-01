@@ -5743,6 +5743,10 @@
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
     },
+    "./surface/channel-mode-policy": {
+      "types": "./dist/surface/channel-mode-policy.d.ts",
+      "default": "./dist/surface/channel-mode-policy.js"
+    },
     "./surface/surface-access-policy": {
       "types": "./dist/surface/surface-access-policy.d.ts",
       "default": "./dist/surface/surface-access-policy.js"
