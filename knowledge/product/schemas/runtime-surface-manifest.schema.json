@@ -31,7 +31,12 @@
           "healthPath": { "type": "string" },
           "service_id": { "type": "string" },
           "preset_path": { "type": "string" },
-          "enabled": { "type": "boolean" }
+          "enabled": { "type": "boolean" },
+          "urlEnv": { "type": "string", "minLength": 1 },
+          "controlPlane": { "type": "string", "enum": ["presence", "chronos"] },
+          "remediationCommand": { "type": "string", "minLength": 1 },
+          "operatorNotesKey": { "type": "string", "minLength": 1 },
+          "bestForKey": { "type": "string", "minLength": 1 }
         },
         "additionalProperties": false
       }

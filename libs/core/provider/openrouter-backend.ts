@@ -1,5 +1,6 @@
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolveProductRepositoryUrl } from '../foundation/service-endpoints.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
@@ -364,7 +365,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       authorization: `Bearer ${this.apiKey}`,
-      'HTTP-Referer': 'https://github.com/famaoai-creator/kyberion',
+      'HTTP-Referer': resolveProductRepositoryUrl(),
       'X-Title': 'Kyberion',
     };
 

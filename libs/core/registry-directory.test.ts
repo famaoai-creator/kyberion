@@ -38,6 +38,18 @@ function envelope(provider: string): string {
           input_modalities: ['text'],
         },
         env_keys: [],
+        transport: 'in-process',
+        data_egress: 'local-only',
+        adapter: 'stub',
+        profile: {
+          streaming: false,
+          tool_calling: false,
+          native_subagent: false,
+          thinking_levels: {},
+          supports_strict_tools: false,
+          supports_grammar_tools: false,
+          utility_fit: [],
+        },
       },
     ],
   });

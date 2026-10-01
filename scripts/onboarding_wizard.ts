@@ -19,6 +19,7 @@ import {
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
 import { writeServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
+import { resolveComfyBaseUrl } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -665,7 +666,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
 }
 
 async function promptComfyuiConnection(): Promise<Record<string, unknown> | null> {
-  const baseUrl = await ask('ComfyUI base URL [http://127.0.0.1:8188]: ', 'http://127.0.0.1:8188');
+  const baseUrl = await ask(`ComfyUI base URL [${resolveComfyBaseUrl()}]: `, resolveComfyBaseUrl());
   const outputDir = await ask('ComfyUI output dir [optional]: ');
   const notes = await ask('ComfyUI notes [optional]: ');
   if (!baseUrl && !outputDir && !notes) return null;

@@ -375,7 +375,7 @@ const MODELING_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   terraform_to_architecture_adf: [{ from: 'terraform' }],
   terraform_to_topology_ir: [{ from: 'terraform' }],
   build_agentic_source_review_participants: [
-    { mission_id: 'MSN-20260826-001', tenant_slug: 'acme' },
+    { mission_id: 'MSN-20260826-001', tenant_slug: 'example-tenant' },
   ],
   compile_agentic_source_review_plan: [{ from: 'participants' }],
   compile_agentic_source_review_verification: [{ from: 'plan' }],

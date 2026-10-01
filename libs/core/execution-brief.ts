@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
+import { getCoordinationExecutionOverride } from './coordination-actuator-routing.js';
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
@@ -654,36 +655,41 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
 ): ActuatorExecutionBrief {
   let missingInputs = inferMissingInputs(seed, guidedBrief.missing_inputs);
   let targetActuators = guidedBrief.suggested_target_actuators;
+  let supportComponents = guidedBrief.suggested_support_components ?? [];
   let deliverables = guidedBrief.suggested_deliverables;
   let workflowSteps: ApprovalWorkflowStep[] | undefined;
   let approvalSystemCandidates: string[] | undefined;
+  // Override routes (actuators, support components, deliverables) are registry
+  // data (coordination-actuator-routing.json, RS-07); only the trigger
+  // predicates live here.
+  const applyOverride = (id: string) => {
+    const override = getCoordinationExecutionOverride(id);
+    targetActuators = override.target_actuators;
+    supportComponents = override.support_components;
+    deliverables = override.deliverables;
+  };
   if (isScheduleAgendaRead(seed)) {
-    targetActuators = ['calendar-actuator', 'wisdom-actuator'];
-    deliverables = ['calendar_agenda_summary'];
+    applyOverride('schedule_agenda_read');
   }
 
   if (isApprovalRequestResolution(seed.requestText)) {
     approvalSystemCandidates = inferApprovalSystemCandidates(seed);
-    targetActuators = ['browser-actuator', 'approval-actuator', 'service-actuator'];
-    deliverables = ['approval_resolved'];
+    applyOverride('approval_request_resolution');
     workflowSteps = inferApprovalWorkflowSteps(seed, approvalSystemCandidates[0]);
   }
 
   if (isApprovalRequestCreation(seed.requestText)) {
     approvalSystemCandidates = inferApprovalSystemCandidates(seed);
-    targetActuators = ['browser-actuator', 'approval-actuator', 'service-actuator'];
-    deliverables = ['approval_request_created'];
+    applyOverride('approval_request_creation');
     workflowSteps = inferApprovalWorkflowSteps(seed, approvalSystemCandidates[0]);
   }
 
   if (isProjectBootstrapRequest(seed.requestText)) {
-    targetActuators = ['orchestrator-actuator', 'artifact-actuator', 'wisdom-actuator'];
-    deliverables = ['project_created'];
+    applyOverride('project_bootstrap');
   }
 
   if (seed.taskType === 'capture_photo') {
-    targetActuators = ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
-    deliverables = ['artifact:image'];
+    applyOverride('capture_photo');
   }
 
   return {
@@ -695,6 +701,7 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
     user_facing_summary: inferUserFacingSummary(guidedBrief.objective),
     normalized_scope: uniqueStrings([guidedBrief.coordination_kind, ...inferNormalizedScope(seed)]),
     target_actuators: targetActuators,
+    ...(supportComponents.length > 0 ? { support_components: supportComponents } : {}),
     deliverables,
     missing_inputs: missingInputs,
     input_bindings: resolveInputBindings(missingInputs) as InputBinding[],
@@ -776,6 +783,11 @@ export function normalizeExecutionBrief(
       toStringArray(raw.target_actuators).length > 0
         ? toStringArray(raw.target_actuators)
         : fallback.target_actuators,
+    ...(toStringArray(raw.support_components).length > 0
+      ? { support_components: toStringArray(raw.support_components) }
+      : fallback.support_components
+        ? { support_components: fallback.support_components }
+        : {}),
     deliverables:
       toStringArray(raw.deliverables).length > 0
         ? toStringArray(raw.deliverables)

@@ -21,7 +21,12 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3000,
       "healthPath": "/api/healthz",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_chronos_mirror_v2",
+      "bestForKey": "surface:surface_best_for_chronos_mirror_v2",
+      "urlEnv": "CHRONOS_URL",
+      "controlPlane": "chronos",
+      "remediationCommand": "pnpm surfaces reconcile"
     }
   ]
 }

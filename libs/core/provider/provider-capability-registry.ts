@@ -33,6 +33,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
+import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import {
   isClaudeCliPlaceholderFailure,
@@ -106,126 +107,72 @@ interface ProviderProbeSpec {
 }
 
 /**
- * Single declarative table of probe commands. `--help`/`--version` mirrors
- * the commands already vetted in this repo — `provider-discovery.ts`
- * (claude/gemini `--version`) and
- * `knowledge/product/governance/provider-capability-scan-policy.json`
- * (`--help` across providers, `gh copilot -- --help` for copilot). Auth
- * probes are declared only where a cheap, non-interactive subcommand exists;
- * `codex`/`agy`/`grok`/`gemini` have none known that don't make a live call,
- * so their `authenticated` field stays `'unknown'` unless the binary itself
- * is missing (then it is `false`). Claude Code exposes the cheap
- * `claude auth status` probe, so Claude can report its actual login state.
+ * Named code hooks a descriptor may reference by id. Probe commands and flags
+ * themselves are descriptor data (`reasoning-providers/*.json`
+ * `cli.capability_probe`); only behaviour that cannot be data lives here.
  */
-export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> = {
-  claude: {
-    binaryCommand: 'claude',
-    binaryArgs: ['--version'],
-    authCommand: 'claude',
-    authArgs: ['auth', 'status'],
-    interpretAuthResult: isClaudeCliAuthenticated,
+const AUTH_INTERPRETERS: Readonly<Record<string, (result: ProbeExecResult) => boolean>> = {
+  'claude-auth-status': isClaudeCliAuthenticated,
+};
+const PLACEHOLDER_FALLBACKS: Readonly<
+  Record<string, { isPlaceholderFailure: (stderr: string) => boolean; candidates: () => string[] }>
+> = {
+  'claude-cli-shim': {
     isPlaceholderFailure: isClaudeCliPlaceholderFailure,
-    fallbackBinaryCandidates: () => resolveClaudeCliFallbackCandidates(),
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'claude',
-      args: ['--help'],
-      expectedFlags: ['--permission-mode'],
-    },
-  },
-  codex: {
-    binaryCommand: 'codex',
-    binaryArgs: ['--help'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'codex',
-      args: ['--help'],
-      expectedFlags: ['--sandbox'],
-    },
-  },
-  agy: {
-    binaryCommand: 'agy',
-    binaryArgs: ['--help'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'agy',
-      args: ['--help'],
-      expectedFlags: ['--sandbox'],
-    },
-  },
-  grok: {
-    binaryCommand: 'grok',
-    binaryArgs: ['--version'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'grok',
-      args: ['--help'],
-      expectedFlags: ['--allow', '--deny'],
-    },
-  },
-  cursor: {
-    binaryCommand: 'cursor-agent',
-    binaryArgs: ['--version'],
-    authCommand: 'cursor-agent',
-    authArgs: ['status'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'cursor-agent',
-      args: ['--help'],
-      expectedFlags: ['--sandbox', '--mode'],
-    },
-  },
-  opencode: {
-    binaryCommand: 'opencode',
-    binaryArgs: ['--version'],
-    authCommand: 'opencode',
-    authArgs: ['auth', 'list'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'opencode',
-      args: ['--help'],
-      expectedFlags: ['--agent', '--format'],
-    },
-  },
-  devin: {
-    binaryCommand: 'devin',
-    binaryArgs: ['--version'],
-    authCommand: 'devin',
-    authArgs: ['auth', 'status'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'devin',
-      args: ['--help'],
-      expectedFlags: ['--permission-mode', '--sandbox'],
-    },
-  },
-  gemini: {
-    binaryCommand: 'gemini',
-    binaryArgs: ['--version'],
-    headless: true,
-    structuredOutput: true,
-    sandboxProbe: {
-      command: 'gemini',
-      args: ['--help'],
-      expectedFlags: ['--sandbox', '--approval-mode'],
-    },
-  },
-  copilot: {
-    binaryCommand: 'gh',
-    binaryArgs: ['copilot', '--', '--help'],
-    authCommand: 'gh',
-    authArgs: ['auth', 'status'],
-    headless: true,
-    structuredOutput: true,
+    candidates: () => resolveClaudeCliFallbackCandidates(),
   },
 };
+
+interface ResolvedProviderProbeSpec extends ProviderProbeSpec {
+  /** Registered env var that overrides the probed binary (descriptor `cli.bin_env_key`). */
+  binEnvKey?: string;
+}
+
+/**
+ * Probe specs keyed by provider id, derived from the governed provider
+ * descriptors (RS follow-up: no provider-id table in code). Probe commands
+ * run the descriptor's `cli.binary`; `--help`/`--version` choices mirror the
+ * commands vetted in `provider-capability-scan-policy.json`. Auth probes are
+ * declared only where a cheap, non-interactive subcommand exists — providers
+ * without one keep `authenticated: 'unknown'` unless the binary is missing.
+ */
+export function listProviderProbeSpecs(): ReadonlyMap<string, ResolvedProviderProbeSpec> {
+  const specs = new Map<string, ResolvedProviderProbeSpec>();
+  for (const { provider, cli } of listCliReasoningProviderDescriptors()) {
+    const probe = cli.capability_probe;
+    if (!probe || specs.has(provider)) continue;
+    const fallback = probe.placeholder_fallback
+      ? PLACEHOLDER_FALLBACKS[probe.placeholder_fallback]
+      : undefined;
+    specs.set(provider, {
+      binaryCommand: cli.binary,
+      binaryArgs: [...probe.binary_args],
+      ...(probe.auth_args ? { authCommand: cli.binary, authArgs: [...probe.auth_args] } : {}),
+      ...(probe.auth_interpreter
+        ? { interpretAuthResult: AUTH_INTERPRETERS[probe.auth_interpreter] }
+        : {}),
+      ...(fallback
+        ? {
+            isPlaceholderFailure: fallback.isPlaceholderFailure,
+            fallbackBinaryCandidates: fallback.candidates,
+          }
+        : {}),
+      headless: probe.headless,
+      structuredOutput: probe.structured_output,
+      ...(probe.sandbox_flags
+        ? {
+            sandboxProbe: {
+              command: cli.binary,
+              args: [...probe.sandbox_flags.args],
+              expectedFlags: [...probe.sandbox_flags.expected_flags],
+            },
+          }
+        : {}),
+      ...(cli.bin_env_key ? { binEnvKey: cli.bin_env_key } : {}),
+    });
+  }
+  return specs;
+}
 
 const DEFAULT_PROBE_TIMEOUT_MS = 5000;
 // Exported so callers that want to state an explicit `maxAgeMs` (e.g.
@@ -234,24 +181,11 @@ const DEFAULT_PROBE_TIMEOUT_MS = 5000;
 export const DEFAULT_PROVIDER_CAPABILITY_TTL_MS = 15 * 60 * 1000; // 15 minutes — cheap probes, but not free
 const REGISTRY_CACHE_RELATIVE_PATH = 'runtime/provider-capability-registry.json';
 
-const PROVIDER_BINARY_ENV_KEYS: Readonly<Record<string, string>> = {
-  claude: 'KYBERION_CLAUDE_CLI_BIN',
-  codex: 'KYBERION_CODEX_CLI_BIN',
-  agy: 'KYBERION_AGY_CLI_BIN',
-  grok: 'KYBERION_GROK_CLI_BIN',
-  cursor: 'KYBERION_CURSOR_CLI_BIN',
-  opencode: 'KYBERION_OPENCODE_CLI_BIN',
-  devin: 'KYBERION_DEVIN_CLI_BIN',
-  gemini: 'KYBERION_GEMINI_CLI_BIN',
-  copilot: 'KYBERION_COPILOT_CLI_BIN',
-};
-
 function resolveProbeBinary(
-  providerId: string,
-  spec: ProviderProbeSpec,
+  spec: ResolvedProviderProbeSpec,
   env: NodeJS.ProcessEnv
 ): { command: string; explicit: boolean } {
-  const envKey = PROVIDER_BINARY_ENV_KEYS[providerId];
+  const envKey = spec.binEnvKey;
   const configured = envKey ? getRegisteredEnvText(envKey, { env })?.trim() : undefined;
   return {
     command: configured || spec.binaryCommand,
@@ -348,9 +282,10 @@ function probeSingleProvider(
   timeoutMs: number,
   probedAt: string,
   fallbackCandidatesOverride: (() => string[]) | undefined,
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  specs: ReadonlyMap<string, ResolvedProviderProbeSpec>
 ): ProviderCapability {
-  const spec = PROVIDER_PROBE_TABLE[providerId];
+  const spec = specs.get(providerId);
   if (!spec) {
     return {
       provider_id: providerId,
@@ -364,7 +299,7 @@ function probeSingleProvider(
     };
   }
 
-  const resolvedBinary = resolveProbeBinary(providerId, spec, env);
+  const resolvedBinary = resolveProbeBinary(spec, env);
   let binaryCommand = resolvedBinary.command;
   let versionResult = runProbe(exec, binaryCommand, spec.binaryArgs, timeoutMs);
   if (
@@ -420,7 +355,7 @@ function probeSingleProvider(
 }
 
 export interface ProbeProviderCapabilitiesOptions {
-  /** Which providers to probe. Defaults to every provider in PROVIDER_PROBE_TABLE. */
+  /** Which providers to probe. Defaults to every provider descriptor declaring `cli.capability_probe`. */
   providerIds?: string[];
   /** Injectable exec seam. Production default calls out via secure-io. Tests MUST inject a fake. */
   exec?: ProbeExecFn;
@@ -445,7 +380,18 @@ export function probeProviderCapabilities(
   const exec = opts.exec ?? defaultProbeExec;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
   const env = opts.env ?? process.env;
-  const providerIds = opts.providerIds ?? Object.keys(PROVIDER_PROBE_TABLE);
+  let specs: ReadonlyMap<string, ResolvedProviderProbeSpec>;
+  try {
+    specs = listProviderProbeSpecs();
+  } catch (err) {
+    // Never throw out of the probe path: an unreadable descriptor registry
+    // degrades every provider to "no probe spec" with the reason attached.
+    logger.warn(
+      `[provider-capability-registry] provider descriptors unavailable (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+    );
+    specs = new Map();
+  }
+  const providerIds = opts.providerIds ?? [...specs.keys()];
   const now = opts.now ?? (() => new Date());
   const probedAt = now().toISOString();
   const claudeFallbackCandidates = opts.resolveClaudeCliFallbackCandidates;
@@ -458,7 +404,8 @@ export function probeProviderCapabilities(
         timeoutMs,
         probedAt,
         claudeFallbackCandidates,
-        env
+        env,
+        specs
       );
     } catch (err) {
       // Belt-and-braces: probeSingleProvider already catches exec errors,
