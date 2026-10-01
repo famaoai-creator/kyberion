@@ -5,12 +5,14 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { createInviteEmailDraft } from '../../../../lib/invite-email';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Puts the invite into a mail DRAFT for the inviter to review and send. Nothing
- * is sent from here; the draft is created in the inviter's own mail backend.
+ * Attempts to create a mail draft for the inviter to review and send. Nothing
+ * is sent from here; draft creation is unavailable until an owner-bound mail
+ * backend can be established.
  */
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
@@ -26,8 +28,7 @@ export async function POST(req: NextRequest) {
     if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
-    // i18n-exempt: normalizes a client-supplied locale query param into 'en'|'ja'
-    const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
+    const locale = resolveConciergeLocale(req.nextUrl.searchParams.get('locale') || undefined);
     const result = await withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation(() =>
         createInviteEmailDraft(resolved.context, parsedBody.body ?? {}, req.nextUrl.origin, locale)

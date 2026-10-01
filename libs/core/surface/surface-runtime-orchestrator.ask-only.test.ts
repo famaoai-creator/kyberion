@@ -17,10 +17,16 @@ const mocks = vi.hoisted(() => ({
   shouldCompileSurfaceIntent: vi.fn(() => false),
   resolveSurfaceConversationReceiver: vi.fn((): string | undefined => 'nerve-agent'),
   triggerBackgroundReviewFork: vi.fn(() => ({ review_due: false })),
+  recordExecutionFeedback: vi.fn(),
+  parseExecutionFeedbackText: vi.fn(() => null),
 }));
 
 vi.mock('../workforce/background-review-runner.js', () => ({
   triggerBackgroundReviewFork: mocks.triggerBackgroundReviewFork,
+}));
+vi.mock('../execution-feedback.js', () => ({
+  recordExecutionFeedback: mocks.recordExecutionFeedback,
+  parseExecutionFeedbackText: mocks.parseExecutionFeedbackText,
 }));
 
 vi.mock('../secure-io.js', async () => {
@@ -79,6 +85,7 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
       getRecord: () => ({ status: 'ready' }),
     });
     mocks.resolveSurfaceConversationReceiver.mockReturnValue('nerve-agent');
+    mocks.parseExecutionFeedbackText.mockReturnValue(null);
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'cross-project-remediation',
       taskType: 'analysis',
@@ -128,6 +135,25 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
     });
     expect(mocks.createTaskSession).toHaveBeenCalled();
   });
+
+  it('does not write tenant-scoped feedback to the shared execution store', async () => {
+    mocks.parseExecutionFeedbackText.mockReturnValue({
+      scenario_id: 'use-case-schedule-read-agenda',
+      intent_id: 'schedule-read-agenda',
+      outcome: 'partially_satisfied',
+      correction: '期間を確認して',
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '評価 use-case-schedule-read-agenda: 一部違う: 期間を確認して',
+      senderAgentId: 'test-sender',
+      scope: { scope_kind: 'tenant', tenant_slug: 'acme', tier: 'confidential' },
+    });
+
+    expect(mocks.recordExecutionFeedback).not.toHaveBeenCalled();
+  });
+
   it('runs an isolated tenant turn on a tool-less per-tenant runtime without delegating', async () => {
     mocks.getAgentRuntimeHandle.mockReturnValue(undefined);
     // No rule-based receiver: only the isolation guard keeps the compiler away.

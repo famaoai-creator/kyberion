@@ -12,6 +12,7 @@ import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agen
 import { constants as osConstants } from 'node:os';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -145,10 +146,24 @@ async function runScriptCommand(
       ]
     : ['run', scriptCommand.script!, ...commandArgs];
   const childCommand = scriptCommand.module ? process.execPath : pnpmExecutable();
+  const credentialEnv =
+    scriptCommand.id === 'script.pr.create' &&
+    scriptCommand.module === 'scripts/publish_pull_request.ts'
+      ? {
+          GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
+          GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
+        }
+      : {};
   // CU-02: terminals, servers, daemons, and multi-minute jobs get the
   // operator's terminal and no router timeout instead of a buffered 2-minute run.
   if (scriptCommand.interactive || scriptCommand.long_running) {
-    await runStreamingScriptCommand(childCommand, childArgs, scriptCommand.id);
+    await runStreamingScriptCommand(
+      childCommand,
+      childArgs,
+      scriptCommand.id,
+      raiseSignalOnSelf,
+      credentialEnv
+    );
     return;
   }
   const result = scriptCommand.module
@@ -161,11 +176,12 @@ async function runScriptCommand(
           ...(scriptCommand.args || []),
           ...commandArgs,
         ],
-        { cwd: pathResolver.rootDir(), timeoutMs: 120_000 }
+        { cwd: pathResolver.rootDir(), timeoutMs: 120_000, env: credentialEnv }
       )
     : await safeExecResultAsync(pnpmExecutable(), ['run', scriptCommand.script!, ...commandArgs], {
         cwd: pathResolver.rootDir(),
         timeoutMs: 120_000,
+        env: credentialEnv,
       });
   if (result.stdout.trim()) print(result.stdout.trim());
   if (result.status !== 0) {
@@ -218,7 +234,8 @@ export async function runStreamingScriptCommand(
   command: string,
   args: string[],
   commandId: string,
-  raiseSignal: (signal: NodeJS.Signals) => void = raiseSignalOnSelf
+  raiseSignal: (signal: NodeJS.Signals) => void = raiseSignalOnSelf,
+  credentialEnv: Record<string, string | undefined> = {}
 ): Promise<void> {
   assertGovernedExec(command, args);
   const { child } = spawnManagedProcess({
@@ -230,7 +247,7 @@ export async function runStreamingScriptCommand(
     args,
     spawnOptions: {
       cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv(kyberionConfigEnv()),
+      env: buildSafeExecEnv({ ...kyberionConfigEnv(), ...credentialEnv }),
       stdio: 'inherit',
     },
     metadata: { source: 'kyberion-cli', commandId },
