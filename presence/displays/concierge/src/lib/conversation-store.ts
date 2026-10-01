@@ -112,16 +112,21 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
 }
 
 /** Known/registered credentials are redacted; arbitrary passwords cannot be inferred. */
-function storedText(text: string): string {
-  return redactSensitiveString(text)
-    .replace(
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
-      '[REDACTED_SECRET]'
-    )
-    .replace(
-      /\b(password|passwd|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
-      '$1=[REDACTED_SECRET]'
-    );
+function storedText(text: string, limit: number): string {
+  return (
+    redactSensitiveString(text)
+      .replace(
+        /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
+        '[REDACTED_SECRET]'
+      )
+      .replace(
+        /\b(password|passwd|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
+        '$1=[REDACTED_SECRET]'
+      )
+      // Redaction can expand short credentials. Bound the persisted projection,
+      // after every secret has been removed, so it remains readable by load().
+      .slice(0, limit)
+  );
 }
 
 export function readConversationHistory(viewer: ConciergeViewerContext): ConversationHistory {
@@ -132,14 +137,18 @@ export function readConversationHistory(viewer: ConciergeViewerContext): Convers
       sessionId: ref.sessionId,
       pending: transcript.turns.filter((turn) => turn.reply === undefined).length,
       messages: transcript.turns.flatMap((turn) => [
-        { id: `${turn.id}-user`, role: 'user' as const, text: storedText(turn.text) },
+        {
+          id: `${turn.id}-user`,
+          role: 'user' as const,
+          text: storedText(turn.text, CONVERSATION_MAX_INPUT),
+        },
         ...(turn.reply === undefined
           ? []
           : [
               {
                 id: `${turn.id}-secretary`,
                 role: 'secretary' as const,
-                text: storedText(turn.reply),
+                text: storedText(turn.reply, CONVERSATION_MAX_REPLY),
               },
             ]),
       ]),
@@ -162,7 +171,11 @@ export function beginConversationTurn(viewer: ConciergeViewerContext, text: stri
         if (completed < 0) throw new ConversationStoreError('invalid_history');
         transcript.turns.splice(completed, 1);
       }
-      transcript.turns.push({ id, text: storedText(text), createdAt: Date.now() });
+      transcript.turns.push({
+        id,
+        text: storedText(text, CONVERSATION_MAX_INPUT),
+        createdAt: Date.now(),
+      });
       writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
       return id;
     })
@@ -181,7 +194,7 @@ export function completeConversationTurn(
       const transcript = load(ref);
       const turn = transcript.turns.find((entry) => entry.id === id);
       if (!turn || turn.reply !== undefined) throw new ConversationStoreError('invalid_history');
-      turn.reply = storedText(reply);
+      turn.reply = storedText(reply, CONVERSATION_MAX_REPLY);
       writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
     })
   );
