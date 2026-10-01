@@ -39,6 +39,7 @@ import { runGenerateAvatar } from './generate_avatar.js';
 import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
+import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
   parseOrganizationRecordRunParams,
@@ -827,6 +828,43 @@ export function runInlineOrganizationDigest(
     ...(locale ? { locale } : {}),
   });
   return exportValue(params, step, { ...result.digest, text: result.text }, ctx);
+}
+
+/**
+ * core:accountability_report — the accountable human's report for every charter
+ * in force (what ran, what was held, budget use, standing tripwires, expiry).
+ * `send: true` delivers it through operator notifications; with no charter in
+ * force it does nothing and reports an empty list.
+ */
+export function runInlineAccountabilityReport(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const rawLocale = String(resolveVars(params.locale ?? '', ctx)).trim();
+  const locale = rawLocale ? normalizeLocale(rawLocale) : null;
+  if (rawLocale && !locale) {
+    throw new Error(`core:accountability_report: unsupported locale ${rawLocale}`);
+  }
+  const hoursRaw = Number(resolveVars(params.hours ?? 24, ctx));
+  const hours = Number.isFinite(hoursRaw) && hoursRaw > 0 ? hoursRaw : 24;
+  const send = resolveVars(params.send ?? false, ctx) === true;
+  const entries = runAccountabilityDigest({
+    now: new Date(),
+    hours,
+    locale: locale?.startsWith('en') ? 'en' : 'ja',
+    send,
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      charters: entries.length,
+      sent: entries.filter((entry) => entry.sent).length,
+      text: entries.map((entry) => entry.text).join('\n\n'),
+    },
+    ctx
+  );
 }
 
 /** core:organization_record_run — record one completed organization operation run. */

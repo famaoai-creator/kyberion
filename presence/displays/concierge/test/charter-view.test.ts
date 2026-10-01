@@ -64,6 +64,7 @@ describe('form <-> draft', () => {
       per_month: 1000000,
       max_loss_per_incident: 100000,
       allow_named_spend: true,
+      allow_customer_outbound: false,
       supersedes_decision_rights: false,
       deputies: ['user:carol', 'user:dave'],
       expires_in_days: 90,

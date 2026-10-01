@@ -12,6 +12,7 @@ export interface CharterFormDraft {
   deputies: string;
   expires_in_days: string;
   allow_named_spend: boolean;
+  allow_customer_outbound: boolean;
   supersedes_decision_rights: boolean;
 }
 
@@ -23,6 +24,7 @@ export const DEFAULT_CHARTER_DRAFT: CharterFormDraft = {
   deputies: '',
   expires_in_days: '90',
   allow_named_spend: false,
+  allow_customer_outbound: false,
   supersedes_decision_rights: false,
 };
 
@@ -73,6 +75,7 @@ export function draftToForm(tenantSlug: string, draft: CharterFormDraft) {
     per_month: parseAmount(draft.per_month),
     max_loss_per_incident: parseAmount(draft.max_loss_per_incident),
     allow_named_spend: draft.allow_named_spend,
+    allow_customer_outbound: draft.allow_customer_outbound,
     supersedes_decision_rights: draft.supersedes_decision_rights,
     deputies: parseDeputies(draft.deputies),
     expires_in_days: Number(draft.expires_in_days),
@@ -85,6 +88,7 @@ export function draftFromCharter(charter: {
   max_loss_per_incident: number;
   deputies: string[];
   allows_named_spend: boolean;
+  allows_customer_outbound?: boolean;
   supersedes_decision_rights: boolean;
 }): CharterFormDraft {
   return {
@@ -95,6 +99,7 @@ export function draftFromCharter(charter: {
     deputies: charter.deputies.join(', '),
     expires_in_days: '90',
     allow_named_spend: charter.allows_named_spend,
+    allow_customer_outbound: charter.allows_customer_outbound === true,
     supersedes_decision_rights: charter.supersedes_decision_rights,
   };
 }
@@ -112,6 +117,7 @@ export interface CharterTenantView {
     money: { currency: string; per_action: number; per_day: number; per_month: number };
     max_loss_per_incident: number;
     allows_named_spend: boolean;
+    allows_customer_outbound?: boolean;
     supersedes_decision_rights: boolean;
     report: {
       tripwires_standing: string[];

@@ -5,6 +5,7 @@ import * as pathResolver from '../path-resolver.js';
 import { agentActor, humanActor } from '../actor.js';
 import { safeRmSync } from '../secure-io.js';
 import {
+  evaluateUnderCharter,
   findActiveCharter,
   recordCharterConsumption,
   recordTripwire,
@@ -88,6 +89,7 @@ describe('renderAcceptanceStatement', () => {
     for (const over of [
       { per_action: 90_000 },
       { allow_named_spend: false },
+      { allow_customer_outbound: true },
       { supersedes_decision_rights: true },
       { deputies: [] },
       { expires_in_days: 30 },
@@ -189,6 +191,37 @@ describe('acceptCharterFromForm + viewCharter', () => {
     expect(
       findActiveCharter({ kind: 'organization', tenant_slug: 'acme' }, NOW, opts())?.charter_id
     ).toBe(c.charter_id);
+  });
+
+  it('customer outbound is delegated only when the owner ticks it: it allows the effect and names the action', () => {
+    const base = findActiveCharter({ kind: 'organization', tenant_slug: 'acme' }, NOW, opts())!;
+    expect(base.envelope.external_effects.send_message_external).toBeUndefined();
+    expect(viewCharter(base, NOW, opts(), 'en').allows_customer_outbound).toBe(false);
+    const f = form({ per_action: 50_000, allow_customer_outbound: true });
+    const c = accept(f, { idNonce: 'e5f6', replaces: base.charter_id });
+    expect(c.envelope.external_effects.send_message_external).toBe('allow');
+    expect(c.envelope.irreversible).toBe('named_actions_only');
+    expect(c.envelope.irreversible_named_actions).toEqual([
+      'operational_spend',
+      'customer_outbound',
+    ]);
+    expect(viewCharter(c, NOW, opts(), 'en').allows_customer_outbound).toBe(true);
+    const sent = evaluateUnderCharter(
+      { kind: 'organization', tenant_slug: 'acme' },
+      {
+        actor: agentActor('kyberion://agent/acme/customer-conversation', 'user:owner'),
+        action_class: 'send_message_external',
+        reversible: false,
+        irreversible_action_name: 'customer_outbound',
+        estimated_loss: 0,
+        reputational_class: 'B',
+        blast_radius: { recipients: 1 },
+      },
+      { accountable_available: true, available_deputies: [] },
+      opts(),
+      NOW
+    );
+    expect(sent?.decision.decision).toBe('allow');
   });
 
   it('viewCharter: limits, usage, standing stops and the report text', () => {

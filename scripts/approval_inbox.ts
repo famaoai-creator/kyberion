@@ -5,14 +5,7 @@ import {
   type DecisionDigest,
   type DigestMissionWait,
 } from '@agent/core/governance/approval-digest';
-import {
-  buildAccountabilityReport,
-  renderAccountabilityReportText,
-} from '@agent/core/governance/accountability-report';
-import {
-  listActiveCharters,
-  readCharterLedger,
-} from '@agent/core/governance/accountability-charter-registry';
+import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { isFixtureApproval } from '@agent/core/governance/approval-store-hygiene';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import {
@@ -127,31 +120,7 @@ function runCharterReport(
   const hours = readHours(context.argv);
   const at = new Date(now);
   const send = context.argv.includes('--send');
-  const reports = withExecutionContext('mission_controller', () =>
-    listActiveCharters(at).map((charter) => {
-      const report = buildAccountabilityReport({
-        charter,
-        ledger: readCharterLedger(charter),
-        now: at,
-        hours,
-      });
-      const text = renderAccountabilityReportText(report, { locale });
-      let sent = false;
-      // An all-clear day is still sent: silence must never be ambiguous
-      // between "nothing happened" and "the report broke".
-      if (send) {
-        sent = notifyOperatorSync(
-          report.tripwires_standing.length > 0 ? 'ops_alert' : 'decision_digest',
-          {
-            title: text.split('\n')[0] ?? 'accountability report',
-            body: text.split('\n').slice(1).join('\n'),
-            correlation_id: `charter-report:${charter.charter_id}:${at.toISOString().slice(0, 10)}`,
-          }
-        );
-      }
-      return { report, text, sent };
-    })
-  );
+  const reports = runAccountabilityDigest({ now: at, hours, locale, send });
   const output =
     reports.length > 0
       ? reports.map((r) => r.text).join('\n\n')
