@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   BUILTIN_JUDGMENT_PROVIDER,
   listJudgmentBackends,
+  registerJudgmentBackend,
   resetJudgmentBackends,
 } from './judgment-backend.js';
 import {
   ensureJudgmentBackendsRegistered,
+  JUDGMENT_ASSISTS_ENV_VAR,
   JUDGMENT_PROVIDERS_ENV_VAR,
+  judgmentAssistReady,
   listOptionalJudgmentProviders,
 } from './judgment-provider-bootstrap.js';
 import { getTaskModelHintAssisted } from '../mission/mission-workitem-dispatch-review.js';
@@ -20,6 +23,31 @@ function registeredIds(): string[] {
 afterEach(() => {
   resetJudgmentBackends();
   delete process.env[JUDGMENT_PROVIDERS_ENV_VAR];
+  delete process.env[JUDGMENT_ASSISTS_ENV_VAR];
+});
+
+describe('judgmentAssistReady', () => {
+  it('stays false while no provider has a calibration fit, and registers the floor', () => {
+    resetJudgmentBackends();
+    registerJudgmentBackend({
+      judgment_id: 'uncalibrated-test',
+      egress: 'local-only',
+      supports: () => true,
+      async judge() {
+        throw new Error('must not be asked');
+      },
+    });
+    expect(judgmentAssistReady('error.category')).toBe(false);
+    expect(registeredIds()).toContain(BUILTIN_JUDGMENT_PROVIDER);
+  });
+
+  it('is false when the assists are switched off', () => {
+    process.env[JUDGMENT_ASSISTS_ENV_VAR] = 'off';
+    resetJudgmentBackends();
+    expect(judgmentAssistReady('error.category')).toBe(false);
+    // Switched off means not even the floor is registered.
+    expect(registeredIds()).toEqual([]);
+  });
 });
 
 describe('ensureJudgmentBackendsRegistered', () => {

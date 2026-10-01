@@ -3,7 +3,13 @@ import {
   readDealRequirementsCapture,
 } from '@agent/core/customer-conversation-modes';
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
-import { listDeals } from '@agent/core/deal-store';
+import { listDeals, type QuoteLineRequest } from '@agent/core/deal-store';
+import {
+  draftContractForDeal,
+  generateQuoteForDeal,
+  handoffWonDealToSdlc,
+  recordContractReview,
+} from '@agent/core/deal-documents';
 import {
   listDistillCandidateRecords,
   updateDistillCandidateRecord,
@@ -239,4 +245,185 @@ export function handleDealsSubcommand(
   }
   print('');
   print(ui('recorder:recorder_deal_requirements_command'));
+}
+
+export interface DealDocumentArgs {
+  quote?: string;
+  lines?: string;
+  draftContract?: string;
+  reviewContract?: string;
+  contractVersion?: number;
+  verdict?: string;
+  reviewer?: string;
+  note?: string;
+  handoff?: string;
+  missionId?: string;
+  json?: boolean;
+}
+
+/** yargs options for the deal-document actions of `pnpm kyberion deals`. */
+export const DEAL_DOCUMENT_OPTIONS = {
+  quote: { type: 'string', description: 'deals: price-book quote for a deal id' },
+  lines: { type: 'string', description: 'deals: JSON array of quote line requests' },
+  'draft-contract': { type: 'string', description: 'deals: draft the contract for a deal id' },
+  'review-contract': { type: 'string', description: 'deals: record a contract review verdict' },
+  'contract-version': { type: 'number', description: 'deals: contract version reviewed' },
+  verdict: { type: 'string', choices: ['approve', 'reject'] },
+  handoff: { type: 'string', description: 'deals: hand a won deal to --mission-id' },
+} as const;
+
+/** Map the operator-home yargs result onto the deal-document arguments. */
+export function dealDocumentArgsFromArgv(argv: Record<string, unknown>): DealDocumentArgs {
+  const text = (key: string) => (argv[key] ? String(argv[key]) : undefined);
+  return {
+    quote: text('quote'),
+    lines: text('lines'),
+    draftContract: text('draft-contract'),
+    reviewContract: text('review-contract'),
+    contractVersion:
+      typeof argv['contract-version'] === 'number' ? Number(argv['contract-version']) : undefined,
+    verdict: text('verdict'),
+    reviewer: text('reviewer'),
+    note: text('note'),
+    handoff: text('handoff'),
+    missionId: text('mission-id'),
+    json: Boolean(argv.json),
+  };
+}
+
+/** True when argv asks for one of the E2E-06 deal-document actions. */
+export function isDealDocumentAction(argv: DealDocumentArgs): boolean {
+  return Boolean(argv.quote || argv.draftContract || argv.reviewContract || argv.handoff);
+}
+
+function parseQuoteLines(raw: string | undefined): QuoteLineRequest[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const lines = parsed.filter(
+      (entry): entry is QuoteLineRequest =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        typeof (entry as { task_kind?: unknown }).task_kind === 'string'
+    );
+    return lines.length === parsed.length ? lines : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * E2E-06 Tasks 5/6 from the operator console: quote, contract draft, contract
+ * review record and the won → SDLC handoff (libs/core/deal-documents.ts).
+ * Sending a document to the customer is not offered here — it needs the
+ * customer channel binding and stays on the approval-gated
+ * sendDealDocumentToCustomer path of the conversation runtime.
+ */
+export function handleDealDocumentAction(
+  ui: HomeUi,
+  argv: DealDocumentArgs,
+  print: HomePrint = () => undefined
+): boolean {
+  if (!isDealDocumentAction(argv)) return false;
+  const dealId = String(argv.quote || argv.draftContract || argv.reviewContract || argv.handoff);
+  const bindings = listCustomerChannelBindings();
+  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
+  const tenantSlug = tenants.find((tenant) =>
+    listDeals(tenant).some((deal) => deal.deal_id === dealId)
+  );
+  if (!tenantSlug) {
+    print(ui('recorder:recorder_deal_not_found', { id: dealId }));
+    throw new ScriptExitError(1, '', true);
+  }
+  const emit = (value: Record<string, unknown>, line: string) =>
+    print(argv.json ? JSON.stringify(value, null, 2) : line);
+
+  if (argv.quote) {
+    const requests = parseQuoteLines(argv.lines);
+    if (!requests) {
+      print(ui('recorder:recorder_deal_quote_usage'));
+      throw new ScriptExitError(1, '', true);
+    }
+    const result = generateQuoteForDeal({ tenantSlug, dealId, requests });
+    if (!result.ok) {
+      emit(
+        { ok: false, unquotable: result.unquotable ?? [] },
+        ui('recorder:recorder_deal_quote_unquotable', {
+          kinds: (result.unquotable ?? []).map((entry) => entry.task_kind).join(', '),
+        })
+      );
+      throw new ScriptExitError(1, '', true);
+    }
+    emit(
+      { ok: true, version: result.version, quote_ref: result.quote_ref, quote: result.quote },
+      ui('recorder:recorder_deal_quote_created', {
+        id: dealId,
+        version: result.version ?? 0,
+        path: result.quote_ref ?? '',
+      })
+    );
+    return true;
+  }
+
+  if (argv.draftContract) {
+    const result = draftContractForDeal({ tenantSlug, dealId });
+    emit(
+      { version: result.version, contract_ref: result.contract_ref },
+      ui('recorder:recorder_deal_contract_created', {
+        id: dealId,
+        version: result.version,
+        path: result.contract_ref,
+      })
+    );
+    return true;
+  }
+
+  if (argv.reviewContract) {
+    const version = Number(argv.contractVersion);
+    const verdict = String(argv.verdict || '');
+    if (
+      !Number.isInteger(version) ||
+      version < 1 ||
+      (verdict !== 'approve' && verdict !== 'reject') ||
+      !argv.reviewer
+    ) {
+      print(ui('recorder:recorder_deal_review_usage'));
+      throw new ScriptExitError(1, '', true);
+    }
+    const recordPath = recordContractReview({
+      tenantSlug,
+      dealId,
+      version,
+      verdict,
+      reviewer: String(argv.reviewer),
+      ...(argv.note ? { notes: String(argv.note) } : {}),
+    });
+    emit(
+      { record_path: recordPath, verdict, version },
+      ui('recorder:recorder_deal_review_recorded', { id: dealId, version, verdict })
+    );
+    return true;
+  }
+
+  if (!argv.missionId) {
+    print(ui('recorder:recorder_deal_handoff_usage'));
+    throw new ScriptExitError(1, '', true);
+  }
+  const result = handoffWonDealToSdlc({ tenantSlug, dealId, missionId: String(argv.missionId) });
+  emit(
+    {
+      handoff_path: result.handoff_path,
+      sdlc_pipeline: result.sdlc_pipeline,
+      ...(result.requirements_draft_version
+        ? { requirements_draft_version: result.requirements_draft_version }
+        : {}),
+    },
+    ui('recorder:recorder_deal_handoff_done', {
+      id: dealId,
+      mission: String(argv.missionId),
+      pipeline: result.sdlc_pipeline,
+    })
+  );
+  return true;
 }

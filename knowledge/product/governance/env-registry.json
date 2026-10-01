@@ -514,6 +514,14 @@
       "subsystem": "governance"
     },
     {
+      "name": "KYBERION_AUTONOMY_DECISION_ROUTING",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 1 so scheduled gate callers (daemon watchdog restart, auto-checkpoint) route an operator-bound autonomous-ops verdict through the HITL decision loop (routeAutonomousDecision): one decision card per daemon/job, reused while pending. Unset keeps the report-only behavior.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_BACKUP_PASSPHRASE",
       "category": "secret",
       "type": "string",
@@ -1289,6 +1297,14 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_EXTERNAL_HOOKS",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'project' to load project-local Claude/Codex hook configs (.claude/settings*.json, .codex/hooks.json) into the worker lifecycle hook engine — only configs with a valid hash-bound project-trust approval (pnpm kyberion hooks trust <path>, then an authenticated human approves). Unset keeps external hooks unloaded; user-level configs are never loaded.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_EXTERNAL_SERVICE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
@@ -1693,6 +1709,14 @@
       "type": "path",
       "required": false,
       "description": "Override for the governance seed used by intent-contract memory sync; tenant-scoped memory cannot be promoted into the global seed without the governed brokered path.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_JUDGMENT_ASSISTS",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'off' to disable the calibration-gated judgment assists (pipeline step error category, browser failure kind, context-pack knowledge relevance). They only consult a provider once judgment-calibration.json carries a fit for the question; until then they are inert regardless of this setting.",
       "documented": true
     },
     {

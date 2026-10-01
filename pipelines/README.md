@@ -174,6 +174,23 @@ The generated `source-test-scenarios.json` may be run after review. Tests with a
 | `chaos-repair-test`       | Validate self-repair after injected fault                  |
 | `chaos-secret-missing`    | Simulate missing secret; validate secret-guard error path  |
 
+### Op Entry Points
+
+Minimal runnable pipelines that make an actuator op reachable (OW-05); run them with
+`pnpm pipeline --input pipelines/<id>.json`.
+
+| Pipeline                         | Description                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `browser-failure-evidence`       | Capture the redacted browser action trail and export a failure-evidence bundle                        |
+| `incident-review`                | List recorded incident notes and run the SRE root-cause analysis over a failure signal                |
+| `meeting-hearing-session`        | Run a guided requirements hearing on a topic and export the structured result                         |
+| `meeting-tutor-session`          | Run a guided tutoring session over a material file and export the result                              |
+| `mission-team-prewarm`           | Queue a team prewarm request so a mission's agent runtimes are ready before work starts               |
+| `mission-team-staff`             | Staff a mission's team runtimes through the agent-runtime supervisor and return the plan              |
+| `open-active-surfaces`           | Open one browser tab per running UI surface                                                           |
+| `terraform-topology-ir`          | Parse a Terraform directory into a topology IR for diagramming or review                              |
+| `test-inventory-device-pipeline` | Compile a test inventory and app profile into an Android/iOS device pipeline (proposal; run approved) |
+
 ---
 
 ### Promoted (pipeline:promote)
