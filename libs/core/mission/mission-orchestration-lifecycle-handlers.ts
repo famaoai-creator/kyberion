@@ -514,6 +514,9 @@ export function notifyRequestingSurface(
       threadTs: payload.threadTs,
       text,
       source: 'system',
+      // Team Channel P2: replies to a tenant channel stay in that tenant's
+      // outbox namespace (the bridge drains tenant namespaces).
+      ...(payload.scope?.tenant_slug ? { scope: { tenant_slug: payload.scope.tenant_slug } } : {}),
     });
   } catch (error: any) {
     logger.warn(

@@ -5767,6 +5767,14 @@
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
     },
+    "./surface/thread-work-index": {
+      "types": "./dist/surface/thread-work-index.d.ts",
+      "default": "./dist/surface/thread-work-index.js"
+    },
+    "./surface/channel-memory-store": {
+      "types": "./dist/surface/channel-memory-store.d.ts",
+      "default": "./dist/surface/channel-memory-store.js"
+    },
     "./surface/channel-speaker-principal": {
       "types": "./dist/surface/channel-speaker-principal.d.ts",
       "default": "./dist/surface/channel-speaker-principal.js"
