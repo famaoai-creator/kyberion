@@ -23836,6 +23836,11 @@
         "ja": "この操作はここではできません。サインイン画面からやり直してください。",
         "qps-ploc": "⟦Ŧħȧŧ řėɋůėşŧ ïş ñőŧ şůṗṗőřŧėḓ ħėřė. Şŧȧřŧ ȧɠȧïñ ƒřőɱ ŧħė şïɠñ-ïñ ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
+      "failed_logout_blocked": {
+        "en": "A sign-out request from another site was ignored, so you are still signed in. Use the sign-out control in this app to sign out.",
+        "ja": "他のサイトからのサインアウト要求は無視しました。サインインしたままです。サインアウトはこのアプリ内の操作から行ってください。",
+        "qps-ploc": "⟦Ȧ şïɠñ-őůŧ řėɋůėşŧ ƒřőɱ ȧñőŧħėř şïŧė ẇȧş ïɠñőřėḓ, şő ẏőů ȧřė şŧïŀŀ şïɠñėḓ ïñ. Ůşė ŧħė şïɠñ-őůŧ ƈőñŧřőŀ ïñ ŧħïş ȧṗṗ ŧő şïɠñ őůŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
       "failed_rate_limited": {
         "en": "Too many sign-in attempts. Wait a minute and try again.",
         "ja": "サインインの試行が多すぎます。1 分ほど待ってからもう一度お試しください。",
