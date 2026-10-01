@@ -184,6 +184,13 @@ vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 500,
+    maxDelayMs: 10000,
+    factor: 2,
+    jitter: true,
+  })),
 }));
 
 vi.mock('@agent/core/foundation', async (importOriginal) => {
@@ -231,7 +238,9 @@ async function installMockFoundationIo(): Promise<void> {
     const normalizedPath = String(filePath).replaceAll('\\', '/');
     const useActualFile =
       normalizedPath.includes('/knowledge/product/schemas/') ||
+      normalizedPath.endsWith('/knowledge/product/governance/retry-policy.json') ||
       normalizedPath.endsWith('/knowledge/product/governance/error-classifier-rules.json') ||
+      normalizedPath.endsWith('/knowledge/product/orchestration/service-endpoints.json') ||
       normalizedPath.endsWith('/libs/actuators/media-generation-actuator/manifest.json');
     return String(
       useActualFile
