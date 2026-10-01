@@ -58,6 +58,11 @@ const allowedManagedProcessConsumers = [
   // PE-02 plugin views E2E: the built Chronos server under test is a
   // supervised child, stopped (SIGTERM, then SIGKILL) even on failure.
   'scripts/check_plugin_views_e2e.ts',
+  // CU-02: the kyberion router runs interactive / long-running script
+  // commands (tui, servers, daemons, onboard, build) supervised with inherited
+  // stdio and no timeout, awaiting the child; the dispatch test mocks it.
+  'scripts/kyberion.ts',
+  'scripts/kyberion.dispatch.test.ts',
   'scripts/run_baseline_check.ts',
   'scripts/soak_restart_e2e.ts',
   'scripts/surface_runtime.ts',

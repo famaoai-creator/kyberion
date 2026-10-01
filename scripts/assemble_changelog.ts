@@ -32,6 +32,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 export const CHANGELOG_CATEGORIES = [
   'Added',
@@ -190,9 +191,17 @@ export function loadChangelogFragments(rootDir = pathResolver.rootDir()): {
   return { fragments, errors };
 }
 
+/** CU-01: `--help` / typos exit before CHANGELOG.md or changelog.d/ is rewritten. */
+export const ASSEMBLE_CHANGELOG_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion changelog assemble',
+  manifestId: 'script.changelog.assemble',
+  options: [{ flag: '--check' }, { flag: '--dry-run' }, { flag: '--json' }, { flag: '--quiet' }],
+};
+
 export const main = defineScript({
   name: 'changelog:assemble',
   run(context) {
+    if (guardCliArgs(context.argv, ASSEMBLE_CHANGELOG_CLI, context.print)) return undefined;
     const rootDir = pathResolver.rootDir();
     const { fragments, errors } = loadChangelogFragments(rootDir);
     if (errors.length > 0) {
