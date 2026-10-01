@@ -7,6 +7,8 @@ describe('mission template catalog', () => {
     expect(catalog.templates.map((template) => template.name)).toEqual([
       'development',
       'meeting_facilitation',
+      'operations',
+      'operations_report',
     ]);
     expect(catalog.templates[0]?.files[0]?.path).toBe('mission-state.json');
   });

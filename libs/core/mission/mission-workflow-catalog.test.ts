@@ -418,6 +418,20 @@ describe('mission-workflow-catalog', () => {
     expect(workflow.workflow_id).toBe('research-report');
   });
 
+  it('routes the operations_report mission-type hint onto the short org ops report process', () => {
+    const workflow = resolveMissionWorkflowDesign({
+      missionClass: 'operations_and_release',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'operations_report',
+    });
+
+    expect(workflow.workflow_id).toBe('organization-ops-report');
+    expect(workflow.phases).toEqual(['draft', 'record', 'self_review']);
+  });
+
   it('selects the meeting facilitator follow-up workflow for meeting facilitation missions', () => {
     const workflow = resolveMissionWorkflowDesign({
       missionClass: 'operations_and_release',
