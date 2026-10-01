@@ -17,6 +17,7 @@ import {
 import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
+import { ReviewCheckin } from './review-checkin';
 import {
   parseConciergeSummaryEvent,
   parseConciergeSummaryResponse,
@@ -1092,6 +1093,7 @@ export default function ConciergePage() {
   return (
     <>
       {notice ? <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} /> : null}
+      <ReviewCheckin key={tenantFilter} tenant={tenantFilter} />
 
       {nextEntry ? (
         <NextAction
