@@ -588,6 +588,69 @@ describe('slack team channel commands (P2)', () => {
     expect(run('memory', 'viewer')).toBe(t('bridge:channel_memory_empty', undefined, locale));
   });
 
+  it('escapes member text, honours the approvers fallback and hides other-tier facts', () => {
+    vi.stubEnv(
+      'KYBERION_SURFACE_CHANNEL_MODES',
+      JSON.stringify({
+        slack: { [channel]: { mode: 'team', tenant_slug: 'acme', approvers: ['U-guest'] } },
+      })
+    );
+    const policy = resolveChannelModePolicy('slack', channel);
+    const locale = resolveOperatorLocale();
+    const saved = handleSlackTeamChannelCommand({
+      policy,
+      speaker: speaker('operator'),
+      threadTs: '1.0',
+      text: 'remember: ping <!channel> & <@U1>',
+    });
+    const id = String(saved?.match(/m[a-f0-9]{8}/)?.[0]);
+    const listed = handleSlackTeamChannelCommand({
+      policy,
+      speaker: speaker(),
+      threadTs: '1.0',
+      text: 'memory',
+    });
+    expect(listed).toContain('&lt;!channel&gt; &amp; &lt;@U1&gt;');
+    expect(listed).not.toContain('<!channel>');
+
+    const denied = { ...speaker('operator'), denied: true };
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: denied,
+        threadTs: '1.0',
+        text: 'remember: x',
+      })
+    ).toBe(t('bridge:channel_memory_not_authorized', undefined, locale));
+
+    // Unlinked actor on the channel approvers list may forget (same rule as approvals).
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: { ...speaker(), actorId: 'U-other' },
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_not_authorized', undefined, locale));
+    const guestApprover = { ...speaker(), actorId: 'U-guest' };
+    expect(
+      handleSlackTeamChannelCommand({
+        policy: { ...policy, maxTier: 'public' },
+        speaker: guestApprover,
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_not_found', { id }, locale));
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: guestApprover,
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_forgotten', { id }, locale));
+  });
+
   it('answers thread status deterministically and ignores normal text', () => {
     vi.stubEnv(
       'KYBERION_SURFACE_CHANNEL_MODES',

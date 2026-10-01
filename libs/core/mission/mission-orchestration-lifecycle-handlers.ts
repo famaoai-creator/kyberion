@@ -530,6 +530,10 @@ export function notifyRequestingSurface(
         threadTs: missionId,
         source: 'system',
         text,
+        // A tenant mission's mirror stays in that tenant's namespace too.
+        ...(payload.scope?.tenant_slug
+          ? { scope: { tenant_slug: payload.scope.tenant_slug } }
+          : {}),
       });
     } catch (error: any) {
       logger.warn(

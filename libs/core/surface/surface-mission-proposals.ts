@@ -518,6 +518,12 @@ export function isSlackMissionRejection(text: string): boolean {
   ].some((pattern) => pattern.test(normalized));
 }
 
+const TIER_RANK: Record<'public' | 'confidential' | 'personal', number> = {
+  public: 1,
+  confidential: 2,
+  personal: 3,
+};
+
 export interface MissionIssuanceParams {
   /** Originating surface ('slack' | 'chronos' | 'terminal' | 'telegram' | …). */
   surface: string;
@@ -553,7 +559,14 @@ export async function issueMissionFromProposal(
     params.proposal,
     params.sourceText
   );
-  const tier = params.proposal.tier || 'public';
+  // Team Channel P2: a mission never runs above the originating channel's
+  // disclosure tier, whatever tier the model proposed.
+  const proposedTier = params.proposal.tier || 'public';
+  const tier =
+    params.scope?.tier && TIER_RANK[proposedTier] > TIER_RANK[params.scope.tier]
+      ? params.scope.tier
+      : proposedTier;
+  const tenantArgs = params.scope ? ['--tenant-slug', params.scope.tenant_slug] : [];
   const missionType = params.proposal.mission_type || 'development';
   const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
   const env = buildExecutionEnv(process.env, 'mission_controller');
@@ -574,6 +587,7 @@ export async function issueMissionFromProposal(
       'default',
       missionType,
       ...routingDecisionArg,
+      ...tenantArgs,
     ],
     { env, cwd: pathResolver.rootDir() }
   );
@@ -602,6 +616,7 @@ export async function issueMissionFromProposal(
           ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
           ...(params.scope ? { scope: params.scope } : {}),
         },
+        ...(params.scope ? { scope: { tenant_slug: params.scope.tenant_slug, tier } } : {}),
       });
       return startMissionOrchestrationWorker(orchestrationEvent);
     });
