@@ -538,6 +538,33 @@ function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
   return null;
 }
 
+/**
+ * Tenant semantic-token overlay for one artifact engine
+ * (`theme.semantic_tokens.<engine>` in the tenant's theme.json, or the same
+ * path in tenant-override.json). Consumed by semantic-design-tokens.ts.
+ */
+export function readTenantSemanticTokens(
+  tenantSlug: string | undefined,
+  engine: string
+): Record<string, string> {
+  if (!tenantSlug || !isValidTenantSlug(tenantSlug)) return {};
+  const tenant = loadTenantDesign(tenantSlug);
+  if (!tenant) return {};
+  const merged: Record<string, string> = {};
+  for (const source of [
+    tenant.themePack?.theme?.semantic_tokens?.[engine],
+    tenant.override?.theme?.semantic_tokens?.[engine],
+    tenant.override?.semantic_tokens?.[engine],
+  ]) {
+    if (!source || typeof source !== 'object') continue;
+    for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+      const safe = normalizeCssToken(value, '');
+      if (safe) merged[key] = safe;
+    }
+  }
+  return merged;
+}
+
 function applyTenantColors(
   base: CreativeDesignColors,
   tenant: TenantDesignData

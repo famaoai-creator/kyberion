@@ -24,6 +24,7 @@ const allowedCoreFsImports = [
   'libs/core/cli-subagent-team.e2e.test.ts',
   'libs/core/data-vault.test.ts',
   'libs/core/creative-design-resolver.test.ts',
+  'libs/core/semantic-design-tokens.test.ts',
   'libs/core/mission/delegation-concurrency.test.ts',
   'libs/core/deliverable-inbox.test.ts',
   'libs/core/knowledge/distill-knowledge-injector.test.ts',

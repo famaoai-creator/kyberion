@@ -101,6 +101,8 @@ export {
 
 export {
   PPTX_PALETTE,
+  resolvePptxPalette,
+  type PptxPalette,
   textElement,
   shapeElement,
   lineElement,
