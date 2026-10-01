@@ -1213,8 +1213,17 @@ const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
   // skipping the ~3s backend bootstrap keeps the triage loop cheap.
   'triage',
   'scope-approve',
-  // Read-only listing of mission summaries from disk.
+  // Read-only views: they read mission/organization/outbox/memory state from disk and
+  // never delegate. (`status` only reports the backend; it does not need it installed.)
   'list',
+  'status',
+  'outbox',
+  'organization-catalogs',
+  'organization-profiles',
+  'organization-profile',
+  'organization-discovery',
+  'memory-queue',
+  'memory-review',
 ]);
 
 /** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
