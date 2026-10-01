@@ -225,6 +225,14 @@
       "allowed_actuators": ["artifact-actuator", "approval-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "scope_locale_reader": {
+      "description": "IT-05/S2: least-privilege reader of a tenant's stored reply locale (knowledge/confidential/<tenant>/locale.json). libs/core locale resolution assumes it, bound to the turn's tenant scope, so surface runtimes whose role cannot read the confidential tier still reply in the tenant locale; it grants that single file only and no write (persona worker).",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "slack_bridge": {
       "description": "Slack gateway authority for channel ingress and observability.",
       "default_persona": "worker",

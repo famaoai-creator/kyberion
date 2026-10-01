@@ -145,6 +145,10 @@
       "pattern": "libs/core/video/video-content-brief-contract.ts"
     },
     {
+      "layer": "domain",
+      "pattern": "libs/core/surface/surface-ux-contract.ts"
+    },
+    {
       "layer": "contracts",
       "pattern": "libs/core/*-contract.ts"
     },

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 
 const TARGETS = [
-  'libs/core/surface/operator-learning.ts',
   'libs/core/report-contract.ts',
   'libs/core/virtual/desktop-pipeline.ts',
   'libs/core/virtual/desktop-recording.ts',

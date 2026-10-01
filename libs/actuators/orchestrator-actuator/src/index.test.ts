@@ -310,6 +310,25 @@ describe('orchestrator-actuator', () => {
     expect(mocks.safeLstat).toHaveBeenCalled();
   });
 
+  it('advertises only capture ops the orchestrator can dispatch', async () => {
+    const { describeOps } = await import('./op-catalog.js');
+    const { handleAction } = await import('./index.js');
+    const captureOps = describeOps()
+      .filter((entry) => entry.kind === 'capture')
+      .map((entry) => entry.op);
+    // Discovery ops belong to code-actuator; the orchestrator never handled them.
+    expect(captureOps).not.toContain('discover_skills');
+    expect(captureOps).not.toContain('discover_capabilities');
+    for (const op of captureOps) {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op, params: {} }],
+      } as never);
+      const error = result.results.find((entry: { error?: string }) => entry.error)?.error || '';
+      expect(error).not.toContain('[UNKNOWN_OP]');
+    }
+  });
+
   it('unknown capture op suggests a nearby known op', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({

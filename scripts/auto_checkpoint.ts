@@ -2,6 +2,10 @@ import { logger } from '@agent/core/core';
 import { safeExec } from '@agent/core/secure-io';
 import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
 import { withExecutionContextAsync } from '@agent/core/authority';
+import {
+  isAutonomyDecisionRoutingEnabled,
+  routeAutonomousDecision,
+} from '@agent/core/governance/approval-decision-routing';
 import { createCheckpoint } from './refactor/mission-maintenance.js';
 import { listActiveMissions, loadState } from './refactor/mission-state.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -26,6 +30,23 @@ async function runAutoCheckpoint(): Promise<number> {
   const gate = evaluateAutonomousOpsAction({ actionId: 'auto_checkpoint', executionMode: 'apply' });
   if (!gate.allowed) {
     logger.warn(`[auto-checkpoint] gated for approval: ${gate.reason}`);
+    if (isAutonomyDecisionRoutingEnabled()) {
+      // Opt-in HITL loop: a scheduled job never blocks on the answer, so the
+      // card waits for the digest and later ticks reuse the pending request.
+      const routed = routeAutonomousDecision({
+        role: 'mission_controller',
+        gate,
+        title: 'Automatic mission checkpoints',
+        question: 'Allow the scheduled job to checkpoint active missions?',
+        recommendation: `Review the gate verdict first: ${gate.reason}`,
+        requestedBy: 'auto_checkpoint',
+        blocking: false,
+        dedupeKey: 'scheduled',
+      });
+      if (routed.requestId) {
+        logger.info(`[auto-checkpoint] decision ${routed.requestId} parked for the operator`);
+      }
+    }
     return 0;
   }
 

@@ -49,6 +49,8 @@ import {
 } from '@agent/core/software-quality';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
+import type { TestCaseADF } from '@agent/core/contracts/test-case-adf';
+import type { UIFlowADF } from '@agent/core/contracts/ui-flow-adf';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
 import {
@@ -588,7 +590,7 @@ export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTra
           entry_state: 'login',
           states,
           transitions,
-        },
+        } satisfies UIFlowADF,
       };
     },
     ui_flow_to_test_inventory: async ({ params, ctx }) => {
@@ -619,7 +621,7 @@ export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTra
           kind: 'test-case-adf',
           app_id: String(flow.app_id || 'unknown-app'),
           cases,
-        },
+        } satisfies TestCaseADF,
       };
     },
     test_inventory_to_browser_pipeline: async ({ op, params, ctx }) => {

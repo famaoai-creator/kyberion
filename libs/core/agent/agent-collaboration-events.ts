@@ -1,3 +1,4 @@
+import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
 import { resolveCollaborationKind } from '../event-vocabulary.js';
 import {
@@ -171,7 +172,7 @@ const SHARED_METADATA_KEYS = new Set([
 /** Keep the shared collaboration projection human-readable without copying raw payloads. */
 export function redactCollaborationSummary(
   value: unknown,
-  fallback = 'イベントを受信しました'
+  fallback = t('surface:collab_event_received')
 ): string {
   const text = String(value ?? '')
     .replace(/[\r\n\t]+/gu, ' ')

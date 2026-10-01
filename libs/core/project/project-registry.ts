@@ -1,3 +1,4 @@
+import { t } from '../t.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -10,6 +11,7 @@ import {
 } from '../secure-io.js';
 import { SPECIALIST_IDS } from '../specialist-ids.js';
 import { slugify } from '../foundation/text.js';
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 
 export interface ProjectRecord {
   project_id: string;
@@ -178,8 +180,9 @@ function inferBootstrapKind(
   utterance?: string
 ): 'web_service' | 'document_program' | 'general_project' {
   const text = String(utterance || '').toLowerCase();
-  if (/(web.?service|webサービス|アプリ|application|saas|サイト)/i.test(text)) return 'web_service';
-  if (/(試験計画|報告書|proposal|document|資料|deck|report)/i.test(text)) return 'document_program';
+  if (matchesIntentPhrase(text, 'project.bootstrap_kind_web_service')) return 'web_service';
+  if (matchesIntentPhrase(text, 'project.bootstrap_kind_document_program'))
+    return 'document_program';
   return 'general_project';
 }
 
@@ -200,7 +203,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-FRAME`,
         kind: 'task_session',
         title: 'Frame the service',
-        summary: `${input.projectName} の目的、利用者、主要ユースケースを固める。`,
+        summary: t('project_ops:bootstrap_web_frame', { project: input.projectName }),
         status: 'active',
         specialist_id: SPECIALIST_IDS.projectLead,
         outcome_id: 'project_created',
@@ -209,7 +212,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-ARCH`,
         kind: 'mission_seed',
         title: 'Design architecture',
-        summary: '情報設計、主要コンポーネント、運用境界を設計する。',
+        summary: t('project_ops:bootstrap_web_arch'),
         status: 'planned',
         specialist_id: SPECIALIST_IDS.documentSpecialist,
       },
@@ -217,7 +220,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-BUILD`,
         kind: 'mission_seed',
         title: 'Build the first slice',
-        summary: '最小の実装スライスと repository/worktree 戦略を切る。',
+        summary: t('project_ops:bootstrap_web_build'),
         status: 'planned',
         specialist_id: SPECIALIST_IDS.surfaceConcierge,
       },
@@ -225,7 +228,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-VERIFY`,
         kind: 'mission_seed',
         title: 'Verify and launch',
-        summary: '試験、運用導線、外部サービス連携を確認する。',
+        summary: t('project_ops:bootstrap_web_verify'),
         status: 'planned',
         specialist_id: SPECIALIST_IDS.serviceOperator,
       },
@@ -238,7 +241,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-SCOPE`,
         kind: 'task_session',
         title: 'Frame the document scope',
-        summary: `${input.projectName} の目的、対象読者、必要成果物を整理する。`,
+        summary: t('project_ops:bootstrap_doc_scope', { project: input.projectName }),
         status: 'active',
         specialist_id: SPECIALIST_IDS.projectLead,
         outcome_id: 'project_created',
@@ -247,7 +250,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-SOURCE`,
         kind: 'mission_seed',
         title: 'Collect source material',
-        summary: '利用可能な資料、要件、参照元を集める。',
+        summary: t('project_ops:bootstrap_doc_source'),
         status: 'planned',
         specialist_id: SPECIALIST_IDS.knowledgeSpecialist,
       },
@@ -255,7 +258,7 @@ export function buildProjectBootstrapWorkItems(input: {
         work_id: `WRK-${prefix}-DRAFT`,
         kind: 'mission_seed',
         title: 'Generate the first draft',
-        summary: '主要な成果物の初版を生成する。',
+        summary: t('project_ops:bootstrap_doc_draft'),
         status: 'planned',
         specialist_id: SPECIALIST_IDS.documentSpecialist,
       },
@@ -267,7 +270,7 @@ export function buildProjectBootstrapWorkItems(input: {
       work_id: `WRK-${prefix}-ALIGN`,
       kind: 'task_session',
       title: 'Frame the project',
-      summary: `${input.projectName} の目的と成功条件を整理する。`,
+      summary: t('project_ops:bootstrap_generic_frame', { project: input.projectName }),
       status: 'active',
       specialist_id: SPECIALIST_IDS.projectLead,
       outcome_id: 'project_created',
@@ -276,7 +279,7 @@ export function buildProjectBootstrapWorkItems(input: {
       work_id: `WRK-${prefix}-PLAN`,
       kind: 'mission_seed',
       title: 'Prepare the first work plan',
-      summary: '最初の durable work を切り出し、進め方を決める。',
+      summary: t('project_ops:bootstrap_generic_plan'),
       status: 'planned',
       specialist_id: SPECIALIST_IDS.surfaceConcierge,
     },
