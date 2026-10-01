@@ -5,6 +5,7 @@ import {
   buildCommandIndex,
   checkCommandInvocations,
   checkComponentMap,
+  checkConfigInvocations,
   checkCliReferenceFresh,
   checkPipelineCatalog,
   extractCodeSnippets,
@@ -130,6 +131,26 @@ describe('checkCommandInvocations', () => {
     expect(check('`pnpm doctor`')[0]).toMatchObject({ severity: 'error' });
     expect(check('`pnpm run doctor`')).toEqual([]);
     expect(check('Bare `pnpm doctor` is pnpm built-in.')).toEqual([]);
+  });
+});
+
+describe('checkConfigInvocations', () => {
+  const run = (file: string, text: string) => checkConfigInvocations(file, text, index);
+
+  it('flags a missing script in a systemd unit with an absolute pnpm path', () => {
+    expect(run('x.service', 'ExecStart=/usr/bin/pnpm nope\n')[0]).toMatchObject({
+      severity: 'error',
+      detail: expect.stringContaining('pnpm nope'),
+    });
+    expect(run('x.service', 'ExecStart=/usr/bin/pnpm mission\n')).toEqual([]);
+  });
+
+  it('reads launchd plist argument arrays and workflow run lines', () => {
+    const plist = '<string>/opt/homebrew/bin/pnpm</string>\n<string>onboard</string>';
+    expect(run('x.plist', plist)[0]).toMatchObject({ severity: 'warn' });
+    expect(run('ci.yml', '      - run: pnpm run bogus-script\n')[0]).toMatchObject({
+      severity: 'error',
+    });
   });
 });
 

@@ -8,7 +8,8 @@
  *  2. relative Markdown links resolve (delegates to check_documentation_links);
  *  3. every pipelines/*.json is listed in pipelines/README.md;
  *  4. docs/COMPONENT_MAP.md names every top-level directory;
- *  5. docs/CLI_REFERENCE.md matches the generator.
+ *  5. docs/CLI_REFERENCE.md matches the generator;
+ *  6. `pnpm <script>` in *.service / *.plist / *.yml under docs/ and .github resolves like (1).
  *
  * Known exceptions live in knowledge/product/governance/docs-drift-baseline.json
  * (each with a reason). Stale baseline entries fail the gate so it only shrinks.
@@ -35,6 +36,9 @@ const EXCLUDED_FRAGMENTS = [
   '/node_modules/',
 ];
 const EXCLUDED_FILES = new Set(['CHANGELOG.md']);
+/** Config roots whose unit/plist/workflow files invoke `pnpm <script>` and rot when a script is renamed. */
+const CONFIG_ROOTS = ['docs', '.github'] as const;
+const CONFIG_EXTENSIONS = ['.service', '.plist', '.yml', '.yaml'] as const;
 
 /** pnpm's own subcommands that docs may legitimately use. `doctor` is deliberately absent. */
 export const PNPM_BUILTINS: ReadonlySet<string> = new Set([
@@ -124,6 +128,42 @@ export function docFiles(): string[] {
   return [...new Set(files)]
     .filter((f) => !EXCLUDED_FRAGMENTS.some((frag) => f.includes(frag)))
     .sort();
+}
+
+/** Service units, launchd plists and workflows under docs/ and .github that may run `pnpm <script>`. */
+export function configFiles(): string[] {
+  const files: string[] = [];
+  for (const root of CONFIG_ROOTS) {
+    const abs = pathResolver.rootResolve(root);
+    if (!safeExistsSync(abs)) continue;
+    files.push(
+      ...getAllFiles(abs).filter(
+        (f) =>
+          CONFIG_EXTENSIONS.some((ext) => f.endsWith(ext)) &&
+          !EXCLUDED_FRAGMENTS.some((frag) => f.includes(frag)) &&
+          isRegularFile(f)
+      )
+    );
+  }
+  return [...new Set(files)].sort();
+}
+
+/**
+ * Check `pnpm <script>` invocations in a non-Markdown config file (systemd unit,
+ * launchd plist, workflow). The text is normalised so the Markdown-oriented
+ * extractor sees plain command lines: absolute `/usr/bin/pnpm` paths collapse to
+ * `pnpm` and plist `<string>` argument arrays collapse to one command line.
+ */
+export function checkConfigInvocations(
+  relativeFile: string,
+  text: string,
+  index: CommandIndex
+): DocsDriftFinding[] {
+  const normalized = text
+    .replace(/<\/string>\s*<string>/gu, ' ')
+    .replace(/<\/?string>/gu, '')
+    .replace(/[^\s"'=]*\/pnpm(?=\s)/gu, ' pnpm');
+  return checkCommandInvocations(relativeFile, `\`\`\`\n${normalized}\n\`\`\``, index);
 }
 
 /** Code the docs show to a reader: fenced blocks (every line) and inline code spans. */
@@ -422,6 +462,9 @@ export async function collectDocsDrift(
     // the generated reference lists deprecated aliases on purpose
     if (path.relative(root, file) === CLI_REFERENCE_FILE) continue;
     findings.push(...checkCommandInvocations(path.relative(root, file), readTextFile(file), index));
+  }
+  for (const file of configFiles()) {
+    findings.push(...checkConfigInvocations(path.relative(root, file), readTextFile(file), index));
   }
   const pipelineDir = pathResolver.rootResolve('pipelines');
   const names = safeReaddir(pipelineDir)

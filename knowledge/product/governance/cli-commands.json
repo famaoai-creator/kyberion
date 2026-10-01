@@ -1915,7 +1915,8 @@
       "audience": "operator",
       "description": "cli_cmd_script_export_validation_bundle",
       "group": "operate",
-      "long_running": true
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.meeting.run",
@@ -2909,7 +2910,8 @@
       "audience": "operator",
       "description": "cli_cmd_script_release_source_archive",
       "group": "operate",
-      "long_running": true
+      "long_running": true,
+      "native_help": true
     },
     {
       "id": "script.changelog.assemble",

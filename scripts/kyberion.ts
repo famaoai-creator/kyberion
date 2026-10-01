@@ -8,7 +8,8 @@ import {
   type CliManifest,
   type CliScriptCommand,
 } from './check_cli_manifest.js';
-import { safeExecResultAsync } from '@agent/core/secure-io';
+import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agent/core/secure-io';
+import { constants as osConstants } from 'node:os';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
@@ -143,7 +144,7 @@ async function runScriptCommand(
         ...commandArgs,
       ]
     : ['run', scriptCommand.script!, ...commandArgs];
-  const childCommand = scriptCommand.module ? process.execPath : 'pnpm';
+  const childCommand = scriptCommand.module ? process.execPath : pnpmExecutable();
   // CU-02: terminals, servers, daemons, and multi-minute jobs get the
   // operator's terminal and no router timeout instead of a buffered 2-minute run.
   if (scriptCommand.interactive || scriptCommand.long_running) {
@@ -162,7 +163,7 @@ async function runScriptCommand(
         ],
         { cwd: pathResolver.rootDir(), timeoutMs: 120_000 }
       )
-    : await safeExecResultAsync('pnpm', ['run', scriptCommand.script!, ...commandArgs], {
+    : await safeExecResultAsync(pnpmExecutable(), ['run', scriptCommand.script!, ...commandArgs], {
         cwd: pathResolver.rootDir(),
         timeoutMs: 120_000,
       });
@@ -184,12 +185,42 @@ function formatGuardedScriptHelp(scriptCommand: CliScriptCommand): string {
   ].join('\n');
 }
 
-/** Run a script command attached to the operator terminal (inherited stdio, no timeout). */
-async function runStreamingScriptCommand(
+/** The pnpm launcher for this platform (Windows ships a `pnpm.cmd` shim, not `pnpm`). */
+export function pnpmExecutable(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+}
+
+/**
+ * The operator's own `KYBERION_*` configuration (locale, backend, tier, ...)
+ * must reach a streamed child like any `pnpm run` invocation; everything else
+ * is dropped by the secure-io env allowlist.
+ */
+function kyberionConfigEnv(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] =>
+        entry[0].startsWith('KYBERION_') && entry[1] !== undefined
+    )
+  );
+}
+
+/** Re-raise a signal on this process once its handlers are restored, so the parent sees a signal death. */
+function raiseSignalOnSelf(signal: NodeJS.Signals): void {
+  process.kill(process.pid, signal);
+}
+
+/**
+ * Run a script command attached to the operator terminal (inherited stdio, no
+ * timeout). The spawn goes through the same exec policy as the buffered path
+ * (shell-script, sensitive-text and execute_command checks, allowlisted env).
+ */
+export async function runStreamingScriptCommand(
   command: string,
   args: string[],
-  commandId: string
+  commandId: string,
+  raiseSignal: (signal: NodeJS.Signals) => void = raiseSignalOnSelf
 ): Promise<void> {
+  assertGovernedExec(command, args);
   const { child } = spawnManagedProcess({
     resourceId: `kyberion-cli:${commandId}:${Date.now().toString(36)}`,
     kind: 'service',
@@ -197,27 +228,44 @@ async function runStreamingScriptCommand(
     ownerType: 'script',
     command,
     args,
-    spawnOptions: { cwd: pathResolver.rootDir(), env: process.env, stdio: 'inherit' },
+    spawnOptions: {
+      cwd: pathResolver.rootDir(),
+      env: buildSafeExecEnv(kyberionConfigEnv()),
+      stdio: 'inherit',
+    },
     metadata: { source: 'kyberion-cli', commandId },
   });
   // Ctrl-C reaches the child through the shared terminal; the router stays
-  // alive until the child has finished its own shutdown. SIGTERM is forwarded.
+  // alive until the child has finished its own shutdown. SIGTERM and SIGHUP
+  // (terminal closed) are forwarded.
   const ignoreInterrupt = (): void => undefined;
   const forwardTerminate = (): void => {
     child.kill('SIGTERM');
   };
+  const forwardHangup = (): void => {
+    child.kill('SIGHUP');
+  };
   process.on('SIGINT', ignoreInterrupt);
   process.on('SIGTERM', forwardTerminate);
+  process.on('SIGHUP', forwardHangup);
+  let exit: { code: number | null; signal: NodeJS.Signals | null };
   try {
-    const code = await new Promise<number>((resolve, reject) => {
+    exit = await new Promise((resolve, reject) => {
       child.once('error', reject);
-      child.once('exit', (exitCode) => resolve(exitCode ?? 1));
+      child.once('exit', (code, signal) => resolve({ code, signal }));
     });
-    if (code !== 0) throw new ScriptExitError(code, '', true);
   } finally {
     process.off('SIGINT', ignoreInterrupt);
     process.off('SIGTERM', forwardTerminate);
+    process.off('SIGHUP', forwardHangup);
   }
+  if (exit.signal) {
+    // Report the child's death by signal faithfully instead of a generic exit 1.
+    raiseSignal(exit.signal);
+    throw new ScriptExitError(128 + (osConstants.signals[exit.signal] ?? 0), '', true);
+  }
+  const code = exit.code ?? 1;
+  if (code !== 0) throw new ScriptExitError(code, '', true);
 }
 
 /** Where operators fix a startup environment failure, named in the error itself. */

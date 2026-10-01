@@ -8218,6 +8218,16 @@
         "ja": "[非推奨] `kyberion {old}` は `kyberion {new}` に改名されました。旧名も当面は動作します。",
         "qps-ploc": "⟦[ḓėṗřėƈȧŧėḓ] `ķẏƀėřïőñ {old}` ïş řėñȧɱėḓ ŧő `ķẏƀėřïőñ {new}`; ŧħė őŀḓ ñȧɱė şŧïŀŀ ẇőřķş ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
+      "cli_deprecated_script": {
+        "en": "[deprecated] `pnpm {old}` is renamed to `pnpm {new}`; the old name still works for now.",
+        "ja": "[非推奨] `pnpm {old}` は `pnpm {new}` に改名されました。旧名も当面は動作します。",
+        "qps-ploc": "⟦[ḓėṗřėƈȧŧėḓ] `ṗñṗɱ {old}` ïş řėñȧɱėḓ ŧő `ṗñṗɱ {new}`; ŧħė őŀḓ ñȧɱė şŧïŀŀ ẇőřķş ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "cli_env_unknown_variables": {
+        "en": "unregistered KYBERION_* variables set: {names} (register via pnpm generate:env-registry)",
+        "ja": "未登録の KYBERION_* 変数が設定されています: {names}（pnpm generate:env-registry で登録してください）",
+        "qps-ploc": "⟦ůñřėɠïşŧėřėḓ ĶẎɃĖŘÏŐÑ_* ṽȧřïȧƀŀėş şėŧ: {names} (řėɠïşŧėř ṽïȧ ṗñṗɱ ɠėñėřȧŧė:ėñṽ-řėɠïşŧřẏ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "cli_manifest_help_scopes": {
         "en": "Scopes: {usage}",
         "ja": "スコープ: {usage}",

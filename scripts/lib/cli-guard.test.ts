@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ScriptExitError } from './harness.js';
-import { guardCliArgs, hasHelpFlag, type CliGuardSpec } from './cli-guard.js';
+import {
+  guardCliArgs,
+  guardCliArgsNormalized,
+  hasHelpFlag,
+  normalizeInlineValueFlags,
+  type CliGuardSpec,
+} from './cli-guard.js';
 
 const spec: CliGuardSpec = {
   command: 'pnpm kyberion demo run',
@@ -44,5 +50,33 @@ describe('CU-01 shared CLI guard', () => {
 
   it('leaves declared subcommands to their own parser', () => {
     expect(guardCliArgs(['inspect', '--anything'], spec, () => undefined)).toBe(false);
+  });
+});
+
+describe('inline --flag=value normalization', () => {
+  it('rewrites valued flags to the two-token form legacy parsers read', () => {
+    expect(normalizeInlineValueFlags(['--title=a=b', '--force', 'x'], spec)).toEqual([
+      '--title',
+      'a=b',
+      '--force',
+      'x',
+    ]);
+  });
+
+  it('leaves boolean flags, unknown flags and tokens after `--` alone', () => {
+    expect(normalizeInlineValueFlags(['--force=1', '--', '--title=z'], spec)).toEqual([
+      '--force=1',
+      '--',
+      '--title=z',
+    ]);
+  });
+
+  it('guardCliArgsNormalized validates then returns the normalized argv', () => {
+    expect(guardCliArgsNormalized(['--title=hi'], spec, () => undefined)).toEqual({
+      handled: false,
+      argv: ['--title', 'hi'],
+    });
+    expect(guardCliArgsNormalized(['--help'], spec, () => undefined).handled).toBe(true);
+    expect(() => guardCliArgsNormalized(['--nope=1'], spec, () => undefined)).toThrow();
   });
 });

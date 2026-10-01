@@ -18,7 +18,8 @@ import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isRecord, readJsonLines } from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, readJsonLines } from '@agent/core/foundation';
+import { withImplicitTraceSubcommand } from './lib/intent-trace-argv.js';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
@@ -595,7 +596,14 @@ export async function main(
   args: string[] = [],
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
-  const argv = await createStandardYargs(['node', 'intent_trace', ...stripSharedScriptFlags(args)])
+  const argv = await createStandardYargs([
+    'node',
+    'intent_trace',
+    ...withImplicitTraceSubcommand(
+      stripSharedScriptFlags(args),
+      getRegisteredEnvText('npm_lifecycle_event')
+    ),
+  ])
     .option('locale', {
       type: 'string',
       description: 'Locale for user-facing status text',
@@ -607,7 +615,7 @@ export async function main(
   const subcommand = normalizeIntentTraceText(argv._[0]);
   const correlationId = normalizeIntentTraceText(argv._[1]);
   if (subcommand !== 'trace' || !correlationId) {
-    throw new Error('Usage: pnpm intent trace <correlation_id> [--locale en|ja]');
+    throw new Error('Usage: pnpm intent:trace <correlation_id> [--locale en|ja]');
   }
 
   const evidence = collectIntentTraceEvidence(correlationId, {

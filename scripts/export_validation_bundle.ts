@@ -55,7 +55,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/governance/audit-chain';
 
 interface BundleManifest {
@@ -409,8 +409,13 @@ if (
     name: 'validation-bundle:export',
     flags: [],
     run(context) {
-      if (guardCliArgs(context.argv, EXPORT_VALIDATION_BUNDLE_CLI, context.print)) return;
-      const status = main(context.argv);
+      const guarded = guardCliArgsNormalized(
+        context.argv,
+        EXPORT_VALIDATION_BUNDLE_CLI,
+        context.print
+      );
+      if (guarded.handled) return;
+      const status = main(guarded.argv);
       if (status !== 0) throw new Error(`validation bundle export failed with exit code ${status}`);
     },
   })();

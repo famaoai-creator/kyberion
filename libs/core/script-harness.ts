@@ -87,7 +87,7 @@ export function parseScriptFlags(
     else if (arg === '--quiet' && enabled.has('quiet')) quiet = true;
     else {
       positional.push(arg);
-      if (arg.startsWith('-')) unknownFlags.push(arg);
+      if (arg.startsWith('-') && arg !== '--') unknownFlags.push(arg);
     }
   }
   return { json, dryRun, check, quiet, positional, unknownFlags };
