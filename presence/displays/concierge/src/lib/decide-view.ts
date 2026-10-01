@@ -152,3 +152,45 @@ export function groupDecideQueue(
 export function presentKinds(countsByKind: Record<DecideKind, number>): DecideKind[] {
   return DECIDE_KINDS.filter((kind) => countsByKind[kind] > 0);
 }
+
+/** Filter value for entries that belong to no organization (hygiene, memory, outcomes, exceptions today). */
+export const NO_TENANT_FILTER = '__no_tenant__';
+
+export interface TenantFilterOption {
+  slug: string;
+  count: number;
+}
+
+/**
+ * Organizations present in the queue, most pending first. A member of several
+ * organizations decides per organization, so the queue can be narrowed to one
+ * without hiding the others' items: counts always cover the whole queue.
+ */
+export function tenantFilterOptions(entries: readonly DecideQueueEntry[]): {
+  tenants: TenantFilterOption[];
+  unassigned: number;
+} {
+  const counts = new Map<string, number>();
+  let unassigned = 0;
+  for (const entry of entries) {
+    const slug = deriveCardFields(entry).tenantSlug;
+    if (slug) counts.set(slug, (counts.get(slug) ?? 0) + 1);
+    else unassigned += 1;
+  }
+  const tenants = [...counts.entries()]
+    .map(([slug, count]) => ({ slug, count }))
+    .sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug));
+  return { tenants, unassigned };
+}
+
+/** `'all'` keeps everything; `NO_TENANT_FILTER` keeps the untenanted; otherwise one organization's items. */
+export function filterByTenant(
+  entries: readonly DecideQueueEntry[],
+  selected: string
+): DecideQueueEntry[] {
+  if (selected === 'all') return [...entries];
+  return entries.filter((entry) => {
+    const slug = deriveCardFields(entry).tenantSlug;
+    return selected === NO_TENANT_FILTER ? !slug : slug === selected;
+  });
+}
