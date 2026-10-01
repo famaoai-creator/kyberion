@@ -490,6 +490,9 @@ function syncSchedulesFromAdf(): void {
           timezone: sched.timezone,
         },
         enabled: sched.enabled !== false,
+        // Shipped-disabled schedules run only when the host lists their id in
+        // KYBERION_CHRONOS_SCHEDULES (see scheduleExplicitlyOptedIn).
+        optIn: sched.enabled === false,
         // Tenant ADF context stays in the confidential file; the child reads it.
         context: scope.kind === 'tenant' ? {} : (adf.context ?? {}),
         deliver_to: sched.deliver_to,

@@ -19,6 +19,8 @@ export interface EnvRegistryValidationEntry {
   enum?: string[];
   required: boolean;
   documented?: boolean;
+  /** Set when the variable is ignored; see EnvRegistryEntry.deprecated. */
+  deprecated?: string;
 }
 
 export interface EnvRegistryEntry extends EnvRegistryValidationEntry {
@@ -27,6 +29,12 @@ export interface EnvRegistryEntry extends EnvRegistryValidationEntry {
   subsystem?: string;
   description: string;
   documented: boolean;
+  /**
+   * Since when the variable is ignored (e.g. "2026-10"). Deprecated entries
+   * stay registered for one release so hosts that still export them get a
+   * warning instead of an unknown-variable error under strict validation.
+   */
+  deprecated?: string;
 }
 
 export interface EnvRegistryFile {
@@ -121,6 +129,14 @@ export function validateEnvAgainstRegistry(
       continue;
     }
     report.checked += 1;
+    if (entry.deprecated) {
+      // Never an error: removing a variable must not break hosts that still set it.
+      report.warnings.push({
+        name: entry.name,
+        issue: `deprecated and ignored since ${entry.deprecated}; unset it`,
+      });
+      continue;
+    }
     if (entry.type === 'boolean' && !BOOLEAN_VALUE_RE.test(value)) {
       addIssue(
         {

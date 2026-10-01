@@ -5,6 +5,8 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
+import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 
 const main = async () => {
   await runActuatorCli({
@@ -26,5 +28,3 @@ export const actuator = defineCatalogBackedActuator({
   handleAction: (input) => handleAction(input as unknown as Parameters<typeof handleAction>[0]),
   actionInput: (op, params) => ({ action: op, params }),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

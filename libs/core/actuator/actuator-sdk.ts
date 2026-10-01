@@ -539,6 +539,13 @@ export function defineActuator<Ops extends Record<string, ActuatorOpDefinition>>
  * their internal operation tables. The compatibility shape is deliberately
  * contained here so pipeline execution never needs a second dispatch path.
  */
+function topLevelFailureError(result: unknown): string | undefined {
+  const error = (result as { error?: unknown }).error;
+  if (typeof error === 'string' && error) return error;
+  if (error instanceof Error && error.message) return error.message;
+  return undefined;
+}
+
 export function defineLegacyPipelineActuator(options: {
   id: string;
   handleAction: LegacyPipelineActionHandler;
@@ -601,6 +608,7 @@ export function defineLegacyPipelineActuator(options: {
             : undefined;
           throw new Error(
             failedEntry?.error ||
+              topLevelFailureError(actionResult) ||
               `Actuator sub-pipeline reported failure for ${options.id}:${input.op}`
           );
         }
@@ -712,6 +720,9 @@ export function defineCatalogBackedActuator(options: {
                 : undefined;
               throw new Error(
                 failed?.error ||
+                  // Single-action handlers (actionInput) report `{ status, error }`
+                  // without a results[] array; keep their message.
+                  topLevelFailureError(result) ||
                   `Actuator sub-pipeline reported failure for ${options.id}:${description.op}`
               );
             }

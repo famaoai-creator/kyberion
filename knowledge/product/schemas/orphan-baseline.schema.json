@@ -5,7 +5,14 @@
   "description": "Known orphans (OW-07) the orphan ratchet tolerates, one reasoned entry each. The list may only shrink.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "libs_core_modules", "scripts", "pipelines", "actuator_ops"],
+  "required": [
+    "version",
+    "libs_core_modules",
+    "scripts",
+    "pipelines",
+    "documented_only",
+    "actuator_ops"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "integer", "minimum": 1 },
@@ -13,6 +20,10 @@
     "libs_core_modules": { "$ref": "#/$defs/entries" },
     "scripts": { "$ref": "#/$defs/entries" },
     "pipelines": { "$ref": "#/$defs/entries" },
+    "documented_only": {
+      "$ref": "#/$defs/entries",
+      "description": "Pipelines only Markdown docs mention (no code, data or schedule invokes them)."
+    },
     "actuator_ops": { "$ref": "#/$defs/entries" }
   },
   "$defs": {
