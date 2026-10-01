@@ -183,7 +183,7 @@
     "@types/express": "^5.0.6",
     "@types/html-to-docx": "^1.8.1",
     "@types/pdf-parse": "^1.1.5",
-    "@types/ws": "^8.18.1",
+    "@types/ws": "^8.18.2",
     "@xmldom/xmldom": "0.9.12",
     "adm-zip": "^0.6.1",
     "ajv": "8.20.0",
@@ -213,7 +213,7 @@
     "pptxgenjs": "^4.0.1",
     "puppeteer": "^25.10.0",
     "tesseract.js": "^7.0.0",
-    "ws": "8.21.3",
+    "ws": "8.22.0",
     "yargs": "^18.1.0",
     "zod": "^4.5.4"
   },
@@ -241,7 +241,7 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.0",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   }
 }
