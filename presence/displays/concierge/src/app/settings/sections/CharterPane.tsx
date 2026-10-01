@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { formatCurrency } from '@agent/core/format';
 import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import {
   DEFAULT_CHARTER_DRAFT,
@@ -141,6 +142,9 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
 
   if (tenants.length === 0) return null;
   const stopped = current ? isManuallyStopped(current) : false;
+  const currency = current?.charter?.money.currency ?? 'JPY';
+  const yen = (value: number) =>
+    formatCurrency(value, { locale, currency, maximumFractionDigits: 0 });
   const onOff = (value: boolean) => (value ? 'on' : 'off');
   const yesNo = [
     { value: 'off', label: t('setup.charter_off_option') },
@@ -218,9 +222,7 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
                   ] as const
                 ).map(([key, spent, limit]) => (
                   <p key={key}>
-                    <span>
-                      {t(key, { spent: spent.toLocaleString(), limit: limit.toLocaleString() })}
-                    </span>{' '}
+                    <span>{t(key, { spent: yen(spent), limit: yen(limit) })}</span>{' '}
                     <progress max={100} value={usagePercent(spent, limit)} />
                   </p>
                 ))}
