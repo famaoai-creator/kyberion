@@ -318,6 +318,7 @@ export type VocabularyKey =
   | 'bridge:thread_assistant'
   | 'bridge:thread_context'
   | 'bridge:thread_user'
+  | 'bridge:work_request_not_authorized'
   | 'brief_title'
   | 'browser_label'
   | 'browser_task_hint'
@@ -9325,4 +9326,5 @@ export type VocabularyKey =
   | 'voice_state_thinking'
   | 'why_human_label'
   | 'work_page_title'
+  | 'work_request_not_authorized'
   | 'you';
