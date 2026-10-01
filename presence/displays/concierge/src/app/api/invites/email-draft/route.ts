@@ -5,6 +5,7 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { createInviteEmailDraft } from '../../../../lib/invite-email';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
-    const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
+    const locale = resolveConciergeLocale(req.nextUrl.searchParams.get('locale') || undefined);
     const result = await withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation(() =>
         createInviteEmailDraft(resolved.context, parsedBody.body ?? {}, req.nextUrl.origin, locale)
