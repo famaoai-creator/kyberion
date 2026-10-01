@@ -1,7 +1,7 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { withOrganizationContext } from './organization-context.js';
 
 describe('organization-context', () => {
@@ -15,7 +15,7 @@ describe('organization-context', () => {
     else process.env.KYBERION_CUSTOMER = originalCustomer;
     if (originalOrganization === undefined) delete process.env.KYBERION_ORGANIZATION_ID;
     else process.env.KYBERION_ORGANIZATION_ID = originalOrganization;
-    fs.rmSync(overlayDir, { recursive: true, force: true });
+    safeRmSync(overlayDir, { recursive: true, force: true });
   });
 
   it('sets KYBERION_ORGANIZATION_ID without switching stance when no customer overlay exists', () => {
@@ -36,7 +36,7 @@ describe('organization-context', () => {
 
   it('switches KYBERION_CUSTOMER only when customer/{slug}/ exists', () => {
     process.env.KYBERION_CUSTOMER = 'baseline';
-    fs.mkdirSync(overlayDir, { recursive: true });
+    safeMkdir(overlayDir, { recursive: true });
 
     const observed = withOrganizationContext(overlaySlug, () => ({
       customer: process.env.KYBERION_CUSTOMER,
