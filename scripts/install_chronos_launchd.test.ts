@@ -4,8 +4,11 @@ import {
   buildChronosLaunchdPlist,
   chronosLaunchAgentTargetPath,
   CHRONOS_LAUNCHD_LABEL,
+  launchAgentTargetPath,
+  LAUNCHD_DAEMON_SPECS,
   main,
   resolveForwardedChronosEnv,
+  resolveStableNodePath,
 } from './install_chronos_launchd.js';
 
 // LC-01d: plist generation is a pure string function — pin its load-bearing
@@ -125,5 +128,81 @@ describe('install_chronos_launchd plist generation', () => {
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('Uninstall steps (dry-run: nothing was changed)');
     expect(output[0]).toContain('pnpm kyberion chronos uninstall --apply');
+  });
+});
+
+// The original agent died permanently when `brew upgrade node` removed the
+// Cellar path baked into ProgramArguments (spawn failed → penalty box). The
+// installer must pin the version-independent opt symlink instead.
+describe('resolveStableNodePath', () => {
+  it('maps a Homebrew Cellar node path to the opt symlink when it exists', () => {
+    const exists = (p: string) => p === '/opt/homebrew/opt/node/bin/node';
+    expect(resolveStableNodePath('/opt/homebrew/Cellar/node/26.10.0_1/bin/node', exists)).toBe(
+      '/opt/homebrew/opt/node/bin/node'
+    );
+  });
+
+  it('keeps the Intel Homebrew prefix layout working', () => {
+    const exists = (p: string) => p === '/usr/local/opt/node/bin/node';
+    expect(resolveStableNodePath('/usr/local/Cellar/node/24.0.0/bin/node', exists)).toBe(
+      '/usr/local/opt/node/bin/node'
+    );
+  });
+
+  it('falls back to the exec path when the opt symlink is absent', () => {
+    const execPath = '/opt/homebrew/Cellar/node/26.10.0_1/bin/node';
+    expect(resolveStableNodePath(execPath, () => false)).toBe(execPath);
+  });
+
+  it('leaves non-Cellar node paths (nvm, pkg installer) unchanged', () => {
+    const exists = vi.fn(() => true);
+    expect(resolveStableNodePath('/Users/alice/.nvm/versions/node/v22.1.0/bin/node', exists)).toBe(
+      '/Users/alice/.nvm/versions/node/v22.1.0/bin/node'
+    );
+    expect(exists).not.toHaveBeenCalled();
+  });
+});
+
+describe('install_chronos_launchd --daemon', () => {
+  it('registers the generation schedule daemon with heartbeat and log names', () => {
+    const spec = LAUNCHD_DAEMON_SPECS['generation-schedule'];
+    expect(spec.label).toBe('com.kyberion.generation-schedule');
+    expect(spec.daemonScript).toBe('dist/scripts/run_generation_schedule_daemon.js');
+    expect(spec.verificationHint).toContain('generation-schedule-daemon.json');
+  });
+
+  it('generates an interval (not KeepAlive) agent for the watchdog', async () => {
+    const output: string[] = [];
+    await main(['--daemon', 'daemon-watchdog'], (value) => output.push(String(value)));
+
+    expect(output).toHaveLength(1);
+    expect(output[0]).toContain('com.kyberion.daemon-watchdog');
+    expect(output[0]).toContain('dist/scripts/daemon_watchdog.js');
+    expect(output[0]).toContain('<key>StartInterval</key>');
+    // A one-shot checker must not be kept resident by launchd.
+    expect(output[0]).not.toContain('<key>KeepAlive</key>');
+  });
+
+  it('generates a plist for a non-chronos daemon via --daemon', async () => {
+    const output: string[] = [];
+    await main(['--daemon', 'generation-schedule'], (value) => output.push(String(value)));
+
+    expect(output).toHaveLength(1);
+    expect(output[0]).toContain('com.kyberion.generation-schedule');
+    expect(output[0]).toContain('dist/scripts/run_generation_schedule_daemon.js');
+    expect(output[0]).toContain('kyberion-generation-schedule.err.log');
+    expect(output[0]).not.toContain('chronos_daemon.js');
+  });
+
+  it('rejects an unknown daemon id before touching the filesystem', async () => {
+    await expect(main(['--daemon', 'bogus'], () => {})).rejects.toThrow(
+      /unknown daemon 'bogus'.*chronos.*generation-schedule/
+    );
+  });
+
+  it('derives the LaunchAgent path from the spec label', () => {
+    expect(launchAgentTargetPath('com.kyberion.generation-schedule', '/Users/alice')).toBe(
+      '/Users/alice/Library/LaunchAgents/com.kyberion.generation-schedule.plist'
+    );
   });
 });
