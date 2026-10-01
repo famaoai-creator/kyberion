@@ -69,7 +69,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 | **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                       |
 | **Stance**         | `customer/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
 
-Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
+New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 concepts you need first. Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
 
 ---
 
@@ -79,7 +79,7 @@ Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-
 
 Kyberion's first visible result comes in three short steps:
 
-- 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
+- 30 seconds: run `pnpm kyberion doctor` and see Kyberion's readiness/value boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
@@ -96,7 +96,7 @@ cd kyberion
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
@@ -225,7 +225,9 @@ The **Capture desk** is one **127.0.0.1-only** server for the eight capture pads
   </tr>
 </table>
 
-Start any of them the same way and open the printed URL:
+The `:81xx` ports above are the **legacy standalone** ports (used only when you start a single pad directly, see below). `pnpm pads` serves every pad from one server on `http://127.0.0.1:8160/`.
+
+Start the Capture desk and open the printed URL:
 
 ```bash
 KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> pnpm pads

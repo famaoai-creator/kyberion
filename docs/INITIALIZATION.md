@@ -16,11 +16,11 @@ first-win をまだ実行していない場合は、先に QUICKSTART.md の 5 �
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-Kyberion の readiness check は `pnpm run doctor` です。`pnpm build` の後なら、上の `pnpm doctor` はリポジトリのスクリプトを実行します。`run` を付けない素の `pnpm doctor` は、ビルド前の文脈では pnpm 自身の診断になります。
+Kyberion の readiness check は `pnpm kyberion doctor` です(`pnpm run doctor` でも同じ)。`run` / `kyberion` を付けない素の `pnpm doctor` は pnpm 組み込みの診断(registry/cache)で、Kyberion のチェックは実行されません。
 
 first-win の後は、標準フローの順に次を進めます。
 

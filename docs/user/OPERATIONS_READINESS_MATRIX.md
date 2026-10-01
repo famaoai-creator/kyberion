@@ -20,7 +20,7 @@ your local environment, credentials, or host permissions.
 | Customer overlays                                        | Ready                 | Create, inspect, switch, and migrate customer workspaces.                                                                                                                                                                                           |
 | Toolchain preflight                                      | Ready                 | Run `pnpm env:bootstrap --manifest kyberion-toolchain` before you build from source.                                                                                                                                                                |
 | Onboarding                                               | Ready                 | Run `pnpm onboard`, then register the tenant, bind organization context, complete activation probes, and obtain human acceptance before tenant-bound first work. See [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md). |
-| Health checks                                            | Ready                 | Run `pnpm doctor` to see what is missing before you start.                                                                                                                                                                                          |
+| Health checks                                            | Ready                 | Run `pnpm kyberion doctor` to see what is missing before you start.                                                                                                                                                                                 |
 | Consolidated readiness                                   | Ready                 | Run `pnpm kyberion setup report` for surfaces, services, reasoning, and doctor together.                                                                                                                                                            |
 | Mission lifecycle                                        | Ready                 | Core mission flows are in place and usable.                                                                                                                                                                                                         |
 | Governance checks                                        | Ready                 | Validation and policy checks are part of normal operation.                                                                                                                                                                                          |
@@ -37,7 +37,7 @@ your local environment, credentials, or host permissions.
 1. Run `pnpm pipeline --input pipelines/baseline-check.json`.
 2. Run `pnpm env:bootstrap --manifest kyberion-toolchain`.
 3. Run `pnpm kyberion setup report`.
-4. Run `pnpm doctor`.
+4. Run `pnpm kyberion doctor`.
 5. Run `pnpm customer:list` if you use customer overlays.
 6. Activate the stance you want with `pnpm customer:switch <slug>`.
 7. For tenant-bound work, follow the activation gate in [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md).

@@ -12,7 +12,7 @@ describe('Good first issue guidance contract', () => {
   it('keeps the issue template pointing at the starter-task guide', () => {
     const template = read('.github/ISSUE_TEMPLATE/good-first-issue-guide.md');
     expect(template).toContain('docs/developer/GOOD_FIRST_ISSUES.md');
-    expect(template).toContain('Add a troubleshooting note for `pnpm doctor`');
+    expect(template).toContain('Add a troubleshooting note for `pnpm kyberion doctor`');
     expect(template).toContain('Reword one release workflow step');
     expect(template).toContain('Estimated time: 1-2 hours');
     expect(template).toContain('Files expected:');

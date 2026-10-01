@@ -13,7 +13,7 @@ pnpm kyberion setup report --persona first-time-user
 If you want the lower-level gate instead, run:
 
 ```bash
-pnpm doctor
+pnpm kyberion doctor
 ```
 
 ## 2. Surface problems
@@ -41,7 +41,7 @@ Useful logs:
 If `pnpm pipeline --input pipelines/verify-session.json` fails with browser permission or launch errors:
 
 1. Re-run `pnpm kyberion setup report --persona first-time-user`.
-2. Run `pnpm doctor --runtime browser` to check the browser/Playwright preflight.
+2. Run `pnpm kyberion doctor --runtime browser` to check the browser/Playwright preflight.
 3. Confirm the browser surface is healthy with `pnpm surfaces status`.
 4. Repair the tracked surface if it is stale: `pnpm surfaces repair -- --surface <surface-id>`.
 5. Retry the first-win smoke.

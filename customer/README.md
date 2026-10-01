@@ -97,7 +97,7 @@ source active/shared/runtime/customer.env
 
 # 4. Run Kyberion as usual
 pnpm onboard
-pnpm doctor
+pnpm kyberion doctor
 ```
 
 When `KYBERION_CUSTOMER` is set, Kyberion overlays `customer/{slug}/` on top of `knowledge/personal/`. Files in the customer dir take precedence; missing files fall back to `knowledge/personal/`.

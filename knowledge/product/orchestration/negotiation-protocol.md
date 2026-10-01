@@ -49,13 +49,13 @@ mission-state.json 内に `negotiation` ブロックを追加し、以下を **�
 
 ## 3. フェーズ
 
-| Phase                | 目的                                                                      | 使うプロトコル                                                                                         |
-| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| P1. Preparation      | 上記フィールドを全て埋める。相手情報は relationship-graph から引く。      | [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md)       |
-| P2. Rehearsal        | 相手役ペルソナとロールプレイ。想定外反論を 1 周する。                     | [rehearsal-protocol.md](knowledge/product/orchestration/rehearsal-protocol.md)                         |
-| P3. Nemawashi (任意) | 正式交渉前の個別擦り合わせ。                                              | [stakeholder-consensus-protocol.md](knowledge/product/orchestration/stakeholder-consensus-protocol.md) |
-| P4. Session          | 実際の交渉。coaching surface が並走。                                     | [real-time-coaching-protocol.md](knowledge/product/orchestration/real-time-coaching-protocol.md)       |
-| P5. Debrief          | 結果を relationship-graph に反映。譲った項目と理由を dissent-log に保存。 | relationship-graph-protocol.md + dissent-log                                                           |
+| Phase                | 目的                                                                      | 使うプロトコル                                                         |
+| -------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| P1. Preparation      | 上記フィールドを全て埋める。相手情報は relationship-graph から引く。      | [relationship-graph-protocol.md](relationship-graph-protocol.md)       |
+| P2. Rehearsal        | 相手役ペルソナとロールプレイ。想定外反論を 1 周する。                     | [rehearsal-protocol.md](rehearsal-protocol.md)                         |
+| P3. Nemawashi (任意) | 正式交渉前の個別擦り合わせ。                                              | [stakeholder-consensus-protocol.md](stakeholder-consensus-protocol.md) |
+| P4. Session          | 実際の交渉。coaching surface が並走。                                     | [real-time-coaching-protocol.md](real-time-coaching-protocol.md)       |
+| P5. Debrief          | 結果を relationship-graph に反映。譲った項目と理由を dissent-log に保存。 | relationship-graph-protocol.md + dissent-log                           |
 
 ## 4. 自律性の境界
 
@@ -70,9 +70,9 @@ mission-state.json 内に `negotiation` ブロックを追加し、以下を **�
 
 ## 6. 関連
 
-- 契約技法: [standards/contract/negotiation_guardrails.md](knowledge/public/standards/contract/negotiation_guardrails.md)
-- ステークホルダー管理: [pmo/standard/stakeholder_management.md](knowledge/public/pmo/standard/stakeholder_management.md)
-- 人格: `Strategic Deal-Maker` ([personalities/matrix.md](knowledge/product/personalities/matrix.md#8))
+- 契約技法: [standards/contract/negotiation_guardrails.md](../../public/standards/contract/negotiation_guardrails.md)
+- ステークホルダー管理: [pmo/standard/stakeholder_management.md](../../public/pmo/standard/stakeholder_management.md)
+- 人格: `Strategic Deal-Maker` ([personalities/matrix.md](../personalities/matrix.md#8))
 
 ---
 

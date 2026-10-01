@@ -35,7 +35,7 @@ mixing state.
 | 3   | Inspect engagement readiness    | `pnpm customer:list`                                                                                     | Shows which overlays exist and which required files are missing |
 | 4   | Activate a customer             | `pnpm customer:switch <slug>`                                                                            | Writes `active/shared/runtime/customer.env` for a ready overlay |
 | 5   | Boot the engagement             | `pnpm onboard`                                                                                           | Creates or updates customer-scoped onboarding state             |
-| 6   | Check the environment           | `pnpm doctor`                                                                                            | Summarizes must / should / nice readiness signals               |
+| 6   | Check the environment           | `pnpm kyberion doctor`                                                                                   | Summarizes must / should / nice readiness signals               |
 | 7   | Fill customer-specific setup    | Edit `customer/<slug>/identity.json`, `vision.md`, `connections/`, `policy/`, `voice/`, `mission-seeds/` | Customer-specific config overrides the personal fallback        |
 | 8   | Run customer work               | Use the normal Kyberion commands and workflows                                                           | Operations resolve against the active customer overlay          |
 | 9   | Move to another customer        | Switch to another slug and repeat the checks                                                             | Customer state stays isolated between engagements               |

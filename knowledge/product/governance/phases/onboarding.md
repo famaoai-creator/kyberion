@@ -32,7 +32,7 @@ pnpm pipeline --input pipelines/baseline-check.json
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain   # dist/ を使うので build の後
-pnpm doctor
+pnpm kyberion doctor
 pnpm kyberion setup report --persona first-time-user
 pnpm kyberion secret introduce <service-id> <secret-key>   # 必要な secret だけ。値は argv に載せない
 pnpm surfaces reconcile

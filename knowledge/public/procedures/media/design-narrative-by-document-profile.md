@@ -22,16 +22,16 @@ The generation boundary is:
 
 Reference:
 
-- [media-document-generation-boundary.md](/Users/famao/kyberion/knowledge/product/architecture/media-document-generation-boundary.md)
+- [media-document-generation-boundary.md](../../../product/architecture/media-document-generation-boundary.md)
 
 The preset catalog is stored as directory-scanned knowledge packs at:
 
-- [media-design-systems](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/media-design-systems/defaults.json)
-- [document-composition-presets](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/document-composition-presets/defaults.json)
-- [slide-layout-presets](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/slide-layout-presets/defaults.json)
-- [semantic-render-tokens](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/semantic-render-tokens/defaults.json)
-- [artifact-library](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/artifact-library/project-mgmt-high-fidelity.json)
-- [design-md-catalog](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/design-md-catalog/README.md)
+- [media-design-systems](../../design-patterns/media-templates/media-design-systems/defaults.json)
+- [document-composition-presets](../../design-patterns/media-templates/document-composition-presets/defaults.json)
+- [slide-layout-presets](../../design-patterns/media-templates/slide-layout-presets/defaults.json)
+- [semantic-render-tokens](../../design-patterns/media-templates/semantic-render-tokens/defaults.json)
+- [artifact-library](../../design-patterns/media-templates/artifact-library/project-mgmt-high-fidelity.json)
+- [design-md-catalog](../../design-patterns/media-templates/design-md-catalog/README.md)
 
 `document-composition-presets` contains the curated default profiles for common Kyberion flows.
 
@@ -39,7 +39,7 @@ The preset catalog is stored as directory-scanned knowledge packs at:
 
 `design-md-catalog` contains imported DESIGN.md-derived design systems. These are reference visual systems that can be selected explicitly with `design_system_id`, and they resolve through the same `theme -> design_system -> semantic/layout override` path as native Kyberion systems. When no explicit imported system is selected, Kyberion may still emit `design_recommendations` based on the brief semantics.
 
-For the current theme / design-system split and the relation between `themes.json`, imported reference systems such as `designmd-claude`, and source-deck extraction, see [theme-and-design-system-reference.md](/Users/famao/kyberion/knowledge/public/procedures/media/theme-and-design-system-reference.md).
+For the current theme / design-system split and the relation between `themes.json`, imported reference systems such as `designmd-claude`, and source-deck extraction, see [theme-and-design-system-reference.md](theme-and-design-system-reference.md).
 
 ## Current Profiles
 

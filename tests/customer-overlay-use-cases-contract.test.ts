@@ -25,7 +25,7 @@ describe('Customer overlay use cases contract', () => {
     expect(doc).toContain('pnpm customer:list');
     expect(doc).toContain('pnpm customer:switch <slug>');
     expect(doc).toContain('pnpm onboard');
-    expect(doc).toContain('pnpm doctor');
+    expect(doc).toContain('pnpm kyberion doctor');
     expect(doc).toContain('Unset `KYBERION_CUSTOMER`');
     expect(readme).toContain('customer-overlay-use-cases.md');
     expect(customerReadme).toContain('customer.json / identity.json / vision.md files are present');

@@ -109,16 +109,16 @@ Knowledge and Memory are related, but they serve different purposes:
 
 ## Where Each Core Concept Belongs
 
-| Concept | Primary Layer | Secondary Role |
-| --- | --- | --- |
-| Sovereign Request | Intent | - |
-| Operator Interaction Packet | Intent | contact surface with Control |
-| Mission | Control | leaves history in Memory |
-| Project Operating System | Control | consumes Knowledge blueprints |
-| ADF | Knowledge | bridge into Execution |
-| Actuator | Execution | - |
-| Delivery Pack | Execution | handoff into Memory |
-| Distilled Wisdom | Memory | may later be promoted into Knowledge |
+| Concept                     | Primary Layer | Secondary Role                       |
+| --------------------------- | ------------- | ------------------------------------ |
+| Sovereign Request           | Intent        | -                                    |
+| Operator Interaction Packet | Intent        | contact surface with Control         |
+| Mission                     | Control       | leaves history in Memory             |
+| Project Operating System    | Control       | consumes Knowledge blueprints        |
+| ADF                         | Knowledge     | bridge into Execution                |
+| Actuator                    | Execution     | -                                    |
+| Delivery Pack               | Execution     | handoff into Memory                  |
+| Distilled Wisdom            | Memory        | may later be promoted into Knowledge |
 
 ## Boundary Rules
 
@@ -167,36 +167,36 @@ Internally, the system may still use:
 
 The recommended path for understanding the overall model is:
 
-1. [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
-2. [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
-3. [`docs/COMPONENT_MAP.md`](docs/COMPONENT_MAP.md)
+1. [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md)
+2. [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+3. [`docs/COMPONENT_MAP.md`](../../../docs/COMPONENT_MAP.md)
 4. [`llm-execution-boundary.md`](llm-execution-boundary.md)
-5. [`project-operating-system.md`](knowledge/product/orchestration/project-operating-system.md)
+5. [`project-operating-system.md`](../orchestration/project-operating-system.md)
 
 ## Cross-Cutting: The Intent Loop
 
-The five layers above describe *where concepts live*. A second, orthogonal view
-— the **intent loop** — describes *how intent moves through the system*:
+The five layers above describe _where concepts live_. A second, orthogonal view
+— the **intent loop** — describes _how intent moves through the system_:
 
 ```
 receive → clarify → preserve → execute → verify → learn
 ```
 
-See [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md) for the
+See [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md) for the
 full definition. The loop is the one non-replaceable primitive: reasoning
 models, CLI hosts, actuator implementations, and schema names are all
 replaceable, but the loop closure is not.
 
 Mapping loop stages onto the five layers:
 
-| Loop Stage | Primary Layer(s) | Example Artifacts |
-|---|---|---|
-| receive | Intent | request, operator interaction packet |
-| clarify | Intent → Control | clarification packet, classification record, hypothesis tree |
-| preserve | Control + Knowledge | mission state, execution brief, negotiation state, relationship graph |
-| execute | Execution | pipeline run, actuator invocation, decision-ops call |
-| verify | Control | review gate verdict, intent-drift gate, golden scenario evaluation |
-| learn | Memory → Knowledge | distillation, run report, heuristic entry, hardening backlog |
+| Loop Stage | Primary Layer(s)    | Example Artifacts                                                     |
+| ---------- | ------------------- | --------------------------------------------------------------------- |
+| receive    | Intent              | request, operator interaction packet                                  |
+| clarify    | Intent → Control    | clarification packet, classification record, hypothesis tree          |
+| preserve   | Control + Knowledge | mission state, execution brief, negotiation state, relationship graph |
+| execute    | Execution           | pipeline run, actuator invocation, decision-ops call                  |
+| verify     | Control             | review gate verdict, intent-drift gate, golden scenario evaluation    |
+| learn      | Memory → Knowledge  | distillation, run report, heuristic entry, hardening backlog          |
 
 Intent drift at any stage is a loop failure — mechanisms such as classification
 preflight, review gates, execution receipts, and `INTENT_DRIFT` are the detail
