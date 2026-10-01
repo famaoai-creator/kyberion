@@ -888,6 +888,19 @@ function assertNotShellScriptInvocation(command: string, args: readonly string[]
 }
 
 /**
+ * The exec-policy gate shared by every governed spawn: rejects shell-script
+ * invocations, sensitive command text and policy-denied `execute_command`.
+ * Exported for supervised long-running spawns (managed-process callers
+ * with inherited stdio) that cannot go through `safeExecResult*` but must not
+ * bypass the same checks; pair it with `buildSafeExecEnv()` for the child env.
+ */
+export function assertGovernedExec(command: string, args: readonly string[] = []): void {
+  assertNotShellScriptInvocation(command, args);
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
+  assertExecPolicy(command);
+}
+
+/**
  * Execute a command safely and return the full result (stdout, stderr, exit code).
  * Unlike safeExec, this does NOT throw on non-zero exit codes.
  */

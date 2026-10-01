@@ -270,14 +270,14 @@ The simulation is now backed by first-class surface intents:
 
 Two schemas anchor the learning layer:
 
-- [`operator-profile.schema.json`](knowledge/product/schemas/operator-profile.schema.json)
-- [`operator-request-log.schema.json`](knowledge/product/schemas/operator-request-log.schema.json)
-- [`operator-learning-scenario-pack.json`](knowledge/product/governance/operator-learning-scenario-pack.json)
-- [`operator-learning-dispatch-registry.json`](knowledge/product/governance/operator-learning-dispatch-registry.json)
+- [`operator-profile.schema.json`](../schemas/operator-profile.schema.json)
+- [`operator-request-log.schema.json`](../schemas/operator-request-log.schema.json)
+- [`operator-learning-scenario-pack.json`](../governance/operator-learning-scenario-pack.json)
+- [`operator-learning-dispatch-registry.json`](../governance/operator-learning-dispatch-registry.json)
 
 The runtime helper is:
 
-- [`operator-learning.ts`](/Users/famao/kyberion/libs/core/surface/operator-learning.ts)
+- [`operator-learning.ts`](../../../libs/core/surface/operator-learning.ts)
 
 It validates profile and request-log records, can create an
 `operator-request-log` from an `intent_resolution_packet`, builds an

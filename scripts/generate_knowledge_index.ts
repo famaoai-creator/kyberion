@@ -347,6 +347,7 @@ export function selectKnowledgeIndexOutputs(
 
 export const runGenerateKnowledgeIndex = defineGenerator({
   id: 'knowledge-index',
+  flags: ['--manifest-only'],
   outputs: [KNOWLEDGE_MANIFEST_PATH, KNOWLEDGE_INDEX_PATH],
   executionContext: 'ecosystem_architect',
   normalize: (content) => normalizeIndex(content),

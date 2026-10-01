@@ -1,13 +1,16 @@
 # Procedure: Generate a Diagram From Document Brief
 
 ## 1. Goal
+
 Generate Mermaid, D2, or Draw.io artifacts from the canonical `document-brief` contract.
 
 ## 2. Dependencies
+
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 
 ## 3. Principle
+
 Separate the diagram into:
 
 - canonical document contract: `document-brief`
@@ -18,6 +21,7 @@ Separate the diagram into:
 - visual selection: `layout_template_id`
 
 ## 4. Step-by-Step Instructions
+
 1. Prepare a `document-brief` JSON file.
 2. Set:
    - `artifact_family: diagram`
@@ -33,6 +37,7 @@ Separate the diagram into:
    - `document_diagram_render_from_brief` remains available as a compatibility adapter for direct `brief -> file` flows
 
 ## 5. Examples
-- [`document-brief-mermaid-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json)
-- [`document-brief-d2-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-d2-diagram.json)
-- [`document-brief-drawio-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-drawio-diagram.json)
+
+- [`document-brief-mermaid-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json)
+- [`document-brief-d2-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-d2-diagram.json)
+- [`document-brief-drawio-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-drawio-diagram.json)

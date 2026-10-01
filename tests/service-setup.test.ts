@@ -175,7 +175,7 @@ describe('services_setup', () => {
       connection: 'missing',
     });
     expect(result.rows[1].nextAction?.suggested_command).toBe(
-      'pnpm onboard -- --services-only --service github'
+      'pnpm onboarding -- --services-only --service github'
     );
   });
 });

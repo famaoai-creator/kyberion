@@ -64,7 +64,7 @@ Tier 0 is the first-win path. This document is about wiring tier 0.
 - [ ] **`presence-studio` voice-hello route** — the browser frontend that uses Web Speech API for input.
 - [ ] **`voice-hub` topic** — `voice-hello.user-spoke` for the bridge between surface and pipeline.
 - [ ] **`wait_for` op** in pipeline-engine that suspends the pipeline until a topic is published or a fallback fires.
-- [ ] **`pnpm doctor` integration** — surface tier-0 voice readiness as a "must" check.
+- [ ] **`pnpm kyberion doctor` integration** — surface tier-0 voice readiness as a "must" check.
 
 These are the concrete next tasks for Phase A-5 to land end-to-end. Each is small (~30 min – 2 hr) but they cross multiple components, so they're listed here as the punchlist.
 

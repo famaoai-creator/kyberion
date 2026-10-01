@@ -30,7 +30,7 @@ are more useful than a long description of a suspected cause.
 ## The five-minute first contribution
 
 1. Read [`docs/QUICKSTART.md`](./QUICKSTART.md) and [`CONTRIBUTING.md`](../CONTRIBUTING.md).
-2. Run `pnpm install`, `pnpm build`, and `pnpm doctor`.
+2. Run `pnpm install`, `pnpm build`, and `pnpm kyberion doctor`.
 3. Choose one small issue and state the intended acceptance condition before coding.
 4. Make one focused change and run the narrowest relevant test immediately.
 5. Open a pull request with the change, evidence, and any remaining limitation.

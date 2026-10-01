@@ -721,7 +721,7 @@ function drawOnboardingHome() {
   );
 
   const recommendedNextAction = !onboardingComplete
-    ? 'Run `pnpm onboard` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
+    ? 'Run `pnpm onboarding` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
     : blockedServices.length > 0
       ? `Review ${blockedServices.join(', ')} connection drafts.`
       : tenantEntries.length === 0

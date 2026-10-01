@@ -56,9 +56,9 @@ knowledge/confidential/relationships/
 
 ## 4. 利用先
 
-- [negotiation-protocol.md](knowledge/product/orchestration/negotiation-protocol.md) — BATNA 推定と stakeholder map 生成
-- [stakeholder-consensus-protocol.md](knowledge/product/orchestration/stakeholder-consensus-protocol.md) — 根回し順序の最適化
-- [rehearsal-protocol.md](knowledge/product/orchestration/rehearsal-protocol.md) — 相手役ペルソナ生成
+- [negotiation-protocol.md](negotiation-protocol.md) — BATNA 推定と stakeholder map 生成
+- [stakeholder-consensus-protocol.md](stakeholder-consensus-protocol.md) — 根回し順序の最適化
+- [rehearsal-protocol.md](rehearsal-protocol.md) — 相手役ペルソナ生成
 
 ## 5. セキュリティ
 
