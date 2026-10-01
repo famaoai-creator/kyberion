@@ -4186,6 +4186,30 @@
       "documented": true
     },
     {
+      "name": "KYBERION_WEB_PUSH_PRIVATE_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_WEB_PUSH_PUBLIC_KEY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "VAPID public key for Web Push (the pair of KYBERION_WEB_PUSH_PRIVATE_KEY). Shared with browsers when a device subscribes.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_WEB_PUSH_SUBJECT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "VAPID contact for Web Push: a `mailto:` address or an `https://` URL the push services can reach the operator at.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_WIN_POINTER",
       "category": "runtime",
       "type": "string",
