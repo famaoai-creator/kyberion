@@ -41,9 +41,10 @@ describe('in-meeting selectors', () => {
   });
 
   it('resolves tables per platform with a Meet default', () => {
-    expect(inMeetingSelectorsForPlatform('zoom')).toBe(ZOOM_IN_MEETING_SELECTORS);
-    expect(inMeetingSelectorsForPlatform('teams')).toBe(TEAMS_IN_MEETING_SELECTORS);
-    expect(inMeetingSelectorsForPlatform('meet')).toBe(MEET_IN_MEETING_SELECTORS);
-    expect(inMeetingSelectorsForPlatform('auto')).toBe(MEET_IN_MEETING_SELECTORS);
+    expect(inMeetingSelectorsForPlatform('zoom')).toEqual({ ...ZOOM_IN_MEETING_SELECTORS });
+    expect(inMeetingSelectorsForPlatform('teams')).toEqual({ ...TEAMS_IN_MEETING_SELECTORS });
+    expect(inMeetingSelectorsForPlatform('meet')).toEqual({ ...MEET_IN_MEETING_SELECTORS });
+    expect(inMeetingSelectorsForPlatform('auto')).toEqual({ ...MEET_IN_MEETING_SELECTORS });
+    expect(inMeetingSelectorsForPlatform('auto')).toBe(inMeetingSelectorsForPlatform('meet'));
   });
 });

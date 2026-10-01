@@ -40,24 +40,46 @@ export function resetAcpToolActuatorResolverCache(): void {
 }
 
 /**
- * Resolve every actuator an ACP tool-call title refers to. Legacy keywords use
- * substring matching (unchanged); manifest-derived actuators match when the
- * actuator stem (`terminal` for `terminal-actuator`) appears as whole word(s) in
- * the title. An empty result means the tool is unknown.
+ * The tool *name* portion of an ACP tool-call title: the leading token before
+ * the first whitespace or colon (`terminal spawn` → `terminal`,
+ * `cat libs/core/agent/x.ts` → `cat`). Free-text arguments after it are never
+ * used for manifest-derived actuator matching.
  */
-export function resolveAcpToolActuators(title: string): string[] {
+export function acpToolNameFromTitle(title: string): string {
+  const trimmed = title.trim().toLowerCase();
+  const match = /^[^\s:]+/u.exec(trimmed);
+  return match ? match[0] : '';
+}
+
+function normalizeToolName(name: string): string {
+  const parts = name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter(Boolean);
+  return parts.length > 0 ? `-${parts.join('-')}-` : '';
+}
+
+/**
+ * Resolve every actuator an ACP tool call refers to. Legacy keywords use
+ * substring matching on the whole title (unchanged); manifest-derived
+ * actuators match only when the actuator stem (`terminal` for
+ * `terminal-actuator`) appears as whole word(s) in the tool name — the ACP
+ * `toolCall.kind` when supplied, or the title's leading tool-name token — so
+ * paths or arguments (`cat libs/core/agent/x.ts`) never select an actuator.
+ * An empty result means the tool is unknown.
+ */
+export function resolveAcpToolActuators(title: string, kind?: string | null): string[] {
   const lower = title.toLowerCase();
   const found = new Set<string>();
   for (const [keyword, actuator] of LEGACY_KEYWORD_ACTUATORS) {
     if (lower.includes(keyword)) found.add(actuator);
   }
-  const normalized = `-${lower
-    .split(/[^a-z0-9]+/u)
-    .filter(Boolean)
-    .join('-')}-`;
+  const toolNames = [acpToolNameFromTitle(title), typeof kind === 'string' ? kind : '']
+    .map(normalizeToolName)
+    .filter(Boolean);
   for (const id of listManifestActuatorIds()) {
     const stem = id.replace(/-actuator$/u, '');
-    if (normalized.includes(`-${stem}-`)) found.add(id);
+    if (toolNames.some((name) => name.includes(`-${stem}-`))) found.add(id);
   }
   return [...found];
 }
@@ -96,9 +118,10 @@ export interface AcpManifestToolVerdict {
  */
 export function evaluateAcpManifestToolPolicy(
   manifest: AgentManifest,
-  title: string
+  title: string,
+  kind?: string | null
 ): AcpManifestToolVerdict {
-  const actuators = resolveAcpToolActuators(title);
+  const actuators = resolveAcpToolActuators(title, kind);
   const restricted = manifest.allowedActuators.length > 0 || manifest.deniedActuators.length > 0;
   if (actuators.length === 0 && restricted && !isReadOnlyWord(title)) {
     return {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentManifest } from '../agent/agent-manifest.js';
 import {
+  acpToolNameFromTitle,
   evaluateAcpManifestToolPolicy,
   resolveAcpToolActuators,
 } from './acp-tool-actuator-resolver.js';
@@ -43,5 +44,40 @@ describe('acp-tool-actuator-resolver', () => {
     const m = manifest({ allowedActuators: ['file-actuator'] });
     expect(evaluateAcpManifestToolPolicy(m, 'read_file').allowed).toBe(true);
     expect(evaluateAcpManifestToolPolicy(m, 'run_shell_command').allowed).toBe(false);
+  });
+
+  it('matches manifest stems only against the tool name, not free-text arguments (B1)', () => {
+    const fileOnly = manifest({ allowedActuators: ['file-actuator'] });
+    expect(resolveAcpToolActuators('cat libs/core/agent/x.ts')).not.toContain('agent-actuator');
+    expect(evaluateAcpManifestToolPolicy(fileOnly, 'cat libs/core/agent/x.ts').allowed).toBe(true);
+
+    const workerDeny = manifest({
+      deniedActuators: [
+        'system-actuator',
+        'process-actuator',
+        'terminal-actuator',
+        'secret-actuator',
+        'browser-actuator',
+        'network-actuator',
+      ],
+    });
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'read system config').allowed).toBe(true);
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'git status libs/core/process').allowed).toBe(
+      true
+    );
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'terminal spawn').allowed).toBe(false);
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'secret: get api key').allowed).toBe(false);
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'Spawning shell', 'terminal').allowed).toBe(
+      false
+    );
+    expect(evaluateAcpManifestToolPolicy(workerDeny, 'Fetching value', 'secret_get').allowed).toBe(
+      false
+    );
+  });
+
+  it('extracts the leading tool-name token', () => {
+    expect(acpToolNameFromTitle('  Terminal: spawn bash')).toBe('terminal');
+    expect(acpToolNameFromTitle('cat libs/core/agent/x.ts')).toBe('cat');
+    expect(acpToolNameFromTitle('')).toBe('');
   });
 });

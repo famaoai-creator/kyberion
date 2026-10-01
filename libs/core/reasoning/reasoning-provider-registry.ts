@@ -32,6 +32,10 @@ import { pathResolver } from '../path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from '../registry-directory.js';
 import { assertModuleInvariant } from '../invariants.js';
 import { isRecord } from '../foundation/text.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('reasoning-provider-registry');
 
 export interface ReasoningProviderCapabilities {
   reasoning: boolean;
@@ -224,6 +228,60 @@ const reasoningProviderDirectoryOptions: RegistryDirectoryOptions = {
   envDirVar: 'KYBERION_REASONING_PROVIDER_REGISTRY_DIR',
   envPathVar: 'KYBERION_REASONING_PROVIDER_REGISTRY_PATH',
 };
+
+/**
+ * Registry overrides (`KYBERION_REASONING_PROVIDER_REGISTRY_DIR` / `_PATH`)
+ * are a hermetic-test / development seam. A production runtime
+ * (`NODE_ENV=production`) ignores them and always loads the committed
+ * descriptors, so an env var cannot swap provider endpoints or egress
+ * classification under a deployed runtime.
+ */
+export function reasoningProviderRegistryOverridesAllowed(): boolean {
+  return getRegisteredEnvText('NODE_ENV')?.trim().toLowerCase() !== 'production';
+}
+
+function effectiveReasoningProviderDirectoryOptions(): RegistryDirectoryOptions {
+  if (reasoningProviderRegistryOverridesAllowed()) return reasoningProviderDirectoryOptions;
+  const ignored = [
+    reasoningProviderDirectoryOptions.envDirVar,
+    reasoningProviderDirectoryOptions.envPathVar,
+  ].filter((name): name is string => Boolean(name && getRegisteredEnvText(name)?.trim()));
+  if (ignored.length > 0) {
+    logger.warn(
+      `reasoning provider registry override ignored — ${ignored.join(', ')} not honoured when NODE_ENV=production | unset it; edit knowledge/product/governance/reasoning-providers/ instead | ${REGISTRY_DIR}`
+    );
+  }
+  const {
+    envDirVar: _envDirVar,
+    envPathVar: _envPathVar,
+    ...committedOnly
+  } = reasoningProviderDirectoryOptions;
+  return committedOnly;
+}
+
+/**
+ * Loopback or private-network host (RFC 1918, IPv6 ULA, localhost). Used to
+ * keep a descriptor's declared `data_egress` consistent with its endpoint.
+ */
+export function isLocalReasoningEndpoint(endpoint: string): boolean {
+  try {
+    const hostname = new URL(endpoint).hostname.toLowerCase().replace(/^\[(.*)\]$/u, '$1');
+    return (
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname === '0.0.0.0' ||
+      hostname === '::' ||
+      hostname === '::1' ||
+      /^127\./u.test(hostname) ||
+      /^10\./u.test(hostname) ||
+      /^192\.168\./u.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./u.test(hostname) ||
+      /^fd[0-9a-f]{2}:/u.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
 
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
@@ -536,6 +594,19 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
   if (!endpoint.ok) return { reason: 'endpoint must be an https origin' };
   if (!egressProviderId.ok) return { reason: 'egress_provider_id must be a slug' };
   if (!setupHint.ok) return { reason: 'setup_hint must be a non-empty string' };
+  if (endpoint.value) {
+    const localEndpoint = isLocalReasoningEndpoint(endpoint.value);
+    if (value.data_egress === 'local-only' && !localEndpoint) {
+      return {
+        reason: `data_egress local-only requires a loopback/private endpoint (got ${endpoint.value}); declare external-api or point endpoint at a local host`,
+      };
+    }
+    if (value.data_egress === 'external-api' && localEndpoint) {
+      return {
+        reason: `data_egress external-api must not use a loopback/private endpoint (got ${endpoint.value}); declare local-only instead`,
+      };
+    }
+  }
   if (value.model_env_keys !== undefined && !isStringArray(value.model_env_keys, ENV_KEY_PATTERN)) {
     return { reason: 'model_env_keys must be env var names' };
   }
@@ -642,7 +713,7 @@ function assertConformanceEvidence(
 
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
   const { items } = loadRegistryDirectory<Record<string, unknown>>(
-    reasoningProviderDirectoryOptions
+    effectiveReasoningProviderDirectoryOptions()
   );
   const descriptors = items.map((entry, index) => {
     const result = explainReasoningProviderDescriptor(entry);
