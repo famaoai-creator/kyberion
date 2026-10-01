@@ -5,5 +5,9 @@
       "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json",
       "auth_strategy": "none"
     }
+  },
+  "defaults": {
+    "comfyui_base_url": "http://127.0.0.1:8188",
+    "product_repository_url": "https://github.com/famaoai-creator/kyberion"
   }
 }

@@ -91,22 +91,6 @@ function render(): GeneratedFile[] {
     merged.services[serviceId] = payload.services[serviceId];
   }
 
-  // D1 remainder: regenerating the snapshot must not drop the governed
-  // `defaults` block. Per-file payloads are authoritative; the previous
-  // snapshot backfills keys no file declares yet (e.g. comfyui_base_url).
-  if (safeExistsSync(SNAPSHOT_PATH)) {
-    try {
-      const previous = loadEndpointFile(SNAPSHOT_PATH);
-      for (const [key, value] of Object.entries(previous.defaults || {})) {
-        if (!(key in mergedDefaults)) {
-          mergedDefaults[key] = value;
-        }
-      }
-    } catch {
-      /* unparsable previous snapshot: regenerate from per-file payloads only */
-    }
-  }
-
   const snapshot: Record<string, unknown> = {
     ...(version ? { version } : {}),
     default_pattern: merged.default_pattern,

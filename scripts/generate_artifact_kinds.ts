@@ -1,3 +1,4 @@
+import { format, type Options } from 'prettier';
 /** Generate artifact vocabulary directly from its canonical schema. */
 import { compile } from 'json-schema-to-typescript';
 import { readJson } from '@agent/core/foundation';
@@ -11,13 +12,13 @@ export function createArtifactKindGenerator(
   return defineGenerator({
     id: 'artifact-kinds',
     outputs: [outputPath],
-    render() {
-      return [renderArtifactKinds(schemaPath, outputPath)];
+    async render() {
+      return [await renderArtifactKinds(schemaPath, outputPath)];
     },
   });
 }
 
-function renderArtifactKinds(schemaPath: string, outputPath: string) {
+async function renderArtifactKinds(schemaPath: string, outputPath: string) {
   const schema = readJson<{ enum?: unknown }>(schemaPath);
   if (
     !Array.isArray(schema.enum) ||
@@ -36,7 +37,12 @@ function renderArtifactKinds(schemaPath: string, outputPath: string) {
     'export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];',
     '',
   ].join('\n');
-  return { path: outputPath, content };
+  return { path: outputPath, content: await formatTypes(content) };
+}
+
+function formatTypes(content: string): Promise<string> {
+  const options = readJson<Options>(pathResolver.rootResolve('.prettierrc.json'));
+  return format(content, { ...options, parser: 'typescript' });
 }
 
 const intentOutput = pathResolver.rootResolve('libs/core/intent/standard-intents.generated.ts');
@@ -46,11 +52,11 @@ export const main = defineGenerator({
   id: 'artifact-kinds',
   outputs: [artifactOutput, intentOutput, workPolicyOutput],
   async render() {
-    const artifact = renderArtifactKinds(
+    const artifact = await renderArtifactKinds(
       pathResolver.knowledge('product/schemas/artifact-kind.schema.json'),
       artifactOutput
     );
-    const schema = readJson<any>(
+    const schema = readJson<Parameters<typeof compile>[0]>(
       pathResolver.knowledge('product/schemas/standard-intents.schema.json')
     );
     const content = await compile(
@@ -82,7 +88,7 @@ export const main = defineGenerator({
       'export type StandardIntentPipelineStep = NonNullable<StandardIntentDefinition["pipeline"]>[number];',
       '',
     ].join('\n');
-    const workPolicy = readJson<any>(
+    const workPolicy = readJson<Parameters<typeof compile>[0]>(
       pathResolver.knowledge('product/schemas/work-policy.schema.json')
     );
     const policyContent = await compile(
@@ -95,8 +101,8 @@ export const main = defineGenerator({
     );
     return [
       artifact,
-      { path: intentOutput, content: content + '\n' + aliases },
-      { path: workPolicyOutput, content: policyContent },
+      { path: intentOutput, content: await formatTypes(content + '\n' + aliases) },
+      { path: workPolicyOutput, content: await formatTypes(policyContent) },
     ];
   },
 });

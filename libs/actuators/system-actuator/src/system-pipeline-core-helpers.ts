@@ -209,6 +209,28 @@ import {
   collectSurfaceErrors,
   parseProviderProbe,
 } from './system-procedure-helpers.js';
+export const SYSTEM_PROCEDURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
+  standard_pr_lifecycle: async ({ params, ctx, resolve }) => {
+    assertUnsafeShellAllowed();
+    const result = await runStandardPrLifecycle({
+      branch_name: String(resolve(params.branch_name)),
+      commit_message: String(resolve(params.commit_message)),
+      pr_title: String(resolve(params.pr_title)),
+      pr_body: String(resolve(params.pr_body)),
+      auto_merge: resolve(params.auto_merge) === true,
+    });
+    return { ...ctx, [String(params.export_as ?? 'pr_creation_result')]: result };
+  },
+  provider_preflight: async ({ params, ctx, resolve }) => {
+    assertUnsafeShellAllowed();
+    const providers = resolve(params.providers);
+    if (!Array.isArray(providers)) throw new Error('providers must be an array');
+    const result = providers.map(parseProviderProbe).map((p) => probeProvider(p));
+    for (const p of result) logger.info(JSON.stringify(p));
+    return { ...ctx, [String(params.export_as ?? 'provider_preflight')]: result };
+  },
+};
+
 export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
   screenshot: async ({ params, ctx, resolve }) => {
     const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
@@ -539,25 +561,6 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
         output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
       }),
     };
-  },
-  standard_pr_lifecycle: async ({ params, ctx, resolve }) => {
-    assertUnsafeShellAllowed();
-    const result = await runStandardPrLifecycle({
-      branch_name: String(resolve(params.branch_name)),
-      commit_message: String(resolve(params.commit_message)),
-      pr_title: String(resolve(params.pr_title)),
-      pr_body: String(resolve(params.pr_body)),
-      auto_merge: resolve(params.auto_merge) === true,
-    });
-    return { ...ctx, [String(params.export_as ?? 'pr_creation_result')]: result };
-  },
-  provider_preflight: async ({ params, ctx, resolve }) => {
-    assertUnsafeShellAllowed();
-    const providers = resolve(params.providers);
-    if (!Array.isArray(providers)) throw new Error('providers must be an array');
-    const result = providers.map(parseProviderProbe).map((p) => probeProvider(p));
-    for (const p of result) logger.info(JSON.stringify(p));
-    return { ...ctx, [String(params.export_as ?? 'provider_preflight')]: result };
   },
   narrated_report_preflight: async ({ params, ctx }) => ({
     ...ctx,
@@ -1217,7 +1220,7 @@ export async function opCapture(
   ctx: Record<string, unknown>,
   resolve: (value: unknown) => unknown
 ) {
-  if (op === 'standard_pr_lifecycle' || op === 'provider_preflight')
+  if (Object.prototype.hasOwnProperty.call(SYSTEM_PROCEDURE_OP_HANDLERS, op))
     throw new Error('Mutating procedures require apply routing');
   return opProcedure(op, params, ctx, resolve);
 }
@@ -1230,9 +1233,10 @@ export async function opProcedure(
 ) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
-  const handler = Object.prototype.hasOwnProperty.call(SYSTEM_CAPTURE_OP_HANDLERS, op)
-    ? SYSTEM_CAPTURE_OP_HANDLERS[op]
-    : undefined;
+  const handlers = Object.prototype.hasOwnProperty.call(SYSTEM_PROCEDURE_OP_HANDLERS, op)
+    ? SYSTEM_PROCEDURE_OP_HANDLERS
+    : SYSTEM_CAPTURE_OP_HANDLERS;
+  const handler = Object.prototype.hasOwnProperty.call(handlers, op) ? handlers[op] : undefined;
   if (!handler) {
     throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }
