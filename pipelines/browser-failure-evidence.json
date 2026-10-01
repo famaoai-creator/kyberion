@@ -3,7 +3,7 @@
   "pipeline_id": "browser-failure-evidence",
   "version": "1.0.0",
   "name": "Browser Failure Evidence Bundle",
-  "description": "Open a page, capture the bounded redacted browser action trail, and export a failure-evidence bundle (snapshot, console/network events, action trail) for triage.",
+  "description": "Open a page, capture the bounded redacted browser action trail and session health (lease, tabs, event counts), and export a failure-evidence bundle (snapshot, console/network events, action trail) for triage.",
   "labels": ["browser", "evidence"],
   "context": {
     "target_url": "https://example.com",
@@ -30,6 +30,13 @@
       "op": "browser:action_trail",
       "produces": { "channel": "action_trail", "type": "BrowserActionTrail" },
       "params": { "limit": "{{trail_limit}}", "export_as": "action_trail" }
+    },
+    {
+      "id": "capture_session_health",
+      "role": "source",
+      "op": "browser:session_health",
+      "produces": { "channel": "browser_health", "type": "BrowserSessionHealth" },
+      "params": { "export_as": "browser_health" }
     },
     {
       "id": "export_bundle",

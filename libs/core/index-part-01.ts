@@ -275,10 +275,6 @@ export * from './foundation/lock-utils.js';
 
 export * from './pipeline/retry-utils.js';
 
-export { parseData, stringifyData } from './data-utils.js'; // Explicitly avoid detectFormat conflict
-
-export * from './detectors.js';
-
 export * from './validators.js';
 
 export * from './mobile-profile-validators.js';

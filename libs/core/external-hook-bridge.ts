@@ -91,7 +91,23 @@ function commandFor(command: unknown): string | string[] | undefined {
   return undefined;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Real Claude Code `settings.json` (and Codex `hooks.json`) nest the event
+ * map under `"hooks"`: `{"hooks": {"PreToolUse": [{matcher, hooks: [...]}]}}`.
+ * The flat shape (event keys at the top level) is still accepted.
+ */
 function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
+  return [
+    ...(isPlainRecord(config.hooks) ? collectGroupedHooks(config.hooks) : []),
+    ...collectGroupedHooks(config),
+  ];
+}
+
+function collectGroupedHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
   const collected: NormalizedExternalHook[] = [];
   for (const [externalEvent, value] of Object.entries(config)) {
     const event = eventFor(externalEvent);
@@ -109,9 +125,12 @@ function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternal
           event,
           ...(typedGroup.matcher ? { matcher: typedGroup.matcher } : {}),
           command,
-          ...(hook.timeout || hook.timeout_ms
-            ? { timeoutMs: hook.timeout || hook.timeout_ms }
-            : {}),
+          // Claude Code's `timeout` is in seconds; `timeout_ms` is milliseconds.
+          ...(typeof hook.timeout_ms === 'number' && hook.timeout_ms > 0
+            ? { timeoutMs: hook.timeout_ms }
+            : typeof hook.timeout === 'number' && hook.timeout > 0
+              ? { timeoutMs: hook.timeout * 1000 }
+              : {}),
         });
       }
     }
@@ -120,6 +139,8 @@ function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternal
 }
 
 function collectNormalizedHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
+  // Codex also accepts the Claude-style nested event map under `hooks`.
+  if (isPlainRecord(config.hooks)) return collectGroupedHooks(config.hooks);
   const source = Array.isArray(config.hooks) ? config.hooks : [];
   const collected: NormalizedExternalHook[] = [];
   for (const item of source) {

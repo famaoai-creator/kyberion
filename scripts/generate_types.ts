@@ -17,10 +17,6 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/contracts/mission-contract.ts',
   },
   {
-    schemaPath: 'knowledge/product/schemas/skill-input.schema.json',
-    outputPath: 'libs/core/contracts/skill-input.ts',
-  },
-  {
     schemaPath: 'knowledge/product/schemas/skill-output.schema.json',
     outputPath: 'libs/core/contracts/skill-output.ts',
   },
@@ -35,10 +31,6 @@ const targets: GenerationTarget[] = [
   {
     schemaPath: 'knowledge/product/schemas/mobile-app-profile-index.schema.json',
     outputPath: 'libs/core/contracts/mobile-app-profile-index.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/webview-session-handoff.schema.json',
-    outputPath: 'libs/core/contracts/webview-session-handoff.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/web-app-profile.schema.json',
@@ -77,10 +69,6 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/contracts/proposal-storyline-adf.ts',
   },
   {
-    schemaPath: 'knowledge/product/schemas/corporate-design-adf.schema.json',
-    outputPath: 'libs/core/contracts/corporate-design-adf.ts',
-  },
-  {
     schemaPath: 'knowledge/product/schemas/actuator-execution-brief.schema.json',
     outputPath: 'libs/core/contracts/actuator-execution-brief.ts',
   },
@@ -101,20 +89,12 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/contracts/system-status-brief.ts',
   },
   {
-    schemaPath: 'knowledge/product/schemas/system-status-report.schema.json',
-    outputPath: 'libs/core/contracts/system-status-report.ts',
-  },
-  {
     schemaPath: 'knowledge/product/schemas/operator-interaction-packet.schema.json',
     outputPath: 'libs/core/contracts/operator-interaction-packet.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/presentation-preference-profile.schema.json',
     outputPath: 'libs/core/contracts/presentation-preference-profile.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/slide-pattern-pack.schema.json',
-    outputPath: 'libs/core/contracts/slide-pattern-pack.ts',
   },
   {
     schemaPath: 'knowledge/product/schemas/narrated-video-preference-profile.schema.json',
@@ -135,10 +115,6 @@ const targets: GenerationTarget[] = [
   {
     schemaPath: 'knowledge/product/schemas/meeting-operations-brief.schema.json',
     outputPath: 'libs/core/contracts/meeting-operations-brief.ts',
-  },
-  {
-    schemaPath: 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json',
-    outputPath: 'libs/core/contracts/points-portal-clickout-usecase.ts',
   },
 ];
 

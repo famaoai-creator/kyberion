@@ -8,7 +8,6 @@ import {
   scanForConfidentialMarkers,
   wrapSkill,
   wrapSkillAsync,
-  classifier,
   validateFilePath,
   safeJsonParse,
   requireArgs,
@@ -101,26 +100,6 @@ describe('core library bundle', () => {
       const result = await wrapSkillAsync('test-async', async () => ({ value: 42 }));
       expect(result.status).toBe('success');
       expect(result.data.value).toBe(42);
-    });
-  });
-
-  describe('classifier', () => {
-    it('should classify text into correct categories', () => {
-      const result = (classifier as any).classify(
-        'Deploy the API Server',
-        {
-          tech: ['API', 'Server', 'Deploy'],
-          finance: ['Budget', 'Cost'],
-        },
-        { resultKey: 'domain' }
-      );
-      expect(result.domain).toBe('tech');
-      expect(result.matches).toBe(3);
-    });
-
-    it('should return unknown for no matches', () => {
-      const result = (classifier as any).classify('lorem ipsum', { tech: ['API'] });
-      expect(result.category).toBe('unknown');
     });
   });
 

@@ -132,8 +132,6 @@ export * from './chain-integrity.js';
 
 // Classification & Knowledge
 
-export * as classifier from './classifier.js';
-
 export {
   buildKnowledgeIndex,
   buildScopedIndex,

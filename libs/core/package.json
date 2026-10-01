@@ -6439,10 +6439,6 @@
       "types": "./dist/contracts/architecture-adf.d.ts",
       "default": "./dist/contracts/architecture-adf.js"
     },
-    "./contracts/skill-input": {
-      "types": "./dist/contracts/skill-input.d.ts",
-      "default": "./dist/contracts/skill-input.js"
-    },
     "./contracts/mobile-app-profile-index": {
       "types": "./dist/contracts/mobile-app-profile-index.d.ts",
       "default": "./dist/contracts/mobile-app-profile-index.js"
@@ -6470,10 +6466,6 @@
     "./contracts/pptx-protocol": {
       "types": "./dist/contracts/pptx-protocol.d.ts",
       "default": "./dist/contracts/pptx-protocol.js"
-    },
-    "./contracts/slide-pattern-pack": {
-      "types": "./dist/contracts/slide-pattern-pack.d.ts",
-      "default": "./dist/contracts/slide-pattern-pack.js"
     },
     "./contracts/docx-protocol": {
       "types": "./dist/contracts/docx-protocol.d.ts",
@@ -6503,14 +6495,6 @@
       "types": "./dist/contracts/actuator-pipeline-bundle.d.ts",
       "default": "./dist/contracts/actuator-pipeline-bundle.js"
     },
-    "./contracts/system-status-report": {
-      "types": "./dist/contracts/system-status-report.d.ts",
-      "default": "./dist/contracts/system-status-report.js"
-    },
-    "./contracts/corporate-design-adf": {
-      "types": "./dist/contracts/corporate-design-adf.d.ts",
-      "default": "./dist/contracts/corporate-design-adf.js"
-    },
     "./contracts/pdf-protocol": {
       "types": "./dist/contracts/pdf-protocol.d.ts",
       "default": "./dist/contracts/pdf-protocol.js"
@@ -6535,10 +6519,6 @@
       "types": "./dist/contracts/narrated-video-publish-plan.d.ts",
       "default": "./dist/contracts/narrated-video-publish-plan.js"
     },
-    "./contracts/points-portal-clickout-usecase": {
-      "types": "./dist/contracts/points-portal-clickout-usecase.d.ts",
-      "default": "./dist/contracts/points-portal-clickout-usecase.js"
-    },
     "./contracts/index": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
@@ -6546,10 +6526,6 @@
     "./contracts/web-app-profile": {
       "types": "./dist/contracts/web-app-profile.d.ts",
       "default": "./dist/contracts/web-app-profile.js"
-    },
-    "./contracts/webview-session-handoff": {
-      "types": "./dist/contracts/webview-session-handoff.d.ts",
-      "default": "./dist/contracts/webview-session-handoff.js"
     },
     "./contracts/generation-schedule": {
       "types": "./dist/contracts/generation-schedule.d.ts",
