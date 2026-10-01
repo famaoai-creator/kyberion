@@ -1,0 +1,985 @@
+{
+  "$schema": "../schemas/orphan-baseline.schema.json",
+  "version": 1,
+  "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a known orphan with the reason it is kept; new orphans fail the check, and an entry that stops being an orphan must be removed.",
+  "libs_core_modules": [
+    {
+      "id": "libs/core/analysis/analysis-execution-contract.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/contracts/actuator-pipeline-bundle.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/actuator-resolution-plan.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/architecture-adf.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/booking-preference-profile.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/bridge-request.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/delivery-pack.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/diagram-adf.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/document-brief.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/proposal-brief.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/proposal-storyline-adf.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/system-status-brief.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/test-case-adf.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/travel-planning-brief.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/contracts/ui-flow-adf.ts",
+      "reason": "Type-only payload contract mirrored by a JSON schema; no TypeScript importer at ratchet creation (backlog: adopt in its producer or retire)."
+    },
+    {
+      "id": "libs/core/intelligence-primitives.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/media/native-pdf-engine/fontkit-shim.ts",
+      "reason": "Module shim re-exported through the media barrel for bundlers; loaded for its side effect, not by name."
+    },
+    {
+      "id": "libs/core/media/native-pptx-engine/examples/gen_project_plan.ts",
+      "reason": "Engine usage example kept as documentation for the native PPTX engine; not a runtime module."
+    },
+    {
+      "id": "libs/core/media/native-xlsx-engine/examples/gen_wbs.ts",
+      "reason": "Engine usage example kept as documentation for the native XLSX engine; not a runtime module."
+    },
+    {
+      "id": "libs/core/mesh/acp-mediator-entry.ts",
+      "reason": "Package entry (libs/core package.json export) reserved for the ACP mediator work; no in-repo importer yet."
+    },
+    {
+      "id": "libs/core/office-snapshot.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/pilot-strategy-policy.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/provider/bundles/agy-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/claude-agent.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/claude-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/codex-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/copilot.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/cursor-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/devin-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/gemini-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/grok-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/provider/bundles/opencode-cli.ts",
+      "reason": "Provider bundle exported through the provider barrel; selected by provider id at runtime, never imported by path."
+    },
+    {
+      "id": "libs/core/reasoning/prompt-constraints.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/secret/secret-guard-entry.ts",
+      "reason": "Package entry (libs/core package.json export) for consumers outside this repo; no in-repo importer by design."
+    },
+    {
+      "id": "libs/core/shell/shell-claude-cli-intent-extractor.ts",
+      "reason": "Exported through the shell barrel only; no in-repo caller at ratchet creation (backlog: wire or retire)."
+    },
+    {
+      "id": "libs/core/store-contract.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/task/task-executor.ts",
+      "reason": "Deprecated facade by design: returns an explicit routing error to legacy callers; declared seam consumer in scripts/generate_capability_seams.ts (ORPHAN_DECISIONS OW-02: keep)."
+    },
+    {
+      "id": "libs/core/test-governance-payload.ts",
+      "reason": "Test helper (withoutSchemaMetadata) shared by governance contract tests; tests are its only intended consumers (OW-02: keep)."
+    },
+    {
+      "id": "libs/core/text-utils.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/tool/tool-actuator-routing.ts",
+      "reason": "Reserved for the ACP mediator work on another branch (OW-02: keep)."
+    },
+    {
+      "id": "libs/core/video/narrated-video-upload-package.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/video/video-content-brief-compiler.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    },
+    {
+      "id": "libs/core/voice/voice-workbench.ts",
+      "reason": "EV-07 regression harness; its designed consumer is the fixture-replay test (OW-02: keep)."
+    },
+    {
+      "id": "libs/core/windows-local-assist-bridge.ts",
+      "reason": "No non-test importer and no exported-symbol use at ratchet creation (OW-07 backlog: wire to a caller or retire to retired/)."
+    }
+  ],
+  "scripts": [
+    {
+      "id": "scripts/system-prelude.ts",
+      "reason": "Legacy secret-guard prelude kept for tests/system-prelude.test.ts and the presence-layer doc; no invocation path (backlog: retire with the doc update)."
+    }
+  ],
+  "pipelines": [
+    {
+      "id": "pipelines/ce-adoption-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/cloudflare-os-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/generate-design-system-demo.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/generate-masterclass-pptx.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/kyberion-product-intro.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/kyberion-vtuber-narrated-demo-collect.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/kyberion-vtuber-narrated-demo-submit.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/media-produce-and-review.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/media-review-fix-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/meeting-minutes-generator.json",
+      "reason": "Demo/one-off pipeline with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/project-management-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/qm02-trigger-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/rg-01-reasoning-governance-validation.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    },
+    {
+      "id": "pipelines/soak-restart-e2e.json",
+      "reason": "Manual validation run with no schedule, caller or README row at ratchet creation (OW-04 backlog: document in pipelines/README.md or retire)."
+    }
+  ],
+  "actuator_ops": [
+    {
+      "id": "agent:a2a",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "agent:restart",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "agent:shutdown",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "agent:shutdown_all",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "agent:team_plan",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "agent:team_role",
+      "reason": "Catalog op of the agent actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:adb_health_check",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_describe",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_docs_search",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_health_check",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_layout",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_screen_capture",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:android_cli_screen_resolve",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:authenticate_with_passkey",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:capture_foreground_activity",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:fill_login_form",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:input_text",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:read_text_file",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:summarize_ui_tree",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:swipe",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:tap",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "android:wait_for_ui_node",
+      "reason": "Catalog op of the android actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "approval:decide",
+      "reason": "Catalog op of the approval actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "approval:list_pending",
+      "reason": "Catalog op of the approval actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "approval:load",
+      "reason": "Catalog op of the approval actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "artifact:ensure_dir",
+      "reason": "Catalog op of the artifact actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "blockchain:verify_anchor",
+      "reason": "Catalog op of the blockchain actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:clear_passkey_credentials",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:click_first_match",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:console",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:delete_passkey",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:export_adf",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:export_playwright",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:extract_text_ref",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:fill_secret_ref",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:llm_decide",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:network",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:passkey_credentials",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:passkey_events",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:pause_for_operator",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:query_elements",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:register_passkey",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:scroll_ref",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:select_tab_matching",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:session_health",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:set_passkey_presence",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:set_passkey_user_verified",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:tabs",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:title",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:url",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:wait_ref",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "browser:while",
+      "reason": "Catalog op of the browser actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:android_build",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:android_bundle",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:android_test",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:ios_archive",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:ios_build",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:ios_generate_project",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "build:ios_test",
+      "reason": "Catalog op of the build actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "calendar:delete_event",
+      "reason": "Catalog op of the calendar actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "calendar:find_slots",
+      "reason": "Catalog op of the calendar actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "calendar:query_freebusy",
+      "reason": "Catalog op of the calendar actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "calendar:update_event",
+      "reason": "Catalog op of the calendar actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "code:discover_skills",
+      "reason": "Catalog op of the code actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "code:impact_analysis",
+      "reason": "Catalog op of the code actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "code:json_update",
+      "reason": "Catalog op of the code actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "code:run_js",
+      "reason": "Catalog op of the code actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "code:while",
+      "reason": "Catalog op of the code actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "codex:app-server",
+      "reason": "Catalog op of the codex actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "codex:cloud",
+      "reason": "Catalog op of the codex actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "codex:features",
+      "reason": "Catalog op of the codex actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "codex:plugin",
+      "reason": "Catalog op of the codex actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "compute:cancel_job",
+      "reason": "Catalog op of the compute actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "compute:collect_artifact",
+      "reason": "Catalog op of the compute actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "compute:poll_status",
+      "reason": "Catalog op of the compute actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "compute:submit_job",
+      "reason": "Catalog op of the compute actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "email:send_from_file",
+      "reason": "Catalog op of the email actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:append",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:copy",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:json_parse",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:move",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:path_join",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "file:while",
+      "reason": "Catalog op of the file actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "gh:agent-task",
+      "reason": "Catalog op of the gh actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "gh:repo",
+      "reason": "Catalog op of the gh actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "gh:run-workflow",
+      "reason": "Catalog op of the gh actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "gh:skill",
+      "reason": "Catalog op of the gh actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ingest:commit",
+      "reason": "Catalog op of the ingest actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ingest:dedup",
+      "reason": "Catalog op of the ingest actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ingest:meeting_digest",
+      "reason": "Catalog op of the ingest actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ingest:staleness_report",
+      "reason": "Catalog op of the ingest actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ios:shutdown_simulator",
+      "reason": "Catalog op of the ios actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ios:simctl_health_check",
+      "reason": "Catalog op of the ios actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "ios:uninstall_app",
+      "reason": "Catalog op of the ios actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media-generation:capture_focused_window",
+      "reason": "Catalog op of the media-generation actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:d2_render",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:document_diagram_render_from_brief",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:document_outline_from_brief",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:document_pdf_from_brief",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:document_report_design_from_brief",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:document_spreadsheet_design_from_brief",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:drawio_from_graph",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:drawio_write",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:json_read",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:mermaid_render",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_delete_pages",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_reorder",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_rotate",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_split",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_to_pptx_design",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:pdf_to_xlsx_design",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:proposal_content_from_storyline",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "media:register_presentation_preference_profile",
+      "reason": "Catalog op of the media actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "meeting:audit_speaker_fairness",
+      "reason": "Catalog op of the meeting actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "meeting:chat",
+      "reason": "Catalog op of the meeting actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "meeting:conduct_1on_1",
+      "reason": "Catalog op of the meeting actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "meeting:generate_facilitation_script",
+      "reason": "Catalog op of the meeting actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "meeting:generate_reminder_message",
+      "reason": "Catalog op of the meeting actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:derive_test_inventory",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:evaluate_architecture_ready",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:evaluate_customer_signoff",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:evaluate_qa_ready",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:terraform_to_architecture_adf",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:test_inventory_to_browser_pipeline",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:ui_flow_to_test_inventory",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:web_profile_to_ui_flow_adf",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "modeling:while",
+      "reason": "Catalog op of the modeling actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "network:a2a_poll",
+      "reason": "Catalog op of the network actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "network:a2a_send",
+      "reason": "Catalog op of the network actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "network:distill_response",
+      "reason": "Catalog op of the network actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "network:while",
+      "reason": "Catalog op of the network actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "orchestrator:discover_skills",
+      "reason": "Catalog op of the orchestrator actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "presence:dispatch_timeline",
+      "reason": "Catalog op of the presence actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "presence:record_interaction",
+      "reason": "Catalog op of the presence actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "service:oauth",
+      "reason": "Catalog op of the service actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:kill",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:kill_terminal",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:list_terminal_sessions",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:poll",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:poll_terminal",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:shell_command",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:spawn_terminal",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "terminal:write_terminal",
+      "reason": "Catalog op of the terminal actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "video-composition:cancel_video_composition_job",
+      "reason": "Catalog op of the video-composition actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "video-composition:compile_narrated_video_brief",
+      "reason": "Catalog op of the video-composition actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "video-composition:get_video_composition_job_status",
+      "reason": "Catalog op of the video-composition actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "video-composition:get_video_composition_queue",
+      "reason": "Catalog op of the video-composition actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "video-composition:lint_video_composition",
+      "reason": "Catalog op of the video-composition actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "vision:build_video_brief",
+      "reason": "Catalog op of the vision actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "vision:describe_screen_delta",
+      "reason": "Catalog op of the vision actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "vision:mark_elements",
+      "reason": "Catalog op of the vision actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "voice:normalize_audio",
+      "reason": "Catalog op of the voice actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "voice:output_to_virtual_camera",
+      "reason": "Catalog op of the voice actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "voice:record_interaction",
+      "reason": "Catalog op of the voice actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "voice:render_talking_avatar",
+      "reason": "Catalog op of the voice actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "voice:transcribe_voice_sample",
+      "reason": "Catalog op of the voice actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:a2a_roleplay",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:adjust_proposal",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:audit_speaker_fairness",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:conduct_1on1",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:conduct_1on_1",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:derive_test_inventory",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_architecture_ready",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_customer_signoff",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_decision_rights_approval",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_qa_ready",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_requirements_completeness",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:evaluate_task_plan_ready",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:execute_task_plan",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:extract_action_items",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:generate_facilitation_script",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:generate_reminder_message",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:peer_advice",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:propose_tool_calls",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:react_loop",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:reasoning_loop",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:register_presentation_preference_profile",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:resolve_hypothesis_conflict",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:task_plan_to_next_tasks",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "wisdom:while",
+      "reason": "Catalog op of the wisdom actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "working-memory:add-action-item",
+      "reason": "Catalog op of the working-memory actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "working-memory:complete-action-item",
+      "reason": "Catalog op of the working-memory actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "working-memory:set-now",
+      "reason": "Catalog op of the working-memory actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    },
+    {
+      "id": "working-memory:todo-done",
+      "reason": "Catalog op of the working-memory actuator for LLM-authored ADF; no pipeline, caller or payload outside the actuator names it at ratchet creation (OW-05 backlog)."
+    }
+  ]
+}
