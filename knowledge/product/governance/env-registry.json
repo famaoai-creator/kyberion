@@ -3050,6 +3050,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_REPOSITORY_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Product repository URL sent as the HTTP-Referer attribution to external providers (default: the upstream Kyberion repository).",
+      "documented": true
+    },
+    {
       "name": "KYBERION_RESTRICTED_ACTIONS_POLICY",
       "category": "runtime",
       "type": "string",

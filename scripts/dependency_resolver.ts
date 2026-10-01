@@ -32,6 +32,7 @@ import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
+import { resolveComfyPort } from '@agent/core/foundation';
 import { isLinux, isMacOS, isWindows } from '@agent/core/platform';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 
@@ -201,11 +202,12 @@ const POPPLER: Dependency = {
 
 const COMFYUI: Dependency = {
   id: 'comfyui-server',
-  name: 'ComfyUI server (port 8188)',
+  name: `ComfyUI server (port ${resolveComfyPort()})`,
   level: 'should',
   check: async () => {
-    const ok = checkPort(8188);
-    return { ok, detail: ok ? 'listening on :8188' : 'not reachable on localhost:8188' };
+    const port = resolveComfyPort();
+    const ok = checkPort(port);
+    return { ok, detail: ok ? `listening on :${port}` : `not reachable on localhost:${port}` };
   },
   fallbackMode: 'image generation unavailable; use cloud API fallback',
 };

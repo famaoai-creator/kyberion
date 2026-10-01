@@ -9,5 +9,6 @@ export * from './governed-catalog.js';
 export { registerFoundationIo, type FoundationIo } from './io.js';
 export * from './json.js';
 export * from './process-env.js';
+export * from './service-endpoints.js';
 export * from './text.js';
 export * from './time.js';
