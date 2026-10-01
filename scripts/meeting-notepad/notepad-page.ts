@@ -9,6 +9,7 @@
  * clear confirmation (`ui:dialog`). Every user-visible string comes from the
  * `meeting_notepad` vocabulary for the request's locale.
  */
+import { coerceLocale } from '@agent/core/locale-normalize';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
@@ -130,7 +131,7 @@ export function meetingNotepadPageHtml(config: MeetingNotepadPageConfig): string
       defaultInstruction: config.defaultInstruction ?? '',
       defaultTitle: config.defaultTitle ?? '',
       outLabel: config.outLabel,
-      language: config.locale === 'ja' ? 'ja' : 'en',
+      language: coerceLocale(config.locale, ['en', 'ja'] as const, 'en'),
     },
   });
 }

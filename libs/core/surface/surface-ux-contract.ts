@@ -1,3 +1,7 @@
+import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
+import { resolveLocale } from '../locale.js';
+import { t, type VocabularyKey } from '../t.js';
+
 export interface SurfaceUxContractInput {
   text: string;
   approval_required?: boolean;
@@ -77,33 +81,27 @@ const APPROVAL_CONSEQUENCE_PATTERNS = [
 ];
 const APPROVAL_ACTION_PATTERNS = [/承認してください|approve|unblock|next action|次のアクション/i];
 
-const EN_REPAIR_RULES: Array<[RegExp, string]> = [
-  [/\bADF\b/g, 'execution flow'],
-  [/\bactuator\b/g, 'capability'],
-  [/\bruntime supervisor\b/gi, 'control service'],
-  [/\bintent_resolution_packet\b/gi, 'intent summary'],
-  [/\bexecution_shape\b/gi, 'execution route'],
-  [/\bmission_class\b/gi, 'mission type'],
-  [/\bworkflow_id\b/gi, 'workflow ID'],
-  [/\bneeds_clarification\b/g, 'needs clarification'],
-  [/\bfully_automatable\b/g, 'ready to run'],
-  [/\bneeds_external_assets\b/g, 'needs external assets'],
-  [/\bmissing_runtime_prerequisites\b/g, 'missing runtime prerequisites'],
+/**
+ * Internal-vocabulary repair rules. The replacement wording lives in the
+ * user-facing vocabulary catalog (`surface:ux_repair_*`), one entry per locale.
+ */
+const REPAIR_RULE_DEFS: Array<[RegExp, VocabularyKey]> = [
+  [/\bADF\b/g, 'surface:ux_repair_adf'],
+  [/\bactuator\b/gi, 'surface:ux_repair_actuator'],
+  [/\bruntime supervisor\b/gi, 'surface:ux_repair_runtime_supervisor'],
+  [/\bintent_resolution_packet\b/gi, 'surface:ux_repair_intent_resolution_packet'],
+  [/\bexecution_shape\b/gi, 'surface:ux_repair_execution_shape'],
+  [/\bmission_class\b/gi, 'surface:ux_repair_mission_class'],
+  [/\bworkflow_id\b/gi, 'surface:ux_repair_workflow_id'],
+  [/\bneeds_clarification\b/g, 'surface:ux_repair_needs_clarification'],
+  [/\bfully_automatable\b/g, 'surface:ux_repair_fully_automatable'],
+  [/\bneeds_external_assets\b/g, 'surface:ux_repair_needs_external_assets'],
+  [/\bmissing_runtime_prerequisites\b/g, 'surface:ux_repair_missing_runtime_prerequisites'],
 ];
 
-const JA_REPAIR_RULES: Array<[RegExp, string]> = [
-  [/\bADF\b/g, '実行フロー'],
-  [/\bactuator\b/gi, '機能'],
-  [/\bruntime supervisor\b/gi, '制御サービス'],
-  [/\bintent_resolution_packet\b/gi, '意図要約'],
-  [/\bexecution_shape\b/gi, '実行形'],
-  [/\bmission_class\b/gi, 'ミッション種別'],
-  [/\bworkflow_id\b/gi, 'ワークフローID'],
-  [/\bneeds_clarification\b/g, '追加確認が必要'],
-  [/\bfully_automatable\b/g, 'そのまま実行可能'],
-  [/\bneeds_external_assets\b/g, '外部素材が必要'],
-  [/\bmissing_runtime_prerequisites\b/g, '実行環境が不足'],
-];
+function buildRepairRules(locale: SupportedLocale): Array<[RegExp, string]> {
+  return REPAIR_RULE_DEFS.map(([pattern, key]) => [pattern, t(key, undefined, locale)]);
+}
 
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
@@ -167,8 +165,7 @@ export function validateSurfaceUxContract(input: SurfaceUxContractInput): Surfac
 
 export function repairSurfaceUxContractText(input: string): string {
   const text = String(input || '');
-  const hasJapanese = /[ぁ-んァ-ン一-龯]/.test(text);
-  const rules = hasJapanese ? JA_REPAIR_RULES : EN_REPAIR_RULES;
+  const rules = buildRepairRules(detectTextLocale(text) ?? resolveLocale());
   return replaceOutsideCodeFences(text, rules);
 }
 

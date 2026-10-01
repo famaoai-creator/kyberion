@@ -87,7 +87,7 @@ export function buildSlackApprovalBlocks(
     nextAction: t('bridge:contract_next_action', undefined, locale),
     consequence: t('bridge:contract_consequence', undefined, locale),
     outcome: t('bridge:contract_outcome', undefined, locale),
-    none: locale === 'en' ? 'None' : t('bridge:contract_none', undefined, locale),
+    none: t('bridge:contract_none', undefined, locale),
   };
   return [
     {
@@ -349,7 +349,7 @@ export function buildSlackApprovalAskWhyBlocks(requestId: string): any[] {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: 'どこが期待と違いましたか？(1問だけ・スキップ可 — 理由は次回の作業改善に使われます)',
+        text: t('integrations:slack_ask_why_prompt'),
       },
     },
     {

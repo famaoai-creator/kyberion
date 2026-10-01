@@ -1,5 +1,7 @@
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import { t } from '../t.js';
+import { detectTextLocale } from '../locale-normalize.js';
+import { resolveLocale } from '../locale.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -133,22 +135,30 @@ function buildTaskSessionReply(params: {
   const isScheduleCoordination = params.intentId === 'schedule-coordination';
 
   if (params.status === 'completed') {
-    lines.push('短い作業として完了しました。');
+    lines.push(t('surface:task_reply_completed'));
   } else if (params.status === 'pending') {
-    lines.push('短い作業として進めます。');
+    lines.push(t('surface:task_reply_pending'));
   } else {
-    lines.push('短い作業としてうまく進められませんでした。');
+    lines.push(t('surface:task_reply_failed'));
   }
 
   if (params.status === 'completed') {
-    lines.push(isScheduleCoordination ? '予定の確認が終わりました。' : '確認が終わりました。');
+    lines.push(
+      isScheduleCoordination
+        ? t('surface:task_reply_schedule_check_done')
+        : t('surface:task_reply_check_done')
+    );
   } else if (params.status === 'pending') {
-    lines.push(isScheduleCoordination ? '予定の確認を進めます。' : '確認を進めます。');
+    lines.push(
+      isScheduleCoordination
+        ? t('surface:task_reply_schedule_check_pending')
+        : t('surface:task_reply_check_pending')
+    );
   } else {
     lines.push(
       isScheduleCoordination
-        ? '予定の確認がうまく進みませんでした。'
-        : 'うまく進められませんでした。'
+        ? t('surface:task_reply_schedule_check_failed')
+        : t('surface:task_reply_check_failed')
     );
   }
 
@@ -160,19 +170,19 @@ function buildTaskSessionReply(params: {
     const readableMissing = params.missingInputs
       .map((input) => {
         const map: Record<string, string> = {
-          schedule_scope: '対象',
-          date_range: '期間',
-          fixed_constraints: '動かせない条件',
-          calendar_action_boundary: '提案だけか更新まで行うか',
-          meeting_handoff_boundary: '会議調整への引き継ぎ可否',
+          schedule_scope: t('surface:task_reply_slot_schedule_scope'),
+          date_range: t('surface:task_reply_slot_date_range'),
+          fixed_constraints: t('surface:task_reply_slot_fixed_constraints'),
+          calendar_action_boundary: t('surface:task_reply_slot_calendar_action_boundary'),
+          meeting_handoff_boundary: t('surface:task_reply_slot_meeting_handoff_boundary'),
         };
         return map[input] || input.replace(/_/g, ' ');
       })
-      .join('、');
+      .join(t('surface:task_reply_list_separator'));
     lines.push(
       isScheduleCoordination
-        ? `確認したい点があります: ${readableMissing}`
-        : `必要な情報があります: ${readableMissing}`
+        ? t('surface:task_reply_schedule_missing', { items: readableMissing })
+        : t('surface:task_reply_missing', { items: readableMissing })
     );
   }
 
@@ -180,13 +190,13 @@ function buildTaskSessionReply(params: {
     (input) => input !== 'approval_confirmation' && input !== 'dual_key_confirmation'
   );
   if (params.approvalRequired && unresolvedInputs.length === 0) {
-    lines.push(t('dock.intent_resolution.waiting_approval', undefined, 'ja'));
-    lines.push(t('dock.intent_resolution.approval_action', undefined, 'ja'));
+    lines.push(t('dock.intent_resolution.waiting_approval'));
+    lines.push(t('dock.intent_resolution.approval_action'));
   }
 
   const serviceOptions = params.serviceOptions || [];
   if (params.intentId === 'stop-service' && serviceOptions.length > 0) {
-    lines.push('停止するサービス候補:');
+    lines.push(t('surface:task_reply_stop_candidates'));
     serviceOptions.forEach((choice, index) => {
       const serviceName =
         typeof choice === 'string'
@@ -203,11 +213,11 @@ function buildTaskSessionReply(params: {
         `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
       );
     });
-    lines.push('停止したいサービス名を指定してください。');
+    lines.push(t('surface:task_reply_stop_prompt'));
   }
 
   if (params.intentId === 'start-service' && serviceOptions.length > 0) {
-    lines.push('起動するサービス候補:');
+    lines.push(t('surface:task_reply_start_candidates'));
     serviceOptions.forEach((choice, index) => {
       const serviceName =
         typeof choice === 'string'
@@ -224,14 +234,14 @@ function buildTaskSessionReply(params: {
         `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
       );
     });
-    lines.push('起動したいサービス名を指定してください。');
+    lines.push(t('surface:task_reply_start_prompt'));
   }
 
   if (params.handoffIntentId) {
     lines.push(
       params.handoffIntentId === 'meeting-operations'
-        ? '必要なら会議調整まで引き継げます。'
-        : '必要なら次の担当に引き継げます。'
+        ? t('surface:task_reply_handoff_meeting')
+        : t('surface:task_reply_handoff_next')
     );
   }
 
@@ -240,7 +250,7 @@ function buildTaskSessionReply(params: {
   }
 
   if (params.error) {
-    lines.push(`詳細: ${params.error}`);
+    lines.push(t('surface:task_reply_detail', { error: params.error }));
   }
 
   return lines.filter(Boolean).join('\n');
@@ -251,27 +261,30 @@ function buildKnowledgeQueryReply(params: {
   results: Array<{ topic: string; hint: string; source?: string; tags?: string[] }>;
   providerLabel: string;
 }): string {
-  const isJapanese = /[ぁ-んァ-ン一-龯]/.test(params.queryText);
+  // The reply follows the language the user asked in.
+  const locale = detectTextLocale(params.queryText) ?? resolveLocale();
   if (params.results.length === 0) {
-    return isJapanese
-      ? `見つかった情報はありませんでした。必要なら別の言い方で探し直せます。`
-      : `I couldn't find a match. If you want, I can try a different phrasing.`;
+    return t('surface:knowledge_reply_none', undefined, locale);
   }
 
-  const opener = isJapanese
-    ? `確認できた内容を短くまとめると、${params.providerLabel} で ${params.results.length} 件見つかりました。`
-    : `Here is the short summary from ${params.providerLabel}: I found ${params.results.length} item(s).`;
+  const opener = t(
+    'surface:knowledge_reply_opener',
+    { provider: params.providerLabel, count: params.results.length },
+    locale
+  );
   const bullets = params.results.slice(0, 3).map((result) => {
-    const tags = result.tags?.length ? `（${result.tags.join('、')}）` : '';
+    const tags = result.tags?.length
+      ? t(
+          'surface:knowledge_reply_tags',
+          { tags: result.tags.join(t('surface:task_reply_list_separator', undefined, locale)) },
+          locale
+        )
+      : '';
     const source = result.source ? ` / ${result.source}` : '';
-    return isJapanese
-      ? `- ${result.topic}${tags}${source}: ${result.hint}`
-      : `- ${result.topic}${tags}${source}: ${result.hint}`;
+    return `- ${result.topic}${tags}${source}: ${result.hint}`;
   });
 
-  const closing = isJapanese
-    ? '必要なら、ここからさらに絞って見ます。'
-    : "If you'd like, I can narrow this down further.";
+  const closing = t('surface:knowledge_reply_closing', undefined, locale);
   return [opener, ...bullets, closing].join('\n');
 }
 
