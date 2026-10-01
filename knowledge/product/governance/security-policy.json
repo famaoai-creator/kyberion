@@ -437,7 +437,8 @@
         "active/shared/coordination/orchestration/",
         "active/shared/observability/channels/slack/",
         "active/shared/observability/mission-control/",
-        "active/audit/"
+        "active/audit/",
+        "knowledge/personal/members/"
       ],
       "allow_write": [
         "presence/bridge/runtime/",
