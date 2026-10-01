@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   spawnManagedProcess: vi.fn(),
   safeExecResultAsync: vi.fn(),
+  assertGovernedExec: vi.fn(),
 }));
 
 vi.mock('@agent/core/managed-process', async (importOriginal) => ({
@@ -14,6 +15,7 @@ vi.mock('@agent/core/managed-process', async (importOriginal) => ({
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
   safeExecResultAsync: mocks.safeExecResultAsync,
+  assertGovernedExec: mocks.assertGovernedExec,
 }));
 
 import { main, pnpmExecutable, runStreamingScriptCommand } from './kyberion.js';
@@ -127,9 +129,16 @@ describe('kyberion script-command dispatch', () => {
 
   it('runs the streamed spawn through the exec policy with an allowlisted env', async () => {
     mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
-    await expect(
-      runStreamingScriptCommand('sh', ['-c', 'echo hi'], 'bad', vi.fn())
-    ).rejects.toThrow(/SECURITY/u);
+    // The policy itself (shell-script / sensitive-text / execute_command) is
+    // covered in secure-io's tests; here we only prove the streamed spawn
+    // consults it first and does not spawn when it refuses.
+    mocks.assertGovernedExec.mockImplementationOnce(() => {
+      throw new Error('[SECURITY] refused by exec policy');
+    });
+    await expect(runStreamingScriptCommand('pnpm', ['run', 'tui'], 'bad', vi.fn())).rejects.toThrow(
+      /SECURITY/u
+    );
+    expect(mocks.assertGovernedExec).toHaveBeenCalledWith('pnpm', ['run', 'tui']);
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
 
     const original = process.env.SECRET_TOKEN_FOR_TEST;
