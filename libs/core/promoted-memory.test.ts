@@ -332,6 +332,8 @@ describe('promoted-memory', () => {
       const markdown = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
       expect(markdown).toContain('source_branch: agent/kl-pr\n');
       expect(markdown).toContain('source_commit: abc123def456\n');
+      expect(markdown).toContain('owner_nhi: ""\n');
+      expect(markdown).not.toMatch(/[ \t]+$/mu);
     });
 
     it('omits provenance when git is unavailable', () => {
