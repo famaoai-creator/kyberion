@@ -960,6 +960,8 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
     },
   },
   {
+    // Answers from the knowledge/query path start no work.
+    askOnlySafe: true,
     matches: (context) => {
       const resolved = resolvedSurfaceIntent(context);
       // Generic direct-reply intent continue-conversation must fall through
@@ -1116,7 +1118,11 @@ async function runSurfaceConversationTurn(
       }),
     };
   }
-  const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
+  // Team Channel P1: ask-only speakers never reach a delegating receiver.
+  const askOnly = input.workAuthority === 'ask_only';
+  const forcedReceiver = askOnly
+    ? undefined
+    : normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
   const originalText = (input.surfaceText || input.query || '').trim();
@@ -1229,12 +1235,13 @@ async function runSurfaceConversationTurn(
     );
   }
 
-  const computedReceiver: SurfaceDelegationReceiver | undefined =
-    forcedReceiver ||
-    ruleBasedReceiver ||
-    (!forcedReceiver && compiledFlow
-      ? resolveSurfaceConversationReceiver(undefined, compiledFlow, surface)
-      : undefined);
+  const computedReceiver: SurfaceDelegationReceiver | undefined = askOnly
+    ? undefined
+    : forcedReceiver ||
+      ruleBasedReceiver ||
+      (!forcedReceiver && compiledFlow
+        ? resolveSurfaceConversationReceiver(undefined, compiledFlow, surface)
+        : undefined);
 
   const structuredQuery = compiledFlow
     ? surfaceRuntimeData.buildSurfaceStructuredQuery(input.query, compiledFlow)
@@ -1255,8 +1262,8 @@ async function runSurfaceConversationTurn(
     structuredQuery,
     parsedSlackPrompt,
   };
-  const matchedRouteHandler = SURFACE_RUNTIME_ROUTE_HANDLERS.find((handler) =>
-    handler.matches(routeContext)
+  const matchedRouteHandler = SURFACE_RUNTIME_ROUTE_HANDLERS.find(
+    (handler) => (!askOnly || handler.askOnlySafe === true) && handler.matches(routeContext)
   );
   if (matchedRouteHandler) {
     const routedResult = await matchedRouteHandler.handle(routeContext);
@@ -1276,7 +1283,9 @@ async function runSurfaceConversationTurn(
   let delegationResults: SurfaceDelegationResult[] = [];
   const delegationFallbackText = buildDelegationFallbackText(structuredQuery);
 
-  if (firstBlocks.a2aMessages.length > 0) {
+  if (askOnly) {
+    // Ask-only turns answer directly; delegations would start work.
+  } else if (firstBlocks.a2aMessages.length > 0) {
     delegationResults = await processDelegations(
       firstBlocks.a2aMessages,
       input.senderAgentId,
