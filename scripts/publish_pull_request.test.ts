@@ -293,4 +293,26 @@ describe('main() wiring (KL-03)', () => {
     );
     expect(prCreateCalls).toEqual([]);
   });
+
+  describe('CU-01 --help never creates a pull request', () => {
+    it.each([['--help'], ['-h'], ['--title', 'fix(pr): x', '--help']])(
+      'prints usage for %j without calling gh, git, or the readiness gates',
+      async (...argv) => {
+        stubGhAndGit();
+        const output: unknown[] = [];
+        await main(argv, (value) => output.push(value));
+        expect(mocks.safeExec).not.toHaveBeenCalled();
+        expect(mocks.safeReadFile).not.toHaveBeenCalled();
+        expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
+        expect(String(output[0])).toContain('pnpm kyberion pr create');
+        expect(String(output[0])).toContain('--body-file');
+      }
+    );
+
+    it('rejects unknown flags before any gh call', async () => {
+      stubGhAndGit();
+      await expect(main(['--titel', 'fix(pr): typo'])).rejects.toMatchObject({ code: 2 });
+      expect(mocks.safeExec).not.toHaveBeenCalled();
+    });
+  });
 });

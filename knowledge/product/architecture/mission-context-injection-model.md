@@ -56,7 +56,7 @@ It should not answer:
 The canonical pack shape is defined in:
 
 - [`mission-context-pack.schema.json`](../schemas/mission-context-pack.schema.json)
-- [`libs/core/mission/mission-context-pack.ts`](/Users/famao/kyberion/libs/core/mission/mission-context-pack.ts)
+- [`libs/core/mission/mission-context-pack.ts`](../../../libs/core/mission/mission-context-pack.ts)
 
 The pack includes:
 

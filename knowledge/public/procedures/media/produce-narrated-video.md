@@ -38,11 +38,11 @@ Use this procedure when the task is:
 
 If the task is just a single short render and you do not need deferred collection, use:
 
-- [`create-narrated-intro-movie.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
+- [`create-narrated-intro-movie.md`](create-narrated-intro-movie.md)
 
 If you already have a final `video-composition-adf`, use:
 
-- [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+- [`compose-video-from-adf.md`](compose-video-from-adf.md)
 
 ## 3. Inputs
 

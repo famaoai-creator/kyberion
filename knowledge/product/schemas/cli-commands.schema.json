@@ -23,20 +23,96 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/scriptCommand" }
+    },
+    "deprecated_script_aliases": {
+      "description": "Renamed package scripts kept as warning aliases; excluded from the package-script ratchet.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/deprecatedScriptAlias" }
+    },
+    "deprecated_command_aliases": {
+      "description": "Renamed kyberion commands kept as warning aliases; the router warns once and dispatches the replacement command.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/deprecatedCommandAlias" }
     }
   },
   "$defs": {
     "command": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "command", "noun", "verb", "entry", "audience"],
+      "required": ["id", "command", "noun", "verb", "entry", "audience", "description", "group"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "command": { "type": "string" },
         "noun": { "type": "string", "minLength": 1 },
         "verb": { "type": "string", "minLength": 1 },
         "entry": { "type": "string", "minLength": 1 },
-        "audience": { "type": "string", "enum": ["user", "operator", "dev"] }
+        "audience": { "type": "string", "enum": ["user", "operator", "dev"] },
+        "description": { "$ref": "#/$defs/descriptionKey" },
+        "group": { "$ref": "#/$defs/group" },
+        "caution": { "$ref": "#/$defs/cautionKey" },
+        "scope_selector": {
+          "description": "How an operator picks a scope: flag (--scope <id>) or positional (<command> <id>).",
+          "type": "string",
+          "enum": ["flag", "positional"]
+        },
+        "scopes": {
+          "description": "CU-09: scopes/areas that delegate to an existing registered command; the bare command keeps its own behavior.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/commandScope" }
+        }
+      }
+    },
+    "commandScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "routes_to", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "routes_to": {
+          "description": "Arguments of the registered command this scope delegates to.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "description": {
+          "description": "Vocabulary key (cli namespace) with the en/ja scope summary.",
+          "type": "string",
+          "pattern": "^cli_scope_[a-z0-9_]+$"
+        }
+      }
+    },
+    "descriptionKey": {
+      "description": "Vocabulary key (cli namespace) with the en/ja one-line summary shown by kyberion --help.",
+      "type": "string",
+      "pattern": "^cli_cmd_[a-z0-9_]+$"
+    },
+    "cautionKey": {
+      "description": "Vocabulary key (cli namespace) for a caution line shown under the summary.",
+      "type": "string",
+      "pattern": "^cli_caution_[a-z0-9_]+$"
+    },
+    "group": {
+      "description": "Task grouping for kyberion --help; dev is hidden unless --all.",
+      "type": "string",
+      "enum": ["start", "inspect", "operate", "dev"]
+    },
+    "deprecatedScriptAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "replaced_by"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1 },
+        "replaced_by": { "type": "string", "minLength": 1 }
+      }
+    },
+    "deprecatedCommandAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "replaced_by"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "replaced_by": { "type": "string", "minLength": 1 }
       }
     },
     "entrypoint": {
@@ -56,7 +132,7 @@
     "scriptCommand": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "command", "noun", "verb", "audience"],
+      "required": ["id", "command", "noun", "verb", "audience", "description", "group"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "script": { "type": "string", "minLength": 1 },
@@ -65,7 +141,27 @@
         "command": { "type": "string", "minLength": 1 },
         "noun": { "type": "string", "minLength": 1 },
         "verb": { "type": "string", "minLength": 1 },
-        "audience": { "type": "string", "enum": ["user", "operator", "dev"] }
+        "audience": { "type": "string", "enum": ["user", "operator", "dev"] },
+        "description": { "$ref": "#/$defs/descriptionKey" },
+        "group": { "$ref": "#/$defs/group" },
+        "caution": { "$ref": "#/$defs/cautionKey" },
+        "interactive": {
+          "description": "Needs the operator terminal (stdin/TTY); the router runs it with inherited stdio and no timeout.",
+          "type": "boolean"
+        },
+        "long_running": {
+          "description": "May run for minutes or indefinitely; the router streams output with no timeout.",
+          "type": "boolean"
+        },
+        "native_help": {
+          "description": "The target handles --help/-h itself before any side effect; otherwise the router answers --help from this registry.",
+          "type": "boolean"
+        },
+        "same_target_as": {
+          "description": "Governed command id this '<noun> default' entry shares a name with because it is the same target.",
+          "type": "string",
+          "minLength": 1
+        }
       },
       "oneOf": [{ "required": ["script"] }, { "required": ["module"] }]
     }

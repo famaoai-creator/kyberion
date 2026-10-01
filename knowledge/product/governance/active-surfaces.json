@@ -22,7 +22,12 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3000,
       "healthPath": "/api/healthz",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_chronos_mirror_v2",
+      "bestForKey": "surface:surface_best_for_chronos_mirror_v2",
+      "urlEnv": "CHRONOS_URL",
+      "controlPlane": "chronos",
+      "remediationCommand": "pnpm surfaces reconcile"
     },
     {
       "id": "computer-surface",
@@ -36,7 +41,9 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3040,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_computer_surface",
+      "bestForKey": "surface:surface_best_for_computer_surface"
     },
     {
       "id": "concierge",
@@ -86,7 +93,7 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3034,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "mcp-server-cowork",
@@ -103,7 +110,9 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_mcp_server_cowork",
+      "bestForKey": "surface:surface_best_for_mcp_server_cowork"
     },
     {
       "id": "nexus-daemon",
@@ -134,7 +143,37 @@
       "ownerType": "surface-runtime-manifest",
       "port": 8787,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_oauth_callback_surface",
+      "bestForKey": "surface:surface_best_for_oauth_callback_surface"
+    },
+    {
+      "id": "operator-surface",
+      "kind": "ui",
+      "description": "Read-only audit monitor (Minimum Operator Surface). Operator-launched; not started by reconcile.",
+      "command": "pnpm",
+      "args": ["--dir", "presence/displays/operator-surface", "start"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3331,
+      "healthPath": "/",
+      "enabled": false
+    },
+    {
+      "id": "personal-pads",
+      "kind": "service",
+      "description": "Personal capture pads (single localhost listener, default port 8160). Legacy standalone pads used 8137 and 8147-8154. Operator-launched; not started by reconcile.",
+      "command": "pnpm",
+      "args": ["pads"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 8160,
+      "healthPath": "/",
+      "enabled": false
     },
     {
       "id": "presence-studio",
@@ -148,7 +187,12 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3031,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_presence_studio",
+      "bestForKey": "surface:surface_best_for_presence_studio",
+      "urlEnv": "PRESENCE_STUDIO_URL",
+      "controlPlane": "presence",
+      "remediationCommand": "pnpm surfaces reconcile"
     },
     {
       "id": "slack-bridge",
@@ -167,7 +211,9 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": false,
+      "operatorNotesKey": "surface:surface_notes_slack_bridge",
+      "bestForKey": "surface:surface_best_for_slack_bridge"
     },
     {
       "id": "telegram-bridge",
@@ -186,7 +232,7 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3035,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "terminal-bridge",
@@ -202,7 +248,20 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_terminal_bridge"
+    },
+    {
+      "id": "terminal-hud",
+      "kind": "service",
+      "description": "Interactive full-screen terminal HUD (Ink TUI, no listening port). Operator-launched in a terminal; not started by reconcile.",
+      "command": "node",
+      "args": ["presence/displays/terminal-hud/dist/index.js"],
+      "cwd": ".",
+      "shutdownPolicy": "manual",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": false
     },
     {
       "id": "voice-hub",
@@ -220,7 +279,10 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3032,
       "healthPath": "/health",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_voice_hub",
+      "bestForKey": "surface:surface_best_for_voice_hub",
+      "urlEnv": "VOICE_HUB_URL"
     }
   ]
 }

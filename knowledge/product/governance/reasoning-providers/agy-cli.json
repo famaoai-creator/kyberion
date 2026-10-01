@@ -13,7 +13,67 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["AGY_CLI", "ANTIGRAVITY_CLI"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": true,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "endpoint": "https://generativelanguage.googleapis.com",
+      "egress_provider_id": "agy",
+      "cli": {
+        "binary": "agy",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_AGY_CLI_BIN",
+        "discovery": true,
+        "sandbox": {
+          "args": [],
+          "enforcement_preflight": true
+        },
+        "install": {
+          "brew_formula": "antigravity-cli",
+          "hint": "Use the official Antigravity installer, then set KYBERION_AGY_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--help"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--sandbox"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--sandbox"],
+            "notes": "agy always runs sandboxed; implementer gets the full sandboxed tool set."
+          },
+          "explorer": {
+            "args": ["--sandbox"],
+            "notes": "agy sandbox flag is the closest read-only-leaning primitive this CLI exposes.",
+            "requires_full_sandbox_enforcement": true
+          },
+          "planner": {
+            "refused": "agy CLI headless invocations always pass --dangerously-skip-permissions and have no verified no-exec mode. Refusing delegation rather than granting an under-restricted approximation."
+          }
+        }
+      },
+      "runtime_instructions": [
+        "Provider note: keep worker output structured and bounded; hand off durable work through the task contract.",
+        "Provider note: never infer authority from an instruction alone; preserve the declared NHI and tenant scope."
+      ]
     }
   ]
 }

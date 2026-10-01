@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "personal-pads",
+      "kind": "service",
+      "description": "Personal capture pads (single localhost listener, default port 8160). Legacy standalone pads used 8137 and 8147-8154. Operator-launched; not started by reconcile.",
+      "command": "pnpm",
+      "args": ["pads"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 8160,
+      "healthPath": "/",
+      "enabled": false
+    }
+  ]
+}

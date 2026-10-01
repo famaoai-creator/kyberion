@@ -11242,6 +11242,113 @@
       ]
     },
     {
+      "id": "organization-ops-report",
+      "pattern": "single_track_execution",
+      "description": "組織オペレーションの定例レポートを短く回すプロセス。起草 → 運用記録 → 軽いセルフレビュー。SNSコミュニティ週次パルスや日次トリアージ報告など、code-change-aidlc を載せるべきでない ops 証跡向き。",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["single_artifact"],
+        "intent_ids": [
+          "organization-ops-report",
+          "weekly-community-pulse",
+          "daily-moderation-triage",
+          "ops-digest"
+        ],
+        "task_types": ["operations_report", "operations"]
+      },
+      "phases": [
+        {
+          "id": "draft",
+          "title": "報告書起草",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "report",
+              "team_role": "operator",
+              "description": "組織ステータスと運用キューから報告書を起草し evidence/ops-report.md に置く",
+              "deliverable": "evidence/ops-report.md",
+              "acceptance_criteria": [
+                "必要な見出し（健全性・対応残・ハイライトまたは同等）がある",
+                "対象 operation / period が明記されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "OPS_REPORT_DRAFTED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/ops-report.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "record",
+          "title": "運用記録",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "operation-run",
+              "team_role": "operator",
+              "description": "organization operation run を記録し、証跡パスを evidence/operation-run-receipt.md に残す",
+              "deliverable": "evidence/operation-run-receipt.md",
+              "acceptance_criteria": ["run_id と evidence_refs が記録されている"],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "OPS_RUN_RECORDED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/operation-run-receipt.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "self_review",
+          "title": "セルフレビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "ops-review",
+              "team_role": "reviewer",
+              "description": "報告書と run 記録の整合・境界逸脱をレビューする",
+              "review_target_suffix": "report",
+              "acceptance_criteria": ["must_fix 指摘が解消済み"],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low"
+            }
+          ],
+          "exit_gate": {
+            "id": "OPS_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "self_review-ops-review"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "action-item-tracking-followup",
       "pattern": "stage_gated_delivery",
       "description": "Cron-able action-item follow-up workflow backed by action-item-store. Restricted or non-declarative items remain gated until explicit confirmation.",

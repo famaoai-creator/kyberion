@@ -13,7 +13,70 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["GROK_CLI", "GROK_VERSION"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": true,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "aliases": ["shell-grok-cli"],
+      "model_vendor": "xai",
+      "endpoint": "https://api.x.ai",
+      "egress_provider_id": "grok",
+      "model_env_keys": ["KYBERION_GROK_CLI_MODEL"],
+      "cli": {
+        "binary": "grok",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_GROK_CLI_BIN",
+        "discovery": true,
+        "sandbox": {
+          "args": ["-p", "{prompt}", "--output-format", "plain", "{permission_args}"]
+        },
+        "install": {
+          "brew_formula": "grok-build",
+          "hint": "Install the official Grok Build CLI, then set KYBERION_GROK_CLI_BIN."
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--allow", "--deny"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--permission-mode", "bypassPermissions"],
+            "notes": "Grok Build full auto-approve path for implementer-tier write/exec work."
+          },
+          "explorer": {
+            "args": [
+              "--permission-mode",
+              "default",
+              "--disallowed-tools",
+              "run_terminal_command,write,search_replace"
+            ],
+            "notes": "Read-leaning: deny shell/write tools; remaining read/search tools stay available under default permission mode."
+          },
+          "planner": {
+            "args": ["--permission-mode", "plan"],
+            "notes": "Grok Build plan mode produces a plan without executing tools."
+          }
+        }
+      }
     }
   ]
 }

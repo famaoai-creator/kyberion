@@ -12,8 +12,27 @@
         "session_continuity": false,
         "input_modalities": ["text", "image"]
       },
-      "env_keys": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-      "cost_tier": "metered"
+      "env_keys": ["KYBERION_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "cost_tier": "metered",
+      "transport": "api",
+      "data_egress": "external-api",
+      "adapter": "gemini-api",
+      "profile": {
+        "streaming": true,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_vendor": "gemini",
+      "endpoint": "https://generativelanguage.googleapis.com",
+      "model_env_keys": ["KYBERION_GEMINI_MODEL"]
     }
   ]
 }

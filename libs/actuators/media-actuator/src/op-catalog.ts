@@ -264,7 +264,7 @@ const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   pptx_patch_paragraphs: [{ path: 'active/shared/tmp/deck.pptx', paragraph_replacements: {} }],
   pptx_render: [{ path: 'active/shared/tmp/deck.pptx' }],
   register_presentation_preference_profile: [{ profile: {} }],
-  save_brand_to_confidential: [{ brand_name: 'default', tenant_slug: 'acme' }],
+  save_brand_to_confidential: [{ brand_name: 'default', tenant_slug: 'example-tenant' }],
   write_file: [{ path: 'active/shared/tmp/note.txt', content: 'completed' }],
   xlsx_render: [{ path: 'active/shared/tmp/data.xlsx' }],
 };

@@ -14,11 +14,11 @@ git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install                # install workspace deps
 pnpm build                  # compile everything
-pnpm doctor                 # verify ecosystem health
+pnpm kyberion doctor                 # verify ecosystem health
 pnpm test -- --suite core   # run core unit tests
 ```
 
-If `pnpm doctor` is green and `pnpm test -- --suite core` passes, you're set.
+If `pnpm kyberion doctor` is green and `pnpm test -- --suite core` passes, you're set.
 
 For deeper setup (voice, surfaces, customer overlay), see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) and [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
