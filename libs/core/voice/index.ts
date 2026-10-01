@@ -86,7 +86,6 @@ export {
 } from './voice-speculative-policy.js';
 export * from './voice-stt.js';
 export * from './voice-synth.js';
-export * from './voice-task-profile-catalog.js';
 export * from './voice-text-chunking.js';
 export * from './voice-transcript-alignment.js';
 export * from './voice-tts-config.js';

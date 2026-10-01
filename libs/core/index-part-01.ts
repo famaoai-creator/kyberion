@@ -14,13 +14,9 @@ export * from './governance/governance-action-recorder.js';
 
 export * from './plugin/skill-wrapper.js';
 
-export * from './capability-wrapper.js';
-
 export * from './metrics.js';
 
 export * from './generation-cost-settlement.js';
-
-export * from './error-codes.js';
 
 export * from './wire-error.js';
 
@@ -249,8 +245,6 @@ export * from './reasoning/reasoning-participant.js';
 
 export * from './participant-context-resolver.js';
 
-export * from './context-promotion-ledger.js';
-
 // Utils
 
 export * from './fs-utils.js';
@@ -292,8 +286,6 @@ export * from './validators.js';
 export * from './mobile-profile-validators.js';
 
 export * from './schema-loader.js';
-
-export * from './surface/operator-learning.js';
 
 export * from './question-resolver.js';
 
@@ -343,8 +335,6 @@ export * from './training-catalog.js';
 export * from './hearing-scenario-catalog.js';
 
 export * from './media/media-brief-lock.js';
-
-export * from './house-style-distillation.js';
 
 export * from './deck-theme-direction.js';
 
@@ -412,10 +402,6 @@ export { resolveInputBindings, classifyInputId, isPathInput } from './input-bind
 
 export type { InputBinding, InputBindingType } from './input-binding.js';
 
-export { distillIncident, summarizeIncidents } from './incident-distiller.js';
-
-export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
-
 export * from './governance/autonomous-ops-gate.js';
 
 export * from './pipeline/patch-decision.js';
@@ -426,10 +412,6 @@ export * from './governance/approval-decision-card.js';
 export * from './governance/approval-digest.js';
 
 export * from './governance/approval-decision-routing.js';
-
-export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
-
-export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
 
 export {
   buildNextAction,

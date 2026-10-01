@@ -75,7 +75,6 @@
     "libs/core/integrations/slack-onboarding.ts": 11,
     "libs/core/intent/intent-clarification-format.ts": 5,
     "libs/core/knowledge/procedure-dispatcher.ts": 1,
-    "libs/core/lead-score.ts": 11,
     "libs/core/mission/mission-hygiene.ts": 13,
     "libs/core/mission/mission-lifecycle.ts": 1,
     "libs/core/mission/mission-maintenance.ts": 5,

@@ -114,8 +114,6 @@ export * from './video/video-content-brief-compiler.js';
 
 export * from './video/video-render-backend.js';
 
-export * from './surface/surface-action-routing.js';
-
 export * from './platform.js';
 
 export { terminalBridge } from './shell/terminal-bridge.js';
@@ -138,11 +136,7 @@ export * from './provider/provider-permission-profiles.js';
 
 export * from './shell/sandbox-policy.js';
 
-export * from './permission-presets.js';
-
 export * from './tool/tool-repeat-advisor.js';
-
-export * from './spill-result.js';
 
 export * from './provider/claude-task-runner.js';
 
@@ -159,10 +153,6 @@ export { isValidTransition, transitionStatus } from './mission/mission-status.js
 export type { MissionStatus } from './mission/mission-status.js';
 
 // Gate Status Guard
-
-export { isValidGateTransition, transitionGateStatus } from './gate-status.js';
-
-export type { GateStatus } from './gate-status.js';
 
 // Storage Governance
 
@@ -340,8 +330,6 @@ export * from './surface/surface-authorization.js';
 export * from './shell/pty-engine.js';
 
 export * from './shell/terminal-keys.js';
-
-export * from './agent/agent-mediator.js';
 
 export * from './mesh/acp-mediator.js';
 

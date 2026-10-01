@@ -387,10 +387,6 @@
       "types": "./dist/blackhole-routing-guard.d.ts",
       "default": "./dist/blackhole-routing-guard.js"
     },
-    "./booking-preference-profile": {
-      "types": "./dist/meeting/booking-preference-profile.d.ts",
-      "default": "./dist/meeting/booking-preference-profile.js"
-    },
     "./environment-capability-probes": {
       "types": "./dist/environment-capability-probes.d.ts",
       "default": "./dist/environment-capability-probes.js"
@@ -1259,10 +1255,6 @@
       "types": "./dist/media/media-contracts.d.ts",
       "default": "./dist/media/media-contracts.js"
     },
-    "./entropy-gate": {
-      "types": "./dist/entropy-gate.d.ts",
-      "default": "./dist/entropy-gate.js"
-    },
     "./email-workflow": {
       "types": "./dist/integrations/email-workflow.d.ts",
       "default": "./dist/integrations/email-workflow.js"
@@ -1486,14 +1478,6 @@
     "./surface-coordination-store": {
       "types": "./dist/surface/surface-coordination-store.d.ts",
       "default": "./dist/surface/surface-coordination-store.js"
-    },
-    "./inbound-inquiry-adapter": {
-      "types": "./dist/inbound-inquiry-adapter.d.ts",
-      "default": "./dist/inbound-inquiry-adapter.js"
-    },
-    "./lead-score": {
-      "types": "./dist/lead-score.d.ts",
-      "default": "./dist/lead-score.js"
     },
     "./mesh-hub-contract": {
       "types": "./dist/mesh/mesh-hub-contract.d.ts",
@@ -1978,10 +1962,6 @@
     "./reasoning-auth-preflight": {
       "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
       "default": "./dist/reasoning/reasoning-auth-preflight.js"
-    },
-    "./voice-task-profile-catalog": {
-      "types": "./dist/voice/voice-task-profile-catalog.d.ts",
-      "default": "./dist/voice/voice-task-profile-catalog.js"
     },
     "./media-tone-style-map": {
       "types": "./dist/media/media-tone-style-map.d.ts",
@@ -3023,6 +3003,10 @@
       "types": "./dist/reasoning/judgment-backend.d.ts",
       "default": "./dist/reasoning/judgment-backend.js"
     },
+    "./judgment-provider-bootstrap": {
+      "types": "./dist/reasoning/judgment-provider-bootstrap.d.ts",
+      "default": "./dist/reasoning/judgment-provider-bootstrap.js"
+    },
     "./provider-pins-store": {
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
@@ -3575,10 +3559,6 @@
       "types": "./dist/agent/agent-manifest.d.ts",
       "default": "./dist/agent/agent-manifest.js"
     },
-    "./agent/agent-mediator": {
-      "types": "./dist/agent/agent-mediator.d.ts",
-      "default": "./dist/agent/agent-mediator.js"
-    },
     "./agent/agent-pane-runtime-bridge": {
       "types": "./dist/agent/agent-pane-runtime-bridge.d.ts",
       "default": "./dist/agent/agent-pane-runtime-bridge.js"
@@ -3646,10 +3626,6 @@
     "./agent/agent-runtime-supervisor": {
       "types": "./dist/agent/agent-runtime-supervisor.d.ts",
       "default": "./dist/agent/agent-runtime-supervisor.js"
-    },
-    "./agent/agent-slo": {
-      "types": "./dist/agent/agent-slo.d.ts",
-      "default": "./dist/agent/agent-slo.js"
     },
     "./agent/agentic-source-review-verification": {
       "types": "./dist/agent/agentic-source-review-verification.d.ts",
@@ -3847,10 +3823,6 @@
       "types": "./dist/integrations/bluebubbles-adapter.d.ts",
       "default": "./dist/integrations/bluebubbles-adapter.js"
     },
-    "./meeting/booking-preference-profile": {
-      "types": "./dist/meeting/booking-preference-profile.d.ts",
-      "default": "./dist/meeting/booking-preference-profile.js"
-    },
     "./browser/browser-automation-runtime-bridge": {
       "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
       "default": "./dist/browser/browser-automation-runtime-bridge.js"
@@ -3858,10 +3830,6 @@
     "./browser/browser-conversation-session": {
       "types": "./dist/browser/browser-conversation-session.d.ts",
       "default": "./dist/browser/browser-conversation-session.js"
-    },
-    "./browser/browser-distill-candidate": {
-      "types": "./dist/browser/browser-distill-candidate.d.ts",
-      "default": "./dist/browser/browser-distill-candidate.js"
     },
     "./browser/browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
@@ -4295,6 +4263,10 @@
       "types": "./dist/reasoning/judgment-backend.d.ts",
       "default": "./dist/reasoning/judgment-backend.js"
     },
+    "./reasoning/judgment-provider-bootstrap": {
+      "types": "./dist/reasoning/judgment-provider-bootstrap.d.ts",
+      "default": "./dist/reasoning/judgment-provider-bootstrap.js"
+    },
     "./reasoning/judgment-calibration-fit": {
       "types": "./dist/reasoning/judgment-calibration-fit.d.ts",
       "default": "./dist/reasoning/judgment-calibration-fit.js"
@@ -4322,10 +4294,6 @@
     "./knowledge/knowledge-index-usage": {
       "types": "./dist/knowledge/knowledge-index-usage.d.ts",
       "default": "./dist/knowledge/knowledge-index-usage.js"
-    },
-    "./knowledge/knowledge-provider": {
-      "types": "./dist/knowledge/knowledge-provider.d.ts",
-      "default": "./dist/knowledge/knowledge-provider.js"
     },
     "./knowledge/knowledge-relevance-judgment": {
       "types": "./dist/knowledge/knowledge-relevance-judgment.d.ts",
@@ -4510,10 +4478,6 @@
     "./mesh/mesh-peer-directory": {
       "types": "./dist/mesh/mesh-peer-directory.d.ts",
       "default": "./dist/mesh/mesh-peer-directory.js"
-    },
-    "./mesh/mesh-router": {
-      "types": "./dist/mesh/mesh-router.d.ts",
-      "default": "./dist/mesh/mesh-router.js"
     },
     "./mesh/mesh-topic-registry": {
       "types": "./dist/mesh/mesh-topic-registry.d.ts",
@@ -5035,10 +4999,6 @@
       "types": "./dist/surface/operator-identity.d.ts",
       "default": "./dist/surface/operator-identity.js"
     },
-    "./surface/operator-learning": {
-      "types": "./dist/surface/operator-learning.d.ts",
-      "default": "./dist/surface/operator-learning.js"
-    },
     "./surface/operator-notifications": {
       "types": "./dist/surface/operator-notifications.d.ts",
       "default": "./dist/surface/operator-notifications.js"
@@ -5110,10 +5070,6 @@
     "./pipeline/patch-decision": {
       "types": "./dist/pipeline/patch-decision.d.ts",
       "default": "./dist/pipeline/patch-decision.js"
-    },
-    "./mesh/peer-backup-reference": {
-      "types": "./dist/mesh/peer-backup-reference.d.ts",
-      "default": "./dist/mesh/peer-backup-reference.js"
     },
     "./mesh/peer-conversation": {
       "types": "./dist/mesh/peer-conversation.d.ts",
@@ -5583,10 +5539,6 @@
       "types": "./dist/service/service-binding.d.ts",
       "default": "./dist/service/service-binding.js"
     },
-    "./service/service-bootstrap-catalog": {
-      "types": "./dist/service/service-bootstrap-catalog.d.ts",
-      "default": "./dist/service/service-bootstrap-catalog.js"
-    },
     "./service/service-connection-readiness": {
       "types": "./dist/service/service-connection-readiness.d.ts",
       "default": "./dist/service/service-connection-readiness.js"
@@ -5747,10 +5699,6 @@
       "types": "./dist/surface/surface-access-policy.d.ts",
       "default": "./dist/surface/surface-access-policy.js"
     },
-    "./surface/surface-action-routing": {
-      "types": "./dist/surface/surface-action-routing.d.ts",
-      "default": "./dist/surface/surface-action-routing.js"
-    },
     "./surface/surface-agent-catalog": {
       "types": "./dist/surface/surface-agent-catalog.d.ts",
       "default": "./dist/surface/surface-agent-catalog.js"
@@ -5895,10 +5843,6 @@
       "types": "./dist/surface/surface-ux.d.ts",
       "default": "./dist/surface/surface-ux.js"
     },
-    "./task/task-distill-candidate": {
-      "types": "./dist/task/task-distill-candidate.d.ts",
-      "default": "./dist/task/task-distill-candidate.js"
-    },
     "./task/task-executor": {
       "types": "./dist/task/task-executor.d.ts",
       "default": "./dist/task/task-executor.js"
@@ -6018,10 +5962,6 @@
     "./tool/tool-runtime-registry": {
       "types": "./dist/tool/tool-runtime-registry.d.ts",
       "default": "./dist/tool/tool-runtime-registry.js"
-    },
-    "./analysis/trace-procedure-candidate": {
-      "types": "./dist/analysis/trace-procedure-candidate.d.ts",
-      "default": "./dist/analysis/trace-procedure-candidate.js"
     },
     "./analysis/trace-schema": {
       "types": "./dist/analysis/trace-schema.d.ts",
@@ -6251,10 +6191,6 @@
       "types": "./dist/voice/voice-synth.d.ts",
       "default": "./dist/voice/voice-synth.js"
     },
-    "./voice/voice-task-profile-catalog": {
-      "types": "./dist/voice/voice-task-profile-catalog.d.ts",
-      "default": "./dist/voice/voice-task-profile-catalog.js"
-    },
     "./voice/voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
       "default": "./dist/voice/voice-text-chunking.js"
@@ -6370,10 +6306,6 @@
     "./workforce/worker-goal": {
       "types": "./dist/workforce/worker-goal.d.ts",
       "default": "./dist/workforce/worker-goal.js"
-    },
-    "./workforce/worker-proxy": {
-      "types": "./dist/workforce/worker-proxy.d.ts",
-      "default": "./dist/workforce/worker-proxy.js"
     },
     "./workforce/worker-state-journal": {
       "types": "./dist/workforce/worker-state-journal.d.ts",
