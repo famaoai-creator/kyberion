@@ -574,6 +574,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "per-call redacted tile crops for the vision describer; removed after each call"
+    },
+    {
+      "file": "libs/core/surface/surface-tenant-isolation.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "empty working directory for the tool-less team-channel surface runtime (Team Channel E); holds no artifacts, recreated on demand"
     }
   ]
 }
