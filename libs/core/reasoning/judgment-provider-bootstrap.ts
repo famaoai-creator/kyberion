@@ -25,7 +25,11 @@ import {
   TYPESAFE_JEV_PROVIDER,
   registerTypeSafeJevBackend,
 } from '../typesafe-jev-judgment-backend.js';
-import { BUILTIN_JUDGMENT_PROVIDER, listJudgmentBackends } from './judgment-backend.js';
+import {
+  BUILTIN_JUDGMENT_PROVIDER,
+  listJudgmentBackends,
+  resolveCalibration,
+} from './judgment-backend.js';
 
 const logger = createLogger('judgment-provider-bootstrap');
 
@@ -87,4 +91,30 @@ export function ensureJudgmentBackendsRegistered(
     result.registered.push(id);
   }
   return result;
+}
+
+/** Kill switch for the calibration-gated judgment assists (`off` disables them). */
+export const JUDGMENT_ASSISTS_ENV_VAR = 'KYBERION_JUDGMENT_ASSISTS';
+
+/**
+ * Gate for the calibration-gated judgment assists (error category, browser
+ * failure kind, knowledge relevance). Those assists default to
+ * `requireCalibrated`, so an answer from an unfitted provider is always
+ * declined — asking would only cost latency (a resident model worker, an
+ * external call) for an outcome that cannot change. This answers "could a call
+ * change the outcome?": not switched off, and some registered provider other
+ * than the built-in floor has a calibration fit for `questionId`
+ * (`judgment-calibration.json`). Registers the providers on first use.
+ *
+ * False keeps the caller on its deterministic baseline without a model call,
+ * which is the state of every call site until a fit lands.
+ */
+export function judgmentAssistReady(questionId: string): boolean {
+  if (getRegisteredEnvText(JUDGMENT_ASSISTS_ENV_VAR) === 'off') return false;
+  ensureJudgmentBackendsRegistered();
+  return listJudgmentBackends().some(
+    (backend) =>
+      backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER &&
+      resolveCalibration(backend.judgment_id, questionId)
+  );
 }

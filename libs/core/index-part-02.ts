@@ -230,17 +230,9 @@ export type {
 export {
   clearMeshTopicRegistryNamespace,
   listMeshTopicSubscriptions,
-  resolveMeshTopicRecipients,
-  subscribeMeshTopic,
 } from './mesh/mesh-topic-registry.js';
 
-export type {
-  MeshTopicRegistryPolicyContext,
-  MeshTopicResolution,
-  MeshTopicResolutionOptions,
-  MeshTopicSubscriptionFilter,
-  MeshTopicSubscriptionInput,
-} from './mesh/mesh-topic-registry.js';
+export type { MeshTopicSubscriptionFilter } from './mesh/mesh-topic-registry.js';
 
 export {
   clearMeshHubPeerMessagingAdapterNamespace,

@@ -970,19 +970,6 @@ export function createContractSchemaChecksPart3(): ContractCheck[] {
       ],
     },
     {
-      id: 'voice-task-profile-catalog',
-      schemaPath: 'knowledge/product/schemas/voice-task-profile-catalog.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/voice-task-profile-catalog.json'),
-      ],
-      invalidPayloads: [
-        {
-          version: '1.0.0',
-          profiles: [{ id: 'broken', task_type: 'presentation_deck' }],
-        },
-      ],
-    },
-    {
       id: 'media-tone-style-map',
       schemaPath: 'knowledge/product/schemas/media-tone-style-map.schema.json',
       validPayloads: [readGovernanceJson('knowledge/product/governance/media-tone-style-map.json')],

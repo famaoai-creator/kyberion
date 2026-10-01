@@ -13,6 +13,7 @@ import {
 import { LifecycleHookEngine } from './lifecycle-hook-engine.js';
 import {
   discoverExternalHookConfigs,
+  ensureTrustedExternalHooksRegistered,
   registerDiscoveredExternalLifecycleHooks,
   registerDiscoveredExternalLifecycleHooksOnDefaultEngine,
 } from './external-hook-discovery.js';
@@ -235,6 +236,44 @@ describe('external hook discovery', () => {
     } finally {
       safeRmSync(projectRoot, { recursive: true, force: true });
       safeRmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('bootstraps only approved project configs, and only when opted in', () => {
+    const projectRoot = pathResolver.shared(`tmp/external-hook-bootstrap-${process.pid}`);
+    const approved = `${projectRoot}/.claude/settings.json`;
+    const unapproved = `${projectRoot}/.codex/hooks.json`;
+    const hooks = JSON.stringify({
+      PreToolUse: [{ hooks: [{ type: 'command', command: ['bootstrap-hook'] }] }],
+    });
+    let approvalId = '';
+    try {
+      safeMkdir(`${projectRoot}/.claude`, { recursive: true });
+      safeMkdir(`${projectRoot}/.codex`, { recursive: true });
+      safeWriteFile(approved, hooks);
+      safeWriteFile(unapproved, hooks);
+      approvalId = approveProjectConfig(approved);
+
+      // Unset: inert, nothing joins the process-wide engine.
+      expect(ensureTrustedExternalHooksRegistered({ rootDir: projectRoot, env: {} })).toBeNull();
+      expect(getDefaultLifecycleHookEngine().hookCountFor('pre_tool_use')).toBe(0);
+
+      const env = { KYBERION_EXTERNAL_HOOKS: 'project' };
+      const result = ensureTrustedExternalHooksRegistered({ rootDir: projectRoot, env });
+      expect(result?.registered).toBe(1);
+      expect(result?.skipped.map((entry) => entry.path)).toEqual([unapproved]);
+      expect(result?.skipped[0]?.reason).toContain('[EXTERNAL_HOOK_APPROVAL_REQUIRED]');
+      expect(getDefaultLifecycleHookEngine().hookCountFor('pre_tool_use')).toBe(1);
+      // Once per engine: a second call does not register the same hooks twice.
+      expect(ensureTrustedExternalHooksRegistered({ rootDir: projectRoot, env })).toBe(result);
+      expect(getDefaultLifecycleHookEngine().hookCountFor('pre_tool_use')).toBe(1);
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(projectRoot, { recursive: true, force: true });
+        if (approvalId) {
+          safeRmSync(approvalRequestLogicalPath('project-trust', approvalId), { force: true });
+        }
+      });
     }
   });
 

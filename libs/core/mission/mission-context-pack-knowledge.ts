@@ -9,6 +9,8 @@ import {
   isKnowledgePathInSearchRoots,
 } from '../knowledge/knowledge-slices.js';
 import { queryTenantKnowledge } from '../organization/tenant-knowledge-retrieval.js';
+import { selectRelevantKnowledge } from '../knowledge/knowledge-relevance-judgment.js';
+import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
@@ -236,6 +238,41 @@ function mergeTenantKnowledgeHints(input: {
   return out;
 }
 
+/** Provider-wide fit key for the per-candidate `knowledge.relevant.<id>` questions. */
+const KNOWLEDGE_RELEVANCE_QUESTION = 'knowledge.relevant';
+
+/**
+ * Narrow retrieved hints with a *calibrated* relevance judgment. Pinned hints
+ * are never dropped, and anything short of a judgment — nothing calibrated
+ * (no provider is asked then), no answer, an error — returns `hints` itself,
+ * so the pack is unchanged until a fit lands.
+ */
+export async function narrowKnowledgeHintsWithJudgment(
+  hints: MissionContextPackKnowledgeHint[],
+  input: { task: string; tier: MissionTier; tenantSlug?: string; pinnedPaths?: ReadonlySet<string> }
+): Promise<MissionContextPackKnowledgeHint[]> {
+  if (hints.length <= 1 || !input.task.trim()) return hints;
+  if (!judgmentAssistReady(KNOWLEDGE_RELEVANCE_QUESTION)) return hints;
+  try {
+    const result = await selectRelevantKnowledge({
+      candidates: hints.map((hint) => ({
+        id: hint.path,
+        title: hint.title,
+        excerpt: hint.excerpt,
+        pinned: input.pinnedPaths?.has(hint.path) ?? false,
+      })),
+      task: input.task,
+      tier: input.tier,
+      ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    });
+    if (result.source !== 'judgment') return hints;
+    const kept = new Set(result.kept.map((candidate) => candidate.id));
+    return hints.filter((hint) => kept.has(hint.path));
+  } catch {
+    return hints;
+  }
+}
+
 export async function loadKnowledgeHintsIfPossible(
   input: LoadKnowledgeHintsInput
 ): Promise<MissionContextPackKnowledgeHint[]> {
@@ -300,6 +337,13 @@ export async function loadKnowledgeHintsIfPossible(
 
   const remaining = hintLimit - pinnedHints.length;
   if (remaining <= 0) return pinnedHints;
+  const narrow = (hints: MissionContextPackKnowledgeHint[]) =>
+    narrowKnowledgeHintsWithJudgment(hints, {
+      task: topic,
+      tier: normalizeTier(input.missionState.tier),
+      ...(sliceTenant ? { tenantSlug: sliceTenant } : {}),
+      pinnedPaths: new Set(pinnedHints.map((hint) => hint.path)),
+    });
 
   const searchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
   const relevant = await findRelevantDistilledKnowledge({
@@ -375,7 +419,7 @@ export async function loadKnowledgeHintsIfPossible(
   }
 
   if (tenantHints.length === 0) {
-    return [...pinnedHints, ...distillHints.slice(0, remaining)];
+    return narrow([...pinnedHints, ...distillHints.slice(0, remaining)]);
   }
 
   const merged = mergeTenantKnowledgeHints({
@@ -384,5 +428,5 @@ export async function loadKnowledgeHintsIfPossible(
     cap: remaining,
     deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),
   });
-  return [...pinnedHints, ...merged];
+  return narrow([...pinnedHints, ...merged]);
 }

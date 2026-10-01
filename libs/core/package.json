@@ -2891,6 +2891,14 @@
       "types": "./dist/deal-store.d.ts",
       "default": "./dist/deal-store.js"
     },
+    "./deal-documents": {
+      "types": "./dist/deal-documents.d.ts",
+      "default": "./dist/deal-documents.js"
+    },
+    "./external-hook-discovery": {
+      "types": "./dist/external-hook-discovery.d.ts",
+      "default": "./dist/external-hook-discovery.js"
+    },
     "./capability-bundle-registry": {
       "types": "./dist/capability-bundle-registry.d.ts",
       "default": "./dist/capability-bundle-registry.js"

@@ -262,30 +262,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh/mesh-topic-registry.ts#recordEvent (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/mesh/mesh-topic-registry.ts#subscribeMeshTopic (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/mesh/peer-conversation.ts#clearPeerConversationRuntime",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1424,6 +1400,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/background_review_mission_e2e.ts#assertActiveMission",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1524,6 +1505,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/check_orphans.ts#<module>",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/check_type_ratchet.ts#checkTypeRatchet",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -1579,6 +1565,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/encrypt_connection_documents.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1590,6 +1581,16 @@
     },
     {
       "site": "scripts/entity_governance_cleanup.ts#runCleanup",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/external_hooks.ts#buildExternalHookDiscoveryReport",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/external_hooks.ts#requestExternalHookTrust",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -4050,11 +4051,17 @@
         "mission_controller": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/front-desk-routes.ts#registerFrontDeskRoutes",
-            "libs/core/browser/browser-onboarding.ts#applyBrowserOnboarding",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityBestEffort",
-            "libs/core/agent/agent-identity.ts#ensureAgentIdentityProvisioned",
-            "libs/core/agent/agent-identity.ts#issueAgentIdentity",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },

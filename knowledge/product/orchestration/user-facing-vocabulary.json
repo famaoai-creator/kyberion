@@ -6787,6 +6787,266 @@
         "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",
         "ja": "  削除は soft-delete: active/archive/.trash/ へ移動し、janitor が purge するまで復元可能。",
         "qps-ploc": "⟦  Ḓėŀėŧïőñş ȧřė şőƒŧ: ėṽėřẏŧħïñɠ ɱőṽėş ŧő ȧƈŧïṽė/ȧřƈħïṽė/.ŧřȧşħ/ ȧñḓ şŧȧẏş řėşŧőřȧƀŀė ůñŧïŀ ŧħė ĵȧñïŧőř ṗůřɠėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "cli_hooks_none": {
+        "en": "No project-local Claude/Codex hook configs found.",
+        "ja": "プロジェクト内の Claude/Codex フック設定は見つかりませんでした。",
+        "qps-ploc": "⟦Ñő ṗřőĵėƈŧ-ŀőƈȧŀ Ƈŀȧůḓė/Ƈőḓėẋ ħőőķ ƈőñƒïɠş ƒőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_hooks_header": {
+        "en": "Project hook configs ({count}):",
+        "ja": "プロジェクトのフック設定 ({count} 件):",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ħőőķ ƈőñƒïɠş ({count}): ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_hooks_row_trusted": {
+        "en": "  ✓ {path} ({source}) — trusted by {id}",
+        "ja": "  ✓ {path} ({source}) — 承認済み {id}",
+        "qps-ploc": "⟦  ✓ {path} ({source}) — ŧřůşŧėḓ ƀẏ {id} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_hooks_row_untrusted": {
+        "en": "  · {path} ({source}) — untrusted; request: pnpm kyberion hooks trust {path}",
+        "ja": "  · {path} ({source}) — 未承認。依頼: pnpm kyberion hooks trust {path}",
+        "qps-ploc": "⟦  · {path} ({source}) — ůñŧřůşŧėḓ; řėɋůėşŧ: ṗñṗɱ ķẏƀėřïőñ ħőőķş ŧřůşŧ {path} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "cli_hooks_bootstrap_on": {
+        "en": "Loading is on (KYBERION_EXTERNAL_HOOKS=project): trusted configs join the worker hook engine.",
+        "ja": "読み込みは有効です (KYBERION_EXTERNAL_HOOKS=project)。承認済みの設定がワーカーのフックエンジンに登録されます。",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ïş őñ (ĶẎɃĖŘÏŐÑ_ĖẊŦĖŘÑȦĿ_ĦŐŐĶŞ=ṗřőĵėƈŧ): ŧřůşŧėḓ ƈőñƒïɠş ĵőïñ ŧħė ẇőřķėř ħőőķ ėñɠïñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "cli_hooks_bootstrap_off": {
+        "en": "Loading is off: set KYBERION_EXTERNAL_HOOKS=project to load trusted configs into workers.",
+        "ja": "読み込みは無効です。承認済みの設定をワーカーに読み込むには KYBERION_EXTERNAL_HOOKS=project を設定してください。",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ïş őƒƒ: şėŧ ĶẎɃĖŘÏŐÑ_ĖẊŦĖŘÑȦĿ_ĦŐŐĶŞ=ṗřőĵėƈŧ ŧő ŀőȧḓ ŧřůşŧėḓ ƈőñƒïɠş ïñŧő ẇőřķėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "cli_hooks_trust_not_discovered": {
+        "en": "Not a discovered project hook config: {path}. Run pnpm kyberion hooks discover.",
+        "ja": "検出されたプロジェクトのフック設定ではありません: {path}。pnpm kyberion hooks discover を実行してください。",
+        "qps-ploc": "⟦Ñőŧ ȧ ḓïşƈőṽėřėḓ ṗřőĵėƈŧ ħőőķ ƈőñƒïɠ: {path}. Řůñ ṗñṗɱ ķẏƀėřïőñ ħőőķş ḓïşƈőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_hooks_trust_requested": {
+        "en": "Trust request {id} ({status}) for {path}. An authenticated human must approve this exact content; editing the file voids it.",
+        "ja": "{path} の信頼リクエスト {id} ({status})。認証済みの人間がこの内容を承認する必要があります。ファイルを編集すると無効になります。",
+        "qps-ploc": "⟦Ŧřůşŧ řėɋůėşŧ {id} ({status}) ƒőř {path}. Ȧñ ȧůŧħėñŧïƈȧŧėḓ ħůɱȧñ ɱůşŧ ȧṗṗřőṽė ŧħïş ėẋȧƈŧ ƈőñŧėñŧ; ėḓïŧïñɠ ŧħė ƒïŀė ṽőïḓş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "cli_hooks_usage": {
+        "en": "Usage: pnpm kyberion hooks discover [--json] | pnpm kyberion hooks trust <path>",
+        "ja": "使い方: pnpm kyberion hooks discover [--json] | pnpm kyberion hooks trust <path>",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ħőőķş ḓïşƈőṽėř [--ĵşőñ] | ṗñṗɱ ķẏƀėřïőñ ħőőķş ŧřůşŧ <ṗȧŧħ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_cmd_script_approvals_digest": {
+        "en": "Summarize pending decisions and autonomous actions as a digest (optionally send it).",
+        "ja": "保留中の判断と自律実行の結果をダイジェストにまとめる(送信も可)。",
+        "qps-ploc": "⟦Şůɱɱȧřïẑė ṗėñḓïñɠ ḓėƈïşïőñş ȧñḓ ȧůŧőñőɱőůş ȧƈŧïőñş ȧş ȧ ḓïɠėşŧ (őṗŧïőñȧŀŀẏ şėñḓ ïŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "cli_cmd_script_approvals_hygiene": {
+        "en": "Expire stale pending approvals and move test-fixture records out of the store (dry-run by default).",
+        "ja": "放置された承認依頼を期限切れにし、テスト用レコードを退避する(既定はドライラン)。",
+        "qps-ploc": "⟦Ėẋṗïřė şŧȧŀė ṗėñḓïñɠ ȧṗṗřőṽȧŀş ȧñḓ ɱőṽė ŧėşŧ-ƒïẋŧůřė řėƈőřḓş őůŧ őƒ ŧħė şŧőřė (ḓřẏ-řůñ ƀẏ ḓėƒȧůŀŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "cli_cmd_script_tenant_export": {
+        "en": "Export one tenant's governed data as a portable bundle.",
+        "ja": "テナント 1 件分の管理データを持ち出し用バンドルとして書き出す。",
+        "qps-ploc": "⟦Ėẋṗőřŧ őñė ŧėñȧñŧ'ş ɠőṽėřñėḓ ḓȧŧȧ ȧş ȧ ṗőřŧȧƀŀė ƀůñḓŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_release_changelog_draft": {
+        "en": "Draft CHANGELOG entries from Conventional Commits since the last tag.",
+        "ja": "前回タグ以降の Conventional Commits から CHANGELOG の下書きを作る。",
+        "qps-ploc": "⟦Ḓřȧƒŧ ƇĦȦÑƓĖĿŐƓ ėñŧřïėş ƒřőɱ Ƈőñṽėñŧïőñȧŀ Ƈőɱɱïŧş şïñƈė ŧħė ŀȧşŧ ŧȧɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_workflow_register": {
+        "en": "Register a new mission workflow from a compact registration request.",
+        "ja": "簡易な登録リクエストから新しいミッションワークフローを登録する。",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ ñėẇ ɱïşşïőñ ẇőřķƒŀőẇ ƒřőɱ ȧ ƈőɱṗȧƈŧ řėɠïşŧřȧŧïőñ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_agent_runtime_manage": {
+        "en": "Inspect and control long-lived agent runtimes (list, start, stop).",
+        "ja": "常駐エージェントランタイムを確認・操作する(一覧、起動、停止)。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧñḓ ƈőñŧřőŀ ŀőñɠ-ŀïṽėḓ ȧɠėñŧ řůñŧïɱėş (ŀïşŧ, şŧȧřŧ, şŧőṗ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_surface_outbox": {
+        "en": "Inspect or drain the surface notification outbox.",
+        "ja": "サーフェス通知の送信待ちキューを確認・送出する。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ őř ḓřȧïñ ŧħė şůřƒȧƈė ñőŧïƒïƈȧŧïőñ őůŧƀőẋ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_action_items_remind": {
+        "en": "Draft reminders for pending meeting action items across active missions.",
+        "ja": "進行中ミッションの未完了の会議アクションアイテムにリマインドを作成する。",
+        "qps-ploc": "⟦Ḓřȧƒŧ řėɱïñḓėřş ƒőř ṗėñḓïñɠ ɱėėŧïñɠ ȧƈŧïőñ ïŧėɱş ȧƈřőşş ȧƈŧïṽė ɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_cmd_script_presence_stimuli": {
+        "en": "Inspect and manage presence stimuli for the operator's surfaces.",
+        "ja": "オペレーター向けサーフェスのプレゼンス刺激を確認・管理する。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧñḓ ɱȧñȧɠė ṗřėşėñƈė şŧïɱůŀï ƒőř ŧħė őṗėřȧŧőř'ş şůřƒȧƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_a2a_run": {
+        "en": "Send an agent-to-agent (A2A) request and print the response.",
+        "ja": "エージェント間 (A2A) リクエストを送り、応答を表示する。",
+        "qps-ploc": "⟦Şėñḓ ȧñ ȧɠėñŧ-ŧő-ȧɠėñŧ (Ȧ2Ȧ) řėɋůėşŧ ȧñḓ ṗřïñŧ ŧħė řėşṗőñşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_report_team_decision_support": {
+        "en": "Report how the roster proposer and advisory panel performed, from recorded outcomes.",
+        "ja": "記録された結果から、メンバー提案とアドバイザリーパネルの実績をレポートする。",
+        "qps-ploc": "⟦Řėṗőřŧ ħőẇ ŧħė řőşŧėř ṗřőṗőşėř ȧñḓ ȧḓṽïşőřẏ ṗȧñėŀ ṗėřƒőřɱėḓ, ƒřőɱ řėƈőřḓėḓ őůŧƈőɱėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "cli_cmd_script_sync_agent_profiles": {
+        "en": "Regenerate the agent profile index from the canonical profiles directory.",
+        "ja": "正本のプロファイルディレクトリからエージェントプロファイル索引を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧɠėñŧ ṗřőƒïŀė ïñḓėẋ ƒřőɱ ŧħė ƈȧñőñïƈȧŀ ṗřőƒïŀėş ḓïřėƈŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_cmd_script_sync_authority_roles": {
+        "en": "Regenerate the authority role index from the role definitions.",
+        "ja": "ロール定義から権限ロール索引を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ƒřőɱ ŧħė řőŀė ḓėƒïñïŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_sync_service_endpoints": {
+        "en": "Regenerate the service endpoint catalog from its sources.",
+        "ja": "ソースからサービスエンドポイントカタログを再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė şėřṽïƈė ėñḓṗőïñŧ ƈȧŧȧŀőɠ ƒřőɱ ïŧş şőůřƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_sync_specialist_catalog": {
+        "en": "Regenerate the specialist catalog from its sources.",
+        "ja": "ソースからスペシャリストカタログを再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė şṗėƈïȧŀïşŧ ƈȧŧȧŀőɠ ƒřőɱ ïŧş şőůřƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_sync_team_roles": {
+        "en": "Regenerate the team role index from the team role definitions.",
+        "ja": "チームロール定義からチームロール索引を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ŧėȧɱ řőŀė ïñḓėẋ ƒřőɱ ŧħė ŧėȧɱ řőŀė ḓėƒïñïŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_generate_service_harness_registry": {
+        "en": "Regenerate the service harness registry.",
+        "ja": "サービスハーネスのレジストリを再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė şėřṽïƈė ħȧřñėşş řėɠïşŧřẏ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_generate_trace_docs": {
+        "en": "Regenerate trace documentation from recorded traces.",
+        "ja": "記録されたトレースからトレース文書を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧřȧƈė ḓőƈůɱėñŧȧŧïőñ ƒřőɱ řėƈőřḓėḓ ŧřȧƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_provider_capabilities_report": {
+        "en": "Report which capabilities each installed provider CLI supports.",
+        "ja": "インストール済みの各プロバイダー CLI が対応する機能をレポートする。",
+        "qps-ploc": "⟦Řėṗőřŧ ẇħïƈħ ƈȧṗȧƀïŀïŧïėş ėȧƈħ ïñşŧȧŀŀėḓ ṗřőṽïḓėř ƇĿÏ şůṗṗőřŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_eval_harness": {
+        "en": "Run the deterministic, named eval harness table.",
+        "ja": "決定論的な名前付き評価ハーネスを実行する。",
+        "qps-ploc": "⟦Řůñ ŧħė ḓėŧėřɱïñïşŧïƈ, ñȧɱėḓ ėṽȧŀ ħȧřñėşş ŧȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_eval_intent_trace": {
+        "en": "Trace how an utterance is classified and routed to an intent.",
+        "ja": "発話がどのように分類され、どのインテントに振り分けられるかを追跡する。",
+        "qps-ploc": "⟦Ŧřȧƈė ħőẇ ȧñ ůŧŧėřȧñƈė ïş ƈŀȧşşïƒïėḓ ȧñḓ řőůŧėḓ ŧő ȧñ ïñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_eval_japanese_intent": {
+        "en": "Evaluate contextual Japanese intent classification against fixtures.",
+        "ja": "文脈付きの日本語インテント分類をフィクスチャで評価する。",
+        "qps-ploc": "⟦Ėṽȧŀůȧŧė ƈőñŧėẋŧůȧŀ Ĵȧṗȧñėşė ïñŧėñŧ ƈŀȧşşïƒïƈȧŧïőñ ȧɠȧïñşŧ ƒïẋŧůřėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_eval_mission_orchestration": {
+        "en": "Evaluate mission orchestration quality on recorded scenarios.",
+        "ja": "記録済みシナリオでミッションオーケストレーションの品質を評価する。",
+        "qps-ploc": "⟦Ėṽȧŀůȧŧė ɱïşşïőñ őřƈħėşŧřȧŧïőñ ɋůȧŀïŧẏ őñ řėƈőřḓėḓ şƈėñȧřïőş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_eval_model_role_fitness": {
+        "en": "Ask a model whether it can hold a team role before a mission relies on it.",
+        "ja": "ミッションで使う前に、モデルがチームロールを担えるかを確認する。",
+        "qps-ploc": "⟦Ȧşķ ȧ ɱőḓėŀ ẇħėŧħėř ïŧ ƈȧñ ħőŀḓ ȧ ŧėȧɱ řőŀė ƀėƒőřė ȧ ɱïşşïőñ řėŀïėş őñ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_cmd_script_eval_learning_efficiency": {
+        "en": "Benchmark how efficiently recorded learnings are reused.",
+        "ja": "記録した学びがどれだけ効率よく再利用されているかを計測する。",
+        "qps-ploc": "⟦Ƀėñƈħɱȧřķ ħőẇ ėƒƒïƈïėñŧŀẏ řėƈőřḓėḓ ŀėȧřñïñɠş ȧřė řėůşėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_check_dead_code": {
+        "en": "List dead-code candidates for review (advisory; deletes nothing).",
+        "ja": "レビュー用にデッドコード候補を列挙する(参考情報。削除はしない)。",
+        "qps-ploc": "⟦Ŀïşŧ ḓėȧḓ-ƈőḓė ƈȧñḓïḓȧŧėş ƒőř řėṽïėẇ (ȧḓṽïşőřẏ; ḓėŀėŧėş ñőŧħïñɠ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_check_rt_mode": {
+        "en": "Check the runtime mode configuration for consistency.",
+        "ja": "ランタイムモード設定の整合性を確認する。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė řůñŧïɱė ɱőḓė ƈőñƒïɠůřȧŧïőñ ƒőř ƈőñşïşŧėñƈẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_surfaces_screenshots": {
+        "en": "Capture before/after screenshots of the UI surfaces.",
+        "ja": "UI サーフェスの変更前後のスクリーンショットを撮る。",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ƀėƒőřė/ȧƒŧėř şƈřėėñşħőŧş őƒ ŧħė ŮÏ şůřƒȧƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_design_import_md_catalog": {
+        "en": "Import a Markdown design catalog into the governed design data.",
+        "ja": "Markdown のデザインカタログを管理対象のデザインデータに取り込む。",
+        "qps-ploc": "⟦Ïɱṗőřŧ ȧ Ɱȧřķḓőẇñ ḓėşïɠñ ƈȧŧȧŀőɠ ïñŧő ŧħė ɠőṽėřñėḓ ḓėşïɠñ ḓȧŧȧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_design_verify_resolution": {
+        "en": "Verify layout and body-zone resolution for each scenario brief.",
+        "ja": "各シナリオブリーフのレイアウトと本文領域の解決結果を検証する。",
+        "qps-ploc": "⟦Ṽėřïƒẏ ŀȧẏőůŧ ȧñḓ ƀőḓẏ-ẑőñė řėşőŀůŧïőñ ƒőř ėȧƈħ şƈėñȧřïő ƀřïėƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_media_intro_scratch": {
+        "en": "Build the scratch-first narrated intro video.",
+        "ja": "スクラッチ優先のナレーション付き紹介動画を作る。",
+        "qps-ploc": "⟦Ƀůïŀḓ ŧħė şƈřȧŧƈħ-ƒïřşŧ ñȧřřȧŧėḓ ïñŧřő ṽïḓėő. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_marketing_publish_dry_run": {
+        "en": "Rehearse a marketing publish without sending anything.",
+        "ja": "何も送信せずにマーケティング公開をリハーサルする。",
+        "qps-ploc": "⟦Řėħėȧřşė ȧ ɱȧřķėŧïñɠ ṗůƀŀïşħ ẇïŧħőůŧ şėñḓïñɠ ȧñẏŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_marketing_review_aggregate": {
+        "en": "Aggregate review results for marketing content.",
+        "ja": "マーケティングコンテンツのレビュー結果を集計する。",
+        "qps-ploc": "⟦Ȧɠɠřėɠȧŧė řėṽïėẇ řėşůŀŧş ƒőř ɱȧřķėŧïñɠ ƈőñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_pipeline_dry_run": {
+        "en": "Dry-run a pipeline: validate and plan its steps without side effects.",
+        "ja": "パイプラインをドライランし、副作用なしで手順を検証・計画する。",
+        "qps-ploc": "⟦Ḓřẏ-řůñ ȧ ṗïṗėŀïñė: ṽȧŀïḓȧŧė ȧñḓ ṗŀȧñ ïŧş şŧėṗş ẇïŧħőůŧ şïḓė ėƒƒėƈŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_scenario_storage_governance": {
+        "en": "Exercise the audit chain, data vault and process logger end to end.",
+        "ja": "監査チェーン、データ保管庫、プロセスロガーを通しで動かす。",
+        "qps-ploc": "⟦Ėẋėřƈïşė ŧħė ȧůḓïŧ ƈħȧïñ, ḓȧŧȧ ṽȧůŀŧ ȧñḓ ṗřőƈėşş ŀőɠɠėř ėñḓ ŧő ėñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_smoke_agent_pane_runtime": {
+        "en": "Smoke-test the opt-in pane agent-runtime launch mode.",
+        "ja": "オプトインのペイン型エージェントランタイム起動を簡易テストする。",
+        "qps-ploc": "⟦Şɱőķė-ŧėşŧ ŧħė őṗŧ-ïñ ṗȧñė ȧɠėñŧ-řůñŧïɱė ŀȧůñƈħ ɱőḓė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_memory_promotion_queue": {
+        "en": "Summarize the memory promotion queue.",
+        "ja": "記憶の昇格キューを要約する。",
+        "qps-ploc": "⟦Şůɱɱȧřïẑė ŧħė ɱėɱőřẏ ṗřőɱőŧïőñ ɋůėůė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_reconcile_config_fallbacks": {
+        "en": "Sweep recorded config fallbacks into reviewable follow-ups.",
+        "ja": "記録された設定のフォールバックを確認用のフォローアップにまとめる。",
+        "qps-ploc": "⟦Şẇėėṗ řėƈőřḓėḓ ƈőñƒïɠ ƒȧŀŀƀȧƈķş ïñŧő řėṽïėẇȧƀŀė ƒőŀŀőẇ-ůṗş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_reconcile_unhandled_intents": {
+        "en": "Sweep unhandled intents into reviewable follow-ups.",
+        "ja": "処理できなかったインテントを確認用のフォローアップにまとめる。",
+        "qps-ploc": "⟦Şẇėėṗ ůñħȧñḓŀėḓ ïñŧėñŧş ïñŧő řėṽïėẇȧƀŀė ƒőŀŀőẇ-ůṗş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_reconcile_unclassified_errors": {
+        "en": "Sweep unclassified errors into reviewable follow-ups.",
+        "ja": "未分類のエラーを確認用のフォローアップにまとめる。",
+        "qps-ploc": "⟦Şẇėėṗ ůñƈŀȧşşïƒïėḓ ėřřőřş ïñŧő řėṽïėẇȧƀŀė ƒőŀŀőẇ-ůṗş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_chat_local": {
+        "en": "Start an interactive local-LLM chat with tool use.",
+        "ja": "ツール利用付きのローカル LLM 対話を始める。",
+        "qps-ploc": "⟦Şŧȧřŧ ȧñ ïñŧėřȧƈŧïṽė ŀőƈȧŀ-ĿĿⱮ ƈħȧŧ ẇïŧħ ŧőőŀ ůşė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_hooks_discover": {
+        "en": "List project-local Claude/Codex hook configs and whether each is trusted.",
+        "ja": "プロジェクト内の Claude/Codex フック設定と、それぞれの承認状態を一覧表示する。",
+        "qps-ploc": "⟦Ŀïşŧ ṗřőĵėƈŧ-ŀőƈȧŀ Ƈŀȧůḓė/Ƈőḓėẋ ħőőķ ƈőñƒïɠş ȧñḓ ẇħėŧħėř ėȧƈħ ïş ŧřůşŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_cmd_script_hooks_trust": {
+        "en": "Request human approval to trust one project hook config (bound to its content).",
+        "ja": "プロジェクトのフック設定 1 件の信頼について人間の承認を依頼する(内容に紐づく)。",
+        "qps-ploc": "⟦Řėɋůėşŧ ħůɱȧñ ȧṗṗřőṽȧŀ ŧő ŧřůşŧ őñė ṗřőĵėƈŧ ħőőķ ƈőñƒïɠ (ƀőůñḓ ŧő ïŧş ƈőñŧėñŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       }
     },
     "recorder": {
@@ -7489,6 +7749,46 @@
         "en": "Requirements hearing: pnpm kyberion deals --requirements <deal-id>",
         "ja": "要件ヒアリング内容: pnpm kyberion deals --requirements <deal-id>",
         "qps-ploc": "⟦Řėɋůïřėɱėñŧş ħėȧřïñɠ: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --řėɋůïřėɱėñŧş <ḓėȧŀ-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "recorder_deal_quote_usage": {
+        "en": "Usage: pnpm kyberion deals --quote <deal-id> --lines '[{\"task_kind\":\"...\",\"size\":\"...\"}]'",
+        "ja": "使い方: pnpm kyberion deals --quote <deal-id> --lines '[{\"task_kind\":\"...\",\"size\":\"...\"}]'",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --ɋůőŧė <ḓėȧŀ-ïḓ> --ŀïñėş '[{\"task_kind\":\"...\",\"size\":\"...\"}]' ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "recorder_deal_quote_unquotable": {
+        "en": "Not quotable from the price book: {kinds}. The operator was asked to price these items.",
+        "ja": "price book で見積できない項目があります: {kinds}。オペレーターに確認を依頼しました。",
+        "qps-ploc": "⟦Ñőŧ ɋůőŧȧƀŀė ƒřőɱ ŧħė ṗřïƈė ƀőőķ: {kinds}. Ŧħė őṗėřȧŧőř ẇȧş ȧşķėḓ ŧő ṗřïƈė ŧħėşė ïŧėɱş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "recorder_deal_quote_created": {
+        "en": "✓ Quote drafted for {id} (v{version}): {path}. Sending it needs approval.",
+        "ja": "✓ {id} の見積書ドラフトを作成しました (v{version}): {path}。送付には承認が必要です。",
+        "qps-ploc": "⟦✓ Ɋůőŧė ḓřȧƒŧėḓ ƒőř {id} (ṽ{version}): {path}. Şėñḓïñɠ ïŧ ñėėḓş ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "recorder_deal_contract_created": {
+        "en": "✓ Contract drafted for {id} (v{version}): {path}. It cannot be sent without an approved review record.",
+        "ja": "✓ {id} の契約書ドラフトを作成しました (v{version}): {path}。承認済みのレビュー記録が無い限り送付できません。",
+        "qps-ploc": "⟦✓ Ƈőñŧřȧƈŧ ḓřȧƒŧėḓ ƒőř {id} (ṽ{version}): {path}. Ïŧ ƈȧññőŧ ƀė şėñŧ ẇïŧħőůŧ ȧñ ȧṗṗřőṽėḓ řėṽïėẇ řėƈőřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "recorder_deal_review_usage": {
+        "en": "Usage: pnpm kyberion deals --review-contract <deal-id> --contract-version <n> --verdict <approve|reject> --reviewer <id> [--note <text>]",
+        "ja": "使い方: pnpm kyberion deals --review-contract <deal-id> --contract-version <n> --verdict <approve|reject> --reviewer <id> [--note <text>]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --řėṽïėẇ-ƈőñŧřȧƈŧ <ḓėȧŀ-ïḓ> --ƈőñŧřȧƈŧ-ṽėřşïőñ <ñ> --ṽėřḓïƈŧ <ȧṗṗřőṽė|řėĵėƈŧ> --řėṽïėẇėř <ïḓ> [--ñőŧė <ŧėẋŧ>] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "recorder_deal_review_recorded": {
+        "en": "✓ Contract review recorded for {id} v{version}: {verdict}",
+        "ja": "✓ {id} v{version} の契約レビューを記録しました: {verdict}",
+        "qps-ploc": "⟦✓ Ƈőñŧřȧƈŧ řėṽïėẇ řėƈőřḓėḓ ƒőř {id} ṽ{version}: {verdict} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "recorder_deal_handoff_usage": {
+        "en": "Usage: pnpm kyberion deals --handoff <deal-id> --mission-id <mission-id>",
+        "ja": "使い方: pnpm kyberion deals --handoff <deal-id> --mission-id <mission-id>",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --ħȧñḓőƒƒ <ḓėȧŀ-ïḓ> --ɱïşşïőñ-ïḓ <ɱïşşïőñ-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_deal_handoff_done": {
+        "en": "✓ Deal {id} handed to mission {mission}. Next pipeline: {pipeline}",
+        "ja": "✓ 商談 {id} をミッション {mission} に引き渡しました。次のパイプライン: {pipeline}",
+        "qps-ploc": "⟦✓ Ḓėȧŀ {id} ħȧñḓėḓ ŧő ɱïşşïőñ {mission}. Ñėẋŧ ṗïṗėŀïñė: {pipeline} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "recorder_capture_not_promotable": {
         "en": "No native OS events were captured. Keep this recording as observation evidence and re-record after enabling Accessibility permission.",
