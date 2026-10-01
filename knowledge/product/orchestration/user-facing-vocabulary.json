@@ -13371,6 +13371,41 @@
         "ja": "招待リンクを作る",
         "qps-ploc": "⟦Ƈřėȧŧė ïñṽïŧė ŀïñķ ŀőřėɱ⟧"
       },
+      "invite.email_subject": {
+        "en": "You are invited to join {tenant}",
+        "ja": "{tenant} への招待",
+        "qps-ploc": "⟦Ẏőů ȧřė ïñṽïŧėḓ ŧő ĵőïñ {tenant} ŀőřėɱ ïṗşů⟧"
+      },
+      "invite.email_body": {
+        "en": "{inviter} invited you to join {tenant}.\n\nOpen this link to join (it works once and expires):\n{link}\n\nIf you were not expecting this, you can ignore this message.",
+        "ja": "{inviter} さんから {tenant} への招待が届いています。\n\n次のリンクから参加してください(1 回だけ使え、期限があります):\n{link}\n\n心当たりがない場合は、このメッセージを無視してください。",
+        "qps-ploc": "⟦{inviter} ïñṽïŧėḓ ẏőů ŧő ĵőïñ {tenant}.\n\nŐṗėñ ŧħïş ŀïñķ ŧő ĵőïñ (ïŧ ẇőřķş őñƈė ȧñḓ ėẋṗïřėş):\n{link}\n\nÏƒ ẏőů ẇėřė ñőŧ ėẋṗėƈŧïñɠ ŧħïş, ẏőů ƈȧñ ïɠñőřė ŧħïş ɱėşşȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "setup.invite_email_label": {
+        "en": "Email address (optional)",
+        "ja": "メールアドレス(任意)",
+        "qps-ploc": "⟦Ėɱȧïŀ ȧḓḓřėşş (őṗŧïőñȧŀ) ŀőřėɱ ï⟧"
+      },
+      "setup.invite_email_draft": {
+        "en": "Make a mail draft",
+        "ja": "メールの下書きを作る",
+        "qps-ploc": "⟦Ɱȧķė ȧ ɱȧïŀ ḓřȧƒŧ ŀőřėɱ⟧"
+      },
+      "setup.invite_email_created": {
+        "en": "A draft is ready in your mail app. Review it and send it yourself.",
+        "ja": "メールアプリに下書きを作りました。内容を確認して、ご自身で送ってください。",
+        "qps-ploc": "⟦Ȧ ḓřȧƒŧ ïş řėȧḓẏ ïñ ẏőůř ɱȧïŀ ȧṗṗ. Řėṽïėẇ ïŧ ȧñḓ şėñḓ ïŧ ẏőůřşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "setup.invite_email_unavailable": {
+        "en": "No mail app is available here. Copy the link above and send it yourself.",
+        "ja": "ここではメールの下書きを作れません。上のリンクをコピーして、ご自身で送ってください。",
+        "qps-ploc": "⟦Ñő ɱȧïŀ ȧṗṗ ïş ȧṽȧïŀȧƀŀė ħėřė. Ƈőṗẏ ŧħė ŀïñķ ȧƀőṽė ȧñḓ şėñḓ ïŧ ẏőůřşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "setup.invite_email_invalid": {
+        "en": "That does not look like an email address.",
+        "ja": "メールアドレスの形式が正しくありません。",
+        "qps-ploc": "⟦Ŧħȧŧ ḓőėş ñőŧ ŀőőķ ŀïķė ȧñ ėɱȧïŀ ȧḓḓřėşş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "setup.invite_link_once": {
         "en": "Share this link now. It is shown only once.",
         "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",

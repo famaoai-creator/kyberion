@@ -9,6 +9,7 @@ import {
   type InviteOverviewTenant,
   type InviteRole,
 } from '../../../lib/invite-view';
+import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 type Message = { text: string; error?: boolean } | null;
@@ -30,11 +31,14 @@ const STATUS_KEYS = {
  * server decides which roles each may grant and shows the link exactly once.
  */
 export function InvitesPane({ t }: { t: SettingsTranslate }) {
+  const { locale } = useConciergeI18n();
   const [tenants, setTenants] = React.useState<InviteOverviewTenant[]>([]);
   const [tenant, setTenant] = React.useState('');
   const [role, setRole] = React.useState<InviteRole>('viewer');
   const [ttl, setTtl] = React.useState('72');
   const [link, setLink] = React.useState<string | null>(null);
+  const [code, setCode] = React.useState<string | null>(null);
+  const [email, setEmail] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<Message>(null);
 
@@ -64,6 +68,7 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
       setRole(current.can_invite_roles[current.can_invite_roles.length - 1] ?? 'viewer');
     }
     setLink(null);
+    setCode(null);
   }, [tenant, current, role]);
 
   const post = async (body: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
@@ -107,7 +112,47 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
     });
     if (data && typeof data.code === 'string') {
       setLink(`${window.location.origin}${inviteJoinPath(data.code)}`);
+      setCode(data.code);
       await load();
+    }
+  };
+
+  const makeDraft = async () => {
+    if (!current || !code) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/invites/email-draft?locale=${locale}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_slug: current.tenant_slug, code, email: email.trim() }),
+      });
+      const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!response.ok || !data || data.ok !== true) {
+        setMessage({
+          text:
+            data?.error === 'invalid_email'
+              ? t('setup.invite_email_invalid')
+              : t('setup.invite_err', { detail: String(data?.error ?? response.status) }),
+          error: true,
+        });
+        return;
+      }
+      setMessage({
+        text:
+          data.draft === 'created'
+            ? t('setup.invite_email_created')
+            : t('setup.invite_email_unavailable'),
+      });
+    } catch (error) {
+      setMessage({
+        text: t('setup.invite_err', {
+          detail: error instanceof Error ? error.message : String(error),
+        }),
+        error: true,
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -129,6 +174,7 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
         'invite.tenant': (v) => setTenant(asText(v)),
         'invite.role': (v) => setRole(asText(v) as InviteRole),
         'invite.ttl': (v) => setTtl(asText(v)),
+        'invite.email': (v) => setEmail(asText(v)),
       }}
     >
       <SettingsGroup
@@ -186,6 +232,23 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
                 <p style={{ wordBreak: 'break-all' }}>
                   <code>{link}</code>
                 </p>
+                <SettingRow label={t('setup.invite_email_label')}>
+                  <TextField
+                    id="invite-email"
+                    name="invite.email"
+                    label={t('setup.invite_email_label')}
+                    hide_label
+                    value={email}
+                  />
+                </SettingRow>
+                <div className="settings-row-actions">
+                  <Button
+                    label={t('setup.invite_email_draft')}
+                    variant="secondary"
+                    disabled={busy || email.trim() === ''}
+                    onClick={() => void makeDraft()}
+                  />
+                </div>
               </div>
             ) : null}
             <h4>{t('setup.invite_list_title')}</h4>
