@@ -16,7 +16,7 @@ diagnoses and prepares; the human only approves**. Nobody needs `KYBERION_PERSON
 
 ```
 pnpm mission hygiene [--notify]     # stale/abandoned population with recommendations
-pnpm doctor                          # includes the hygiene report
+pnpm kyberion doctor                          # includes the hygiene report
 pnpm mission purge                   # dry-run sweep preview (archive candidates by policy)
 ```
 

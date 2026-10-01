@@ -17,7 +17,7 @@ describe('AGY SDK setup report', () => {
       '[WARN] agy_sdk',
       '  managed_env: /tmp/agy',
       '  detail: runtime unavailable',
-      'Next step: `pnpm agy:sdk:setup --apply`',
+      'Next step: `pnpm agy:sdk-setup --apply`',
     ]);
   });
 });

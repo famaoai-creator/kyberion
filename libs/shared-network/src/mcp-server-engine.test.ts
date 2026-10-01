@@ -629,7 +629,7 @@ describe('createKyberionMcpServer()', () => {
       const fakeHints = [
         {
           topic: 'onboarding',
-          hint: 'Run pnpm onboard',
+          hint: 'Run pnpm onboarding',
           source: 'knowledge/public/procedures',
           confidence: 0.9,
         },

@@ -13,7 +13,27 @@
         "input_modalities": ["text", "image"]
       },
       "env_keys": ["XAI_API_KEY", "KYBERION_GROK_API_KEY"],
-      "cost_tier": "metered"
+      "cost_tier": "metered",
+      "transport": "api",
+      "data_egress": "external-api",
+      "adapter": "grok-api",
+      "profile": {
+        "streaming": true,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_vendor": "xai",
+      "endpoint": "https://api.x.ai",
+      "egress_provider_id": "grok",
+      "model_env_keys": ["KYBERION_GROK_API_MODEL"]
     }
   ]
 }

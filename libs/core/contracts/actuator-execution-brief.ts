@@ -15,6 +15,8 @@ export interface ActuatorExecutionBrief {
   user_facing_summary?: string;
   normalized_scope?: string[];
   target_actuators: string[];
+  /** Non-actuator runtime components the brief relies on (RS-07). */
+  support_components?: string[];
   deliverables: string[];
   missing_inputs: string[];
   service_binding_refs?: string[];

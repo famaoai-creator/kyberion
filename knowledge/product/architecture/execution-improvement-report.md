@@ -10,7 +10,7 @@ This report tracks the hardening work needed to improve execution smoothness wit
 
 ### Multilingual Archetype Detection
 
-- Japanese request patterns now feed archetype detection through a bridge layer in [orchestrator-actuator](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/src/index.ts).
+- Japanese request patterns now feed archetype detection through a bridge layer in [orchestrator-actuator](../../../libs/actuators/orchestrator-actuator/src/index.ts).
 - The current approach adds English detection hints instead of translating the entire request, which reduces semantic drift.
 
 ### Intelligent Input Binding

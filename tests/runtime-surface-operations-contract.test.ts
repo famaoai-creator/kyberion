@@ -17,7 +17,9 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.js');
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
       expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
-    expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
+    expect(pkg.scripts['channels:list']).toBe(
+      'node scripts/run_built.mjs dist/scripts/channel_directory.js'
+    );
     // SX-05 (script ratchet, commit a877d9c12) pruned the combined
     // `bootstrap` alias along with the rest of the redundant script surface
     // (package scripts 168 -> <=120); the canonical successor is the
@@ -27,7 +29,9 @@ describe('Runtime surface operations contract', () => {
     // is that both halves exist and the onboarding doc still spells it out.
     expect(pkg.scripts.build).toContain('build:packages');
     expect(read('docs/INITIALIZATION.md')).toContain('pnpm surfaces reconcile');
-    expect(pkg.scripts.dashboard).toBe('node dist/scripts/sovereign_dashboard.js');
+    expect(pkg.scripts.dashboard).toBe(
+      'node scripts/run_built.mjs dist/scripts/sovereign_dashboard.js'
+    );
     expect(pkg.scripts['dashboard:onboarding']).toBeUndefined();
   });
 

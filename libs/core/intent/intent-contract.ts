@@ -46,6 +46,10 @@ import {
   type ModelRegistryFile,
 } from '../reasoning/reasoning-model-routing.js';
 import {
+  listReasoningProviderDescriptors,
+  resolveReasoningProviderDescriptor,
+} from '../reasoning/reasoning-provider-registry.js';
+import {
   buildIntentFlowCacheEligibility,
   lookupIntentFlowCache,
   storeIntentFlowCache,
@@ -332,13 +336,41 @@ export function parseIntentModelJsonObject(text: string): Record<string, unknown
   }
 }
 
-function providerToCompilerProvider(provider: string): IntentCompilerProvider | null {
+/** Intent-compiler adapters. The provider vocabulary itself comes from the reasoning registry. */
+const INTENT_COMPILER_PROVIDERS: readonly IntentCompilerProvider[] = ['codex', 'claude', 'gemini'];
+
+/**
+ * RS-03: map any provider identifier — a mode, runtime alias, provider id, or
+ * model-registry vendor (`openai`, `anthropic`, `google`) — to a compiler
+ * adapter through the reasoning provider registry. Unknown → null.
+ */
+export function providerToCompilerProvider(provider: string): IntentCompilerProvider | null {
   const normalized = provider.trim().toLowerCase();
-  if (normalized === 'openai' || normalized === 'codex') return 'codex';
-  if (normalized === 'anthropic' || normalized === 'claude') return 'claude';
-  if (normalized === 'google' || normalized === 'gemini') return 'gemini';
+  if (!normalized) return null;
+  const resolved = resolveReasoningProviderDescriptor(normalized);
+  const candidates = [
+    ...(resolved ? [resolved] : []),
+    ...listReasoningProviderDescriptors().filter(
+      (descriptor) => descriptor.model_vendor === normalized
+    ),
+  ];
+  for (const descriptor of candidates) {
+    const compiler = INTENT_COMPILER_PROVIDERS.find((entry) => entry === descriptor.provider);
+    if (compiler) return compiler;
+  }
   return null;
 }
+
+const INTENT_COMPILER_MODEL_DEFAULTS: Readonly<
+  Record<IntentCompilerProvider, () => { model?: string; modelProvider?: string }>
+> = {
+  claude: () => ({ model: getRegisteredEnvText('KYBERION_CLAUDE_MODEL') }),
+  gemini: () => ({ model: resolveRuntimeModelId('gemini-default') }),
+  codex: () => ({
+    model: getRegisteredEnvText('KYBERION_CODEX_MODEL'),
+    modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
+  }),
+};
 
 function stripModelProviderPrefix(modelId: string): string {
   const idx = modelId.indexOf(':');
@@ -1124,30 +1156,23 @@ export function resolveIntentCompilerTarget(
     getRegisteredEnvText('KYBERION_INTENT_COMPILER_PROVIDER') ||
     'codex'
   ).toLowerCase();
-  const provider: IntentCompilerProvider =
-    rawProvider === 'claude' || rawProvider === 'gemini' ? rawProvider : 'codex';
+  const provider = providerToCompilerProvider(rawProvider);
+  if (!provider) {
+    // RS-03: never silently substitute another provider for an unknown one.
+    throw new Error(
+      `[INTENT_COMPILER_PROVIDER_UNSUPPORTED] ${rawProvider} has no intent-compiler adapter (supported: ${INTENT_COMPILER_PROVIDERS.join(', ')})`
+    );
+  }
   const explicitModel = options.model || getRegisteredEnvText('KYBERION_INTENT_COMPILER_MODEL');
   const explicitModelProvider =
     options.modelProvider || getRegisteredEnvText('KYBERION_INTENT_COMPILER_MODEL_PROVIDER');
-
-  if (provider === 'claude') {
-    return {
-      provider,
-      model: explicitModel || getRegisteredEnvText('KYBERION_CLAUDE_MODEL'),
-    };
-  }
-
-  if (provider === 'gemini') {
-    return {
-      provider,
-      model: explicitModel || resolveRuntimeModelId('gemini-default'),
-    };
-  }
-
+  const defaults = INTENT_COMPILER_MODEL_DEFAULTS[provider]();
+  const model = explicitModel || defaults.model;
+  const modelProvider = explicitModelProvider || defaults.modelProvider;
   return {
-    provider: 'codex',
-    model: explicitModel || getRegisteredEnvText('KYBERION_CODEX_MODEL'),
-    modelProvider: explicitModelProvider || getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
+    provider,
+    model,
+    ...(modelProvider ? { modelProvider } : {}),
   };
 }
 

@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getControlPlaneBaseUrl } from './control-plane-client.js';
+import { resolveSurfaceUrl } from './surface/surface-url.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
 import {
@@ -304,15 +305,23 @@ export const a2uiDispatcher = new A2UIDispatcher();
 /**
  * Bridge HTTP transport: forwards A2UI messages to the Bridge SSE relay.
  */
-function createBridgeTransport(
-  bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') ||
-    `${getControlPlaneBaseUrl('presence')},http://127.0.0.1:3040`
-): A2UITransport {
-  const targets = bridgeUrl
+function resolveBridgeTargets(bridgeUrl?: string): string[] {
+  const configured =
+    bridgeUrl ||
+    getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') ||
+    `${getControlPlaneBaseUrl('presence')},${resolveSurfaceUrl('computer-surface')}`;
+  return configured
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function createBridgeTransport(bridgeUrl?: string): A2UITransport {
+  // Targets resolve lazily (RS-04): the surface registry is read on first dispatch,
+  // not at module load.
+  let targets: string[] | undefined;
   return (message: A2UIMessage) => {
+    targets ??= resolveBridgeTargets(bridgeUrl);
     for (const target of targets) {
       const payload = redactSensitiveObject(message);
       const localadminToken = String(
