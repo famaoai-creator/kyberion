@@ -32,7 +32,7 @@ export interface CliReferenceRow {
 function describe(key: string | undefined): string {
   if (!key) return '';
   const resolved = resolveVocabularyEntry(`cli:${key}`);
-  return (resolved?.entry.en ?? key).replace(/\|/gu, '\\|');
+  return (resolved?.entry.en ?? key).replace(/\\/gu, '\\\\').replace(/\|/gu, '\\|');
 }
 
 /** `x default` is invoked as plain `x`; the home command is the bare `kyberion`. */
