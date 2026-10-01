@@ -13,6 +13,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { logger } from '../core.js';
+import { t, type VocabularyKey } from '../t.js';
 import { formatDiagnostic } from '../logger.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
@@ -312,23 +313,28 @@ export function resetOperatorNotificationRateLimiter(): void {
   lastNotifiedAt.clear();
 }
 
-const EVENT_LABEL: Record<OperatorEvent, string> = {
-  question: '❓ 質問',
-  approval_required: '🔐 承認待ち',
-  mission_completed: '✅ ミッション完了',
-  mission_failed: '❌ ミッション失敗',
-  deliverable_ready: '📦 成果物',
-  ops_alert: '🚨 運用アラート',
+const EVENT_LABEL_KEYS: Record<OperatorEvent, VocabularyKey | null> = {
+  question: 'surface:operator_event_question',
+  approval_required: 'surface:operator_event_approval_required',
+  mission_completed: 'surface:operator_event_mission_completed',
+  mission_failed: 'surface:operator_event_mission_failed',
+  deliverable_ready: 'surface:operator_event_deliverable_ready',
+  ops_alert: 'surface:operator_event_ops_alert',
   // The digest title is localized by the digest itself.
-  decision_digest: '🗂',
+  decision_digest: null,
 };
+
+function eventLabel(event: OperatorEvent): string {
+  const key = EVENT_LABEL_KEYS[event];
+  return key ? t(key) : '🗂';
+}
 
 function formatNotificationText(
   event: OperatorEvent,
   payload: OperatorNotificationPayload
 ): string {
   return [
-    `${EVENT_LABEL[event]} — ${payload.title}`,
+    `${eventLabel(event)} — ${payload.title}`,
     payload.body,
     payload.link_hint ? `→ ${payload.link_hint}` : '',
   ]

@@ -1,4 +1,5 @@
 import { logger } from '../core.js';
+import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
 import { enforceApprovalGate } from '../governance/approval-gate.js';
 import { recordGovernanceAction } from '../governance/kill-switch.js';
@@ -916,8 +917,11 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
         operations: externalEffectSteps.map((s) => `${s.service_id}.${s.action}`),
       },
       draft: {
-        title: `Service 実行: ${procedure.target.name}`,
-        summary: `${externalEffectSteps.length} 件の external-effect（${externalEffectSteps.map((s) => `${s.service_id}.${s.action}`).join(', ')}）`,
+        title: t('mission_ops:approval_service_run_title', { name: procedure.target.name }),
+        summary: t('mission_ops:approval_service_external_effect_summary', {
+          count: externalEffectSteps.length,
+          operations: externalEffectSteps.map((s) => `${s.service_id}.${s.action}`).join(', '),
+        }),
         severity: 'high',
       },
       ...(hasHuman !== undefined ? { hasHuman } : {}),

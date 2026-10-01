@@ -30,6 +30,7 @@
  * each started with `tsx scripts/<pad>/server.ts [port]` on its default port.
  */
 
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -201,10 +202,10 @@ async function captureOne(
   const context = await browser.newContext({
     viewport: { width, height },
     colorScheme: theme,
-    locale: locale === 'ja' ? 'ja-JP' : 'en-US',
+    locale: localeToBcp47(locale),
     extraHTTPHeaders: {
       'x-real-ip': '127.0.0.1',
-      'accept-language': locale === 'ja' ? 'ja-JP,ja;q=0.9' : 'en-US,en;q=0.9',
+      'accept-language': `${localeToBcp47(locale)},${locale};q=0.9`,
     },
   });
   const origin = new URL(baseUrl);

@@ -6,8 +6,8 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
-import { resolveLocale } from '../locale.js';
-import { normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
+import { deriveReplyLocale, enterReplyLocale, resolveLocale } from '../locale.js';
+import { detectTextLocale, normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
 import { t } from '../t.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
@@ -167,7 +167,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_promoted_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_promoted_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -350,7 +350,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_created_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_created_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -687,7 +687,7 @@ export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   const threadTs = input.threadTs || input.ts || 'unknown';
   const channelType = input.channelType || 'unknown';
   const normalizedText = input.text.trim();
-  const language = /[ぁ-んァ-ン一-龯]/.test(normalizedText) ? 'ja' : 'en';
+  const language = detectTextLocale(normalizedText) ?? 'en';
   warnOnUserLanguageDisagreement(language, 'buildSlackSurfacePrompt content heuristic');
   const executionMode = deriveSlackExecutionMode(normalizedText);
   return [
@@ -1064,6 +1064,11 @@ export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
   surfaceRuntimeData.surfaceRuntimeContextStore.enterWith(input);
+  // IT-02: reply in the turn's locale — explicit request locale, else the
+  // language the user wrote in, else (undefined) the resolveLocale() default.
+  enterReplyLocale(
+    deriveReplyLocale({ explicit: input.locale, text: input.surfaceText || input.query })
+  );
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
   if (parsedExecutionFeedback) {

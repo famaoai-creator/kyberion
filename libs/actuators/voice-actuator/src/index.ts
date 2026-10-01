@@ -1,5 +1,6 @@
 import { collectVoiceSamples } from '@agent/core/voice/voice-sample-collection';
 import { isDirectEntry } from '@agent/core/direct-entry';
+import { t } from '@agent/core/t';
 import {
   getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration,
@@ -455,9 +456,7 @@ async function recordVerifyRepairVoiceSample(input: {
     initialVerification = session.verification;
     repairAttempts = Array.isArray(session.repair_attempts) ? session.repair_attempts : [];
     replacements = Array.isArray(session.replacements) ? session.replacements : [];
-    logger.info(
-      `[VOICE] ↩️ ${sampleId} の修復セッションを再開します。初回録音と確認を再実行しません。`
-    );
+    logger.info(`[VOICE] ↩️ ${t('voice:repair_resume', { sampleId })}`);
   } else {
     initial = await recordVoiceSample({
       action: 'record_voice_sample',
@@ -482,7 +481,7 @@ async function recordVerifyRepairVoiceSample(input: {
     }
 
     try {
-      logger.info(`[VOICE] 🔎 ${sampleId} のSTT確認中（タイムスタンプ付きバックエンドを優先）...`);
+      logger.info(`[VOICE] 🔎 ${t('voice:repair_stt_checking', { sampleId })}`);
       initialTranscript = await transcribeVoiceSample({
         action: 'transcribe_voice_sample',
         audio_path: initial.output_path,
@@ -500,7 +499,7 @@ async function recordVerifyRepairVoiceSample(input: {
         verification: { status: 'blocked', reason: 'stt_unavailable' },
         repair_attempts: [],
         status: 'blocked',
-        reason: `STT確認を開始できませんでした: ${error?.message || String(error)}`,
+        reason: t('voice:repair_stt_start_failed', { detail: error?.message || String(error) }),
         data_retention: { raw_audio: 'deleted', resume_session: 'not_created' },
       };
     }
@@ -511,7 +510,7 @@ async function recordVerifyRepairVoiceSample(input: {
     );
   }
   if (initialVerification.status === 'passed') {
-    logger.info(`[VOICE] ✅ ${sampleId} STT確認OK。再録音は不要です。`);
+    logger.info(`[VOICE] ✅ ${t('voice:repair_stt_ok', { sampleId })}`);
     return {
       ...initial,
       action: 'record_verify_repair_voice_sample',
@@ -546,8 +545,7 @@ async function recordVerifyRepairVoiceSample(input: {
       verification: initialVerification,
       repair_attempts: [],
       status: 'blocked',
-      reason:
-        'タイムスタンプ付きSTTで文の位置を特定できないため、安全な部分置換を実行できません。STT設定を確認してから再試行してください。',
+      reason: t('voice:repair_no_timestamps'),
       data_retention: { raw_audio: 'deleted', resume_session: 'not_created' },
     };
   }
@@ -588,9 +586,15 @@ async function recordVerifyRepairVoiceSample(input: {
         `voice-sample-repairs/${requestId}/${sampleId}/${mismatch.segment_id}-attempt-${attempt}.wav`
       );
       logger.warn(
-        `[VOICE] ⚠️ ${sampleId} 修復 ${mismatchIndex + 1}/${initialVerification.mismatches.length} ` +
-          `${mismatch.segment_id} が不一致。` +
-          `この文だけ再録音します (${attempt}/${maxAttempts})。\n原稿: 「${mismatch.text}」`
+        `[VOICE] ⚠️ ${t('voice:repair_segment_mismatch', {
+          sampleId,
+          index: mismatchIndex + 1,
+          total: initialVerification.mismatches.length,
+          segmentId: mismatch.segment_id,
+          attempt,
+          maxAttempts,
+          text: mismatch.text,
+        })}`
       );
       const repair = await recordVoiceSample({
         action: 'record_voice_sample',
@@ -628,7 +632,7 @@ async function recordVerifyRepairVoiceSample(input: {
           segment_id: mismatch.segment_id,
           attempt,
           status: 'blocked',
-          reason: `STT確認に失敗: ${error?.message || String(error)}`,
+          reason: t('voice:repair_stt_failed', { detail: error?.message || String(error) }),
         });
         cleanupVoiceArtifact(repair.output_path);
         persistRepairSession();
@@ -671,7 +675,7 @@ async function recordVerifyRepairVoiceSample(input: {
             repair_attempts: repairAttempts,
             resume_session_path: sessionPath,
             status: 'blocked',
-            reason: `${mismatch.segment_id} の元音声区間を特定できないため、部分置換を中止しました`,
+            reason: t('voice:repair_no_source_span', { segmentId: mismatch.segment_id }),
           };
         }
         replacements.push({
@@ -724,7 +728,7 @@ async function recordVerifyRepairVoiceSample(input: {
   } catch {
     logger.warn(`[VOICE] cleanup skipped for repair session ${sessionPath}`);
   }
-  logger.info(`[VOICE] ✅ ${sampleId} のズレた文だけ再録音し、STT確認を通過しました。`);
+  logger.info(`[VOICE] ✅ ${t('voice:repair_done', { sampleId })}`);
   return {
     ...initial,
     action: 'record_verify_repair_voice_sample',

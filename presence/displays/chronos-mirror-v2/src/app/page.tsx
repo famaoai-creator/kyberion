@@ -1,5 +1,6 @@
 'use client';
 
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import {
   Shield,
   Building2,
@@ -246,7 +247,7 @@ function ChronosMirrorV2Content() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
+    document.documentElement.lang = localeToBcp47(locale);
   }, [locale]);
 
   useEffect(() => {
@@ -501,67 +502,80 @@ function ChronosMirrorV2Content() {
   );
 
   // SU-02: operator clicks on actionable A2UI components move things forward.
-  const handleA2UIComponentAction = useCallback(async (action: any) => {
-    try {
-      if (action.componentType === 'kb-intervention-panel' && action.action === 'select-option') {
-        const props = action.props || {};
-        const option = action.option || {};
-        const optionValue = String(option.value ?? option.label ?? '').trim();
-        const approvalId = String(props.approval_id || props.approvalId || '').trim();
-        const missionId = String(props.mission_id || props.missionId || '').trim();
-        if (approvalId && (optionValue === 'approved' || optionValue === 'rejected')) {
-          const response = await fetch('/api/intelligence', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'approval_decision',
-              requestId: approvalId,
-              channel: props.channel || 'chronos',
-              storageChannel:
-                props.storage_channel || props.storageChannel || props.channel || 'chronos',
-              decision: optionValue,
-            }),
-          });
-          if (!response.ok) throw new Error('approval decision failed');
-          setA2uiActionNotice(
-            `承認リクエスト ${approvalId} を ${optionValue === 'approved' ? '承認' : '差し戻し'}しました。`
-          );
+  const handleA2UIComponentAction = useCallback(
+    async (action: any) => {
+      try {
+        if (action.componentType === 'kb-intervention-panel' && action.action === 'select-option') {
+          const props = action.props || {};
+          const option = action.option || {};
+          const optionValue = String(option.value ?? option.label ?? '').trim();
+          const approvalId = String(props.approval_id || props.approvalId || '').trim();
+          const missionId = String(props.mission_id || props.missionId || '').trim();
+          if (approvalId && (optionValue === 'approved' || optionValue === 'rejected')) {
+            const response = await fetch('/api/intelligence', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'approval_decision',
+                requestId: approvalId,
+                channel: props.channel || 'chronos',
+                storageChannel:
+                  props.storage_channel || props.storageChannel || props.channel || 'chronos',
+                decision: optionValue,
+              }),
+            });
+            if (!response.ok) throw new Error('approval decision failed');
+            setA2uiActionNotice(
+              uxMessage(
+                optionValue === 'approved'
+                  ? 'chronos_a2ui_approval_approved'
+                  : 'chronos_a2ui_approval_rejected',
+                { id: approvalId },
+                `Approval request ${approvalId} was ${optionValue === 'approved' ? 'approved' : 'sent back'}.`,
+                locale
+              )
+            );
+            return;
+          }
+          if (missionId) {
+            const response = await fetch('/api/intelligence', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'intervention_respond',
+                missionId,
+                question: props.reason || '',
+                response: optionValue || option.label,
+              }),
+            });
+            if (!response.ok) throw new Error('intervention response failed');
+            setA2uiActionNotice(
+              uxMessage(
+                'chronos_a2ui_intervention_sent',
+                { missionId, label: option.label },
+                `Sent the intervention response "${option.label}" to mission ${missionId}.`,
+                locale
+              )
+            );
+            return;
+          }
+          setA2uiActionNotice(uxText('chronos_a2ui_intervention_no_target', locale));
           return;
         }
-        if (missionId) {
-          const response = await fetch('/api/intelligence', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'intervention_respond',
-              missionId,
-              question: props.reason || '',
-              response: optionValue || option.label,
-            }),
-          });
-          if (!response.ok) throw new Error('intervention response failed');
-          setA2uiActionNotice(
-            `ミッション ${missionId} へ介入回答「${option.label}」を送信しました。`
-          );
-          return;
+        if (action.componentType === 'kb-artifact-tile') {
+          const path = String(action.props?.path || '').trim();
+          if (path) {
+            window.open(`/api/mission-asset?path=${encodeURIComponent(path)}`, '_blank');
+            return;
+          }
+          setA2uiActionNotice(uxText('chronos_a2ui_artifact_no_path', locale));
         }
-        setA2uiActionNotice(
-          'この介入パネルには対象（mission_id / approval_id）が指定されていません。'
-        );
-        return;
+      } catch (error) {
+        setA2uiActionNotice(error instanceof Error ? error.message : String(error));
       }
-      if (action.componentType === 'kb-artifact-tile') {
-        const path = String(action.props?.path || '').trim();
-        if (path) {
-          window.open(`/api/mission-asset?path=${encodeURIComponent(path)}`, '_blank');
-          return;
-        }
-        setA2uiActionNotice('この成果物タイルにはパスがありません。');
-      }
-    } catch (error) {
-      setA2uiActionNotice(error instanceof Error ? error.message : String(error));
-    }
-  }, []);
+    },
+    [locale]
+  );
 
   const openDeliverableAsset = useCallback(
     (item: {
@@ -601,7 +615,7 @@ function ChronosMirrorV2Content() {
 
   const runPlanPreview = useCallback(async () => {
     if (!planRequestText.trim()) {
-      setPlanPreviewError('依頼文を入力してください');
+      setPlanPreviewError(uxText('chronos_plan_request_required', locale));
       return;
     }
     setPlanPreviewBusy(true);
@@ -645,11 +659,11 @@ function ChronosMirrorV2Content() {
 
   const approvePlanAndStart = useCallback(async () => {
     if (!planPreview) {
-      setPlanApprovalMessage('先に plan preview を作成してください');
+      setPlanApprovalMessage(uxText('chronos_plan_preview_required', locale));
       return;
     }
     if (planPreviewIsStale) {
-      setPlanApprovalMessage('入力を変更したので plan preview を再実行してください');
+      setPlanApprovalMessage(uxText('chronos_plan_preview_stale', locale));
       return;
     }
     const sessionId = planApprovalSessionId || planPreview.missionId;
@@ -706,7 +720,7 @@ function ChronosMirrorV2Content() {
     ) => {
       const item = deliverables.find((entry) => entry.artifactId === selectedDeliverableId);
       if (!item) {
-        setDeliverableReviewError('成果物を選択してください');
+        setDeliverableReviewError(uxText('chronos_deliverable_select_required', locale));
         return;
       }
       // LC-10 ask-why: a rejection with no comment and no category teaches
@@ -750,7 +764,7 @@ function ChronosMirrorV2Content() {
         setDeliverableReviewBusy(false);
       }
     },
-    [deliverableReviewComment, deliverables, refreshDeliverables, selectedDeliverableId]
+    [deliverableReviewComment, deliverables, locale, refreshDeliverables, selectedDeliverableId]
   );
 
   const submitConnectionReview = useCallback(

@@ -1,6 +1,7 @@
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { localeToBcp47, normalizeLocale } from '@agent/core/locale-normalize';
+import { resolveLocale } from '@agent/core/locale';
 import {
   ensureOwnerMember,
   resolveMemberByPrincipal,
@@ -1287,7 +1288,7 @@ presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
   logger.info(
     presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.accept', {
       request_id: requestId,
-      locale: parsed.data.locale || 'ja-JP',
+      locale: parsed.data.locale || localeToBcp47(resolveLocale()),
       backend: parsed.data.backend || 'default',
       timeout_seconds: parsed.data.timeout_seconds || 8,
     })
@@ -1299,7 +1300,7 @@ presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         request_id: requestId,
-        locale: parsed.data.locale || 'ja-JP',
+        locale: parsed.data.locale || localeToBcp47(resolveLocale()),
         device_id: parsed.data.device_id,
         backend: parsed.data.backend,
         timeout_seconds: parsed.data.timeout_seconds || 8,

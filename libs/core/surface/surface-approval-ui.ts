@@ -21,7 +21,7 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from '../intent/intent-resolution-contract.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { resolveLocale, type SupportedLocale } from '../locale.js';
 import { t, type VocabularyKey } from '../t.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
@@ -161,7 +161,7 @@ export function buildSurfaceApprovalText(
   intentResolution?: IntentResolutionContract,
   options: { locale?: SupportedLocale } = {}
 ): string {
-  const locale = options.locale ?? 'ja';
+  const locale = options.locale ?? resolveLocale();
   if (record.decisionCard) {
     return renderDecisionCardText(viewDecisionCard(record, { locale }), locale);
   }
@@ -236,12 +236,12 @@ export function buildDecisionCardActions(record: ApprovalRequestRecord): Decisio
   }));
 }
 
-const SURFACE_ASK_WHY_LABELS: Record<RejectionReasonCategory, string> = {
-  incorrect_content: '内容が誤り',
-  wrong_direction: '方向が違う',
-  quality: '品質不足',
-  scope: 'スコープ過不足',
-  other: 'その他',
+const SURFACE_ASK_WHY_LABEL_KEYS: Record<RejectionReasonCategory, VocabularyKey> = {
+  incorrect_content: 'surface:ask_why_incorrect_content',
+  wrong_direction: 'surface:ask_why_wrong_direction',
+  quality: 'surface:ask_why_quality',
+  scope: 'surface:ask_why_scope',
+  other: 'surface:ask_why_other',
 };
 
 export interface SurfaceApprovalAskWhyAction {
@@ -260,13 +260,18 @@ export function normalizeSurfaceApprovalAskWhyCategory(
 
 /** Build the portable ask-why vocabulary used by native surface renderers. */
 export function buildSurfaceApprovalAskWhyActions(
-  requestId: string
+  requestId: string,
+  locale?: SupportedLocale
 ): SurfaceApprovalAskWhyAction[] {
   const categories: SurfaceApprovalAskWhyCategory[] = [...REJECTION_REASON_CATEGORIES, 'skip'];
   return categories.map((category) => ({
     requestId,
     category,
-    label: category === 'skip' ? 'スキップ' : SURFACE_ASK_WHY_LABELS[category],
+    label: t(
+      category === 'skip' ? 'surface:ask_why_skip' : SURFACE_ASK_WHY_LABEL_KEYS[category],
+      undefined,
+      locale
+    ),
     callbackData: `appr:${requestId}:why:${category}`,
   }));
 }
@@ -333,6 +338,7 @@ export function resolveSurfaceApprovalAskWhy(params: {
   threadTs: string;
   annotatedBy: string;
   storageChannel?: string;
+  locale?: SupportedLocale;
 }): SurfaceApprovalAskWhyReply {
   const category = normalizeSurfaceApprovalAskWhyCategory(params.category);
   const record = category
@@ -347,11 +353,11 @@ export function resolveSurfaceApprovalAskWhy(params: {
   if (!category || !record) {
     return {
       handled: true,
-      reply: 'この却下要求は存在しないか、別のスレッドにあります。',
+      reply: t('surface:ask_why_target_missing', undefined, params.locale),
     };
   }
   if (category === 'skip') {
-    return { handled: true, reply: '理由の記録をスキップしました。', record };
+    return { handled: true, reply: t('surface:ask_why_skipped', undefined, params.locale), record };
   }
   const updated = applySurfaceApprovalRejectionReason({
     ...params,
@@ -360,7 +366,7 @@ export function resolveSurfaceApprovalAskWhy(params: {
   });
   return {
     handled: true,
-    reply: `却下理由を記録しました(${category})。次回の作業改善に反映されます。`,
+    reply: t('surface:ask_why_recorded', { category }, params.locale),
     record: updated,
   };
 }
@@ -562,12 +568,16 @@ function resolveSurfaceApprovalRecord(params: {
   threadTs: string;
   decision: SurfaceApprovalDecision;
   decidedBy: string;
+  locale?: SupportedLocale;
 }): SurfaceApprovalReply {
   if (params.record.status !== 'pending') {
-    return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+    return {
+      handled: true,
+      reply: t('surface:approval_not_found_or_done', undefined, params.locale),
+    };
   }
   if (!replyTargetsRecord(params.record, params.surface, params.channel, params.threadTs)) {
-    return { handled: true, reply: 'この承認要求は別のスレッドにあります。' };
+    return { handled: true, reply: t('surface:approval_other_thread', undefined, params.locale) };
   }
   if (isApprovalRequestExpired(params.record)) {
     const expired = expireApprovalRequest(approvalRole(params.surface, params.storageChannel), {
@@ -575,7 +585,11 @@ function resolveSurfaceApprovalRecord(params: {
       storageChannel: params.storageChannel,
       requestId: params.record.id,
     });
-    return { handled: true, record: expired, reply: 'この承認要求は期限切れです。' };
+    return {
+      handled: true,
+      record: expired,
+      reply: t('surface:approval_expired', undefined, params.locale),
+    };
   }
   const updated = applySurfaceApprovalDecision({
     surface: params.surface,
@@ -591,8 +605,8 @@ function resolveSurfaceApprovalRecord(params: {
     record: updated,
     reply:
       params.decision === 'approved'
-        ? `承認しました: ${updated.title}`
-        : `却下しました: ${updated.title}`,
+        ? t('surface:approval_approved_reply', { title: updated.title }, params.locale)
+        : t('surface:approval_rejected_reply', { title: updated.title }, params.locale),
   };
 }
 
@@ -617,7 +631,7 @@ export function resolveSurfaceApprovalReply(params: {
       requestId: cardToken[1].toLowerCase(),
       kind: cardToken[2].toLowerCase() === 'explain' ? 'explain' : 'changes',
       instruction: instruction || undefined,
-      locale: params.locale ?? 'ja',
+      locale: params.locale ?? resolveLocale(),
     });
   }
   const token = text.match(DECISION_TOKEN);
@@ -628,9 +642,17 @@ export function resolveSurfaceApprovalReply(params: {
     decision = normalizeDecision(token[2]);
     record = loadReplyTarget(params.surface, token[1]);
     if (!record || record.status !== 'pending') {
-      return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
+      return {
+        handled: true,
+        reply: t('surface:approval_not_found_or_done', undefined, params.locale),
+      };
     }
-    if (!decision) return { handled: true, reply: '承認操作を解釈できませんでした。' };
+    if (!decision) {
+      return {
+        handled: true,
+        reply: t('surface:approval_decision_unparsed', undefined, params.locale),
+      };
+    }
     return resolveSurfaceApprovalRecord({
       surface: params.surface,
       record,
@@ -639,6 +661,7 @@ export function resolveSurfaceApprovalReply(params: {
       threadTs: params.threadTs,
       decision,
       decidedBy: params.decidedBy,
+      locale: params.locale,
     });
   } else {
     decision = normalizeDecision(text);
@@ -652,14 +675,19 @@ export function resolveSurfaceApprovalReply(params: {
         handled: true,
         reply:
           pending.length === 0
-            ? 'このスレッドに処理待ちの承認要求はありません。'
-            : '承認要求が複数あります。要求メッセージの appr:<id>:approve / reject を返信してください。',
+            ? t('surface:approval_none_pending', undefined, params.locale)
+            : t('surface:approval_multiple_pending', undefined, params.locale),
       };
     }
     record = pending[0];
   }
 
-  if (!record || !decision) return { handled: true, reply: '承認操作を解釈できませんでした。' };
+  if (!record || !decision) {
+    return {
+      handled: true,
+      reply: t('surface:approval_decision_unparsed', undefined, params.locale),
+    };
+  }
   return resolveSurfaceApprovalRecord({
     surface: params.surface,
     record,
@@ -668,5 +696,6 @@ export function resolveSurfaceApprovalReply(params: {
     threadTs: params.threadTs,
     decision,
     decidedBy: params.decidedBy,
+    locale: params.locale,
   });
 }

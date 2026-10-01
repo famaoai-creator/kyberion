@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeLocale } from '@agent/core/locale-normalize';
 import { DiscussionRoom } from '../components/DiscussionRoom';
 import { Suspense, useCallback, type ReactNode } from 'react';
 import Link from 'next/link';
@@ -250,11 +251,8 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
       } else if (actionId === KB_FORM_ACTIONS.fieldChange && payload) {
         if (payload.name === 'theme') {
           setThemeModePreference(normalizeThemeChoice(payload.value));
-        } else if (
-          payload.name === 'locale' &&
-          (payload.value === 'ja' || payload.value === 'en')
-        ) {
-          setChronosLocalePreference(payload.value);
+        } else if (payload.name === 'locale' && normalizeLocale(payload.value)) {
+          setChronosLocalePreference(normalizeLocale(payload.value)!);
         }
       }
     },

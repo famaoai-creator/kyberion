@@ -20,6 +20,7 @@ import {
   uxTextOr,
   type SupportedLocale,
 } from '../../../lib/ux-vocabulary';
+import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
   collectActiveMissions,
   runCommandQuickAction,
@@ -1221,7 +1222,9 @@ export async function POST(req: NextRequest) {
     const conversation = await runSurfaceMessageConversation({
       surface: 'chronos',
       text: query,
-      locale,
+      // IT-02: only an explicit request locale is passed; otherwise the reply
+      // follows the language of `query` (detected by the surface runtime).
+      locale: normalizeLocale(body.locale) ?? undefined,
       threadTs: sessionId,
       correlationId: requestArtifact.correlation_id,
       actorId: requesterId,

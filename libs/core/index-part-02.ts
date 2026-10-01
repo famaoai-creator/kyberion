@@ -51,7 +51,19 @@ export * from './browser/browser-onboarding.js';
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './surface/operator-identity.js';
 // I18N-01: single source of truth for locale resolution.
 
-export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
+export {
+  resolveLocale,
+  resolveDefaultLocale,
+  normalizeLocale,
+  deriveReplyLocale,
+  enterReplyLocale,
+  runWithReplyLocale,
+  getReplyLocale,
+  detectTextLocale,
+  localeToBcp47,
+  localeUsesWordSpaces,
+  pickByLocale,
+} from './locale.js';
 
 export type { SupportedLocale, LocaleContext } from './locale.js';
 // I18N-05: single source of truth for locale/timeZone-aware date, number,

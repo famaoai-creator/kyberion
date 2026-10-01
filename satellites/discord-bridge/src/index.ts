@@ -8,6 +8,7 @@ import {
   readJsonLines,
 } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
@@ -271,6 +272,13 @@ async function collectDiscordThreadContext(
 }
 
 export async function handleDiscordMessage(message: Message) {
+  // IT-02: replies follow the language the user wrote in (explicit locale still wins).
+  return runWithReplyLocale(deriveReplyLocale({ text: message.content }), () =>
+    handleDiscordMessageInner(message)
+  );
+}
+
+async function handleDiscordMessageInner(message: Message) {
   if (message.author.bot) return;
 
   const access = evaluateSurfaceActorAccess('discord', message.author.id);

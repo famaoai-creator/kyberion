@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectInput } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
@@ -7,7 +8,15 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
-import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
+import {
+  normalizeLocale,
+  nextSupportedLocale,
+  detectTextLocale,
+  localeToBcp47,
+  localeUsesWordSpaces,
+  pickByLocale,
+  type SupportedLocale,
+} from './locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from './scope-context.js';
 import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 
@@ -18,7 +27,15 @@ import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
  * import-free `locale-normalize.ts` so browser surfaces can share them; they
  * are re-exported here so Node callers have a single import site.
  */
-export { normalizeLocale, nextSupportedLocale, type SupportedLocale };
+export {
+  normalizeLocale,
+  nextSupportedLocale,
+  detectTextLocale,
+  localeToBcp47,
+  localeUsesWordSpaces,
+  pickByLocale,
+  type SupportedLocale,
+};
 
 /**
  * Inputs a caller may supply to short-circuit the precedence chain at a
@@ -140,6 +157,9 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
  * 1. `ctx.explicit` — CLI `--locale` / an explicit API argument.
  * 2. `ctx.surfacePreference` — a surface's own persisted choice (e.g. the
  *    chronos header-toggle value read from localStorage by its caller).
+ *    Then the current conversation turn's reply locale (explicit request /
+ *    session / channel locale, else the language of the incoming message —
+ *    see {@link enterReplyLocale}).
  * 3. Onboarding identity `language` (`my-identity.json` under
  *    `resolveActiveProfileRoot()`).
  * 4. the canonical `KYBERION_LOCALE` setting, then the deprecated
@@ -172,9 +192,49 @@ export function resolveLocale(ctx: LocaleContext = {}): SupportedLocale {
   return resolveWithoutExplicit(ctx);
 }
 
+/**
+ * IT-02: the locale of the conversation turn currently being answered.
+ *
+ * Chat surfaces (slack / telegram / discord / imessage / chronos / voice)
+ * usually carry no explicit locale, and the operator's identity / env locale
+ * is the wrong language for a user who just wrote in another one. The
+ * surface runtime enters the turn's reply locale here (explicit request /
+ * session / channel locale, else the language detected from the incoming
+ * message) and `resolveLocale()` honors it right after an explicit argument
+ * or a surface preference — so every reply builder that calls `t()` follows
+ * the user without a locale parameter being threaded through each of them.
+ */
+const replyLocaleStore = new AsyncLocalStorage<{ locale?: SupportedLocale }>();
+
+/** Derives a turn's reply locale: explicit locale > language detected from the user text. */
+export function deriveReplyLocale(input: {
+  explicit?: string | null;
+  text?: string | null;
+}): SupportedLocale | undefined {
+  return normalizeLocale(input.explicit) ?? detectTextLocale(input.text) ?? undefined;
+}
+
+/** Sets (or clears, with `undefined`) the reply locale for the current async context. */
+export function enterReplyLocale(locale: SupportedLocale | undefined): void {
+  replyLocaleStore.enterWith({ locale });
+}
+
+/** Runs `fn` with the given reply locale scoped to it (and anything it awaits). */
+export function runWithReplyLocale<T>(locale: SupportedLocale | undefined, fn: () => T): T {
+  return replyLocaleStore.run({ locale }, fn);
+}
+
+/** The reply locale of the current conversation turn, when one was entered. */
+export function getReplyLocale(): SupportedLocale | undefined {
+  return replyLocaleStore.getStore()?.locale;
+}
+
 function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const surfacePreference = normalizeLocale(ctx.surfacePreference);
   if (surfacePreference) return surfacePreference;
+
+  const replyLocale = getReplyLocale();
+  if (replyLocale) return replyLocale;
 
   const scopedLocale = resolveScopedLocale(ctx.scope);
   if (scopedLocale) return scopedLocale;

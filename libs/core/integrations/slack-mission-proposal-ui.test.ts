@@ -5,6 +5,10 @@ import {
   slackMissionProposalFallbackText,
 } from './slack-mission-proposal-ui.js';
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('Slack mission proposal UI (UX-04)', () => {
   const proposal = {
     intent: 'create_mission' as const,

@@ -72,6 +72,10 @@ function readApprovalEvents(storageChannel: string): ApprovalEventLine[] {
   });
 }
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('surface-approval-ui MO-11 cross-surface coherence', () => {
   it('rejects the brief surface for human_only final approval (S-3)', () => {
     const record = createSurfaceApprovalRequest({
