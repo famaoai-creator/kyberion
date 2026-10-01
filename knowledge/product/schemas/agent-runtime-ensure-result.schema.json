@@ -99,8 +99,19 @@
       "properties": {
         "team_role": { "type": "string", "minLength": 1 },
         "required": { "type": "boolean" },
-        "status": { "enum": ["assigned", "unfilled"] },
+        "status": { "enum": ["assigned", "standby", "unfilled"] },
+        "role_sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["structural", "obligation", "template", "restaff"]
+          }
+        },
         "agent_id": { "type": ["string", "null"] },
+        "instance_of": { "type": "string", "minLength": 1 },
+        "instance_index": { "type": "integer", "minimum": 1 },
         "actor_type": { "enum": ["agent", "human", "service"] },
         "resource": { "$ref": "#/definitions/workforce_resource_ref" },
         "accountable_human_id": { "type": ["string", "null"] },
@@ -130,7 +141,7 @@
           "items": { "type": "string", "minLength": 1 }
         },
         "runtime_status": {
-          "enum": ["spawned", "already_ready", "unfilled", "failed"]
+          "enum": ["spawned", "already_ready", "standby", "unfilled", "failed"]
         },
         "error": { "type": "string" }
       },
@@ -171,6 +182,7 @@
       "required": ["tier", "effort", "model_id", "route_reason"],
       "properties": {
         "tier": { "enum": ["small", "standard", "large"] },
+        "execution_tier": { "enum": ["fast", "standard", "deep"] },
         "effort": { "enum": ["low", "medium", "high"] },
         "model_id": { "type": "string", "minLength": 1 },
         "route_reason": { "type": "string", "minLength": 1 }

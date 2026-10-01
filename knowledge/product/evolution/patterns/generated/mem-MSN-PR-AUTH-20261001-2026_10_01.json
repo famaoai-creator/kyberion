@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-PR-AUTH-20261001-2026_10_01",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Explicit GitHub CLI auth preserves child-process isolation",
+  "summary": "Forward existing GitHub token bindings only as explicit overrides for GitHub CLI commands.",
+  "candidate_id": "mem-MSN-PR-AUTH-20261001-2026_10_01",
+  "evidence_refs": [
+    "active/missions/public/MSN-PR-AUTH-20261001/evidence/design-spec.json",
+    "active/missions/public/MSN-PR-AUTH-20261001/evidence/implementation-report.md",
+    "active/missions/public/MSN-PR-AUTH-20261001/evidence/test-report.md",
+    "active/missions/public/MSN-PR-AUTH-20261001/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-01T16:55:25.283Z",
+  "applicability": ["mission", "mission:MSN-PR-AUTH-20261001"],
+  "reusable_steps": [
+    "Forward existing GitHub token bindings only as explicit overrides for GitHub CLI commands"
+  ],
+  "expected_outcome": "The governed execution facade deliberately strips credentials from general child inheritance. A publishing command must explicitly forward the existing GH_TOKEN and GITHUB_TOKEN bindings to gh subprocesses only. Do not widen the global safe-exec allowlist or pass token values in command arguments or logs. Keep readiness and knowledge checks unchanged, and test both credential names plus unrelated-secret isolation.",
+  "source_branch": "feat/concierge-continuity-20261001",
+  "source_commit": "dc140cebedbd6a704d42d482ed788453b7ab0ce8"
+}

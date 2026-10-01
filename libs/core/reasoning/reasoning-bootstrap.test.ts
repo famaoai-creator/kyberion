@@ -128,6 +128,18 @@ describe('reasoning-bootstrap', () => {
     expect(getVoiceBridge().name).toBe('codex-cli-text');
   });
 
+  it('does not mutate the caller-supplied options when applying default-route limits', () => {
+    // The unscoped chain backfills timeoutMs/toolsEnabled/allowedTools from the
+    // resolved `default` role route; those defaults must not leak onto the
+    // caller's object (a reused options bag would suppress re-resolution).
+    const reusable: { mode: 'codex-cli'; force: boolean; timeoutMs?: number } = {
+      mode: 'codex-cli',
+      force: true,
+    };
+    expect(installReasoningBackends(reusable)).toBe(true);
+    expect(reusable.timeoutMs).toBeUndefined();
+  });
+
   it('connects Codex to the provider-native harness dispatcher when opted in', () => {
     process.env.KYBERION_HARNESS_SUBAGENT = '1';
 

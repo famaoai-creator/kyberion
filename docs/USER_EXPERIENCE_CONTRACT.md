@@ -23,17 +23,17 @@ At the interaction boundary, Kyberion should consistently answer four questions:
 
 ## Vocabulary Mapping
 
-| Internal Concept | User-Facing Label | Meaning |
-| --- | --- | --- |
-| execution brief | Request understanding | A normalized summary of the request and missing inputs |
-| resolution plan | Execution plan | A structured view of how the system intends to proceed |
-| pipeline bundle | Execution bundle | A bundle of execution templates |
-| capability bundle | Capability bundle | A reusable package of actuators, pipelines, governance, and docs |
-| execution plan set | Generated execution files | The concrete pipelines that will actually run |
-| delivery pack | Deliverable pack | Main outputs, evidence, and summary |
-| operator-interaction-packet | Interaction card | A human-facing clarification, status, or delivery contract |
-| operator-response-preview | Response preview | A draft of what the system will say to the operator |
-| system-status-report | Status report | A structured report of system, mission, or project state |
+| Internal Concept            | User-Facing Label         | Meaning                                                          |
+| --------------------------- | ------------------------- | ---------------------------------------------------------------- |
+| execution brief             | Request understanding     | A normalized summary of the request and missing inputs           |
+| resolution plan             | Execution plan            | A structured view of how the system intends to proceed           |
+| pipeline bundle             | Execution bundle          | A bundle of execution templates                                  |
+| capability bundle           | Capability bundle         | A reusable package of actuators, pipelines, governance, and docs |
+| execution plan set          | Generated execution files | The concrete pipelines that will actually run                    |
+| delivery pack               | Deliverable pack          | Main outputs, evidence, and summary                              |
+| operator-interaction-packet | Interaction card          | A human-facing clarification, status, or delivery contract       |
+| operator-response-preview   | Response preview          | A draft of what the system will say to the operator              |
+| system-status-report        | Status report             | A structured report of system, mission, or project state         |
 
 ## Standard Conversation Shapes
 
@@ -179,7 +179,55 @@ When implementing a UI surface:
 This keeps the system maintainable when new locales are added.
 It also prevents each surface from inventing a separate localization model.
 
+## Concierge Conversation Continuity
+
+The conversation dock restores the authenticated principal's transcript before
+accepting a new request. The server binds the thread to the principal, member,
+role, and complete tenant, organization, project, and tier permissions. Sharing
+one administrator credential shares its principal and therefore its history.
+
+Requests are persisted before orchestration. Restoring history never replays a
+request, and historical approval buttons are not restored. A failed initial save
+prevents execution; a failed final save displays the actual reply with an unsaved
+warning. The durable text path uses the orchestrator's server-owned thread;
+legacy voice-hub ingestion does not provide this durability guarantee.
+
+Retention is bounded to 50 turns. At capacity, a completed turn or a pending turn
+older than 24 hours may be removed. Current pending turns are protected. An
+outcome arriving after its turn is removed is returned with the unsaved warning.
+Pending-history status refreshes on page reload. Recognized credentials are
+redacted before storage; arbitrary unrecognized secret text is not guaranteed to
+be detected. Transcript restoration does not promise that every historical word
+is injected into model context or that work continues while the service is off.
+
+The next stages are supervised read-only background research, feedback memory,
+and unified project context across channels. Always-on scheduling, learning from
+corrections, and proactive notifications require separate implementation and
+validation.
+
 ## Contract Test Hook
+
+### Personal read-only review
+
+The Concierge home offers a manual check and an explicit one-hour opt-in for
+five-minute checks while the page remains mounted. Leaving the page, changing
+the selected organization, request failure, or the one-hour deadline stops the
+timer and cancels in-flight requests. This is browser polling; it does not claim
+24-hour background operation or external notifications.
+
+Each GET resolves the active server-authenticated member, narrows to one concrete
+allowed tenant with a membership, and rechecks the original recording consent
+at the start/end of the recording and at review time. Summaries without tenant
+attribution and viewers restricted to organizations/projects are excluded because
+the records cannot prove those scopes. Own-member data follows the existing
+recording-panel self-service exception; confidential tenant visibility is also
+required. No shared personal-tier projection is widened.
+
+Only counts of pending summaries and summaries containing attention-required
+operations are returned, from the last seven days and at most the newest 100
+eligible summaries. App names, hosts, text, step descriptions, hashes and action
+controls never enter this response. Errors clear the previous counts and stop
+periodic checks. The fixed settings link provides consent and review controls.
 
 Surface implementations should also be verifiable by automated checks.
 

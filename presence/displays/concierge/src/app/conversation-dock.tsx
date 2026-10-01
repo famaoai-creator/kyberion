@@ -5,6 +5,7 @@ import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { useVoice } from '../lib/use-voice';
 import { DockAvatar } from './dock-avatar';
 import { buildIntentResolutionView } from '../lib/intent-resolution-view';
+import { parseConversationHistory } from '../lib/conversation-history';
 import type { ConciergeMessageKey } from '../lib/i18n';
 import type {
   ConversationMessageResponse,
@@ -77,13 +78,49 @@ export function ConversationDock() {
   const [messages, setMessages] = React.useState<DockMessage[]>([]);
   const [draft, setDraft] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [historyState, setHistoryState] = React.useState<'loading' | 'ready' | 'failed'>('loading');
+  const [historyWarning, setHistoryWarning] = React.useState(false);
+  const [pendingTurns, setPendingTurns] = React.useState(0);
+  const [historyAttempt, setHistoryAttempt] = React.useState(0);
   const voice = useVoice(locale);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
   const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
-  const sessionIdRef = React.useRef(
-    `concierge-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`
-  );
+  const sessionIdRef = React.useRef<string | null>(null);
   const logRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!open || sessionIdRef.current) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      setHistoryState('failed');
+      controller.abort();
+    }, 15000);
+    setHistoryState('loading');
+    void (async () => {
+      try {
+        const response = await fetch('/api/message', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('history_unavailable');
+        const history = parseConversationHistory(await response.json());
+        if (!history) throw new Error('invalid_history');
+        if (controller.signal.aborted) return;
+        sessionIdRef.current = history.sessionId;
+        setMessages(history.messages);
+        setPendingTurns(history.pending);
+        setHistoryState('ready');
+      } catch {
+        if (!controller.signal.aborted) setHistoryState('failed');
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [open, historyAttempt]);
 
   React.useEffect(() => {
     const log = logRef.current;
@@ -101,7 +138,7 @@ export function ConversationDock() {
   const send = React.useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || busy) return;
+      if (!trimmed || busy || historyState !== 'ready' || !sessionIdRef.current) return;
       // PA-09: every send path starts from a user gesture (submit, chip,
       // action button) or a mic turn that began with one — resume Web Audio
       // now so the avatar's reply audio may play (autoplay policy).
@@ -111,11 +148,22 @@ export function ConversationDock() {
       try {
         const response = await fetch('/api/message', {
           method: 'POST',
+          cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: trimmed, locale, sessionId: sessionIdRef.current }),
         });
         const rawPayload: unknown = await response.json();
         const payload = parseConversationMessageResponse(rawPayload);
+        if (response.status === 413) throw new Error(t('api.message_too_long'));
+        if (response.status === 503 && !payload.reply)
+          throw new Error(t('api.history_unavailable'));
+        if (payload.historySaved === false) setHistoryWarning(true);
+        if (response.status === 409) {
+          sessionIdRef.current = null;
+          setMessages([]);
+          setHistoryState('failed');
+          throw new Error(t('dock.history.failed'));
+        }
         // A 503 still carries a polite, actionable reply — show it as the
         // secretary's answer instead of a technical failure.
         const reply = typeof payload.reply === 'string' ? payload.reply : '';
@@ -158,7 +206,7 @@ export function ConversationDock() {
         setBusy(false);
       }
     },
-    [busy, locale, t, notifyServerSpeech, speakText, unlockSpeechAudio]
+    [busy, historyState, locale, t, notifyServerSpeech, speakText, unlockSpeechAudio]
   );
 
   // Tier 1 mic turn: one server-side capture → STT → reply. The transcript is
@@ -202,6 +250,8 @@ export function ConversationDock() {
             ]
           : []),
       ]);
+      // The separate voice-hub listen-once protocol is not yet a durable thread.
+      setHistoryWarning(true);
     } finally {
       setBusy(false);
     }
@@ -265,6 +315,19 @@ export function ConversationDock() {
         >
           –
         </button>
+      </div>
+      <div className="dock-empty" role="status" aria-live="polite">
+        {historyState === 'loading' ? t('dock.history.loading') : null}
+        {historyState === 'failed' ? (
+          <>
+            {t('dock.history.failed')}{' '}
+            <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
+              {t('dock.history.retry')}
+            </button>
+          </>
+        ) : null}
+        {historyState === 'ready' && pendingTurns > 0 ? t('dock.history.pending') : null}
+        {historyWarning ? t('dock.history.unsaved') : null}
       </div>
       <div className="dock-log" ref={logRef} aria-live="polite">
         {messages.length === 0 ? <p className="dock-empty">{t('dock.empty')}</p> : null}
@@ -350,7 +413,7 @@ export function ConversationDock() {
                       key={action.id}
                       type="button"
                       className={`action-button${action.id === 'confirm' ? '' : ' secondary'}`}
-                      disabled={busy}
+                      disabled={busy || historyState !== 'ready'}
                       onClick={() => void send(action.label)}
                     >
                       {action.label}
@@ -452,7 +515,7 @@ export function ConversationDock() {
               key={key}
               type="button"
               className="dock-quick-chip"
-              disabled={busy}
+              disabled={busy || historyState !== 'ready'}
               onClick={() => void send(t(key))}
             >
               {t(key)}
@@ -468,7 +531,7 @@ export function ConversationDock() {
             aria-pressed={voice.listening}
             aria-label={t(voice.listening ? 'dock.voice.mic_stop' : 'dock.voice.mic_start')}
             title={t(voice.listening ? 'dock.voice.mic_stop' : 'dock.voice.mic_start')}
-            disabled={busy}
+            disabled={busy || historyState !== 'ready'}
             onClick={handleMicClick}
           >
             <svg
@@ -493,9 +556,13 @@ export function ConversationDock() {
           placeholder={t('dock.placeholder')}
           aria-label={t('dock.placeholder')}
           onChange={(event) => setDraft(event.target.value)}
-          disabled={busy}
+          disabled={busy || historyState !== 'ready'}
         />
-        <button type="submit" className="action-button" disabled={busy || !draft.trim()}>
+        <button
+          type="submit"
+          className="action-button"
+          disabled={busy || historyState !== 'ready' || !draft.trim()}
+        >
           {t('dock.send')}
         </button>
       </form>
@@ -557,6 +624,7 @@ export function parseConversationMessageResponse(
     ...(promoted ? { promoted } : {}),
     ...(nextActions ? { nextActions } : {}),
     ...(intentResolution ? { intentResolution } : {}),
+    ...(typeof raw.historySaved === 'boolean' ? { historySaved: raw.historySaved } : {}),
   };
 }
 

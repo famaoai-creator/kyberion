@@ -140,6 +140,8 @@ export interface InstallReasoningOptions {
   allowedTools?: import('./reasoning-route-resolver.js').ReasoningToolName[];
   contextWindowTokens?: number;
   maxCompletionTokens?: number;
+  /** Per-request timeout for HTTP-based backends (e.g. OpenAI-compatible). */
+  timeoutMs?: number;
   /** Pre-built Anthropic client (applies only to `anthropic` mode). */
   anthropicClient?: Anthropic;
   /** Force install even if stub would be chosen otherwise (for tests). */
@@ -201,6 +203,7 @@ function openAiOverrides(
       : undefined,
     contextWindowTokens: options.contextWindowTokens,
     maxCompletionTokens: options.maxCompletionTokens,
+    timeoutMs: options.timeoutMs,
     toolsEnabled: options.toolsEnabled,
     allowedTools: options.allowedTools,
   };
@@ -377,6 +380,7 @@ function buildReasoningRuntimeChain(
           allowedTools: route.allowedTools,
           contextWindowTokens: route.limits.contextWindowTokens ?? options.contextWindowTokens,
           maxCompletionTokens: route.limits.maxCompletionTokens ?? options.maxCompletionTokens,
+          timeoutMs: route.limits.timeoutMs ?? options.timeoutMs,
         }
       );
       if (candidate) candidates.push(candidate);
@@ -509,7 +513,28 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
   initializeAdapterDefaultPreferences();
-  const effectiveOptions = applyOperatorLlmSelection(options);
+  // Copy before applying route-derived defaults — applyOperatorLlmSelection
+  // may return the caller's object, and these fields must not leak back.
+  const effectiveOptions: InstallReasoningOptions = { ...applyOperatorLlmSelection(options) };
+  // The default (unscoped) chain serves every dispatch whose role is not in
+  // the governed role map. Give it the `default` role's resolved route so the
+  // profile's timeout_ms / tools_enabled / allowed_tools actually reach the
+  // backend; without this they are computed by the resolver but dropped
+  // before construction.
+  try {
+    const defaultRoute = resolveReasoningRoute({ role: 'default' });
+    if (effectiveOptions.timeoutMs === undefined) {
+      effectiveOptions.timeoutMs = defaultRoute.limits.timeoutMs;
+    }
+    if (effectiveOptions.toolsEnabled === undefined) {
+      effectiveOptions.toolsEnabled = defaultRoute.toolsEnabled;
+    }
+    if (effectiveOptions.allowedTools === undefined) {
+      effectiveOptions.allowedTools = defaultRoute.allowedTools;
+    }
+  } catch {
+    // No default route — the backend keeps its own built-in defaults.
+  }
   const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
   refreshCapabilityRegistryIfRequested(effectiveOptions);
 

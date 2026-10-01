@@ -8,6 +8,14 @@ import { readRequestObject } from '../../../lib/request-input';
 import { voiceHubUrl } from '../../../lib/voice-hub';
 import { conciergeConversationScope, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
+import { CONVERSATION_MAX_INPUT } from '../../../lib/conversation-history';
+import {
+  beginConversationTurn,
+  completeConversationTurn,
+  conversationRef,
+  readConversationHistory,
+  ConversationStoreError,
+} from '../../../lib/conversation-store';
 import {
   ConversationMessageResponse,
   parseVoiceHubConversationResponse,
@@ -17,6 +25,25 @@ import {
 } from '../../../lib/conversation-types';
 
 export const dynamic = 'force-dynamic';
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
+/** Restore only the current server-owned conversation; query IDs never select an owner. */
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
+  try {
+    return NextResponse.json(readConversationHistory(resolved.context), { headers: NO_STORE });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: 'conversation_history_unavailable' },
+      {
+        status:
+          error instanceof ConversationStoreError && error.code === 'identity_required' ? 403 : 503,
+        headers: NO_STORE,
+      }
+    );
+  }
+}
 
 /**
  * CS-01 conversation core — ported from the legacy Express concierge
@@ -238,16 +265,70 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const speaker = typeof body?.speaker === 'string' && body.speaker ? body.speaker : 'Sovereign';
-  const sessionId =
-    typeof body?.sessionId === 'string' && body.sessionId.trim()
-      ? body.sessionId.trim()
-      : undefined;
+  if (text.length > CONVERSATION_MAX_INPUT) {
+    return NextResponse.json(
+      { ok: false, error: conciergeText('api.message_too_long', locale) },
+      { status: 413, headers: NO_STORE }
+    );
+  }
+  let ref: ReturnType<typeof conversationRef>;
+  try {
+    ref = conversationRef(resolved.context);
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: 'conversation_identity_required' },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+  const speaker = resolved.context.principalId!;
+  const sessionId = ref.sessionId;
+  const durable = body.sessionId !== undefined;
+  if (durable && body.sessionId !== sessionId) {
+    return NextResponse.json(
+      { ok: false, error: 'conversation_scope_changed' },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
+  // The voice-hub protocol has no verified thread contract. New durable clients
+  // use the orchestrator directly, where this server-owned thread is authoritative.
+  if (durable) {
+    let turnId: string;
+    try {
+      turnId = beginConversationTurn(resolved.context, text);
+    } catch {
+      // Nothing was executed: do not lose a request and imply it was accepted.
+      return NextResponse.json(
+        { ok: false, error: conciergeText('api.history_unavailable', locale) },
+        { status: 503, headers: NO_STORE }
+      );
+    }
+    let payload: ConversationMessageResponse;
+    let status = 200;
+    try {
+      payload = await replyViaOrchestrator(text, speaker, sessionId, locale, scope);
+    } catch {
+      payload = {
+        reply: conciergeText('api.message_unavailable', locale),
+        mode: 'unavailable',
+        shape: 'reply',
+      };
+      status = 503;
+    }
+    let historySaved = true;
+    try {
+      completeConversationTurn(resolved.context, turnId, payload.reply);
+    } catch {
+      // Execution may have completed. Return the real reply, never invite a blind retry.
+      historySaved = false;
+    }
+    return NextResponse.json({ ...payload, historySaved }, { status, headers: NO_STORE });
+  }
 
   // Try voice-hub first (rich path). The bridge returns the same intent
   // resolution contract as the in-process orchestrator path.
   try {
-    const voiceReply = await replyViaVoiceHub(text, speaker, scope);
+    const voiceReply = await replyViaVoiceHub(text, sessionId, scope);
     const intentView = voiceReply.intentResolution
       ? viewFromIntentResolution(voiceReply.intentResolution)
       : { shape: 'reply' as const };
@@ -257,7 +338,7 @@ export async function POST(req: NextRequest) {
       ...intentView,
       ...(voiceReply.intentResolution ? { intentResolution: voiceReply.intentResolution } : {}),
     };
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { headers: NO_STORE });
   } catch (error) {
     console.warn(
       `[concierge] voice-hub path failed (${error instanceof Error ? error.message : String(error)}); falling back to orchestrator`
@@ -267,7 +348,7 @@ export async function POST(req: NextRequest) {
   // Degrade to the orchestrator directly (no voice-hub needed).
   try {
     const payload = await replyViaOrchestrator(text, speaker, sessionId, locale, scope);
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { headers: NO_STORE });
   } catch (error) {
     console.warn(
       `[concierge] orchestrator fallback failed (${error instanceof Error ? error.message : String(error)})`
@@ -280,5 +361,5 @@ export async function POST(req: NextRequest) {
     mode: 'unavailable',
     shape: 'reply',
   };
-  return NextResponse.json(unavailable, { status: 503 });
+  return NextResponse.json(unavailable, { status: 503, headers: NO_STORE });
 }

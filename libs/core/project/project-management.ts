@@ -1045,7 +1045,10 @@ export function reconcileProjectOperationalState(
           summary: project.summary,
           status: project.status,
           tier: scope.tier,
-          tenant_slug: scope.tenant,
+          // `shared` is the tenantless workspace partition, not a serialized
+          // tenant — mirror syncProjectOperationalStateFromMission so the state
+          // record stays schema-valid for shared-scope projects.
+          tenant_slug: scope.tenant === 'shared' ? undefined : scope.tenant,
           source_refs: [],
           sources: [],
           distill_targets: [
@@ -1056,6 +1059,10 @@ export function reconcileProjectOperationalState(
         name: project.name,
         summary: project.summary,
         status: scoped.missions.length > 0 ? 'active' : project.status,
+        tenant_slug:
+          (existing?.tenant_slug ?? scope.tenant) === 'shared'
+            ? undefined
+            : (existing?.tenant_slug ?? scope.tenant),
         active_mission_ids: scoped.missions,
         active_track_ids: scoped.tracks,
         active_task_session_ids: scoped.sessions,
