@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-10-01T02:49:47.656Z",
+  "generated_at": "2026-10-01T05:37:17.171Z",
   "scan_roots": [
     "libs/core",
     "libs/shared-ui",
@@ -93,27 +93,16 @@
     "locale_literal": {
       "libs/core/apple-intelligence-bridge.ts": 2,
       "libs/core/apple-speech-file-stt-bridge.ts": 2,
-      "libs/core/business-calendar.ts": 1,
       "libs/core/contextual-intent-frame.ts": 4,
       "libs/core/deal-documents.ts": 1,
-      "libs/core/governance/accountability-report.ts": 1,
-      "libs/core/governance/approval-veto-window.ts": 1,
-      "libs/core/governance/charter-service.ts": 1,
-      "libs/core/governance/decision-card.ts": 1,
       "libs/core/media/native-pptx-engine/builders.ts": 3,
       "libs/core/media/native-pptx-engine/engine.ts": 1,
       "libs/core/media/native-xlsx-engine/drawing.ts": 3,
-      "libs/core/organization/organization-operating-model-management.ts": 1,
-      "libs/core/organization/organization-operation-runtime.ts": 1,
-      "libs/core/pipeline/cron-utils.ts": 1,
       "libs/core/provider/codex-cli-query.ts": 1,
-      "libs/core/surface/operator-notifications.ts": 1,
-      "libs/core/temporal-context.ts": 1,
       "scripts/check_contract_schemas_checks_1.ts": 1,
       "scripts/check_contract_schemas_checks_2.ts": 2,
       "scripts/check_plugin_views_e2e.ts": 1,
       "libs/actuators/media-actuator/src/media-document-helpers.ts": 7,
-      "libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts": 1,
       "libs/actuators/media-actuator/src/proposal-pptx-helpers.ts": 1
     },
     "engine_hex": {

@@ -991,7 +991,13 @@
         "キャンセル",
         "キャンセル ok",
         "やめて",
-        "やめて ok"
+        "やめて ok",
+        "停止して",
+        "停止してください",
+        "止めてください",
+        "キャンセルして。",
+        "再開して",
+        "戻って！"
       ],
       "no_match": [
         "来週の予定教えて",
@@ -1000,9 +1006,16 @@
         "backup now",
         "pausex",
         "ねえ 止めて して",
-        "ねえ 停止 して"
+        "ねえ 停止 して",
+        "停止ボタンを押して",
+        "キャンセルボタンをクリック",
+        "再開ボタンを押して",
+        "停止中のタスクを見せて",
+        "キャンセルを確認して",
+        "戻ってきたら教えて",
+        "やめておく"
       ],
-      "intentional_behavior_fix": "The old /^(...|止めて|停止|...)\\b/i literal required an ASCII word char right after a Japanese command, so Japanese commands never matched on their own. The lexicon applies the word boundary only to ASCII alternatives, so Japanese commands now match (intentional fix, not parity)."
+      "intentional_behavior_fix": "The old /^(...|止めて|停止|...)\\b/i literal required an ASCII word char right after a Japanese command, so Japanese commands never matched on their own. The lexicon keeps the ASCII word boundary for ASCII alternatives and gives Japanese alternatives a Japanese-aware trailing guard (clause end, ASCII word char, or a short polite suffix such as して / ください), so 止めて / キャンセル / 停止して now match while 停止ボタンを押して stays a click (intentional fix, not parity)."
     },
     "browser.control_pause": {
       "old_regex": "/pause/i",

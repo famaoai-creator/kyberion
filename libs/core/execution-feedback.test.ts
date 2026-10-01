@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildExecutionFeedbackHints,
   loadExecutionFeedbackStore,
@@ -11,6 +11,10 @@ import {
 } from './execution-feedback.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  getIntentPhraseMatcher,
+  resetIntentPhraseLexiconCache,
+} from './intent/intent-phrase-lexicon.js';
 
 describe('execution feedback loop', () => {
   const feedbackPath = resolveExecutionFeedbackPath();
@@ -130,5 +134,26 @@ describe('execution feedback loop', () => {
       procedure_id: 'invoice.submit',
       review_required: true,
     });
+  });
+});
+
+describe('execution feedback reply pattern caching', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('compiles the reply pattern once per lexicon matcher', () => {
+    resetIntentPhraseLexiconCache();
+    const matcher = getIntentPhraseMatcher();
+    const source = vi.spyOn(matcher, 'source');
+    for (let i = 0; i < 5; i += 1) {
+      expect(
+        parseExecutionFeedbackText('feedback use-case-schedule-read-agenda: satisfied')?.outcome
+      ).toBe('satisfied');
+    }
+    const compiledCalls = source.mock.calls.length;
+    expect(compiledCalls).toBeGreaterThan(0);
+    parseExecutionFeedbackText('評価 use-case-schedule-read-agenda: 満足');
+    expect(source.mock.calls.length).toBe(compiledCalls);
   });
 });

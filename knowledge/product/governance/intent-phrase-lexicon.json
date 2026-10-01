@@ -3,6 +3,19 @@
   "version": "1.0.0",
   "description": "Locale-keyed phrase lexicon for heuristic intent classification. Each concept lists literal phrases (escaped) and/or regex source patterns per locale; the matcher checks every configured locale because the input language may differ from the UI locale. Add a locale by adding a key under `locales` — no code change is required.",
   "default_flags": "i",
+  "prefix_word_suffixes": {
+    "ja": [
+      "してください",
+      "して下さい",
+      "してくれ",
+      "して",
+      "します",
+      "ください",
+      "下さい",
+      "お願いします",
+      "お願い"
+    ]
+  },
   "concepts": {
     "approval.decision_approve": {
       "description": "Approval decision word: approve.",
@@ -1348,10 +1361,10 @@
       "description": "Extraction patterns (first capture group) for the value to type into a field. Used via captureIntentPhrase.",
       "locales": {
         "ja": {
-          "patterns": ["「(.+?)」を.*(?:入力|入れて)", "(.+?)\\s*と入力"]
+          "patterns": ["「([^」]+)」を.*(?:入力|入れて)", "(.+?)\\s*と入力"]
         },
         "en": {
-          "patterns": ["\"(.+?)\".*(?:input|type|fill)"]
+          "patterns": ["\"([^\"]+)\".*(?:input|type|fill)"]
         }
       }
     },

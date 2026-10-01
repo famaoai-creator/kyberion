@@ -757,7 +757,6 @@ async function handleTelegramUpdateInner(
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'telegram',
-          locale: resolveOperatorLocale(),
           text,
           channel: chatId,
           threadTs,

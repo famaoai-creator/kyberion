@@ -443,7 +443,6 @@ async function processIncomingIMessageInner(
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'imessage',
-          locale: resolveOperatorLocale(),
           text: incomingText,
           channel: msg.chatId,
           threadTs: msg.id,

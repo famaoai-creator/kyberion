@@ -130,8 +130,10 @@ export function pickByLocale<T>(
 
 /**
  * Script-based guess of the language a user wrote in: kana (or kana + kanji)
- * -> `ja`; Latin text with at least one plain word (not an id or acronym) -> `en`; anything else
- * (digits, emoji, one-word acks, other scripts) -> `null` so the caller keeps
+ * -> `ja`; Latin text with two plain words, or one plain word that is not a
+ * language-neutral ack (not an id or acronym) -> `en`; anything else
+ * (digits, emoji, one-word acks such as "Yes" / "OK" / "Thanks", other
+ * scripts) -> `null` so the caller keeps
  * its own default instead of flipping language on an ambiguous message.
  */
 export function detectTextLocale(text: unknown): SupportedLocale | null {
@@ -139,13 +141,45 @@ export function detectTextLocale(text: unknown): SupportedLocale | null {
   if (/[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9f]/u.test(value)) return 'ja';
   if (/[\u0400-\u04ff\u0590-\u06ff\u0e00-\u0e7f\u1100-\u11ff\uac00-\ud7af]/u.test(value))
     return null;
-  // Prose, not an identifier: at least one plain word of 3+ letters. All-caps
-  // tokens (REQ-123, MSN-X, API) and tokens with digits / separators are ids.
-  const hasWord = value
+  // Prose, not an identifier: plain words of 3+ letters. All-caps tokens
+  // (REQ-123, MSN-X, API) and tokens with digits / separators are ids.
+  const plainWords = value
     .split(/\s+/u)
-    .some((token) => /^[A-Za-z']{3,}[.,!?;:]*$/u.test(token) && token !== token.toUpperCase());
-  return hasWord ? 'en' : null;
+    .filter((token) => /^[A-Za-z']{3,}[.,!?;:]*$/u.test(token) && token !== token.toUpperCase())
+    .map((token) => token.replace(/[.,!?;:]+$/u, '').toLowerCase());
+  if (plainWords.length >= 2) return 'en';
+  // A lone acknowledgement ("Yes", "Okay", "Thanks", "Done") is used by
+  // speakers of every language, so it is not a language signal.
+  if (plainWords.length === 1 && !LANGUAGE_NEUTRAL_ACKS.has(plainWords[0])) return 'en';
+  return null;
 }
+
+/**
+ * Single-word replies that operators type regardless of their language
+ * (detection input, not user-facing copy). Two or more plain words still
+ * count as English.
+ */
+const LANGUAGE_NEUTRAL_ACKS: ReadonlySet<string> = new Set([
+  'yes',
+  'yeah',
+  'yep',
+  'yup',
+  'okay',
+  'sure',
+  'done',
+  'thanks',
+  'thank',
+  'thx',
+  'fine',
+  'cool',
+  'great',
+  'nice',
+  'good',
+  'nope',
+  'noted',
+  'ack',
+  'lgtm',
+]);
 
 export type BrowserVocabularyEntry = Record<string, string>;
 
