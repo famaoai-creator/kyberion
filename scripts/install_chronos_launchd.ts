@@ -2,14 +2,17 @@
 /**
  * scripts/install_chronos_launchd.ts — LC-01d
  *
- * Ceremony for keeping the chronos scheduler daemon alive across logins.
- * The daemon (`pnpm scheduler`) is the ONLY scheduler in the system; when it
- * dies, every registered pipeline schedule silently stops firing. This
- * script generates a macOS LaunchAgent so launchd restarts it.
+ * Ceremony for keeping long-lived daemons alive across logins. The chronos
+ * daemon (`pnpm scheduler`) is the ONLY pipeline scheduler in the system; when
+ * it dies, every registered pipeline schedule silently stops firing. This
+ * script generates a macOS LaunchAgent so launchd restarts it. Other
+ * heartbeat-recording daemons from LAUNCHD_DAEMON_SPECS are installed the
+ * same way via `--daemon <id>`.
  *
  * Modes:
  *   pnpm kyberion scheduler install                 # dry-run: print plist + exact steps
  *   pnpm kyberion scheduler install --apply         # stage plist + run launchctl
+ *   pnpm kyberion scheduler install --apply --daemon generation-schedule
  *   pnpm kyberion scheduler uninstall               # dry-run: print bootout steps
  *   pnpm kyberion scheduler uninstall --apply       # bootout + remove the plist
  *
@@ -31,8 +34,63 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const CHRONOS_LAUNCHD_LABEL = 'com.kyberion.chronos';
 
+export interface LaunchdDaemonSpec {
+  /** Value accepted by `--daemon` (kebab-case). */
+  id: string;
+  /** launchd Label; also the plist filename stem under ~/Library/LaunchAgents. */
+  label: string;
+  /** Daemon entrypoint, relative to the repo root (compiled dist path). */
+  daemonScript: string;
+  /** Extra argv after daemonScript (e.g. flags a one-shot job needs). */
+  daemonArgs?: string[];
+  /** Log filename stem under logDir (`<logBaseName>.log` / `.err.log`). */
+  logBaseName: string;
+  /** Where to confirm the agent is doing its job (heartbeat file, alert log, …). */
+  verificationHint: string;
+  /**
+   * Seconds between runs for periodic one-shot jobs (launchd StartInterval).
+   * When set the plist drops KeepAlive — a short-lived checker must not be
+   * kept resident.
+   */
+  startIntervalSec?: number;
+}
+
+/**
+ * Daemons that get launchd persistence. Only daemons that record a heartbeat
+ * (daemon_watchdog's DEFAULT_DAEMONS) belong here as KeepAlive residents —
+ * anything else cannot be observed when it stops. The
+ * agent-runtime-supervisor is deliberately absent: clients respawn it on
+ * demand, so launchd would only add a second owner. `daemon-watchdog` runs
+ * as a StartInterval one-shot: it must fire even when every watched daemon
+ * is dead, which a chronos-scheduled pipeline can never guarantee.
+ */
+export const LAUNCHD_DAEMON_SPECS: Record<string, LaunchdDaemonSpec> = {
+  chronos: {
+    id: 'chronos',
+    label: CHRONOS_LAUNCHD_LABEL,
+    daemonScript: 'dist/scripts/chronos_daemon.js',
+    logBaseName: 'kyberion-chronos',
+    verificationHint: 'heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json',
+  },
+  'generation-schedule': {
+    id: 'generation-schedule',
+    label: 'com.kyberion.generation-schedule',
+    daemonScript: 'dist/scripts/run_generation_schedule_daemon.js',
+    logBaseName: 'kyberion-generation-schedule',
+    verificationHint: 'heartbeat: active/shared/runtime/heartbeats/generation-schedule-daemon.json',
+  },
+  'daemon-watchdog': {
+    id: 'daemon-watchdog',
+    label: 'com.kyberion.daemon-watchdog',
+    daemonScript: 'dist/scripts/daemon_watchdog.js',
+    logBaseName: 'kyberion-daemon-watchdog',
+    verificationHint: 'ops alerts: active/shared/observability/ops-alerts.jsonl',
+    startIntervalSec: 300,
+  },
+};
+
 export interface ChronosLaunchdPlistOptions {
-  /** Absolute path to the node binary (production: process.execPath). */
+  /** Absolute path to the node binary (production: resolveStableNodePath()). */
   nodePath: string;
   /** Absolute repo root (production: pathResolver.rootDir()). */
   repoRoot: string;
@@ -43,8 +101,35 @@ export interface ChronosLaunchdPlistOptions {
    */
   logDir: string;
   label?: string;
+  /** Daemon entrypoint relative to repoRoot (default: chronos scheduler). */
+  daemonScript?: string;
+  /** Extra argv after daemonScript. */
+  daemonArgs?: string[];
+  /** Log filename stem under logDir (default: 'kyberion-chronos'). */
+  logBaseName?: string;
+  /** StartInterval in seconds for periodic one-shot jobs (drops KeepAlive). */
+  startIntervalSec?: number;
   /** Extra daemon environment (names must be in CHRONOS_FORWARDABLE_ENV). */
   env?: Record<string, string>;
+}
+
+/**
+ * Map a Homebrew Cellar node path to the version-independent opt symlink
+ * (`<prefix>/opt/<pkg>/bin/node`). `process.execPath` bakes in the versioned
+ * Cellar path, which the next `brew upgrade` deletes — that is what stranded
+ * the original agent in the launchd penalty box (spawn failed, EX_CONFIG).
+ * The opt link tracks whatever version is currently linked. Non-Homebrew
+ * installs (nvm, pkg installer, …) and a missing opt link fall back to the
+ * exec path unchanged.
+ */
+export function resolveStableNodePath(
+  execPath: string = process.execPath,
+  exists: (candidate: string) => boolean = safeExistsSync
+): string {
+  const match = /^(.*)\/Cellar\/([^/]+)\/[^/]+\/bin\/node$/.exec(execPath);
+  if (!match) return execPath;
+  const optPath = `${match[1]}/opt/${match[2]}/bin/node`;
+  return exists(optPath) ? optPath : execPath;
 }
 
 /**
@@ -87,9 +172,13 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
     }
   }
   const label = options.label ?? CHRONOS_LAUNCHD_LABEL;
-  const daemonScript = path.join(options.repoRoot, 'dist/scripts/chronos_daemon.js');
-  const stdoutPath = path.join(options.logDir, 'kyberion-chronos.log');
-  const stderrPath = path.join(options.logDir, 'kyberion-chronos.err.log');
+  const daemonScript = path.join(
+    options.repoRoot,
+    options.daemonScript ?? 'dist/scripts/chronos_daemon.js'
+  );
+  const logBaseName = options.logBaseName ?? 'kyberion-chronos';
+  const stdoutPath = path.join(options.logDir, `${logBaseName}.log`);
+  const stderrPath = path.join(options.logDir, `${logBaseName}.err.log`);
   // launchd spawns with PATH=/usr/bin:/bin:/usr/sbin:/sbin; scheduled
   // pipelines shell out to node/pnpm, so extend PATH with the node bin dir
   // and the standard package-manager locations.
@@ -114,14 +203,25 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
   <key>ProgramArguments</key>
   <array>
     <string>${escapeXml(options.nodePath)}</string>
-    <string>${escapeXml(daemonScript)}</string>
+    <string>${escapeXml(daemonScript)}</string>${(options.daemonArgs ?? [])
+      .map(
+        (arg) => `
+    <string>${escapeXml(arg)}</string>`
+      )
+      .join('')}
   </array>
   <key>RunAtLoad</key>
-  <true/>
+  <true/>${
+    options.startIntervalSec
+      ? `
+  <key>StartInterval</key>
+  <integer>${options.startIntervalSec}</integer>`
+      : `
   <key>KeepAlive</key>
   <true/>
   <key>ThrottleInterval</key>
-  <integer>10</integer>
+  <integer>10</integer>`
+  }
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
@@ -142,8 +242,12 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
 `;
 }
 
+export function launchAgentTargetPath(label: string, homeDir: string = os.homedir()): string {
+  return path.join(homeDir, 'Library/LaunchAgents', `${label}.plist`);
+}
+
 export function chronosLaunchAgentTargetPath(homeDir: string = os.homedir()): string {
-  return path.join(homeDir, 'Library/LaunchAgents', `${CHRONOS_LAUNCHD_LABEL}.plist`);
+  return launchAgentTargetPath(CHRONOS_LAUNCHD_LABEL, homeDir);
 }
 
 function currentUid(): string {
@@ -167,6 +271,7 @@ function runOrThrow(command: string, args: string[], tolerateFailure = false): v
 
 function printManualSteps(
   plist: string,
+  spec: LaunchdDaemonSpec,
   target: string,
   uid: string,
   print: (value: unknown) => void
@@ -178,11 +283,11 @@ function printManualSteps(
       '--- Install steps (dry-run: nothing was changed) ---',
       `1. Save the plist above to: ${target}`,
       `2. launchctl bootstrap gui/${uid} ${target}`,
-      `3. Verify: launchctl print gui/${uid}/${CHRONOS_LAUNCHD_LABEL} | head`,
-      '   (heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json)',
+      `3. Verify: launchctl print gui/${uid}/${spec.label} | head`,
+      `   (${spec.verificationHint})`,
       '',
       'Or run: pnpm kyberion scheduler install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
-      `Uninstall later: launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL} && rm ${target}`,
+      `Uninstall later: launchctl bootout gui/${uid}/${spec.label} && rm ${target}`,
     ].join('\n')
   );
 }
@@ -205,25 +310,48 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
       default: [],
       describe: `Copy a setting from this shell into the daemon (${CHRONOS_FORWARDABLE_ENV.join(', ')})`,
     })
+    .option('daemon', {
+      type: 'string',
+      default: 'chronos',
+      describe: `Daemon to install (${Object.keys(LAUNCHD_DAEMON_SPECS).join(', ')})`,
+    })
     .parseSync();
 
+  const daemonId = String(argv.daemon);
+  const spec = LAUNCHD_DAEMON_SPECS[daemonId];
+  if (!spec) {
+    throw new Error(
+      `unknown daemon '${daemonId}' — known: ${Object.keys(LAUNCHD_DAEMON_SPECS).join(', ')}`
+    );
+  }
+
   const repoRoot = pathResolver.rootDir();
-  const nodePath = process.execPath;
+  const nodePath = resolveStableNodePath();
   const uid = currentUid();
-  const target = chronosLaunchAgentTargetPath();
+  const target = launchAgentTargetPath(spec.label);
   const logDir = path.join(os.homedir(), 'Library/Logs');
   const env = resolveForwardedChronosEnv(argv['forward-env'] as string[]);
-  const plist = buildChronosLaunchdPlist({ nodePath, repoRoot, logDir, env });
+  const plist = buildChronosLaunchdPlist({
+    nodePath,
+    repoRoot,
+    logDir,
+    label: spec.label,
+    daemonScript: spec.daemonScript,
+    daemonArgs: spec.daemonArgs,
+    logBaseName: spec.logBaseName,
+    startIntervalSec: spec.startIntervalSec,
+    env,
+  });
 
   if (argv.uninstall) {
     if (!argv.apply) {
       print(
         [
           '--- Uninstall steps (dry-run: nothing was changed) ---',
-          `1. launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`,
+          `1. launchctl bootout gui/${uid}/${spec.label}`,
           `2. rm ${target}`,
           '',
-          'Or run: pnpm kyberion scheduler uninstall --apply',
+          `Or run: pnpm kyberion scheduler uninstall --apply${daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`}`,
         ].join('\n')
       );
       return;
@@ -233,14 +361,14 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
         'launchd uninstall is macOS-only (use systemd on Linux — see docs/operator/DEPLOYMENT.md)'
       );
     }
-    runOrThrow('launchctl', ['bootout', `gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`], true);
+    runOrThrow('launchctl', ['bootout', `gui/${uid}/${spec.label}`], true);
     runOrThrow('rm', ['-f', target]);
-    logger.success(`[chronos-launchd] uninstalled ${CHRONOS_LAUNCHD_LABEL} (${target} removed)`);
+    logger.success(`[chronos-launchd] uninstalled ${spec.label} (${target} removed)`);
     return;
   }
 
   if (!argv.apply) {
-    printManualSteps(plist, target, uid, print);
+    printManualSteps(plist, spec, target, uid, print);
     return;
   }
 
@@ -250,7 +378,7 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
     );
   }
 
-  const distDaemon = path.join(repoRoot, 'dist/scripts/chronos_daemon.js');
+  const distDaemon = path.join(repoRoot, spec.daemonScript);
   if (!safeExistsSync(distDaemon)) {
     throw new Error(`dist build missing: ${distDaemon} — run \`pnpm build\` first`);
   }
@@ -261,15 +389,15 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
 
   // Stage under active/shared/tmp (secure-io write root), then copy into
   // ~/Library/LaunchAgents via governed exec — see header note.
-  const staging = pathResolver.sharedTmp(`launchd/${CHRONOS_LAUNCHD_LABEL}.plist`);
+  const staging = pathResolver.sharedTmp(`launchd/${spec.label}.plist`);
   safeWriteFile(staging, plist);
   runOrThrow('mkdir', ['-p', path.dirname(target)]);
   runOrThrow('cp', [staging, target]);
   // Re-bootstrap cleanly if an older agent is already loaded.
-  runOrThrow('launchctl', ['bootout', `gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`], true);
+  runOrThrow('launchctl', ['bootout', `gui/${uid}/${spec.label}`], true);
   runOrThrow('launchctl', ['bootstrap', `gui/${uid}`, target]);
   logger.success(
-    `[chronos-launchd] installed ${CHRONOS_LAUNCHD_LABEL} at ${target} — verify with: launchctl print gui/${uid}/${CHRONOS_LAUNCHD_LABEL} | head`
+    `[chronos-launchd] installed ${spec.label} at ${target} — verify with: launchctl print gui/${uid}/${spec.label} | head`
   );
 }
 
