@@ -165,7 +165,7 @@ pnpm inventory candidates --tenant <slug>
 pnpm inventory promote <entry_id> --kind mission --decided-by user:<id> [--execute]
 
 # 7. after promoted work has run, fold outcomes back into calibration
-pnpm inventory learn --tenant <slug>
+pnpm inventory learn --tenant <slug> --decided-by user:<member-id>
 ```
 
 Every subcommand accepts `--json` for machine output and never writes outside the caller's
