@@ -786,6 +786,51 @@ describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
   });
 });
 
+describe("dispatchDecisionOp 'resolve_hypothesis_conflict' / 'adjust_proposal'", () => {
+  it('resolves surviving hypotheses through the typed wisdom op', async () => {
+    const { rel: sourceRel, abs: sourceAbs } = tmpPath(`dispatch-tree-${Date.now()}.json`);
+    safeWriteFile(
+      sourceAbs,
+      JSON.stringify({
+        hypotheses: [
+          { id: 'H-SPEED', survived: true, golden_rule_dimension: 'execution_speed' },
+          { id: 'H-INTEGRITY', survived: true, golden_rule_dimension: 'logical_integrity' },
+        ],
+      })
+    );
+    const { rel: outputRel } = tmpPath(`dispatch-conflict-${Date.now()}.json`);
+    const result = await dispatchDecisionOp(
+      'resolve_hypothesis_conflict',
+      { source_path: sourceRel, output_path: outputRel, export_as: 'resolution' },
+      {}
+    );
+    expect(result.handled).toBe(true);
+    expect(result.ctx.resolution).toMatchObject({ winner_id: 'H-INTEGRITY', conflict: true });
+  });
+
+  it('appends new signals to the proposal without rewriting it', async () => {
+    const { rel: proposalRel, abs: proposalAbs } = tmpPath(`proposal-${Date.now()}.md`);
+    safeWriteFile(proposalAbs, '# Proposal\n\nOriginal body.');
+    const { rel: outputRel, abs: outputAbs } = tmpPath(`proposal-adjusted-${Date.now()}.md`);
+    const result = await dispatchDecisionOp(
+      'adjust_proposal',
+      {
+        proposal: proposalRel,
+        new_signals: [{ source: 'customer', note: 'needs SSO' }],
+        output_path: outputRel,
+        export_as: 'adjusted',
+      },
+      {}
+    );
+    expect(result.handled).toBe(true);
+    expect(result.ctx.adjusted).toEqual({ written_to: outputRel });
+    const written = String(safeReadFile(outputAbs, { encoding: 'utf8' }));
+    expect(written.startsWith('# Proposal\n\nOriginal body.')).toBe(true);
+    expect(written).toContain('### Updates');
+    expect(written).toContain('needs SSO');
+  });
+});
+
 describe("dispatchDecisionOp 'curate_background_review'", () => {
   it('routes the archive-only curator through the typed wisdom op', async () => {
     const result = await dispatchDecisionOp(

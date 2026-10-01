@@ -43,13 +43,4 @@ describe('system upgrade dispatcher', () => {
     expect(source).toContain('getProcessExitCode()');
     expect(source).toContain('clearProcessExitCode()');
   });
-
-  it('routes the in-session delegated result through the shared printer', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/test-insession.ts'), { encoding: 'utf8' })
-    );
-    expect(source).not.toContain('console.log');
-    expect(source).toContain('run({ print })');
-    expect(source).toContain('test(print)');
-  });
 });

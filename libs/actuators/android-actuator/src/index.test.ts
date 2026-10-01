@@ -618,6 +618,172 @@ describe('android-actuator', () => {
       });
     });
 
+    describe('Android CLI and device-wait ops', () => {
+      const UI_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy rotation="0">
+  <node index="0" text="Sign in with passkey" resource-id="com.example:id/passkey" class="android.widget.Button" package="com.example" content-desc="" bounds="[100,200][300,400]" clickable="true" enabled="true" />
+</hierarchy>`;
+
+      /** Route safeExec by binary + argv so each op sees a plausible device. */
+      async function stubDevice(cliOutputs: Record<string, string> = {}) {
+        const { safeExec } = await import('@agent/core/secure-io');
+        vi.mocked(safeExec).mockImplementation(((bin: string, args: string[] = []) => {
+          if (bin === 'android') {
+            if (args[0] === '--version') return 'android-cli 1.2.0';
+            return cliOutputs[args[0]!] ?? '';
+          }
+          if (args[0] === 'version') return 'Android Debug Bridge version 1.0.41';
+          if (args[0] === 'devices') return 'List of devices attached\nemulator-5554\tdevice';
+          const shell = args.includes('shell') ? args.slice(args.indexOf('shell') + 1) : [];
+          if (shell[0] === 'dumpsys')
+            return '  mResumedActivity: ActivityRecord{1 com.example/.Main}';
+          if (shell[0] === 'cat') return UI_XML;
+          return '';
+        }) as never);
+        return vi.mocked(safeExec);
+      }
+
+      function argvOf(exec: Awaited<ReturnType<typeof stubDevice>>, bin: string): string[][] {
+        return exec.mock.calls.filter((call) => call[0] === bin).map((call) => call[1] as string[]);
+      }
+
+      it('android_cli_health_check reports the CLI version without failing when missing', async () => {
+        await stubDevice();
+        const ok = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'android_cli_health_check', params: {} }],
+        });
+        expect(ok.context.android_cli_available).toBe(true);
+        expect(ok.context.android_cli_health.version).toBe('android-cli 1.2.0');
+
+        const { safeExec } = await import('@agent/core/secure-io');
+        vi.mocked(safeExec).mockImplementation(() => {
+          throw new Error('android: command not found');
+        });
+        const missing = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'android_cli_health_check', params: {} }],
+        });
+        expect(missing.status).toBe('succeeded');
+        expect(missing.context.android_cli_available).toBe(false);
+      });
+
+      it('android_cli_layout / describe / docs_search parse CLI JSON and pass flags', async () => {
+        const exec = await stubDevice({
+          layout: '{"root":{"text":"Home"}}',
+          describe: '{"package":"com.example"}',
+          docs: '[{"title":"Screen capture"}]',
+        });
+        const result = await handleAction({
+          action: 'pipeline',
+          options: { serial: 'emulator-5554' },
+          steps: [
+            {
+              type: 'capture',
+              op: 'android_cli_layout',
+              params: { path: 'active/shared/tmp/android-test/layout.json' },
+            },
+            {
+              type: 'capture',
+              op: 'android_cli_describe',
+              params: { apk_path: 'active/shared/tmp/app.apk' },
+            },
+            {
+              type: 'capture',
+              op: 'android_cli_docs_search',
+              params: { query: 'screen capture', limit: 5 },
+            },
+          ],
+        });
+        expect(result.status).toBe('succeeded');
+        expect(result.context.last_cli_layout).toEqual({ root: { text: 'Home' } });
+        expect(result.context.last_cli_description).toEqual({ package: 'com.example' });
+        expect(result.context.last_docs_results).toEqual([{ title: 'Screen capture' }]);
+        const cli = argvOf(exec, 'android');
+        expect(cli).toContainEqual(['layout', '--serial', 'emulator-5554', '--pretty']);
+        expect(cli).toContainEqual([
+          'describe',
+          '--serial',
+          'emulator-5554',
+          'active/shared/tmp/app.apk',
+        ]);
+        expect(cli).toContainEqual(['docs', 'search', 'screen capture', '--limit', '5']);
+      });
+
+      it('android_cli_screen_resolve requires a label and returns raw output when not JSON', async () => {
+        const exec = await stubDevice({ screen: 'x=10 y=20' });
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { last_screenshot_path: 'active/shared/tmp/screen.png' },
+          steps: [
+            { type: 'capture', op: 'android_cli_screen_resolve', params: { string: 'Login' } },
+          ],
+        });
+        expect(result.context.last_screen_resolve).toEqual({ raw: 'x=10 y=20' });
+        expect(argvOf(exec, 'android')).toContainEqual([
+          'screen',
+          'resolve',
+          '--screenshot=active/shared/tmp/screen.png',
+          '--string=Login',
+        ]);
+        const missing = await handleAction({
+          action: 'pipeline',
+          context: { last_screenshot_path: 'active/shared/tmp/screen.png' },
+          steps: [{ type: 'capture', op: 'android_cli_screen_resolve', params: {} }],
+        });
+        expect(missing.status).toBe('failed');
+      });
+
+      it('android_cli_screen_capture records the annotated screenshot path', async () => {
+        const exec = await stubDevice();
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'apply',
+              op: 'android_cli_screen_capture',
+              params: { path: 'active/shared/tmp/android-test/screen.png', annotate: true },
+            },
+          ],
+        });
+        expect(result.status).toBe('succeeded');
+        expect(result.context.last_screenshot_path).toMatch(
+          /active\/shared\/tmp\/android-test\/screen\.png$/u
+        );
+        expect(result.context.last_cli_screenshot_annotated).toBe(true);
+        const capture = argvOf(exec, 'android').find((args) => args[0] === 'screen');
+        expect(capture).toEqual(expect.arrayContaining(['capture', '--output', '--annotate']));
+      });
+
+      it('capture_foreground_activity extracts the resumed activity line', async () => {
+        await stubDevice();
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'capture_foreground_activity', params: {} }],
+        });
+        expect(result.context.foreground_activity.summary).toBe(
+          'mResumedActivity: ActivityRecord{1 com.example/.Main}'
+        );
+      });
+
+      it('wait_for_ui_node returns the first matching node from a fresh dump', async () => {
+        await stubDevice();
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'apply',
+              op: 'wait_for_ui_node',
+              params: { resource_id: 'com.example:id/passkey', timeout_ms: 50, interval_ms: 10 },
+            },
+          ],
+        });
+        expect(result.status).toBe('succeeded');
+        expect(result.context.wait_for_ui_node_found).toBe(true);
+        expect(result.context.wait_for_ui_node_match.text).toBe('Sign in with passkey');
+      });
+    });
+
     describe('未知のapplyオペレーター', () => {
       it('未知のapplyオペレーターはエラーで失敗する(silent no-op 禁止)', async () => {
         const result = await handleAction({

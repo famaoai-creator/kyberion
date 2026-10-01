@@ -1,5 +1,7 @@
 {
   "$schema": "../schemas/mesh-hub-policy.schema.json",
+  "documentation_only": true,
+  "documentation_note": "Mesh hub Task 4 routing policy. Its runtime loader (mesh-router.ts) was retired on 2026-10-01 (retired/README.md); the policy stays as the contract a restored router must load.",
   "version": "1.0.0",
   "placement": {
     "mode": "in_process_local_control_plane",

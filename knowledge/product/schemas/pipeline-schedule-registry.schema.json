@@ -43,6 +43,7 @@
             ]
           },
           "enabled": { "type": "boolean" },
+          "optIn": { "type": "boolean" },
           "lastRun": { "type": "string", "format": "date-time" },
           "lastStatus": { "enum": ["succeeded", "failed"] },
           "consecutiveFailures": { "type": "integer", "minimum": 0 },

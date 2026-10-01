@@ -526,6 +526,31 @@ describe('agent-actuator team composition actions', () => {
     );
   });
 
+  it('restart goes through the supervisor daemon with the requested runtime spec', async () => {
+    mocks.restartAgentRuntimeViaDaemon.mockResolvedValue({ agentId: 'agent-1', status: 'ready' });
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'restart',
+      params: { agentId: 'agent-1', provider: 'claude', modelId: 'm-1' },
+    } as never);
+    expect(result).toMatchObject({
+      status: 'ok',
+      agentId: 'agent-1',
+      snapshot: { agentId: 'agent-1', status: 'ready' },
+    });
+    expect(mocks.restartAgentRuntimeViaDaemon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'agent-1',
+        provider: 'claude',
+        modelId: 'm-1',
+        requestedBy: 'agent_actuator',
+      })
+    );
+    await expect(handleAction({ action: 'restart', params: {} } as never)).rejects.toThrow(
+      'agentId is required for restart'
+    );
+  });
+
   it('shutdown_all terminates all agents', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({ action: 'shutdown_all', params: {} } as any);

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import { registerOpGuard, resetOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/governance';
 import { handleArtifactAction } from './artifact-actuator-helpers.js';
+import { actuator } from './index.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -56,5 +59,46 @@ describe('artifact-actuator', () => {
       dispose();
       resetOpPreflight();
     }
+  });
+
+  it('ensure_dir creates the governed directory and requires logicalDir', async () => {
+    // Own scratch root: other suites scan runtime/artifacts and expect only files there.
+    const scratchRoot = `active/shared/runtime/artifact-actuator-test-${process.pid}`;
+    const logicalDir = `${scratchRoot}/ensure`;
+    try {
+      const result = (await handleArtifactAction({
+        action: 'ensure_dir',
+        params: { role: 'mission_controller', logicalDir },
+      })) as { status: string; path: string };
+      expect(result.status).toBe('ensured');
+      expect(result.path).toBe(pathResolver.rootResolve(logicalDir));
+      expect(safeExistsSync(result.path)).toBe(true);
+    } finally {
+      withExecutionContext('mission_controller', () =>
+        safeRmSync(pathResolver.rootResolve(scratchRoot), { recursive: true, force: true })
+      );
+    }
+    await expect(
+      handleArtifactAction({
+        action: 'ensure_dir',
+        params: { role: 'mission_controller', logicalDir: 'active/shared/tmp/not-governed' },
+      })
+    ).rejects.toThrow('outside governed');
+    await expect(
+      handleArtifactAction({
+        action: 'ensure_dir',
+        params: { role: 'mission_controller' },
+      } as never)
+    ).rejects.toThrow('logicalDir is required');
+  });
+});
+
+describe('artifact-actuator SDK dispatch (pipeline / ADF path)', () => {
+  it('reaches the action handler with { action: op, params }', async () => {
+    const result = await actuator.dispatch('read_json', {
+      role: 'mission_controller',
+      logicalPath: 'active/shared/runtime/artifacts/test/never-written.json',
+    });
+    expect(result).toMatchObject({ ok: true, output: { status: 'ok', value: null } });
   });
 });

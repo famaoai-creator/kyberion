@@ -22,9 +22,12 @@ import { escapeXml } from '@agent/core/text-escaping';
 import { nowIso } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { semanticToken } from '@agent/core/semantic-design-tokens';
 import type { MediaLayoutChrome, MediaLayoutTemplateCatalog } from './media-layout-catalog.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
+
+const dtok = (name: string): string => semanticToken('diagram', name);
 
 function normalizeFontFamily(input: string): string {
   return input.split(',')[0].trim();
@@ -220,9 +223,9 @@ function buildDrawioNodeStyle(
     options.iconMap?.resources?.[node.type] ||
     options.iconMap?.resources?.default ||
     {};
-  const background = resourceEntry.fillColor || colors.background || '#ffffff';
-  const stroke = resourceEntry.strokeColor || colors.primary || '#232f3e';
-  const accent = resourceEntry.accentColor || colors.accent || '#ff9900';
+  const background = resourceEntry.fillColor || colors.background || dtok('diagram.background');
+  const stroke = resourceEntry.strokeColor || colors.primary || dtok('diagram.stroke');
+  const accent = resourceEntry.accentColor || colors.accent || dtok('diagram.accent');
   const fontFamily = normalizeFontFamily(
     fonts.body || fonts.heading || resolveLatinFontFamily(undefined)
   );
@@ -240,7 +243,7 @@ function buildDrawioNodeStyle(
       'container=1',
       `fillColor=${boundaryPalette.fill}`,
       `strokeColor=${boundaryPalette.stroke}`,
-      `fontColor=${colors.text || '#111827'}`,
+      `fontColor=${colors.text || dtok('diagram.text')}`,
       `fontFamily=${fontFamily}`,
       'fontStyle=1',
       ...(boundaryIcon
@@ -266,7 +269,7 @@ function buildDrawioNodeStyle(
       'aspect=fixed',
       'align=center',
       'labelBackgroundColor=none',
-      `fontColor=${colors.text || '#111827'}`,
+      `fontColor=${colors.text || dtok('diagram.text')}`,
       `fontFamily=${fontFamily}`,
       `image=${embeddedIcon}`,
     ].join(';');
@@ -279,7 +282,7 @@ function buildDrawioNodeStyle(
     'arcSize=12',
     `fillColor=${background}`,
     `strokeColor=${stroke}`,
-    `fontColor=${colors.text || '#111827'}`,
+    `fontColor=${colors.text || dtok('diagram.text')}`,
     `fontFamily=${fontFamily}`,
     `gradientColor=${accent}`,
   ].join(';');
@@ -322,11 +325,11 @@ function resolveDiagramTheme(params: any, ctx: any): any {
 
   return {
     colors: {
-      primary: '#0f172a',
-      secondary: '#334155',
-      accent: '#38bdf8',
-      background: '#ffffff',
-      text: '#1e293b',
+      primary: dtok('diagram.palette.primary'),
+      secondary: dtok('diagram.palette.secondary'),
+      accent: dtok('diagram.palette.accent'),
+      background: dtok('diagram.palette.background'),
+      text: dtok('diagram.palette.text'),
     },
     fonts: {
       heading: resolveLatinFontFamily(undefined),
@@ -532,8 +535,8 @@ function generateDrawioDocument(
       'orthogonalLoop=1',
       'jettySize=auto',
       'html=1',
-      `strokeColor=${colors.primary || '#232f3e'}`,
-      `fontColor=${colors.text || '#111827'}`,
+      `strokeColor=${colors.primary || dtok('diagram.stroke')}`,
+      `fontColor=${colors.text || dtok('diagram.text')}`,
       `fontFamily=${normalizeFontFamily(fonts.body || fonts.heading || resolveLatinFontFamily(undefined))}`,
     ];
     const labelStyleParts = resolveDrawioEdgeLabelStyleParts(edge.label);
@@ -544,8 +547,8 @@ function generateDrawioDocument(
             ? part.replace(
                 /strokeColor=[^;]+/,
                 edge.label === 'source'
-                  ? `strokeColor=${colors.accent || '#ff9900'}`
-                  : `strokeColor=${colors.secondary || '#4b5563'}`
+                  ? `strokeColor=${colors.accent || dtok('diagram.accent')}`
+                  : `strokeColor=${colors.secondary || dtok('diagram.secondary')}`
               )
             : part
         )
@@ -895,7 +898,7 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
   // default Office theme) is not evidence of the deck's real visual identity.
   const themeAccent = normalizeHexColor(
     palette.accent1 || palette.hlink || palette.accent2,
-    '#2563EB'
+    dtok('diagram.extracted.accent')
   );
   const themeAccentEvidence = contentColorCounts.get(themeAccent) || 0;
   const accent =
@@ -922,15 +925,21 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
     colors: {
       primary: normalizeHexColor(
         palette.dk1 || palette.tx1 || palette.accent2 || palette.accent1,
-        '#1F2937'
+        dtok('diagram.extracted.primary')
       ),
       secondary: normalizeHexColor(
         palette.dk2 || palette.tx2 || palette.accent2 || palette.accent3,
-        '#4B5563'
+        dtok('diagram.extracted.secondary')
       ),
       accent,
-      background: normalizeHexColor(palette.lt1 || palette.bg1 || palette.lt2, '#FFFFFF'),
-      text: normalizeHexColor(palette.tx1 || palette.dk1 || palette.dk2, '#111827'),
+      background: normalizeHexColor(
+        palette.lt1 || palette.bg1 || palette.lt2,
+        dtok('diagram.extracted.background')
+      ),
+      text: normalizeHexColor(
+        palette.tx1 || palette.dk1 || palette.dk2,
+        dtok('diagram.extracted.text')
+      ),
     },
     fonts: {
       heading: titleFont || slideTitleFont || fallbackFont || 'Aptos, sans-serif',

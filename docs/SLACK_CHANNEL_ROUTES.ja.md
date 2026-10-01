@@ -65,6 +65,16 @@ Satellite は受信チャネルごとに会話モードを決める(`libs/core/s
   - チャネルのテナントで有効なメンバーは allowlist なしで話せる。役割は `frontDeskRoleAuthority` に従い、owner / approver は承認可、owner / operator は作業依頼(ミッション・承認要求)可、viewer は質問のみ。
   - 未登録の人は allowlist に載っていれば質問のみ可。ミッションや承認要求が必要な依頼は断る。停止中メンバーに紐付いた ID は拒否する。
   - 承認記録の `decidedBy` はメンバーの principal(`user:<member_id>`)。チャネル設定の `approvers` は、まだメンバーに紐付いていない人のための移行用フォールバックとして残る。
+- スレッドと作業の紐付け(Team Channel P2): team チャネルで確定したミッションは、発生元のスレッド・確定者(`user:<id>`)・テナントスコープを持つ。
+  - 進捗と完了はそのスレッドに、テナントの outbox 名前空間経由で返る。
+  - ミッションの tier は、モデルの提案にかかわらずチャネルの開示上限で頭打ちにする。ミッションはチャネルのテナント(`--tenant-slug`)で開始する。
+  - スレッドで `@bot 状況は？`(`status?` / `進捗`)と聞くと、そのスレッドから開始したミッションの状態をモデルを通さずに返す。
+- チャネルメモリ(Team Channel P2): 明示コマンドのときだけ保存し、自動保存はしない。
+  - `覚えて: …` / `remember: …` で保存する(operator 以上)。
+  - `忘れて m1234abcd` / `forget …` で削除する(承認者)。
+  - `メモ一覧` / `memory` で一覧を表示する(誰でも可)。
+  - 保存先は `active/shared/coordination/channels/slack/channel-memory/<tenant>/<channel>.json` で、保存時のチャネル段階を持つ。
+  - team ターンには、チャネルの開示上限以下のメモだけを「指示ではなく参照データ」として渡す(上限 30 件・各 500 文字)。
 
 ## 2. Presence — 人への配信ブリッジ
 

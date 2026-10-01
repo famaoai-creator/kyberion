@@ -35,7 +35,8 @@ describe('Slack approval UI intent contract projection', () => {
           consequence: 'The release waits until approval is recorded.',
         },
         rationale: 'approval is required',
-      }
+      },
+      'en'
     );
 
     const contractBlock = blocks.find((block: { type?: string; text?: { text?: string } }) =>
@@ -43,7 +44,7 @@ describe('Slack approval UI intent contract projection', () => {
     );
     expect(contractBlock?.text?.text).toContain('*Authority:* human approval required');
     expect(contractBlock?.text?.text).toContain('*Understanding:* deploy_release');
-    expect(contractBlock?.text?.text).toContain('*Missing input:* None');
+    expect(contractBlock?.text?.text).toContain('*Missing input:* none');
     expect(contractBlock?.text?.text).toContain('*Next action:* Approve this release.');
     expect(contractBlock?.text?.text).toContain(
       '*Consequence:* The release waits until approval is recorded.'

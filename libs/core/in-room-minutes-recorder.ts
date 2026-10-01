@@ -9,6 +9,7 @@
  * minutes.md とアクションアイテムを生成する。
  */
 
+import { t } from './t.js';
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 
@@ -188,7 +189,10 @@ export async function startInRoomMinutesSession(
       }
     } catch (error) {
       appendTranscript(
-        `- (segment ${segment} の文字起こしに失敗: ${error instanceof Error ? error.message : String(error)})\n`
+        `- ${t('minutes_record:segment_transcription_failed', {
+          segment,
+          detail: error instanceof Error ? error.message : String(error),
+        })}\n`
       );
     }
   };

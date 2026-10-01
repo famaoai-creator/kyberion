@@ -1,3 +1,4 @@
+import { t } from './t.js';
 import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
@@ -330,7 +331,10 @@ function snapshotDealAgreement(deal: DealRecord): void {
 }
 
 function queueDealDistillCandidate(deal: DealRecord): void {
-  const outcome = deal.stage === 'delivered' ? '受注・納品まで完了' : '失注';
+  const outcome =
+    deal.stage === 'delivered'
+      ? t('deal_ops:learning_outcome_won')
+      : t('deal_ops:learning_outcome_lost');
   const recentNotes = deal.notes
     .slice(-8)
     .map((note) => `${note.role}: ${note.text.slice(0, 120)}`);
@@ -339,11 +343,20 @@ function queueDealDistillCandidate(deal: DealRecord): void {
     sourceRef: `deal:${deal.tenant_slug}/${deal.deal_id}`,
     proposedMemoryKind: 'heuristic',
     summary: [
-      `商談 ${deal.deal_id}(${outcome})の学び候補: ${deal.summary.slice(0, 160)}`,
+      t('deal_ops:learning_headline', {
+        dealId: deal.deal_id,
+        outcome,
+        summary: deal.summary.slice(0, 160),
+      }),
       deal.agreed?.amount
-        ? `合意金額 ${deal.agreed.amount.value} ${deal.agreed.amount.currency}`
+        ? t('deal_ops:learning_agreed_amount', {
+            value: deal.agreed.amount.value,
+            currency: deal.agreed.amount.currency,
+          })
         : '',
-      recentNotes.length > 0 ? `直近のやりとり: ${recentNotes.join(' / ').slice(0, 400)}` : '',
+      recentNotes.length > 0
+        ? t('deal_ops:learning_recent_notes', { notes: recentNotes.join(' / ').slice(0, 400) })
+        : '',
     ]
       .filter(Boolean)
       .join('\n'),

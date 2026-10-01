@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Segmented, SettingRow, SettingsGroup } from '@agent/shared-ui';
-import type { ConciergeLocale } from '../../../lib/i18n';
+import { resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
 import {
   normalizeThemePreference,
   onDisplayPreferencesChange,
@@ -43,7 +43,7 @@ export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProp
   return (
     <FormScope
       fields={{
-        'display.locale': (value) => onLocaleChange(asText(value) === 'en' ? 'en' : 'ja'),
+        'display.locale': (value) => onLocaleChange(resolveConciergeLocale(asText(value))),
         'display.theme': (value) => {
           const next = normalizeThemePreference(value);
           setTheme(next);

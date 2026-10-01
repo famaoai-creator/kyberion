@@ -5,7 +5,7 @@ tags: [intent, operator-learning, simulation, personal-memory, ceo, cto]
 importance: 9
 author: Codex
 audit_date: 2026-04-29
-last_updated: 2026-04-29
+last_updated: 2026-10-01
 ---
 
 # Operator Intent Learning Simulation
@@ -272,12 +272,11 @@ Two schemas anchor the learning layer:
 
 - [`operator-profile.schema.json`](../schemas/operator-profile.schema.json)
 - [`operator-request-log.schema.json`](../schemas/operator-request-log.schema.json)
-- [`operator-learning-scenario-pack.json`](../governance/operator-learning-scenario-pack.json)
-- [`operator-learning-dispatch-registry.json`](../governance/operator-learning-dispatch-registry.json)
+- `operator-learning-scenario-pack.json` and `operator-learning-dispatch-registry.json` (+ schemas) — retired 2026-10-01 with their loader to `retired/knowledge/product/` (no reader left; see `retired/README.md`)
 
 The runtime helper is:
 
-- [`operator-learning.ts`](../../../libs/core/surface/operator-learning.ts)
+- `operator-learning.ts` — retired 2026-10-01 to `retired/libs-core/surface/operator-learning.ts` (no production caller; see `retired/README.md`)
 
 It validates profile and request-log records, can create an
 `operator-request-log` from an `intent_resolution_packet`, builds an

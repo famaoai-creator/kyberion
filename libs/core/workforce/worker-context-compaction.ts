@@ -33,6 +33,7 @@ import {
 } from '../secure-io.js';
 import { notifyAllDynamicInjectionRegistries } from '../dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from '../lifecycle-hook-engine.js';
+import { ensureTrustedExternalHooksRegistered } from '../external-hook-discovery.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import type { ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../physical-namespace.js';
@@ -605,6 +606,12 @@ export async function compactWorkerContext(
   // KC-04 pre_compact hooks are observational: compaction is itself a safety
   // mechanism, so a hook block verdict must not stop it. KC-02: mirror onto
   // the worker event stream (best-effort).
+  try {
+    // DH-16: trusted project hook configs join the engine (opt-in, inert by default).
+    ensureTrustedExternalHooksRegistered();
+  } catch {
+    /* external hooks are additive; a bootstrap failure must not stop compaction */
+  }
   await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'pre_compact', {
     ...(options.missionId
       ? { matcher_value: options.missionId, mission_id: options.missionId }

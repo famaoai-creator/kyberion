@@ -11,6 +11,7 @@
  * Pure + injectable clock/timer — no globals, no real timers in tests.
  */
 
+import { localeUsesWordSpaces, pickByLocale } from '../locale-normalize.js';
 import { loadVoiceTurnTakingLexicon } from './voice-turn-taking-lexicon.js';
 
 export type VoiceEotLang = 'ja' | 'en' | 'auto';
@@ -121,10 +122,13 @@ function scoreEnglish(text: string): EotScore {
 export function scoreEndOfTurn(text: string, lang: VoiceEotLang = 'auto'): EotScore {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
-    return { probability: 0.5, lang: lang === 'ja' ? 'ja' : 'en', rule: 'empty' };
+    return { probability: 0.5, lang: pickByLocale(lang, { en: 'en', ja: 'ja' }), rule: 'empty' };
   }
   const resolvedLang = lang === 'auto' ? detectLang(trimmed) : lang;
-  return resolvedLang === 'ja' ? scoreJapanese(trimmed) : scoreEnglish(trimmed);
+  return pickByLocale(resolvedLang, {
+    en: () => scoreEnglish(trimmed),
+    ja: () => scoreJapanese(trimmed),
+  })();
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +222,6 @@ export class EotHoldAggregator {
   private appendFragment(buffer: string, fragment: string): string {
     if (!buffer) return fragment;
     const resolvedLang = this.lang === 'auto' ? detectLang(buffer + fragment) : this.lang;
-    return resolvedLang === 'ja' ? `${buffer}${fragment}` : `${buffer} ${fragment}`;
+    return localeUsesWordSpaces(resolvedLang) ? `${buffer} ${fragment}` : `${buffer}${fragment}`;
   }
 }

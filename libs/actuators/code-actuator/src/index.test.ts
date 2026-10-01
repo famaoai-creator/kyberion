@@ -417,6 +417,97 @@ describe('code-actuator', () => {
 
         expect(result.status).toBe('succeeded');
       });
+
+      it('while repeats the nested pipeline until max_iterations', async () => {
+        const { logger } = await import('@agent/core/core');
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { flag: true },
+          steps: [
+            {
+              type: 'control',
+              op: 'while',
+              params: {
+                condition: { from: 'flag', operator: 'eq', value: true },
+                max_iterations: 3,
+                pipeline: [{ type: 'apply', op: 'log', params: { message: 'tick' } }],
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        const ticks = vi
+          .mocked(logger.info)
+          .mock.calls.filter((call) => String(call[0]).includes('[CODE_LOG] tick'));
+        expect(ticks).toHaveLength(3);
+      });
+    });
+
+    describe('transform ops', () => {
+      it('json_update sets keys on the captured JSON document', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { last_capture: '{"name":"kyberion","version":"1.0.0"}', next: '1.1.0' },
+          steps: [
+            {
+              type: 'transform',
+              op: 'json_update',
+              params: { updates: [{ key: 'version', value: '{{next}}' }], export_as: 'updated' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(JSON.parse(result.context.updated)).toEqual({ name: 'kyberion', version: '1.1.0' });
+      });
+
+      it('run_js is refused while KYBERION_ALLOW_UNSAFE_JS is off (code-pipeline-run-js.test.ts covers on)', async () => {
+        const step = {
+          type: 'transform' as const,
+          op: 'run_js',
+          params: { code: 'ctx.answer = 40 + 2;' },
+        };
+        const denied = await handleAction({ action: 'pipeline', steps: [step] });
+        expect(denied.status).toBe('failed');
+        expect(denied.results[0].error).toContain('[SECURITY]');
+      });
+
+      it('impact_analysis asks the reasoning backend and normalizes its JSON answer', async () => {
+        const { safeExistsSync } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        const prompt = vi.fn(
+          async () =>
+            'Here: {"summary":"Add a flag","files":[{"path":"src/a.ts","change":"read flag"}],"risks":["none"],"size":"XL"}'
+        );
+        vi.doMock('@agent/core/reasoning/reasoning-backend', () => ({
+          getReasoningBackend: () => ({ prompt }),
+        }));
+        try {
+          const result = await handleAction({
+            action: 'pipeline',
+            steps: [
+              {
+                type: 'transform',
+                op: 'impact_analysis',
+                params: { repo_path: 'active/shared/tmp/repo', requirements: 'Add a flag' },
+              },
+            ],
+          });
+
+          expect(result.status).toBe('succeeded');
+          expect(result.context.impact_analysis).toMatchObject({
+            kind: 'impact-analysis',
+            summary: 'Add a flag',
+            files: [{ path: 'src/a.ts', change: 'read flag' }],
+            risks: ['none'],
+            size: 'M', // an out-of-range size falls back to M
+          });
+          expect(prompt).toHaveBeenCalledWith(expect.stringContaining('Add a flag'));
+        } finally {
+          vi.doUnmock('@agent/core/reasoning/reasoning-backend');
+        }
+      });
     });
 
     describe('context_path', () => {

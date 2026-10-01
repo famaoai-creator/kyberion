@@ -34,7 +34,12 @@
           "default": { "type": ["string", "null"] },
           "subsystem": { "type": "string" },
           "description": { "type": "string" },
-          "documented": { "type": "boolean" }
+          "documented": { "type": "boolean" },
+          "deprecated": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Release/month since which the variable is ignored. Deprecated entries stay registered (so operators who still export them get a warning, not an unknown-variable failure) even when no code reads them."
+          }
         },
         "additionalProperties": false
       }

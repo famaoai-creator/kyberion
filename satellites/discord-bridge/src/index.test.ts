@@ -1,3 +1,4 @@
+import { runWithReplyLocale } from '@agent/core/locale';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
 import {
@@ -22,7 +23,7 @@ vi.mock('discord.js', () => ({
 }));
 
 const captured = vi.hoisted(() => ({
-  conversationInputs: [] as { threadContext?: string; text: string }[],
+  conversationInputs: [] as { threadContext?: string; text: string; locale?: string }[],
 }));
 
 vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
@@ -33,6 +34,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
       captured.conversationInputs.push({
         threadContext: input.threadContext,
         text: input.text,
+        locale: input.locale,
       });
       return {
         text: 'ok',
@@ -198,8 +200,14 @@ describe('discord bridge thread context', () => {
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
+    // No explicit turn locale: the orchestrator derives it (user text > scope > operator),
+    // and the Japanese input makes the thread context Japanese on every host locale.
+    expect(captured.conversationInputs.map((input) => input.locale)).toEqual([
+      undefined,
+      undefined,
+    ]);
     expect(captured.conversationInputs[1].threadContext).toContain(
-      t('bridge:thread_user', { author: 'alice#0001', text: '最初の相談' }, resolveOperatorLocale())
+      t('bridge:thread_user', { author: 'alice#0001', text: '最初の相談' }, 'ja')
     );
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
   });
@@ -217,13 +225,17 @@ describe('discord bridge thread context', () => {
     approvalId = record.id;
     const reply = vi.fn().mockResolvedValue(undefined);
 
-    await handleDiscordInteraction({
-      isButton: () => true,
-      user: { id: 'actor-42' },
-      channelId: 'channel-approval',
-      customId: `appr:${record.id}:approve`,
-      reply,
-    });
+    // A button press carries no text, so pin the reply locale instead of
+    // inheriting the host's.
+    await runWithReplyLocale('ja', () =>
+      handleDiscordInteraction({
+        isButton: () => true,
+        user: { id: 'actor-42' },
+        channelId: 'channel-approval',
+        customId: `appr:${record.id}:approve`,
+        reply,
+      })
+    );
 
     expect(reply).toHaveBeenCalledWith({ content: '承認しました: Deploy', ephemeral: true });
     expect(loadApprovalRequest('discord', record.id)).toMatchObject({ status: 'approved' });

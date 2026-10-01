@@ -91,7 +91,9 @@ describe('reconcile ops (LE-03)', () => {
   it('reconcileConfigFallbacks returns an empty result on a missing registry', async () => {
     const { reconcileConfigFallbacks } = await import('./reconcile-ops.js');
     expect(reconcileConfigFallbacks()).toEqual({
+      applied: false,
       repaired: [],
+      planned: [],
       proposals_written: [],
       skipped: [],
       pruned: 0,
@@ -130,8 +132,23 @@ describe('reconcile ops (LE-03)', () => {
     );
 
     const { reconcileConfigFallbacks } = await import('./reconcile-ops.js');
-    const result = reconcileConfigFallbacks();
+    const created = path.join(tmpRoot, 'knowledge', 'public', 'demo', 'le03-sample.json');
 
+    // B1: without apply the sweep is proposal-only — nothing under knowledge/.
+    const preview = reconcileConfigFallbacks();
+    expect(preview.applied).toBe(false);
+    expect(preview.repaired).toEqual([]);
+    expect(preview.planned).toEqual([
+      {
+        knowledge_path: 'public/demo/le03-sample.json',
+        action: 'would create from defaults_snapshot (re-run with --apply)',
+      },
+    ]);
+    expect(fs.existsSync(created)).toBe(false);
+
+    const result = reconcileConfigFallbacks({ apply: true });
+
+    expect(result.applied).toBe(true);
     expect(result.repaired).toEqual([
       { knowledge_path: 'public/demo/le03-sample.json', action: 'created from defaults_snapshot' },
     ]);
@@ -141,7 +158,6 @@ describe('reconcile ops (LE-03)', () => {
         reason: 'not in public/ tier — auto-create skipped for safety',
       },
     ]);
-    const created = path.join(tmpRoot, 'knowledge', 'public', 'demo', 'le03-sample.json');
     expect(JSON.parse(fs.readFileSync(created, 'utf8'))).toEqual({ hello: 'world' });
   });
 
