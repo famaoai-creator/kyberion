@@ -67,7 +67,7 @@ Current status by phase:
 
 ### 1. Contract-first execution is the right model
 
-The lifecycle described in [contract-lifecycle.md](/Users/famao/kyberion/knowledge/product/architecture/contract-lifecycle.md) is correct:
+The lifecycle described in [contract-lifecycle.md](contract-lifecycle.md) is correct:
 
 `conversation -> semantic brief -> draft contract -> preflight -> committed executable contract -> execution -> evidence`
 
@@ -75,13 +75,13 @@ This is the right answer to the earlier "raw ADF too early" failure mode.
 
 ### 2. Mission authority is properly separated
 
-[mission-orchestration-control-plane.md](/Users/famao/kyberion/knowledge/product/architecture/mission-orchestration-control-plane.md) keeps mission state deterministic and outside ad hoc agent mutation.
+[mission-orchestration-control-plane.md](mission-orchestration-control-plane.md) keeps mission state deterministic and outside ad hoc agent mutation.
 
 That separation should be preserved.
 
 ### 3. Analysis and review are modeled as governed execution, not freeform chat
 
-[analysis-execution-boundary.md](/Users/famao/kyberion/knowledge/product/architecture/analysis-execution-boundary.md) is conceptually strong.
+[analysis-execution-boundary.md](analysis-execution-boundary.md) is conceptually strong.
 
 It correctly separates:
 
@@ -92,7 +92,7 @@ It correctly separates:
 
 ### 4. Harness evolution is now conceptually aligned
 
-[benchmark-driven-harness-evolution.md](/Users/famao/kyberion/knowledge/product/architecture/benchmark-driven-harness-evolution.md) correctly adapts the useful part of `autoagent` into Kyberion's worldview.
+[benchmark-driven-harness-evolution.md](benchmark-driven-harness-evolution.md) correctly adapts the useful part of `autoagent` into Kyberion's worldview.
 
 The key point is correct:
 
@@ -105,13 +105,13 @@ The key point is correct:
 
 The repository rule says direct `node:fs` is prohibited in normal operation:
 
-- [AGENTS.md](/Users/famao/kyberion/AGENTS.md)
+- [AGENTS.md](../../../AGENTS.md)
 
 This pass removed known production bypasses from `media-actuator` and added a boundary test:
 
-- [libs/actuators/media-actuator/src/index.ts](/Users/famao/kyberion/libs/actuators/media-actuator/src/index.ts)
-- [libs/actuators/media-actuator/src/artisan/extraction-engine.ts](/Users/famao/kyberion/libs/actuators/media-actuator/src/artisan/extraction-engine.ts)
-- [libs/actuators/media-actuator/src/security-boundary.test.ts](/Users/famao/kyberion/libs/actuators/media-actuator/src/security-boundary.test.ts)
+- [libs/actuators/media-actuator/src/index.ts](../../../libs/actuators/media-actuator/src/index.ts)
+- [libs/actuators/media-actuator/src/artisan/extraction-engine.ts](../../../libs/actuators/media-actuator/src/artisan/extraction-engine.ts)
+- [libs/actuators/media-actuator/src/security-boundary.test.ts](../../../libs/actuators/media-actuator/src/security-boundary.test.ts)
 
 The remaining gap is repository-wide enforcement.
 
@@ -125,13 +125,13 @@ Kyberion still needs:
 
 The intended design is documented here:
 
-- [intent-classifier-routing.md](/Users/famao/kyberion/knowledge/product/architecture/intent-classifier-routing.md)
+- [intent-classifier-routing.md](intent-classifier-routing.md)
 
 This pass introduced:
 
-- [knowledge/product/schemas/intent-resolution-packet.schema.json](/Users/famao/kyberion/knowledge/product/schemas/intent-resolution-packet.schema.json)
-- [libs/core/intent/intent-resolution.ts](/Users/famao/kyberion/libs/core/intent/intent-resolution.ts)
-- [libs/core/task/task-session.ts](/Users/famao/kyberion/libs/core/task/task-session.ts)
+- [knowledge/product/schemas/intent-resolution-packet.schema.json](../schemas/intent-resolution-packet.schema.json)
+- [libs/core/intent/intent-resolution.ts](../../../libs/core/intent/intent-resolution.ts)
+- [libs/core/task/task-session.ts](../../../libs/core/task/task-session.ts)
 
 That now covers:
 
@@ -148,14 +148,14 @@ The remaining extension is optional, not blocking:
 
 `work-design.ts` already reads knowledge catalogs, which is the right direction:
 
-- [libs/core/workforce/work-design.ts](/Users/famao/kyberion/libs/core/workforce/work-design.ts#L153)
+- [libs/core/workforce/work-design.ts](../../../libs/core/workforce/work-design.ts#L153)
 
 This pass moved those semantics into knowledge catalogs:
 
-- [knowledge/product/governance/execution-boundary-profiles.json](/Users/famao/kyberion/knowledge/product/governance/execution-boundary-profiles.json)
-- [knowledge/product/governance/runtime-design-profiles.json](/Users/famao/kyberion/knowledge/product/governance/runtime-design-profiles.json)
-- [knowledge/product/governance/work-policy.json](/Users/famao/kyberion/knowledge/product/governance/work-policy.json)
-- [libs/core/workforce/work-design.ts](/Users/famao/kyberion/libs/core/workforce/work-design.ts)
+- [knowledge/product/governance/execution-boundary-profiles.json](../governance/execution-boundary-profiles.json)
+- [knowledge/product/governance/runtime-design-profiles.json](../governance/runtime-design-profiles.json)
+- [knowledge/product/governance/work-policy.json](../governance/work-policy.json)
+- [libs/core/workforce/work-design.ts](../../../libs/core/workforce/work-design.ts)
 
 The remaining gap is narrower:
 
@@ -166,7 +166,7 @@ The remaining gap is narrower:
 
 The current coverage matrix now accurately narrows the catalog-first gap:
 
-- [knowledge/product/governance/intent-coverage-matrix.json](/Users/famao/kyberion/knowledge/product/governance/intent-coverage-matrix.json)
+- [knowledge/product/governance/intent-coverage-matrix.json](../governance/intent-coverage-matrix.json)
 
 Current declared gaps include:
 
@@ -178,13 +178,13 @@ Current declared gaps include:
 
 This pass closed the immediate runtime drift in:
 
-- [libs/core/task/task-session.ts](/Users/famao/kyberion/libs/core/task/task-session.ts)
-- [libs/core/task/task-session.test.ts](/Users/famao/kyberion/libs/core/task/task-session.test.ts)
+- [libs/core/task/task-session.ts](../../../libs/core/task/task-session.ts)
+- [libs/core/task/task-session.test.ts](../../../libs/core/task/task-session.test.ts)
 
 Approval policy now lives in:
 
-- [knowledge/product/governance/approval-policy.json](/Users/famao/kyberion/knowledge/product/governance/approval-policy.json)
-- [libs/core/governance/approval-policy.ts](/Users/famao/kyberion/libs/core/governance/approval-policy.ts)
+- [knowledge/product/governance/approval-policy.json](../governance/approval-policy.json)
+- [libs/core/governance/approval-policy.ts](../../../libs/core/governance/approval-policy.ts)
 
 The remaining work here is additive, not corrective:
 

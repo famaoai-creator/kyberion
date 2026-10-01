@@ -160,38 +160,74 @@ export interface DispatchResult {
  * Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §7 Layer③
  */
 export async function dispatchProcedure(input: DispatchInput): Promise<DispatchResult> {
-  // Layer C substrate branch (design doc §7/§9): browser procedures authored
-  // for Playwright execution are routed to a dedicated function so the
-  // existing `extension_session` path (dispatchExtensionSession) never has to
-  // be edited to accommodate the new substrate.
-  if (
-    input.procedure.substrate === 'browser' &&
-    input.procedure.execution_substrate === 'playwright'
-  ) {
-    return dispatchPlaywrightPipeline(input);
-  }
+  // Layer C substrate branch (design doc §7/§9): an execution-substrate route
+  // (e.g. browser procedures authored for Playwright) wins over the adapter
+  // executor, so the existing `extension_session` path never has to be edited
+  // to accommodate a new substrate.
+  const substrateKey = executionSubstrateKey(input.procedure);
+  const substrateHandler = substrateKey ? EXECUTION_SUBSTRATE_EXECUTORS[substrateKey] : undefined;
+  if (substrateHandler) return substrateHandler(input);
 
   const executor = input.procedure.adapter.executor;
-  switch (executor) {
-    case 'extension_session':
-      return dispatchExtensionSession(input);
-    case 'service:preset':
-      return dispatchServiceSession(input);
-    case 'system':
-      return dispatchDesktopProcedure(input);
-    case 'media:pipeline':
-      // Media recipe→pipeline mapping is a separate phase.
-      logger.info(`[procedure-dispatcher] executor "${executor}" is not yet implemented`);
-      return {
-        status: 'not_implemented',
-        errors: [`Executor "${executor}" is not yet implemented (planned substrate adapter)`],
-      };
-    default:
-      return {
-        status: 'blocked',
-        errors: [`Unknown executor: "${executor}"`],
-      };
+  const handler = Object.prototype.hasOwnProperty.call(PROCEDURE_EXECUTORS, executor)
+    ? PROCEDURE_EXECUTORS[executor]
+    : undefined;
+  if (!handler) {
+    return {
+      status: 'blocked',
+      errors: [`Unknown executor: "${executor}"`],
+    };
   }
+  return handler(input);
+}
+
+// ---------------------------------------------------------------------------
+// Executor registry (RS-07)
+// ---------------------------------------------------------------------------
+
+type ProcedureExecutorHandler = (input: DispatchInput) => Promise<DispatchResult>;
+
+async function dispatchNotImplementedExecutor(input: DispatchInput): Promise<DispatchResult> {
+  const executor = input.procedure.adapter.executor;
+  logger.info(`[procedure-dispatcher] executor "${executor}" is not yet implemented`);
+  return {
+    status: 'not_implemented',
+    errors: [`Executor "${executor}" is not yet implemented (planned substrate adapter)`],
+  };
+}
+
+/**
+ * Adapter executors keyed by `procedure.adapter.executor`. Adding an executor
+ * is a registration here, not a new branch in dispatchProcedure. Unknown
+ * executors fail closed (`blocked`).
+ */
+const PROCEDURE_EXECUTORS: Readonly<Record<string, ProcedureExecutorHandler>> = {
+  extension_session: async (input) => dispatchExtensionSession(input),
+  'service:preset': async (input) => dispatchServiceSession(input),
+  system: async (input) => dispatchDesktopProcedure(input),
+  // Media recipe→pipeline mapping is a separate phase.
+  'media:pipeline': async (input) => dispatchNotImplementedExecutor(input),
+};
+
+/** Execution-substrate overrides keyed by `<substrate>:<execution_substrate>`. */
+const EXECUTION_SUBSTRATE_EXECUTORS: Readonly<Record<string, ProcedureExecutorHandler>> = {
+  'browser:playwright': async (input) => dispatchPlaywrightPipeline(input),
+};
+
+function executionSubstrateKey(procedure: ProcedureEntry): string | undefined {
+  return procedure.execution_substrate
+    ? `${procedure.substrate}:${procedure.execution_substrate}`
+    : undefined;
+}
+
+/** Registered adapter executor ids (for catalog validation and diagnostics). */
+export function listProcedureExecutors(): string[] {
+  return Object.keys(PROCEDURE_EXECUTORS);
+}
+
+/** Registered execution-substrate routes (`<substrate>:<execution_substrate>`). */
+export function listProcedureExecutionSubstrateRoutes(): string[] {
+  return Object.keys(EXECUTION_SUBSTRATE_EXECUTORS);
 }
 
 // ---------------------------------------------------------------------------

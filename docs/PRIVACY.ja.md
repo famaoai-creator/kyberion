@@ -49,7 +49,7 @@ Kyberion がデータに対して何をして、何をしないか。
 | Whisper (local)                   | STT 音声 → ローカルサーバ、外部送信なし           | 同上                                                           |
 | Slack / Google Workspace / Notion | 接続が読み書きするよう設定したもの                | 接続を作成したとき                                             |
 
-どの backend が active かは常に分かる — `pnpm doctor` や CLI ログが起動時に出力する。
+どの backend が active かは常に分かる — `pnpm kyberion doctor` や CLI ログが起動時に出力する。
 
 ## 4. Egress redaction
 

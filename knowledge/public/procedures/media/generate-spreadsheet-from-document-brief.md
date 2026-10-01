@@ -1,13 +1,16 @@
 # Procedure: Generate a Spreadsheet From Document Brief
 
 ## 1. Goal
+
 Generate an XLSX artifact from the canonical `document-brief` contract.
 
 ## 2. Dependencies
+
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 
 ## 3. Principle
+
 Separate the spreadsheet into:
 
 - canonical document contract: `document-brief`
@@ -17,6 +20,7 @@ Separate the spreadsheet into:
 - output engine target: `xlsx`
 
 ## 4. Step-by-Step Instructions
+
 1. Prepare a `document-brief` JSON file.
 2. Set:
    - `artifact_family: spreadsheet`
@@ -38,5 +42,6 @@ Separate the spreadsheet into:
 7. `document_spreadsheet_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Example
-- [`document-brief-wbs-spreadsheet.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json)
-- [`document-brief-semantic-tracker-spreadsheet.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-semantic-tracker-spreadsheet.json)
+
+- [`document-brief-wbs-spreadsheet.json`](../../../../libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json)
+- [`document-brief-semantic-tracker-spreadsheet.json`](../../../../libs/actuators/media-actuator/examples/document-brief-semantic-tracker-spreadsheet.json)

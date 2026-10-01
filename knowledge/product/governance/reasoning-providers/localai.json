@@ -13,7 +13,21 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["KYBERION_LOCALAI_URL"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "local-server",
+      "data_egress": "local-only",
+      "adapter": "openai-compatible",
+      "openai_compatible_preset": "localai",
+      "profile": {
+        "streaming": true,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {},
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["classify", "summarize"]
+      },
+      "model_env_keys": ["KYBERION_LOCALAI_MODEL", "KYBERION_LOCAL_LLM_MODEL"]
     }
   ]
 }

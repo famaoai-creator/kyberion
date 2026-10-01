@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { resolveSurfacePort, resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import {
   appendJsonLine,
   getRegisteredEnvText,
@@ -141,9 +142,9 @@ const app = express();
 const server = createServer(app);
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const PORT = Number(getRegisteredEnvText('VOICE_HUB_PORT') || 3032);
+const PORT = Number(getRegisteredEnvText('VOICE_HUB_PORT') || resolveSurfacePort('voice-hub'));
 const HOST = getRegisteredEnvText('VOICE_HUB_HOST') || '127.0.0.1';
-const PRESENCE_STUDIO_URL = getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031';
+const PRESENCE_STUDIO_URL = resolveSurfaceUrl('presence-studio');
 const PRESENCE_SURFACE_WARMUP_QUERY = 'Reply with exactly: Ready.';
 
 if (!getRegisteredEnvText('MISSION_ROLE')) {

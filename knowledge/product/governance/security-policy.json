@@ -50,7 +50,9 @@
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
       "knowledge/confidential/heuristics/",
-      "knowledge/confidential/relationships/"
+      "knowledge/confidential/relationships/",
+      "active/organizations/personal/shared/",
+      "active/organizations/public/shared/"
     ],
     "broker_requirements": {
       "require_approved_by": true,
@@ -160,6 +162,7 @@
         "tools/adf-replay-extension/",
         "tools/meet-copilot-extension/",
         "docs/developer/",
+        "docs/CLI_REFERENCE.md",
         "package.json",
         "pnpm-lock.yaml",
         "README.md",
@@ -256,6 +259,15 @@
     },
     "ops_alerts": {
       "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+    },
+    "operational_learning_writer": {
+      "allow_write": [
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
+      ]
     },
     "run_pipeline": {
       "allow_read": ["knowledge/personal/voice/profile-registry.json"],

@@ -1,19 +1,15 @@
+import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
+
 /**
- * Canonical provider-id -> CLI binary map.
+ * Provider-id -> CLI binary.
  *
- * Both `provider-bridge` (invocation plans) and `backend-conformance`
- * (capability probes) need this mapping, and it used to be hardcoded twice
- * with slightly different shapes. Convention: `<provider>-cli` -> `<provider>`
- * with explicit overrides only where the binary differs.
+ * RS-01: the binary is declared once in the governed provider descriptor
+ * (`reasoning-providers/*.json` `cli.binary`); a mode, alias, or provider id
+ * resolves to it. Identifiers the registry does not know (e.g. `gh` for a
+ * GitHub capability) keep the `<provider>-cli` -> `<provider>` convention.
  */
-
-const PROVIDER_BINARY_OVERRIDES: Record<string, string> = {
-  gh: 'gh',
-  'cursor-cli': 'cursor-agent',
-};
-
 export function providerCliBinary(provider: string): string {
-  return PROVIDER_BINARY_OVERRIDES[provider] ?? provider.replace(/-cli$/, '');
+  return resolveReasoningProviderDescriptor(provider)?.cli?.binary ?? provider.replace(/-cli$/, '');
 }
 
 /**

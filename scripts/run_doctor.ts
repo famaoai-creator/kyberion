@@ -47,6 +47,7 @@ import {
   stripSharedScriptFlags,
   type ScriptContext,
 } from './lib/harness.js';
+import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli-guard.js';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,
@@ -609,9 +610,28 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
   return lines.join('\n');
 }
 
-export const runDoctor = defineScript<DoctorRunReport>({
+export const DOCTOR_CLI: CliGuardSpec = {
+  command: 'pnpm run doctor',
+  manifestId: 'script.doctor',
+  options: [
+    { flag: '--manifest', value: '<path>' },
+    { flag: '--runtime', value: '<app|meeting|voice|browser|baseline>' },
+    { flag: '--all' },
+    { flag: '--mission', value: '<id>' },
+    { flag: '--platform', value: '<ios|android|all>' },
+    { flag: '--full' },
+    { flag: '--json' },
+  ],
+};
+
+export const runDoctor = defineScript<DoctorRunReport | undefined>({
   name: 'doctor',
-  async run(context: ScriptContext): Promise<DoctorRunReport> {
+  async run(context: ScriptContext): Promise<DoctorRunReport | undefined> {
+    // CU-01: `--help` prints usage and exits 0 without running any probe.
+    if (hasHelpFlag(context.argv)) {
+      context.print(formatCliUsage(DOCTOR_CLI));
+      return undefined;
+    }
     const argv = await parseDoctorArguments(context.argv);
     const report = await collectDoctorReport(argv);
     context.print(context.json ? report : formatDoctorReport(report, argv));

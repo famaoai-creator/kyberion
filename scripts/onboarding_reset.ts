@@ -118,7 +118,7 @@ export function formatResetSummary(result: OnboardingResetResult): string {
     'Removed:',
     formatPathList(result.profileRoot, result.removed),
     '',
-    'Next step: run `pnpm onboard` or `pnpm onboard apply --identity <path>` to start again.',
+    'Next step: run `pnpm onboarding` or `pnpm onboarding apply --identity <path>` to start again.',
   ].join('\n');
 }
 
@@ -131,7 +131,7 @@ export async function main(
   const dryRun = args.includes('--dry-run') || args.includes('--check');
 
   if (args.includes('--help') || args.includes('-h')) {
-    print('Usage: pnpm onboard reset [--force] [--json] [--dry-run] [--check]');
+    print('Usage: pnpm onboarding reset [--force] [--json] [--dry-run] [--check]');
     return;
   }
 

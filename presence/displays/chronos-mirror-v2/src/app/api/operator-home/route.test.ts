@@ -77,7 +77,7 @@ describe('operator-home route', () => {
         title: 'Review the approval queue',
         reason: 'pending review',
         next_action_type: 'run_command',
-        suggested_command: 'pnpm chronos',
+        suggested_command: 'pnpm scheduler',
       },
     });
 

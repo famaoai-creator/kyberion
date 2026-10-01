@@ -11,7 +11,7 @@ Need help with Kyberion? This page describes how to get support for this public 
 
 ## How to file a good report
 
-- **Bug**: include reproduction steps, expected vs. actual behavior, and your environment (`pnpm doctor` output helps). Use the [bug template](./ISSUE_TEMPLATE/bug.md) — it prompts for all of these.
+- **Bug**: include reproduction steps, expected vs. actual behavior, and your environment (`pnpm kyberion doctor` output helps). Use the [bug template](./ISSUE_TEMPLATE/bug.md) — it prompts for all of these.
 - **Feature**: describe the problem you are trying to solve before proposing a solution. Use the [feature template](./ISSUE_TEMPLATE/feature.md).
 
 ## Contributing and community standards

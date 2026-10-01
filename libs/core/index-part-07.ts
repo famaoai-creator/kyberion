@@ -76,7 +76,6 @@ export {
 
 export {
   GROK_API_DEFAULT_BASE_URL,
-  GROK_API_DEFAULT_MODEL,
   buildGrokApiBackendFromEnv,
   probeGrokApiBackendAvailability,
   resolveGrokApiKey,
@@ -330,6 +329,7 @@ export * from './reasoning/reasoning-route-resolver.js';
 export * from './llm-selection-preferences.js';
 
 export * from './reasoning/reasoning-route-doctor.js';
+export * from './reasoning/reasoning-provider-readiness.js';
 
 export * from './reasoning/reasoning-failure-taxonomy.js';
 

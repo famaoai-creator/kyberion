@@ -36,7 +36,7 @@ describe('scenario coverage contracts', () => {
     }) as string;
 
     expect(scenarioDoc).toContain(
-      '[product-audit](knowledge/product/orchestration/mission-playbooks/product-audit.md)'
+      '[product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md)'
     );
     expect(scenarioDoc).toContain('[ceo-strategic-report](../pipelines/ceo-strategic-report.json)');
 

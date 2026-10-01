@@ -195,6 +195,20 @@
       "allowed_actuators": ["service-actuator", "presence-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "operational_learning_writer": {
+      "description": "Narrow internal store-writer for machine-generated organization learning proposals, bound to one organization and tenant execution scope.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
+      ],
+      "scope_classes": ["organization_operations"],
+      "allowed_actuators": ["artifact-actuator"],
+      "tier_access": ["personal", "confidential", "public"]
+    },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
       "default_persona": "qa_lead",
@@ -259,6 +273,7 @@
       "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
       "default_persona": "worker",
       "write_scopes": [
+        "active/shared/inbox/",
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
         "active/shared/observability/protocol-services/",

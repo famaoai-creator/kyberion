@@ -1,0 +1,20 @@
+{
+  "exceptions": [
+    {
+      "key": "command|docs/developer/ACTUATOR_DAILY_WORK_GAP_REPORT.ja.md|pnpm doctor: bare `pnpm doctor` runs pnpm’s own diagnostic, not Kyberion’s — use `pnpm kyberion doctor` (or `pnpm run doctor`)",
+      "reason": "Dated gap report that records the doctor name collision as a finding (historical record)."
+    },
+    {
+      "key": "command|docs/developer/PRODUCTION_READINESS_PLAN.ja.md|pnpm doctor: bare `pnpm doctor` runs pnpm’s own diagnostic, not Kyberion’s — use `pnpm kyberion doctor` (or `pnpm run doctor`)",
+      "reason": "Dated plan snapshot written before the pnpm built-in doctor collision was found."
+    },
+    {
+      "key": "command|docs/developer/PRODUCTION_RELEASE_GATE_AUDIT.ja.md|pnpm doctor: bare `pnpm doctor` runs pnpm’s own diagnostic, not Kyberion’s — use `pnpm kyberion doctor` (or `pnpm run doctor`)",
+      "reason": "Dated audit log that quotes the commands as run at the time."
+    },
+    {
+      "key": "command|docs/developer/PRODUCT_UX_EVALUATION_2026-05-29.ja.md|pnpm doctor: bare `pnpm doctor` runs pnpm’s own diagnostic, not Kyberion’s — use `pnpm kyberion doctor` (or `pnpm run doctor`)",
+      "reason": "Dated evaluation snapshot (2026-05-29)."
+    }
+  ]
+}

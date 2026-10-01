@@ -6,7 +6,9 @@
   "additionalProperties": false,
   "required": ["version", "providers"],
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "version": {
       "type": "string"
     },
@@ -52,6 +54,13 @@
         "terminal": {
           "$ref": "#/$defs/providerManifest"
         }
+      }
+    },
+    "channel_adapters": {
+      "type": "object",
+      "description": "Channel adapter registry (RS-06): the single source for which channels exist, their markup dialect and escaping rules, operator-notification delivery, presence dispatch, message shape and mission-event stream. Non-local entries must name a registered surface provider.",
+      "additionalProperties": {
+        "$ref": "#/$defs/channelAdapter"
       }
     }
   },
@@ -454,6 +463,81 @@
               }
             }
           }
+        }
+      }
+    },
+    "channelAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["markup", "human_chat"],
+      "properties": {
+        "surface_provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local": {
+          "type": "boolean",
+          "description": "Local channel with no remote bridge (e.g. the deliverable inbox)."
+        },
+        "markup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dialect"],
+          "properties": {
+            "dialect": {
+              "type": "string",
+              "enum": ["plain", "slack-mrkdwn", "telegram-markdown-legacy", "discord-markdown"]
+            },
+            "entity_escapes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "backslash_escape_chars": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mention_guards": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "operator_notification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["delivery"],
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "enum": ["surface-outbox", "imessage-direct", "local-inbox"]
+            },
+            "default_target": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "presence_dispatch": {
+          "type": "string",
+          "enum": ["slack-webclient", "satellite-outbox"]
+        },
+        "human_chat": {
+          "type": "boolean",
+          "description": "A human operator converses on this channel (used to attribute interventions)."
+        },
+        "message_shape": {
+          "type": "string",
+          "enum": ["generic", "slack-thread", "chronos-session"]
+        },
+        "mission_event_stream": {
+          "type": "string",
+          "enum": ["shared", "slack", "chronos"]
         }
       }
     }

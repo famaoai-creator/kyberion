@@ -8,6 +8,8 @@
  * injectable `now`.
  */
 
+import { resolveMeetingPlatformByHost } from '@agent/core/meeting/meeting-platform-registry';
+
 export type JoinablePlatform = 'meet' | 'zoom' | 'teams';
 
 export interface CalendarLikeEvent {
@@ -47,15 +49,6 @@ export interface ResolveNextTargetOptions {
 
 const URL_PATTERN = /https?:\/\/[^\s"'<>)]+/giu;
 
-const PLATFORM_HOSTS: Array<{ platform: JoinablePlatform; hosts: string[] }> = [
-  { platform: 'meet', hosts: ['meet.google.com'] },
-  { platform: 'zoom', hosts: ['zoom.us', 'zoom.com'] },
-  {
-    platform: 'teams',
-    hosts: ['teams.microsoft.com', 'teams.live.com', 'microsoft.com'],
-  },
-];
-
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.toLowerCase().replace(/\.$/, '');
@@ -67,16 +60,15 @@ function hostOf(url: string): string {
 function platformOf(url: string): JoinablePlatform | undefined {
   const host = hostOf(url);
   if (!host) return undefined;
-  for (const { platform, hosts } of PLATFORM_HOSTS) {
-    if (hosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`))) {
-      // Bare microsoft.com hosts many non-meeting pages — require a Teams path.
-      if (platform === 'teams' && host === 'microsoft.com') {
-        if (!/\/microsoft-teams\/join-a-meeting/i.test(url)) return undefined;
-      }
-      return platform;
-    }
+  let pathname = '';
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return undefined;
   }
-  return undefined;
+  // Hosts and entry-path restrictions (bare microsoft.com hosts many
+  // non-meeting pages, so Teams requires its join path) are registry data.
+  return (resolveMeetingPlatformByHost(host, pathname)?.id as JoinablePlatform) ?? undefined;
 }
 
 function cleanUrl(raw: string): string {

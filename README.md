@@ -69,17 +69,17 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 | **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                       |
 | **Stance**         | `customer/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
 
-Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
+New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 concepts you need first. Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
 
 ---
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is the short version. Day-2 tenant / organization / activation work: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). Documentation authority map: [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
+> **Start here — canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)** (it also explains which onboarding command to use when). Map of all docs: [`docs/README.md`](./docs/README.md). This page is the short version. Day-2 tenant / organization / activation work: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). Documentation authority map: [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
 
 Kyberion's first visible result comes in three short steps:
 
-- 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
+- 30 seconds: run `pnpm kyberion doctor` and see Kyberion's readiness/value boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
@@ -96,7 +96,7 @@ cd kyberion
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
@@ -110,7 +110,7 @@ pnpm pipeline --input pipelines/verify-session.json
 
 **Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
 
-Already have onboarding JSON? Skip the wizard: `pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
+Already have onboarding JSON? Skip the wizard: `pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
 
 To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md). For a server / customer deployment: [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
@@ -144,7 +144,7 @@ Day to day you rarely write a pipeline — you use one command per sense (Markdo
 | Video → timeline   | `pnpm kyberion watch`   | Document ↔ document | `pnpm kyberion diff`      |
 | Ask in plain words | `pnpm kyberion ask "…"` | Approve / reject    | `pnpm kyberion approvals` |
 
-`pnpm kyberion` with no arguments is the terminal home: a status digest plus your next move. Verb inventory: [`capability-verb-inventory`](./knowledge/product/orchestration/capability-verb-inventory.md).
+`pnpm kyberion` with no arguments is the terminal home: a status digest plus your next move. Every command is listed in the generated [CLI Reference](./docs/CLI_REFERENCE.md); task-oriented notes are in the [Commands Guide](./docs/user/COMMANDS_GUIDE.md). Verb inventory: [`capability-verb-inventory`](./knowledge/product/orchestration/capability-verb-inventory.md).
 
 ### Design-system-governed output
 
@@ -225,7 +225,9 @@ The **Capture desk** is one **127.0.0.1-only** server for the eight capture pads
   </tr>
 </table>
 
-Start any of them the same way and open the printed URL:
+The `:81xx` ports above are the **legacy standalone** ports (used only when you start a single pad directly, see below). `pnpm pads` serves every pad from one server on `http://127.0.0.1:8160/`.
+
+Start the Capture desk and open the printed URL:
 
 ```bash
 KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> pnpm pads

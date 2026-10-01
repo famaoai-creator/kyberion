@@ -10,7 +10,7 @@
  * 参照するためコピー不要。
  *
  * Usage:
- *   pnpm onboard company bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--root-dir <path>] [--force]
+ *   pnpm onboarding company bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社" [--root-dir <path>] [--force]
  */
 
 import * as path from 'node:path';
@@ -189,14 +189,14 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
         'Available company verticals:',
         ...verticals.map((entry) => `  - ${entry}`),
         '',
-        '\nUsage: pnpm onboard company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]',
+        '\nUsage: pnpm onboarding company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]',
       ].join('\n')
     );
     return vertical || slug ? 1 : 0;
   }
   if (!vertical || !slug) {
     logger.error(
-      'Usage: pnpm onboard company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
+      'Usage: pnpm onboarding company bootstrap --vertical <id> --slug <slug> [--name "<会社名>"] [--root-dir <path>] [--force]'
     );
     return 1;
   }

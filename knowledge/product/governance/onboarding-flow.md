@@ -98,11 +98,11 @@ pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm exec playwright install chromium   # 任意。ブラウザ系 first-win を使う場合
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-`pnpm doctor` と verify-session の first-win は [QUICKSTART](../../../docs/QUICKSTART.md) が正本である。
+`pnpm kyberion doctor` と verify-session の first-win は [QUICKSTART](../../../docs/QUICKSTART.md) が正本である。
 
 ### Step 2: readiness を確認する（A）
 
@@ -116,7 +116,7 @@ pnpm kyberion setup report --persona first-time-user
 
 - **reasoning backend**: `pnpm reasoning:setup` で使える backend を確認して選ぶ。選んだ値は
   `.env.local` の `KYBERION_REASONING_BACKEND` に保存される。
-- **外部サービス**: `pnpm services:setup` で必要な secret と接続の置き場を確認する。実行直前の
+- **外部サービス**: `pnpm service:setup` で必要な secret と接続の置き場を確認する。実行直前の
   可否は `pnpm service:preflight -- --service <service-id>` で確かめる。
 - **secret の登録**: API key などの値は `pnpm kyberion secret introduce <service-id> <secret-key>` で
   入れる。値は argv では受け付けず、TTY の非表示プロンプトか `active/shared/tmp/` 配下の
@@ -142,18 +142,18 @@ identity の保存先は stance で決まる。baseline の L3 も同じ場所�
 stance を決める。
 
 - 自分として使う（ルート 1）: `KYBERION_CUSTOMER` を設定しない。保存先は `knowledge/personal/`。
-- 顧客・会社として使う: 先に `pnpm customer:switch <customer-slug>` で stance を切り替える。保存先は
-  `customer/{customer-slug}/`。ルート 2 の `pnpm onboard company` はこの overlay を作る。
+- 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug>` で stance を切り替える。保存先は
+  `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作る。
 
 identity は次のどれかで保存する。
 
 ```bash
 # 対話（TTY あり）
-pnpm onboard
+pnpm onboarding
 
 # 非対話。まず dry-run で検証してから適用する
-pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
-pnpm onboard apply --identity <reviewed-identity-json>
+pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+pnpm onboarding apply --identity <reviewed-identity-json>
 ```
 
 GUI では concierge の `/settings` を開く（旧 `/setup` と `/onboarding` はここへリダイレクトされる）。
@@ -184,8 +184,8 @@ Step 0 の baseline をもう一度実行する。初回は次の層が `needs_a
   ```
 
 - **L10（scheduler）**: 有効なスケジュールが一つもなければ通る。スケジュールを登録したら chronos
-  daemon を常駐させる。macOS では `pnpm kyberion chronos install` で内容を確認し、`--apply` で
-  LaunchAgent に登録する。その場で動かすだけなら `pnpm chronos`。
+  daemon を常駐させる。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で
+  LaunchAgent に登録する。その場で動かすだけなら `pnpm scheduler`。
 - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちる。Step 3 の identity 保存などの
   governed 操作を行えば記録される。
 
@@ -212,7 +212,7 @@ binding と activation に進めない。customer stance を切り替えても r
 確認してから、`--dry-run` を外して適用する。
 
 ```bash
-pnpm onboard company --vertical saas-product-company --slug <company-slug> \
+pnpm onboarding company --vertical saas-product-company --slug <company-slug> \
   --name "<会社名>" --owner-id human:<owner> \
   --goal "<最初に達成する顧客成果>" \
   --tenant-slug <tenant-slug> --dry-run
@@ -369,7 +369,7 @@ baseline が `all_clear` になれば完了である。`needs_attention` が残�
 | provider 選択（browser、OCR、STT など）の調整     | `pnpm kyberion seam select list` / `explain` / `calibrate` / `rules set` |
 | 外部送信の状況を見る                              | `pnpm egress:report`                                                     |
 | サブエージェント定義の生成                        | `pnpm agents:generate`                                                   |
-| AGY SDK の導入                                    | `pnpm agy:sdk:setup --apply`                                             |
+| AGY SDK の導入                                    | `pnpm agy:sdk-setup --apply`                                             |
 | surface、channel、MCP grant、quota、egress の変更 | `pnpm config-mission ...`（Step 7.1）                                    |
 
 ## 5. 再開・停止・ロールバック
@@ -391,13 +391,13 @@ activation を suspend すると、tenant の task-scoped grant は取り消さ�
 probe をやり直し、同じ activation receipt を更新する。offboarding 済みや archived の tenant では、
 tenant に紐づく読み書き、memory retrieval、NHI、grant、projection が fail-closed になる。
 
-identity をやり直す場合は `pnpm onboard reset` を使い、生成物を手で消さない。
+identity をやり直す場合は `pnpm onboarding reset` を使い、生成物を手で消さない。
 
 ## 6. 完了条件
 
 全ルート共通:
 
-- `pnpm env:bootstrap` と `pnpm doctor` が成功している
+- `pnpm env:bootstrap` と `pnpm kyberion doctor` が成功している
 - アクティブな profile に identity と onboarding summary が保存されている
 - `pnpm pipeline vital-check` が成功し、baseline-check が `all_clear` である
 

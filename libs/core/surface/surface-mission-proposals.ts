@@ -29,6 +29,10 @@ import { nowIso } from '../foundation/time.js';
 import { resolveLocale, type SupportedLocale } from '../locale.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
+import {
+  resolveChannelMissionEventStream,
+  type ChannelMissionEventStream,
+} from './channel-adapter-registry.js';
 
 import type {
   ChronosMissionProposalState,
@@ -629,20 +633,25 @@ export async function issueMissionFromProposal(
   };
 }
 
+// Mission-event stream writers keyed by the channel adapter registry's
+// `mission_event_stream` (RS-06). Surfaces without a dedicated channel stream
+// record into the shared mission-control observability stream
+// (mission_controller-writable).
+const MISSION_EVENT_STREAM_WRITERS: Record<
+  ChannelMissionEventStream,
+  (surface: string, event: Record<string, unknown>) => void
+> = {
+  slack: (_surface, event) =>
+    emitSlackMissionEvent({ ...event, slack_channel: event.surface_channel }),
+  chronos: (_surface, event) => emitChronosMissionEvent(event),
+  shared: (surface, event) =>
+    withExecutionContext('mission_controller', () =>
+      emitMissionOrchestrationObservation({ surface_channel: surface, ...event })
+    ),
+};
+
 function emitSurfaceMissionIssueEvent(surface: string, event: Record<string, unknown>): void {
-  if (surface === 'slack') {
-    emitSlackMissionEvent({ ...event, slack_channel: event.surface_channel });
-    return;
-  }
-  if (surface === 'chronos') {
-    emitChronosMissionEvent(event);
-    return;
-  }
-  // Surfaces without a dedicated channel stream record into the shared
-  // mission-control observability stream (mission_controller-writable).
-  withExecutionContext('mission_controller', () =>
-    emitMissionOrchestrationObservation({ surface_channel: surface, ...event })
-  );
+  MISSION_EVENT_STREAM_WRITERS[resolveChannelMissionEventStream(surface)](surface, event);
 }
 
 export async function issueSlackMissionFromProposal(params: {

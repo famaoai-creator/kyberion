@@ -1,10 +1,10 @@
 /**
  * Backend capability profiles (QM-06, ported from qm's HarnessAdapterProfile).
  *
- * Every reasoning backend mode DECLARES its transport and capability set here
- * so routing can select by declared capability instead of tribal knowledge,
- * and a conformance test pins the declarations (completeness is enforced at
- * the type level: the Record covers the whole mode union).
+ * Every reasoning backend mode DECLARES its transport and capability set in
+ * its governed provider descriptor (reasoning-providers/*.json) so routing can
+ * select by declared capability instead of tribal knowledge; this module
+ * projects those declarations onto the profile shape (RS-01).
  *
  * Honest scope: these are declarations plus spot conformance checks. A full
  * live conformance matrix (exercising each CLI for abort/structured-output
@@ -13,6 +13,11 @@
  */
 
 import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
+import {
+  listReasoningProviderDescriptors,
+  resolveReasoningProviderDescriptor,
+  type ReasoningProviderDescriptor,
+} from './reasoning/reasoning-provider-registry.js';
 
 export type BackendTransport = 'cli' | 'sdk' | 'api' | 'local-server' | 'in-process';
 /** Whether prompts stay on this machine or are sent to a hosted provider. */
@@ -61,173 +66,90 @@ export interface BackendCapabilityProfile {
   utility_fit: BackendUtilityFit[];
 }
 
-const cli = (
-  mode: ReasoningBackendMode,
-  overrides: Partial<BackendCapabilityProfile['capabilities']> = {},
-  utilityFit: BackendUtilityFit[] = ['judge', 'classify', 'summarize', 'divergent']
-): BackendCapabilityProfile => ({
-  mode,
-  transport: 'cli',
-  data_egress: 'external-api',
-  provider_retry: { max_retries: 0, quota_errors_propagate: true },
-  capabilities: {
-    input_modalities: ['text'],
-    structured_output: true,
-    session_continuity: true,
-    abort: true,
-    streaming: false,
-    tool_calling: true,
-    native_subagent: false,
-    thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
-    supportsStrictTools: false,
-    supportsGrammarTools: false,
-    ...overrides,
-  },
-  utility_fit: utilityFit,
-});
-
-const api = (
-  mode: ReasoningBackendMode,
-  overrides: Partial<BackendCapabilityProfile['capabilities']> = {},
-  utilityFit: BackendUtilityFit[] = ['judge', 'classify', 'summarize', 'divergent']
-): BackendCapabilityProfile => ({
-  mode,
-  transport: 'api',
-  data_egress: 'external-api',
-  provider_retry: { max_retries: 0, quota_errors_propagate: true },
-  capabilities: {
-    input_modalities: ['text'],
-    structured_output: true,
-    session_continuity: false,
-    abort: true,
-    streaming: false,
-    tool_calling: true,
-    native_subagent: false,
-    thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
-    supportsStrictTools: false,
-    supportsGrammarTools: false,
-    ...overrides,
-  },
-  utility_fit: utilityFit,
-});
-
-const localServer = (mode: ReasoningBackendMode): BackendCapabilityProfile => ({
-  mode,
-  transport: 'local-server',
-  data_egress: 'local-only',
-  provider_retry: { max_retries: 0, quota_errors_propagate: true },
-  capabilities: {
-    input_modalities: ['text'],
-    // The local OpenAI-compatible adapters can enforce the repository's
-    // structured response envelope even though the model server itself does
-    // not expose a native schema API.
-    structured_output: true,
-    session_continuity: false,
-    abort: true,
-    streaming: true,
-    tool_calling: true,
-    native_subagent: false,
-    thinkingLevelMap: {},
-    supportsStrictTools: false,
-    supportsGrammarTools: false,
-  },
-  utility_fit: ['classify', 'summarize'],
-});
-
-export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCapabilityProfile> = {
-  // ShellClaudeCliBackend spawns a fresh CLI per call — no session continuity.
-  'claude-cli': cli('claude-cli', { session_continuity: false, native_subagent: true }),
-  'codex-cli': cli('codex-cli', { session_continuity: false, native_subagent: true }),
-  'claude-agent': {
-    mode: 'claude-agent',
-    transport: 'sdk',
-    data_egress: 'external-api',
+/**
+ * RS-01: profiles are derived from the governed provider descriptors
+ * (`reasoning-providers/*.json` → `capabilities` + `profile` + `transport` +
+ * `data_egress`). There is no per-mode table here; adding a provider JSON adds
+ * its profile. Provider SDK retries are uniformly disabled — orchestration
+ * retries stay explicit in reasoning-backend.
+ */
+function profileFromDescriptor(descriptor: ReasoningProviderDescriptor): BackendCapabilityProfile {
+  return {
+    mode: descriptor.mode,
+    transport: descriptor.transport,
+    data_egress: descriptor.data_egress,
     provider_retry: { max_retries: 0, quota_errors_propagate: true },
     capabilities: {
-      input_modalities: ['text', 'image'],
-      structured_output: true,
-      session_continuity: true,
-      abort: true,
-      streaming: false,
-      tool_calling: true,
-      native_subagent: true,
-      thinkingLevelMap: { low: 'low', medium: 'medium', high: 'high' },
-      supportsStrictTools: true,
-      supportsGrammarTools: false,
+      input_modalities: descriptor.capabilities.input_modalities,
+      structured_output: descriptor.capabilities.structured_output,
+      session_continuity: descriptor.capabilities.session_continuity,
+      abort: descriptor.capabilities.abort,
+      streaming: descriptor.profile.streaming,
+      tool_calling: descriptor.profile.tool_calling,
+      native_subagent: descriptor.profile.native_subagent,
+      thinkingLevelMap: { ...descriptor.profile.thinking_levels },
+      supportsStrictTools: descriptor.profile.supports_strict_tools,
+      supportsGrammarTools: descriptor.profile.supports_grammar_tools,
     },
-    utility_fit: ['judge', 'classify', 'summarize', 'divergent'],
-  },
-  anthropic: api('anthropic', { input_modalities: ['text', 'image'] }),
-  'gemini-cli': cli('gemini-cli', { session_continuity: false }),
-  'gemini-api': api('gemini-api', {
-    input_modalities: ['text', 'image'],
-    streaming: true,
-  }),
-  'agy-cli': cli('agy-cli', { native_subagent: true }),
-  'grok-cli': cli('grok-cli', { native_subagent: true }),
-  'cursor-cli': cli('cursor-cli', { session_continuity: false }),
-  'opencode-cli': cli('opencode-cli', { session_continuity: false }),
-  // DevinCliReasoningBackend spawns a fresh `devin -p` per call — the CLI's
-  // `-c`/`--resume` session continuity is not used by the adapter.
-  'devin-cli': cli('devin-cli', { session_continuity: false }),
-  'grok-api': api('grok-api', {
-    input_modalities: ['text', 'image'],
-    streaming: true,
-  }),
-  // CopilotAcpReasoningBackend holds a persistent ACP mediator session.
-  copilot: cli('copilot', { session_continuity: true }),
-  local: localServer('local'),
-  ollama: localServer('ollama'),
-  vllm: localServer('vllm'),
-  lmstudio: localServer('lmstudio'),
-  llamacpp: localServer('llamacpp'),
-  mlx: localServer('mlx'),
-  localai: localServer('localai'),
-  nemotron: localServer('nemotron'),
-  'nemotron-api': api('nemotron-api'),
-  openrouter: api('openrouter'),
-  stub: {
-    mode: 'stub',
-    transport: 'in-process',
-    data_egress: 'local-only',
-    provider_retry: { max_retries: 0, quota_errors_propagate: true },
-    capabilities: {
-      input_modalities: ['text'],
-      structured_output: true,
-      session_continuity: false,
-      abort: true,
-      streaming: false,
-      tool_calling: false,
-      native_subagent: false,
-      thinkingLevelMap: {},
-      supportsStrictTools: false,
-      supportsGrammarTools: false,
-    },
-    // The stub is deterministic — it can exercise plumbing but must never
-    // be treated as capable of real judgment or divergent thinking
-    // (AGENTS.md: wisdom:* ops need a non-stub backend).
-    utility_fit: [],
-  },
-};
-
-export function backendCapabilityProfile(mode: ReasoningBackendMode): BackendCapabilityProfile {
-  return BACKEND_CAPABILITY_PROFILES[mode];
+    utility_fit: [...descriptor.profile.utility_fit],
+  };
 }
 
-const BACKEND_MODE_ALIASES: Record<string, ReasoningBackendMode> = {
-  'shell-claude-cli': 'claude-cli',
-  'copilot-acp': 'copilot',
-};
+let cachedProfileSource: readonly ReasoningProviderDescriptor[] | null = null;
+let cachedProfiles: Record<string, BackendCapabilityProfile> = {};
+
+function profileTable(): Record<string, BackendCapabilityProfile> {
+  const descriptors = listReasoningProviderDescriptors();
+  if (descriptors !== cachedProfileSource) {
+    cachedProfiles = Object.fromEntries(
+      descriptors.map((descriptor) => [descriptor.mode, profileFromDescriptor(descriptor)])
+    );
+    cachedProfileSource = descriptors;
+  }
+  return cachedProfiles;
+}
+
+/**
+ * Read-only view of every governed mode's profile, keyed by mode. Lazily
+ * derived from the registry (no file I/O at import time).
+ */
+export const BACKEND_CAPABILITY_PROFILES: Readonly<Record<string, BackendCapabilityProfile>> =
+  new Proxy({} as Record<string, BackendCapabilityProfile>, {
+    get: (_target, key) => (typeof key === 'string' ? profileTable()[key] : undefined),
+    has: (_target, key) => typeof key === 'string' && Object.hasOwn(profileTable(), key),
+    ownKeys: () => Object.keys(profileTable()),
+    getOwnPropertyDescriptor: (_target, key) =>
+      typeof key === 'string' && Object.hasOwn(profileTable(), key)
+        ? { value: profileTable()[key], enumerable: true, configurable: true, writable: false }
+        : undefined,
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+  });
+
+/** Profile for a governed mode. Throws (fail closed) for a mode the registry does not declare. */
+export function backendCapabilityProfile(mode: ReasoningBackendMode): BackendCapabilityProfile {
+  const profile = profileTable()[mode];
+  if (!profile) {
+    throw new Error(
+      `[BACKEND_CAPABILITY_PROFILE_UNKNOWN] ${mode} is not declared in knowledge/product/governance/reasoning-providers/`
+    );
+  }
+  return profile;
+}
 
 /** Capability declarations for local bridges that are not reasoning modes. */
 const LOCAL_ONLY_BACKEND_IDENTIFIERS = new Set(['apple-intelligence']);
 
+/**
+ * Resolve a mode, a runtime backend name (descriptor `aliases`), or a
+ * provider id to its profile; `undefined` when the registry does not know it.
+ */
 export function backendCapabilityProfileForIdentifier(
   identifier: string
 ): BackendCapabilityProfile | undefined {
-  const mode = BACKEND_MODE_ALIASES[identifier] ?? identifier;
-  if (!Object.prototype.hasOwnProperty.call(BACKEND_CAPABILITY_PROFILES, mode)) return undefined;
-  return BACKEND_CAPABILITY_PROFILES[mode as ReasoningBackendMode];
+  const descriptor = resolveReasoningProviderDescriptor(identifier);
+  return descriptor ? profileTable()[descriptor.mode] : undefined;
 }
 
 /** Resolve the data-boundary capability for an adapter name, failing closed. */
@@ -302,7 +224,7 @@ export function resolveConstrainedSampling(
 }
 
 export function modesWithUtilityFit(fit: BackendUtilityFit): ReasoningBackendMode[] {
-  return (Object.values(BACKEND_CAPABILITY_PROFILES) as BackendCapabilityProfile[])
+  return Object.values(profileTable())
     .filter((profile) => profile.utility_fit.includes(fit))
     .map((profile) => profile.mode);
 }
