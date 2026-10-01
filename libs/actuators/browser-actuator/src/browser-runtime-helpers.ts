@@ -7,6 +7,8 @@ import {
   readJson,
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
+import { resolveLocale } from '@agent/core/locale';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -1489,7 +1491,7 @@ export const browserRuntimeHelpers = {
       channel: options.browser_channel === 'chrome' ? 'chrome' : undefined,
       headless: options.headless !== false,
       viewport: options.viewport || { width: 1280, height: 720 },
-      locale: options.locale || 'ja-JP',
+      locale: options.locale || localeToBcp47(resolveLocale()),
       recordVideo: options.record_video ? { dir: videoDir } : undefined,
       args: [
         ...(Array.isArray(options.launch_args) ? options.launch_args : []),

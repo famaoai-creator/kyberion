@@ -91,7 +91,23 @@ function commandFor(command: unknown): string | string[] | undefined {
   return undefined;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Real Claude Code `settings.json` (and Codex `hooks.json`) nest the event
+ * map under `"hooks"`: `{"hooks": {"PreToolUse": [{matcher, hooks: [...]}]}}`.
+ * The flat shape (event keys at the top level) is still accepted.
+ */
 function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
+  return [
+    ...(isPlainRecord(config.hooks) ? collectGroupedHooks(config.hooks) : []),
+    ...collectGroupedHooks(config),
+  ];
+}
+
+function collectGroupedHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
   const collected: NormalizedExternalHook[] = [];
   for (const [externalEvent, value] of Object.entries(config)) {
     const event = eventFor(externalEvent);
@@ -109,9 +125,12 @@ function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternal
           event,
           ...(typedGroup.matcher ? { matcher: typedGroup.matcher } : {}),
           command,
-          ...(hook.timeout || hook.timeout_ms
-            ? { timeoutMs: hook.timeout || hook.timeout_ms }
-            : {}),
+          // Claude Code's `timeout` is in seconds; `timeout_ms` is milliseconds.
+          ...(typeof hook.timeout_ms === 'number' && hook.timeout_ms > 0
+            ? { timeoutMs: hook.timeout_ms }
+            : typeof hook.timeout === 'number' && hook.timeout > 0
+              ? { timeoutMs: hook.timeout * 1000 }
+              : {}),
         });
       }
     }
@@ -120,6 +139,8 @@ function collectClaudeHooks(config: Record<string, unknown>): NormalizedExternal
 }
 
 function collectNormalizedHooks(config: Record<string, unknown>): NormalizedExternalHook[] {
+  // Codex also accepts the Claude-style nested event map under `hooks`.
+  if (isPlainRecord(config.hooks)) return collectGroupedHooks(config.hooks);
   const source = Array.isArray(config.hooks) ? config.hooks : [];
   const collected: NormalizedExternalHook[] = [];
   for (const item of source) {
@@ -149,6 +170,32 @@ function toArgv(command: string | string[]): string[] {
   return process.platform === 'win32'
     ? ['cmd.exe', '/d', '/s', '/c', command]
     : ['/bin/sh', '-c', command];
+}
+
+export interface ExternalHookCommandSummary {
+  /** Event name as written in the config (e.g. PreToolUse). */
+  event: LifecycleHookEvent;
+  matcher?: string;
+  /** Command as it would run; argv arrays are joined with spaces for display. */
+  command: string;
+}
+
+/**
+ * The exact event → command pairs registration would install from this
+ * config, for display on a human trust decision. Uses the same parser as
+ * registerExternalLifecycleHooks so the approver sees what will execute.
+ */
+export function describeExternalHookCommands(
+  config: Record<string, unknown>,
+  source: ExternalHookSource
+): ExternalHookCommandSummary[] {
+  const hooks =
+    source === 'claude-code' ? collectClaudeHooks(config) : collectNormalizedHooks(config);
+  return hooks.map((hook) => ({
+    event: hook.event,
+    ...(hook.matcher ? { matcher: hook.matcher } : {}),
+    command: Array.isArray(hook.command) ? hook.command.join(' ') : hook.command,
+  }));
 }
 
 /** Register an external hook config and return one disposer for the batch. */

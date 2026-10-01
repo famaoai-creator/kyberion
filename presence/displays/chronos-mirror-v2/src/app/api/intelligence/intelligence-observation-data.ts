@@ -7,6 +7,7 @@ import {
   type ViewerContext,
 } from '../../../lib/viewer-context';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
+import { t } from '@agent/core/t';
 import { type CompanyAggregate } from '@agent/core/company';
 import { type ApprovalAuditDrilldownSummary } from '@agent/core/governance/approval-audit';
 import type { FinanceControllerDecision } from '@agent/core/finance-controller';
@@ -747,10 +748,11 @@ export function buildLearnedNotificationText(input: {
     .filter((value, index, array) => array.indexOf(value) === index)
     .slice(0, 2);
   if (titles.length === 0) return '';
-  if (input.language === 'ja') {
-    return ` 過去の learned pattern（${titles.join('、')}）も参照できます。`;
-  }
-  return ` Learned patterns such as ${titles.join(', ')} are also available.`;
+  return ` ${t(
+    'chronos:learned_patterns_available',
+    { titles: titles.join(t('chronos:list_separator', undefined, input.language)) },
+    input.language
+  )}`;
 }
 
 export function inferProjectIdForApproval(input: {

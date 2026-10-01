@@ -22,6 +22,11 @@ import {
 } from '@agent/core/i18n-hardcoding-baseline';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
+import {
+  LOCALE_TOKEN_RULES,
+  scanFileForLocaleTokens,
+  type LocaleTokenRule,
+} from './lib/locale-token-scan.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
@@ -111,6 +116,8 @@ export type I18nHardcodingReport = {
   violations: string[];
   stale_entries: string[];
   updated_baseline: boolean;
+  /** IT-05: frozen violation totals per locale/colour token rule. */
+  locale_token_totals?: Record<LocaleTokenRule, number>;
 };
 
 export function isTestFile(repoRelativePath: string): boolean {
@@ -281,13 +288,21 @@ export function scanHtmlForKanaLiterals(text: string, repoRelativePath: string):
   return { count, exemptions };
 }
 
+type TokenCounts = Record<LocaleTokenRule, Record<string, number>>;
+
+function emptyTokenCounts(): TokenCounts {
+  return Object.fromEntries(LOCALE_TOKEN_RULES.map((rule) => [rule, {}])) as TokenCounts;
+}
+
 function scanTree(scanRoots: string[]): {
   currentCounts: Record<string, number>;
+  tokenCounts: TokenCounts;
   scannedFiles: Set<string>;
   checkedFiles: number;
   exemptionCount: number;
 } {
   const currentCounts: Record<string, number> = {};
+  const tokenCounts = emptyTokenCounts();
   const scannedFiles = new Set<string>();
   let checkedFiles = 0;
   let exemptionCount = 0;
@@ -309,10 +324,16 @@ function scanTree(scanRoots: string[]): {
         : scanFileForKanaLiterals(text, repoRelativePath);
       exemptionCount += exemptions;
       if (count > 0) currentCounts[repoRelativePath] = count;
+
+      const tokens = scanFileForLocaleTokens(text, repoRelativePath);
+      exemptionCount += tokens.exemptions;
+      for (const rule of LOCALE_TOKEN_RULES) {
+        if (tokens.counts[rule] > 0) tokenCounts[rule][repoRelativePath] = tokens.counts[rule];
+      }
     }
   }
 
-  return { currentCounts, scannedFiles, checkedFiles, exemptionCount };
+  return { currentCounts, tokenCounts, scannedFiles, checkedFiles, exemptionCount };
 }
 
 function loadBaseline(baselinePath: string): I18nHardcodingBaseline | null {
@@ -345,8 +366,15 @@ export function checkI18nHardcoding(
     path.relative(ROOT, root).split(path.sep).join('/')
   );
 
-  const { currentCounts, scannedFiles, checkedFiles, exemptionCount } = scanTree(scanRoots);
+  const { currentCounts, tokenCounts, scannedFiles, checkedFiles, exemptionCount } =
+    scanTree(scanRoots);
   const totalViolationsInTree = Object.values(currentCounts).reduce((sum, n) => sum + n, 0);
+  const localeTokenTotals = Object.fromEntries(
+    LOCALE_TOKEN_RULES.map((rule) => [
+      rule,
+      Object.values(tokenCounts[rule]).reduce((sum, n) => sum + n, 0),
+    ])
+  ) as Record<LocaleTokenRule, number>;
 
   if (options.updateBaseline) {
     const nextBaseline: I18nHardcodingBaseline = {
@@ -354,6 +382,7 @@ export function checkI18nHardcoding(
       generated_at: nowIso(),
       scan_roots: relativeScanRoots,
       files: currentCounts,
+      locale_tokens: tokenCounts,
     };
     writeBaselineFile(baselinePath, nextBaseline, relativeScanRoots);
     return {
@@ -366,6 +395,7 @@ export function checkI18nHardcoding(
       violations: [],
       stale_entries: [],
       updated_baseline: true,
+      locale_token_totals: localeTokenTotals,
     };
   }
 
@@ -384,6 +414,7 @@ export function checkI18nHardcoding(
       ],
       stale_entries: [],
       updated_baseline: false,
+      locale_token_totals: localeTokenTotals,
     };
   }
 
@@ -415,6 +446,30 @@ export function checkI18nHardcoding(
     );
   }
 
+  for (const rule of LOCALE_TOKEN_RULES) {
+    const baselineCounts = baseline.locale_tokens?.[rule] ?? {};
+    for (const [file, currentCount] of Object.entries(tokenCounts[rule])) {
+      const baselineCount = baselineCounts[file];
+      if (baselineCount === undefined) {
+        violations.push(
+          `${file}: [${rule}] new file with ${currentCount} violation(s) (absent from baseline)`
+        );
+      } else if (currentCount > baselineCount) {
+        violations.push(`${file}: [${rule}] increased from ${baselineCount} to ${currentCount}`);
+      } else if (currentCount < baselineCount) {
+        staleEntries.push(
+          `${file}: [${rule}] decreased from ${baselineCount} to ${currentCount} (baseline is stale, run --update-baseline)`
+        );
+      }
+    }
+    for (const [file, baselineCount] of Object.entries(baselineCounts)) {
+      if (file in tokenCounts[rule] || !scannedFiles.has(file)) continue;
+      staleEntries.push(
+        `${file}: [${rule}] decreased from ${baselineCount} to 0 (baseline is stale, run --update-baseline)`
+      );
+    }
+  }
+
   violations.sort();
   staleEntries.sort();
 
@@ -428,16 +483,23 @@ export function checkI18nHardcoding(
     violations,
     stale_entries: staleEntries,
     updated_baseline: false,
+    locale_token_totals: localeTokenTotals,
   };
+}
+
+function formatTokenTotals(report: I18nHardcodingReport): string {
+  const totals = report.locale_token_totals;
+  if (!totals) return '';
+  return `; locale/colour tokens: ${LOCALE_TOKEN_RULES.map((rule) => `${rule}=${totals[rule]}`).join(', ')}`;
 }
 
 function formatHumanReport(report: I18nHardcodingReport): string {
   if (report.updated_baseline) {
-    return `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`;
+    return `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s)${formatTokenTotals(report)})`;
   }
 
   if (report.status === 'pass') {
-    return `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`;
+    return `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s)${formatTokenTotals(report)})`;
   }
 
   const lines = ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)];

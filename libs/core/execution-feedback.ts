@@ -10,6 +10,11 @@ import {
   updateDistillCandidateRecord,
   type DistillCandidateRecord,
 } from './knowledge/distill-candidate-registry.js';
+import {
+  getIntentPhraseMatcher,
+  matchesIntentPhrase,
+  type IntentPhraseMatcher,
+} from './intent/intent-phrase-lexicon.js';
 import { t } from './t.js';
 
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
@@ -167,31 +172,60 @@ export function materializeExecutionFeedbackCandidate(input: {
   return { summary, candidate };
 }
 
+const FEEDBACK_OUTCOME_CONCEPTS: Array<[string, ExecutionFeedbackOutcome]> = [
+  ['execution_feedback.outcome_partially_satisfied', 'partially_satisfied'],
+  ['execution_feedback.outcome_dissatisfied', 'dissatisfied'],
+  ['execution_feedback.outcome_satisfied', 'satisfied'],
+];
+
+function resolveFeedbackOutcome(label: string): ExecutionFeedbackOutcome {
+  for (const [concept, outcome] of FEEDBACK_OUTCOME_CONCEPTS) {
+    if (matchesIntentPhrase(label, concept)) return outcome;
+  }
+  return 'dissatisfied';
+}
+
+const feedbackReplyPatternCache = new WeakMap<IntentPhraseMatcher, RegExp>();
+
+/**
+ * `<feedback prefix> <scenario-id>: <outcome>[: detail]` — prefixes come from the
+ * intent phrase lexicon. Compiled once per lexicon matcher (a lexicon edit yields
+ * a new matcher and therefore a fresh pattern).
+ */
+function feedbackReplyPattern(): RegExp {
+  const matcher = getIntentPhraseMatcher();
+  const cached = feedbackReplyPatternCache.get(matcher);
+  if (cached) return cached;
+  const compiled = buildFeedbackReplyPattern(matcher);
+  feedbackReplyPatternCache.set(matcher, compiled);
+  return compiled;
+}
+
+function buildFeedbackReplyPattern(matcher: IntentPhraseMatcher): RegExp {
+  const prefix = matcher.source('execution_feedback.prefix');
+  const outcomeWords = FEEDBACK_OUTCOME_CONCEPTS.map(([concept]) => matcher.source(concept)).join(
+    '|'
+  );
+  return new RegExp(
+    `^${prefix}\\s+(use-case-[a-z0-9_-]+)\\s*[:：]\\s*(${outcomeWords})(?:\\s*[:：]\\s*(\\S.*))?$`,
+    'iu'
+  );
+}
+
 export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput | null {
-  const match = text
-    .trim()
-    .match(
-      /^評価\s+(use-case-[a-z0-9_-]+)\s*[:：]\s*(満足|一部違う|不満|satisfied|partially_satisfied|dissatisfied)(?:\s*[:：]\s*(\S.*))?$/iu
-    );
+  const match = text.trim().match(feedbackReplyPattern());
   if (!match) return null;
-  const outcomeByLabel: Record<string, ExecutionFeedbackOutcome> = {
-    満足: 'satisfied',
-    一部違う: 'partially_satisfied',
-    不満: 'dissatisfied',
-    satisfied: 'satisfied',
-    partially_satisfied: 'partially_satisfied',
-    dissatisfied: 'dissatisfied',
-  };
   const scenarioId = match[1];
   const label = match[2];
+  const outcome = resolveFeedbackOutcome(label);
   const detail = normalizeFeedbackText(match[3]);
   return {
     scenario_id: scenarioId,
     intent_id: scenarioId.slice('use-case-'.length),
-    outcome: outcomeByLabel[label.toLowerCase()] || outcomeByLabel[label],
+    outcome,
     ...(detail
       ? {
-          ...(outcomeByLabel[label.toLowerCase()] === 'satisfied'
+          ...(outcome === 'satisfied'
             ? { comment: detail }
             : { correction: detail, comment: detail }),
         }

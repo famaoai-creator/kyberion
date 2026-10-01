@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, autonomy, approval, hitl, decision-card, veto-window, digest, mobile]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-28
+last_updated: 2026-10-01
 ---
 
 # HITL Decision Loop
@@ -94,6 +94,11 @@ else if (routed.parked) parkAndContinue(routed.requestId);
 ```
 
 - `blocking: false` for questions that can wait: the card goes to the digest instead of the phone.
+- Recurring callers (a watchdog tick, a scheduled job) pass a stable `dedupeKey`: while a pending
+  request with the same action and key exists, the decision parks on it again (`reused: true`)
+  instead of opening and ringing a new card. The scheduled gate callers `daemon_watchdog.ts`
+  (`daemon_restart`) and `auto_checkpoint.ts` route this way once
+  `KYBERION_AUTONOMY_DECISION_ROUTING=1` is set; unset, they keep their report-only behavior.
 - Ask a stricter tier with the gate's `requestedDecision`; there is no way to ask for a looser one.
 - Before raising a `decide`, try another agent and `knowledge/` first (plan D, "相談の自己解決").
 - A change request is a new instruction, not a retry signal: read `changeRequest.instruction` and change the approach.

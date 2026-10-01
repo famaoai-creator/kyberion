@@ -51,7 +51,20 @@ export * from './browser/browser-onboarding.js';
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './surface/operator-identity.js';
 // I18N-01: single source of truth for locale resolution.
 
-export { resolveLocale, resolveDefaultLocale, normalizeLocale } from './locale.js';
+export {
+  resolveLocale,
+  resolveDefaultLocale,
+  normalizeLocale,
+  deriveReplyLocale,
+  resolveScopeLocale,
+  enterReplyLocale,
+  runWithReplyLocale,
+  getReplyLocale,
+  detectTextLocale,
+  localeToBcp47,
+  localeUsesWordSpaces,
+  pickByLocale,
+} from './locale.js';
 
 export type { SupportedLocale, LocaleContext } from './locale.js';
 // I18N-05: single source of truth for locale/timeZone-aware date, number,
@@ -132,10 +145,6 @@ export * from './chain-integrity.js';
 
 // Classification & Knowledge
 
-export * as classifier from './classifier.js';
-
-export * from './knowledge/knowledge-provider.js';
-
 export {
   buildKnowledgeIndex,
   buildScopedIndex,
@@ -180,8 +189,6 @@ export {
   verifyPeerMessage,
 } from './mesh/peer-messaging.js';
 
-export { buildPeerBackupArtifactReferenceNotification } from './mesh/peer-backup-reference.js';
-
 export {
   createPeerRuntimeRecoveryApprovalRequest,
   resumePeerRuntimeFromQuarantine,
@@ -193,11 +200,6 @@ export type {
   PeerRuntimeRecoveryResumeInput,
   PeerRuntimeRecoveryResult,
 } from './mesh/peer-runtime-recovery.js';
-
-export type {
-  BuildPeerBackupArtifactReferenceInput,
-  PeerBackupArtifactReference,
-} from './mesh/peer-backup-reference.js';
 
 export type {
   BuildPeerMessageInput,
@@ -239,17 +241,9 @@ export type {
 export {
   clearMeshTopicRegistryNamespace,
   listMeshTopicSubscriptions,
-  resolveMeshTopicRecipients,
-  subscribeMeshTopic,
 } from './mesh/mesh-topic-registry.js';
 
-export type {
-  MeshTopicRegistryPolicyContext,
-  MeshTopicResolution,
-  MeshTopicResolutionOptions,
-  MeshTopicSubscriptionFilter,
-  MeshTopicSubscriptionInput,
-} from './mesh/mesh-topic-registry.js';
+export type { MeshTopicSubscriptionFilter } from './mesh/mesh-topic-registry.js';
 
 export {
   clearMeshHubPeerMessagingAdapterNamespace,
@@ -268,15 +262,6 @@ export type {
 } from './mesh/mesh-hub-peer-messaging-adapter.js';
 
 export type { MeshRequest } from './mesh/mesh-hub-contract.js';
-
-export { routeMeshRequest } from './mesh/mesh-router.js';
-
-export type {
-  MeshRouteCandidate,
-  MeshRouteDecision,
-  MeshRouteExclusion,
-  MeshRouteOptions,
-} from './mesh/mesh-router.js';
 
 export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh/mesh-hub-inspection.js';
 

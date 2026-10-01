@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { resolveConciergeLocale } from '../../../lib/i18n';
 import {
   acceptCharterForViewer,
+  dismissCharterProposal,
+  proposeCharter,
   previewCharter,
   readCharterOverview,
 } from '../../../lib/charter-server';
@@ -18,7 +21,8 @@ const asContext = <T>(fn: () => T): T =>
 /**
  * Accountability charters of the viewer's tenants. GET is a read of the
  * viewer's own scope (`?tenant=` may only narrow). POST is either `preview`
- * (returns the exact statement + its digest) or `accept` (recomputes the
+ * (returns the exact statement + its digest), `propose` / `dismiss_proposal`
+ * (an approver drafts limits; the owner sets it aside), or `accept` (recomputes the
  * statement and refuses if its digest differs from what the human saw). The
  * accountable human is always the authenticated member, never a client field.
  */
@@ -26,7 +30,7 @@ export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
+    const locale = resolveConciergeLocale(req.nextUrl.searchParams.get('locale') ?? undefined);
     const overview = asContext(() =>
       readCharterOverview(
         resolved.context,
@@ -55,23 +59,33 @@ export async function POST(req: NextRequest) {
       'action',
       'form',
       'statement_sha256',
+      'note',
+      'tenant_slug',
     ]);
     if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
     const { body } = parsedBody;
     const action = body?.action;
-    if (action !== 'preview' && action !== 'accept') {
+    if (
+      action !== 'preview' &&
+      action !== 'accept' &&
+      action !== 'propose' &&
+      action !== 'dismiss_proposal'
+    ) {
       return NextResponse.json(
-        { ok: false, error: 'action must be preview or accept' },
+        { ok: false, error: 'action must be preview, accept, propose or dismiss_proposal' },
         { status: 400 }
       );
     }
-    const result = asContext(() =>
-      action === 'preview'
-        ? previewCharter(resolved.context, body?.form)
-        : acceptCharterForViewer(resolved.context, body?.form, body?.statement_sha256)
-    );
+    const result = asContext(() => {
+      if (action === 'preview') return previewCharter(resolved.context, body?.form);
+      if (action === 'propose') return proposeCharter(resolved.context, body?.form, body?.note);
+      if (action === 'dismiss_proposal') {
+        return dismissCharterProposal(resolved.context, body?.tenant_slug);
+      }
+      return acceptCharterForViewer(resolved.context, body?.form, body?.statement_sha256);
+    });
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
     }

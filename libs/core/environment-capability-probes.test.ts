@@ -282,6 +282,6 @@ describe('playwright.chromium-browser probe', () => {
     const statuses = await probeManifest(manifest);
     expect(statuses).toHaveLength(1);
     expect(statuses[0]?.satisfied).toBe(false);
-    expect(statuses[0]?.reason).toContain('pnpm exec playwright install chromium');
+    expect(statuses[0]?.reason).toContain('pnpm env:bootstrap');
   });
 });

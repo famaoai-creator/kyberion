@@ -20,6 +20,7 @@
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { t } from './t.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson, readJsonLines } from './foundation/json.js';
@@ -295,11 +296,7 @@ async function probeNodeVersionFloor(): Promise<{ available: boolean; reason?: s
   const current = `v${process.versions.node}`;
   return {
     available: false,
-    reason:
-      `Node ${current} does not satisfy package.json engines "${range}". ` +
-      `Fix: \`nvm install ${major} && nvm use ${major}\` (or \`mise install node@${major}\`), then rerun. ` +
-      `/ 実行中の Node ${current} は engines "${range}" を満たしていません。` +
-      `\`nvm install ${major} && nvm use ${major}\`(または \`mise install node@${major}\`)でアップグレードしてから再実行してください。`,
+    reason: t('status:probe_node_engines_unmet', { current, range, major }),
   };
 }
 
@@ -331,10 +328,7 @@ async function probePlaywrightChromium(): Promise<{ available: boolean; reason?:
   if (safeExistsSync(dir)) return { available: true };
   return {
     available: false,
-    reason:
-      `no Playwright browser cache at ${dir} — browser features (first-win screenshot, browser:goto) ` +
-      `will silently fall back to text. Fix: \`pnpm exec playwright install chromium\`. ` +
-      `/ Playwright ブラウザ未導入です。\`pnpm exec playwright install chromium\` を実行してください。`,
+    reason: t('status:probe_playwright_missing', { dir }),
   };
 }
 

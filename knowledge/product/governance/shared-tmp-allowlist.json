@@ -270,12 +270,6 @@
       "note": "mission-less calibration probe output; mission-bound runs use mission evidence"
     },
     {
-      "file": "libs/core/spill-result.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "bounded secure spill for oversized text results"
-    },
-    {
       "file": "libs/core/media/docx-utils.ts",
       "count": 1,
       "classification": "legit-tmp",
@@ -286,18 +280,6 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "extracted image cache (per-document hash dir)"
-    },
-    {
-      "file": "libs/core/media/native-pptx-engine/examples/gen_project_plan.ts",
-      "count": 2,
-      "classification": "legit-tmp",
-      "note": "example script output"
-    },
-    {
-      "file": "libs/core/media/native-xlsx-engine/examples/gen_wbs.ts",
-      "count": 2,
-      "classification": "legit-tmp",
-      "note": "example script output"
     },
     {
       "file": "libs/core/storage-janitor.ts",

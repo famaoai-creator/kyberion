@@ -15,6 +15,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { dedupContent, parseIngestRegistryRecord } from './dedup.js';
+import { handleAction } from './index.js';
 
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
@@ -115,6 +116,28 @@ describe('ingest:dedup (DA-04 acceptance 3)', () => {
       register: false,
     });
     expect(result).toEqual({ duplicate: false, registered: false });
+    expect(readRegistryLines()).toHaveLength(before);
+  });
+
+  it('is reachable as the dedup pipeline transform (check-only, exported to ctx)', async () => {
+    const before = readRegistryLines().length;
+    const ctx = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'transform',
+          op: 'dedup',
+          params: {
+            content_sha256: HASH_A,
+            registry_path: registryPath,
+            register: false,
+            export_as: 'seen',
+          },
+        },
+      ],
+      context: {},
+    });
+    expect(ctx.seen).toMatchObject({ duplicate: true, registered: false });
     expect(readRegistryLines()).toHaveLength(before);
   });
 

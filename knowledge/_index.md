@@ -390,6 +390,7 @@
 - [Mission Portability Standard (MEP v0.1)](./product/orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
 - [Mission Triage Playbook — closing missions that cannot finish](./product/orchestration/mission-triage-playbook.md) (public | Unknown)
 - [Mission Types & Categories](./product/orchestration/mission-types.md) (public | Ecosystem Architect)
+- [Multi-branch audit delivery lessons](./product/orchestration/multi-branch-audit-delivery-lessons.md) (public | Unknown)
 - [Narrated Video Production Playbook](./product/orchestration/narrated-video-production-playbook.md) (public | ecosystem_architect)
 - [Native operation selection ladder](./product/orchestration/native-op-ladder.md) (public | Unknown)
 - [Negotiation Mission Protocol](./product/orchestration/negotiation-protocol.md) (public | Ecosystem Architect)

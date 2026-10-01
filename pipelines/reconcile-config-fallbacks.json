@@ -3,7 +3,13 @@
   "pipeline_id": "reconcile-config-fallbacks",
   "version": "1.0.0",
   "name": "Config Fallback Reconciler",
-  "description": "Reads the config fallback registry and closes the feedback loop: creates missing knowledge JSON files from defaults (file_not_found), and writes corrected proposals for parse errors for human review.",
+  "description": "Reads the config fallback registry and closes the feedback loop proposal-only: lists missing public-tier knowledge JSON files it would recreate from defaults (file_not_found) and writes corrected proposals for parse errors for human review. It never writes knowledge/; apply with `pnpm kyberion reconcile config-fallbacks --apply`. Ships with its schedule disabled; opt in on a host by listing the schedule id (reconcile-config-fallbacks-weekly) in KYBERION_CHRONOS_SCHEDULES.",
+  "schedule": {
+    "id": "reconcile-config-fallbacks-weekly",
+    "cron": "0 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
   "context": {
     "registry_path": "active/shared/tmp/config-fallback-registry.json",
     "proposals_dir": "active/shared/tmp/config-fallback-proposals"
@@ -69,7 +75,7 @@
             "op": "system:log",
             "consumes": "analysis_result",
             "params": {
-              "message": "[CONFIG-FALLBACK] Proposal review complete. See active/shared/tmp/config-fallback-review.json. Apply corrections manually or re-run with --apply flag."
+              "message": "[CONFIG-FALLBACK] Proposal review complete. See active/shared/tmp/config-fallback-review.json. Apply corrections manually or run `pnpm kyberion reconcile config-fallbacks --apply`."
             }
           }
         ],
@@ -105,7 +111,7 @@
       "op": "system:log",
       "consumes": "reconcile_result",
       "params": {
-        "message": "[CONFIG-FALLBACK] Done. Repaired: {{reconcile_result.repaired.length}}, Proposals: {{reconcile_result.proposals_written.length}}, Skipped: {{reconcile_result.skipped.length}}, Pruned: {{reconcile_result.pruned}}"
+        "message": "[CONFIG-FALLBACK] Done (proposal-only). Planned creates: {{reconcile_result.planned.length}}, Repaired: {{reconcile_result.repaired.length}}, Proposals: {{reconcile_result.proposals_written.length}}, Skipped: {{reconcile_result.skipped.length}}, Pruned: {{reconcile_result.pruned}}"
       }
     }
   ]

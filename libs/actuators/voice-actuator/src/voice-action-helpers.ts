@@ -39,6 +39,16 @@ export function validateVoiceAction(input: unknown): void {
   throw new Error(`Invalid voice action: ${detail}`);
 }
 
+/** Voice actions whose schema is a flat contract (voice-action.schema.json `$ref`s). */
+const FLAT_VOICE_ACTIONS = new Set([
+  'generate_voice',
+  'register_voice_profile',
+  'collect_voice_samples',
+  'record_voice_sample',
+  'record_verify_repair_voice_sample',
+  'collect_and_register_voice_profile',
+]);
+
 const PIPELINE_META_KEYS = new Set([
   'export_as',
   '_facets',
@@ -77,10 +87,12 @@ function normalizeVoicePipelineStep(step: unknown): unknown {
         ? (rec.params as Record<string, unknown>)
         : {};
     const cleaned = stripVoicePipelineMeta({ ...params });
-    // Flat voice contracts (generate_voice, …) put fields at the top level.
     if (cleaned.params && typeof cleaned.params === 'object') {
       return { action: rec.op, params: cleaned.params };
     }
+    // Flat voice contracts (generate_voice, …) put fields at the top level;
+    // every other voice action takes a `{ action, params }` envelope.
+    if (!FLAT_VOICE_ACTIONS.has(rec.op)) return { action: rec.op, params: cleaned };
     return { action: rec.op, ...cleaned };
   }
   return step;

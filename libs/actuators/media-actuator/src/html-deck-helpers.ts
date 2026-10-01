@@ -11,6 +11,8 @@
  * dependency: a small self-generated-HTML parser rather than cheerio/jsdom.
  */
 
+import { semanticToken } from '@agent/core/semantic-design-tokens';
+
 // ───────────────────────── minimal HTML parser ─────────────────────────
 export interface HNode {
   tag: string; // '' for text nodes
@@ -227,29 +229,30 @@ function extractTokens(root: HNode): Palette {
     }
   return vars;
 }
+const tok = (name: string): string => semanticToken('deck', name);
 function palette(v: Palette) {
   return {
-    bg: hex(v['--bg'], '#F6F7F9'),
-    panel: hex(v['--panel'], '#FFFFFF'),
-    ink: hex(v['--ink'], '#1A1F29'),
-    muted: hex(v['--muted'], '#5B6472'),
-    line: hex(v['--line'], '#E3E7EE'),
-    navy: hex(v['--accent'], '#1F3A5F'),
-    navy2: hex(v['--accent2'], '#2F5C9E'),
-    soft: hex(v['--soft'], '#EEF3FB'),
-    crit: hex(v['--crit'], '#B3123B'),
-    critBg: hex(v['--crit-bg'], '#FDEAEF'),
-    high: hex(v['--high'], '#C8471B'),
-    highBg: hex(v['--high-bg'], '#FCECE3'),
-    med: hex(v['--med'], '#B8860B'),
-    medBg: hex(v['--med-bg'], '#FBF3DD'),
-    low: hex(v['--low'], '#2F7D5B'),
-    lowBg: hex(v['--low-bg'], '#E7F4EC'),
-    good: hex(v['--good'], '#1F7A4D'),
-    goodBg: hex(v['--good-bg'], '#E6F5EC'),
-    white: '#FFFFFF',
-    navyInk: '#DBEAFE',
-    navyMute: '#9FB4CE',
+    bg: hex(v['--bg'], tok('deck.bg')),
+    panel: hex(v['--panel'], tok('deck.panel')),
+    ink: hex(v['--ink'], tok('deck.ink')),
+    muted: hex(v['--muted'], tok('deck.muted')),
+    line: hex(v['--line'], tok('deck.line')),
+    navy: hex(v['--accent'], tok('deck.navy')),
+    navy2: hex(v['--accent2'], tok('deck.navy2')),
+    soft: hex(v['--soft'], tok('deck.soft')),
+    crit: hex(v['--crit'], tok('status.crit')),
+    critBg: hex(v['--crit-bg'], tok('status.crit.bg')),
+    high: hex(v['--high'], tok('status.high')),
+    highBg: hex(v['--high-bg'], tok('status.high.bg')),
+    med: hex(v['--med'], tok('status.med')),
+    medBg: hex(v['--med-bg'], tok('status.med.bg')),
+    low: hex(v['--low'], tok('status.low')),
+    lowBg: hex(v['--low-bg'], tok('status.low.bg')),
+    good: hex(v['--good'], tok('status.good')),
+    goodBg: hex(v['--good-bg'], tok('status.good.bg')),
+    white: tok('deck.white'),
+    navyInk: tok('deck.navyInk'),
+    navyMute: tok('deck.navyMute'),
   };
 }
 type PaletteResolved = ReturnType<typeof palette>;

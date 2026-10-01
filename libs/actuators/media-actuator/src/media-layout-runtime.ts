@@ -7,6 +7,7 @@ import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
 import * as path from 'node:path';
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
+import { semanticToken } from '@agent/core/semantic-design-tokens';
 import { resolveSemanticRenderTokens, resolveThemeHexColor } from './media-layout-design-tokens.js';
 import {
   MEDIA_MANIFEST_PATH,
@@ -109,8 +110,14 @@ function buildPptxSlideFromPattern(
   canvas: any
 ) {
   const themeColors = resolveThemeColors(theme);
-  const primaryHex = (themeColors.primary || '#3867D6').replace('#', '');
-  const accentHex = (themeColors.accent || '#0070C0').replace('#', '');
+  const primaryHex = (themeColors.primary || semanticToken('layout', 'layout.primary')).replace(
+    '#',
+    ''
+  );
+  const accentHex = (themeColors.accent || semanticToken('layout', 'layout.accent')).replace(
+    '#',
+    ''
+  );
   const semanticType =
     data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
   const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType, data.design_system_id);
@@ -343,18 +350,36 @@ function buildPptxSlideFromPattern(
     const bodyX = chr.body_x;
     const bodyW = chr.body_w;
     // Resolve colors from theme; fall back to neutral corporate defaults
-    const navyHex = resolveThemeHexColor(themeColors, 'navy', '#003366').replace('#', '');
-    const azureHex = resolveThemeHexColor(themeColors, 'cta', '#0070C0').replace('#', '');
-    const surfaceBg = resolveThemeHexColor(themeColors, 'surface', '#E9EDF4').replace('#', '');
-    const borderHex = resolveThemeHexColor(themeColors, 'border', '#C9CED8').replace('#', '');
-    const bodyTextColor = resolveThemeHexColor(themeColors, 'text_primary', '#000000').replace(
-      '#',
-      ''
-    );
-    const subTextColor = resolveThemeHexColor(themeColors, 'text_secondary', '#595959').replace(
-      '#',
-      ''
-    );
+    const navyHex = resolveThemeHexColor(
+      themeColors,
+      'navy',
+      semanticToken('layout', 'layout.navy')
+    ).replace('#', '');
+    const azureHex = resolveThemeHexColor(
+      themeColors,
+      'cta',
+      semanticToken('layout', 'layout.cta')
+    ).replace('#', '');
+    const surfaceBg = resolveThemeHexColor(
+      themeColors,
+      'surface',
+      semanticToken('layout', 'layout.surface')
+    ).replace('#', '');
+    const borderHex = resolveThemeHexColor(
+      themeColors,
+      'border',
+      semanticToken('layout', 'layout.border')
+    ).replace('#', '');
+    const bodyTextColor = resolveThemeHexColor(
+      themeColors,
+      'text_primary',
+      semanticToken('layout', 'layout.text_primary')
+    ).replace('#', '');
+    const subTextColor = resolveThemeHexColor(
+      themeColors,
+      'text_secondary',
+      semanticToken('layout', 'layout.text_secondary')
+    ).replace('#', '');
 
     // A theme missing a role falls back to a neighbouring one, which is how a
     // panel can end up with identical fill and text color and render its body

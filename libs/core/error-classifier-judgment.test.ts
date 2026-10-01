@@ -11,6 +11,7 @@ import {
   ERROR_CATEGORY_DESCRIPTIONS,
   ERROR_CATEGORY_QUESTION,
   errorCategoryQuestion,
+  refineErrorClassification,
 } from './error-classifier-judgment.js';
 
 /** A local-only provider the egress policy declares, so personal tier works. */
@@ -151,5 +152,22 @@ describe('classifyErrorAssisted', () => {
         `missing description for ${option}`
       ).toBeTruthy();
     }
+  });
+});
+
+describe('refineErrorClassification (pipeline recovery path)', () => {
+  it('is exactly classifyError and asks no provider while nothing is calibrated', async () => {
+    let asked = 0;
+    registerJudgmentBackend({
+      ...provider('invalid_input'),
+      async judge(request) {
+        asked += 1;
+        return provider('invalid_input').judge(request);
+      },
+    });
+    for (const input of [UNMATCHED, MATCHED, new Error(UNMATCHED)]) {
+      expect(await refineErrorClassification(input)).toStrictEqual(classifyError(input));
+    }
+    expect(asked).toBe(0);
   });
 });
