@@ -1140,6 +1140,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/invites/email-draft/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/invites/join/route.ts#asContext",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2810,6 +2815,7 @@
         "presence/displays/concierge/src/app/api/ingest-input.ts",
         "presence/displays/concierge/src/app/api/ingest-output-parser.ts",
         "presence/displays/concierge/src/app/api/ingest/route.ts",
+        "presence/displays/concierge/src/app/api/invites/email-draft/route.ts",
         "presence/displays/concierge/src/app/api/invites/join/route.ts",
         "presence/displays/concierge/src/app/api/invites/route.ts",
         "presence/displays/concierge/src/app/api/me/avatar/[expression]/route.ts",
@@ -2900,6 +2906,7 @@
         "presence/displays/concierge/src/lib/i18n.ts",
         "presence/displays/concierge/src/lib/ingest-response.ts",
         "presence/displays/concierge/src/lib/intent-resolution-view.ts",
+        "presence/displays/concierge/src/lib/invite-email.ts",
         "presence/displays/concierge/src/lib/invite-server.ts",
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
