@@ -59,6 +59,8 @@ export interface SurfaceAuthRouteRequest {
   clientKey?: string;
   /** `Sec-Fetch-Site` of the request, when the client sent one. */
   secFetchSite?: string | null;
+  /** Origin (or Referer origin) header, consulted only when `Sec-Fetch-Site` is absent. */
+  referrerOrigin?: string | null;
   /** Where a surface that supports pasted access tokens (concierge `/signin`) offers that path. */
   tokenSignInHref?: string;
 }
@@ -112,22 +114,30 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT_PER_CLIENT = 120;
 /** Whole-surface ceiling: a rotating caller-supplied key cannot exceed it. */
 const RATE_LIMIT_PER_SURFACE = 600;
-const RATE_MAX_TRACKED_KEYS = 5_000;
+const DEFAULT_RATE_MAX_TRACKED_KEYS = 5_000;
+let rateMaxTrackedKeys = DEFAULT_RATE_MAX_TRACKED_KEYS;
 const rateBuckets = new Map<string, { windowStart: number; count: number }>();
 
-export function resetSurfaceAuthRateLimitForTests(): void {
+export function resetSurfaceAuthRateLimitForTests(maxTrackedKeys?: number): void {
   rateBuckets.clear();
+  rateMaxTrackedKeys = maxTrackedKeys ?? DEFAULT_RATE_MAX_TRACKED_KEYS;
 }
 
 function takeRateToken(key: string, limit: number, now: number): boolean {
   const bucket = rateBuckets.get(key);
+  if (bucket && now - bucket.windowStart < RATE_WINDOW_MS) {
+    // Re-insert so Map order tracks recency: eviction below drops the least
+    // recently used bucket, never a hot attacker's.
+    rateBuckets.delete(key);
+    rateBuckets.set(key, bucket);
+  }
   if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
-    if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+    if (rateBuckets.size >= rateMaxTrackedKeys) {
       // Bound memory under key-rotation abuse: drop expired buckets, then the oldest.
       for (const [k, v] of rateBuckets) {
         if (now - v.windowStart >= RATE_WINDOW_MS) rateBuckets.delete(k);
       }
-      if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+      if (rateBuckets.size >= rateMaxTrackedKeys) {
         const oldest = rateBuckets.keys().next().value;
         if (oldest !== undefined) rateBuckets.delete(oldest);
       }
@@ -139,12 +149,43 @@ function takeRateToken(key: string, limit: number, now: number): boolean {
   return bucket.count <= limit;
 }
 
-/** True when this request may proceed. Only applies when the adapter gave a clientKey. */
+/** Client key the adapter returns when it cannot tell callers apart (no trusted peer IP). */
+const SHARED_CLIENT_KEY = 'shared';
+
+/**
+ * True when this request may proceed. Only applies when the adapter gave a
+ * clientKey. Loopback is exempt (matches the Express surfaces). When callers
+ * cannot be told apart (`shared`), a per-client cap would let one anonymous
+ * flood lock every user out, so only the whole-surface ceiling applies.
+ */
 function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
-  if (req.clientKey === undefined) return true;
+  if (req.clientKey === undefined || req.loopback) return true;
   const surfaceOk = takeRateToken(`s:${req.surfaceId}`, RATE_LIMIT_PER_SURFACE, now);
+  if (req.clientKey === SHARED_CLIENT_KEY) return surfaceOk;
   const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, RATE_LIMIT_PER_CLIENT, now);
   return surfaceOk && clientOk;
+}
+
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A GET/POST /logout that a third party triggered. Browsers tag fetches with
+ * `Sec-Fetch-Site`; only `same-origin` and `none` (typed URL) may sign out.
+ * Without the header (older browsers) fall back to Origin/Referer: a present
+ * origin whose host is not ours is rejected; an absent one is allowed.
+ */
+function isForeignLogout(req: SurfaceAuthRouteRequest, ownOrigins: string[]): boolean {
+  if (req.secFetchSite) return req.secFetchSite !== 'same-origin' && req.secFetchSite !== 'none';
+  if (!req.referrerOrigin) return false;
+  const host = originHost(req.referrerOrigin);
+  if (host === null) return true;
+  return !ownOrigins.some((o) => originHost(o) === host);
 }
 
 function redirect(location: string, setCookies: string[] = []): SurfaceAuthRouteResponse {
@@ -278,9 +319,11 @@ export async function handleSurfaceAuthRoute(
 
     case SURFACE_LOGOUT_PATH: {
       if (method !== 'GET' && method !== 'POST') return notAllowed(req);
-      // A cross-site request (an <img>, a link on another origin) must not be
-      // able to sign the user out; browsers tag it with Sec-Fetch-Site.
-      if (req.secFetchSite === 'cross-site') return redirect(loginHrefFor(req));
+      // An <img> or link on another origin (or a sibling subdomain) must not be
+      // able to sign the user out.
+      if (isForeignLogout(req, [req.requestOrigin, ...(publicOrigin ? [publicOrigin] : [])])) {
+        return html(req, 403, { kind: 'failed', code: 'logout_blocked' });
+      }
       return redirect(`${SURFACE_LOGIN_PATH}?signedout=1`, [
         serializeClearedCookie(SURFACE_SESSION_COOKIE, secure),
       ]);
