@@ -176,19 +176,6 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
       ],
     },
     {
-      id: 'pilot-strategy-policy',
-      schemaPath: 'knowledge/product/schemas/pilot-strategy-policy.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/pilot-strategy-policy.json'),
-      ],
-      invalidPayloads: [
-        {
-          version: '1.0.0',
-          title: 'Kyberion AI Consulting: Go-to-Market Strategy',
-        },
-      ],
-    },
-    {
       id: 'production-evidence-summary-policy',
       schemaPath: 'knowledge/product/schemas/production-evidence-summary-policy.schema.json',
       validPayloads: [

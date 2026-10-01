@@ -101,7 +101,6 @@ const allowedCoreFsImports = [
   'libs/core/agent/agent-activity-board.test.ts',
   'libs/core/agent/agent-input-queue.test.ts',
   'libs/core/agent/agent-manifest.test.ts',
-  'libs/core/analysis/analysis-corpus.test.ts',
   'libs/core/workforce/artifact-bundle.test.ts',
   'libs/core/workforce/artifact-review.test.ts',
   'libs/core/workforce/background-review-patch.test.ts',
