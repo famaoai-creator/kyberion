@@ -9293,9 +9293,9 @@
         "qps-ploc": "⟦Ñőḓė {current} ḓőėş ñőŧ şȧŧïşƒẏ ṗȧƈķȧɠė.ĵşőñ ėñɠïñėş \"{range}\". Ƒïẋ: `ñṽɱ ïñşŧȧŀŀ {major} && ñṽɱ ůşė {major}` (őř `ɱïşė ïñşŧȧŀŀ ñőḓė@{major}`), ŧħėñ řėřůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
       },
       "probe_playwright_missing": {
-        "en": "No Playwright browser cache at {dir} — browser features (first-win screenshot, browser:goto) will silently fall back to text. Fix: `pnpm exec playwright install chromium`.",
-        "ja": "Playwright ブラウザ未導入です ({dir})。ブラウザ機能 (first-win スクリーンショット, browser:goto) はテキストにフォールバックします。`pnpm exec playwright install chromium` を実行してください。",
-        "qps-ploc": "⟦Ñő Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} — ƀřőẇşėř ƒėȧŧůřėş (ƒïřşŧ-ẇïñ şƈřėėñşħőŧ, ƀřőẇşėř:ɠőŧő) ẇïŀŀ şïŀėñŧŀẏ ƒȧŀŀ ƀȧƈķ ŧő ŧėẋŧ. Ƒïẋ: `ṗñṗɱ ėẋėƈ ṗŀȧẏẇřïɠħŧ ïñşŧȧŀŀ ƈħřőɱïůɱ`. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+        "en": "No Playwright browser cache at {dir} — browser features (first-win screenshot, browser:goto) will silently fall back to text. Fix: `pnpm env:bootstrap` (installs the managed browser runtime).",
+        "ja": "Playwright ブラウザ未導入です ({dir})。ブラウザ機能 (first-win スクリーンショット, browser:goto) はテキストにフォールバックします。`pnpm env:bootstrap` で管理ブラウザランタイムを導入してください。",
+        "qps-ploc": "⟦Ñő Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} — ƀřőẇşėř ƒėȧŧůřėş (ƒïřşŧ-ẇïñ şƈřėėñşħőŧ, ƀřőẇşėř:ɠőŧő) ẇïŀŀ şïŀėñŧŀẏ ƒȧŀŀ ƀȧƈķ ŧő ŧėẋŧ. Ƒïẋ: `ṗñṗɱ ėñṽ:ƀőőŧşŧřȧṗ` (ïñşŧȧŀŀş ŧħė ɱȧñȧɠėḓ ƀřőẇşėř řůñŧïɱė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       }
     },
     "error": {
