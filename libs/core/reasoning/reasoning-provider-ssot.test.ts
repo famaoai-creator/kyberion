@@ -15,10 +15,12 @@ import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io
 import { getAllFiles } from '../fs-utils.js';
 import { resetRegistryDirectoryCacheForTests } from '../registry-directory.js';
 import {
+  explainReasoningProviderDescriptor,
   getReasoningProviderDescriptor,
   listCliReasoningProviderDescriptors,
   listReasoningProviderDescriptors,
   reasoningProviderModelEnvKeys,
+  reasoningProviderRegistryOverridesAllowed,
   resetReasoningProviderRegistryForTests,
 } from './reasoning-provider-registry.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
@@ -208,6 +210,45 @@ describe('reasoning provider registry is the single source of truth (RS-01)', ()
   it('rejects an adapter outside the governed adapter set', () => {
     seedRegistry(syntheticDescriptor({ adapter: 'acme-proprietary' }));
     expect(() => listReasoningProviderDescriptors()).toThrow(/REASONING_PROVIDER_REGISTRY|adapter/);
+  });
+
+  it('rejects data_egress that contradicts the declared endpoint (S3)', () => {
+    expect(
+      explainReasoningProviderDescriptor(
+        syntheticDescriptor({ data_egress: 'local-only', endpoint: 'https://api.acme.example' })
+      )
+    ).toEqual({
+      reason: expect.stringMatching(/local-only requires a loopback\/private endpoint/),
+    });
+    for (const endpoint of ['https://localhost', 'https://127.0.0.1', 'https://192.168.1.20']) {
+      expect(explainReasoningProviderDescriptor(syntheticDescriptor({ endpoint }))).toEqual({
+        reason: expect.stringMatching(/external-api must not use a loopback/),
+      });
+    }
+    expect(
+      explainReasoningProviderDescriptor(
+        syntheticDescriptor({ data_egress: 'local-only', endpoint: 'https://10.0.0.5' })
+      )
+    ).toHaveProperty('descriptor');
+    expect(explainReasoningProviderDescriptor(syntheticDescriptor())).toHaveProperty('descriptor');
+  });
+
+  it('ignores registry overrides under NODE_ENV=production (S3)', () => {
+    seedRegistry(syntheticDescriptor());
+    expect(getReasoningProviderDescriptor(SYNTHETIC_MODE)).toBeDefined();
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(reasoningProviderRegistryOverridesAllowed()).toBe(false);
+      resetRegistryDirectoryCacheForTests();
+      resetReasoningProviderRegistryForTests();
+      expect(getReasoningProviderDescriptor(SYNTHETIC_MODE)).toBeUndefined();
+      expect(getReasoningProviderDescriptor('claude-cli' as ReasoningBackendMode)).toBeDefined();
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+    expect(reasoningProviderRegistryOverridesAllowed()).toBe(true);
   });
 
   it('treats an unknown identifier as unknown everywhere (fail closed)', async () => {

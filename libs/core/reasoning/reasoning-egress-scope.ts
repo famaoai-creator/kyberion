@@ -3,7 +3,10 @@ import { createLogger } from '../logger.js';
 import { evaluateEgressPolicy } from '../egress-policy.js';
 import { isLocalOnlyReasoningBackend } from '../backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from '../shell/sandbox-policy.js';
-import { resolveReasoningProviderDescriptor } from './reasoning-provider-registry.js';
+import {
+  isLocalReasoningEndpoint,
+  resolveReasoningProviderDescriptor,
+} from './reasoning-provider-registry.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -153,24 +156,5 @@ export function assertReasoningEgressAllowedAtEndpoint(
       `[EGRESS] blocked a ${scope.tier} payload from reaching ${backendName}: ${decision.reason}`
     );
     throw new ReasoningEgressDeniedError(decision.reason);
-  }
-}
-
-function isLocalReasoningEndpoint(endpoint: string): boolean {
-  try {
-    const hostname = new URL(endpoint).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
-    return (
-      hostname === 'localhost' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::' ||
-      hostname === '::1' ||
-      /^127\./u.test(hostname) ||
-      /^10\./u.test(hostname) ||
-      /^192\.168\./u.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./u.test(hostname) ||
-      /^fd[0-9a-f]{2}:/u.test(hostname)
-    );
-  } catch {
-    return false;
   }
 }

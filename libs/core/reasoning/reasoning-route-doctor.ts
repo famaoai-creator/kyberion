@@ -1,7 +1,11 @@
 import { discoverProviders } from '../provider/provider-discovery.js';
 import { nowIso } from '../foundation/time.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js';
-import { probeReasoningProviderReadiness } from './reasoning-provider-readiness.js';
+import {
+  probeReasoningProviderReadiness,
+  type ReasoningProviderReadinessDeps,
+} from './reasoning-provider-readiness.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import {
   loadReasoningRoutePolicy,
@@ -31,6 +35,32 @@ export interface ReasoningRouteDoctorReport {
   nextActions: string[];
 }
 
+export interface ReasoningRouteDoctorOptions {
+  /**
+   * Perform live credential probes (e.g. Anthropic `GET /v1/models`). Off by
+   * default: the doctor runs on every operator-surface reasoning page load
+   * and `pnpm reasoning:config doctor`, so it only checks that the key is
+   * configured unless the operator asks for `--live`.
+   */
+  live?: boolean;
+  env?: NodeJS.ProcessEnv;
+  /** Test seam for the readiness probes. */
+  readinessDeps?: ReasoningProviderReadinessDeps;
+}
+
+const ANTHROPIC_KEY_PRESENT_REASON = 'ANTHROPIC_API_KEY configured; live call not consumed';
+
+/** Key-presence check used instead of a live API call when `live` is off. */
+function anthropicKeyPresenceProbe(
+  env: NodeJS.ProcessEnv
+): Promise<{ available: boolean; reason?: string }> {
+  return Promise.resolve(
+    getRegisteredEnvText('ANTHROPIC_API_KEY', { env })?.trim()
+      ? { available: true }
+      : { available: false, reason: 'ANTHROPIC_API_KEY is not configured' }
+  );
+}
+
 /** Adapters whose readiness is answered by provider discovery (no live spawn here). */
 const DISCOVERY_ADAPTERS = new Set(['provider-cli', 'claude-cli', 'claude-agent-sdk']);
 
@@ -40,8 +70,9 @@ const DISCOVERY_ADAPTERS = new Set(['provider-cli', 'claude-cli', 'claude-agent-
  * other adapter uses the shared readiness probe. An unknown mode is reported
  * as unavailable with an explicit reason.
  */
-async function probeMode(
-  mode: string
+export async function probeReasoningRouteMode(
+  mode: string,
+  options: ReasoningRouteDoctorOptions = {}
 ): Promise<{ status: ReasoningRouteDoctorStatus; reason: string }> {
   const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
   if (!descriptor) {
@@ -57,7 +88,17 @@ async function probeMode(
       ? { status: 'ready', reason: `${provider} CLI healthy` }
       : { status: 'not_configured', reason: `${provider} CLI is not installed or healthy` };
   }
-  const result = await probeReasoningProviderReadiness(descriptor);
+  const deps: ReasoningProviderReadinessDeps = options.live
+    ? { ...options.readinessDeps }
+    : { ...options.readinessDeps, anthropicProbe: anthropicKeyPresenceProbe };
+  const result = await probeReasoningProviderReadiness(
+    descriptor,
+    options.env ?? process.env,
+    deps
+  );
+  if (result.available && !options.live && descriptor.adapter === 'anthropic-api') {
+    return { status: 'ready', reason: ANTHROPIC_KEY_PRESENT_REASON };
+  }
   return result.available
     ? { status: 'ready', reason: 'endpoint reachable; model-specific completion not consumed' }
     : { status: 'not_configured', reason: result.reason || 'endpoint probe failed' };
@@ -65,6 +106,7 @@ async function probeMode(
 
 async function inspectRole(
   role: string,
+  options: ReasoningRouteDoctorOptions,
   probeCache: Map<string, Promise<{ status: ReasoningRouteDoctorStatus; reason: string }>>
 ): Promise<ReasoningRouteDoctorEntry> {
   let route: ResolvedReasoningRoute;
@@ -87,7 +129,7 @@ async function inspectRole(
       const candidateRoute = resolveReasoningRoute({ role, requestedProfile: candidate });
       let pending = probeCache.get(candidateRoute.mode);
       if (!pending) {
-        pending = probeMode(candidateRoute.mode);
+        pending = probeReasoningRouteMode(candidateRoute.mode, options);
         probeCache.set(candidateRoute.mode, pending);
       }
       const probe = await pending;
@@ -127,13 +169,15 @@ async function inspectRole(
   };
 }
 
-export async function inspectReasoningRoutes(): Promise<ReasoningRouteDoctorReport> {
+export async function inspectReasoningRoutes(
+  options: ReasoningRouteDoctorOptions = {}
+): Promise<ReasoningRouteDoctorReport> {
   const roles = Object.keys(loadReasoningRoutePolicy().roles);
   const probeCache = new Map<
     string,
     Promise<{ status: ReasoningRouteDoctorStatus; reason: string }>
   >();
-  const entries = await Promise.all(roles.map((role) => inspectRole(role, probeCache)));
+  const entries = await Promise.all(roles.map((role) => inspectRole(role, options, probeCache)));
   const nextActions = Array.from(
     new Set(
       entries.flatMap((entry) => {

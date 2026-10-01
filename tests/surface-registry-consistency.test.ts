@@ -14,7 +14,9 @@ const readJson = (rel: string) =>
   JSON.parse(safeReadFile(path.join(root, rel), { encoding: 'utf8' }) as string);
 
 describe('RS-04 surface registry consistency', () => {
-  const manifest = loadSurfaceManifest();
+  // The committed registry only: operator enable/disable overrides live in an
+  // untracked runtime overlay and must not affect these pins.
+  const manifest = loadSurfaceManifest(undefined, { applyOverrides: false });
   const snapshot = readJson('knowledge/product/governance/active-surfaces.json');
   const roles = readJson('knowledge/product/governance/surface-roles.json').roles as Array<{
     id: string;

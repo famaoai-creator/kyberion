@@ -18670,6 +18670,16 @@
       }
     },
     "surface": {
+      "surface_enable_hint": {
+        "en": "Disabled. Enable with: pnpm surfaces enable --surface {surface}",
+        "ja": "無効です。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ. Ėñȧƀŀė ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_gateway_disabled_by_default_warning": {
+        "en": "Gateway \"{surface}\" has credentials configured but is now disabled by default, so it was not started. Enable it with: pnpm surfaces enable --surface {surface}",
+        "ja": "ゲートウェイ「{surface}」は認証情報が設定済みですが、既定で無効になったため起動していません。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ɠȧŧėẇȧẏ \"{surface}\" ħȧş ƈřėḓėñŧïȧŀş ƈőñƒïɠůřėḓ ƀůŧ ïş ñőẇ ḓïşȧƀŀėḓ ƀẏ ḓėƒȧůŀŧ, şő ïŧ ẇȧş ñőŧ şŧȧřŧėḓ. Ėñȧƀŀė ïŧ ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
+      },
       "voice_hub_error_fallback": {
         "en": "I could not process that. Please try again.",
         "ja": "うまく処理できませんでした。もう一度お願いします。",

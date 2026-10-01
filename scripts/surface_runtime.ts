@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
+  loadSurfaceEnablementOverrides,
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
@@ -12,6 +13,8 @@ import {
   readSurfaceLogTail,
   saveSurfaceManifest,
   saveSurfaceState,
+  setSurfaceEnablementOverride,
+  surfaceEnablementOverridesPath,
   surfaceLogPath,
   surfaceManifestDirectoryPath,
   surfaceManifestFilePath,
@@ -36,6 +39,7 @@ import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lif
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { t } from '@agent/core/t';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =
@@ -435,6 +439,45 @@ function stopSurfaceById(surfaceId: string) {
   return { status: 'stopped', id: surfaceId, pid: record.pid };
 }
 
+/**
+ * True when the surface has a service preset whose credentials validate
+ * (secret store / env / CLI fallback, via inspectServiceAuth). Surfaces
+ * without a preset are host-managed and report false.
+ */
+function surfaceCredentialsConfigured(definition: SurfaceRuntimeDefinition): boolean {
+  if (!definition.preset_path) return false;
+  try {
+    return inspectServiceAuth(definition.service_id || definition.id, definition.preset_path).valid;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reconcile result for a disabled surface: a `skipped_disabled` row with the
+ * enable hint. When a gateway is disabled only because the committed registry
+ * now defaults it off, yet its credentials are configured (it used to start),
+ * also return a one-time migration warning telling the operator how to opt in.
+ */
+export function buildDisabledSurfaceReconcileRow(
+  definition: Pick<SurfaceRuntimeDefinition, 'id' | 'kind'>,
+  options: { disabledByDefault: boolean; credentialsConfigured: boolean }
+): { row: Record<string, unknown>; migrationWarning?: string } {
+  const params = { surface: definition.id };
+  const row: Record<string, unknown> = {
+    id: definition.id,
+    status: 'skipped_disabled',
+    hint: t('surface:surface_enable_hint', params),
+    enableCommand: `pnpm surfaces enable --surface ${definition.id}`,
+  };
+  if (definition.kind === 'gateway' && options.disabledByDefault && options.credentialsConfigured) {
+    const migrationWarning = t('surface:surface_gateway_disabled_by_default_warning', params);
+    row.migrationWarning = migrationWarning;
+    return { row, migrationWarning };
+  }
+  return { row };
+}
+
 async function reconcileSurfaces(manifestPath: string, cleanup = false) {
   const manifest = loadSurfaceManifest(manifestPath);
   const state = loadSurfaceState();
@@ -449,8 +492,18 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
   }
 
   const results: Array<Record<string, unknown>> = [];
+  const overrides = loadSurfaceEnablementOverrides();
+  const usesRegistry = path.resolve(manifestPath) === path.resolve(surfaceManifestPath());
   for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
-    if (!definition.enabled) continue;
+    if (!definition.enabled) {
+      const disabled = buildDisabledSurfaceReconcileRow(definition, {
+        disabledByDefault: usesRegistry && !overrides.surfaces[definition.id],
+        credentialsConfigured: surfaceCredentialsConfigured(definition),
+      });
+      if (disabled.migrationWarning) logger.warn(`⚠️  [SURFACE] ${disabled.migrationWarning}`);
+      results.push(disabled.row);
+      continue;
+    }
     const existing = state.surfaces[definition.id];
     if (existing && isRunning(existing.pid)) {
       results.push({ id: definition.id, status: 'running', pid: existing.pid });
@@ -678,9 +731,7 @@ function formatSurfaceSetupReport(report: Awaited<ReturnType<typeof setupSurface
     );
     if (row.auth === 'missing' || row.auth === 'n/a') lines.push(`  ↳ ${row.hint}`);
     if (row.enabled === 'disabled')
-      lines.push(
-        `  ↳ Disabled by default. Enable with: pnpm surfaces enable --surface ${row.surface}`
-      );
+      lines.push(`  ↳ ${t('surface:surface_enable_hint', { surface: row.surface })}`);
   }
   lines.push('');
   return lines.join('\n');
@@ -764,49 +815,57 @@ async function repairSurfaces(manifestPath: string, surfaceId?: string) {
   };
 }
 
-async function enableSurfaceById(surfaceId: string, manifestPath: string) {
-  const manifest = loadSurfaceManifest(manifestPath);
+/**
+ * Persist an operator enable/disable decision. For the canonical registry the
+ * decision goes to the untracked overlay (active/shared/runtime/surfaces/
+ * overrides.json) so the committed knowledge/product/governance/surfaces/*.json
+ * defaults are never rewritten; an explicit --manifest file is operator-owned
+ * and is updated in place as before.
+ */
+function setSurfaceEnabled(surfaceId: string, manifestPath: string, enabled: boolean): boolean {
+  const usesRegistry = path.resolve(manifestPath) === path.resolve(surfaceManifestPath());
+  const manifest = loadSurfaceManifest(manifestPath, { applyOverrides: usesRegistry });
   const definition = manifest.surfaces.find((s) => s.id === surfaceId);
   if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
+  if ((definition.enabled !== false) === enabled) return false;
 
-  if (definition.enabled === true) {
-    logger.info(`Surface "${surfaceId}" is already enabled.`);
+  let storage: string;
+  if (usesRegistry) {
+    const committed = loadSurfaceManifest(manifestPath, { applyOverrides: false }).surfaces.find(
+      (s) => s.id === surfaceId
+    );
+    setSurfaceEnablementOverride(surfaceId, enabled, committed?.enabled !== false);
+    storage = surfaceEnablementOverridesPath();
   } else {
-    definition.enabled = true;
+    definition.enabled = enabled;
     saveSurfaceManifest(manifest, manifestPath);
-    auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
-      action: 'surface.enable',
-      operation: surfaceId,
-      result: 'completed',
-      metadata: { surfaceId, manifestPath },
-    });
-    logger.success(`✅ Enabled surface "${surfaceId}".`);
+    storage = manifestPath;
   }
+  auditChain.record({
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    action: enabled ? 'surface.enable' : 'surface.disable',
+    operation: surfaceId,
+    result: 'completed',
+    metadata: { surfaceId, manifestPath, storage },
+  });
+  return true;
+}
 
+async function enableSurfaceById(surfaceId: string, manifestPath: string) {
+  if (setSurfaceEnabled(surfaceId, manifestPath, true)) {
+    logger.success(`✅ Enabled surface "${surfaceId}".`);
+  } else {
+    logger.info(`Surface "${surfaceId}" is already enabled.`);
+  }
   return startSurfaceById(surfaceId, manifestPath);
 }
 
 async function disableSurfaceById(surfaceId: string, manifestPath: string) {
-  const manifest = loadSurfaceManifest(manifestPath);
-  const definition = manifest.surfaces.find((s) => s.id === surfaceId);
-  if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
-
-  if (definition.enabled === false) {
-    logger.info(`Surface "${surfaceId}" is already disabled.`);
-  } else {
-    definition.enabled = false;
-    saveSurfaceManifest(manifest, manifestPath);
-    auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
-      action: 'surface.disable',
-      operation: surfaceId,
-      result: 'completed',
-      metadata: { surfaceId, manifestPath },
-    });
+  if (setSurfaceEnabled(surfaceId, manifestPath, false)) {
     logger.success(`✅ Disabled surface "${surfaceId}".`);
+  } else {
+    logger.info(`Surface "${surfaceId}" is already disabled.`);
   }
-
   return stopSurfaceById(surfaceId);
 }
 
@@ -819,7 +878,7 @@ async function registerSurface(params: {
   description?: string;
   manifestPath: string;
 }) {
-  const manifest = loadSurfaceManifest(params.manifestPath);
+  const manifest = loadSurfaceManifest(params.manifestPath, { applyOverrides: false });
   if (manifest.surfaces.some((s) => s.id === params.id)) {
     throw new Error(`Surface "${params.id}" is already registered.`);
   }
@@ -853,7 +912,7 @@ async function registerSurface(params: {
 }
 
 async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
-  const manifest = loadSurfaceManifest(manifestPath);
+  const manifest = loadSurfaceManifest(manifestPath, { applyOverrides: false });
   const index = manifest.surfaces.findIndex((s) => s.id === surfaceId);
   if (index === -1) throw new Error(`Surface "${surfaceId}" not found.`);
 
