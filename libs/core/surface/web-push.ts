@@ -42,6 +42,8 @@ export interface WebPushSubscription {
 
 export interface StoredPushSubscription extends WebPushSubscription {
   member_id: string;
+  /** Legacy rows without this marker are member-owned and never operator-targeted. */
+  owner_kind?: 'member' | 'operator';
   created_at: string;
 }
 
@@ -55,6 +57,10 @@ const MAX_PER_MEMBER = 5;
 const MAX_TOTAL = 500;
 const MAX_ENDPOINT = 2048;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
+// `operator-notifications` emits process-wide operator events without a
+// tenant/member audience. Until event scope is carried through that API, only
+// the local operator's device may receive these events.
+const OPERATOR_PUSH_OWNER = 'operator';
 
 /** The browser push services; anything else is refused (the server POSTs to this host). */
 const PUSH_HOSTS: ReadonlyArray<RegExp> = [
@@ -115,7 +121,14 @@ export function listPushSubscriptions(options: WebPushPathOptions = {}): StoredP
   if (!Array.isArray(parsed)) return [];
   return parsed.filter((entry): entry is StoredPushSubscription => {
     const sub = parseSubscription(entry);
-    return sub !== null && typeof (entry as StoredPushSubscription).member_id === 'string';
+    const stored = entry as StoredPushSubscription;
+    return (
+      sub !== null &&
+      typeof stored.member_id === 'string' &&
+      (stored.owner_kind === undefined ||
+        stored.owner_kind === 'member' ||
+        stored.owner_kind === 'operator')
+    );
   });
 }
 
@@ -133,16 +146,25 @@ export function addPushSubscription(
   memberId: string,
   raw: unknown,
   options: WebPushPathOptions = {},
-  now: Date = new Date()
+  now: Date = new Date(),
+  ownerKind: 'member' | 'operator' = 'member'
 ): SubscribeResult {
   const sub = parseSubscription(raw);
   if (!sub) return { ok: false, error: 'invalid_subscription' };
   const others = listPushSubscriptions(options).filter((e) => e.endpoint !== sub.endpoint);
-  const mine = others.filter((e) => e.member_id === memberId).length;
+  const mine = others.filter(
+    (e) => e.member_id === memberId && (e.owner_kind ?? 'member') === ownerKind
+  ).length;
   if (mine >= MAX_PER_MEMBER || others.length >= MAX_TOTAL) {
     return { ok: false, error: 'too_many' };
   }
-  save([...others, { ...sub, member_id: memberId, created_at: now.toISOString() }], options);
+  save(
+    [
+      ...others,
+      { ...sub, member_id: memberId, owner_kind: ownerKind, created_at: now.toISOString() },
+    ],
+    options
+  );
   return { ok: true };
 }
 
@@ -150,25 +172,47 @@ export function addPushSubscription(
 export function removePushSubscription(
   memberId: string,
   endpoint: string,
-  options: WebPushPathOptions = {}
+  options: WebPushPathOptions = {},
+  ownerKind: 'member' | 'operator' = 'member'
 ): boolean {
   const all = listPushSubscriptions(options);
-  const next = all.filter((e) => !(e.endpoint === endpoint && e.member_id === memberId));
+  const next = all.filter(
+    (e) =>
+      !(
+        e.endpoint === endpoint &&
+        e.member_id === memberId &&
+        (e.owner_kind ?? 'member') === ownerKind
+      )
+  );
   if (next.length === all.length) return false;
   save(next, options);
   return true;
 }
 
-export function pushSubscribedFor(memberId: string, options: WebPushPathOptions = {}): number {
-  return listPushSubscriptions(options).filter((e) => e.member_id === memberId).length;
+export function pushSubscribedFor(
+  memberId: string,
+  options: WebPushPathOptions = {},
+  ownerKind: 'member' | 'operator' = 'member'
+): number {
+  return listPushSubscriptions(options).filter(
+    (e) => e.member_id === memberId && (e.owner_kind ?? 'member') === ownerKind
+  ).length;
 }
 
-/** True when this event would reach at least one device (keys set, a device subscribed, event buzzes). */
-export function webPushWouldDeliver(event: string, options: WebPushPathOptions = {}): boolean {
+/** True when this event would reach at least one device in the selected audience. */
+export function webPushWouldDeliver(
+  event: string,
+  options: WebPushPathOptions = {},
+  audience: 'all' | 'operator' = 'all'
+): boolean {
   return (
     pushKindForEvent(event) !== null &&
     loadWebPushConfig() !== null &&
-    listPushSubscriptions(options).length > 0
+    listPushSubscriptions(options).some(
+      (entry) =>
+        audience === 'all' ||
+        (entry.member_id === OPERATOR_PUSH_OWNER && entry.owner_kind === 'operator')
+    )
   );
 }
 
@@ -221,8 +265,10 @@ export interface FanOutResult {
 }
 
 /**
- * Buzz every subscribed device (content-free). Never throws: a failing push
- * service must not break the event that triggered it.
+ * Send a content-free event to its selected audience. Process-wide operator
+ * events must pass `audience: 'operator'`; those events have no tenant/member
+ * audience, so member-owned subscriptions must not receive them. Never throws:
+ * a failing push service must not break the event that triggered it.
  */
 export async function sendWebPushForEvent(
   event: string,
@@ -230,6 +276,7 @@ export async function sendWebPushForEvent(
     config?: WebPushConfig | null;
     sender?: PushSender;
     options?: WebPushPathOptions;
+    audience?: 'all' | 'operator';
   } = {}
 ): Promise<FanOutResult> {
   const result: FanOutResult = { sent: 0, removed: 0, failed: 0 };
@@ -239,7 +286,11 @@ export async function sendWebPushForEvent(
   if (!config) return result;
   const options = deps.options ?? {};
   const sender = deps.sender ?? defaultSender;
-  const subscriptions = listPushSubscriptions(options);
+  const subscriptions = listPushSubscriptions(options).filter(
+    (entry) =>
+      deps.audience !== 'operator' ||
+      (entry.member_id === OPERATOR_PUSH_OWNER && entry.owner_kind === 'operator')
+  );
   if (subscriptions.length === 0) return result;
   const payload = buildPushPayload(kind);
   const gone = new Set<string>();

@@ -250,6 +250,10 @@ function fallbackSteps(summary: string, defaults: string[]): string[] {
   return lines.length > 0 ? lines : defaults;
 }
 
+function yamlOptionalString(value: string | undefined): string {
+  return value?.trim() ? value : '""';
+}
+
 function buildMarkdown(record: PromotedMemoryRecord): string {
   const frontmatter = [
     `---`,
@@ -257,14 +261,14 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
     `kind: ${record.kind}`,
     `tier: ${record.tier}`,
     `knowledge_domain: ${record.knowledge_domain}`,
-    `owner_nhi: ${record.owner_nhi || ''}`,
+    `owner_nhi: ${yamlOptionalString(record.owner_nhi)}`,
     `candidate_id: ${record.candidate_id}`,
-    `supersedes: ${record.supersedes || ''}`,
-    `superseded_by: ${record.superseded_by || ''}`,
-    `project_id: ${record.project_id || ''}`,
-    `task_session_id: ${record.task_session_id || ''}`,
-    `specialist_id: ${record.specialist_id || ''}`,
-    `locale: ${record.locale || ''}`,
+    `supersedes: ${yamlOptionalString(record.supersedes)}`,
+    `superseded_by: ${yamlOptionalString(record.superseded_by)}`,
+    `project_id: ${yamlOptionalString(record.project_id)}`,
+    `task_session_id: ${yamlOptionalString(record.task_session_id)}`,
+    `specialist_id: ${yamlOptionalString(record.specialist_id)}`,
+    `locale: ${yamlOptionalString(record.locale)}`,
     `created_at: ${record.created_at}`,
     ...(record.source_branch ? [`source_branch: ${record.source_branch}`] : []),
     ...(record.source_commit ? [`source_commit: ${record.source_commit}`] : []),
