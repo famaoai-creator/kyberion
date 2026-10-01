@@ -47,6 +47,7 @@ describe('virtual office surface', () => {
     // copy above).
     const REQUIRED_GOVERNED_CATALOGS = [
       'product/governance/provider-config.json',
+      'product/governance/tasktype-artifact-map.json',
       'public/common/project_standards.json',
     ];
     for (const relPath of REQUIRED_GOVERNED_CATALOGS) {
