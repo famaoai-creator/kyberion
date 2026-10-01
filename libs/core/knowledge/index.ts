@@ -10,7 +10,6 @@ export * from './knowledge-feedback-loop.js';
 export * from './knowledge-index-cache.js';
 export * from './knowledge-index-usage.js';
 export * from './knowledge-index.js';
-export * from './knowledge-provider.js';
 export * from './knowledge-relevance-judgment.js';
 export * from './knowledge-scope-check-policy.js';
 export * from './knowledge-scope-health-history.js';

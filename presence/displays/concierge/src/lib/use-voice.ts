@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import type { ConciergeLocale } from './i18n';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import {
   parseVoiceListenOnceResponse,
   parseVoiceStatusResponse,
@@ -82,7 +83,7 @@ function resolveSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
 }
 
 function speechLocale(locale: ConciergeLocale): string {
-  return locale === 'en' ? 'en-US' : 'ja-JP';
+  return localeToBcp47(locale);
 }
 
 /** The avatar-facing speech mode (null = silent). */

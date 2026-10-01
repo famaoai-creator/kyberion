@@ -28,6 +28,9 @@ import { evaluateTaskPlanReadyGate } from '@agent/core/sdlc-artifact-store';
 import { buildCostReportFromHistory } from '@agent/core/cost-report';
 import { summarizeSemanticDegradations } from '@agent/core/semantic-degradation-log';
 import { listPromotionCandidates } from '@agent/core/promotion-candidates';
+import type { ActuatorPipelineBundle } from '@agent/core/contracts/actuator-pipeline-bundle';
+import type { ActuatorResolutionPlan } from '@agent/core/contracts/actuator-resolution-plan';
+import type { SystemStatusBrief } from '@agent/core/contracts/system-status-brief';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
 import type { AdfEngineContext, AdfRunResult, AdfStep } from '../../../core/pipeline/adf-engine.js';
@@ -500,7 +503,7 @@ async function opTransform(op: string, params: any, ctx: any) {
             'pnpm run check -- --scope pr --only esm',
             'pnpm run check -- --scope full --only catalogs',
           ],
-        },
+        } satisfies SystemStatusBrief,
       };
     }
     case 'execution_brief_to_resolution_plan': {
@@ -543,7 +546,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           summary: brief.summary,
           reasoning_mode: reasoningMode,
           phases,
-        },
+        } satisfies ActuatorResolutionPlan,
       };
     }
     case 'collect_system_status_snapshot': {
@@ -972,7 +975,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           summary: brief.summary || plan.summary || 'Actuator execution pipeline bundle',
           missing_inputs: missingInputs,
           jobs,
-        },
+        } satisfies ActuatorPipelineBundle,
       };
     }
     case 'pipeline_bundle_to_execution_plan_set': {

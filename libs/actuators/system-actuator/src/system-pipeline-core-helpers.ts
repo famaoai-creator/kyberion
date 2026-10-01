@@ -470,7 +470,10 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
   reconcile_config_fallbacks: async ({ params, ctx }) => {
     return {
       ...ctx,
-      [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks(),
+      // B1: proposal-only unless the step explicitly opts into knowledge writes.
+      [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks({
+        apply: params.apply === true,
+      }),
     };
   },
   reconcile_unclassified_errors: async ({ params, ctx }) => {

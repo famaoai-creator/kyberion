@@ -17,6 +17,11 @@ import {
   type AutonomousOpsGateResult,
 } from '@agent/core/governance/autonomous-ops-gate';
 import { withExecutionContextAsync } from '@agent/core/authority';
+import {
+  isAutonomyDecisionRoutingEnabled,
+  routeAutonomousDecision,
+} from '@agent/core/governance/approval-decision-routing';
+import { logger } from '@agent/core/core';
 
 /**
  * EV-05: every long-lived daemon that fires work must be listed here.
@@ -50,6 +55,40 @@ export interface DaemonRecoveryOutcome {
   trigger_status: TriggerReceipt['status'];
   requires_operator: boolean;
   reason?: string;
+  /**
+   * HITL decision card raised for the operator (opt-in,
+   * `KYBERION_AUTONOMY_DECISION_ROUTING=1`); reused while one is pending.
+   */
+  decision_request_id?: string;
+}
+
+function routeDaemonRecoveryDecision(
+  status: DaemonHeartbeatStatus,
+  gate: AutonomousOpsGateResult
+): string | undefined {
+  try {
+    const routed = routeAutonomousDecision({
+      // A shared role libs/core stores assume on behalf of every caller; the
+      // watchdog's own authority has no approval-store scope.
+      role: 'infrastructure_sentinel',
+      gate,
+      title: `Restart daemon ${status.daemon_id}`,
+      question: `Restart the ${status.daemon_id} daemon (heartbeat ${status.status})?`,
+      recommendation: `Restart it after checking that no firing is in flight; the heartbeat is ${status.status}.`,
+      requestedBy: DAEMON_WATCHDOG_ROLE,
+      dedupeKey: status.daemon_id,
+    });
+    return routed.requestId;
+  } catch (error) {
+    // The recovery receipt already records the outage; a routing failure must
+    // not hide it.
+    logger.warn(
+      `[daemon-watchdog] decision routing failed for ${status.daemon_id} — ${
+        error instanceof Error ? error.message : String(error)
+      } | next: decide from the watchdog report`
+    );
+    return undefined;
+  }
 }
 
 /** EV-02: the watchdog's own authority; see authority-roles/daemon_watchdog.json. */
@@ -227,13 +266,19 @@ export async function requestDaemonRecovery(
       // reporting an auto-eligible recovery that was never evaluated.
       const evaluated: AutonomousOpsGateResult | null = gate;
       const reason = receipt.reason ?? evaluated?.reason;
+      // Anything short of `auto` needs a human before the daemon comes back.
+      const requiresOperator = evaluated?.decision !== 'auto' || !evaluated.allowed;
+      const decisionRequestId =
+        evaluated && requiresOperator && isAutonomyDecisionRoutingEnabled()
+          ? routeDaemonRecoveryDecision(status, evaluated)
+          : undefined;
       outcomes.push({
         daemon_id: status.daemon_id,
         decision: evaluated?.decision ?? 'approve',
         trigger_status: receipt.status,
-        // Anything short of `auto` needs a human before the daemon comes back.
-        requires_operator: evaluated?.decision !== 'auto' || !evaluated.allowed,
+        requires_operator: requiresOperator,
         ...(reason ? { reason } : {}),
+        ...(decisionRequestId ? { decision_request_id: decisionRequestId } : {}),
       });
     }
     return outcomes;
@@ -260,7 +305,9 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
     lines.push(
       `Recovery ${recovery.daemon_id}: gate=${recovery.decision}; trigger=${recovery.trigger_status}; ${
         recovery.requires_operator ? 'awaiting operator' : 'auto-eligible'
-      }${recovery.reason ? `; reason=${recovery.reason}` : ''}`
+      }${recovery.decision_request_id ? `; decision=${recovery.decision_request_id}` : ''}${
+        recovery.reason ? `; reason=${recovery.reason}` : ''
+      }`
     );
   }
   return lines;

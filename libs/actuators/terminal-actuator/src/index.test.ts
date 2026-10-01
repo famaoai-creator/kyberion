@@ -146,6 +146,45 @@ describe('terminal-actuator computer_interaction adapter', () => {
   });
 });
 
+describe('terminal-actuator SDK dispatch (pipeline / ADF path)', () => {
+  beforeEach(() => {
+    ptyState.sessions.clear();
+  });
+
+  it('maps action ops to { action, params } and *_terminal ops to computer_interaction', async () => {
+    const { actuator } = await import('./index');
+    const spawned = await actuator.dispatch('spawn_terminal', {
+      shell: '/bin/bash',
+      cwd: 'active/shared/tmp',
+    });
+    expect(spawned).toMatchObject({ ok: true, output: { status: 'created' } });
+
+    const listed = await actuator.dispatch('list_terminal_sessions', {});
+    expect(listed).toMatchObject({ ok: true, output: { status: 'listed' } });
+    expect((listed.output as { sessions: unknown[] }).sessions).toHaveLength(1);
+
+    const direct = await actuator.dispatch('list', {});
+    expect((direct.output as { sessions: unknown[] }).sessions).toHaveLength(1);
+
+    const sessionId = (spawned.output as { sessionId: string }).sessionId;
+    await expect(actuator.dispatch('kill_terminal', { sessionId })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('write_terminal forwards the whole key sequence, not only the first key', async () => {
+    const { actuator } = await import('./index');
+    const { ptyEngine } = await import('@agent/core/shell/pty-engine');
+    const spawned = await actuator.dispatch('spawn_terminal', { shell: '/bin/bash' });
+    const sessionId = (spawned.output as { sessionId: string }).sessionId;
+    vi.mocked(ptyEngine.write).mockClear();
+    await expect(
+      actuator.dispatch('write_terminal', { sessionId, keys: ['C-c', 'Up', 'Enter'] })
+    ).resolves.toMatchObject({ ok: true });
+    expect(ptyEngine.write).toHaveBeenCalledWith(sessionId, 'C-c+Up+Enter');
+  });
+});
+
 describe('terminal-actuator direct actions', () => {
   beforeEach(() => {
     ptyState.sessions.clear();
