@@ -4,12 +4,15 @@ import * as React from 'react';
 import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import {
   DEFAULT_CHARTER_DRAFT,
+  applyProposalToDraft,
   charterErrorKind,
   checkDraft,
   draftFromCharter,
   draftToForm,
   isManuallyStopped,
   parseCharterOverview,
+  proposalDraftField,
+  usagePercent,
   type CharterFormDraft,
   type CharterTenantView,
 } from '../../../lib/charter-view';
@@ -198,6 +201,60 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
             <p className="charter-report" style={{ whiteSpace: 'pre-wrap' }}>
               {current.charter.report_text}
             </p>
+            {current.charter.report.money ? (
+              <>
+                {(
+                  [
+                    [
+                      'setup.charter_usage_day',
+                      current.charter.report.money.spent_today,
+                      current.charter.money.per_day,
+                    ],
+                    [
+                      'setup.charter_usage_month',
+                      current.charter.report.money.spent_this_month,
+                      current.charter.money.per_month,
+                    ],
+                  ] as const
+                ).map(([key, spent, limit]) => (
+                  <p key={key}>
+                    <span>
+                      {t(key, { spent: spent.toLocaleString(), limit: limit.toLocaleString() })}
+                    </span>{' '}
+                    <progress max={100} value={usagePercent(spent, limit)} />
+                  </p>
+                ))}
+              </>
+            ) : null}
+            {(current.charter.report.amendment_proposals ?? []).length > 0 ? (
+              <div className="charter-proposals">
+                <h4>{t('setup.charter_proposals_title')}</h4>
+                {(current.charter.report.amendment_proposals ?? []).map((proposal) => (
+                  <div key={proposal.field} className="settings-row-block">
+                    <p>
+                      {t('setup.charter_proposal_line', {
+                        count: String(proposal.count),
+                        field: proposal.field,
+                        current: String(proposal.current ?? '—'),
+                        requested: String(proposal.requested ?? '—'),
+                      })}
+                    </p>
+                    {current.can_create && proposalDraftField(proposal) ? (
+                      <Button
+                        label={t('setup.charter_proposal_apply')}
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          setDraft((d) => applyProposalToDraft(d, proposal));
+                          setPreview(null);
+                          setAgreed(false);
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {stopped ? <p role="alert">{t('setup.charter_stopped')}</p> : null}
             {current.can_stop ? (
               <div className="settings-row-actions">

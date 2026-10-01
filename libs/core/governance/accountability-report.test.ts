@@ -91,6 +91,38 @@ describe('buildAccountabilityReport', () => {
     expect(r.all_clear).toBe(false);
   });
 
+  it('proposes the smallest widening that admits every denial, per field', () => {
+    const ask = (ts: string, requested: number, cls = 'payment'): LedgerEntry => ({
+      kind: 'denied',
+      ts,
+      actor: 'a',
+      action_class: cls,
+      reasons: ['x'],
+      amendment_field: 'envelope.money.per_action',
+      amendment_current: 100_000,
+      amendment_requested: requested,
+    });
+    const r = buildAccountabilityReport({
+      charter: charter(),
+      ledger: [
+        ask('2026-10-01T02:00:00.000Z', 150_000),
+        ask('2026-10-01T03:00:00.000Z', 220_000, 'vendor_payment'),
+        ask('2026-09-20T03:00:00.000Z', 900_000),
+      ],
+      now: NOW,
+    });
+    expect(r.amendment_proposals).toEqual([
+      {
+        field: 'envelope.money.per_action',
+        count: 2,
+        current: 100_000,
+        requested: 220_000,
+        action_classes: ['payment', 'vendor_payment'],
+        last_seen: '2026-10-01T03:00:00.000Z',
+      },
+    ]);
+  });
+
   it('a tripwire stands until cleared, and puts the stop first in the text', () => {
     const stop: LedgerEntry = {
       kind: 'tripwire',

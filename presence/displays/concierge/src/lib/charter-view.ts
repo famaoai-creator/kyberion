@@ -113,9 +113,64 @@ export interface CharterTenantView {
     max_loss_per_incident: number;
     allows_named_spend: boolean;
     supersedes_decision_rights: boolean;
-    report: { tripwires_standing: string[] };
+    report: {
+      tripwires_standing: string[];
+      money?: { currency: string; spent_today: number; spent_this_month: number };
+      amendment_proposals?: CharterProposal[];
+    };
     report_text: string;
   };
+}
+
+export interface CharterProposal {
+  field: string;
+  count: number;
+  current?: unknown;
+  requested?: unknown;
+}
+
+const PROPOSAL_DRAFT_FIELD: Record<string, keyof CharterFormDraft> = {
+  'envelope.money.per_action': 'per_action',
+  'envelope.money.per_day': 'per_day',
+  'envelope.money.per_month': 'per_month',
+  'appetite.max_loss_per_incident': 'max_loss_per_incident',
+};
+
+/** Only numeric limits the form edits can be pre-filled; other fields are shown as advice only. */
+export function proposalDraftField(proposal: CharterProposal): keyof CharterFormDraft | null {
+  if (typeof proposal.requested !== 'number') return null;
+  return PROPOSAL_DRAFT_FIELD[proposal.field] ?? null;
+}
+
+/**
+ * Put a proposal into the form. It never saves anything: the owner still
+ * reviews the statement and accepts. Raising a limit may require raising the
+ * ones above it (`checkDraft` enforces per_action ≤ per_day ≤ per_month), so
+ * the parents are lifted together rather than leaving the form invalid.
+ */
+export function applyProposalToDraft(
+  draft: CharterFormDraft,
+  proposal: CharterProposal
+): CharterFormDraft {
+  const key = proposalDraftField(proposal);
+  if (!key) return draft;
+  const value = proposal.requested as number;
+  const next = { ...draft, [key]: String(value) };
+  const lift = (child: keyof CharterFormDraft, parent: keyof CharterFormDraft) => {
+    const c = parseAmount(String(next[child]));
+    const p = parseAmount(String(next[parent]));
+    if (!Number.isNaN(c) && (Number.isNaN(p) || c > p)) next[parent] = String(c) as never;
+  };
+  lift('per_action', 'per_day');
+  lift('per_day', 'per_month');
+  lift('max_loss_per_incident', 'per_month');
+  return next;
+}
+
+/** 0..100, clamped; a zero limit reads as 0 so an unset budget never shows a full bar. */
+export function usagePercent(spent: number, limit: number): number {
+  if (!(limit > 0) || !(spent > 0)) return 0;
+  return Math.min(100, Math.round((spent / limit) * 100));
 }
 
 export function parseCharterOverview(value: unknown): CharterTenantView[] | undefined {
