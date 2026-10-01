@@ -1,0 +1,497 @@
+{
+  "$schema": "../schemas/meeting-platforms.schema.json",
+  "version": "1.0.0",
+  "description": "Meeting platform registry (RS-06): the single source for joinable meeting platforms — URL hosts, provider-adapter aliases and browser-driver UI selectors. Selector entries keep their try-order; entries matching a localized vendor UI label carry a `locale` so a deployment can restrict them. Adding a platform that uses the browser driver is a data change here.",
+  "default_selector_platform": "meet",
+  "platforms": {
+    "meet": {
+      "display_name": "Google Meet",
+      "provider_id": "google_meet",
+      "provider_aliases": ["meet", "google_meet"],
+      "execution_provider": "google_meet",
+      "hosts": [
+        {
+          "host": "meet.google.com"
+        }
+      ],
+      "pre_join_selectors": {
+        "name_input": [
+          "input[jsname=\"YPqjbf\"]",
+          {
+            "selector": "input[aria-label=\"Your name\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "input[placeholder=\"Your name\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "input[aria-label=\"お名前を入力\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "input[placeholder=\"お名前を入力\"]",
+            "locale": "ja"
+          }
+        ],
+        "meeting_id_input": [],
+        "meeting_passcode_input": [],
+        "continue_without_audio_video_button": [
+          {
+            "selector": "button:has-text(\"Continue without microphone and camera\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Continue without audio and video\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"マイクとカメラをオフにして参加\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "button:has-text(\"マイクとカメラなしで続行\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "[role=\"button\"]:has-text(\"Continue without microphone and camera\")",
+            "locale": "en"
+          }
+        ],
+        "settings_button": [
+          {
+            "selector": "button[aria-label*=\"Settings\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"設定\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button:has-text(\"Settings\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"設定\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "[role=\"button\"][aria-label*=\"Settings\" i]",
+            "locale": "en"
+          }
+        ],
+        "microphone_device_button": [
+          {
+            "selector": "button[aria-label*=\"Microphone\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Microphone\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"マイク\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "[role=\"button\"][aria-label*=\"Microphone\" i]",
+            "locale": "en"
+          }
+        ],
+        "speaker_device_button": [
+          {
+            "selector": "button[aria-label*=\"Speaker\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Speaker\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"スピーカー\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "[role=\"button\"][aria-label*=\"Speaker\" i]",
+            "locale": "en"
+          }
+        ],
+        "camera_device_button": [
+          {
+            "selector": "button[aria-label*=\"Camera\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Camera\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"カメラ\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "[role=\"button\"][aria-label*=\"Camera\" i]",
+            "locale": "en"
+          }
+        ],
+        "device_option": [
+          "[role=\"option\"]",
+          "button[role=\"menuitem\"]",
+          "button[role=\"option\"]",
+          "[role=\"menuitem\"]"
+        ],
+        "mute_mic_button": [
+          {
+            "selector": "[aria-label=\"Turn off microphone\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "[aria-label=\"マイクをオフにする\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"Microphone\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "[data-tooltip=\"マイクをオフにする\"]",
+            "locale": "ja"
+          }
+        ],
+        "disable_camera_button": [
+          {
+            "selector": "[aria-label=\"Turn off camera\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "[aria-label=\"カメラをオフにする\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"Camera\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "[data-tooltip=\"カメラをオフにする\"]",
+            "locale": "ja"
+          }
+        ],
+        "join_button": [
+          {
+            "selector": "button:has-text(\"Ask to join\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Join now\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"参加をリクエスト\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "button:has-text(\"今すぐ参加\")",
+            "locale": "ja"
+          },
+          "button[jsname=\"Qx7uuf\"]"
+        ],
+        "leave_button": [
+          {
+            "selector": "button[aria-label*=\"Leave call\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"通話を終了\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "[data-tooltip*=\"Leave\" i]",
+            "locale": "en"
+          }
+        ]
+      },
+      "in_meeting_selectors": {
+        "captions_toggle": [
+          {
+            "selector": "button[aria-label*=\"Turn on captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"字幕をオンにする\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"字幕を表示\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "[data-tooltip*=\"captions\" i]",
+            "locale": "en"
+          }
+        ],
+        "captions_container": [
+          {
+            "selector": "[aria-label*=\"字幕\"] [jsname]",
+            "locale": "ja"
+          },
+          "div[jsname][aria-live=\"polite\"]",
+          {
+            "selector": "[aria-label=\"Captions\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "[aria-label=\"字幕\"]",
+            "locale": "ja"
+          },
+          "div[jsname=\"dsyhDe\"]",
+          "div[jsname=\"YrF9Sd\"]"
+        ]
+      }
+    },
+    "zoom": {
+      "display_name": "Zoom",
+      "provider_id": "zoom",
+      "provider_aliases": ["zoom"],
+      "execution_provider": "zoom",
+      "hosts": [
+        {
+          "host": "zoom.us"
+        },
+        {
+          "host": "zoom.com"
+        }
+      ],
+      "pre_join_selectors": {
+        "name_input": [
+          "#input-for-name",
+          {
+            "selector": "input[aria-label=\"Your Name\"]",
+            "locale": "en"
+          }
+        ],
+        "meeting_id_input": [],
+        "meeting_passcode_input": [],
+        "continue_without_audio_video_button": [],
+        "settings_button": [],
+        "microphone_device_button": [],
+        "speaker_device_button": [],
+        "camera_device_button": [],
+        "device_option": [],
+        "mute_mic_button": [
+          "#preview-audio-control-button",
+          {
+            "selector": "button[aria-label=\"Mute\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label=\"マイクをミュート\"]",
+            "locale": "ja"
+          }
+        ],
+        "disable_camera_button": [
+          "#preview-video-control-button",
+          {
+            "selector": "button[aria-label=\"Stop Video\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label=\"ビデオの停止\"]",
+            "locale": "ja"
+          }
+        ],
+        "join_button": [
+          ".preview-join-button",
+          {
+            "selector": "button:has-text(\"Join\")",
+            "locale": "en"
+          }
+        ],
+        "leave_button": [
+          {
+            "selector": "button[aria-label=\"Leave\"]",
+            "locale": "en"
+          },
+          {
+            "selector": "button:has-text(\"Leave\")",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label=\"退出\"]",
+            "locale": "ja"
+          }
+        ]
+      },
+      "in_meeting_selectors": {
+        "captions_toggle": [
+          {
+            "selector": "button[aria-label*=\"字幕を表示\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"show captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"ライブ文字起こし\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"closed caption\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"字幕\" i]",
+            "locale": "ja"
+          }
+        ],
+        "captions_container": [
+          "[class*=\"live-transcription-subtitle\"]",
+          "[class*=\"caption\" i]",
+          ".closed-caption__window",
+          {
+            "selector": "[aria-label*=\"closed caption\" i]",
+            "locale": "en"
+          },
+          "div[class*=\"closed-caption\" i]"
+        ]
+      }
+    },
+    "teams": {
+      "display_name": "Microsoft Teams",
+      "provider_id": "teams",
+      "provider_aliases": ["teams", "teams_pipeline"],
+      "execution_provider": "teams_pipeline",
+      "hosts": [
+        {
+          "host": "teams.microsoft.com"
+        },
+        {
+          "host": "teams.live.com"
+        },
+        {
+          "host": "microsoft.com",
+          "required_path": "/microsoft-teams/join-a-meeting"
+        }
+      ],
+      "pre_join_selectors": {
+        "name_input": ["input[data-tid=\"prejoin-display-name-input\"]"],
+        "meeting_id_input": [
+          {
+            "selector": "input[aria-label*=\"会議 ID\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "input[placeholder*=\"会議 ID\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "input[aria-label*=\"Meeting ID\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "input[placeholder*=\"Meeting ID\" i]",
+            "locale": "en"
+          },
+          "input[data-tid=\"meeting-id-input\"]"
+        ],
+        "meeting_passcode_input": [
+          {
+            "selector": "input[aria-label*=\"会議パスコード\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "input[placeholder*=\"会議パスコード\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "input[aria-label*=\"passcode\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "input[placeholder*=\"passcode\" i]",
+            "locale": "en"
+          },
+          "input[data-tid=\"meeting-passcode-input\"]"
+        ],
+        "continue_without_audio_video_button": [],
+        "settings_button": [],
+        "microphone_device_button": [],
+        "speaker_device_button": [],
+        "camera_device_button": [],
+        "device_option": [],
+        "mute_mic_button": ["input[data-tid=\"toggle-mute\"]"],
+        "disable_camera_button": ["input[data-tid=\"toggle-video\"]"],
+        "join_button": [
+          {
+            "selector": "button:has-text(\"会議に参加する\")",
+            "locale": "ja"
+          },
+          {
+            "selector": "button:has-text(\"Join the meeting\")",
+            "locale": "en"
+          },
+          "button[data-tid=\"prejoin-join-button\"]",
+          "button[id=\"prejoin-join-button\"]"
+        ],
+        "leave_button": [
+          "button[data-tid=\"hangup-button\"]",
+          {
+            "selector": "button[aria-label*=\"Leave\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"通話を終了\"]",
+            "locale": "ja"
+          }
+        ]
+      },
+      "in_meeting_selectors": {
+        "captions_toggle": [
+          {
+            "selector": "button[aria-label*=\"ライブ キャプションをオンに\"]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"turn on live captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"字幕をオンに\"]",
+            "locale": "ja"
+          },
+          "button[data-tid=\"toggle-cc\"]",
+          {
+            "selector": "button[aria-label*=\"captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "button[aria-label*=\"字幕\" i]",
+            "locale": "ja"
+          },
+          {
+            "selector": "button[aria-label*=\"Live captions\" i]",
+            "locale": "en"
+          }
+        ],
+        "captions_container": [
+          "[data-tid=\"closed-caption-v2-window-wrapper\"]",
+          "[data-tid*=\"closed-caption\"]",
+          "[data-tid*=\"caption\" i]",
+          "div[data-tid=\"closed-captions-renderer\"]",
+          {
+            "selector": "[aria-label*=\"Live captions\" i]",
+            "locale": "en"
+          },
+          {
+            "selector": "[aria-label*=\"ライブ キャプション\" i]",
+            "locale": "ja"
+          }
+        ]
+      }
+    }
+  }
+}

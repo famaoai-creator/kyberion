@@ -34,12 +34,14 @@ import {
 import {
   abortableAudioChunks,
   type AudioChunk,
+  type MeetingPlatform,
   type MeetingSession,
   type MeetingSessionState,
   type MeetingTarget,
   type TranscriptChunk,
 } from '@agent/core/meeting/meeting-session-types';
 import type { AudioBus } from '@agent/core/voice/audio-bus';
+import { listMeetingPlatformIds } from '@agent/core/meeting/meeting-platform-registry';
 import {
   MEET_IN_MEETING_SELECTORS,
   MEET_SELECTORS,
@@ -113,11 +115,10 @@ export interface BrowserDriverOptions {
   speaker_device?: string;
   camera_device?: string;
   /** Override selectors per deployment / DOM update. */
-  selectors_override?: Partial<Record<'meet' | 'zoom' | 'teams', MeetingPreJoinSelectors>>;
+  /** Keyed by registered meeting platform id (meeting-platforms.json). */
+  selectors_override?: Partial<Record<string, MeetingPreJoinSelectors>>;
   /** Override in-meeting (caption) selectors per deployment / DOM update. */
-  in_meeting_selectors_override?: Partial<
-    Record<'meet' | 'zoom' | 'teams', MeetingInMeetingSelectors>
-  >;
+  in_meeting_selectors_override?: Partial<Record<string, MeetingInMeetingSelectors>>;
   /** Try to switch live captions on after joining (default true, best effort). */
   enable_captions?: boolean;
   /** Live-caption DOM poll interval in ms (default 3000). */
@@ -336,7 +337,10 @@ async function createPlaywrightJoinRuntime(
 
 class BrowserMeetingJoinDriver implements MeetingJoinDriver {
   readonly driver_id = MEETING_BROWSER_DRIVER_ID;
-  readonly supported_platforms = ['meet', 'zoom', 'teams', 'auto'] as const;
+  /** Every registered meeting platform (selectors are registry data) plus `auto`. */
+  get supported_platforms(): readonly MeetingPlatform[] {
+    return [...(listMeetingPlatformIds() as MeetingPlatform[]), 'auto'];
+  }
 
   constructor(private readonly opts: BrowserDriverOptions = {}) {}
 
@@ -360,11 +364,9 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const { chromium } = await loadPlaywright();
     const validatedTarget = validateMeetingTarget(target);
     const platform = validatedTarget.platform;
-    const selectors =
-      this.opts.selectors_override?.[platform as 'meet' | 'zoom' | 'teams'] ??
-      selectorsForPlatform(platform);
+    const selectors = this.opts.selectors_override?.[platform] ?? selectorsForPlatform(platform);
     const inMeetingSelectors =
-      this.opts.in_meeting_selectors_override?.[platform as 'meet' | 'zoom' | 'teams'] ??
+      this.opts.in_meeting_selectors_override?.[platform] ??
       inMeetingSelectorsForPlatform(platform);
     const accountSlug = this.opts.account_slug ?? 'default';
     const microphoneDevice = this.opts.microphone_device;
