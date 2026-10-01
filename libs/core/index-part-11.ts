@@ -143,3 +143,7 @@ export * from './workforce/work-inventory-decompose.js';
 export * from './workforce/work-inventory-harvest.js';
 export * from './workforce/work-inventory-promotion.js';
 export * from './html-to-markdown.js';
+
+// Dot charters: declarative standing-responsibility contracts for resident
+// agents (see dots/README.md and knowledge/product/architecture/resident-dot-model.md).
+export * from './dot/dot-charter.js';

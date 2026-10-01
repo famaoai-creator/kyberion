@@ -111,6 +111,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion channels list`                | `pnpm channels:list`              | List channels                                                                        |
 | `pnpm kyberion config report`                | `pnpm config:report`              | Report operational configuration                                                     |
 | `pnpm kyberion cost report`                  | `pnpm cost:report`                | Report usage cost                                                                    |
+| `pnpm kyberion dot list`                     |                                   | List resident-agent (dot) charters and their status                                  |
 | `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                               |
 | `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                       |
 | `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.            |

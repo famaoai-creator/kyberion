@@ -3562,6 +3562,16 @@
       "audience": "dev",
       "description": "cli_cmd_script_generate_artifact_kinds",
       "group": "dev"
+    },
+    {
+      "id": "script.dot.list",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot list",
+      "noun": "dot",
+      "verb": "list",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_list",
+      "group": "inspect"
     }
   ],
   "deprecated_script_aliases": [
