@@ -396,18 +396,20 @@ function deliver(
         .replace(/[^A-Za-z0-9]/g, '')
         .slice(-24)
         .toUpperCase()}`;
-      const alreadyQueued = listInboxEntries({ limit: 500 }).some(
-        (entry) => entry.entry_id === entryId
-      );
-      if (!alreadyQueued) {
-        addInboxEntry({
-          entryId,
-          title: title || 'Operator notification',
-          summary: text,
-          kind: 'operator_notification',
-          status: 'unread',
-        });
-      }
+      withExecutionContext('surface_runtime', () => {
+        const alreadyQueued = listInboxEntries({ limit: 500 }).some(
+          (entry) => entry.entry_id === entryId
+        );
+        if (!alreadyQueued) {
+          addInboxEntry({
+            entryId,
+            title: title || 'Operator notification',
+            summary: text,
+            kind: 'operator_notification',
+            status: 'unread',
+          });
+        }
+      });
       return;
     }
     // slack/telegram/discord: enqueue to the surface outbox; each bridge

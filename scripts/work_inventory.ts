@@ -50,6 +50,9 @@ import {
 import { runLearn, runPromote } from './lib/work-inventory-cli-promotion.js';
 import {
   governed,
+  governedTenant,
+  optionalDecidedBy,
+  resolveScope,
   resolveRootDir,
   WorkInventoryCliUsageError,
 } from './lib/work-inventory-cli-shared.js';
@@ -248,7 +251,19 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       return;
     }
     case 'learn': {
-      const result = governed(() => runLearn(argv, { ...coreOptions, dryRun, now }));
+      const scope = resolveScope(argv);
+      if (scope.tenant_slug && coreOptions.rootDir) {
+        throw new WorkInventoryCliUsageError(
+          'inventory learn --tenant cannot use an isolated root override; authorization and learning records must use the configured repository root'
+        );
+      }
+      const run = () => runLearn(argv, { ...coreOptions, dryRun, now });
+      const result = scope.tenant_slug
+        ? governedTenant(scope.tenant_slug, run, {
+            ...(coreOptions.rootDir ? { rootDir: coreOptions.rootDir } : {}),
+            decidedBy: optionalDecidedBy(argv),
+          })
+        : governed(run);
       emit(
         result,
         [

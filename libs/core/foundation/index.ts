@@ -1,6 +1,7 @@
 export * from './ajv.js';
 export * from './env.js';
 export * from './governed-catalog.js';
+export { currentExecutionScope } from './execution-scope.js';
 // The bridge *registration* seam is public: a consumer that stands in for
 // secure-io (a test fixture root) must be able to install the governed
 // implementation through the barrel instead of reaching into

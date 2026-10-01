@@ -33,10 +33,58 @@ export interface AccountabilityReport {
   tripwires_standing: string[];
   /** Charter fields agents asked to widen, most requested first. */
   amendments: Array<{ field: string; count: number }>;
+  /** Concrete widenings the accountable human may accept as a new charter (never applied automatically). */
+  amendment_proposals: AmendmentSuggestion[];
   expires_at: string;
   expires_in_days: number;
   /** True when nothing needs the accountable human. */
   all_clear: boolean;
+}
+
+export interface AmendmentSuggestion {
+  field: string;
+  count: number;
+  current?: unknown;
+  /** Smallest widening that would have admitted every denied action (numeric fields: the maximum asked). */
+  requested?: unknown;
+  action_classes: string[];
+  last_seen: string;
+}
+
+/** Group denials by the charter field they asked to widen. Pure; proposals are advice, not authority. */
+export function buildAmendmentSuggestions(
+  ledger: readonly LedgerEntry[],
+  sinceMs: number
+): AmendmentSuggestion[] {
+  const byField = new Map<string, AmendmentSuggestion>();
+  for (const entry of ledger) {
+    if (entry.kind !== 'denied' || !entry.amendment_field) continue;
+    if (Date.parse(entry.ts) < sinceMs) continue;
+    const found = byField.get(entry.amendment_field);
+    const suggestion: AmendmentSuggestion = found ?? {
+      field: entry.amendment_field,
+      count: 0,
+      current: entry.amendment_current,
+      requested: entry.amendment_requested,
+      action_classes: [],
+      last_seen: entry.ts,
+    };
+    suggestion.count += 1;
+    if (!suggestion.action_classes.includes(entry.action_class)) {
+      suggestion.action_classes.push(entry.action_class);
+    }
+    if (entry.ts > suggestion.last_seen) suggestion.last_seen = entry.ts;
+    const asked = entry.amendment_requested;
+    if (typeof asked === 'number' && typeof suggestion.requested === 'number') {
+      suggestion.requested = Math.max(suggestion.requested, asked);
+    } else if (suggestion.requested === undefined) {
+      suggestion.requested = asked;
+    }
+    byField.set(entry.amendment_field, suggestion);
+  }
+  return [...byField.values()]
+    .map((s) => ({ ...s, action_classes: [...s.action_classes].sort() }))
+    .sort((a, b) => b.count - a.count || a.field.localeCompare(b.field));
 }
 
 export function buildAccountabilityReport(input: {
@@ -104,6 +152,7 @@ export function buildAccountabilityReport(input: {
     near_limit: near,
     tripwires_standing: [...standing].sort(),
     amendments,
+    amendment_proposals: buildAmendmentSuggestions(ledger, sinceMs),
     expires_at: charter.accountable.expires_at,
     expires_in_days: expiresInDays,
     all_clear: standing.size === 0 && denied === 0 && near.length === 0 && expiresInDays > 14,

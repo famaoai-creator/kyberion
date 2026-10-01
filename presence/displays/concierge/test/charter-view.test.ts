@@ -136,3 +136,38 @@ describe('charterErrorKind', () => {
     expect(charterErrorKind('invalid_form: x')).toBe('generic');
   });
 });
+
+describe('amendment proposals', () => {
+  it('pre-fills a limit and lifts the parents so the form stays valid', async () => {
+    const { applyProposalToDraft, checkDraft, DEFAULT_CHARTER_DRAFT, proposalDraftField } =
+      await import('../src/lib/charter-view');
+    const base = {
+      ...DEFAULT_CHARTER_DRAFT,
+      per_action: '100000',
+      per_day: '500000',
+      per_month: '3000000',
+      max_loss_per_incident: '300000',
+    };
+    const next = applyProposalToDraft(base, {
+      field: 'envelope.money.per_action',
+      count: 2,
+      requested: 800_000,
+    });
+    expect(next.per_action).toBe('800000');
+    expect(next.per_day).toBe('800000');
+    expect(checkDraft(next)).toEqual({ ok: true });
+    expect(
+      applyProposalToDraft(base, { field: 'envelope.irreversible', count: 1, requested: 'allow' })
+    ).toBe(base);
+    expect(
+      proposalDraftField({ field: 'appetite.max_loss_per_incident', count: 1, requested: 1 })
+    ).toBe('max_loss_per_incident');
+  });
+
+  it('usage percent is clamped and a zero limit is not a full bar', async () => {
+    const { usagePercent } = await import('../src/lib/charter-view');
+    expect(usagePercent(50, 200)).toBe(25);
+    expect(usagePercent(900, 200)).toBe(100);
+    expect(usagePercent(10, 0)).toBe(0);
+  });
+});
