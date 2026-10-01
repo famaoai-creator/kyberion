@@ -82,14 +82,29 @@ import {
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
 import {
-  buildChannelDisclosureDirective,
   channelTurnScope,
   decideChannelEngagement,
-  evaluateChannelActorAccess,
   evaluateChannelApprovalAuthority,
   resolveChannelModePolicy,
   type ChannelModePolicy,
 } from '@agent/core/surface/channel-mode-policy';
+import {
+  createSlackBotUserIdResolver,
+  ensureSlackApprovalAuthority,
+  evaluateSlackChannelActorAccess,
+  isSlackOwnerOnboardingActor,
+  slackBotParticipatesInThread,
+  withSlackChannelDirective,
+} from './team-channel.js';
+
+export {
+  createSlackBotUserIdResolver,
+  ensureSlackApprovalAuthority,
+  evaluateSlackChannelActorAccess,
+  isSlackOwnerOnboardingActor,
+  slackBotParticipatesInThread,
+  withSlackChannelDirective,
+} from './team-channel.js';
 import { renderIntentAuthorityLabel } from '@agent/core/intent/intent-resolution-contract';
 import {
   buildAutomationSlackModal,
@@ -240,107 +255,6 @@ export async function collectSlackThreadContext(
   }
 }
 
-/**
- * Team Channel: whether the bot already posted in this thread, so follow-up
- * replies there count as addressed to it without a fresh @mention.
- */
-export async function slackBotParticipatesInThread(
-  client: SlackThreadRepliesClient,
-  channel: string,
-  threadTs: string,
-  botUserId: string | undefined
-): Promise<boolean> {
-  if (!botUserId || !client.conversations?.replies) return false;
-  try {
-    const response = await client.conversations.replies({ channel, ts: threadTs, limit: 50 });
-    return (response.messages || []).some((message) => message.user === botUserId);
-  } catch (error: unknown) {
-    logger.warn(`[SlackBridge] Thread participation lookup failed: ${errorDetail(error)}`);
-    return false;
-  }
-}
-
-interface SlackAuthTestClient {
-  auth: { test(): Promise<{ user_id?: string }> };
-}
-
-/** Resolve (once) the bot's own user id; undefined keeps team channels silent. */
-export function createSlackBotUserIdResolver(
-  client: SlackAuthTestClient
-): () => Promise<string | undefined> {
-  let pending: Promise<string | undefined> | undefined;
-  return () => {
-    pending ??= client.auth
-      .test()
-      .then((result) => result.user_id || undefined)
-      .catch((error: unknown) => {
-        pending = undefined;
-        logger.warn(
-          `[SlackBridge] auth.test failed — team channels stay silent until it succeeds | retry on next message | ${errorDetail(error)}`
-        );
-        return undefined;
-      });
-    return pending;
-  };
-}
-
-/** Speaker access in a specific channel (team channels are deny-by-default). */
-export function evaluateSlackChannelActorAccess(channel: string, actorId: string) {
-  const policy = resolveChannelModePolicy('slack', channel);
-  return { policy, access: evaluateChannelActorAccess(policy, actorId) };
-}
-
-interface SlackEphemeralClient {
-  chat: {
-    postEphemeral(input: {
-      channel: string;
-      user: string;
-      thread_ts?: string;
-      text: string;
-    }): Promise<unknown>;
-  };
-}
-
-/**
- * Team Channel: approval-class actions (approve, reject, request changes,
- * confirm a mission proposal) need the channel's approval authority. A
- * refused actor is told privately and the refusal is logged with its reason.
- */
-export async function ensureSlackApprovalAuthority(
-  client: SlackEphemeralClient,
-  channel: string,
-  threadTs: string,
-  actorId: string
-): Promise<boolean> {
-  const policy = resolveChannelModePolicy('slack', channel);
-  const authority = evaluateChannelApprovalAuthority(policy, actorId);
-  if (authority.allowed) return true;
-  logger.warn(
-    `[SlackBridge] Approval action refused — ${actorId} lacks approval authority in ${channel} (mode=${policy.mode}, ${authority.reason}) | ask a channel approver | channel=${channel} thread=${threadTs}`
-  );
-  try {
-    await client.chat.postEphemeral({
-      channel,
-      user: actorId,
-      thread_ts: threadTs,
-      text: 'この操作を行う権限がありません。承認者に依頼してください。',
-    });
-  } catch (error: unknown) {
-    logger.warn(`[SlackBridge] Refusal notice failed: ${errorDetail(error)}`);
-  }
-  return false;
-}
-
-/** Onboarding actions are accepted only from allowed speakers in owner_direct channels. */
-export function isSlackOwnerOnboardingActor(channel: string, actorId: string): boolean {
-  const { policy, access } = evaluateSlackChannelActorAccess(channel, actorId);
-  if (policy.mode === 'owner_direct' && access.allowed) return true;
-  logger.warn(
-    `[SlackBridge] Onboarding action refused — ${actorId || 'unknown'} in ${channel} (mode=${policy.mode}, ${access.reason}) | onboard from the owner channel`
-  );
-  return false;
-}
-
 export interface SlackChannelTurnRequest {
   text: string;
   channel: string;
@@ -352,16 +266,6 @@ export interface SlackChannelTurnRequest {
   metadata?: Record<string, unknown>;
   /** Team Channel: the channel's conversation-mode policy (absent = owner_direct). */
   channelPolicy?: ChannelModePolicy;
-}
-
-/** Prefix the team disclosure directive to the thread context, if any. */
-export function withSlackChannelDirective(
-  policy: ChannelModePolicy | undefined,
-  threadContext: string | undefined
-): string | undefined {
-  const directive = policy ? buildChannelDisclosureDirective(policy) : undefined;
-  if (!directive) return threadContext;
-  return threadContext ? `${directive}\n\n${threadContext}` : directive;
 }
 
 /**
