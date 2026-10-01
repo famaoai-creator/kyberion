@@ -331,6 +331,16 @@ export async function ensureSlackApprovalAuthority(
   return false;
 }
 
+/** Onboarding actions are accepted only from allowed speakers in owner_direct channels. */
+export function isSlackOwnerOnboardingActor(channel: string, actorId: string): boolean {
+  const { policy, access } = evaluateSlackChannelActorAccess(channel, actorId);
+  if (policy.mode === 'owner_direct' && access.allowed) return true;
+  logger.warn(
+    `[SlackBridge] Onboarding action refused — ${actorId || 'unknown'} in ${channel} (mode=${policy.mode}, ${access.reason}) | onboard from the owner channel`
+  );
+  return false;
+}
+
 export interface SlackChannelTurnRequest {
   text: string;
   channel: string;
@@ -808,7 +818,7 @@ async function start(_args: string[] = []) {
       );
       return;
     }
-    const botUserId = await resolveBotUserId();
+    const botUserId = channelPolicy.rules.requireMention ? await resolveBotUserId() : undefined;
     const engagement = await decideChannelEngagement(channelPolicy, {
       text: message.text,
       agentUserId: botUserId,
@@ -852,6 +862,13 @@ async function start(_args: string[] = []) {
       appendStimulus(artifact.stimulus);
 
       const initialized = isEnvironmentInitialized();
+      // Operator onboarding shapes the owner's identity: never from a team channel.
+      if (!initialized && channelPolicy.mode !== 'owner_direct') {
+        logger.warn(
+          `[SlackBridge] Workspace not initialized — team channel ${message.channel} stays silent | complete onboarding in the owner channel`
+        );
+        return;
+      }
 
       if (artifact.shouldAck || !initialized) {
         await client.chat.postMessage({
@@ -888,6 +905,21 @@ async function start(_args: string[] = []) {
       }
 
       const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
+      const mayDecideProposal = () =>
+        evaluateChannelApprovalAuthority(channelPolicy, message.user || '').allowed;
+      const isProposalDecision =
+        pendingMissionProposal &&
+        (isSlackMissionRejection(messageText) || isSlackMissionConfirmation(messageText));
+      // Confirming or cancelling a mission proposal is approval-class: team
+      // channels need an approver.
+      if (isProposalDecision && !mayDecideProposal()) {
+        await postSlackText(client, {
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: 'このミッション提案を判断する権限がありません。承認者に依頼してください。',
+        });
+        return;
+      }
       if (pendingMissionProposal && isSlackMissionRejection(messageText)) {
         clearSlackMissionProposalState(message.channel, threadTs);
         const response = await client.chat.postMessage({
@@ -905,15 +937,6 @@ async function start(_args: string[] = []) {
         return;
       }
       if (pendingMissionProposal && isSlackMissionConfirmation(messageText)) {
-        // Issuing a mission is approval-class: team channels need an approver.
-        if (!evaluateChannelApprovalAuthority(channelPolicy, message.user || '').allowed) {
-          await postSlackText(client, {
-            channel: message.channel,
-            thread_ts: threadTs,
-            text: 'このミッション提案を確定する権限がありません。承認者に依頼してください。',
-          });
-          return;
-        }
         const issued = await issueSlackMissionFromProposal({
           channel: message.channel,
           threadTs,
@@ -1336,6 +1359,7 @@ async function start(_args: string[] = []) {
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs)
         throw new Error('Slack approval reason action is missing channel/thread');
+      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
       const resolved = resolveSurfaceApprovalAskWhy({
         surface: 'slack',
         requestId: payload.requestId,
@@ -1481,6 +1505,7 @@ async function start(_args: string[] = []) {
 
     try {
       const payload = parseSlackOnboardingAction(readStringAt(action, ['value']));
+      if (!isSlackOwnerOnboardingActor(payload.channel, readStringAt(body, ['user', 'id']))) return;
       const onboarding = handleSlackOnboardingTurn({
         channel: payload.channel,
         threadTs: payload.threadTs,
@@ -1504,6 +1529,7 @@ async function start(_args: string[] = []) {
 
     try {
       const payload = parseSlackOnboardingAction(readStringAt(action, ['value']));
+      if (!isSlackOwnerOnboardingActor(payload.channel, readStringAt(body, ['user', 'id']))) return;
       await client.views.open({
         trigger_id: readStringAt(body, ['trigger_id']),
         view: buildSlackOnboardingModal(payload),
@@ -1518,6 +1544,7 @@ async function start(_args: string[] = []) {
 
     try {
       const payload = parseSlackOnboardingAction(view.private_metadata);
+      if (!isSlackOwnerOnboardingActor(payload.channel, readStringAt(body, ['user', 'id']))) return;
       const input = view.state.values?.slack_onboarding_input?.value?.value || '';
       const onboarding = handleSlackOnboardingTurn({
         channel: payload.channel,

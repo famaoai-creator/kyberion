@@ -242,8 +242,10 @@ export async function decideChannelEngagement(
 ): Promise<ChannelEngagementDecision> {
   const agentUserId = input.agentUserId?.trim();
   const mentioned = agentUserId ? mentionToken(agentUserId).test(input.text) : false;
+  // Remove only the mention token and the spacing right after it, so
+  // multi-line messages (code blocks, lists) keep their layout.
   const text = agentUserId
-    ? input.text.replace(mentionToken(agentUserId), '').replace(/\s+/gu, ' ').trim()
+    ? input.text.replace(new RegExp(`${mentionToken(agentUserId).source}[ \\t]?`, 'gu'), '').trim()
     : input.text;
   if (!policy.rules.requireMention) {
     return { respond: true, reason: 'mode_does_not_require_mention', text };
