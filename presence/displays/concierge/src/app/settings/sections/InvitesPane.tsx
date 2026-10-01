@@ -26,7 +26,7 @@ const STATUS_KEYS = {
 } as const;
 
 /**
- * 設定 › 組織とメンバー › 招待. Owners and approvers create a one-time link; the
+ * Settings › Organization and members › Invites. Owners and approvers create a one-time link; the
  * server decides which roles each may grant and shows the link exactly once.
  */
 export function InvitesPane({ t }: { t: SettingsTranslate }) {
