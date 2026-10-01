@@ -4,14 +4,12 @@ import {
   buildPresenceSurfaceFrame,
   type PresenceSurfaceFrameInput,
 } from './presence-surface.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveSurfaceUrl } from './surface/surface-url.js';
 import { redactSensitiveObject } from './network.js';
-
-const PRESENCE_STUDIO_URL = getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031';
 
 export async function dispatchPresenceMessages(
   messages: A2UIMessage[],
-  baseUrl = PRESENCE_STUDIO_URL
+  baseUrl = resolveSurfaceUrl('presence-studio')
 ): Promise<void> {
   const response = await fetch(`${baseUrl}/a2ui/dispatch`, {
     method: 'POST',
@@ -25,7 +23,7 @@ export async function dispatchPresenceMessages(
 
 export async function dispatchPresenceFrame(
   input: PresenceSurfaceFrameInput,
-  baseUrl = PRESENCE_STUDIO_URL
+  baseUrl = resolveSurfaceUrl('presence-studio')
 ): Promise<void> {
   await dispatchPresenceMessages(buildPresenceSurfaceFrame(input), baseUrl);
 }
@@ -39,7 +37,7 @@ export async function reflectPresenceAgentReply(
     thinkingMs?: number;
     speakingMs?: number;
   },
-  baseUrl = PRESENCE_STUDIO_URL
+  baseUrl = resolveSurfaceUrl('presence-studio')
 ): Promise<void> {
   const timeline = buildPresenceAssistantReplyTimeline({
     agentId: input.agentId,

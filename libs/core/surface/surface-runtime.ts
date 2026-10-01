@@ -45,6 +45,14 @@ export interface SurfaceRuntimeDefinition {
   service_id?: string;
   preset_path?: string;
   enabled?: boolean;
+  /** Env var that overrides this surface's base URL (see surface-url.ts). */
+  urlEnv?: string;
+  /** Control-plane alias served by this surface (control-plane-client). */
+  controlPlane?: 'presence' | 'chronos';
+  remediationCommand?: string;
+  /** Vocabulary keys (`domain:key`) for operator-facing text. */
+  operatorNotesKey?: string;
+  bestForKey?: string;
 }
 
 export interface SurfaceRuntimeManifest {
