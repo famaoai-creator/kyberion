@@ -92,6 +92,7 @@ import type {
   SurfaceConversationInput,
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
+  SurfaceTenantIsolation,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
 import { parseExecutionFeedbackText, recordExecutionFeedback } from '../execution-feedback.js';
@@ -477,7 +478,47 @@ function buildMissionTeamPromptContext(missionId: string): string {
   ].join('\n');
 }
 
-async function ensureSurfaceAgent(agentId: string, cwd?: string) {
+/**
+ * Team Channel E: the surface agent for an isolated tenant turn. One runtime
+ * per (agent, tenant) so a lease is never shared across tenants, launched with
+ * every tool disabled and in-process (the daemon cannot carry the lockdown),
+ * so the model answers only from what the turn hands it. Fails closed when the
+ * provider cannot disable tools.
+ */
+async function ensureIsolatedSurfaceAgent(agentId: string, isolation: SurfaceTenantIsolation) {
+  const runtimeId = `${agentId}--tenant-${isolation.tenantSlug}`;
+  const existing = getAgentRuntimeHandle(runtimeId);
+  const status = existing?.getRecord?.()?.status;
+  if (existing && status !== 'shutdown' && status !== 'error') return existing;
+  const manifest = getAgentManifest(agentId, pathResolver.rootDir());
+  if (!manifest) throw new Error(`Surface agent manifest not found: ${agentId}`);
+  return ensureAgentRuntime({
+    agentId: runtimeId,
+    provider: 'claude',
+    systemPrompt: manifest.systemPrompt,
+    capabilities: manifest.capabilities,
+    cwd: pathResolver.rootDir(),
+    requestedBy: 'surface_agent',
+    runtimeOwnerId: runtimeId,
+    runtimeOwnerType: 'surface',
+    runtimeBackend: 'pipe',
+    toolAccess: 'none',
+    scope: { tenant_slug: isolation.tenantSlug, tier: isolation.maxTier },
+    runtimeMetadata: {
+      lease_kind: 'surface',
+      surface_agent_id: agentId,
+      tenant_slug: isolation.tenantSlug,
+      tool_access: 'none',
+    },
+  });
+}
+
+async function ensureSurfaceAgent(
+  agentId: string,
+  cwd?: string,
+  isolation?: SurfaceTenantIsolation
+) {
+  if (isolation) return ensureIsolatedSurfaceAgent(agentId, isolation);
   const existing = getAgentRuntimeHandle(agentId);
   const status = existing?.getRecord?.()?.status;
   if (existing && status !== 'shutdown' && status !== 'error') return existing;
@@ -1087,7 +1128,9 @@ export async function runSurfaceConversation(
     };
   }
   // Team Channel P1: ask-only speakers never reach a delegating receiver.
-  const askOnly = input.workAuthority === 'ask_only';
+  // Team Channel E: an isolated (tenant) turn is restricted the same way —
+  // only direct replies; real work goes through a tenant-scoped mission.
+  const askOnly = input.workAuthority === 'ask_only' || Boolean(input.isolation);
   const forcedReceiver = askOnly
     ? undefined
     : normalizeSurfaceDelegationReceiver(input.forcedReceiver);
@@ -1244,7 +1287,7 @@ export async function runSurfaceConversation(
     );
   }
 
-  const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
+  const handle = await ensureSurfaceAgent(input.agentId, input.cwd, input.isolation);
   const firstResponse = await handle.ask(structuredQuery, { model_tier: 'fast' });
   recordSurfaceReasoningTierDeclaration({ callSite: 'surface_main_ask', declaredTier: 'fast' });
   const firstBlocks = extractSurfaceBlocks(firstResponse);

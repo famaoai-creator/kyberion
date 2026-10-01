@@ -168,4 +168,30 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     });
     await agentLifecycle.shutdown(agentId);
   });
+  it('fails closed when a tool-less runtime is requested from a provider that cannot disable tools', async () => {
+    await expect(
+      agentLifecycle.spawn({
+        agentId: 'lockdown-agy-agent',
+        provider: 'agy',
+        modelId: 'Gemini 3.6 Flash (Medium)',
+        toolAccess: 'none',
+        runtimeMetadata: { skip_provider_resolution: true },
+      })
+    ).rejects.toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
+    expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
+    agentRegistry.unregister('lockdown-agy-agent');
+  });
+
+  it('fails closed when a tool-less runtime is requested on the pane backend', async () => {
+    await expect(
+      agentLifecycle.spawn({
+        agentId: 'lockdown-pane-agent',
+        provider: 'claude',
+        runtimeBackend: 'pane',
+        toolAccess: 'none',
+        runtimeMetadata: { skip_provider_resolution: true },
+      })
+    ).rejects.toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
+    agentRegistry.unregister('lockdown-pane-agent');
+  });
 });
