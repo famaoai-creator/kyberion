@@ -56,6 +56,9 @@ function asError(error: unknown): Error {
  * Manages spawn/shutdown/health of multiple agent instances.
  */
 
+/** Providers whose exec adapter can launch with every tool disabled (`toolAccess: 'none'`). */
+const TOOL_LOCKDOWN_PROVIDERS: ReadonlySet<string> = new Set(['claude']);
+
 export interface SpawnOptions {
   agentId?: string;
   provider: AgentProvider;
@@ -86,6 +89,12 @@ export interface SpawnOptions {
   /** Durable supervisor ownership propagated before the runtime is registered. */
   runtimeOwnerId?: string;
   runtimeOwnerType?: string;
+  /**
+   * Team Channel E: `none` launches the provider with every tool disabled
+   * (no file, shell, web or MCP access). Only providers that can enforce it
+   * may be used; any other provider or a pane backend fails closed.
+   */
+  toolAccess?: 'default' | 'none';
 }
 
 export interface AgentHandleAskOptions {
@@ -392,6 +401,23 @@ class AgentLifecycleManagerImpl {
       );
     }
 
+    const runtimeBackend = resolveAgentRuntimeLaunchMode({
+      runtimeBackend: resolvedOptions.runtimeBackend,
+      runtimeMetadata,
+    });
+    // Tool lockdown is checked against the resolved (post-fallback) provider
+    // before anything is registered, so a refused spawn leaves no state behind.
+    if (
+      resolvedOptions.toolAccess === 'none' &&
+      (runtimeBackend === 'pane' ||
+        !TOOL_LOCKDOWN_PROVIDERS.has(resolvedOptions.provider) ||
+        !(await hasAgentExecAdapter(resolvedOptions.provider)))
+    ) {
+      throw new Error(
+        `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run with tools disabled`
+      );
+    }
+
     this.spawnOptions.set(agentId, resolvedOptions);
     this.ensureMetrics(agentId);
 
@@ -421,11 +447,6 @@ class AgentLifecycleManagerImpl {
     const config = lifecycleMap[resolvedOptions.provider];
 
     // Register in registry
-    const runtimeBackend = resolveAgentRuntimeLaunchMode({
-      runtimeBackend: resolvedOptions.runtimeBackend,
-      runtimeMetadata,
-    });
-
     agentRegistry.register({
       agentId,
       provider: resolvedOptions.provider,
@@ -448,6 +469,7 @@ class AgentLifecycleManagerImpl {
         },
         task_model_hint: runtimeMetadata.task_model_hint,
         scope: resolvedScope,
+        ...(resolvedOptions.toolAccess === 'none' ? { tool_access: 'none' } : {}),
       },
     });
 
@@ -492,6 +514,7 @@ class AgentLifecycleManagerImpl {
     }
 
     // Opt-in pane backend: interactive provider CLIs in visible terminal panes.
+
     if (runtimeBackend === 'pane') {
       const paneBackend = await createAgentPaneRuntimeAdapter({
         agentId,
@@ -570,6 +593,7 @@ class AgentLifecycleManagerImpl {
         effort: taskModelHint?.effort,
         allowedActuators: manifest?.allowedActuators,
         deniedActuators: manifest?.deniedActuators,
+        ...(resolvedOptions.toolAccess === 'none' ? { toolsDisabled: true } : {}),
       });
 
       await adapter.boot();
@@ -633,6 +657,14 @@ class AgentLifecycleManagerImpl {
       };
       this.handles.set(agentId, handle);
       return handle;
+    }
+
+    // ACP mediators launch the provider with its own tools; never a lockdown target.
+    if (resolvedOptions.toolAccess === 'none') {
+      agentRegistry.updateStatus(agentId, 'error');
+      throw new Error(
+        `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: no exec adapter for '${resolvedOptions.provider}' to run with tools disabled`
+      );
     }
 
     // ACP-based agents (gemini, claude, etc.)

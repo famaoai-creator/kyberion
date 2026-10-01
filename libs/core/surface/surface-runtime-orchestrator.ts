@@ -27,6 +27,7 @@ import { logger } from '../core.js';
 import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-declaration.js';
 import type { AgentHandle } from '../agent/agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from '../workforce/background-review-runner.js';
+import { ensureIsolatedSurfaceAgent } from './surface-tenant-isolation.js';
 import {
   checkAndRepairSurfaceUxContract,
   validateSurfaceUxContract,
@@ -92,6 +93,7 @@ import type {
   SurfaceConversationInput,
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
+  SurfaceTenantIsolation,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
 import { parseExecutionFeedbackText, recordExecutionFeedback } from '../execution-feedback.js';
@@ -477,7 +479,12 @@ function buildMissionTeamPromptContext(missionId: string): string {
   ].join('\n');
 }
 
-async function ensureSurfaceAgent(agentId: string, cwd?: string) {
+async function ensureSurfaceAgent(
+  agentId: string,
+  cwd?: string,
+  isolation?: SurfaceTenantIsolation
+) {
+  if (isolation) return ensureIsolatedSurfaceAgent(agentId, isolation);
   const existing = getAgentRuntimeHandle(agentId);
   const status = existing?.getRecord?.()?.status;
   if (existing && status !== 'shutdown' && status !== 'error') return existing;
@@ -1119,7 +1126,9 @@ async function runSurfaceConversationTurn(
     };
   }
   // Team Channel P1: ask-only speakers never reach a delegating receiver.
-  const askOnly = input.workAuthority === 'ask_only';
+  // Team Channel E: an isolated (tenant) turn is restricted the same way —
+  // only direct replies; real work goes through a tenant-scoped mission.
+  const askOnly = input.workAuthority === 'ask_only' || Boolean(input.isolation);
   const forcedReceiver = askOnly
     ? undefined
     : normalizeSurfaceDelegationReceiver(input.forcedReceiver);
@@ -1170,6 +1179,8 @@ async function runSurfaceConversationTurn(
     !forcedReceiver &&
     !ruleBasedReceiver &&
     !isDirectDelegationIntent &&
+    // Team Channel E: member text never reaches the (tool-capable) compiler.
+    !input.isolation &&
     shouldCompileSurfaceIntent(input, routingText, ruleBasedReceiver, originalResolutionPacket)
       ? await (() => {
           recordSurfaceReasoningTierDeclaration({
@@ -1276,7 +1287,7 @@ async function runSurfaceConversationTurn(
     );
   }
 
-  const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
+  const handle = await ensureSurfaceAgent(input.agentId, input.cwd, input.isolation);
   const firstResponse = await handle.ask(structuredQuery, { model_tier: 'fast' });
   recordSurfaceReasoningTierDeclaration({ callSite: 'surface_main_ask', declaredTier: 'fast' });
   const firstBlocks = extractSurfaceBlocks(firstResponse);
@@ -1446,12 +1457,12 @@ export async function runSurfaceMessageConversation(
   );
 }
 
-async function runSurfaceMessageConversationTurn(
-  input: SurfaceConversationMessageInput
-): Promise<SurfaceConversationResult> {
-  // HA-01: count one non-blocking worker turn per surface thread. The
-  // correlation id is per message, so derive the stable session key from the
-  // surface/channel/thread tuple instead.
+/**
+ * HA-01: count one non-blocking worker turn per surface thread. The
+ * correlation id is per message, so derive the stable session key from the
+ * surface/channel/thread tuple instead.
+ */
+async function startSurfaceBackgroundReview(input: SurfaceConversationMessageInput): Promise<void> {
   try {
     // SO-02: single source of truth for this derivation lives in
     // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
@@ -1505,6 +1516,14 @@ async function runSurfaceMessageConversationTurn(
       }`
     );
   }
+}
+
+async function runSurfaceMessageConversationTurn(
+  input: SurfaceConversationMessageInput
+): Promise<SurfaceConversationResult> {
+  // Team Channel E: an isolated turn never feeds the background-review fork,
+  // which runs on the general (tool-capable) backend with unscoped knowledge.
+  if (!input.isolation) await startSurfaceBackgroundReview(input);
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
   // Enforce the surface UX contract on the outbound user-facing text. This is
   // the single chokepoint for all surface responses; validation is non-blocking
