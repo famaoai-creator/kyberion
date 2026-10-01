@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authorizeSurfaceMutation } from '@agent/core/surface/surface-mutation-guard';
 import { isSameOriginMutation } from '@agent/core/surface/surface-session-cookie';
 import {
+  checkConciergeRateLimit,
   conciergeCredential,
   guardConciergeRequest,
   resolveConciergeViewer,
@@ -52,6 +53,46 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
         { status: 403 }
       );
     }
+  }
+  return null;
+}
+
+/**
+ * Guard for the join flow (`/api/invites/join`). Joining is done by someone who
+ * is authenticated but may not hold a mutation role yet (a verified OIDC subject
+ * with no membership resolves to a read-only viewer), so the usual
+ * "localadmin viewer" requirement does not apply. What does apply: a tight
+ * per-principal rate limit (an invite code is a one-time grant, not something
+ * to guess at), and the CSRF check for cookie-borne requests. The identity that
+ * joins is never taken from the request (see invite-server.ts).
+ */
+export function requireConciergeJoinAccess(req: NextRequest): NextResponse | null {
+  const limited = checkConciergeRateLimit(req, { limit: 10 });
+  if (!limited.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'Concierge rate limit exceeded. Try again later.' },
+      {
+        status: 429,
+        headers: limited.retryAfterSeconds
+          ? { 'Retry-After': String(limited.retryAfterSeconds) }
+          : undefined,
+      }
+    );
+  }
+  const credential = conciergeCredential(req);
+  if (
+    credential.source === 'session-cookie' &&
+    req.method !== 'GET' &&
+    !isSameOriginMutation({
+      method: req.method,
+      headers: req.headers,
+      expectedHost: req.headers.get('host') ?? new URL(req.url).host,
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, error: 'Forbidden. Cross-origin session request.' },
+      { status: 403 }
+    );
   }
   return null;
 }
