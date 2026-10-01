@@ -35,6 +35,7 @@ export type ServiceAuthStrategy = (typeof SERVICE_AUTH_STRATEGIES)[number];
 
 export const CREDENTIAL_SUFFIX_KEYS = [
   'accessToken',
+  'basicAuthToken',
   'appToken',
   'refreshToken',
   'clientId',
