@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import {
@@ -93,6 +93,40 @@ describe('script harness', () => {
 
     expect(result?.changed).toEqual([]);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('generators print usage on --help without rendering or writing', async () => {
+    const render = vi.fn(() => [{ path: NORMALIZED_OUTPUT, content: 'x' }]);
+    const main = defineGenerator({ id: 'harness-help-test', outputs: [NORMALIZED_OUTPUT], render });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    process.exitCode = undefined;
+    await main(['--help']);
+    await main(['-h']);
+    expect(render).not.toHaveBeenCalled();
+    expect(log.mock.calls[0]?.[0]).toContain('Usage: pnpm generate:harness-help-test');
+    expect(log.mock.calls[0]?.[0]).toContain('--check');
+    expect(process.exitCode).toBeUndefined();
+    log.mockRestore();
+  });
+
+  it('generators reject undeclared flags and accept declared ones', async () => {
+    const render = vi.fn(() => [{ path: NORMALIZED_OUTPUT, content: 'x' }]);
+    const main = defineGenerator({
+      id: 'harness-flags-test',
+      outputs: [NORMALIZED_OUTPUT],
+      flags: ['--out'],
+      render,
+    });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    process.exitCode = undefined;
+    await main(['--bogus']);
+    expect(render).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(2);
+    process.exitCode = undefined;
+    await main(['--out=foo', '--check']);
+    expect(render).toHaveBeenCalledTimes(1);
+    process.exitCode = undefined;
+    err.mockRestore();
   });
 
   it('resolves generator outputs from the invocation context', async () => {

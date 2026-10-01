@@ -1,7 +1,7 @@
 # Blog Authoring Playbook
 
 Use this playbook when the user asks for a blog post, article, editorial draft, or web publication content.
-It specializes the shared [Guided Coordination Protocol](knowledge/product/orchestration/guided-coordination-protocol.md) for long-form text production.
+It specializes the shared [Guided Coordination Protocol](guided-coordination-protocol.md) for long-form text production.
 
 ## Kyberion Fit
 

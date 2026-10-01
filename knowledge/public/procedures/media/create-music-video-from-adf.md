@@ -13,7 +13,7 @@ This procedure is for the common music-video case where the visual story is driv
 
 For the end-to-end operator flow, including music generation, render submission, deferred collection, and validation, use:
 
-- [`produce-music-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-music-video.md)
+- [`produce-music-video.md`](produce-music-video.md)
 
 ## 2. Dependencies
 
@@ -21,10 +21,10 @@ For the end-to-end operator flow, including music generation, render submission,
 - **Actuator**: `video-composition-actuator`
 - **Preflight**: `pnpm service:preflight -- --service media-generation`
 - **Schemas**:
-  - [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
-  - [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-composition-adf.schema.json)
+  - [`music-generation-adf.schema.json`](../../../product/schemas/music-generation-adf.schema.json)
+  - [`video-composition-adf.schema.json`](../../../product/schemas/video-composition-adf.schema.json)
 - **Procedure**:
-  - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+  - [`compose-video-from-adf.md`](compose-video-from-adf.md)
 
 ## 3. Contract Shape
 

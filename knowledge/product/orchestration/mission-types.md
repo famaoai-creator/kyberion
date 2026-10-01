@@ -44,9 +44,9 @@ last_updated: 2026-03-06
 
 ### 3.1 実行原則
 
-- [hypothesis-tree-protocol.md](knowledge/product/orchestration/hypothesis-tree-protocol.md) に従い、divergence → critique → convergence の 3 段階を必ず通す。
+- [hypothesis-tree-protocol.md](hypothesis-tree-protocol.md) に従い、divergence → critique → convergence の 3 段階を必ず通す。
 - 不採用仮説は `dissent-log.json` に保存する (judgment-rules.json の `require_dissent_quorum` に従う)。
-- 重大判断 (priority 8+) では [counterfactual-simulation-protocol.md](knowledge/product/orchestration/counterfactual-simulation-protocol.md) の適用を推奨する。
+- 重大判断 (priority 8+) では [counterfactual-simulation-protocol.md](counterfactual-simulation-protocol.md) の適用を推奨する。
 
 ## 4. 交渉ミッション (Negotiation Mission)
 
@@ -54,9 +54,9 @@ last_updated: 2026-03-06
 
 ### 4.1 実行原則
 
-- [negotiation-protocol.md](knowledge/product/orchestration/negotiation-protocol.md) に従い、`negotiation` ブロック (BATNA/ZOPA/concession_ladder/red_lines) を planning 段階で必ず埋める。
-- 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](knowledge/product/orchestration/real-time-coaching-protocol.md) の補助に徹する。
-- 相手情報は [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md) から取得する。
+- [negotiation-protocol.md](negotiation-protocol.md) に従い、`negotiation` ブロック (BATNA/ZOPA/concession_ladder/red_lines) を planning 段階で必ず埋める。
+- 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](real-time-coaching-protocol.md) の補助に徹する。
+- 相手情報は [relationship-graph-protocol.md](relationship-graph-protocol.md) から取得する。
 
 ## 5. セキュリティ検査ミッション (Security Scan Mission)
 

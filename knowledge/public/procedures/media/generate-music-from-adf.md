@@ -12,7 +12,7 @@ Generate a governed music artifact from a human-readable `music-generation-adf` 
   - `media-generation.musicgen_mlx` — Apple Silicon MusicGen via `mlx-audiocraft` (`KYBERION_MUSICGEN_*`)
   - `media-generation.stable_audio_3_small_music` — Stable Audio 3 small-music via git/`uv` (`KYBERION_STABLE_AUDIO_*`; gated HF weights need `HF_TOKEN`)
 - **Preflight**: `pnpm service:preflight -- --service media-generation` for ComfyUI; local CLI backends use tool-runtime trial/install
-- **Schema**: [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
+- **Schema**: [`music-generation-adf.schema.json`](../../../product/schemas/music-generation-adf.schema.json)
 
 ## 3. Contract Shape
 
@@ -42,16 +42,16 @@ uv tool install git+https://github.com/Stability-AI/stable-audio-3.git
 
 Direct actuator examples:
 
-- [`direct-musicgen-mlx.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/direct-musicgen-mlx.json)
-- [`direct-stable-audio-3-small-music.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/direct-stable-audio-3-small-music.json)
+- [`direct-musicgen-mlx.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-musicgen-mlx.json)
+- [`direct-stable-audio-3-small-music.json`](../../../../libs/actuators/media-generation-actuator/examples/direct-stable-audio-3-small-music.json)
 
 ## 4. Execution
 
 Example input:
 
-- [`music-adf-anniversary-country-ja.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json)
-- [`submit-music-generation-job.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json)
-- [`music-generation-schedule-anniversary.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json)
+- [`music-adf-anniversary-country-ja.json`](../../../../libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json)
+- [`submit-music-generation-job.json`](../../../../libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json)
+- [`music-generation-schedule-anniversary.json`](../../../../libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json)
 
 Run:
 
@@ -92,9 +92,9 @@ If the latest job has completed successfully and `delivery_policy.latest_alias_p
 
 Orchestrator-ready bundle:
 
-- [`music-generation-pipeline-bundle.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-generation-pipeline-bundle.json)
-- [`music-bundle-to-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-execution-plan-set.json)
-- [`music-bundle-to-run-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-run-execution-plan-set.json)
+- [`music-generation-pipeline-bundle.json`](../../../../libs/actuators/orchestrator-actuator/examples/music-generation-pipeline-bundle.json)
+- [`music-bundle-to-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/music-bundle-to-execution-plan-set.json)
+- [`music-bundle-to-run-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/music-bundle-to-run-execution-plan-set.json)
 
 ## 5. Expected Output
 
@@ -114,4 +114,4 @@ Use `generation-schedule` to describe the trigger and `generation-job` for each 
 
 For a full music-video production flow that reuses the generated music artifact, see:
 
-- [`produce-music-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-music-video.md)
+- [`produce-music-video.md`](produce-music-video.md)

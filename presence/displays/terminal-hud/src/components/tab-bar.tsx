@@ -1,4 +1,5 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
+import { Text } from './text.js';
 import { PANELS, PANEL_LABEL_KEYS, type PanelId } from '../keymap.js';
 import { useI18n } from '../i18n.js';
 import { theme } from '../theme.js';

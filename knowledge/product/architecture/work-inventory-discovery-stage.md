@@ -83,11 +83,11 @@ can be inspected, versioned, and corrected — a baked-in LLM judgment cannot.
 
 Work inventory entries and their supporting evidence are built from three independent channels:
 
-| Channel                  | Entry point                                                                                                                                                       | What it yields                                                |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| ① Self-report            | 相棒「頼む」hearing, `scenario=work_inventory` (`/ask?mode=hearing&scenario=work_inventory`), or `pnpm inventory add`                                             | work title, trigger, frequency, effort estimate, step list    |
-| ② Kyberion usage         | `pnpm inventory harvest` — trace files, repeated adhoc-pipeline runs, unhandled-intent records, mission history (`libs/core/workforce/work-inventory-harvest.ts`) | real frequency, real effort, real failures                    |
-| ③ PC operation recording | consented `desktop-recording` / browser-extension recordings, summarized through `libs/core/workforce/work-inventory-observation.ts`                              | actual operation sequence (app, operation kind, host, counts) |
+| Channel                  | Entry point                                                                                                                                                            | What it yields                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| ① Self-report            | 相棒「頼む」hearing, `scenario=work_inventory` (`/ask?mode=hearing&scenario=work_inventory`), or `pnpm work:inventory add`                                             | work title, trigger, frequency, effort estimate, step list    |
+| ② Kyberion usage         | `pnpm work:inventory harvest` — trace files, repeated adhoc-pipeline runs, unhandled-intent records, mission history (`libs/core/workforce/work-inventory-harvest.ts`) | real frequency, real effort, real failures                    |
+| ③ PC operation recording | consented `desktop-recording` / browser-extension recordings, summarized through `libs/core/workforce/work-inventory-observation.ts`                                   | actual operation sequence (app, operation kind, host, counts) |
 
 Channel ③ carries the sharpest privacy stakes, so it runs under an explicit invariant set:
 
@@ -121,12 +121,12 @@ else (WI-06 acceptance).
 
 ## 6. Promotion and the learning cycle
 
-A candidate never self-promotes. A human decision (`decided_by`) drives `pnpm inventory promote`,
+A candidate never self-promotes. A human decision (`decided_by`) drives `pnpm work:inventory promote`,
 which either produces a mission (through the same alignment-gate hand-off hearing already uses for
 other scenarios) or a `pipeline:promote` input when the repetition is already confirmed
 (`libs/core/workforce/work-inventory-promotion.ts`). Once promoted work actually runs, its real outcomes
 (`outcomes[]` — runs, minutes saved, failures) are measured back from the promoted mission/pipeline's
-own execution evidence, and `pnpm inventory learn` folds the delta between prediction and outcome back
+own execution evidence, and `pnpm work:inventory learn` folds the delta between prediction and outcome back
 into `calibration.json`. Work whose predicted and observed automatable share diverge sharply is also
 signaled into the organization's learning-candidate queue (`operational-learning.ts`), closing the loop:
 
@@ -142,30 +142,30 @@ A first inventory, in order:
 
 ```bash
 # 1. capture a work item (self-report)
-pnpm inventory add --title "..." --trigger request --frequency week:3 --effort-minutes 30
+pnpm work:inventory add --title "..." --trigger request --frequency week:3 --effort-minutes 30
 
 # 2. or capture through the hearing surface instead of the CLI
 #    open /ask?mode=hearing&scenario=work_inventory and answer the guided questions;
 #    confirming the hand-off creates the same kind of entry
 
 # 3. see what Kyberion already knows about how often this kind of work actually runs
-pnpm inventory harvest --tenant <slug>   # omit --tenant for personal scope
+pnpm work:inventory harvest --tenant <slug>   # omit --tenant for personal scope
 
 # 4. (optional, channel ③) record real operation sequences under explicit, time-boxed consent
-pnpm inventory consent grant --member <id> --sources desktop_recording --purpose "..." \
+pnpm work:inventory consent grant --member <id> --sources desktop_recording --purpose "..." \
   --days 30 --decided-by user:<id>
-pnpm inventory observe summarize --member <id> --recording <path>
-pnpm inventory observe confirm --member <id> --summary <id> --decided-by user:<id>
-pnpm inventory observe attach --member <id> --summary <id> --entry <entry_id> --decided-by user:<id>
+pnpm work:inventory observe summarize --member <id> --recording <path>
+pnpm work:inventory observe confirm --member <id> --summary <id> --decided-by user:<id>
+pnpm work:inventory observe attach --member <id> --summary <id> --entry <entry_id> --decided-by user:<id>
 
 # 5. rank automation candidates
-pnpm inventory candidates --tenant <slug>
+pnpm work:inventory candidates --tenant <slug>
 
 # 6. promote a candidate once a human has decided
-pnpm inventory promote <entry_id> --kind mission --decided-by user:<id> [--execute]
+pnpm work:inventory promote <entry_id> --kind mission --decided-by user:<id> [--execute]
 
 # 7. after promoted work has run, fold outcomes back into calibration
-pnpm inventory learn --tenant <slug>
+pnpm work:inventory learn --tenant <slug>
 ```
 
 Every subcommand accepts `--json` for machine output and never writes outside the caller's
@@ -179,7 +179,7 @@ tenant/personal scope.
   that value; a `cron:`-prefixed correlationId or an ambient cron trigger delivery scope (Chronos)
   -> scheduled; `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` set -> agent (`MISSION_ROLE` alone is not
   an agent signal); else interactive — see `deriveTraceOrigin` in
-  `libs/core/analysis/trace.ts`). `pnpm inventory harvest` now drops `test`/`ci`-tagged traces entirely
+  `libs/core/analysis/trace.ts`). `pnpm work:inventory harvest` now drops `test`/`ci`-tagged traces entirely
   before they ever become or inflate a signal, and when at least half of a signature's counted
   traces are `scheduled`-tagged its signal's
   `origin` is `scheduled` even for a non-pipeline (`actuator_op`) signature that the
@@ -197,7 +197,7 @@ tenant/personal scope.
   `inferred: true` since it was introduced, but entries created earlier never got the flag even
   though their binding is exactly the verb's first taxonomy candidate — so `matchSignalsToEntries`
   could treat generic actuator traffic as if it were real evidence for that entry. Run
-  `pnpm inventory migrate [--dry-run]` to backfill `inferred: true` on every entry in scope whose
+  `pnpm work:inventory migrate [--dry-run]` to backfill `inferred: true` on every entry in scope whose
   binding matches the default candidate and carries no `pipeline_id`/`intent_id`/`inferred` key
   already; explicit bindings (including an explicit `inferred: false`) are left untouched, and a
   second run is always a no-op (see `migrateInferredBindings` in `libs/core/workforce/work-inventory.ts`).

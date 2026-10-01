@@ -98,7 +98,7 @@ P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 | `deployment-actuator`        | 1.0.0 | 配備境界                            | `deploy_release`                                                               | `deployment-action.schema.json`           | pipeline。承認ゲート                                                                              |
 | `email-actuator`             | 1.2.0 | 下書き/送信(Mail.app / SMTP)        | `create_draft, send, send_from_file`                                           | アクチュエータ内 schema                   | `pnpm kyberion email` / `email:workflow`。**受信なし**。`create_draft` は darwin                  |
 | `file-actuator`              | 1.1.0 | ガバナンス下ファイル I/O            | `pipeline`                                                                     | `file-pipeline.schema.json`               | pipeline。内部 21 ops(`read/write/search/…`)                                                      |
-| `ingest-actuator`            | 1.2.0 | 文書 → knowledge card               | `sync_source, parse_document, normalize_card, dedup, staleness_report, commit` | **manifest に未宣言**                     | `pnpm ingest` / pipeline                                                                          |
+| `ingest-actuator`            | 1.2.0 | 文書 → knowledge card               | `sync_source, parse_document, normalize_card, dedup, staleness_report, commit` | **manifest に未宣言**                     | `pnpm knowledge:ingest` / pipeline                                                                |
 | `ios-actuator`               | 1.1.0 | iOS Simulator                       | `pipeline`                                                                     | `mobile-device-pipeline.schema.json`      | **darwin only**                                                                                   |
 | `media-actuator`             | 1.2.0 | PPTX/DOCX/XLSX / digest             | `pipeline`                                                                     | `media-pipeline.schema.json`              | pipeline / examples                                                                               |
 | `media-generation-actuator`  | 1.2.0 | 生成 + 画面キャプチャ               | `generate_*, capture_*, record_screen, pipeline, …`(12)                        | `media-generation-action.schema.json`     | pipeline / generation schedule                                                                    |
@@ -156,7 +156,7 @@ libs/actuators/*/manifest.json          ← 正本(スキャン: libs/core の a
 | **MCP(Cowork)**    | `pnpm mcp:server`                                                  | 発見 + allowlist 8 本 + `service.actuate`(承認・operator・既定オフ) |
 | **Mission**        | `pnpm mission …`                                                   | 直接 op CLI は無い。タスクが pipeline / agent を呼ぶ                |
 | **TUI**            | `pnpm tui`                                                         | 監視/操作。生 op REPL ではない                                      |
-| **Chronos**        | `pnpm chronos` + `pnpm daemon:watchdog`                            | `schedule.cron` 付き pipeline を 60s tick                           |
+| **Chronos**        | `pnpm scheduler` + `pnpm daemon:watchdog`                          | `schedule.cron` 付き pipeline を 60s tick                           |
 | **Satellite**      | Slack / Telegram / Discord / iMessage                              | 会話入口。アクチュエータ本体ではない                                |
 | **Playground**     | `pnpm exec tsx scripts/actuator_playground.ts`                     | 単発 op。未 script 化                                               |
 
@@ -225,7 +225,7 @@ asana, aws-ce, backlog, box, brave-search, canva, cloudflare, comfyui, confluenc
 ```bash
 # 前提: Node >=24 && pnpm install && pnpm build
 # 任意: Chronos 常駐( cron 0 6 * * * Asia/Tokyo )
-pnpm chronos
+pnpm scheduler
 
 # 手動再実行
 pnpm pipeline --input pipelines/daily-routine.json
@@ -292,7 +292,7 @@ pnpm pipeline --input pipelines/daily-routine.json
 
 ```bash
 pnpm kyberion email status
-pnpm services:setup
+pnpm service:setup
 # tenant copy of email-triage-workflow.json
 pnpm pipeline --input knowledge/confidential/<tenant>/pipelines/email-triage-workflow.json
 ```

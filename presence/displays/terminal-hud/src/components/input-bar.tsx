@@ -1,6 +1,8 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
+import { Text } from './text.js';
 import TextInput from 'ink-text-input';
 import { useI18n } from '../i18n.js';
+import { sanitizeTerminalText } from '../terminal-text.js';
 import { theme } from '../theme.js';
 
 export type VoiceState = 'recording' | 'transcribing' | undefined;
@@ -34,7 +36,10 @@ export function InputBar({ focused, value, onChange, onSubmit, busy, voiceState 
         <Text color={theme.warn}>{tr('tui:tui_voice_transcribing')}</Text>
       ) : (
         <TextInput
-          value={value}
+          // TextInput renders through ink's own <Text>, bypassing the
+          // sanitized wrapper — scrub the value here as well (voice
+          // transcripts and pasted bytes are arbitrary text).
+          value={sanitizeTerminalText(value)}
           onChange={onChange}
           onSubmit={onSubmit}
           focus={focused}

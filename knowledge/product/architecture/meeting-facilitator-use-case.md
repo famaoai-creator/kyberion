@@ -321,11 +321,11 @@ Camera output (`voice:output_to_virtual_camera`):
 ## 7. Reference
 
 - [`schemas/action-item.schema.json`](../schemas/action-item.schema.json)
-- [`libs/core/action-item-store.ts`](libs/core/action-item-store.ts)
-- [`libs/actuators/meeting-actuator/`](libs/actuators/meeting-actuator)
-- [`pipelines/meeting-facilitation-workflow.json`](pipelines/meeting-facilitation-workflow.json)
+- [`libs/core/action-item-store.ts`](../../../libs/core/action-item-store.ts)
+- [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator)
+- [`pipelines/meeting-facilitation-workflow.json`](../../../pipelines/meeting-facilitation-workflow.json)
 - [`pipelines/action-item-execute-self.json`](../pipeline-templates/action-item-execute-self.json)
 - [`pipelines/action-item-tracking.json`](../pipeline-templates/action-item-tracking.json)
-- [`scripts/meeting_orchestrator.ts`](scripts/meeting_orchestrator.ts)
-- [`knowledge/product/agents/meeting-proxy.agent.md`](knowledge/product/agents/meeting-proxy.agent.md) — agent template
-- [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents
+- [`scripts/meeting_orchestrator.ts`](../../../scripts/meeting_orchestrator.ts)
+- [`knowledge/product/agents/meeting-proxy.agent.md`](../agents/meeting-proxy.agent.md) — agent template
+- [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents

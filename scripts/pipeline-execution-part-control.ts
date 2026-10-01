@@ -921,7 +921,7 @@ async function dispatchResolvedActuatorOperation(
         `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
       );
       throw new Error(
-        `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`
+        `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm kyberion doctor\` to verify credential and capability prerequisites.`
       );
     }
   }

@@ -614,15 +614,15 @@ it should be treated as unstable until fixed.
 
 Score each category from 0 to 2.
 
-| Category | 0 | 1 | 2 |
-|---|---|---|---|
-| Input quality | mock or ambiguous | partially real | real and representative |
-| Contract clarity | unclear | partially defined | explicit and testable |
-| Runtime stability | inconsistent | mostly stable | deterministic enough to rerun |
-| Artifact quality | incomplete | usable but rough | review-ready |
-| Governability | undocumented | partially documented | fully documented and tier-safe |
-| Reusability | one-off only | partially reusable | parameterized and portable |
-| Failure clarity | opaque or misleading | partially classifiable | load vs runtime vs operator failures are distinguishable |
+| Category          | 0                    | 1                      | 2                                                        |
+| ----------------- | -------------------- | ---------------------- | -------------------------------------------------------- |
+| Input quality     | mock or ambiguous    | partially real         | real and representative                                  |
+| Contract clarity  | unclear              | partially defined      | explicit and testable                                    |
+| Runtime stability | inconsistent         | mostly stable          | deterministic enough to rerun                            |
+| Artifact quality  | incomplete           | usable but rough       | review-ready                                             |
+| Governability     | undocumented         | partially documented   | fully documented and tier-safe                           |
+| Reusability       | one-off only         | partially reusable     | parameterized and portable                               |
+| Failure clarity   | opaque or misleading | partially classifiable | load vs runtime vs operator failures are distinguishable |
 
 ### Interpretation
 
@@ -632,7 +632,8 @@ Score each category from 0 to 2.
 
 ## 11. Related Template
 
-For a copy-ready starting point, see [`adf-pipeline-template.md`](knowledge/product/orchestration/adf-pipeline-template.md).
+For a copy-ready starting point, see [`adf-pipeline-template.md`](adf-pipeline-template.md).
 
 ---
-*Status: Living guidance for ADF pipeline construction and refinement*
+
+_Status: Living guidance for ADF pipeline construction and refinement_

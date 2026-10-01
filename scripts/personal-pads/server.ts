@@ -127,10 +127,7 @@ function resolveStartupScope(args: string[]): {
     throw new ScriptExitError(1, 'CLI tenant does not match server-side KYBERION_TENANT scope');
   const tenant = serverTenant || cliTenant;
   if (tier !== 'public' && !tenant)
-    throw new ScriptExitError(
-      1,
-      'confidential and personal pads require server-side KYBERION_TENANT scope'
-    );
+    throw new ScriptExitError(1, padsT()('personal_pads:error_tenant_required'));
   if (tenant) resolveTenant(tenant);
   const principal = (
     getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||

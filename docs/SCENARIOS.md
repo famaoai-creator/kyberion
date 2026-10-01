@@ -2,17 +2,17 @@
 
 > Persona-mapped view. Canonical breadth lives in [`USE_CASES.md`](./USE_CASES.md); this document keeps the persona and playbook mapping tight.
 
-Each scenario demonstrates how multiple actuators and capability flows chain together to automate complex workflows. These scenarios map to specific personas and can be packaged as [Mission Playbooks](knowledge/product/orchestration/mission-playbooks).
+Each scenario demonstrates how multiple actuators and capability flows chain together to automate complex workflows. These scenarios map to specific personas and can be packaged as [Mission Playbooks](../knowledge/product/orchestration/mission-playbooks).
 
 本リポジトリに実装されたアクチュエータ群と capability flow を組み合わせることで、ソフトウェア開発ライフサイクルの各フェーズを高度に自動化できます。
 
-| #   | Scenario                                  | Primary Persona | Related Playbook                                                              |
-| --- | ----------------------------------------- | --------------- | ----------------------------------------------------------------------------- |
-| 1   | Asset Visualization & Reverse Engineering | Engineer        | —                                                                             |
-| 2   | Requirements-to-Test Quality Pipeline     | PM / Auditor    | [product-audit](knowledge/product/orchestration/mission-playbooks/product-audit.md) |
-| 3   | Automated UI Audit & Visual Report        | PM / Auditor    | [product-audit](knowledge/product/orchestration/mission-playbooks/product-audit.md) |
-| 4   | Pre-commit Security Health Check          | Engineer        | —                                                                             |
-| 5   | CEO Strategic Executive Report            | CEO / Architect | [ceo-strategic-report](../pipelines/ceo-strategic-report.json)               |
+| #   | Scenario                                  | Primary Persona | Related Playbook                                                                       |
+| --- | ----------------------------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| 1   | Asset Visualization & Reverse Engineering | Engineer        | —                                                                                      |
+| 2   | Requirements-to-Test Quality Pipeline     | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md) |
+| 3   | Automated UI Audit & Visual Report        | PM / Auditor    | [product-audit](../knowledge/product/orchestration/mission-playbooks/product-audit.md) |
+| 4   | Pre-commit Security Health Check          | Engineer        | —                                                                                      |
+| 5   | CEO Strategic Executive Report            | CEO / Architect | [ceo-strategic-report](../pipelines/ceo-strategic-report.json)                         |
 
 ## 1. 既存資産の可視化とリバースエンジニアリング
 
@@ -83,7 +83,7 @@ Webサイトの主要動線を自動確認し、エビデンス付きの報告�
 
 These scenarios can be formalized as JSON ADF pipelines (`pipelines/*.json`) or mission playbooks (`knowledge/product/orchestration/mission-playbooks/`).
 
-See also: [`intent_mapping.yaml`](knowledge/product/orchestration/meta-skills/intent_mapping.yaml) for intent-driven routing that can trigger these chains automatically from natural language.
+See also: [`intent_mapping.yaml`](../knowledge/product/orchestration/meta-skills/intent_mapping.yaml) for intent-driven routing that can trigger these chains automatically from natural language.
 
 For a compact build-and-review loop for ADF pipelines, see:
 

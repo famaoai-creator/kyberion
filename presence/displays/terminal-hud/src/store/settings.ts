@@ -47,7 +47,7 @@ export function settingsViewModel(data: SettingsData, i18n: I18n): PanelViewMode
       },
       {
         id: 'customer',
-        cells: [i18n.tr('tui:tui_status_customer'), data.customer, hint('pnpm customer:switch')],
+        cells: [i18n.tr('tui:tui_status_customer'), data.customer, hint('pnpm stance:switch')],
       },
       {
         id: 'locale',

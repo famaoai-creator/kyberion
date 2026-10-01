@@ -1,5 +1,5 @@
 /**
- * WI-07: `pnpm inventory consent ...` and `pnpm inventory observe ...`
+ * WI-07: `pnpm work:inventory consent ...` and `pnpm work:inventory observe ...`
  * command handlers.
  *
  * Who acts: the terminal CLI runs on this machine as its local owner — the
@@ -78,7 +78,7 @@ export function resolveLocalOwnerActor(
   );
   if (!owner) {
     throw new WorkInventoryCliUsageError(
-      `${subcommand}: no active owner member is provisioned on this machine — complete onboarding (pnpm onboard, which provisions it via ensureOwnerMember) first`
+      `${subcommand}: no active owner member is provisioned on this machine — complete onboarding (pnpm onboarding, which provisions it via ensureOwnerMember) first`
     );
   }
   const ownerId = owner.member_id;

@@ -93,7 +93,7 @@ export KYBERION_CUSTOMER=acme-corp
 顧客オーバーレイ構造に変換する場合:
 
 ```bash
-pnpm customer:create my-org
+pnpm stance:create my-org
 export KYBERION_CUSTOMER=my-org
 ```
 
@@ -122,9 +122,9 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 
 - [x] ディレクトリ構造
 - [x] Resolver API + テスト
-- [x] `pnpm customer:create`
-- [x] `customer:list`
-- [x] `customer:switch`
+- [x] `pnpm stance:create`
+- [x] `stance:list`
+- [x] `stance:switch`
 - [x] onboarding wizard 統合
 - [x] 移行ヘルパ
 - [ ] 各 caller のオーバーレイ対応
