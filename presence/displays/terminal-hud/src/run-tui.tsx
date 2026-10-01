@@ -1,5 +1,6 @@
 import { render } from 'ink';
 import { App } from './app.js';
+import { sanitizeTerminalText } from './terminal-text.js';
 import { renderSnapshotLines } from './snapshot.js';
 import { isPanelId, type PanelId } from './keymap.js';
 
@@ -20,7 +21,9 @@ export async function runTui(options: RunTuiOptions = {}): Promise<void> {
   // because interactive input is unavailable.
   if (options.once || !canUseInteractiveTerminal()) {
     const lines = await renderSnapshotLines({ panel: options.panel });
-    process.stdout.write(lines.join('\n') + '\n');
+    // Snapshot lines embed the same store-derived text the panels render —
+    // scrub control bytes before writing straight to the tty.
+    process.stdout.write(lines.map(sanitizeTerminalText).join('\n') + '\n');
     return;
   }
   const initialPanel: PanelId | undefined =
