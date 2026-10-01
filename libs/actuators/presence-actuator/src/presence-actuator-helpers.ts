@@ -10,6 +10,7 @@ import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defa
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
+import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
 import type { SurfaceAsyncChannel } from '@agent/core/surface/channel-surface-types';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -234,7 +235,8 @@ export async function handleAction(input: PresenceAction) {
 
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
-      const bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || 'http://127.0.0.1:3031';
+      const bridgeUrl =
+        getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || resolveSurfaceUrl('presence-studio');
       const body: unknown = await retry(
         async () =>
           secureFetch({
