@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NO_TENANT_FILTER,
   deriveCardFields,
+  filterByTenant,
   groupDecideQueue,
   hasEffectColumn,
   presentKinds,
+  tenantFilterOptions,
   type DecideQueueEntry,
 } from '../src/lib/decide-view';
 
@@ -222,5 +225,39 @@ describe('presentKinds', () => {
     expect(presentKinds({ approval: 0, hygiene: 0, memory: 0, outcome: 0, exception: 0 })).toEqual(
       []
     );
+  });
+});
+
+describe('organization filter (a member of several organizations decides per organization)', () => {
+  const queue: DecideQueueEntry[] = [
+    approval('a1', { tenant_slug: 'acme' }),
+    approval('a2', { tenant_slug: 'acme' }),
+    approval('b1', { tenant_slug: 'beta' }),
+    hygiene('h1'),
+  ];
+  it('lists organizations most-pending first, and counts the untenanted separately', () => {
+    expect(tenantFilterOptions(queue)).toEqual({
+      tenants: [
+        { slug: 'acme', count: 2 },
+        { slug: 'beta', count: 1 },
+      ],
+      unassigned: 1,
+    });
+    expect(tenantFilterOptions([])).toEqual({ tenants: [], unassigned: 0 });
+  });
+  it('breaks ties by slug so the order is stable', () => {
+    expect(
+      tenantFilterOptions([
+        approval('x', { tenant_slug: 'zeta' }),
+        approval('y', { tenant_slug: 'alpha' }),
+      ]).tenants.map((t) => t.slug)
+    ).toEqual(['alpha', 'zeta']);
+  });
+  it('narrows to one organization, to the untenanted, or keeps everything', () => {
+    expect(filterByTenant(queue, 'all').map((e) => e.id)).toEqual(['a1', 'a2', 'b1', 'h1']);
+    expect(filterByTenant(queue, 'acme').map((e) => e.id)).toEqual(['a1', 'a2']);
+    expect(filterByTenant(queue, 'beta').map((e) => e.id)).toEqual(['b1']);
+    expect(filterByTenant(queue, NO_TENANT_FILTER).map((e) => e.id)).toEqual(['h1']);
+    expect(filterByTenant(queue, 'gone')).toEqual([]);
   });
 });
