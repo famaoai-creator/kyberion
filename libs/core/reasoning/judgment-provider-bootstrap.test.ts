@@ -1,4 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ bootstrapWarn: vi.fn() }));
+
+// Capture only the bootstrap channel's warnings; every other logger stays real.
+vi.mock('../logger.js', async () => {
+  const actual = await vi.importActual<typeof import('../logger.js')>('../logger.js');
+  return {
+    ...actual,
+    createLogger: (name: string, options?: unknown) => {
+      const real = actual.createLogger(name, options as any);
+      if (name !== 'judgment-provider-bootstrap') return real;
+      return { ...real, warn: mocks.bootstrapWarn };
+    },
+  };
+});
 import {
   BUILTIN_JUDGMENT_PROVIDER,
   listJudgmentBackends,
@@ -83,6 +98,19 @@ describe('ensureJudgmentBackendsRegistered', () => {
       { id: 'not-a-provider', reason: expect.stringContaining('unknown judgment provider') },
     ]);
     expect(registeredIds()).toEqual([BUILTIN_JUDGMENT_PROVIDER, 'laya-mlx'].sort());
+  });
+
+  it('warns about an unknown provider id once, while still reporting it every call', () => {
+    resetJudgmentBackends();
+    mocks.bootstrapWarn.mockClear();
+    const first = ensureJudgmentBackendsRegistered({ providers: 'stale-provider-once' });
+    const second = ensureJudgmentBackendsRegistered({ providers: 'stale-provider-once' });
+    expect(first.refused.map((entry) => entry.id)).toEqual(['stale-provider-once']);
+    expect(second.refused.map((entry) => entry.id)).toEqual(['stale-provider-once']);
+    const warnings = mocks.bootstrapWarn.mock.calls.filter(([message]) =>
+      String(message).includes('stale-provider-once')
+    );
+    expect(warnings).toHaveLength(1);
   });
 });
 

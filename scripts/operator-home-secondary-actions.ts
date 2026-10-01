@@ -19,7 +19,16 @@ import {
   recordExecutionFeedback,
 } from '@agent/core/execution-feedback';
 import type { VocabularyKey } from '@agent/core/t';
+import { withExecutionContext } from '@agent/core/authority';
 import { ScriptExitError } from './lib/harness.js';
+
+/**
+ * Governed role for the operator's deal-document writes. They land under
+ * customer/{tenant}/deals/ (and, for the handoff, the mission's intent and
+ * requirements drafts); security-policy.json grants customer/ writes to
+ * mission_controller, the same role the deal-documents module tests use.
+ */
+const DEAL_DOCUMENT_WRITE_ROLE = 'mission_controller';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
 export type HomePrint = (value: unknown) => void;
@@ -258,6 +267,8 @@ export interface DealDocumentArgs {
   note?: string;
   handoff?: string;
   missionId?: string;
+  /** Tenant owning the deal; required when the deal id exists in several tenants. */
+  tenant?: string;
   json?: boolean;
 }
 
@@ -270,6 +281,10 @@ export const DEAL_DOCUMENT_OPTIONS = {
   'contract-version': { type: 'number', description: 'deals: contract version reviewed' },
   verdict: { type: 'string', choices: ['approve', 'reject'] },
   handoff: { type: 'string', description: 'deals: hand a won deal to --mission-id' },
+  tenant: {
+    type: 'string',
+    description: 'deals: tenant owning the deal (required when the id is ambiguous)',
+  },
 } as const;
 
 /** Map the operator-home yargs result onto the deal-document arguments. */
@@ -287,6 +302,7 @@ export function dealDocumentArgsFromArgv(argv: Record<string, unknown>): DealDoc
     note: text('note'),
     handoff: text('handoff'),
     missionId: text('mission-id'),
+    tenant: text('tenant'),
     json: Boolean(argv.json),
   };
 }
@@ -327,15 +343,25 @@ export function handleDealDocumentAction(
 ): boolean {
   if (!isDealDocumentAction(argv)) return false;
   const dealId = String(argv.quote || argv.draftContract || argv.reviewContract || argv.handoff);
-  const bindings = listCustomerChannelBindings();
-  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
-  const tenantSlug = tenants.find((tenant) =>
+  const tenants = argv.tenant
+    ? [argv.tenant]
+    : Array.from(new Set(listCustomerChannelBindings().map((binding) => binding.tenantSlug)));
+  const owners = tenants.filter((tenant) =>
     listDeals(tenant).some((deal) => deal.deal_id === dealId)
   );
-  if (!tenantSlug) {
+  if (owners.length === 0) {
     print(ui('recorder:recorder_deal_not_found', { id: dealId }));
     throw new ScriptExitError(1, '', true);
   }
+  if (owners.length > 1) {
+    print(
+      ui('recorder:recorder_deal_tenant_ambiguous', { id: dealId, tenants: owners.join(', ') })
+    );
+    throw new ScriptExitError(1, '', true);
+  }
+  const tenantSlug = owners[0];
+  const governed = <T>(write: () => T): T =>
+    withExecutionContext(DEAL_DOCUMENT_WRITE_ROLE, write, undefined, tenantSlug);
   const emit = (value: Record<string, unknown>, line: string) =>
     print(argv.json ? JSON.stringify(value, null, 2) : line);
 
@@ -345,7 +371,7 @@ export function handleDealDocumentAction(
       print(ui('recorder:recorder_deal_quote_usage'));
       throw new ScriptExitError(1, '', true);
     }
-    const result = generateQuoteForDeal({ tenantSlug, dealId, requests });
+    const result = governed(() => generateQuoteForDeal({ tenantSlug, dealId, requests }));
     if (!result.ok) {
       emit(
         { ok: false, unquotable: result.unquotable ?? [] },
@@ -367,7 +393,7 @@ export function handleDealDocumentAction(
   }
 
   if (argv.draftContract) {
-    const result = draftContractForDeal({ tenantSlug, dealId });
+    const result = governed(() => draftContractForDeal({ tenantSlug, dealId }));
     emit(
       { version: result.version, contract_ref: result.contract_ref },
       ui('recorder:recorder_deal_contract_created', {
@@ -391,14 +417,16 @@ export function handleDealDocumentAction(
       print(ui('recorder:recorder_deal_review_usage'));
       throw new ScriptExitError(1, '', true);
     }
-    const recordPath = recordContractReview({
-      tenantSlug,
-      dealId,
-      version,
-      verdict,
-      reviewer: String(argv.reviewer),
-      ...(argv.note ? { notes: String(argv.note) } : {}),
-    });
+    const recordPath = governed(() =>
+      recordContractReview({
+        tenantSlug,
+        dealId,
+        version,
+        verdict,
+        reviewer: String(argv.reviewer),
+        ...(argv.note ? { notes: String(argv.note) } : {}),
+      })
+    );
     emit(
       { record_path: recordPath, verdict, version },
       ui('recorder:recorder_deal_review_recorded', { id: dealId, version, verdict })
@@ -410,7 +438,9 @@ export function handleDealDocumentAction(
     print(ui('recorder:recorder_deal_handoff_usage'));
     throw new ScriptExitError(1, '', true);
   }
-  const result = handoffWonDealToSdlc({ tenantSlug, dealId, missionId: String(argv.missionId) });
+  const result = governed(() =>
+    handoffWonDealToSdlc({ tenantSlug, dealId, missionId: String(argv.missionId) })
+  );
   emit(
     {
       handoff_path: result.handoff_path,

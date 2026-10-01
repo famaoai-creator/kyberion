@@ -255,6 +255,19 @@ describe('actuator SDK', () => {
     expect(seen.at(-1)).toEqual({ action: 'ensure_dir', params: { dir: 'x' } });
   });
 
+  it('keeps the error of a single-action handler that fails without a results array', async () => {
+    const actuator = defineCatalogBackedActuator({
+      id: 'action-error-demo',
+      describeOps: () => [{ op: 'ensure_dir', kind: 'apply' as const }],
+      handleAction: () => ({ status: 'failed', error: 'dir outside governed root' }),
+      actionInput: (op, params) => ({ action: op, params }),
+    });
+    await expect(actuator.dispatch('ensure_dir', { dir: '/etc' })).resolves.toMatchObject({
+      ok: false,
+      error: 'dir outside governed root',
+    });
+  });
+
   it('uses the catalog-provided legacy contract for runtime pipeline operations', async () => {
     const actuator = defineCatalogBackedActuator({
       id: 'browser-actuator',

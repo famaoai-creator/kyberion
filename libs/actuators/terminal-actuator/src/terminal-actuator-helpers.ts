@@ -94,6 +94,8 @@ export interface ComputerInteractionAction {
     thread_id?: string;
     text?: string;
     key?: string;
+    /** Ordered key sequence for write_terminal; takes precedence over `key`. */
+    keys?: string[];
     timeout_ms?: number;
   };
 }
@@ -290,7 +292,7 @@ async function handleComputerInteraction(
         params: {
           sessionId,
           data: action.text,
-          keys: action.key ? [action.key] : undefined,
+          keys: action.keys?.length ? action.keys : action.key ? [action.key] : undefined,
         },
       } as TerminalAction).then((result) => {
         emitComputerSurfacePatch({
@@ -298,7 +300,7 @@ async function handleComputerInteraction(
           executor: 'terminal',
           status: result.success ? 'running' : 'error',
           latestAction: action.type,
-          detail: action.text || action.key || '',
+          detail: action.text || action.keys?.join(' ') || action.key || '',
         });
         return result;
       });

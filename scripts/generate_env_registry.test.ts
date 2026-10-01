@@ -109,6 +109,37 @@ describe('mergeRegistry', () => {
     expect(added.documented).toBe(false);
   });
 
+  it('keeps deprecated entries registered even when no code reads them (S1)', () => {
+    const merged = mergeRegistry(['KYBERION_KEPT'], {
+      ...existing,
+      entries: [
+        ...existing.entries,
+        {
+          name: 'KYBERION_AARDVARK_RETIRED',
+          category: 'runtime',
+          type: 'string',
+          required: false,
+          description: 'Deprecated/ignored since 2026-10; unset it.',
+          documented: true,
+          deprecated: '2026-10',
+        },
+      ],
+    });
+    // Sorted with the discovered names; the plain unreferenced entry is still dropped.
+    expect(merged.entries.map((entry) => entry.name)).toEqual([
+      'KYBERION_AARDVARK_RETIRED',
+      'KYBERION_KEPT',
+    ]);
+    expect(merged.entries[0].deprecated).toBe('2026-10');
+    expect(validateEnvRegistryQuality(merged)).toEqual([]);
+    expect(
+      validateEnvRegistryQuality({
+        ...merged,
+        entries: [{ ...merged.entries[0], required: true }],
+      })
+    ).toContain('KYBERION_AARDVARK_RETIRED: deprecated entries may not be required');
+  });
+
   it('promotes an existing undocumented discovery entry with a safe explanation', () => {
     const merged = mergeRegistry(['KYBERION_EXISTING_TIMEOUT_MS'], {
       version: '1.0.0',

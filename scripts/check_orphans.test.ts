@@ -68,6 +68,26 @@ describe('check_orphans (OW-07)', () => {
       expect(report.libs_core_modules).toEqual([]);
     });
 
+    it('counts imported names, not identifiers that merely share the name', () => {
+      const report = findOrphans(
+        snapshot({
+          'libs/core/named.ts': 'export function sharedName() {}',
+          'libs/core/namespaced.ts': 'export function viaNamespace() {}',
+          'libs/core/dynamic.ts': 'export function viaDynamic() {}',
+          'libs/core/coincidence.ts': 'export function status() {}',
+          'scripts/a.ts': [
+            "import { sharedName as alias } from '@agent/core';",
+            "import * as core from '@agent/core';",
+            "const { viaDynamic } = await import('@agent/core');",
+            // A local `status` variable is not a use of libs/core/coincidence.ts.
+            'const status = 1; alias(); core.viaNamespace(); viaDynamic(); status;',
+          ].join('\n'),
+          'package.json': '"scripts/a.ts"',
+        })
+      );
+      expect(report.libs_core_modules).toEqual(['libs/core/coincidence.ts']);
+    });
+
     it('extracts declared and listed exports', () => {
       expect(
         exportedSymbols(
@@ -106,6 +126,21 @@ describe('check_orphans (OW-07)', () => {
       })
     );
     expect(report.pipelines).toEqual(['pipelines/lost.json']);
+    // A README row alone is a docs-only mention, tracked as its own kind.
+    expect(report.documented_only).toEqual(['pipelines/documented.json']);
+  });
+
+  it('counts a disabled (opt-in) schedule as wired', () => {
+    const report = findOrphans(
+      snapshot({
+        'pipelines/opt-in.json': JSON.stringify({
+          pipeline_id: 'opt-in',
+          schedule: { id: 'opt-in-weekly', cron: '0 3 * * 0', enabled: false },
+        }),
+      })
+    );
+    expect(report.pipelines).toEqual([]);
+    expect(report.documented_only).toEqual([]);
   });
 
   it('requires an op reference outside its own actuator and the catalogs', () => {
@@ -140,22 +175,60 @@ describe('check_orphans (OW-07)', () => {
   it('treats an op advertised in the discovery catalog and named by a test as agent-callable', () => {
     const discovery = JSON.stringify({
       actuators: [
-        { n: 'media-actuator', ops: [{ op: 'tested' }, { op: 'untested' }, { op: 'qualified' }] },
+        {
+          n: 'media-actuator',
+          ops: [
+            { op: 'tested' },
+            { op: 'stepped' },
+            { op: 'mentioned' },
+            { op: 'untested' },
+            { op: 'qualified' },
+          ],
+        },
       ],
     });
     const report = findOrphans(
       snapshot(
         {
           'knowledge/product/orchestration/actuator-op-discovery.json': discovery,
-          'libs/actuators/media-actuator/src/ops.test.ts': "runOp('tested', {});",
+          'libs/actuators/media-actuator/src/ops.test.ts': [
+            "await actuator.dispatch('tested', {});",
+            "handleAction({ action: 'stepped', params: {} });",
+            // Any other quoted string that equals an op name is not an exercise.
+            "expect(result.status).toBe('mentioned');",
+          ].join('\n'),
           // A qualified `domain:op` in any test counts; a bare name elsewhere does not.
           'tests/media.test.ts': "expect(ids).toContain('media:qualified'); run('unadvertised');",
-          'libs/actuators/other-actuator/src/x.test.ts': "run('untested');",
+          'libs/actuators/other-actuator/src/x.test.ts': "dispatch('untested');",
         },
-        { media: { capture: ['tested', 'untested', 'qualified', 'unadvertised'] } }
+        {
+          media: {
+            capture: ['tested', 'stepped', 'mentioned', 'untested', 'qualified', 'unadvertised'],
+          },
+        }
       )
     );
-    expect(report.actuator_ops).toEqual(['media:unadvertised', 'media:untested']);
+    expect(report.actuator_ops).toEqual([
+      'media:mentioned',
+      'media:unadvertised',
+      'media:untested',
+    ]);
+  });
+
+  it('attributes a bare op literal only to the domain its file targets', () => {
+    const report = findOrphans(
+      snapshot(
+        {
+          // `op: 'status'` in a file that only talks to the system actuator.
+          'scripts/system-caller.ts': "run({ actuator: 'system', op: 'status' });",
+          'scripts/browser-caller.ts':
+            "browserActuator.run({ op: 'snapshot' }); // browser-actuator",
+          'package.json': '"scripts/system-caller.ts scripts/browser-caller.ts"',
+        },
+        { system: { capture: ['status'] }, browser: { capture: ['status', 'snapshot'] } }
+      )
+    );
+    expect(report.actuator_ops).toEqual(['browser:status']);
   });
 
   it('treats an op the provider bridge resolves to a cli_native harness capability as reachable', () => {
@@ -205,6 +278,7 @@ describe('check_orphans (OW-07)', () => {
       libs_core_modules: [{ id: 'libs/core/old.ts', reason: 'kept on purpose' }],
       scripts: [{ id: 'scripts/fixed.ts', reason: 'was orphaned' }],
       pipelines: [{ id: 'pipelines/x.json', reason: 'TODO: explain' }],
+      documented_only: [],
       actuator_ops: [],
     };
 
@@ -214,6 +288,7 @@ describe('check_orphans (OW-07)', () => {
           libs_core_modules: ['libs/core/new.ts', 'libs/core/old.ts'],
           scripts: [],
           pipelines: ['pipelines/x.json'],
+          documented_only: [],
           actuator_ops: [],
         },
         baseline
@@ -225,7 +300,13 @@ describe('check_orphans (OW-07)', () => {
 
     it('rejects placeholder backlog reasons', () => {
       const comparison = compareWithBaseline(
-        { libs_core_modules: [], scripts: ['scripts/x.ts'], pipelines: [], actuator_ops: [] },
+        {
+          libs_core_modules: [],
+          scripts: ['scripts/x.ts'],
+          pipelines: [],
+          documented_only: [],
+          actuator_ops: [],
+        },
         {
           version: 1,
           libs_core_modules: [],
@@ -233,6 +314,7 @@ describe('check_orphans (OW-07)', () => {
             { id: 'scripts/x.ts', reason: 'No caller yet (OW-07 backlog: wire or retire).' },
           ],
           pipelines: [],
+          documented_only: [],
           actuator_ops: [],
         }
       );
@@ -247,6 +329,7 @@ describe('check_orphans (OW-07)', () => {
           libs_core_modules: ['libs/core/new.ts', 'libs/core/old.ts'],
           scripts: [],
           pipelines: [],
+          documented_only: [],
           actuator_ops: [],
         },
         baseline

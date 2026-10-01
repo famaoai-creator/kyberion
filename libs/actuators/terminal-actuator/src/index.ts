@@ -19,7 +19,9 @@ const COMPUTER_INTERACTION_OPS = new Set([
 
 function terminalActionInput(op: string, params: Record<string, unknown>): unknown {
   if (!COMPUTER_INTERACTION_OPS.has(op)) return { action: op, params };
-  const keys = Array.isArray(params.keys) ? params.keys : [];
+  const keys = Array.isArray(params.keys)
+    ? params.keys.filter((key): key is string => typeof key === 'string')
+    : [];
   return {
     version: '0.1',
     kind: 'computer_interaction',
@@ -31,7 +33,8 @@ function terminalActionInput(op: string, params: Record<string, unknown>): unkno
       cwd: params.cwd,
       thread_id: params.threadId,
       text: params.text,
-      ...(typeof keys[0] === 'string' ? { key: keys[0] } : {}),
+      // The whole key sequence, in order (not just the first key).
+      ...(keys.length > 0 ? { keys } : {}),
     },
   };
 }

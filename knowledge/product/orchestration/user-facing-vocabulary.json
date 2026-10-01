@@ -7047,6 +7047,31 @@
         "en": "Request human approval to trust one project hook config (bound to its content).",
         "ja": "プロジェクトのフック設定 1 件の信頼について人間の承認を依頼する(内容に紐づく)。",
         "qps-ploc": "⟦Řėɋůėşŧ ħůɱȧñ ȧṗṗřőṽȧŀ ŧő ŧřůşŧ őñė ṗřőĵėƈŧ ħőőķ ƈőñƒïɠ (ƀőůñḓ ŧő ïŧş ƈőñŧėñŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_hooks_trust_card_title": {
+        "en": "Approve project hook commands: {path}",
+        "ja": "プロジェクトのフックコマンドを承認: {path}",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ṗřőĵėƈŧ ħőőķ ƈőɱɱȧñḓş: {path} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_hooks_trust_card_summary": {
+        "en": "This hook config registers {count, plural, one {# shell command} other {# shell commands}} that run automatically on agent lifecycle events. They stay blocked until an authenticated human approves this exact content.",
+        "ja": "このフック設定は、エージェントのライフサイクルイベントで自動実行されるシェルコマンドを {count} 件登録します。認証済みの人間がこの内容を承認するまでブロックされます。",
+        "qps-ploc": "⟦Ŧħïş ħőőķ ƈőñƒïɠ řėɠïşŧėřş {count, plural, one {# shell command} other {# shell commands}} ŧħȧŧ řůñ ȧůŧőɱȧŧïƈȧŀŀẏ őñ ȧɠėñŧ ŀïƒėƈẏƈŀė ėṽėñŧş. Ŧħėẏ şŧȧẏ ƀŀőƈķėḓ ůñŧïŀ ȧñ ȧůŧħėñŧïƈȧŧėḓ ħůɱȧñ ȧṗṗřőṽėş ŧħïş ėẋȧƈŧ ƈőñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_hooks_trust_card_commands_header": {
+        "en": "Commands (event → command):",
+        "ja": "コマンド (イベント → コマンド):",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓş (ėṽėñŧ → ƈőɱɱȧñḓ): ŀőřėɱ ïṗ⟧"
+      },
+      "cli_hooks_trust_card_no_commands": {
+        "en": "(no runnable command hooks found)",
+        "ja": "(実行可能なコマンドフックはありません)",
+        "qps-ploc": "⟦(ñő řůññȧƀŀė ƈőɱɱȧñḓ ħőőķş ƒőůñḓ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_hooks_trust_card_unparsable": {
+        "en": "(config could not be parsed: {reason})",
+        "ja": "(設定を解析できませんでした: {reason})",
+        "qps-ploc": "⟦(ƈőñƒïɠ ƈőůŀḓ ñőŧ ƀė ṗȧřşėḓ: {reason}) ŀőřėɱ ïṗşůɱ ⟧"
       }
     },
     "recorder": {
@@ -7694,6 +7719,11 @@
         "en": "Deal not found: {id}",
         "ja": "商談が見つかりません: {id}",
         "qps-ploc": "⟦Ḓėȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ⟧"
+      },
+      "recorder_deal_tenant_ambiguous": {
+        "en": "Deal {id} exists in several tenants ({tenants}); pass --tenant <slug>.",
+        "ja": "商談 {id} は複数のテナント ({tenants}) に存在します。--tenant <slug> を指定してください。",
+        "qps-ploc": "⟦Ḓėȧŀ {id} ėẋïşŧş ïñ şėṽėřȧŀ ŧėñȧñŧş ({tenants}); ṗȧşş --ŧėñȧñŧ <şŀůɠ>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "recorder_deal_audio_usage": {
         "en": "Usage: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>",

@@ -41,6 +41,13 @@ const OPTIONAL_JUDGMENT_PROVIDERS: Readonly<Record<string, () => () => void>> = 
   [TYPESAFE_JEV_PROVIDER]: () => registerTypeSafeJevBackend(),
 };
 
+/**
+ * Unknown ids already warned about. The bootstrap runs on every judgment
+ * assist call, so without this a stale env entry would re-warn per call; the
+ * refusal itself is still reported in every result.
+ */
+const warnedRefusedProviders = new Set<string>();
+
 export interface JudgmentProviderBootstrapResult {
   /** Providers registered by this call (already-present ones are not repeated). */
   registered: string[];
@@ -80,6 +87,8 @@ export function ensureJudgmentBackendsRegistered(
     if (!register) {
       const reason = `unknown judgment provider; known: ${listOptionalJudgmentProviders().join(', ')}`;
       result.refused.push({ id, reason });
+      if (warnedRefusedProviders.has(id)) continue;
+      warnedRefusedProviders.add(id);
       logger.warn(
         `${JUDGMENT_PROVIDERS_ENV_VAR} lists '${id}' — ${reason} | fix the id or remove it | evidence: ${JUDGMENT_PROVIDERS_ENV_VAR}=${raw}`
       );

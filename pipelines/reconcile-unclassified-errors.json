@@ -3,12 +3,12 @@
   "pipeline_id": "reconcile-unclassified-errors",
   "version": "1.0.0",
   "name": "Unclassified Error Reconciler",
-  "description": "Reads the unclassified-error registry and writes rule-proposal stubs for each unrecognized error. Optionally invokes reasoning:analyze to suggest category, label, remediation, and patterns for each proposal.",
+  "description": "Reads the unclassified-error registry and writes rule-proposal stubs for each unrecognized error under active/shared/tmp/. When proposals exist it invokes reasoning:analyze to suggest category, label, remediation, and patterns; accepted rules are applied by a human. Ships with its schedule disabled; opt in on a host by listing the schedule id (reconcile-unclassified-errors-weekly) in KYBERION_CHRONOS_SCHEDULES.",
   "schedule": {
     "id": "reconcile-unclassified-errors-weekly",
     "cron": "40 3 * * 0",
     "timezone": "Asia/Tokyo",
-    "enabled": true
+    "enabled": false
   },
   "context": {
     "registry_path": "active/shared/tmp/unclassified-error-registry.json",

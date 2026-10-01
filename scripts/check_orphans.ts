@@ -2,18 +2,35 @@
  * OW-07: orphan ratchet. Fails when a NEW orphan appears:
  *
  *   (a) a libs/core module no non-test, non-barrel source imports (resolved
- *       specifier) and whose exported symbols no other source uses;
+ *       specifier) and none of whose exported symbols another source imports
+ *       by name (`import { name }`, `ns.name` on a namespace import, a
+ *       destructured dynamic import or a non-barrel re-export) — a bare
+ *       identifier that merely shares the name does not count;
  *   (b) a top-level scripts/*.ts nothing invokes — package.json, cli-commands,
  *       ci-gates, .github, pipelines, governance data or another source;
- *   (c) a top-level pipelines/*.json with no schedule, no reference and no
- *       pipelines/README.md row;
+ *   (c) a top-level pipelines/*.json with no schedule and no reference from a
+ *       source, data file or package.json. A declared `schedule` counts even
+ *       when it ships `enabled: false`: such schedules are opt-in per host via
+ *       KYBERION_CHRONOS_SCHEDULES, so they stay an operator-reachable entry
+ *       point;
+ *   (c') `documented_only`: a pipeline whose only mentions are Markdown docs
+ *       (including its pipelines/README.md row) — runnable by hand, but no
+ *       code, data or schedule invokes it, so each one carries a reason;
  *   (d) a registered actuator op referenced nowhere outside its own actuator,
  *       the op registry / discovery catalog and manifests — unless it is
  *       agent-callable: advertised in the agent-facing op catalog
  *       (actuator-op-discovery.json, rendered into CAPABILITIES_GUIDE.md) AND
- *       named by a unit test (its own actuator's tests, or `domain:op` in any
- *       test), or resolved at runtime by the pipeline provider bridge to a
- *       `cli_native` harness capability (harness-capabilities/*.json).
+ *       exercised by a unit test, or resolved at runtime by the pipeline
+ *       provider bridge to a `cli_native` harness capability
+ *       (harness-capabilities/*.json). A reference is a quoted `domain:op`, a
+ *       bare `op: 'x'` / `action: 'x'` of a name only one domain registers,
+ *       or a bare literal of a shared name in a file that targets that domain
+ *       (names its `<domain>-actuator`, `actuator: '<domain>'` or a
+ *       `<domain>:` op, or is a fragment file named `<domain>-*`). A test
+ *       exercises an op through a quoted `domain:op` or, in the actuator's
+ *       own tests, a step/action literal (`op: 'x'`, `action: 'x'`,
+ *       `type: 'x'`) or a `dispatch*('x'` / `handleAction('x'` / `runOp('x'`
+ *       call — any other quoted string equal to the op name does not count.
  *
  * A side-effect import (`import './x.js'`) counts as a caller even inside a
  * barrel: self-registering modules are loaded that way.
@@ -37,7 +54,13 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-export const ORPHAN_KINDS = ['libs_core_modules', 'scripts', 'pipelines', 'actuator_ops'] as const;
+export const ORPHAN_KINDS = [
+  'libs_core_modules',
+  'scripts',
+  'pipelines',
+  'documented_only',
+  'actuator_ops',
+] as const;
 export type OrphanKind = (typeof ORPHAN_KINDS)[number];
 export type OrphanReport = Record<OrphanKind, string[]>;
 
@@ -53,6 +76,7 @@ export interface OrphanBaseline {
   libs_core_modules: OrphanBaselineEntry[];
   scripts: OrphanBaselineEntry[];
   pipelines: OrphanBaselineEntry[];
+  documented_only: OrphanBaselineEntry[];
   actuator_ops: OrphanBaselineEntry[];
 }
 
@@ -143,7 +167,6 @@ function resolveSpecifier(
   return joined.replace(/\.(?:[cm]?js)$/u, '.ts').replace(/^(?!.*\.[cm]?tsx?$)(.*)$/u, '$1.ts');
 }
 
-const IDENTIFIER = /[A-Za-z_$][\w$]*/gu;
 const EXPORT_DECLARATION =
   /\bexport\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(?:function\*?|const|let|var|class|interface|type|enum|namespace)\s+([A-Za-z_$][\w$]*)/gu;
 const EXPORT_LIST = /\bexport\s+(?:type\s+)?\{([^}]*)\}(?!\s*from)/gu;
@@ -163,6 +186,48 @@ export function exportedSymbols(source: string): string[] {
     }
   }
   return [...names];
+}
+
+const NAMED_IMPORT = /\bimport\s+(?:type\s+)?(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\b/gu;
+const NAMESPACE_IMPORT = /\bimport\s+(?:type\s+)?\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\b/gu;
+const REEXPORT_LIST = /\bexport\s+(?:type\s+)?\{([^}]*)\}\s*from\b/gu;
+const DYNAMIC_DESTRUCTURE =
+  /\{([^{}]*)\}\s*=\s*(?:await\s+)?import\s*\(|\.then\s*\(\s*\(\s*\{([^{}]*)\}\s*\)\s*=>/gu;
+
+function bindingNames(list: string): string[] {
+  return list
+    .split(',')
+    .map((part) =>
+      part
+        .trim()
+        .replace(/^type\s+/u, '')
+        .split(/\s+as\s+|\s*:\s*/u)[0]!
+        .trim()
+    )
+    .filter((name) => /^[A-Za-z_$][\w$]*$/u.test(name) && name !== 'default');
+}
+
+/**
+ * Names a source imports from other modules: named imports, members read off a
+ * namespace import, destructured dynamic imports and re-export lists.
+ */
+export function importedNames(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(NAMED_IMPORT)) {
+    for (const name of bindingNames(match[1]!)) names.add(name);
+  }
+  for (const match of source.matchAll(REEXPORT_LIST)) {
+    for (const name of bindingNames(match[1]!)) names.add(name);
+  }
+  for (const match of source.matchAll(DYNAMIC_DESTRUCTURE)) {
+    for (const name of bindingNames(match[1] ?? match[2] ?? '')) names.add(name);
+  }
+  for (const match of source.matchAll(NAMESPACE_IMPORT)) {
+    const namespace = match[1]!.replace(/\$/gu, '\\$');
+    const member = new RegExp(`(?<![\\w$])${namespace}\\.([A-Za-z_$][\\w$]*)`, 'gu');
+    for (const access of source.matchAll(member)) names.add(access[1]!);
+  }
+  return names;
 }
 
 function sortUnique(values: Iterable<string>): string[] {
@@ -258,8 +323,8 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
       }
     }
     if (isCoreBarrel(file)) continue;
-    for (const identifier of new Set(text.match(IDENTIFIER) ?? [])) {
-      symbolDocs.set(identifier, (symbolDocs.get(identifier) ?? 0) + 1);
+    for (const name of importedNames(text)) {
+      symbolDocs.set(name, (symbolDocs.get(name) ?? 0) + 1);
     }
   }
   const coreModules = usage.filter(
@@ -273,9 +338,9 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
   const libsCore = coreModules
     .filter(([file, text]) => {
       if (importedPaths.has(file)) return false;
-      const ownIdentifiers = new Set(text.match(IDENTIFIER) ?? []);
+      const ownImports = importedNames(text);
       return !exportedSymbols(text).some(
-        (symbol) => (symbolDocs.get(symbol) ?? 0) - (ownIdentifiers.has(symbol) ? 1 : 0) > 0
+        (symbol) => (symbolDocs.get(symbol) ?? 0) - (ownImports.has(symbol) ? 1 : 0) > 0
       );
     })
     .map(([file]) => file);
@@ -295,7 +360,8 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
     .filter((file) => !scriptRefs.usedOutside(path.posix.basename(file, '.ts'), file));
 
   // (c) top-level pipelines: a schedule, a `<name>.json` mention, or a quoted id
-  //     (sources, data, docs and the pipelines README).
+  //     in a source, data file or package.json; (c') docs-only mentions
+  //     (Markdown, including the pipelines README) are reported separately.
   const pipelineRefs = new TokenIndex();
   for (const [file, text] of entries) {
     if (isTest(file)) continue;
@@ -311,46 +377,62 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
       pipelineRefs.add(`${match[1]!}.json`, file);
     for (const match of text.matchAll(/['"`]([\w.:-]+)['"`]/gu)) pipelineRefs.add(match[1]!, file);
   }
-  const pipelines = usage
-    .map(([file]) => file)
-    .filter((file) => /^pipelines\/[^/]+\.json$/u.test(file))
-    .filter((file) => {
-      let parsed: Record<string, unknown> = {};
-      try {
-        parsed = JSON.parse(snapshot.files.get(file) ?? '') as Record<string, unknown>;
-      } catch {
-        // An unparsable pipeline is another gate's finding; treat it as unscheduled.
-      }
-      if (parsed.schedule && typeof parsed.schedule === 'object') return false;
-      const name = path.posix.basename(file, '.json');
-      const ids = [name, parsed.pipeline_id, parsed.id].filter(
-        (value): value is string => typeof value === 'string' && value.length > 0
-      );
-      return ![`${name}.json`, ...ids].some((token) => pipelineRefs.usedOutside(token, file));
-    });
+  const pipelines: string[] = [];
+  const documentedOnly: string[] = [];
+  for (const file of usage.map(([candidate]) => candidate)) {
+    if (!/^pipelines\/[^/]+\.json$/u.test(file)) continue;
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(snapshot.files.get(file) ?? '') as Record<string, unknown>;
+    } catch {
+      // An unparsable pipeline is another gate's finding; treat it as unscheduled.
+    }
+    if (parsed.schedule && typeof parsed.schedule === 'object') continue;
+    const name = path.posix.basename(file, '.json');
+    const ids = [name, parsed.pipeline_id, parsed.id].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0
+    );
+    const referrers = [`${name}.json`, ...ids].flatMap((token) =>
+      pipelineRefs.files(token).filter((other) => other !== file)
+    );
+    if (referrers.some((other) => !other.endsWith('.md'))) continue;
+    (referrers.length > 0 ? documentedOnly : pipelines).push(file);
+  }
 
   // (d) actuator ops: `"domain:op"` anywhere, or a bare `op: "name"` / `action: 'name'`
   //     (actuator-scoped ADF and payloads), outside the op's own actuator and catalogs.
   const qualifiedRefs = new TokenIndex();
   const bareRefs = new TokenIndex();
+  const bareRefText = new Map<string, string>();
   for (const [file, text] of usage) {
     if (OP_CATALOG_FILES.has(file)) continue;
     if (/^libs\/actuators\/[^/]+\/(?:manifest\.json|src\/op-catalog\.ts)$/u.test(file)) continue;
     if (!(isSource(file) || DATA_EXT.test(file))) continue;
-    for (const match of text.matchAll(/['"`]([\w-]+:[\w-]+)['"`]/gu))
-      qualifiedRefs.add(match[1]!, file);
-    for (const match of text.matchAll(/\b(?:op|action)['"]?\s*:\s*['"]([\w-]+)['"]/gu)) {
+    for (const match of text.matchAll(QUALIFIED_OP_LITERAL)) qualifiedRefs.add(match[1]!, file);
+    for (const match of text.matchAll(BARE_OP_LITERAL)) {
       bareRefs.add(match[1]!, file);
+      bareRefText.set(file, text);
     }
   }
-  // Agent-callable ops: advertised in the discovery catalog and named by a test.
+  // Agent-callable ops: advertised in the discovery catalog and exercised by a test.
   const advertised = advertisedOps(snapshot.files.get(OP_DISCOVERY_PATH));
   const bridged = providerBridgeOps(entries);
-  const testRefs = new TokenIndex();
+  const testQualifiedRefs = new TokenIndex();
+  const testBareRefs = new TokenIndex();
   for (const [file, text] of entries) {
     if (!isTest(file)) continue;
-    for (const match of text.matchAll(/['"`]([\w-]+(?::[\w-]+)?)['"`]/gu)) {
-      testRefs.add(match[1]!, file);
+    for (const match of text.matchAll(QUALIFIED_OP_LITERAL)) testQualifiedRefs.add(match[1]!, file);
+    for (const match of text.matchAll(BARE_OP_LITERAL)) testBareRefs.add(match[1]!, file);
+    for (const match of text.matchAll(DISPATCH_LITERAL)) {
+      testBareRefs.add((match[1] ?? match[2])!, file);
+    }
+  }
+  // How many domains register each op name: a bare literal of a name only one
+  // domain registers is unambiguous; a shared name (`status`, `log`) is not.
+  const opNameDomains = new Map<string, number>();
+  for (const kinds of Object.values(snapshot.opDomains)) {
+    for (const op of new Set(Object.values(kinds).flat())) {
+      opNameDomains.set(op, (opNameDomains.get(op) ?? 0) + 1);
     }
   }
   const actuatorOps: string[] = [];
@@ -358,12 +440,19 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
     const ownPrefix = `libs/actuators/${domain}-actuator/`;
     for (const op of sortUnique(Object.values(kinds).flat())) {
       const id = `${domain}:${op}`;
-      const outside = (index: TokenIndex, token: string) =>
-        index.files(token).some((file) => !file.startsWith(ownPrefix));
-      if (outside(qualifiedRefs, id) || outside(bareRefs, op) || bridged.has(id)) continue;
+      const qualifiedOutside = qualifiedRefs.files(id).some((file) => !file.startsWith(ownPrefix));
+      const bareOutside = bareRefs
+        .files(op)
+        .some(
+          (file) =>
+            !file.startsWith(ownPrefix) &&
+            (opNameDomains.get(op) === 1 ||
+              fileTargetsDomain(bareRefText.get(file) ?? '', domain, file))
+        );
+      if (qualifiedOutside || bareOutside || bridged.has(id)) continue;
       const tested =
-        testRefs.files(id).length > 0 ||
-        testRefs.files(op).some((file) => file.startsWith(ownPrefix));
+        testQualifiedRefs.files(id).length > 0 ||
+        testBareRefs.files(op).some((file) => file.startsWith(ownPrefix));
       if (advertised.has(id) && tested) continue;
       actuatorOps.push(id);
     }
@@ -373,8 +462,41 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
     libs_core_modules: sortUnique(libsCore),
     scripts: sortUnique(scripts),
     pipelines: sortUnique(pipelines),
+    documented_only: sortUnique(documentedOnly),
     actuator_ops: sortUnique(actuatorOps),
   };
+}
+
+/** A quoted `domain:op` literal. */
+const QUALIFIED_OP_LITERAL = /['"`]([\w-]+:[\w-]+)['"`]/gu;
+/** A step / action literal: `op: 'x'`, `"action": "x"`. */
+const BARE_OP_LITERAL = /\b(?:op|action)['"]?\s*:\s*['"]([\w-]+)['"]/gu;
+/**
+ * Test-side exercise of an op: an actuator dispatch / action handler call with
+ * the op as its first argument (`dispatch('x'`, `handleAction('x'`, or the
+ * test's `runOp('x'` / `runApply('x'` wrapper), or a computer-interaction
+ * action literal (`type: 'x'`).
+ */
+const DISPATCH_LITERAL =
+  /\b(?:dispatch\w*|handleAction|handle[A-Z]\w*Action|run(?:Op|Apply|Capture|Transform|Action))\s*\(\s*['"`]([\w-]+)['"`]|\btype['"]?\s*:\s*['"]([\w-]+)['"]/gu;
+
+/**
+ * True when a file addresses this actuator domain, so its bare `op: 'x'`
+ * literals can be attributed to it: it names `<domain>-actuator`, declares
+ * `actuator: '<domain>'`, uses a qualified `<domain>:` op, or is an
+ * actuator-scoped fragment named `<domain>-*`.
+ */
+export function fileTargetsDomain(text: string, domain: string, file = ''): boolean {
+  if (!text) return false;
+  // Actuator-scoped ADF fragments are named after their actuator
+  // (pipelines/fragments/browser-session-start.json → browser).
+  if (path.posix.basename(file).startsWith(`${domain}-`)) return true;
+  const escaped = domain.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return (
+    text.includes(`${domain}-actuator`) ||
+    new RegExp(`\\bactuator['"]?\\s*:\\s*['"]${escaped}['"]`, 'u').test(text) ||
+    new RegExp(`['"\`]${escaped}:[\\w-]+['"\`]`, 'u').test(text)
+  );
 }
 
 export interface OrphanComparison {
@@ -384,7 +506,13 @@ export interface OrphanComparison {
 }
 
 function emptyReport(): OrphanReport {
-  return { libs_core_modules: [], scripts: [], pipelines: [], actuator_ops: [] };
+  return {
+    libs_core_modules: [],
+    scripts: [],
+    pipelines: [],
+    documented_only: [],
+    actuator_ops: [],
+  };
 }
 
 export function compareWithBaseline(
