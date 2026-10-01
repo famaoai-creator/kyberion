@@ -242,6 +242,43 @@ describe('surface-approval-ui', () => {
     expect(result).toMatchObject({ handled: true, record: { status: 'approved' } });
   });
 
+  it('refuses a decision from an actor the caller does not authorize', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-unauthorized',
+      correlationId: `surface-approval-test-${RUN_ID}-unauthorized`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Deploy the reviewed change.' },
+    });
+    for (const text of ['1', `appr:${record.id}:approve`]) {
+      const refused = resolveSurfaceApprovalReply({
+        surface: 'telegram',
+        channel: FIXTURE_CHANNEL,
+        threadTs: 'thread-unauthorized',
+        text,
+        decidedBy: 'member-1',
+        canDecide: () => false,
+      });
+      expect(refused.handled).toBe(true);
+      expect(refused.reply).toContain('権限がありません');
+      expect(refused.record).toBeUndefined();
+    }
+
+    const approved = resolveSurfaceApprovalReply({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-unauthorized',
+      text: '1',
+      decidedBy: 'lead-1',
+      canDecide: () => true,
+    });
+    expect(approved).toMatchObject({
+      handled: true,
+      record: { id: record.id, status: 'approved' },
+    });
+  });
+
   it('keeps the shared intent authority and next action in approval text', () => {
     const record = createSurfaceApprovalRequest({
       surface: 'telegram',
