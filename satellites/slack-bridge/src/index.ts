@@ -97,7 +97,6 @@ import {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
   answerSlackTeamChannelCommand,
-  handleSlackTeamChannelCommand,
   issueSlackThreadMission,
   slackTextConfirmer,
   evaluateSlackChannelActorAccess,
