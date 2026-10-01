@@ -1680,6 +1680,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/migrate_binding_owners.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/migrate_peer_tenant_runtime.ts#applyPeerTenantMigrationPlan",
       "roles": ["physical_namespace_migration"],
       "unresolved": []
@@ -2838,6 +2843,7 @@
         "presence/displays/concierge/src/lib/charter-view.ts",
         "presence/displays/concierge/src/lib/concierge-advisory-response.ts",
         "presence/displays/concierge/src/lib/concierge-theme.ts",
+        "presence/displays/concierge/src/lib/connection-view.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",
         "presence/displays/concierge/src/lib/front-desk-auth-token.ts",

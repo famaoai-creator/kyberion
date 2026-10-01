@@ -5515,6 +5515,10 @@
       "types": "./dist/service/service-authority-map.d.ts",
       "default": "./dist/service/service-authority-map.js"
     },
+    "./service/service-binding-owner": {
+      "types": "./dist/service/service-binding-owner.d.ts",
+      "default": "./dist/service/service-binding-owner.js"
+    },
     "./service/service-binding-registry": {
       "types": "./dist/service/service-binding-registry.d.ts",
       "default": "./dist/service/service-binding-registry.js"
@@ -5674,6 +5678,10 @@
     "./voice/streaming-tts-bridge": {
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
+    },
+    "./surface/channel-mode-policy": {
+      "types": "./dist/surface/channel-mode-policy.d.ts",
+      "default": "./dist/surface/channel-mode-policy.js"
     },
     "./surface/surface-access-policy": {
       "types": "./dist/surface/surface-access-policy.d.ts",
