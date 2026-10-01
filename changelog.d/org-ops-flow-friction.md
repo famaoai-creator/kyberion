@@ -1,6 +1,6 @@
 ---
 type: change
-pr: TBD
+pr: '848'
 category: fix
 summary: Separate organization_id from customer stance; tenant-aware mission dirs; short ops-report process; mission-id execution refs.
 ---
