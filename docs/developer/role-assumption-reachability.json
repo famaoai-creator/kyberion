@@ -113,6 +113,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/accountability-digest.ts#runAccountabilityDigest",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1410,11 +1415,6 @@
     },
     {
       "site": "scripts/approval_inbox.ts#collectDecisionDigest",
-      "roles": ["mission_controller"],
-      "unresolved": []
-    },
-    {
-      "site": "scripts/approval_inbox.ts#runCharterReport",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3435,7 +3435,7 @@
         "scope_locale_reader": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#buildIMessageChannelAdapter",
-            "libs/core/t.ts#t",
+            "libs/core/surface/operator-identity.ts#resolveOperatorLocale",
             "libs/core/locale.ts#resolveLocale",
             "libs/core/locale.ts#resolveWithoutExplicit",
             "libs/core/locale.ts#resolveScopedLocale"
