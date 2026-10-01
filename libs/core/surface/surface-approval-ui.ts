@@ -621,18 +621,30 @@ export function resolveSurfaceApprovalReply(params: {
   text: string;
   decidedBy: string;
   locale?: SupportedLocale;
+  /**
+   * Team Channel: whether `decidedBy` may decide (approve, reject, request
+   * changes). Omitted means the caller already authorized the actor.
+   */
+  canDecide?: () => boolean;
 }): SurfaceApprovalReply {
   const text = params.text.trim();
+  const unauthorized: SurfaceApprovalReply = {
+    handled: true,
+    reply: t('bridge:approval_not_authorized', undefined, params.locale),
+  };
+  const mayDecide = () => (params.canDecide ? params.canDecide() : true);
   const cardToken = text.match(CARD_TOKEN);
   if (cardToken) {
     const instruction = text.slice(cardToken[0].length).trim();
+    const kind = cardToken[2].toLowerCase() === 'explain' ? 'explain' : 'changes';
+    if (kind === 'changes' && !mayDecide()) return unauthorized;
     return resolveDecisionCardToken({
       surface: params.surface,
       channel: params.channel,
       threadTs: params.threadTs,
       decidedBy: params.decidedBy,
       requestId: cardToken[1].toLowerCase(),
-      kind: cardToken[2].toLowerCase() === 'explain' ? 'explain' : 'changes',
+      kind,
       instruction: instruction || undefined,
       locale: params.locale ?? resolveLocale(),
     });
@@ -642,6 +654,7 @@ export function resolveSurfaceApprovalReply(params: {
   let decision: SurfaceApprovalDecision | undefined;
 
   if (token) {
+    if (!mayDecide()) return unauthorized;
     decision = normalizeDecision(token[2]);
     record = loadReplyTarget(params.surface, token[1]);
     if (!record || record.status !== 'pending') {
@@ -691,6 +704,7 @@ export function resolveSurfaceApprovalReply(params: {
       reply: t('surface:approval_decision_unparsed', undefined, params.locale),
     };
   }
+  if (!mayDecide()) return unauthorized;
   return resolveSurfaceApprovalRecord({
     surface: params.surface,
     record,

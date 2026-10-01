@@ -3700,6 +3700,15 @@
       "subsystem": "surface"
     },
     {
+      "name": "KYBERION_SURFACE_CHANNEL_MODES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "JSON per-channel conversation mode keyed by surface then channel id (for example {\"slack\":{\"C0TEAM\":{\"mode\":\"team\",\"tenant_slug\":\"acme\",\"max_tier\":\"confidential\",\"approvers\":[\"U0LEAD\"]}}}); unlisted channels stay owner_direct and an invalid value fails closed.",
+      "documented": true,
+      "subsystem": "surface"
+    },
+    {
       "name": "KYBERION_SURFACE_QUERY_CONFIG_PATH",
       "category": "path",
       "type": "path",

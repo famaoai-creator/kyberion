@@ -10558,6 +10558,21 @@
         "en": "Rejected by {actor}: {title}",
         "ja": "{actor} が却下しました: {title}",
         "qps-ploc": "⟦Řėĵėƈŧėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
+      },
+      "approval_not_authorized": {
+        "en": "You are not authorized to decide this approval request. Please ask an approver.",
+        "ja": "この承認要求を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "approval_action_not_authorized": {
+        "en": "You are not authorized to perform this action. Please ask an approver.",
+        "ja": "この操作を行う権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ṗėřƒőřɱ ŧħïş ȧƈŧïőñ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "mission_proposal_not_authorized": {
+        "en": "You are not authorized to decide this mission proposal. Please ask an approver.",
+        "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       }
     },
     "concierge": {
@@ -13195,6 +13210,26 @@
         "en": "Put this in the form",
         "ja": "フォームに入れる",
         "qps-ploc": "⟦Ṗůŧ ŧħïş ïñ ŧħė ƒőřɱ ŀőřėɱ ⟧"
+      },
+      "setup.connections_mine": {
+        "en": "Your connections",
+        "ja": "あなたの連携",
+        "qps-ploc": "⟦Ẏőůř ƈőññėƈŧïőñş ŀőřėɱ⟧"
+      },
+      "setup.connections_organization": {
+        "en": "{tenant} connections",
+        "ja": "{tenant} の連携",
+        "qps-ploc": "⟦{tenant} ƈőññėƈŧïőñş ŀőřėɱ ⟧"
+      },
+      "setup.connection_owner_person": {
+        "en": "Yours",
+        "ja": "あなたの",
+        "qps-ploc": "⟦Ẏőůřş ŀőř⟧"
+      },
+      "setup.connection_owner_organization": {
+        "en": "Organization: {tenant}",
+        "ja": "組織: {tenant}",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
       }
     },
     "onboarding": {
@@ -25295,6 +25330,11 @@
         "en": "That request is not supported here. Start again from the sign-in page.",
         "ja": "この操作はここではできません。サインイン画面からやり直してください。",
         "qps-ploc": "⟦Ŧħȧŧ řėɋůėşŧ ïş ñőŧ şůṗṗőřŧėḓ ħėřė. Şŧȧřŧ ȧɠȧïñ ƒřőɱ ŧħė şïɠñ-ïñ ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "failed_logout_blocked": {
+        "en": "A sign-out request from another site was ignored, so you are still signed in. Use the sign-out control in this app to sign out.",
+        "ja": "他のサイトからのサインアウト要求は無視しました。サインインしたままです。サインアウトはこのアプリ内の操作から行ってください。",
+        "qps-ploc": "⟦Ȧ şïɠñ-őůŧ řėɋůėşŧ ƒřőɱ ȧñőŧħėř şïŧė ẇȧş ïɠñőřėḓ, şő ẏőů ȧřė şŧïŀŀ şïɠñėḓ ïñ. Ůşė ŧħė şïɠñ-őůŧ ƈőñŧřőŀ ïñ ŧħïş ȧṗṗ ŧő şïɠñ őůŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       },
       "failed_rate_limited": {
         "en": "Too many sign-in attempts. Wait a minute and try again.",
