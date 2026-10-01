@@ -5,7 +5,6 @@ import type { TierLevel } from '../types.js';
 import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-  type GovernedArtifactRole,
 } from '../workforce/artifact-store.js';
 
 /**
@@ -43,11 +42,6 @@ interface ChannelMemoryFile {
 
 export const CHANNEL_MEMORY_LIMITS = Object.freeze({ maxEntries: 30, maxTextLength: 500 });
 
-const MEMORY_WRITER: Partial<Record<string, GovernedArtifactRole>> = {
-  slack: 'slack_bridge',
-  chronos: 'chronos_gateway',
-};
-
 const TIER_RANK: Record<TierLevel, number> = { public: 1, confidential: 2, personal: 3 };
 
 function safeSegment(value: string): string {
@@ -73,15 +67,23 @@ function readFile(ref: ChannelMemoryRef): ChannelMemoryFile | null {
 }
 
 function writeFile(ref: ChannelMemoryRef, entries: ChannelMemoryEntry[]): void {
-  const role = MEMORY_WRITER[ref.surface];
-  if (!role) throw new Error(`[CHANNEL_MEMORY] surface '${ref.surface}' has no memory writer`);
   const file: ChannelMemoryFile = {
     surface: ref.surface,
     tenant_slug: ref.tenantSlug,
     channel: ref.channel,
     entries,
   };
-  writeGovernedArtifactJson(role, channelMemoryLogicalPath(ref), file);
+  const logicalPath = channelMemoryLogicalPath(ref);
+  switch (ref.surface) {
+    case 'slack':
+      writeGovernedArtifactJson('slack_bridge', logicalPath, file);
+      return;
+    case 'chronos':
+      writeGovernedArtifactJson('chronos_gateway', logicalPath, file);
+      return;
+    default:
+      throw new Error(`[CHANNEL_MEMORY] surface '${ref.surface}' has no memory writer`);
+  }
 }
 
 /** Facts visible at `maxTier` (never above it), oldest first. */
