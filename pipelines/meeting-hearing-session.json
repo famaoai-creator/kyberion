@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "meeting-hearing-session",
+  "version": "1.0.0",
+  "name": "Guided Hearing Session",
+  "description": "Run a guided hearing (requirements interview) on a topic and export the structured hearing result. Provide answers to resume a session; the front-desk hearing agent uses the same meeting:hearing_session op.",
+  "labels": ["meeting", "hearing"],
+  "context": {
+    "topic": "Renewal requirements",
+    "counterparty_label": "",
+    "language": "ja",
+    "output_path": "active/shared/tmp/meeting/hearing-result.json"
+  },
+  "steps": [
+    {
+      "id": "run_hearing",
+      "role": "source",
+      "op": "meeting:hearing_session",
+      "produces": { "channel": "hearing_result", "type": "HearingSessionResult" },
+      "params": {
+        "topic": "{{topic}}",
+        "counterparty_label": "{{counterparty_label}}",
+        "language": "{{language}}",
+        "output_path": "{{output_path}}",
+        "export_as": "hearing_result"
+      }
+    },
+    {
+      "id": "log_hearing",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "hearing_result",
+      "params": { "message": "Hearing session result stored at {{output_path}}" }
+    }
+  ]
+}

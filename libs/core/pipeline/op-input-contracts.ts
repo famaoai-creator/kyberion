@@ -607,12 +607,13 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
     reconcile_config_fallbacks: {
       summary:
-        'Sweep the config-fallback registry: recreate missing public-tier knowledge JSON from defaults, write parse-error proposals. Returns { repaired, proposals_written, skipped, pruned }.',
+        'Sweep the config-fallback registry: write parse-error proposals and list missing public-tier knowledge JSON as planned recreations; only apply: true writes those files from defaults. Returns { applied, repaired, planned, proposals_written, skipped, pruned }.',
       examples: [{ export_as: 'reconcile_result' }],
       schema: {
         type: 'object',
         properties: {
           export_as: { type: 'string', minLength: 1 },
+          apply: { type: 'boolean' },
         },
         additionalProperties: true,
       },

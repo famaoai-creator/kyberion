@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "test-inventory-device-pipeline",
+  "version": "1.0.0",
+  "name": "Test Inventory To Device Pipeline",
+  "description": "Compile a test-case inventory and an app profile into an executable Android/iOS device pipeline (proposal artifact; run it separately under approval).",
+  "labels": ["modeling", "testing", "mobile"],
+  "context": {
+    "test_inventory_path": "active/shared/tmp/test-runs/test-inventory.json",
+    "app_profile_path": "active/shared/tmp/test-runs/app-profile.json",
+    "platform": "android",
+    "output_path": "active/shared/tmp/test-runs/device-execution-pipeline.json"
+  },
+  "steps": [
+    {
+      "id": "read_inventory",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "test_case_inventory", "type": "TestCaseAdf" },
+      "params": { "path": "{{test_inventory_path}}", "export_as": "test_case_inventory" }
+    },
+    {
+      "id": "read_profile",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "app_profile", "type": "AppProfile" },
+      "params": { "path": "{{app_profile_path}}", "export_as": "app_profile" }
+    },
+    {
+      "id": "compile_device_pipeline",
+      "role": "transform",
+      "op": "modeling:test_inventory_to_device_pipeline",
+      "consumes": ["test_case_inventory", "app_profile"],
+      "produces": { "channel": "device_execution_pipeline", "type": "DevicePipelineAdf" },
+      "params": {
+        "from": "test_case_inventory",
+        "profile_from": "app_profile",
+        "platform": "{{platform}}",
+        "export_as": "device_execution_pipeline"
+      }
+    },
+    {
+      "id": "write_device_pipeline",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "device_execution_pipeline",
+      "params": { "path": "{{output_path}}", "content": "{{device_execution_pipeline}}" }
+    }
+  ]
+}

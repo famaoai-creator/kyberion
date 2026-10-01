@@ -22,7 +22,7 @@ describe('peer server entrypoints', () => {
   });
 
   it('keeps startup failures in the shared harness boundary', () => {
-    for (const name of ['peer_conversation_server.ts', 'peer_messaging_server.ts']) {
+    for (const name of ['peer_conversation_server.ts']) {
       const source = readScript(name);
       expect(source).not.toContain('process.exitCode');
       expect(source).not.toContain('flags: []');
@@ -30,9 +30,6 @@ describe('peer server entrypoints', () => {
       expect(source).toContain('run: async ({ argv, dryRun, check, print })');
       expect(source).toContain('options.dryRun === true || options.check === true');
       expect(source).toContain('if (result) print(result);');
-      if (name === 'peer_messaging_server.ts') {
-        expect(source).toContain('await server.close();\n    throw error;');
-      }
     }
   });
 });

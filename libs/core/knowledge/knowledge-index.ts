@@ -4,6 +4,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonEntriesInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
+import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -102,6 +103,7 @@ export interface KnowledgeQueryOptions {
   includeScores?: boolean;
 }
 
+const logger = createLogger('knowledge-index');
 const USAGE_YIELD_CACHE_TTL_MS = 15_000;
 const usageYieldCache = new Map<string, { expiresAt: number; values: Map<string, number> }>();
 
@@ -693,7 +695,12 @@ function _scanConfidentialTier(
   const isVisibleRoot = (root: string): boolean => {
     try {
       return safeExistsSync(root);
-    } catch {
+    } catch (error) {
+      logger.debug(
+        `[knowledge-index] confidential root not visible to this reader, skipped: ${root} (${
+          error instanceof Error ? error.message : String(error)
+        })`
+      );
       return false;
     }
   };

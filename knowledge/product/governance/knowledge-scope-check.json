@@ -6,7 +6,6 @@
   "legacy_quarantine_ttl_days": 14,
   "confidential_scope_allowlist": [],
   "scoped_runtime_writer_files": [
-    "libs/core/context-promotion-ledger.ts",
     "libs/core/contextual-intent-learning.ts",
     "libs/core/contextual-intent-memory.ts",
     "libs/core/intent/intent-contract-learning.ts",

@@ -9,7 +9,6 @@
     "analysis-config.json": ["algorithms", "auto_update", "description", "name", "version"],
     "analysis-execution-contracts.json": ["contracts", "version"],
     "autonomous-ops-policy.json": ["actions", "axis_weights", "decision_thresholds", "version"],
-    "dynamic-policies.json": ["policies", "version"],
     "ecosystem-blueprint.json": ["infrastructure", "name", "version"],
     "env-registry.json": ["description", "entries", "version"],
     "execution-boundary-profiles.json": ["profiles", "version"],
@@ -25,7 +24,7 @@
       "trend_window_ms",
       "version"
     ],
-    "i18n-baseline.json": ["files", "generated_at", "scan_roots", "version"],
+    "i18n-baseline.json": ["files", "generated_at", "locale_tokens", "scan_roots", "version"],
     "ingest-quota-policy.json": [
       "description",
       "max_bytes_per_day",

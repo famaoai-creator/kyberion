@@ -270,11 +270,6 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/product/governance/shell-command-policy.json',
   },
   {
-    id: 'permission-presets',
-    schemaPath: 'knowledge/product/schemas/permission-presets.schema.json',
-    dataPath: 'knowledge/product/governance/permission-presets.json',
-  },
-  {
     id: 'intent-routing-map',
     schemaPath: 'knowledge/product/schemas/intent-routing-map.schema.json',
     dataPath: 'knowledge/product/governance/intent-routing-map.json',

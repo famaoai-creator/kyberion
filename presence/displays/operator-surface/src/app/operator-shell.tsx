@@ -14,7 +14,7 @@ import {
   useA2UIActions,
   type A2UILinkProps,
 } from '@agent/shared-ui';
-import type { OperatorLocale } from '../lib/i18n';
+import { normalizeOperatorLocale, OPERATOR_DEFAULT_LOCALE, type OperatorLocale } from '../lib/i18n';
 import {
   hasLocaleCookie,
   normalizeThemePreference,
@@ -163,7 +163,7 @@ export function OperatorPageHeader({ title, subtitle }: { title: string; subtitl
       if (actionId === KB_DISPLAY_CONTROLS_ACTIONS.theme) {
         setTheme?.(normalizeThemePreference(payload?.value));
       } else if (actionId === KB_DISPLAY_CONTROLS_ACTIONS.locale) {
-        setLocale?.(payload?.value === 'en' ? 'en' : 'ja');
+        setLocale?.(normalizeOperatorLocale(payload?.value) ?? OPERATOR_DEFAULT_LOCALE);
       }
     },
     [setTheme, setLocale]

@@ -1,5 +1,4 @@
 /** Domain barrel — public surface for libs/core/task */
-export * from './task-distill-candidate.js';
 export * from './task-executor.js';
 export * from './task-knowledge-provisioning.js';
 export * from './task-plan-coordinator-port.js';

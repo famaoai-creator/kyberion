@@ -7,6 +7,11 @@ const mocks = vi.hoisted(() => ({
   queryTenantKnowledge: vi.fn(),
   queryKnowledgeHybrid: vi.fn(),
   readScheduleAgenda: vi.fn(async () => 'owner agenda'),
+  recordIntentContractOutcome: vi.fn(),
+}));
+
+vi.mock('../intent/intent-contract-learning.js', () => ({
+  recordIntentContractOutcome: mocks.recordIntentContractOutcome,
 }));
 
 vi.mock('../organization/tenant-knowledge-retrieval.js', () => ({
@@ -26,7 +31,11 @@ vi.mock('./surface-runtime-helpers.js', async () => ({
   readScheduleAgenda: mocks.readScheduleAgenda,
 }));
 
-import { handleSurfaceQueryRoute } from './surface-runtime-conversation-data.js';
+import {
+  handleSurfaceQueryRoute,
+  recordLearningOutcomeSafely,
+  surfaceRuntimeContextStore,
+} from './surface-runtime-conversation-data.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 
 function routeContext(
@@ -109,5 +118,22 @@ describe('handleSurfaceQueryRoute tenant isolation', () => {
     expect(mocks.readScheduleAgenda).not.toHaveBeenCalled();
     expect(agenda.text).toContain('not available in a shared channel');
     expect(location.text).toContain('not available in a shared channel');
+  });
+
+  it('keeps isolated turns out of the shared intent-learning store', () => {
+    const outcome = {
+      intent_id: 'knowledge-query',
+      execution_shape: 'direct_reply',
+      success: true,
+    } as never;
+    surfaceRuntimeContextStore.run(
+      { ...routeContext({ tenantSlug: 'acme', maxTier: 'confidential' }).input },
+      () => recordLearningOutcomeSafely(outcome)
+    );
+    expect(mocks.recordIntentContractOutcome).not.toHaveBeenCalled();
+    surfaceRuntimeContextStore.run({ ...routeContext().input }, () =>
+      recordLearningOutcomeSafely(outcome)
+    );
+    expect(mocks.recordIntentContractOutcome).toHaveBeenCalledTimes(1);
   });
 });

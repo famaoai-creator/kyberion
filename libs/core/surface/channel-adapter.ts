@@ -4,7 +4,8 @@ import {
   renderIntentOutcomeLabel,
 } from '../intent/intent-resolution-contract.js';
 import { t } from '../t.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
+import { resolveLocale } from '../locale.js';
 import type {
   SurfaceAsyncChannel,
   SurfaceConversationAttachment,
@@ -97,8 +98,7 @@ export function formatChannelTurnText(
   if (!text || !contract || !includeContract || !contractNeedsOperatorAttention) {
     return result.text;
   }
-  const locale =
-    options.locale ?? (/[ぁ-んァ-ン一-龯]/u.test(text) ? ('ja' as const) : ('en' as const));
+  const locale = options.locale ?? detectTextLocale(text) ?? resolveLocale();
   const labels = {
     understanding: t('bridge:contract_understanding', undefined, locale),
     missingInput: t('bridge:contract_missing_input', undefined, locale),

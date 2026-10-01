@@ -1,3 +1,4 @@
+import { t } from './t.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -251,7 +252,7 @@ export async function runCustomerConversation(
     // E2E-04 Task 2 landed: push the question to the operator's channel;
     // sendOpsAlert stays as the durable JSONL record (deduped).
     void notifyOperator('question', {
-      title: `顧客からの確認事項 (${tenantSlug} / ${deal.deal_id})`,
+      title: t('deal_ops:customer_question_title', { tenant: tenantSlug, dealId: deal.deal_id }),
       body: question,
       link_hint: `deal ${deal.deal_id} on ${binding.binding.surface}:${binding.binding.channel_id}`,
       correlation_id: `${deal.deal_id}:${question.slice(0, 40)}`,

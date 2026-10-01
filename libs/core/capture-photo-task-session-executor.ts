@@ -1,3 +1,5 @@
+import { t } from './t.js';
+import { deriveReplyLocale, getReplyLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
@@ -80,10 +82,17 @@ export async function executeCapturePhotoTaskSession(
     device_preference: devicePreference || probe.selected_camera,
   });
 
+  // Reply in the language the user asked in (IT-02), else the turn/operator locale.
+  const locale =
+    deriveReplyLocale({ text: params.queryText }) ??
+    deriveReplyLocale({ text: params.session.goal.summary }) ??
+    getReplyLocale();
   const summaryParts = [
-    '写真を取得しました。',
-    capture.selected_camera ? `使用カメラ: ${capture.selected_camera}` : '',
-    `保存先: ${outputPath}`,
+    t('surface:photo_captured', undefined, locale),
+    capture.selected_camera
+      ? t('surface:photo_camera_used', { camera: capture.selected_camera }, locale)
+      : '',
+    t('surface:photo_saved_to', { path: outputPath }, locale),
   ].filter(Boolean);
 
   const updated = updateTaskSession(params.session.session_id, {

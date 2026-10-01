@@ -15,6 +15,7 @@ import {
 } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
+import { t } from '@agent/core/t';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -111,22 +112,28 @@ export function detectRequestArchetype(
 
 const ARCHETYPE_DETECTION_BRIDGE: Array<{ pattern: RegExp; hints: string[] }> = [
   {
+    // i18n-exempt: intent-matching pattern
     pattern: /(プロジェクト|要件定義|設計書|運用設計|ゲート|トレーサビリティ)/i,
     hints: ['project', 'requirements', 'design', 'gate'],
   },
   {
+    // i18n-exempt: intent-matching pattern
     pattern: /(提案書|提案資料|営業資料|ピッチ|デッキ|スライド|プレゼン)/i,
     hints: ['proposal', 'deck', 'pitch'],
   },
   {
+    // i18n-exempt: intent-matching pattern
     pattern: /(サイト|webサイト|lp|landing page|価格ページ|pricing page|デザインをクローン|踏襲)/i,
     hints: ['website', 'landing page', 'design', 'reference source'],
   },
   {
+    // i18n-exempt: intent-matching pattern
     pattern: /(モバイル|アプリ|ios|android|webview)/i,
     hints: ['mobile', 'app', 'ios', 'android', 'webview'],
   },
+  // i18n-exempt: intent-matching pattern
   { pattern: /(状態|健全性|ヘルス|readiness|稼働状況)/i, hints: ['status', 'health', 'readiness'] },
+  // i18n-exempt: intent-matching pattern
   { pattern: /(作って|作成して|生成して|まとめて|build|deliver)/i, hints: ['build', 'deliver'] },
 ];
 
@@ -810,33 +817,33 @@ export function parseJsonCommandOutput(output: string): unknown {
 export function buildClarificationQuestion(inputName: string): string {
   switch (inputName) {
     case 'reference source':
-      return '参照元となる画面、URL、資料、またはアプリ名を指定してください。';
+      return t('question:orch_brief_q_reference_source');
     case 'preserved elements':
-      return '踏襲したい要素は何ですか。配色、レイアウト、トーン、導線などを指定してください。';
+      return t('question:orch_brief_q_preserved_elements');
     case 'new concept':
-      return '新しく実現したいコンセプトや目的を一文で指定してください。';
+      return t('question:orch_brief_q_new_concept');
     case 'target environment':
-      return '対象環境を指定してください。例: local / staging / production-like。';
+      return t('question:orch_brief_q_target_environment');
     case 'execution environment':
-      return '実行環境を指定してください。例: simulator / emulator / local browser。';
+      return t('question:orch_brief_q_execution_environment');
     case 'source materials':
-      return 'ベースにする資料や入力ファイルを指定してください。';
+      return t('question:orch_brief_q_source_materials');
     case 'target audience':
-      return '想定読者または利用者を指定してください。';
+      return t('question:orch_brief_q_target_audience');
     case 'storyline':
-      return 'どういう流れで伝えたいか、章立てまたは要点を指定してください。';
+      return t('question:orch_brief_q_storyline');
     case 'required output format':
-      return '必要な出力形式を指定してください。例: pptx / docx / pdf。';
+      return t('question:orch_brief_q_required_output_format');
     case 'project name':
-      return 'プロジェクト名を指定してください。正式名または運用名で構いません。';
+      return t('question:orch_brief_q_project_name');
     case 'delivery scope':
-      return '今回の納品範囲を指定してください。例: project OS / document pack / design pack。';
+      return t('question:orch_brief_q_delivery_scope');
     case 'phase or gate':
-      return '対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。';
+      return t('question:orch_brief_q_phase_or_gate');
     case 'related missions':
-      return '関連する mission があれば指定してください。無ければ none と答えてください。';
+      return t('question:orch_brief_q_related_missions');
     default:
-      return `${inputName} を指定してください。`;
+      return t('question:orch_brief_q_default', { name: inputName });
   }
 }
 
@@ -884,7 +891,9 @@ export function deriveStatusNextActions(
         action: `Investigate logs and restart ${surfaceId}`,
         reason: finding.detail || finding.message,
         suggested_command: `node dist/scripts/surface_runtime.js --action reconcile --surface ${surfaceId}`,
-        suggested_followup_request: `${surfaceId} を reconcile して状態を再確認してください。`,
+        suggested_followup_request: t('next_action:followup_reconcile_surface', {
+          surface: surfaceId,
+        }),
       });
       continue;
     }
@@ -897,7 +906,7 @@ export function deriveStatusNextActions(
           'Run `pnpm run check -- --scope pr --only esm` and resolve import/runtime mismatches',
         reason: finding.detail || finding.message,
         suggested_command: 'pnpm run check -- --scope pr --only esm',
-        suggested_followup_request: 'ESM integrity の失敗箇所を修正してください。',
+        suggested_followup_request: t('next_action:followup_fix_esm_integrity'),
       });
       continue;
     }
@@ -910,7 +919,7 @@ export function deriveStatusNextActions(
           'Run `pnpm run check -- --scope full --only catalogs` and repair invalid orchestration catalogs',
         reason: finding.detail || finding.message,
         suggested_command: 'pnpm run check -- --scope full --only catalogs',
-        suggested_followup_request: 'catalog integrity の失敗箇所を修正してください。',
+        suggested_followup_request: t('next_action:followup_fix_catalog_integrity'),
       });
       continue;
     }
@@ -921,8 +930,7 @@ export function deriveStatusNextActions(
         next_action_type: 'inspect',
         action: 'Review active missions and confirm checkpoints or finish criteria',
         reason: finding.detail || finding.message,
-        suggested_followup_request:
-          'active な mission の checkpoint または finish 条件を確認してください。',
+        suggested_followup_request: t('next_action:followup_review_active_missions'),
       });
       continue;
     }
@@ -938,7 +946,9 @@ export function deriveStatusNextActions(
         action: `Review artifacts for ${missionId}`,
         reason: 'The requested mission is already completed.',
         suggested_command: `node dist/scripts/mission_controller.js status ${missionId}`,
-        suggested_followup_request: `${missionId} の成果物と distillation を確認してください。`,
+        suggested_followup_request: t('next_action:followup_review_mission_artifacts', {
+          missionId,
+        }),
       });
       continue;
     }
@@ -951,7 +961,7 @@ export function deriveStatusNextActions(
         action: `Resume or verify ${missionId}`,
         reason: 'The requested mission is still active.',
         suggested_command: `node dist/scripts/mission_controller.js resume ${missionId}`,
-        suggested_followup_request: `${missionId} を再開して進捗を確認してください。`,
+        suggested_followup_request: t('next_action:followup_resume_mission', { missionId }),
       });
       continue;
     }
@@ -963,8 +973,7 @@ export function deriveStatusNextActions(
         next_action_type: 'inspect',
         action: 'Inspect the project mission ledger and gate artifacts',
         reason: finding.detail || finding.message,
-        suggested_followup_request:
-          '対象 project の mission ledger と gate 資料を確認してください。',
+        suggested_followup_request: t('next_action:followup_review_project_ledger'),
         ...(projectPath
           ? { suggested_command: `sed -n '1,220p' ${projectPath}/04_control/mission-ledger.md` }
           : {}),
@@ -978,8 +987,7 @@ export function deriveStatusNextActions(
       next_action_type: 'inspect',
       action: 'No immediate action required',
       reason: 'The status report did not identify corrective work.',
-      suggested_followup_request:
-        '必要なら別の mission または project を指定して詳細状態を確認してください。',
+      suggested_followup_request: t('next_action:followup_specify_other_target'),
     });
   }
   return actions;

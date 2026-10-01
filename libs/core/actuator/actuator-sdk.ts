@@ -539,6 +539,13 @@ export function defineActuator<Ops extends Record<string, ActuatorOpDefinition>>
  * their internal operation tables. The compatibility shape is deliberately
  * contained here so pipeline execution never needs a second dispatch path.
  */
+function topLevelFailureError(result: unknown): string | undefined {
+  const error = (result as { error?: unknown }).error;
+  if (typeof error === 'string' && error) return error;
+  if (error instanceof Error && error.message) return error.message;
+  return undefined;
+}
+
 export function defineLegacyPipelineActuator(options: {
   id: string;
   handleAction: LegacyPipelineActionHandler;
@@ -601,6 +608,7 @@ export function defineLegacyPipelineActuator(options: {
             : undefined;
           throw new Error(
             failedEntry?.error ||
+              topLevelFailureError(actionResult) ||
               `Actuator sub-pipeline reported failure for ${options.id}:${input.op}`
           );
         }
@@ -624,6 +632,17 @@ export function defineCatalogBackedActuator(options: {
   describeOps: () => readonly ActuatorOpDescription[];
   /** Existing action handlers often expose a narrower domain input type. */
   handleAction: (input: never) => Promise<unknown> | unknown;
+  /**
+   * Shape of the handler input for one catalog op. Defaults to a one-step
+   * `{ action: 'pipeline', steps: [...] }` envelope; actuators whose handler
+   * takes a single action (`{ action: op, params }`, `{ op, ... }`) declare
+   * that shape here so SDK dispatch (and therefore ADF) reaches the op.
+   */
+  actionInput?: (
+    op: string,
+    params: Record<string, unknown>,
+    context: Record<string, unknown>
+  ) => unknown;
 }): ActuatorDefinition {
   const compileInputValidator = (op: string, schema: unknown) => {
     if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return undefined;
@@ -671,11 +690,24 @@ export function defineCatalogBackedActuator(options: {
               input && typeof input === 'object' && !Array.isArray(input)
                 ? (input as Record<string, unknown>)
                 : {};
-            const result = await options.handleAction({
-              action: 'pipeline',
-              steps: [{ type: description.kind, op: description.op, params }],
-              context,
-            } as never);
+            const result = await options.handleAction(
+              (options.actionInput
+                ? options.actionInput(
+                    description.op,
+                    // Pipeline step metadata is the runner's, not the action's.
+                    Object.fromEntries(
+                      Object.entries(params).filter(
+                        ([key]) => !Object.hasOwn(PIPELINE_EXECUTION_METADATA_PROPERTIES, key)
+                      )
+                    ),
+                    context
+                  )
+                : {
+                    action: 'pipeline',
+                    steps: [{ type: description.kind, op: description.op, params }],
+                    context,
+                  }) as never
+            );
             if (
               result &&
               typeof result === 'object' &&
@@ -688,6 +720,9 @@ export function defineCatalogBackedActuator(options: {
                 : undefined;
               throw new Error(
                 failed?.error ||
+                  // Single-action handlers (actionInput) report `{ status, error }`
+                  // without a results[] array; keep their message.
+                  topLevelFailureError(result) ||
                   `Actuator sub-pipeline reported failure for ${options.id}:${description.op}`
               );
             }

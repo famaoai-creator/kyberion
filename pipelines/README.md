@@ -110,13 +110,12 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 
 ### Onboarding & Provisioning
 
-| Pipeline                         | pnpm shortcut                                                         | Description                                                           |
-| -------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `kyberion-autonomous-onboarding` | `pnpm pipeline --input pipelines/kyberion-autonomous-onboarding.json` | Full autonomous onboarding (install → surfaces → alignment)           |
-| `kyberion-config-provisioner`    | —                                                                     | Provision operator config from canonical defaults                     |
-| `launch-first-run-onboarding`    | —                                                                     | Interactive first-run setup wizard                                    |
-| `platform-onboarding`            | —                                                                     | Platform-level dependency bootstrap                                   |
-| `setup-oauth`                    | —                                                                     | Interactive pipeline to setup OAuth connection for a specific service |
+| Pipeline                         | pnpm shortcut | Description                                                                                                                                   |
+| -------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kyberion-autonomous-onboarding` | —             | LLM-drafted organization profile and interview questions, run by hand (`pnpm pipeline --input pipelines/kyberion-autonomous-onboarding.json`) |
+| `launch-first-run-onboarding`    | —             | Interactive first-run setup wizard                                                                                                            |
+| `platform-onboarding`            | —             | Organization-integration artifacts: discovery transcript → requirements → design → test plan → task plan                                      |
+| `setup-oauth`                    | —             | Interactive pipeline to setup OAuth connection for a specific service                                                                         |
 
 > `pnpm onboarding` is **not** a shortcut for `kyberion-autonomous-onboarding`: it runs the onboarding facade (`scripts/onboarding.ts`, wizard via `onboarding_wizard.ts`). Run the pipeline explicitly with `pnpm pipeline --input pipelines/kyberion-autonomous-onboarding.json`.
 
@@ -152,27 +151,20 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 
 ### Verification
 
-| Pipeline                                | Description                                                                                                                                                                                                                                                                                                           |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verify-session`                        | Verify surface session lifecycle                                                                                                                                                                                                                                                                                      |
-| `verify-session-fallback`               | Verify session fallback behaviour                                                                                                                                                                                                                                                                                     |
-| `service-lifecycle-smoke`               | Service start/stop/health smoke test                                                                                                                                                                                                                                                                                  |
-| `orchestration-jobs`                    | Run scheduled orchestration batch                                                                                                                                                                                                                                                                                     |
-| `ai-audit`                              | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend)                                                                                                                              |
-| `agentic-source-code-review`            | Threat-model-first source review: deterministic reconnaissance/rule selection, human approval gate, scoped multi-perspective hypotheses, independent critique, and human-only validation handoff                                                                                                                      |
-| `ui-voice-browser-smoke`                | End-to-end smoke test: launches presence-studio, runs voice-hello pipeline, verifies browser session, and checks meeting consent gate.                                                                                                                                                                                |
-| `soak-endurance`                        | Compressed soak / endurance harness for AO-04 with maintenance pulses, resource trend sampling, and fail-closed regression validation. Schedule: `30 5 * * *`.                                                                                                                                                        |
-| `soak-endurance-live`                   | Daily live soak evidence pulse for OP-04. Schedule: `30 5 * * *`.                                                                                                                                                                                                                                                     |
-| `soak-restart-e2e`                      | Task 3 soak restart e2e for AO-04.                                                                                                                                                                                                                                                                                    |
-| `ui-ux-governance-audit`                | Weekly deterministic audit for canonical design tokens and operator-facing UX vocabulary. Schedule: `30 7 * * 1`.                                                                                                                                                                                                     |
-| `aws-operations-simulation`             | AWS 運用操作の副作用なし決定的シミュレーション(ドライラン)。変更計画(change-plan)を入力に、terraform plan / aws-cli --dry-run 相当の実行トレース(作成/変更/削除リソース・IAM/権限チェック・影響範囲(blast radius)・切り戻し手順・前提条件の合否)を生成し、実プロビジョニングせずに評価結果を出力する。it-operation... |
-| `ce-adoption-validation`                | Deterministic validation envelope for the claw-empire adoption slice (CE-01..12).                                                                                                                                                                                                                                     |
-| `ce-chronos-perf`                       | Weekly browser-dependent CE-08 FPS and JS heap evidence for Chronos. Schedule: `30 3 * * 1`.                                                                                                                                                                                                                          |
-| `cloudflare-os-validation`              | Hermetic acceptance checks for the Cloudflare OS control-plane adoption (OS-01..15).                                                                                                                                                                                                                                  |
-| `qm02-trigger-validation`               | Deterministic validation envelope for QM-02 trigger unification, authority non-escalation, registry portability, and managed-process watch.                                                                                                                                                                           |
-| `rg-01-reasoning-governance-validation` | Deterministic readiness checks for the unified reasoning/model governance implementation.                                                                                                                                                                                                                             |
-| `project-management-validation`         | Deterministic validation envelope for Project control, Mission reassignment, bootstrap, and reconciliation.                                                                                                                                                                                                           |
-| `media-review-fix-validation`           | Deterministic media review gates: compile a canonical brief, inspect PPTX layout diagnostics, and fail on unapproved overflow.                                                                                                                                                                                        |
+| Pipeline                     | Description                                                                                                                                                                                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify-session`             | Verify surface session lifecycle                                                                                                                                                                                                                                                                                      |
+| `verify-session-fallback`    | Verify session fallback behaviour                                                                                                                                                                                                                                                                                     |
+| `service-lifecycle-smoke`    | Service start/stop/health smoke test                                                                                                                                                                                                                                                                                  |
+| `orchestration-jobs`         | Run the `orchestration-config.json` job batch by hand (no schedule is declared)                                                                                                                                                                                                                                       |
+| `ai-audit`                   | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend)                                                                                                                              |
+| `agentic-source-code-review` | Threat-model-first source review: deterministic reconnaissance/rule selection, human approval gate, scoped multi-perspective hypotheses, independent critique, and human-only validation handoff                                                                                                                      |
+| `ui-voice-browser-smoke`     | End-to-end smoke test: launches presence-studio, runs voice-hello pipeline, verifies browser session, and checks meeting consent gate.                                                                                                                                                                                |
+| `soak-endurance`             | Compressed soak / endurance harness for AO-04 with maintenance pulses, resource trend sampling, and fail-closed regression validation. Schedule: `30 5 * * *`.                                                                                                                                                        |
+| `soak-endurance-live`        | Daily live soak evidence pulse for OP-04. Schedule: `30 5 * * *`.                                                                                                                                                                                                                                                     |
+| `ui-ux-governance-audit`     | Weekly deterministic audit for canonical design tokens and operator-facing UX vocabulary. Schedule: `30 7 * * 1`.                                                                                                                                                                                                     |
+| `aws-operations-simulation`  | AWS 運用操作の副作用なし決定的シミュレーション(ドライラン)。変更計画(change-plan)を入力に、terraform plan / aws-cli --dry-run 相当の実行トレース(作成/変更/削除リソース・IAM/権限チェック・影響範囲(blast radius)・切り戻し手順・前提条件の合否)を生成し、実プロビジョニングせずに評価結果を出力する。it-operation... |
+| `ce-chronos-perf`            | Weekly browser-dependent CE-08 FPS and JS heap evidence for Chronos. Schedule: `30 3 * * 1`.                                                                                                                                                                                                                          |
 
 ### Source Engineering
 
@@ -218,27 +210,19 @@ Meeting participation and the voice first-win path (see `docs/user/meeting-facil
 | `meeting-proxy-workflow`        | Meeting proxy: join with cloned voice → listen → extract action items.                                                                                                                                   |
 | `meeting-watcher`               | Calendar-driven auto-join: list today's events, pick the meeting starting now, join with live-caption capture. Schedule: `*/5 * * * *`.                                                                  |
 | `meeting-followup`              | Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.                                      |
-| `meeting-minutes-generator`     | 会議やプレゼン発表の録音から、文字起こし、要約、課題、決定事項を自動抽出し、Kyberionのプロジェクト要件として連携・エクスポートするシステムパイプライン                                                   |
 
 ### Media & Reporting
 
 Governed document/deck/video production and executive reporting.
 
-| Pipeline                                | Description                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `campaign-suite`                        | E2E-02 Task 6: generate deck/doc/video/web/mv deliverables from one campaign brief under a single resolved design.                                                                                                                                                                                                                               |
-| `ceo-strategic-report`                  | Generates a strategic executive report for CEO decision-making: code analysis, multi-scenario reasoning, and PPTX output.                                                                                                                                                                                                                        |
-| `executive-narrative-bridge`            | Bridges raw analysis into executive-grade narrative: reasoning synthesis, multi-perspective wisdom, and system logging.                                                                                                                                                                                                                          |
-| `marketing-content`                     | Generates brand-aligned marketing materials: diagrams, themed PPTX slides, and merged content output.                                                                                                                                                                                                                                            |
-| `media-produce-and-review`              | MP-01〜07 の作成プロセスを一本に通すパイプライン。ブリーフのロック（明示/推定の区別と run-shape 確定）→ デザインプロトコル生成（トークン駆動・テキスト計測レイアウトフィット）→ レイアウト preflight（オーバーフローは明示 opt-in が無い限り失敗）→ PPTX レンダリング → 視覚レビュー（ラスタライズして批評。実施不能なら理由付きで skipped を... |
-| `trial-narrated-report`                 | End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.                                                                                                                                                                                                                                             |
-| `generate-design-system-demo`           | Diagnostic PPTX exercising all 11 slide-layout-presets and 5 core element types (shape/line/table/image/text) via media:pptx_render.                                                                                                                                                                                                             |
-| `generate-dt-security-proposal-pptx`    | generate-dt-security-proposal-pptx                                                                                                                                                                                                                                                                                                               |
-| `generate-masterclass-pptx`             | Generate premium masterclass PPTX via media-actuator pipeline                                                                                                                                                                                                                                                                                    |
-| `kyberion-product-intro`                | Local narrated product intro (Japanese): intent alignment, safe execution, evidence, Quality Gate.                                                                                                                                                                                                                                               |
-| `kyberion-vtuber-narrated-demo`         | Produce a vtuber-style video that presents Kyberion as a live operator persona with on-air cues, chat, and demo beats.                                                                                                                                                                                                                           |
-| `kyberion-vtuber-narrated-demo-submit`  | Submit the vtuber narrated demo render as a background job and persist the job ticket for later collection.                                                                                                                                                                                                                                      |
-| `kyberion-vtuber-narrated-demo-collect` | Collect the result of a previously submitted vtuber narrated demo render, then validate the rendered output.                                                                                                                                                                                                                                     |
+| Pipeline                        | Description                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `campaign-suite`                | E2E-02 Task 6: generate deck/doc/video/web/mv deliverables from one campaign brief under a single resolved design.        |
+| `ceo-strategic-report`          | Generates a strategic executive report for CEO decision-making: code analysis, multi-scenario reasoning, and PPTX output. |
+| `executive-narrative-bridge`    | Bridges raw analysis into executive-grade narrative: reasoning synthesis, multi-perspective wisdom, and system logging.   |
+| `marketing-content`             | Generates brand-aligned marketing materials: diagrams, themed PPTX slides, and merged content output.                     |
+| `trial-narrated-report`         | End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.                      |
+| `kyberion-vtuber-narrated-demo` | Produce a vtuber-style video that presents Kyberion as a live operator persona with on-air cues, chat, and demo beats.    |
 
 ### Chaos & Resilience
 
@@ -247,6 +231,47 @@ Governed document/deck/video production and executive reporting.
 | `chaos-actuator-down`     | Simulate actuator failure; validate fallback               |
 | `chaos-network-partition` | Simulate network partition; validate retry/circuit-breaker |
 | `chaos-secret-missing`    | Simulate missing secret; validate secret-guard error path  |
+
+### Feature Validation Envelopes
+
+Replayable acceptance runs for one delivered feature slice: each re-runs that slice's targeted
+tests and gates in one command (`pnpm pipeline --input pipelines/<id>.json`). CI already runs the
+same tests; use an envelope when re-validating the slice after touching it.
+
+| Pipeline                        | Description                                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ce-adoption-validation`        | Claw-empire adoption slice (CE-01..12): full build, core workforce/CE tests, Chronos collaboration-stream/live-sync tests, DOM-contrast gate |
+| `cloudflare-os-validation`      | Cloudflare OS control plane (OS-01..15): core control-plane/egress/OAuth tests, service-actuator tests, operator- and computer-surface tests |
+| `project-management-validation` | Project control and mission reassignment: project tests, typecheck, package build, Chronos typecheck                                         |
+| `qm02-trigger-validation`       | QM-02 trigger unification: core build, trigger-runner/managed-process/scheduler tests, `script-integrity` gate                               |
+| `media-review-fix-validation`   | Media review gates: compile a canonical brief and fail on unapproved PPTX layout overflow (deterministic, no rendering)                      |
+| `soak-restart-e2e`              | AO-04 soak restart: boots a worker, kills it, resumes and checks that state was restored (`core:run_soak_restart_e2e`)                       |
+
+### Media Demos and Production
+
+| Pipeline                      | Description                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `media-produce-and-review`    | MP-01..07 deck flow: lock brief → design protocol → layout preflight → render → visual review → delivery gate; override `brief_path` / `mission_evidence_dir` with `--context` |
+| `generate-design-system-demo` | Diagnostic PPTX exercising all slide-layout presets and core element types; writes `active/shared/exports/design_system_demo.pptx`                                             |
+| `generate-masterclass-pptx`   | Layout sample deck from `pipelines/fragments/masterclass_design_protocol.json`; writes `active/shared/exports/all_objects_layout_sample.pptx`                                  |
+| `kyberion-product-intro`      | Local narrated product-intro video (ja; no publish). `scripts/kyberion_product_intro_render.ts` renders the same flow directly                                                 |
+
+### Op Entry Points
+
+Minimal runnable pipelines that make an actuator op reachable (OW-05); run them with
+`pnpm pipeline --input pipelines/<id>.json`.
+
+| Pipeline                         | Description                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `browser-failure-evidence`       | Capture the redacted browser action trail and export a failure-evidence bundle                        |
+| `incident-review`                | List recorded incident notes and run the SRE root-cause analysis over a failure signal                |
+| `meeting-hearing-session`        | Run a guided requirements hearing on a topic and export the structured result                         |
+| `meeting-tutor-session`          | Run a guided tutoring session over a material file and export the result                              |
+| `mission-team-prewarm`           | Queue a team prewarm request so a mission's agent runtimes are ready before work starts               |
+| `mission-team-staff`             | Staff a mission's team runtimes through the agent-runtime supervisor and return the plan              |
+| `open-active-surfaces`           | Open one browser tab per running UI surface                                                           |
+| `terraform-topology-ir`          | Parse a Terraform directory into a topology IR for diagramming or review                              |
+| `test-inventory-device-pipeline` | Compile a test inventory and app profile into an Android/iOS device pipeline (proposal; run approved) |
 
 ---
 

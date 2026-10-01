@@ -47,8 +47,12 @@
  *     (never a thrown error; see `runBestOfProviders`'s per-candidate
  *     try/catch) — so nothing starts spawning provider CLIs just because
  *     `runBestOfProviders` is called. Nothing in this repo sets this env
- *     var today, so best-of-providers stays inert-by-default in production
- *     until an operator/deployment explicitly opts in.
+ *     var by default, so best-of-providers stays inert in production until
+ *     an operator/deployment explicitly opts in. The production caller is
+ *     the MO-07 best-of-N judge step
+ *     (`obtainBestOfProvidersJudgeVerdict` in
+ *     `mission/mission-orchestration-worker-part-results.ts`), which only
+ *     fans out when this flag is `1`.
  *   - `KYBERION_BEST_OF_PROVIDERS_LIVE=1`: delegates to
  *     `resolveProviderBackend` (`provider-backend-resolver.ts`), which
  *     lazily constructs a real 'claude'/'codex'/'agy'/'grok' CLI-backed backend

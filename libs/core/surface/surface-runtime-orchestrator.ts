@@ -6,8 +6,8 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
-import { resolveLocale } from '../locale.js';
-import { normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
+import { deriveReplyLocale, getReplyLocale, resolveLocale, runWithReplyLocale } from '../locale.js';
+import { detectTextLocale, normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
 import { t } from '../t.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
@@ -27,6 +27,7 @@ import { logger } from '../core.js';
 import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-declaration.js';
 import type { AgentHandle } from '../agent/agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from '../workforce/background-review-runner.js';
+import { ensureIsolatedSurfaceAgent } from './surface-tenant-isolation.js';
 import {
   checkAndRepairSurfaceUxContract,
   validateSurfaceUxContract,
@@ -168,7 +169,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_promoted_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_promoted_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -351,7 +352,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_created_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_created_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -476,41 +477,6 @@ function buildMissionTeamPromptContext(missionId: string): string {
     '',
     'If delegation is needed, choose a team_role from the team object and emit a ```nerve_route``` JSON block.',
   ].join('\n');
-}
-
-/**
- * Team Channel E: the surface agent for an isolated tenant turn. One runtime
- * per (agent, tenant) so a lease is never shared across tenants, launched with
- * every tool disabled and in-process (the daemon cannot carry the lockdown),
- * so the model answers only from what the turn hands it. Fails closed when the
- * provider cannot disable tools.
- */
-async function ensureIsolatedSurfaceAgent(agentId: string, isolation: SurfaceTenantIsolation) {
-  const runtimeId = `${agentId}--tenant-${isolation.tenantSlug}`;
-  const existing = getAgentRuntimeHandle(runtimeId);
-  const status = existing?.getRecord?.()?.status;
-  if (existing && status !== 'shutdown' && status !== 'error') return existing;
-  const manifest = getAgentManifest(agentId, pathResolver.rootDir());
-  if (!manifest) throw new Error(`Surface agent manifest not found: ${agentId}`);
-  return ensureAgentRuntime({
-    agentId: runtimeId,
-    provider: 'claude',
-    systemPrompt: manifest.systemPrompt,
-    capabilities: manifest.capabilities,
-    cwd: pathResolver.rootDir(),
-    requestedBy: 'surface_agent',
-    runtimeOwnerId: runtimeId,
-    runtimeOwnerType: 'surface',
-    runtimeBackend: 'pipe',
-    toolAccess: 'none',
-    scope: { tenant_slug: isolation.tenantSlug, tier: isolation.maxTier },
-    runtimeMetadata: {
-      lease_kind: 'surface',
-      surface_agent_id: agentId,
-      tenant_slug: isolation.tenantSlug,
-      tool_access: 'none',
-    },
-  });
 }
 
 async function ensureSurfaceAgent(
@@ -728,7 +694,7 @@ export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   const threadTs = input.threadTs || input.ts || 'unknown';
   const channelType = input.channelType || 'unknown';
   const normalizedText = input.text.trim();
-  const language = /[ぁ-んァ-ン一-龯]/.test(normalizedText) ? 'ja' : 'en';
+  const language = detectTextLocale(normalizedText) ?? 'en';
   warnOnUserLanguageDisagreement(language, 'buildSlackSurfacePrompt content heuristic');
   const executionMode = deriveSlackExecutionMode(normalizedText);
   return [
@@ -1103,10 +1069,42 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
   },
 ];
 
+/**
+ * IT-02: the reply locale of a turn — explicit request locale, else the
+ * language the user wrote in, else the locale stored for the turn's scope,
+ * else the locale an enclosing caller already entered (a bridge's turn
+ * wrapper). `undefined` lets the rest of the resolveLocale() chain decide.
+ */
+function turnReplyLocale(input: {
+  locale?: string | null;
+  text?: string | null;
+  scope?: Parameters<typeof deriveReplyLocale>[0]['scope'];
+}) {
+  return (
+    deriveReplyLocale({ explicit: input.locale, text: input.text, scope: input.scope }) ??
+    getReplyLocale()
+  );
+}
+
 export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
   surfaceRuntimeData.surfaceRuntimeContextStore.enterWith(input);
+  // Scoped with run(), not enterWith(): the locale must end with the turn and
+  // never leak into the caller's continuation.
+  return runWithReplyLocale(
+    turnReplyLocale({
+      locale: input.locale,
+      text: input.surfaceText || input.query,
+      scope: input.scope,
+    }),
+    () => runSurfaceConversationTurn(input)
+  );
+}
+
+async function runSurfaceConversationTurn(
+  input: SurfaceConversationInput
+): Promise<SurfaceConversationResult> {
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
   if (parsedExecutionFeedback) {
@@ -1181,6 +1179,8 @@ export async function runSurfaceConversation(
     !forcedReceiver &&
     !ruleBasedReceiver &&
     !isDirectDelegationIntent &&
+    // Team Channel E: member text never reaches the (tool-capable) compiler.
+    !input.isolation &&
     shouldCompileSurfaceIntent(input, routingText, ruleBasedReceiver, originalResolutionPacket)
       ? await (() => {
           recordSurfaceReasoningTierDeclaration({
@@ -1449,9 +1449,20 @@ export async function runSurfaceConversation(
 export async function runSurfaceMessageConversation(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
-  // HA-01: count one non-blocking worker turn per surface thread. The
-  // correlation id is per message, so derive the stable session key from the
-  // surface/channel/thread tuple instead.
+  // Enter the turn's reply locale before anything else runs — including the
+  // HA-01 background review fork below — and scope it to this turn.
+  return runWithReplyLocale(
+    turnReplyLocale({ locale: input.locale, text: input.text, scope: input.scope }),
+    () => runSurfaceMessageConversationTurn(input)
+  );
+}
+
+/**
+ * HA-01: count one non-blocking worker turn per surface thread. The
+ * correlation id is per message, so derive the stable session key from the
+ * surface/channel/thread tuple instead.
+ */
+async function startSurfaceBackgroundReview(input: SurfaceConversationMessageInput): Promise<void> {
   try {
     // SO-02: single source of truth for this derivation lives in
     // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
@@ -1505,6 +1516,14 @@ export async function runSurfaceMessageConversation(
       }`
     );
   }
+}
+
+async function runSurfaceMessageConversationTurn(
+  input: SurfaceConversationMessageInput
+): Promise<SurfaceConversationResult> {
+  // Team Channel E: an isolated turn never feeds the background-review fork,
+  // which runs on the general (tool-capable) backend with unscoped knowledge.
+  if (!input.isolation) await startSurfaceBackgroundReview(input);
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
   // Enforce the surface UX contract on the outbound user-facing text. This is
   // the single chokepoint for all surface responses; validation is non-blocking

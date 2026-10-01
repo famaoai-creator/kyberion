@@ -1,6 +1,7 @@
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import type { SurfaceTenantIsolation } from '@agent/core/surface/channel-surface-types';
+import { issueSlackMissionFromProposal } from '@agent/core/surface/surface-mission-proposals';
 import type { TierLevel } from '@agent/core/types';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
@@ -353,4 +354,56 @@ export function runInTeamTurnContext<T>(
 ): Promise<T> {
   if (!isolation) return fn();
   return withExecutionContextAsync('slack_bridge', fn, undefined, isolation.tenantSlug);
+}
+
+/**
+ * Team Channel P2: answers a deterministic thread command (status, channel
+ * memory) through `post`. True when the turn is handled — also when the
+ * command failed, so a broken command never falls through to the model.
+ */
+export async function answerSlackTeamChannelCommand(
+  params: Parameters<typeof handleSlackTeamChannelCommand>[0],
+  post: (text: string) => Promise<unknown>
+): Promise<boolean> {
+  try {
+    const reply = handleSlackTeamChannelCommand(params);
+    if (reply === undefined) return false;
+    await post(reply);
+  } catch (err) {
+    logger.error(
+      `❌ [SlackBridge] Team channel command failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  return true;
+}
+
+/** Principal recorded as the confirmer of a mission confirmed by text. */
+export function slackTextConfirmer(
+  policy: ChannelModePolicy,
+  actorId: string,
+  speaker?: ChannelSpeakerPrincipal
+): ReturnType<typeof evaluateChannelApprovalAuthority>['decidedBy'] {
+  return evaluateChannelApprovalAuthority(policy, actorId, speaker ? { speaker } : {}).decidedBy;
+}
+
+/** Team Channel P2: issues a confirmed mission and links it to its thread. */
+export async function issueSlackThreadMission(
+  channel: string,
+  threadTs: string,
+  pending: Pick<
+    Parameters<typeof issueSlackMissionFromProposal>[0],
+    'proposal' | 'sourceText' | 'routingDecision'
+  >,
+  confirmedBy: string
+): ReturnType<typeof issueSlackMissionFromProposal> {
+  const issued = await issueSlackMissionFromProposal({
+    channel,
+    threadTs,
+    proposal: pending.proposal,
+    sourceText: pending.sourceText,
+    routingDecision: pending.routingDecision,
+    ...slackMissionIssueContext(channel, confirmedBy),
+  });
+  linkSlackMissionToThread(channel, threadTs, issued.missionId, confirmedBy);
+  return issued;
 }

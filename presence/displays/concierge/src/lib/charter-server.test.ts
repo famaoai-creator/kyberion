@@ -22,7 +22,9 @@ import {
   actOnCharter,
   acceptCharterForViewer,
   charterTenants,
+  dismissCharterProposal,
   previewCharter,
+  proposeCharter,
   readCharterOverview,
 } from './charter-server';
 
@@ -205,6 +207,66 @@ describe('charter-server', () => {
       ok: false,
       status: 404,
       error: 'no_active_charter',
+    });
+  });
+  describe('approver proposals', () => {
+    const v = (id: string) => viewer(id, ['other-co']);
+    const f = (over: Record<string, unknown> = {}) => form({ tenant_slug: 'other-co', ...over });
+
+    it('only an approver can propose; the owner and others are refused', () => {
+      expect(proposeCharter(v('carol'), f(), 'n', opts(), NOW)).toMatchObject({ ok: true });
+      expect(proposeCharter(v('owner'), f(), '', opts(), NOW)).toMatchObject({
+        ok: false,
+        status: 403,
+        error: 'approver_required',
+      });
+      expect(proposeCharter(v('nobody'), f(), '', opts(), NOW)).toMatchObject({
+        ok: false,
+        error: 'member_required',
+      });
+      expect(proposeCharter(viewer('carol', ['acme']), f(), '', opts(), NOW)).toMatchObject({
+        ok: false,
+        error: 'tenant_out_of_scope',
+      });
+      expect(proposeCharter(v('carol'), f({ per_action: -1 }), '', opts(), NOW)).toMatchObject({
+        ok: false,
+        status: 400,
+      });
+    });
+
+    it('the draft is shown to owner and approvers with no authority, and accepting clears it', () => {
+      proposeCharter(v('carol'), f({ per_action: 7 }), 'please', opts(), NOW);
+      const owner = readCharterOverview(v('owner'), null, opts(), NOW).tenants[0];
+      expect(owner.draft).toMatchObject({ proposed_by: 'user:carol', note: 'please' });
+      expect(owner.can_propose).toBe(false);
+      const approver = readCharterOverview(v('carol'), null, opts(), NOW).tenants[0];
+      expect(approver).toMatchObject({ can_create: false, can_propose: true });
+      expect(approver.charter).toBeNull();
+      // The draft alone activates nothing.
+      const shown = previewCharter(v('owner'), f({ per_action: 7 }), opts(), NOW);
+      if (!shown.ok) throw new Error('x');
+      expect(
+        acceptCharterForViewer(
+          v('owner'),
+          f({ per_action: 7 }),
+          shown.statement_sha256,
+          opts(),
+          NOW
+        )
+      ).toMatchObject({ ok: true });
+      expect(readCharterOverview(v('owner'), null, opts(), NOW).tenants[0].draft).toBeNull();
+    });
+
+    it('only the owner can dismiss', () => {
+      proposeCharter(v('carol'), f(), '', opts(), NOW);
+      expect(dismissCharterProposal(v('carol'), 'other-co', opts(), NOW)).toMatchObject({
+        ok: false,
+        error: 'owner_required',
+      });
+      expect(dismissCharterProposal(v('owner'), 'other-co', opts(), NOW)).toEqual({
+        ok: true,
+        dismissed: true,
+      });
     });
   });
 });

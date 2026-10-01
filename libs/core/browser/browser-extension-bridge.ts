@@ -1,3 +1,4 @@
+import { t } from '../t.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import type { ValidateFunction } from 'ajv';
@@ -706,8 +707,11 @@ export function enforceBrowserExtensionApproval(input: {
       operations: highRiskActions.map((action) => action.op),
     },
     draft: {
-      title: `Chrome 実行: ${input.session.origin}`,
-      summary: `${highRiskActions.length} 件の高リスク操作（${highRiskActions.map((action) => action.op).join(', ')}）`,
+      title: t('mission_ops:approval_chrome_run_title', { origin: input.session.origin }),
+      summary: t('mission_ops:approval_chrome_high_risk_summary', {
+        count: highRiskActions.length,
+        operations: highRiskActions.map((action) => action.op).join(', '),
+      }),
       severity: 'high',
     },
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),

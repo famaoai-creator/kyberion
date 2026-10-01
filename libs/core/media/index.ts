@@ -87,7 +87,6 @@ export * from './native-xlsx-engine/styles.js';
 export * from './native-xlsx-engine/table.js';
 export * from './native-xlsx-engine/workbook.js';
 export * from './native-xlsx-engine/worksheet.js';
-export * from './native-xlsx-engine/examples/gen_wbs.js';
 export * from './native-pptx-engine/builders.js';
 // skipped './native-pptx-engine/content-types.js' (all exports shadowed)
 export * from './native-pptx-engine/design-cascade.js';
@@ -102,9 +101,7 @@ export {
 } from './native-pptx-engine/rels.js';
 export * from './native-pptx-engine/text-metrics.js';
 export * from './native-pptx-engine/theme.js';
-export * from './native-pptx-engine/examples/gen_project_plan.js';
 // skipped './native-pdf-engine/engine.js' (all exports shadowed)
-export * from './native-pdf-engine/fontkit-shim.js';
 export * from './native-pdf-engine/parser.js';
 export * from './native-pdf-engine/primitives.js';
 // skipped './native-docx-engine/engine.js' (all exports shadowed)

@@ -20,6 +20,12 @@ import {
   type CharterPathOptions,
 } from '@agent/core/governance/accountability-charter-registry';
 import {
+  clearCharterProposal,
+  readPendingProposal,
+  submitCharterProposal,
+  type CharterProposal,
+} from '@agent/core/governance/charter-proposal';
+import {
   MANUAL_STOP_TRIPWIRE,
   acceptCharterFromForm,
   parseCharterForm,
@@ -71,6 +77,10 @@ export interface CharterTenantEntry {
   /** The viewer's membership role on this tenant, when it is decision-capable. */
   role: 'owner' | 'approver' | 'viewer' | null;
   can_create: boolean;
+  /** An approver may draft limits for the owner to decide; it carries no authority. */
+  can_propose: boolean;
+  /** The draft waiting for the owner (visible to owner and approvers). */
+  draft: CharterProposal | null;
   /** The viewer is the accountable human or a deputy of the active charter. */
   can_stop: boolean;
   charter: CharterView | null;
@@ -90,10 +100,13 @@ export function readCharterOverview(
     if (who) member = { id: who.id, display_name: who.display_name };
     const charter = findActiveCharter({ kind: 'organization', tenant_slug: tenant }, now, options);
     const holders = charter ? [charter.accountable.actor, ...charter.accountable.deputies] : [];
+    const decider = who?.role === 'owner' || who?.role === 'approver';
     return {
       tenant_slug: tenant,
       role: who?.role ?? null,
       can_create: who?.role === 'owner',
+      can_propose: who?.role === 'approver',
+      draft: decider ? readPendingProposal(tenant, options) : null,
       can_stop: Boolean(who && holders.includes(who.id)),
       charter: charter ? viewCharter(charter, now, options, locale) : null,
     };
@@ -166,6 +179,7 @@ export function acceptCharterForViewer(
       },
       options
     );
+    clearCharterProposal(tenant, 'accepted', who.id, options, now);
     return { ok: true, charter_id: charter.charter_id };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -215,4 +229,48 @@ export function actOnCharter(
     );
   }
   return { ok: true, action };
+}
+
+/** An approver drafts limits; only an owner can turn a draft into a charter. */
+export function proposeCharter(
+  viewer: Viewer,
+  rawForm: unknown,
+  note: unknown,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): CharterResult<{ proposal: CharterProposal }> {
+  const parsed = parseCharterForm(rawForm);
+  if (!parsed.ok) return fail(400, `invalid_form: ${parsed.error}`);
+  const tenant = requireTenant(viewer, parsed.form.tenant_slug);
+  if (typeof tenant !== 'string') return tenant;
+  const who = actingMember(viewer, tenant);
+  if (!who) return fail(403, 'member_required');
+  if (who.role !== 'approver') return fail(403, 'approver_required');
+  const submitted = submitCharterProposal(
+    {
+      form: parsed.form,
+      proposedBy: who.id,
+      proposedByName: who.display_name,
+      note,
+      now,
+    },
+    options
+  );
+  if (!submitted.ok) return fail(400, `invalid_form: ${submitted.error}`);
+  return { ok: true, proposal: submitted.proposal };
+}
+
+/** The owner sets a pending draft aside (accepting a charter clears it too). */
+export function dismissCharterProposal(
+  viewer: Viewer,
+  tenantRaw: unknown,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): CharterResult<{ dismissed: boolean }> {
+  const tenant = requireTenant(viewer, tenantRaw);
+  if (typeof tenant !== 'string') return tenant;
+  const who = actingMember(viewer, tenant);
+  if (!who) return fail(403, 'member_required');
+  if (who.role !== 'owner') return fail(403, 'owner_required');
+  return { ok: true, dismissed: clearCharterProposal(tenant, 'dismissed', who.id, options, now) };
 }

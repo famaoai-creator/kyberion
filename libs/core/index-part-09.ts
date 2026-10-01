@@ -95,8 +95,6 @@ export * from './surface/channel-memory-store.js';
 
 export * from './surface/surface-approval-ui.js';
 
-export * from './service/service-bootstrap-catalog.js';
-
 export * from './service/service-onboarding-catalog.js';
 
 export * from './service/service-connection-readiness.js';
@@ -163,8 +161,6 @@ export * from './browser/browser-conversation-session.js';
 
 export * from './mesh/peer-conversation.js';
 
-export * from './browser/browser-distill-candidate.js';
-
 export * from './browser/browser-extension-bridge.js';
 
 export * from './video/narrated-video-preference-profile.js';
@@ -178,8 +174,6 @@ export * from './meeting/meeting-attendees.js';
 export * from './mission/mission-seed-assessment.js';
 
 export * from './mission/mission-assessment.js';
-
-export * from './task/task-distill-candidate.js';
 
 export * from './presence-surface.js';
 
@@ -215,17 +209,9 @@ export * from './governance/approval-policy.js';
 
 export * from './router-contract.js';
 
-export * from './analysis/analysis-intent-support.js';
-
 export * from './intent/intent-outcome-patterns.js';
 
-export * from './analysis/analysis-corpus.js';
-
-export * from './analysis/analysis-impact-bands.js';
-
-export * from './analysis/analysis-findings.js';
-
-export * from './analysis/analysis-execution-contract.js';
+export * from './intent/intent-phrase-lexicon.js';
 
 export * from './workforce/work-design.js';
 
@@ -234,8 +220,6 @@ export * from './workforce/work-scope-decision.js';
 export * from './mission/mission-execution-surface.js';
 
 export * from './productivity-task-plan.js';
-
-export * from './meeting/booking-preference-profile.js';
 
 export * from './presentation-preference-profile.js';
 
@@ -329,8 +313,6 @@ export * from './virtual/desktop-intent-reconstruction.js';
 
 export * from './media/native-op-mapping.js';
 
-export * from './analysis/trace-procedure-candidate.js';
-
 export * from './ingest-tier-gate.js';
 
 export * from './generation-scheduler.js';
@@ -348,8 +330,6 @@ export * from './governance/policy-engine.js';
 export * from './trust-engine.js';
 
 export * from './governance/audit-chain.js';
-
-export * from './agent/agent-slo.js';
 
 export * from './governance/kill-switch.js';
 

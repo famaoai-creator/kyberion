@@ -315,7 +315,6 @@ export default [
       'libs/**/src/index.ts',
       'libs/**/examples/**',
       'libs/core/cli-utils.ts',
-      'libs/core/test-utils.ts',
       'libs/core/skill-wrapper.ts',
       '**/*.test.ts',
     ],

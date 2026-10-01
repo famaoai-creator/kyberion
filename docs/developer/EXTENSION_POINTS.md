@@ -320,9 +320,9 @@ Stable surfaces are deprecated for **at least one minor version** before removal
 
 ## 8. Shared Utilities (Internal)
 
-Common helpers (`slugify`, `retry`, `sleep`, `chunk`, `loadJson`/`ensureDir`) have exactly one canonical implementation in `@agent/core` (`libs/core/text-utils.ts`, `libs/core/async-utils.ts`, `libs/core/secure-io.ts`). See IP-09 (`docs/developer/improvement-plans-2026-07/IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md`) for the history of why: independently-drifted local copies previously produced ID/output mismatches (mission dir names, file names) across call sites.
+Common helpers (`slugify`, `retry`, `sleep`, `chunk`, `loadJson`/`ensureDir`) have exactly one canonical implementation in `@agent/core` (`libs/core/foundation/text.ts`, `libs/core/async-utils.ts`, `libs/core/secure-io.ts`). See IP-09 (`docs/developer/improvement-plans-2026-07/IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md`) for the history of why: independently-drifted local copies previously produced ID/output mismatches (mission dir names, file names) across call sites.
 
-**Do not add a new local `function slugify(...)` / `function retry(...)` / etc.** Import the canonical version from `@agent/core` instead. If a call site genuinely needs different behavior (e.g. a different separator, max length, or fallback), pass options to the canonical function rather than hand-rolling a variant — see `SlugifyOptions` in `libs/core/text-utils.ts`.
+**Do not add a new local `function slugify(...)` / `function retry(...)` / etc.** Import the canonical version from `@agent/core` instead. If a call site genuinely needs different behavior (e.g. a different separator, max length, or fallback), pass options to the canonical function rather than hand-rolling a variant — see `SlugifyOptions` in `libs/core/foundation/text.ts`.
 
 # Marketing Workload Extension
 

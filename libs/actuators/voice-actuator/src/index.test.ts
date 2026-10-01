@@ -519,9 +519,6 @@ vi.mock('@agent/core/voice/voice-generation-runtime', () => ({
     }
   },
 }));
-vi.mock('@agent/core/relationship-graph-store', () => ({
-  recordInteraction: vi.fn(() => ({ history: [] })),
-}));
 
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>();

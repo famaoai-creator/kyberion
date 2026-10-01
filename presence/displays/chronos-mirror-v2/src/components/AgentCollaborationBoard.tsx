@@ -173,20 +173,24 @@ export type CollaborationAttentionAction =
     }
   | { mode: 'mission'; label: string };
 
-export function attentionActionForKind(kind: string): CollaborationAttentionAction | null {
+export function attentionActionForKind(
+  kind: string,
+  locale: SupportedLocale
+): CollaborationAttentionAction | null {
+  const label = collaborationActionLabel(kind, locale);
   switch (kind) {
     case 'approval':
-      return { mode: 'view', viewId: 'secret-approval-queue', label: '承認キューを開く' };
+      return { mode: 'view', viewId: 'secret-approval-queue', label: label ?? kind };
     case 'failure':
-      return { mode: 'view', viewId: 'runtime-topology-map', label: 'Runtime を確認' };
+      return { mode: 'view', viewId: 'runtime-topology-map', label: label ?? kind };
     case 'retry':
-      return { mode: 'view', viewId: 'runtime-lease-doctor', label: '再試行・lease診断を開く' };
+      return { mode: 'view', viewId: 'runtime-lease-doctor', label: label ?? kind };
     case 'handoff':
-      return { mode: 'view', viewId: 'trace-viewer', label: '引き継ぎ履歴を開く' };
+      return { mode: 'view', viewId: 'trace-viewer', label: label ?? kind };
     case 'waiting':
     case 'blocked':
     case 'review':
-      return { mode: 'mission', label: '停止・再開操作を開く' };
+      return { mode: 'mission', label: label ?? kind };
     default:
       return null;
   }
@@ -540,7 +544,7 @@ export function AgentCollaborationBoard({
         {projection.attention.slice(0, 6).map((item) => {
           const event = eventById.get(item.event_id);
           const evidenceRefs = collaborationEvidenceRefs(event);
-          const action = attentionActionForKind(item.kind);
+          const action = attentionActionForKind(item.kind, locale);
           const actionLabel = collaborationActionLabel(item.kind, locale);
           return (
             <Callout

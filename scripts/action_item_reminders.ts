@@ -6,6 +6,8 @@
  * mirrors the reminder into the Slack outbox for operator visibility.
  */
 
+import { coerceLocale } from '@agent/core/locale-normalize';
+import { resolveLocale } from '@agent/core/locale';
 import { runActionItemReminderSweepOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -22,7 +24,7 @@ async function main(argv: string[]) {
   const maxItemsValue = Number(getArgValue('--max-items') || '20');
   const report = await runActionItemReminderSweep({
     tone: toneValue === 'formal' || toneValue === 'urgent' ? toneValue : 'friendly',
-    language: languageValue === 'en' ? 'en' : 'ja',
+    language: coerceLocale(languageValue ?? resolveLocale(), ['en', 'ja'] as const, 'en'),
     max_items_per_mission: Number.isFinite(maxItemsValue) && maxItemsValue > 0 ? maxItemsValue : 20,
     ...(reportPathValue ? { report_path: reportPathValue } : {}),
   });
