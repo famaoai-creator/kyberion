@@ -11436,97 +11436,97 @@
         "ja": "この憲章をやめる",
         "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
       },
-"setup.invite_title": {
+      "setup.invite_title": {
         "en": "Invite people",
         "ja": "メンバーを招待する",
         "qps-ploc": "⟦Ïñṽïŧė ṗėőṗŀė ŀőřė⟧"
       },
-"setup.invite_description": {
+      "setup.invite_description": {
         "en": "Create a one-time link for someone to join an organization. They must sign in themselves; the link alone gives nothing.",
         "ja": "組織に参加するための 1 回限りのリンクを作ります。参加する人が自分でサインインする必要があり、リンクだけでは何も得られません。",
         "qps-ploc": "⟦Ƈřėȧŧė ȧ őñė-ŧïɱė ŀïñķ ƒőř şőɱėőñė ŧő ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ. Ŧħėẏ ɱůşŧ şïɠñ ïñ ŧħėɱşėŀṽėş; ŧħė ŀïñķ ȧŀőñė ɠïṽėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       },
-"setup.invite_tenant": {
+      "setup.invite_tenant": {
         "en": "Organization",
         "ja": "組織",
         "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
       },
-"setup.invite_role": {
+      "setup.invite_role": {
         "en": "Role",
         "ja": "役割",
         "qps-ploc": "⟦Řőŀė ŀőř⟧"
       },
-"setup.invite_ttl": {
+      "setup.invite_ttl": {
         "en": "Valid for (hours)",
         "ja": "有効時間(時間)",
         "qps-ploc": "⟦Ṽȧŀïḓ ƒőř (ħőůřş) ŀőřėɱ⟧"
       },
-"setup.invite_create": {
+      "setup.invite_create": {
         "en": "Create invite link",
         "ja": "招待リンクを作る",
         "qps-ploc": "⟦Ƈřėȧŧė ïñṽïŧė ŀïñķ ŀőřėɱ⟧"
       },
-"setup.invite_link_once": {
+      "setup.invite_link_once": {
         "en": "Share this link now. It is shown only once.",
         "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",
         "qps-ploc": "⟦Şħȧřė ŧħïş ŀïñķ ñőẇ. Ïŧ ïş şħőẇñ őñŀẏ őñƈė. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
-"setup.invite_list_title": {
+      "setup.invite_list_title": {
         "en": "Invites",
         "ja": "招待の一覧",
         "qps-ploc": "⟦Ïñṽïŧėş ŀőř⟧"
       },
-"setup.invite_none": {
+      "setup.invite_none": {
         "en": "No invites yet.",
         "ja": "招待はまだありません。",
         "qps-ploc": "⟦Ñő ïñṽïŧėş ẏėŧ. ŀőřė⟧"
       },
-"setup.invite_line": {
+      "setup.invite_line": {
         "en": "{role} · {status} · until {date}",
         "ja": "{role} · {status} · {date} まで",
         "qps-ploc": "⟦{role} · {status} · ůñŧïŀ {date} ŀőřėɱ ïṗşů⟧"
       },
-"setup.invite_status_pending": {
+      "setup.invite_status_pending": {
         "en": "waiting",
         "ja": "待機中",
         "qps-ploc": "⟦ẇȧïŧïñɠ ŀőř⟧"
       },
-"setup.invite_status_accepted": {
+      "setup.invite_status_accepted": {
         "en": "used",
         "ja": "使用済み",
         "qps-ploc": "⟦ůşėḓ ŀőř⟧"
       },
-"setup.invite_status_revoked": {
+      "setup.invite_status_revoked": {
         "en": "revoked",
         "ja": "取り消し済み",
         "qps-ploc": "⟦řėṽőķėḓ ŀőř⟧"
       },
-"setup.invite_status_expired": {
+      "setup.invite_status_expired": {
         "en": "expired",
         "ja": "期限切れ",
         "qps-ploc": "⟦ėẋṗïřėḓ ŀőř⟧"
       },
-"setup.invite_revoke": {
+      "setup.invite_revoke": {
         "en": "Revoke",
         "ja": "取り消す",
         "qps-ploc": "⟦Řėṽőķė ŀőř⟧"
       },
-"setup.invite_role_approver": {
+      "setup.invite_role_approver": {
         "en": "Approver",
         "ja": "承認者",
         "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
       },
-"setup.invite_role_operator": {
+      "setup.invite_role_operator": {
         "en": "Operator",
         "ja": "実行者",
         "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
       },
-"setup.invite_role_viewer": {
+      "setup.invite_role_viewer": {
         "en": "Viewer",
         "ja": "閲覧者",
         "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
       },
-"setup.invite_err": {
+      "setup.invite_err": {
         "en": "Could not complete: {detail}",
         "ja": "実行できませんでした: {detail}",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė: {detail} ŀőřėɱ ïṗş⟧"
