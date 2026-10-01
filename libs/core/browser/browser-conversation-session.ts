@@ -17,7 +17,12 @@ import {
 } from '../secure-io.js';
 import { resolveSurfaceIntent } from '../router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
-import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
+import {
+  captureIntentPhrase,
+  intentPhraseSource,
+  matchesIntentPhrase,
+} from '../intent/intent-phrase-lexicon.js';
+import { t } from '../t.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -1012,18 +1017,10 @@ export function classifyBrowserConversationCommand(
             ? 'center'
             : undefined;
 
-  const targetTextMatch =
-    trimmed.match(/「(.+?)」/) ||
-    trimmed.match(/"(.+?)"/) ||
-    trimmed.match(/『(.+?)』/) ||
-    trimmed.match(/(.+?)を押して/) ||
-    trimmed.match(/(.+?)をクリック/) ||
-    trimmed.match(/(.+?)をタップ/) ||
-    trimmed.match(/(.+?)ボタン/);
-  const targetText = targetTextMatch?.[1]
+  const targetText = captureIntentPhrase(trimmed, 'browser.target_text_extract')
     ?.trim()
-    .replace(/^(左下|右下|左上|右上|中央|真ん中)\s*の?/, '')
-    .replace(/(?:ボタン|button)$/i, '')
+    .replace(new RegExp(intentPhraseSource('browser.target_region_prefix')), '')
+    .replace(new RegExp(`${intentPhraseSource('browser.target_role_button')}$`, 'i'), '')
     .trim();
   const targetRole = matchesIntentPhrase(trimmed, 'browser.target_role_button')
     ? 'button'
@@ -1055,14 +1052,11 @@ export function classifyBrowserConversationCommand(
       };
     }
     if (matchesIntentPhrase(trimmed, 'browser.fill_verb')) {
-      const inputTextMatch =
-        trimmed.match(/「(.+?)」を.*(?:入力|入れて)/) ||
-        trimmed.match(/"(.+?)".*(?:input|type|fill)/i) ||
-        trimmed.match(/(.+?)\s*と入力/);
+      const inputText = captureIntentPhrase(trimmed, 'browser.input_text_extract')?.trim();
       return {
         commandType: 'step_command',
         action: 'fill',
-        inputText: inputTextMatch?.[1]?.trim(),
+        inputText,
         targetHint: {
           text: targetText,
           region,
@@ -1119,14 +1113,11 @@ export function classifyBrowserConversationCommand(
   }
 
   if (matchesIntentPhrase(trimmed, 'browser.fill_verb')) {
-    const inputTextMatch =
-      trimmed.match(/「(.+?)」を.*(?:入力|入れて)/) ||
-      trimmed.match(/"(.+?)".*(?:input|type|fill)/i) ||
-      trimmed.match(/(.+?)\s*と入力/);
+    const inputText = captureIntentPhrase(trimmed, 'browser.input_text_extract')?.trim();
     return {
       commandType: 'step_command',
       action: 'fill',
-      inputText: inputTextMatch?.[1]?.trim(),
+      inputText,
       targetHint: {
         text: targetText,
         region,
@@ -1221,8 +1212,8 @@ export function applyBrowserConversationCommand(
       status: 'progress',
       message:
         command.resolution?.action === 'resume'
-          ? 'ブラウザ操作を再開します。'
-          : 'ブラウザ操作をいったん停止しました。',
+          ? t('browser_conversation:control_resumed')
+          : t('browser_conversation:control_paused'),
     });
   }
 
@@ -1263,7 +1254,9 @@ export function applyBrowserConversationCommand(
     return createBrowserConversationFeedback({
       sessionId,
       status: 'awaiting_confirmation',
-      message: `候補が ${session.candidate_targets.length} 件あります。対象を確認します。`,
+      message: t('browser_conversation:candidates_found', {
+        count: session.candidate_targets.length,
+      }),
       candidates: session.candidate_targets.slice(0, 3).map((candidate) => ({
         element_id: candidate.element_id,
         label: candidate.label || candidate.text,
@@ -1277,7 +1270,9 @@ export function applyBrowserConversationCommand(
     return createBrowserConversationFeedback({
       sessionId,
       status: 'progress',
-      message: `「${session.candidate_targets[0].label || command.utterance}」を対象として操作を進めます。`,
+      message: t('browser_conversation:target_proceeding', {
+        label: session.candidate_targets[0].label || command.utterance,
+      }),
       candidates: session.candidate_targets.map((candidate) => ({
         element_id: candidate.element_id,
         label: candidate.label || candidate.text,
@@ -1292,8 +1287,8 @@ export function applyBrowserConversationCommand(
     status: 'progress',
     message:
       command.command_type === 'task_command'
-        ? 'ブラウザ操作の準備を始めます。'
-        : '対象を確認して操作を進めます。',
+        ? t('browser_conversation:task_preparing')
+        : t('browser_conversation:step_proceeding'),
   });
 }
 
@@ -1354,21 +1349,17 @@ export function executeBrowserConversationCandidateAction(
       },
     });
   } else if (session.active_step.kind === 'fill') {
-    const inputText =
-      session.conversation_context.last_user_instruction?.match(
-        /「(.+?)」を.*(?:入力|入れて)/
-      )?.[1] ||
-      session.conversation_context.last_user_instruction?.match(
-        /"(.+?)".*(?:input|type|fill)/i
-      )?.[1] ||
-      session.conversation_context.last_user_instruction?.match(/(.+?)\s*と入力/)?.[1];
+    const lastInstruction = session.conversation_context.last_user_instruction;
+    const inputText = lastInstruction
+      ? captureIntentPhrase(lastInstruction, 'browser.input_text_extract')
+      : undefined;
     if (!inputText) {
       return {
         ok: false,
         feedback: createBrowserConversationFeedback({
           sessionId,
           status: 'blocked',
-          message: '入力する値が会話から解決できませんでした。',
+          message: t('browser_conversation:input_unresolved'),
         }),
       };
     }
@@ -1397,7 +1388,7 @@ export function executeBrowserConversationCandidateAction(
       feedback: createBrowserConversationFeedback({
         sessionId,
         status: 'blocked',
-        message: 'この操作種別はまだ自動実行に接続されていません。',
+        message: t('browser_conversation:action_unsupported'),
       }),
     };
   }
@@ -1456,7 +1447,9 @@ export function executeBrowserConversationCandidateAction(
       feedback: createBrowserConversationFeedback({
         sessionId,
         status: 'completed',
-        message: `「${selected.label || selected.text || selected.element_id}」を操作しました。`,
+        message: t('browser_conversation:action_done', {
+          label: selected.label || selected.text || selected.element_id,
+        }),
       }),
       raw: normalized,
     };
@@ -1477,7 +1470,7 @@ export function executeBrowserConversationCandidateAction(
       feedback: createBrowserConversationFeedback({
         sessionId,
         status: 'failed',
-        message: `ブラウザ操作に失敗しました: ${message}`,
+        message: t('browser_conversation:action_failed', { error: message }),
       }),
     };
   }
@@ -1506,7 +1499,9 @@ export function confirmBrowserConversationCandidate(
       feedback: createBrowserConversationFeedback({
         sessionId,
         status: 'awaiting_confirmation',
-        message: `候補は ${session.candidate_targets.length} 件あります。番号か「それ」で指定してください。`,
+        message: t('browser_conversation:candidates_ask', {
+          count: session.candidate_targets.length,
+        }),
         candidates: session.candidate_targets.slice(0, 3).map((candidate) => ({
           element_id: candidate.element_id,
           label: candidate.label || candidate.text,
@@ -1518,7 +1513,9 @@ export function confirmBrowserConversationCandidate(
   }
 
   const selected = session.candidate_targets[candidateIndex];
-  session.conversation_context.last_agent_ack = `候補 ${candidateIndex + 1} を選択しました。`;
+  session.conversation_context.last_agent_ack = t('browser_conversation:candidate_selected', {
+    index: candidateIndex + 1,
+  });
   session.updated_at = nowIso();
   saveBrowserConversationSession(session);
   return executeBrowserConversationCandidateAction(sessionId, selected.element_id);

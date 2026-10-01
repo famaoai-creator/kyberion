@@ -68,6 +68,11 @@ export interface IntentPhraseMatcher {
   matches(text: string, conceptId: string, options?: IntentPhraseMatchOptions): boolean;
   /** First (leftmost) matched text, or undefined. */
   find(text: string, conceptId: string, options?: IntentPhraseMatchOptions): string | undefined;
+  /**
+   * First capture group of the first pattern (in declaration order) that matches.
+   * For extraction concepts whose patterns each carry one capture group.
+   */
+  capture(text: string, conceptId: string, options?: IntentPhraseMatchOptions): string | undefined;
 }
 
 export const INTENT_PHRASE_LEXICON_PATH = (): string =>
@@ -205,6 +210,26 @@ export function compileIntentPhraseLexicon(lexicon: IntentPhraseLexicon): Intent
     regExp,
     matches: (text, conceptId, options) => regExp(conceptId, options).test(text),
     find: (text, conceptId, options) => regExp(conceptId, options).exec(text)?.[0],
+    capture: (text, conceptId, options) => {
+      const concept = conceptOf(conceptId);
+      if (!validated.has(conceptId)) {
+        assertSafePatterns(conceptId, concept, flagsOf(conceptId));
+        validated.add(conceptId);
+      }
+      for (const locale of selectLocales(Object.keys(concept.locales), options)) {
+        for (const pattern of concept.locales[locale].patterns || []) {
+          const key = `capture\u0000${conceptId}\u0000${pattern}`;
+          let compiled = regExpCache.get(key);
+          if (!compiled) {
+            compiled = new RegExp(pattern, flagsOf(conceptId));
+            regExpCache.set(key, compiled);
+          }
+          const hit = compiled.exec(text)?.[1];
+          if (hit !== undefined) return hit;
+        }
+      }
+      return undefined;
+    },
   };
 }
 
@@ -257,6 +282,15 @@ export function findIntentPhrase(
   options?: IntentPhraseMatchOptions
 ): string | undefined {
   return getIntentPhraseMatcher().find(text, conceptId, options);
+}
+
+/** First capture group of the first matching extraction pattern of `conceptId`, or undefined. */
+export function captureIntentPhrase(
+  text: string,
+  conceptId: string,
+  options?: IntentPhraseMatchOptions
+): string | undefined {
+  return getIntentPhraseMatcher().capture(text, conceptId, options);
 }
 
 /** Unanchored alternation source for composing a concept into a larger pattern. */

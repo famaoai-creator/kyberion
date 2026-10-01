@@ -207,12 +207,25 @@ function describeIfNoResponse(
   };
 }
 
+/**
+ * Locale for a card that may have no inbound message to follow (a proactive
+ * push): the turn's reply locale when one is active, else the locale stored
+ * for the approval's tenant / organization / project scope, else the
+ * operator's (identity language, `KYBERION_LOCALE`, catalog default).
+ */
+export function resolveApprovalLocale(
+  record: Pick<ApprovalRequestRecord, 'scope'>,
+  explicit?: SupportedLocale
+): SupportedLocale {
+  return explicit ?? resolveLocale({ scope: record.scope });
+}
+
 export function viewDecisionCard(
   record: ApprovalRequestRecord,
   options: { now?: number; locale?: SupportedLocale } = {}
 ): DecisionCardView {
   const now = options.now ?? Date.now();
-  const locale = options.locale ?? resolveLocale();
+  const locale = resolveApprovalLocale(record, options.locale);
   const card = record.decisionCard;
   const level = effectiveInterventionLevel(record, now);
   const vetoState = record.veto ? evaluateVetoWindow(record.veto, now) : undefined;

@@ -1142,6 +1142,17 @@
         "明日の会議予定を見て"
       ]
     },
+    "browser.input_text_extract": {
+      "old_regex": "/「(.+?)」を.*(?:入力|入れて)|\"(.+?)\".*(?:input|type|fill)|(.+?)\\s*と入力/i",
+      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "match": [
+        "「abc」を入力して",
+        "abcと入力",
+        "\"abc\" into the field type",
+        "「x」をここに入れて"
+      ],
+      "no_match": ["hello world", "クリックして"]
+    },
     "browser.open_verb": {
       "old_regex": "/開いて|open|表示して|show/i",
       "sites": ["libs/core/browser/browser-conversation-session.ts:1140"],
@@ -1495,6 +1506,12 @@
         "明日の会議予定を見て"
       ]
     },
+    "browser.target_region_prefix": {
+      "old_regex": "/^(?:左下|右下|左上|右上|中央|真ん中)\\s*の?/",
+      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "match": ["左下の保存", "中央ボタン", "右上 メニュー"],
+      "no_match": ["保存ボタン", "メニュー左下"]
+    },
     "browser.target_role_button": {
       "old_regex": "/ボタン|button/i",
       "sites": ["libs/core/browser/browser-conversation-session.ts:1031"],
@@ -1524,6 +1541,19 @@
         "朝イチの予定だけ教えて",
         "明日の会議予定を見て"
       ]
+    },
+    "browser.target_text_extract": {
+      "old_regex": "/「(.+?)」|\"(.+?)\"|『(.+?)』|(.+?)を押して|(.+?)をクリック|(.+?)をタップ|(.+?)ボタン/",
+      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "match": [
+        "「保存」を押して",
+        "\"Save\" please",
+        "『確定』",
+        "送信ボタン",
+        "OKをクリック",
+        "次へをタップ"
+      ],
+      "no_match": ["hello world", "open the page"]
     },
     "calendar_source.google": {
       "old_regex": "/(Google Calendar|Googleカレンダー|calendar\\.google\\.com|Google)/i",
@@ -2249,6 +2279,24 @@
         "週末の予定を詰め直して",
         "顧客訪問の予定を再調整して"
       ]
+    },
+    "execution_feedback.outcome_dissatisfied": {
+      "old_regex": "/不満|dissatisfied/i",
+      "sites": ["libs/core/execution-feedback.ts"],
+      "match": ["不満", "dissatisfied"],
+      "no_match": ["満足", "satisfied"]
+    },
+    "execution_feedback.outcome_partially_satisfied": {
+      "old_regex": "/一部違う|partially_satisfied/i",
+      "sites": ["libs/core/execution-feedback.ts"],
+      "match": ["一部違う", "partially_satisfied"],
+      "no_match": ["不満", "satisfied"]
+    },
+    "execution_feedback.outcome_satisfied": {
+      "old_regex": "/満足|satisfied/i",
+      "sites": ["libs/core/execution-feedback.ts"],
+      "match": ["満足", "satisfied"],
+      "no_match": ["不満", "hello"]
     },
     "execution_feedback.prefix": {
       "old_regex": "/^評価/",

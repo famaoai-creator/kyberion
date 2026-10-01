@@ -90,6 +90,7 @@ import { SEMANTIC_TOKEN_FALLBACKS } from './semantic-design-token-fallbacks.js';
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
 import {
   PPTX_PALETTE,
+  createPptxLayoutKit,
   footerElements,
   resolvePptxPalette,
   sectionHeaderElements,
@@ -155,7 +156,7 @@ describe('semantic-design-tokens', () => {
           backgroundColor: '#000',
           layoutFamily: family,
           motionProfile: motion,
-          designSystemRef: { css_vars: {} } as any,
+          designSystemRef: { css_vars: {} } as never,
         })
       ).toEqual(golden.css[family]);
     }
@@ -251,5 +252,14 @@ describe('semantic-design-tokens', () => {
       tenantSlug: 'tenant-b',
     })[0].style?.line;
     expect(footerRule).toBe('#BB0002');
+
+    // A layout kit binds one render's tenant once: palette, header and footer agree.
+    const kitB = createPptxLayoutKit({ tenantSlug: 'tenant-b' });
+    const kitA = createPptxLayoutKit({ tenantSlug: 'tenant-a' });
+    expect(kitB.palette.navy).toBe('#BB0002');
+    expect(kitB.sectionHeader('T')[0].style?.fill).toBe('#BB0002');
+    expect(kitB.footer({ pageNum: 1, totalPages: 2, label: 'x' })[0].style?.line).toBe('#BB0002');
+    expect(kitA.sectionHeader('T')[0].style?.fill).toBe('#AA0001');
+    expect(createPptxLayoutKit().sectionHeader('T')[0].style?.fill).toBe(defaultNavy);
   });
 });

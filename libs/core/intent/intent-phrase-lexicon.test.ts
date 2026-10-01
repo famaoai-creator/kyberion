@@ -4,6 +4,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   compileIntentPhraseLexicon,
+  captureIntentPhrase,
   findIntentPhrase,
   getIntentPhraseMatcher,
   intentPhraseFlags,
@@ -88,6 +89,21 @@ describe('intent phrase lexicon — parity with the migrated regex literals', ()
     expect(findIntentPhrase('普通の依頼', 'approval.system_name')).toBeUndefined();
     expect(findIntentPhrase('REQ-1 を却下、その後承認', 'approval.decision_word')).toBe('却下');
     expect(findIntentPhrase('Please approve REQ-1234', 'approval.decision_word')).toBe('approve');
+  });
+
+  it('captures the first group of the first matching extraction pattern (quoted text first)', () => {
+    const target = 'browser.target_text_extract';
+    expect(captureIntentPhrase('左下の「保存」を押して', target)).toBe('保存');
+    expect(captureIntentPhrase('送信ボタンを押して', target)).toBe('送信ボタン');
+    expect(captureIntentPhrase('click "Save"', target)).toBe('Save');
+    expect(captureIntentPhrase('hello world', target)).toBeUndefined();
+    const input = 'browser.input_text_extract';
+    expect(captureIntentPhrase('「abc」を入力して', input)).toBe('abc');
+    expect(captureIntentPhrase('abcと入力', input)).toBe('abc');
+    expect(captureIntentPhrase('type "abc" in the box', input)).toBeUndefined();
+    expect(captureIntentPhrase('"abc" type', input)).toBe('abc');
+    // locale filter narrows the patterns tried
+    expect(captureIntentPhrase('"abc" type', input, { locales: ['ja'] })).toBeUndefined();
   });
 
   it('composes the slide-count unit like the old /(\\d+)\\s*(枚|slides?)/i literal', () => {

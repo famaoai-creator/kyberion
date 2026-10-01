@@ -116,10 +116,16 @@ function readDeprecatedUiLocaleAlias(): SupportedLocale | null {
 
 function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | null {
   if (!scope?.tenant_slug) return null;
-  const normalizedScope = assertScopeContext(
-    { ...scope, tier: 'confidential' },
-    { requireTenant: true }
-  );
+  let normalizedScope: ScopeContext;
+  try {
+    normalizedScope = assertScopeContext(
+      { ...scope, tier: 'confidential' },
+      { requireTenant: true }
+    );
+  } catch {
+    // A malformed or unauthorized scope never yields a locale (and must not throw from a reply path).
+    return null;
+  }
   const candidates = [
     normalizedScope.project_id
       ? pathResolver.knowledge(
@@ -206,12 +212,35 @@ export function resolveLocale(ctx: LocaleContext = {}): SupportedLocale {
  */
 const replyLocaleStore = new AsyncLocalStorage<{ locale?: SupportedLocale }>();
 
-/** Derives a turn's reply locale: explicit locale > language detected from the user text. */
+/**
+ * The locale stored for a tenant / organization / project scope
+ * (`knowledge/confidential/<tenant>/[organizations/<org>/[projects/<p>/]]locale.json`),
+ * or `undefined` when the scope carries no tenant or no overlay exists.
+ */
+export function resolveScopeLocale(
+  scope: LocaleContext['scope'] | null | undefined
+): SupportedLocale | undefined {
+  return resolveScopedLocale(scope ?? undefined) ?? undefined;
+}
+
+/**
+ * Derives a turn's reply locale: explicit locale > language detected from the
+ * user text > the locale stored for the turn's scope. A turn with no language
+ * signal at all (button / action payload, bare id or digit) yields `undefined`
+ * so the rest of the {@link resolveLocale} chain (operator identity,
+ * `KYBERION_LOCALE`, catalog default) decides.
+ */
 export function deriveReplyLocale(input: {
   explicit?: string | null;
   text?: string | null;
+  scope?: LocaleContext['scope'] | null;
 }): SupportedLocale | undefined {
-  return normalizeLocale(input.explicit) ?? detectTextLocale(input.text) ?? undefined;
+  return (
+    normalizeLocale(input.explicit) ??
+    detectTextLocale(input.text) ??
+    resolveScopeLocale(input.scope) ??
+    undefined
+  );
 }
 
 /** Sets (or clears, with `undefined`) the reply locale for the current async context. */

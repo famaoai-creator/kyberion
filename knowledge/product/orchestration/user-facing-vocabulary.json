@@ -8668,6 +8668,16 @@
         "en": "This approval request has expired.",
         "ja": "この承認要求は期限切れです。",
         "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "approval_action_approved": {
+        "en": "Approved by {actor}: {title}",
+        "ja": "{actor} が承認しました: {title}",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
+      },
+      "approval_action_rejected": {
+        "en": "Rejected by {actor}: {title}",
+        "ja": "{actor} が却下しました: {title}",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
       }
     },
     "concierge": {
@@ -23727,6 +23737,80 @@
         "en": "Customer question ({tenant} / {dealId})",
         "ja": "顧客からの確認事項 ({tenant} / {dealId})",
         "qps-ploc": "⟦Ƈůşŧőɱėř ɋůėşŧïőñ ({tenant} / {dealId}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      }
+    },
+    "browser_conversation": {
+      "control_resumed": {
+        "en": "Resuming browser control.",
+        "ja": "ブラウザ操作を再開します。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗ⟧"
+      },
+      "control_paused": {
+        "en": "Browser control is paused for now.",
+        "ja": "ブラウザ操作をいったん停止しました。",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ïş ṗȧůşėḓ ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "candidates_found": {
+        "en": "Found {count} candidates. Checking the target.",
+        "ja": "候補が {count} 件あります。対象を確認します。",
+        "qps-ploc": "⟦Ƒőůñḓ {count} ƈȧñḓïḓȧŧėş. Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "target_proceeding": {
+        "en": "Proceeding with \"{label}\" as the target.",
+        "ja": "「{label}」を対象として操作を進めます。",
+        "qps-ploc": "⟦Ṗřőƈėėḓïñɠ ẇïŧħ \"{label}\" ȧş ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "task_preparing": {
+        "en": "Getting ready for browser control.",
+        "ja": "ブラウザ操作の準備を始めます。",
+        "qps-ploc": "⟦Ɠėŧŧïñɠ řėȧḓẏ ƒőř ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "step_proceeding": {
+        "en": "Checking the target and proceeding.",
+        "ja": "対象を確認して操作を進めます。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ ȧñḓ ṗřőƈėėḓïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "input_unresolved": {
+        "en": "Could not work out the value to enter from the conversation.",
+        "ja": "入力する値が会話から解決できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ẇőřķ őůŧ ŧħė ṽȧŀůė ŧő ėñŧėř ƒřőɱ ŧħė ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_unsupported": {
+        "en": "This kind of action is not yet wired to automatic execution.",
+        "ja": "この操作種別はまだ自動実行に接続されていません。",
+        "qps-ploc": "⟦Ŧħïş ķïñḓ őƒ ȧƈŧïőñ ïş ñőŧ ẏėŧ ẇïřėḓ ŧő ȧůŧőɱȧŧïƈ ėẋėƈůŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_done": {
+        "en": "Operated \"{label}\".",
+        "ja": "「{label}」を操作しました。",
+        "qps-ploc": "⟦Őṗėřȧŧėḓ \"{label}\". ŀőřėɱ ⟧"
+      },
+      "action_failed": {
+        "en": "Browser control failed: {error}",
+        "ja": "ブラウザ操作に失敗しました: {error}",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗşů⟧"
+      },
+      "candidates_ask": {
+        "en": "There are {count} candidates. Specify one by number or say \"that one\".",
+        "ja": "候補は {count} 件あります。番号か「それ」で指定してください。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė {count} ƈȧñḓïḓȧŧėş. Şṗėƈïƒẏ őñė ƀẏ ñůɱƀėř őř şȧẏ \"ŧħȧŧ őñė\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "candidate_selected": {
+        "en": "Selected candidate {index}.",
+        "ja": "候補 {index} を選択しました。",
+        "qps-ploc": "⟦Şėŀėƈŧėḓ ƈȧñḓïḓȧŧė {index}. ŀőřėɱ ïṗ⟧"
+      }
+    },
+    "ceo_summary": {
+      "approval_title_fallback": {
+        "en": "Approval request",
+        "ja": "承認のご依頼",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "exception_title_fallback": {
+        "en": "Event needing attention",
+        "ja": "要確認の事象",
+        "qps-ploc": "⟦Ėṽėñŧ ñėėḓïñɠ ȧŧŧėñŧïőñ ŀőřėɱ ï⟧"
       }
     }
   }
