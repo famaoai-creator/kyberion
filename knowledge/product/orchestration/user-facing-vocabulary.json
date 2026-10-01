@@ -8299,6 +8299,21 @@
         "ja": "どこが期待と違いましたか？(スキップ可)",
         "qps-ploc": "⟦Ẇħȧŧ ḓïḓ ñőŧ ɱėėŧ ėẋṗėƈŧȧŧïőñş? (Őṗŧïőñȧŀ) ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "approval_not_authorized": {
+        "en": "You are not authorized to decide this approval request. Please ask an approver.",
+        "ja": "この承認要求を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "approval_action_not_authorized": {
+        "en": "You are not authorized to perform this action. Please ask an approver.",
+        "ja": "この操作を行う権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ṗėřƒőřɱ ŧħïş ȧƈŧïőñ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "mission_proposal_not_authorized": {
+        "en": "You are not authorized to decide this mission proposal. Please ask an approver.",
+        "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
       "operation_not_allowed": {
         "en": "This operation is not allowed.",
         "ja": "この操作は許可されていません。",
