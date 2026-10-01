@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { compileSchema } from '../foundation/ajv.js';
 import { readJson } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -135,15 +136,20 @@ export function checkPrerequisites(): void {
   if (missingFiles.length > 0) {
     throw new Error(
       `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
-        'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.'
+        'Please run "pnpm onboarding" (or complete customer onboarding) before creating missions.'
     );
   }
 
-  const tiers = [
-    'knowledge/personal/missions',
-    'active/missions/confidential',
-    'active/missions/public',
-  ];
+  // When KYBERION_TENANT is set, confidential mission dirs are tenant-scoped
+  // (`active/missions/confidential/{tenant}/`). Creating the bare confidential
+  // prefix fails the tenant-segment path policy and breaks `mission kickoff`.
+  const tenantSlug = String(getRegisteredEnvText('KYBERION_TENANT') || '')
+    .trim()
+    .toLowerCase();
+  const confidentialMissionRoot = tenantSlug
+    ? `active/missions/confidential/${tenantSlug}`
+    : 'active/missions/confidential';
+  const tiers = ['knowledge/personal/missions', confidentialMissionRoot, 'active/missions/public'];
   tiers.forEach((tier) => {
     const fullPath = pathResolver.rootResolve(tier);
     if (!safeExistsSync(fullPath)) {

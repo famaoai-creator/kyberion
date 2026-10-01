@@ -46,7 +46,7 @@ phase_affinity: [alignment, execution]
 | その場で理解する（保存しない）   | 上の感覚コマンド                                                                                   |
 | 同じことをパイプライン内で       | `media:document_digest`, `vision:ocr_image`, `voice:transcribe`                                    |
 | 議事録（話者・アクション）       | `pnpm minutes:record`（マイク実時間）/ `ingest:meeting_digest`（meeting-operations-playbook 参照） |
-| テナントのナレッジとして取り込む | `pnpm ingest --tenant <slug> --file <file> [--ocr]`（文書・html・md）                              |
+| テナントのナレッジとして取り込む | `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr]`（文書・html・md）                    |
 | Web ページ（URL）                | 外部通信が統制された `network:fetch` で保存し、保存したファイルを `read`                           |
 
 ## 3. 実行方法

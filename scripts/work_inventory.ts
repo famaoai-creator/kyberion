@@ -1,6 +1,6 @@
 /**
  * WI-07 (docs/developer/improvement-plans-2026-08/WORK_INVENTORY_PLAN_2026-09-22.ja.md
- * §3/§6): `pnpm inventory` — the governed CLI over the work-inventory.v1
+ * §3/§6): `pnpm work:inventory` — the governed CLI over the work-inventory.v1
  * record type and its decomposition / harvest / consent / observation /
  * scoring / promotion modules.
  *
@@ -97,7 +97,7 @@ function requirePositional(value: string | undefined, usage: string): string {
 }
 
 /**
- * Testable core of `pnpm inventory`. `options.rootDir` (also accepted as an
+ * Testable core of `pnpm work:inventory`. `options.rootDir` (also accepted as an
  * undocumented `--root-dir <path>` argv flag) isolates storage for hermetic
  * tests without an env var; production runs always default to the real repo
  * root via the core modules' own `pathResolver.rootDir()` fallback.
@@ -288,7 +288,7 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
 }
 
 export const runWorkInventory = defineScript({
-  name: 'inventory',
+  name: 'work:inventory',
   flags: ['json', 'dry-run', 'quiet'],
   async run(context) {
     try {

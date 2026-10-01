@@ -4,7 +4,7 @@
     {
       "id": "mcp-server-cowork",
       "kind": "gateway",
-      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
+      "description": "Kyberion MCP Server facade \u2014 exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
       "command": "node",
       "args": ["dist/scripts/mcp_server.js"],
       "env": {
@@ -16,7 +16,9 @@
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": true,
+      "operatorNotesKey": "surface:surface_notes_mcp_server_cowork",
+      "bestForKey": "surface:surface_best_for_mcp_server_cowork"
     }
   ]
 }

@@ -1,6 +1,6 @@
 /**
  * WI-07: shared argv-parsing, scope-resolution, and formatting helpers for
- * `pnpm inventory` (scripts/work_inventory.ts). Kept separate from the
+ * `pnpm work:inventory` (scripts/work_inventory.ts). Kept separate from the
  * dispatcher and the per-area command modules so none of them grows past the
  * ~600 line guideline (docs/developer/improvement-plans-2026-08/
  * WORK_INVENTORY_PLAN_2026-09-22.ja.md §3 WI-07).

@@ -14,6 +14,7 @@ import {
   normalizeReasoningBackendMode as normalizeReasoningBackendModePolicy,
   type ReasoningBackendMode,
 } from '@agent/core/reasoning/reasoning-backend-policy';
+import { getReasoningProviderDescriptor } from '@agent/core/reasoning/reasoning-provider-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
@@ -38,11 +39,22 @@ export function normalizeReasoningBackendChoice(value: string): ReasoningBackend
   return policy.allowed_modes.includes(normalized) ? normalized : null;
 }
 
-/** Numbered menu lines for interactive selection, derived from the catalog. */
-export function formatReasoningBackendMenu(choices: readonly string[]): string[] {
+/**
+ * Numbered menu lines for interactive selection, derived from the catalog.
+ * "Recommended" is the policy's `default_mode` (reasoning-backend-policy.json);
+ * "Offline mock" marks an in-process provider (reasoning-providers/*.json).
+ */
+export function formatReasoningBackendMenu(
+  choices: readonly string[],
+  recommended: string = loadReasoningBackendPolicy().default_mode
+): string[] {
   return choices.map((mode, index) => {
     const suffix =
-      mode === 'claude-cli' ? ' (Recommended)' : mode === 'stub' ? ' (Offline mock)' : '';
+      mode === recommended
+        ? ' (Recommended)'
+        : getReasoningProviderDescriptor(mode as ReasoningBackendMode)?.transport === 'in-process'
+          ? ' (Offline mock)'
+          : '';
     return `${index + 1}. ${mode}${suffix}`;
   });
 }

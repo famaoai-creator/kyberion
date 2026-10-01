@@ -127,7 +127,7 @@ describe('install_chronos_launchd plist generation', () => {
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('Uninstall steps (dry-run: nothing was changed)');
-    expect(output[0]).toContain('pnpm kyberion chronos uninstall --apply');
+    expect(output[0]).toContain('pnpm kyberion scheduler uninstall --apply');
   });
 });
 

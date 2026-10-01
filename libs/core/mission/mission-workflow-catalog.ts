@@ -260,6 +260,12 @@ export function resolveMissionWorkflowDesign(
       intentId: 'incident-analysis',
       taskType: 'incident_analysis',
     },
+    operations_report: {
+      missionClass: 'operations_and_release',
+      deliveryShape: 'single_artifact',
+      intentId: 'organization-ops-report',
+      taskType: 'operations_report',
+    },
     research_report: {
       missionClass: 'research_and_absorption',
       intentId: 'research-report',

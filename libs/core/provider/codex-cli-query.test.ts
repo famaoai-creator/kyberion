@@ -22,6 +22,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 // WS-02: the private git index is stubbed so no real index is ever copied.
+const isProviderDescriptorPath = vi.hoisted(
+  () => (filePath: string) => /[\\/]reasoning-providers[\\/][^\\/]+\.json$/u.test(String(filePath))
+);
+
 vi.mock('../session-git-index.js', () => ({
   prepareSessionGitIndex: mocks.prepareSessionGitIndex,
 }));
@@ -33,7 +37,12 @@ vi.mock('../secure-io.js', async () => {
     safeExecResult: mocks.safeExecResult,
     safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
-    safeReadFile: mocks.safeReadFile,
+    // Provider permission projections are descriptor data
+    // (reasoning-providers/*.json); keep those governed reads real.
+    safeReadFile: ((filePath: string, options?: unknown) =>
+      isProviderDescriptorPath(filePath)
+        ? actual.safeReadFile(filePath, options as never)
+        : mocks.safeReadFile(filePath, options)) as typeof actual.safeReadFile,
     safeRmSync: mocks.safeRmSync,
   };
 });
@@ -42,7 +51,10 @@ vi.mock('../foundation/text.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../foundation/text.js')>();
   return {
     ...actual,
-    readTextFile: (filePath: string) => mocks.safeReadFile(filePath),
+    readTextFile: (filePath: string) =>
+      isProviderDescriptorPath(filePath)
+        ? actual.readTextFile(filePath)
+        : mocks.safeReadFile(filePath),
   };
 });
 

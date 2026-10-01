@@ -1,5 +1,5 @@
 ---
-title: Documentation Inventory & Audit (Phase C'-1)
+title: Documentation Inventory & Audit (2026-05 snapshot)
 category: Planning
 tags: [docs, audit, c-1, scrutiny]
 importance: 8
@@ -8,7 +8,7 @@ last_updated: 2026-05-07
 
 # Documentation Inventory & Audit
 
-> **注記:** 本文書は 2026-05-07 時点のスナップショット（歴史的記録）であり、最新の状態を反映していません。現在の実際のリポジトリ構造とは異なる場合があります。
+> **注記:** 本文書は 2026-05-07 時点のスナップショット（歴史的記録）であり、最新の状態を反映していません。現在の docs の地図は [docs/README.md](./README.md)（各文書の役割と正本）です。以降の変更例: `INITIALIZATION.md` は英語が正本で `INITIALIZATION.ja.md` を併置、`OPERATIONS_READINESS_MATRIX.md` は `docs/user/` に一本化、`CLI_REFERENCE.md` はコマンド manifest から生成。
 
 A scrutiny pass over `docs/` and high-level `knowledge/public/` to:
 
@@ -17,7 +17,7 @@ A scrutiny pass over `docs/` and high-level `knowledge/public/` to:
 3. Move clearly-misplaced docs into the right tier.
 4. Archive content that is no longer current but worth keeping for trend archaeology.
 
-This is the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`.
+This was the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`, which is complete. For the current map of `docs/` see [README.md](./README.md).
 
 > Note: this document is a historical snapshot from 2026-05-07. It is kept for archaeology, not as the current source of truth for documentation inventory.
 
@@ -64,7 +64,7 @@ These remain at `docs/` root (not moved this pass) because they are heavily link
 | File                   | Notes                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------- |
 | `WHY.md` / `WHY.ja.md` | Positioning, thesis. Entry point for new visitors.                                    |
-| `QUICKSTART.md`        | 5-minute getting-started. Linked from `README.md`.                                    |
+| `QUICKSTART.md`        | The canonical front door: 5-minute getting-started and onboarding entry points.       |
 | `USE_CASES.md`         | Canonical catalog of automation scenarios (Japanese, ~1100 lines).                    |
 | `SCENARIOS.md`         | Persona-mapped scenario view linking actuators to playbooks.                          |
 | `CEO_SCENARIOS.md`     | Executive / decision-support scenario view.                                           |
@@ -72,12 +72,12 @@ These remain at `docs/` root (not moved this pass) because they are heavily link
 
 ### Operator-facing (deploy / run / daily ops)
 
-| File                           | Notes                                                                              |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| `INITIALIZATION.md`            | First-time setup (canonical, referenced by the onboarding section in `AGENTS.md`). |
-| `OPERATOR_UX_GUIDE.md`         | Day-to-day operations: Slack, Chronos, terminal, directories.                      |
-| `PRIVACY.md` / `PRIVACY.ja.md` | Data flow + telemetry policy.                                                      |
-| `operator/DEPLOYMENT.md`       | macOS / Linux / Docker deployment runbook (new in Phase D'-3).                     |
+| File                           | Notes                                                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `INITIALIZATION.md`            | Day-2 setup reference reached from `QUICKSTART.md` (English canonical; `INITIALIZATION.ja.md` alongside). |
+| `OPERATOR_UX_GUIDE.md`         | Day-to-day operations: Slack, Chronos, terminal, directories.                                             |
+| `PRIVACY.md` / `PRIVACY.ja.md` | Data flow + telemetry policy.                                                                             |
+| `operator/DEPLOYMENT.md`       | macOS / Linux / Docker deployment runbook (new in Phase D'-3).                                            |
 
 ### Developer-facing (extend / contribute)
 

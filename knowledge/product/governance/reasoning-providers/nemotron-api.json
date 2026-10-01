@@ -13,7 +13,25 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["KYBERION_NEMOTRON_URL"],
-      "cost_tier": "metered"
+      "cost_tier": "metered",
+      "transport": "api",
+      "data_egress": "external-api",
+      "adapter": "openai-compatible",
+      "openai_compatible_preset": "nemotron",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": false,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_env_keys": ["KYBERION_NEMOTRON_MODEL"]
     }
   ]
 }
