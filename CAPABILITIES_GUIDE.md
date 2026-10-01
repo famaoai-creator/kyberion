@@ -70,6 +70,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `clipboard_read`                   | system                                                           |
 | `collect_artifact`                 | compute                                                          |
 | `collect_artifacts`                | system                                                           |
+| `collect_surface_errors`           | system                                                           |
 | `console`                          | browser                                                          |
 | `consolidation-status`             | working-memory                                                   |
 | `content`                          | browser                                                          |
@@ -131,9 +132,11 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `load`                             | approval                                                         |
 | `macos_automation_probe`           | system                                                           |
 | `mark_elements`                    | vision                                                           |
+| `narrated_report_preflight`        | system                                                           |
 | `network`                          | browser                                                          |
 | `ocr_image`                        | vision                                                           |
 | `parse_document`                   | ingest                                                           |
+| `partition_surface_health`         | system                                                           |
 | `passkey_credentials`              | browser                                                          |
 | `passkey_events`                   | browser                                                          |
 | `pdf_delete_pages`                 | media                                                            |
@@ -194,6 +197,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `transcribe`                       | voice                                                            |
 | `transcribe_voice_sample`          | voice                                                            |
 | `url`                              | browser                                                          |
+| `validate_audio_artifact`          | system                                                           |
 | `verify_anchor`                    | blockchain                                                       |
 | `vision_consult`                   | system                                                           |
 | `window_list`                      | system                                                           |
@@ -436,6 +440,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `prewarm_mission`                          | agent                                                                 |
 | `process_kill`                             | system                                                                |
 | `propose_tool_calls`                       | wisdom                                                                |
+| `provider_preflight`                       | system                                                                |
 | `react_loop`                               | wisdom                                                                |
 | `reasoning`                                | wisdom                                                                |
 | `reasoning_loop`                           | wisdom                                                                |
@@ -481,6 +486,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `speak_local`                              | voice                                                                 |
 | `staff_mission`                            | agent                                                                 |
 | `stakeholder_grid_sort`                    | wisdom                                                                |
+| `standard_pr_lifecycle`                    | system                                                                |
 | `stop`                                     | process                                                               |
 | `submit_generation`                        | media-generation                                                      |
 | `submit_job`                               | compute                                                               |
