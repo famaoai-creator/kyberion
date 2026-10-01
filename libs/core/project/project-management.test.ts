@@ -115,6 +115,14 @@ function cleanup(): void {
   if (safeExistsSync(trackProjectWorkspace)) {
     safeRmSync(trackProjectWorkspace, { recursive: true, force: true });
   }
+  const sharedProjectWorkspace = pathResolver.projectWorkspaceDir(
+    'PRJ-PMC-SHARED',
+    'public',
+    'shared'
+  );
+  if (safeExistsSync(sharedProjectWorkspace)) {
+    safeRmSync(sharedProjectWorkspace, { recursive: true, force: true });
+  }
 }
 
 describe('project-management facade', () => {
@@ -192,6 +200,35 @@ describe('project-management facade', () => {
     expect(repaired.status).toBe('repaired');
     expect(loadProjectRecord(PROJECT_ID)?.active_missions).toEqual([]);
     expect(loadProjectRecord(PROJECT_ID)?.active_task_sessions).toEqual([]);
+  });
+
+  it('repairs a shared-scope public project without serializing tenant_slug "shared"', () => {
+    const project = createManagedProject({
+      project_id: 'PRJ-PMC-SHARED',
+      name: 'Shared Scope Project',
+      summary: 'Tenantless public project fixture.',
+      tier: 'public',
+      status: 'active',
+    });
+    createManagedProjectTrack({
+      track_id: 'TRK-PMC-SHARED',
+      project_id: project.project_id,
+      name: 'Shared Track',
+      summary: 'Active track fixture in the shared scope.',
+    });
+    saveProjectRecord({
+      ...loadProjectRecord(project.project_id)!,
+      active_missions: ['MSN-STALE'],
+    });
+
+    const repaired = reconcileProjectOperationalState(project.project_id, { apply: true });
+    expect(repaired.status).toBe('repaired');
+    const view = getProjectManagementView(project.project_id);
+    const sharedState = view.operational_states.find(
+      (state) => (state.tenant_slug || 'shared') === 'shared'
+    );
+    expect(sharedState).toBeTruthy();
+    expect(sharedState?.tenant_slug).not.toBe('shared');
   });
 
   it('projects tenant-scoped canonical WorkItems and their live status into the Project view', () => {
