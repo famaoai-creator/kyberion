@@ -3,6 +3,7 @@
   "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
   "default_persona": "worker",
   "write_scopes": [
+    "active/shared/inbox/",
     "active/shared/runtime/",
     "active/shared/logs/surfaces/",
     "active/shared/observability/protocol-services/",
