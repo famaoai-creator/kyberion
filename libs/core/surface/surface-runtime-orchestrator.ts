@@ -1105,9 +1105,14 @@ export async function runSurfaceConversation(
 async function runSurfaceConversationTurn(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
+  // Shared execution feedback is a write to a process-wide store with no
+  // tenant attribution. Isolated, ask-only, and tenant-scoped speakers cannot
+  // add records to it.
+  const askOnly = input.workAuthority === 'ask_only' || Boolean(input.isolation);
+  const mayRecordSharedFeedback = !askOnly && !input.scope?.tenant_slug;
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
-  if (parsedExecutionFeedback) {
+  if (parsedExecutionFeedback && mayRecordSharedFeedback) {
     const record = recordExecutionFeedback({
       ...parsedExecutionFeedback,
       ...(input.correlationId && !parsedExecutionFeedback.correlation_id
@@ -1128,7 +1133,6 @@ async function runSurfaceConversationTurn(
   // Team Channel P1: ask-only speakers never reach a delegating receiver.
   // Team Channel E: an isolated (tenant) turn is restricted the same way —
   // only direct replies; real work goes through a tenant-scoped mission.
-  const askOnly = input.workAuthority === 'ask_only' || Boolean(input.isolation);
   const forcedReceiver = askOnly
     ? undefined
     : normalizeSurfaceDelegationReceiver(input.forcedReceiver);
