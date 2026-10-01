@@ -637,13 +637,13 @@ export function resolveSurfaceApprovalReply(params: {
   let decision: SurfaceApprovalDecision | undefined;
 
   if (token) {
+    if (!mayDecide()) return unauthorized;
     decision = normalizeDecision(token[2]);
     record = loadReplyTarget(params.surface, token[1]);
     if (!record || record.status !== 'pending') {
       return { handled: true, reply: 'この承認要求は存在しないか、すでに処理済みです。' };
     }
     if (!decision) return { handled: true, reply: '承認操作を解釈できませんでした。' };
-    if (!mayDecide()) return unauthorized;
     return resolveSurfaceApprovalRecord({
       surface: params.surface,
       record,

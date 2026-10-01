@@ -59,6 +59,7 @@ import {
   createSlackBotUserIdResolver,
   createSlackTypingHandle,
   ensureSlackApprovalAuthority,
+  isSlackOwnerOnboardingActor,
   resolveSlackApprovalText,
   runSlackChannelTurn,
   slackBotParticipatesInThread,
@@ -427,6 +428,14 @@ describe('slack team channel', () => {
       true
     );
     expect(postEphemeral).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts onboarding actions only in owner_direct channels', () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    vi.stubEnv('KYBERION_SURFACE_ALLOWLISTS', JSON.stringify({ slack: ['U-lead', 'U-owner'] }));
+    expect(isSlackOwnerOnboardingActor('C-team', 'U-lead')).toBe(false);
+    expect(isSlackOwnerOnboardingActor('C-dm', 'U-owner')).toBe(true);
+    expect(isSlackOwnerOnboardingActor('C-dm', 'U-stranger')).toBe(false);
   });
 
   it('refuses a text approval from a team member who is not an approver', () => {

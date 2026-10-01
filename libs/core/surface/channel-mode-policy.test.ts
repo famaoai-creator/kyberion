@@ -119,6 +119,16 @@ describe('channel-mode-policy', () => {
       });
     });
 
+    it('keeps the layout of multi-line messages when stripping the mention', async () => {
+      const text = '<@UBOT> review this:\n```ts\n  const a = 1;\n```\n- item';
+      const decision = await decideChannelEngagement(resolveChannelModePolicy('slack', 'C0DM'), {
+        text,
+        agentUserId: 'UBOT',
+        isThreadReply: false,
+      });
+      expect(decision.text).toBe('review this:\n```ts\n  const a = 1;\n```\n- item');
+    });
+
     it('answers team messages only when mentioned or in a participating thread', async () => {
       stubModes(TEAM_CONFIG);
       const policy = resolveChannelModePolicy('slack', 'C0TEAM');
