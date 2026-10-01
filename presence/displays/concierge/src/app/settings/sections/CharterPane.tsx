@@ -179,6 +179,8 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
         'charter.expires_in_days': (v) => setDraft((d) => ({ ...d, expires_in_days: asText(v) })),
         'charter.allow_named_spend': (v) =>
           setDraft((d) => ({ ...d, allow_named_spend: asText(v) === 'on' })),
+        'charter.allow_customer_outbound': (v) =>
+          setDraft((d) => ({ ...d, allow_customer_outbound: asText(v) === 'on' })),
         'charter.supersedes_decision_rights': (v) =>
           setDraft((d) => ({ ...d, supersedes_decision_rights: asText(v) === 'on' })),
         'charter.agree': (v) => setAgreed(asText(v) === 'on'),
@@ -310,6 +312,16 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
                 label={t('setup.charter_named_spend')}
                 hide_label
                 value={onOff(draft.allow_named_spend)}
+                options={yesNo}
+              />
+            </SettingRow>
+            <SettingRow label={t('setup.charter_outbound')}>
+              <Select
+                id="charter-outbound"
+                name="charter.allow_customer_outbound"
+                label={t('setup.charter_outbound')}
+                hide_label
+                value={onOff(draft.allow_customer_outbound)}
                 options={yesNo}
               />
             </SettingRow>
