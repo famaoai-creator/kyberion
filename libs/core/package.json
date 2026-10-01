@@ -4059,6 +4059,10 @@
       "types": "./dist/integrations/email-account-catalog.d.ts",
       "default": "./dist/integrations/email-account-catalog.js"
     },
+    "./surface/web-push": {
+      "types": "./dist/surface/web-push.d.ts",
+      "default": "./dist/surface/web-push.js"
+    },
     "./integrations/email-bridge": {
       "types": "./dist/integrations/email-bridge.d.ts",
       "default": "./dist/integrations/email-bridge.js"
@@ -7011,6 +7015,10 @@
     "js-yaml": "^5.4.2",
     "marked": "^18.0.12",
     "openai": "^7.12.1",
+    "web-push": "3.6.7",
     "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/web-push": "^3.6.4"
   }
 }

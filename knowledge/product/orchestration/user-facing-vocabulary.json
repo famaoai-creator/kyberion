@@ -13406,6 +13406,81 @@
         "ja": "メールアドレスの形式が正しくありません。",
         "qps-ploc": "⟦Ŧħȧŧ ḓőėş ñőŧ ŀőőķ ŀïķė ȧñ ėɱȧïŀ ȧḓḓřėşş. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "webpush.title": {
+        "en": "Kyberion",
+        "ja": "Kyberion",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ŀőř⟧"
+      },
+      "webpush.body_approval_required": {
+        "en": "Something is waiting for your decision.",
+        "ja": "決めていただくことがあります。",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "webpush.body_question": {
+        "en": "There is a question for you.",
+        "ja": "確認したいことがあります。",
+        "qps-ploc": "⟦Ŧħėřė ïş ȧ ɋůėşŧïőñ ƒőř ẏőů. ŀőřėɱ ïṗş⟧"
+      },
+      "webpush.body_digest": {
+        "en": "Your decision summary is ready.",
+        "ja": "決める項目のまとめができました。",
+        "qps-ploc": "⟦Ẏőůř ḓėƈïşïőñ şůɱɱȧřẏ ïş řėȧḓẏ. ŀőřėɱ ïṗşů⟧"
+      },
+      "webpush.body_other": {
+        "en": "Something needs your attention.",
+        "ja": "お知らせがあります。",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ ñėėḓş ẏőůř ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.push_title": {
+        "en": "Notify this device",
+        "ja": "この端末に通知する",
+        "qps-ploc": "⟦Ñőŧïƒẏ ŧħïş ḓėṽïƈė ŀőřėɱ⟧"
+      },
+      "setup.push_description": {
+        "en": "A short alert that something is waiting. It never says what, so nothing private is sent through the push service.",
+        "ja": "「決めることがあります」とだけ知らせます。内容は一切送らないので、通知サービスに機密が渡ることはありません。",
+        "qps-ploc": "⟦Ȧ şħőřŧ ȧŀėřŧ ŧħȧŧ şőɱėŧħïñɠ ïş ẇȧïŧïñɠ. Ïŧ ñėṽėř şȧẏş ẇħȧŧ, şő ñőŧħïñɠ ṗřïṽȧŧė ïş şėñŧ ŧħřőůɠħ ŧħė ṗůşħ şėřṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "setup.push_on": {
+        "en": "Turn on notifications on this device",
+        "ja": "この端末の通知をオンにする",
+        "qps-ploc": "⟦Ŧůřñ őñ ñőŧïƒïƈȧŧïőñş őñ ŧħïş ḓėṽïƈė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.push_off": {
+        "en": "Turn off notifications on this device",
+        "ja": "この端末の通知をオフにする",
+        "qps-ploc": "⟦Ŧůřñ őƒƒ ñőŧïƒïƈȧŧïőñş őñ ŧħïş ḓėṽïƈė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.push_enabled": {
+        "en": "Notifications are on for this device.",
+        "ja": "この端末の通知はオンです。",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ȧřė őñ ƒőř ŧħïş ḓėṽïƈė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.push_disabled": {
+        "en": "Notifications are off for this device.",
+        "ja": "この端末の通知はオフです。",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ȧřė őƒƒ ƒőř ŧħïş ḓėṽïƈė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.push_unconfigured": {
+        "en": "Push notifications are not set up on this server yet (an operator needs to add the keys).",
+        "ja": "このサーバーではプッシュ通知がまだ設定されていません(管理者が鍵を設定する必要があります)。",
+        "qps-ploc": "⟦Ṗůşħ ñőŧïƒïƈȧŧïőñş ȧřė ñőŧ şėŧ ůṗ őñ ŧħïş şėřṽėř ẏėŧ (ȧñ őṗėřȧŧőř ñėėḓş ŧő ȧḓḓ ŧħė ķėẏş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "setup.push_unsupported": {
+        "en": "This browser does not support push notifications.",
+        "ja": "このブラウザはプッシュ通知に対応していません。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ḓőėş ñőŧ şůṗṗőřŧ ṗůşħ ñőŧïƒïƈȧŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "setup.push_denied": {
+        "en": "Notifications are blocked in this browser. Allow them in the browser settings first.",
+        "ja": "このブラウザでは通知がブロックされています。先にブラウザの設定で許可してください。",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ȧřė ƀŀőƈķėḓ ïñ ŧħïş ƀřőẇşėř. Ȧŀŀőẇ ŧħėɱ ïñ ŧħė ƀřőẇşėř şėŧŧïñɠş ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "setup.push_err": {
+        "en": "Could not change notifications: {detail}",
+        "ja": "通知を変更できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈħȧñɠė ñőŧïƒïƈȧŧïőñş: {detail} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "setup.invite_link_once": {
         "en": "Share this link now. It is shown only once.",
         "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",
