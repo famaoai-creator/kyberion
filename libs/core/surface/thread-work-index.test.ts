@@ -40,8 +40,12 @@ describe('thread-work-index', () => {
         tenantSlug: 'acme',
       }
     );
-    recordThreadWork(thread, { kind: 'mission', id: 'MSN-B' });
-    recordThreadWork(thread, { kind: 'mission', id: 'MSN-A', confirmed_by: 'user:lead' });
+    recordThreadWork(thread, { kind: 'mission', id: 'MSN-B' }, { tenantSlug: 'acme' });
+    recordThreadWork(
+      thread,
+      { kind: 'mission', id: 'MSN-A', confirmed_by: 'user:lead' },
+      { tenantSlug: 'acme' }
+    );
     const index = readThreadWork(thread);
     expect(index?.tenant_slug).toBe('acme');
     expect(index?.entries.map((entry) => entry.id)).toEqual(['MSN-B', 'MSN-A']);

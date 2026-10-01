@@ -10,8 +10,9 @@ import { resolveConciergeLocale } from '../../../../lib/i18n';
 export const dynamic = 'force-dynamic';
 
 /**
- * Puts the invite into a mail DRAFT for the inviter to review and send. Nothing
- * is sent from here; the draft is created in the inviter's own mail backend.
+ * Attempts to create a mail draft for the inviter to review and send. Nothing
+ * is sent from here; draft creation is unavailable until an owner-bound mail
+ * backend can be established.
  */
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
