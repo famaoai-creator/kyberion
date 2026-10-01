@@ -382,6 +382,12 @@ export interface SurfaceConversationAttachment {
 
 export type SurfaceWorkAuthority = 'full' | 'ask_only';
 
+export interface SurfaceTenantIsolation {
+  tenantSlug: string;
+  /** Highest tier the turn may disclose; tenant knowledge is searched only at confidential. */
+  maxTier: 'public' | 'confidential';
+}
+
 interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
@@ -404,6 +410,14 @@ interface SurfaceConversationInputBase {
    * promotion or delegation. Omitted means full authority (current behaviour).
    */
   workAuthority?: SurfaceWorkAuthority;
+  /**
+   * Team Channel E: tenant isolation for a shared channel turn. The turn
+   * answers directly through a tool-less agent runtime keyed to the tenant;
+   * it never delegates to other agents or starts in-process work (real work
+   * goes through a tenant-scoped mission), and knowledge search covers public
+   * plus this tenant only.
+   */
+  isolation?: SurfaceTenantIsolation;
 }
 
 export type SurfaceConversationInput = SurfaceConversationInputBase & {
@@ -437,6 +451,14 @@ interface SurfaceConversationMessageInputBase {
    * promotion or delegation. Omitted means full authority (current behaviour).
    */
   workAuthority?: SurfaceWorkAuthority;
+  /**
+   * Team Channel E: tenant isolation for a shared channel turn. The turn
+   * answers directly through a tool-less agent runtime keyed to the tenant;
+   * it never delegates to other agents or starts in-process work (real work
+   * goes through a tenant-scoped mission), and knowledge search covers public
+   * plus this tenant only.
+   */
+  isolation?: SurfaceTenantIsolation;
 }
 
 export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBase & {

@@ -22,6 +22,8 @@ const captured = vi.hoisted(() => ({
     locale?: string;
     scope?: SurfaceConversationMessageInput['scope'];
     workAuthority?: SurfaceConversationMessageInput['workAuthority'];
+    isolation?: SurfaceConversationMessageInput['isolation'];
+    boundTenant?: string;
   }[],
 }));
 
@@ -30,7 +32,10 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
   return {
     ...actual,
     runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {
+      const { currentExecutionScope } = await import('@agent/core/foundation');
       captured.conversationInputs.push({
+        isolation: input.isolation,
+        boundTenant: currentExecutionScope()?.tenantSlug,
         threadContext: input.threadContext,
         text: input.text,
         locale: input.locale,
@@ -365,6 +370,9 @@ describe('slack team channel', () => {
 
     const input = captured.conversationInputs[0];
     expect(input.scope).toEqual({ tier: 'confidential', tenant_slug: 'acme' });
+    // Team Channel E: isolated to the tenant, with reads bound to it.
+    expect(input.isolation).toEqual({ tenantSlug: 'acme', maxTier: 'confidential' });
+    expect(input.boundTenant).toBe('acme');
     expect(input.threadContext?.startsWith('[channel-policy]')).toBe(true);
     expect(input.threadContext).toContain(THREAD_CONTEXT);
   });
@@ -418,6 +426,8 @@ describe('slack team channel', () => {
       { ...baseRequest(), channelPolicy: resolveChannelModePolicy('slack', 'C-thread') }
     );
     expect(captured.conversationInputs[0].scope).toBeUndefined();
+    expect(captured.conversationInputs[0].isolation).toBeUndefined();
+    expect(captured.conversationInputs[0].boundTenant).toBeUndefined();
     expect(captured.conversationInputs[0].threadContext).toBe(THREAD_CONTEXT);
   });
 

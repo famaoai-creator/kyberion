@@ -83,7 +83,6 @@ import {
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
 import {
-  channelTurnScope,
   decideChannelEngagement,
   evaluateChannelApprovalAuthority,
   resolveChannelModePolicy,
@@ -98,6 +97,8 @@ import {
   ensureSlackApprovalAuthority,
   answerSlackTeamChannelCommand,
   issueSlackThreadMission,
+  resolveSlackTeamTurn,
+  runInTeamTurnContext,
   slackTextConfirmer,
   evaluateSlackChannelActorAccess,
   isSlackOwnerOnboardingActor,
@@ -291,10 +292,9 @@ export function runSlackChannelTurn(
   request: SlackChannelTurnRequest,
   options: RunChannelTurnOptions = {}
 ): Promise<SurfaceConversationResult> {
-  const scope = request.channelPolicy ? channelTurnScope(request.channelPolicy) : undefined;
-  // Team Channel P1: speakers without request_work get direct replies only.
-  const askOnly = Boolean(
-    request.channelSpeaker && !speakerCan(request.channelSpeaker, 'request_work')
+  const { scope, askOnly, isolation } = resolveSlackTeamTurn(
+    request.channelPolicy,
+    request.channelSpeaker
   );
   return runChannelTurn(
     adapter,
@@ -306,28 +306,31 @@ export function runSlackChannelTurn(
       ...(scope ? { scope } : {}),
     },
     ({ threadContext }) =>
-      runSurfaceMessageConversation({
-        surface: 'slack',
-        text: request.text,
-        channel: request.channel,
-        threadTs: request.threadTs,
-        correlationId: request.correlationId,
-        receivedAt: request.receivedAt,
-        actorId: request.actorId,
-        senderAgentId: 'kyberion:slack-bridge',
-        agentId: SLACK_SURFACE_AGENT_ID,
-        forcedReceiver: request.forcedReceiver,
-        threadContext: withSlackChannelDirective(
-          request.channelPolicy,
-          threadContext,
-          request.channelSpeaker
-        ),
-        ...(scope ? { scope } : {}),
-        ...(askOnly ? { workAuthority: 'ask_only' as const } : {}),
-        delegationSummaryInstruction:
-          'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
-        metadata: request.metadata,
-      }),
+      runInTeamTurnContext(isolation, () =>
+        runSurfaceMessageConversation({
+          surface: 'slack',
+          text: request.text,
+          channel: request.channel,
+          threadTs: request.threadTs,
+          correlationId: request.correlationId,
+          receivedAt: request.receivedAt,
+          actorId: request.actorId,
+          senderAgentId: 'kyberion:slack-bridge',
+          agentId: SLACK_SURFACE_AGENT_ID,
+          forcedReceiver: request.forcedReceiver,
+          threadContext: withSlackChannelDirective(
+            request.channelPolicy,
+            threadContext,
+            request.channelSpeaker
+          ),
+          ...(scope ? { scope } : {}),
+          ...(askOnly ? { workAuthority: 'ask_only' as const } : {}),
+          ...(isolation ? { isolation } : {}),
+          delegationSummaryInstruction:
+            'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
+          metadata: request.metadata,
+        })
+      ),
     options
   );
 }

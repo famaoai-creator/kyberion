@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  toSupervisorEnsurePayload,
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
   resolveAskTransportTimeout,
@@ -72,5 +73,16 @@ describe('resolveAskTransportTimeout', () => {
   it('keeps the supervisor socket open beyond a task dispatch budget', () => {
     expect(resolveAskTransportTimeout(180_000)).toBe(185_000);
     expect(resolveAskTransportTimeout(300_000)).toBe(305_000);
+  });
+
+  it('refuses to send a tool-less runtime to the daemon, which cannot honor it', () => {
+    expect(() =>
+      toSupervisorEnsurePayload({
+        agentId: 'surface--tenant-acme--confidential',
+        provider: 'claude',
+        requestedBy: 'surface_agent',
+        toolAccess: 'none',
+      })
+    ).toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
   });
 });

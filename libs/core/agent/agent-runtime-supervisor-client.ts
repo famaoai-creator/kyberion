@@ -734,6 +734,12 @@ export function toSupervisorEnsurePayload(
     runtimeOwnerType?: string;
   }
 ): AgentRuntimeSupervisorEnsurePayload {
+  // The daemon payload cannot carry a tool lockdown; refuse rather than drop it.
+  if (options.toolAccess === 'none') {
+    throw new Error(
+      `[TOOL_LOCKDOWN_UNSUPPORTED] ${options.agentId}: the supervisor daemon cannot launch a tool-less runtime`
+    );
+  }
   return {
     agentId: options.agentId!,
     provider: options.provider,
