@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "browser-failure-evidence",
+  "version": "1.0.0",
+  "name": "Browser Failure Evidence Bundle",
+  "description": "Open a page, capture the bounded redacted browser action trail, and export a failure-evidence bundle (snapshot, console/network events, action trail) for triage.",
+  "labels": ["browser", "evidence"],
+  "context": {
+    "target_url": "https://example.com",
+    "trail_limit": 50,
+    "bundle_path": "active/shared/tmp/browser/failure-bundle.json"
+  },
+  "steps": [
+    {
+      "id": "visit_target",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": { "url": "{{target_url}}" }
+    },
+    {
+      "id": "capture_snapshot",
+      "role": "source",
+      "op": "browser:snapshot",
+      "produces": { "channel": "browser_snapshot", "type": "SnapshotResult" },
+      "params": {}
+    },
+    {
+      "id": "capture_action_trail",
+      "role": "source",
+      "op": "browser:action_trail",
+      "produces": { "channel": "action_trail", "type": "BrowserActionTrail" },
+      "params": { "limit": "{{trail_limit}}", "export_as": "action_trail" }
+    },
+    {
+      "id": "export_bundle",
+      "role": "sink",
+      "op": "browser:export_failure_bundle",
+      "params": { "path": "{{bundle_path}}", "export_as": "failure_bundle_path" }
+    },
+    {
+      "id": "log_bundle",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "Browser failure bundle written to {{bundle_path}}" }
+    }
+  ]
+}

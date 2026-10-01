@@ -4,6 +4,12 @@
   "version": "1.0.0",
   "name": "Unclassified Error Reconciler",
   "description": "Reads the unclassified-error registry and writes rule-proposal stubs for each unrecognized error. Optionally invokes reasoning:analyze to suggest category, label, remediation, and patterns for each proposal.",
+  "schedule": {
+    "id": "reconcile-unclassified-errors-weekly",
+    "cron": "40 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "context": {
     "registry_path": "active/shared/tmp/unclassified-error-registry.json",
     "proposals_dir": "active/shared/tmp/unclassified-error-proposals"
