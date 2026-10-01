@@ -27,9 +27,36 @@ import type { HumanDecidedBy } from '../mission/mission-types.js';
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
 export type MemoryCandidateKind =
   'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt' | 'archive_advisory';
-export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
+/** D7: sensitivity tier is single-sourced from the scope envelope (MemoryScopeEnvelope['tier']). */
+export type MemoryCandidateTier = MemoryScopeEnvelope['tier'];
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
+/**
+ * D7: knowledge ownership is distinct from sensitivity_tier and has no scope-envelope
+ * axis, so this queue-side declaration remains the canonical vocabulary (consumers
+ * reference MemoryCandidate['knowledge_domain'] rather than re-declaring it).
+ */
 export type MemoryKnowledgeDomain = 'product' | 'organization' | 'personal' | 'unclassified';
+/**
+ * D7: tagged evidence reference. Persisted queue rows keep the legacy canonical
+ * string form (`artifact:<id>` | knowledge path); use parse/formatMemoryEvidenceRef
+ * to convert. memory-candidate.schema.json accepts both forms.
+ */
+export type MemoryEvidenceRef =
+  { kind: 'artifact_id'; artifact_id: string } | { kind: 'knowledge_path'; knowledge_path: string };
+/** Input form accepted wherever evidence refs are supplied (legacy strings preserved verbatim). */
+export type MemoryEvidenceRefInput = string | MemoryEvidenceRef;
+/**
+ * D7: brokered promotion grant. The scope envelope stays authoritative for the
+ * source tenant (see getMemoryPromotionSourceTenant); the grant records the
+ * redaction decision and approver for the audit trail.
+ */
+export interface MemoryPromotionGrant {
+  source_tenant_slug: string;
+  target_tier: MemoryCandidateTier;
+  redacted: boolean;
+  approved_by?: string;
+  approved_at?: string;
+}
 /**
  * KL-04: who ratifies an approved candidate. `steward` (default) ratifies at
  * approval time; `pr_review` defers ratification to the merge of the PR that
@@ -72,13 +99,7 @@ export interface MemoryCandidate {
   /** Scope envelope retained with the candidate; absent only for legacy records. */
   scope?: MemoryScopeEnvelope;
   /** Required when a tenant-scoped candidate is promoted to a broader tier. */
-  promotion?: {
-    source_tenant_slug: string;
-    target_tier: MemoryCandidateTier;
-    redacted: boolean;
-    approved_by?: string;
-    approved_at?: string;
-  };
+  promotion?: MemoryPromotionGrant;
 }
 
 const SCHEMA_PATH = pathResolver.rootResolve(
@@ -174,7 +195,138 @@ function ensureValidator(): ValidateFunction {
 
 function normalizeEvidenceRefs(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item || '').trim()).filter(Boolean);
+  return value
+    .map((item) =>
+      typeof item === 'string'
+        ? item.trim()
+        : item && typeof item === 'object'
+          ? formatMemoryEvidenceRef(item as MemoryEvidenceRef)
+          : String(item || '').trim()
+    )
+    .filter(Boolean);
+}
+
+/**
+ * D7: parse any evidence-ref input into its tagged form. Legacy strings:
+ * `artifact:<id>` → artifact_id, anything else → knowledge_path.
+ */
+export function parseMemoryEvidenceRef(ref: MemoryEvidenceRefInput): MemoryEvidenceRef {
+  if (typeof ref === 'object' && ref !== null) {
+    if (ref.kind === 'artifact_id' && String(ref.artifact_id || '').trim()) {
+      return { kind: 'artifact_id', artifact_id: String(ref.artifact_id).trim() };
+    }
+    if (ref.kind === 'knowledge_path' && String(ref.knowledge_path || '').trim()) {
+      return { kind: 'knowledge_path', knowledge_path: String(ref.knowledge_path).trim() };
+    }
+    throw new Error(
+      '[MEMORY_EVIDENCE_REF_INVALID] tagged evidence ref needs artifact_id or knowledge_path.'
+    );
+  }
+  const text = String(ref || '').trim();
+  if (!text) {
+    throw new Error('[MEMORY_EVIDENCE_REF_INVALID] evidence ref must not be empty.');
+  }
+  if (text.startsWith('artifact:')) {
+    const artifactId = text.slice('artifact:'.length).trim();
+    if (!artifactId) {
+      throw new Error('[MEMORY_EVIDENCE_REF_INVALID] artifact evidence ref needs an id.');
+    }
+    return { kind: 'artifact_id', artifact_id: artifactId };
+  }
+  return { kind: 'knowledge_path', knowledge_path: text };
+}
+
+/** D7: canonical persisted string form of an evidence ref (legacy strings pass through trimmed). */
+export function formatMemoryEvidenceRef(ref: MemoryEvidenceRefInput): string {
+  if (typeof ref === 'string') return String(ref || '').trim();
+  const parsed = parseMemoryEvidenceRef(ref);
+  return parsed.kind === 'artifact_id' ? `artifact:${parsed.artifact_id}` : parsed.knowledge_path;
+}
+
+/**
+ * D7: envelope-first source tenant. The scope envelope is the single source of
+ * truth; legacy candidates without an envelope may use the promotion grant.
+ * Read-only helper — validation paths still require the explicit grant fields.
+ */
+export function getMemoryPromotionSourceTenant(
+  candidate: Pick<MemoryCandidate, 'scope' | 'promotion'>
+): string | null {
+  const scoped = String(candidate.scope?.tenant_slug || '').trim();
+  if (scoped) return scoped;
+  return String(candidate.promotion?.source_tenant_slug || '').trim() || null;
+}
+
+/** Minimal candidate shape for outcome linkage (also satisfiable by distill-candidate rows). */
+export interface OutcomeLinkedCandidate {
+  candidate_id: string;
+  source_ref?: string;
+  evidence_refs: Array<string | MemoryEvidenceRef>;
+}
+
+function normalizeOutcomeToken(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+/**
+ * D7: exact outcome-id equivalence for a candidate. Unlike substring matching
+ * (work-design.ts resolveWorkDesign reusableRefs filter), this matches only:
+ * candidate_id equality, source_ref equality (`mission:<id>` / `task_session:<id>`
+ * prefixes included), or an evidence ref equal to the outcome id.
+ * Summary text is deliberately never consulted.
+ */
+export function memoryCandidateMatchesOutcomeId(
+  candidate: OutcomeLinkedCandidate,
+  outcomeId: string
+): boolean {
+  const target = normalizeOutcomeToken(outcomeId);
+  if (!target) return false;
+  if (normalizeOutcomeToken(candidate.candidate_id) === target) return true;
+  const sourceRef = normalizeOutcomeToken(candidate.source_ref);
+  if (
+    sourceRef === target ||
+    sourceRef === `mission:${target}` ||
+    sourceRef === `task_session:${target}`
+  ) {
+    return true;
+  }
+  return (candidate.evidence_refs || []).some((ref) => {
+    try {
+      const formatted = formatMemoryEvidenceRef(ref);
+      return (
+        formatted === target ||
+        formatted === `artifact:${target}` ||
+        formatted === `mission:${target}`
+      );
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** D7: filter candidates to those exactly linked to any of the given outcome ids. */
+export function filterMemoryCandidatesByOutcomeIds<T extends OutcomeLinkedCandidate>(
+  candidates: T[],
+  outcomeIds: Array<string | undefined | null>
+): T[] {
+  const targets = new Set(
+    (outcomeIds || []).map((id) => normalizeOutcomeToken(id)).filter(Boolean)
+  );
+  if (targets.size === 0) return [];
+  return (candidates || []).filter((candidate) =>
+    [...targets].some((id) => memoryCandidateMatchesOutcomeId(candidate, id))
+  );
+}
+
+/**
+ * D7: queue-side outcome lookup. Returns queued candidates exactly linked to the
+ * outcome id (see memoryCandidateMatchesOutcomeId). work-design.ts uses memoryCandidateMatchesOutcomeId for exact reusable-ref
+ * linkage; this helper provides the same rule for queue-side lookup.
+ */
+export function findMemoryPromotionCandidatesByOutcomeId(
+  outcomeId: string,
+  scope?: MemoryScopeEnvelope
+): MemoryCandidate[] {
+  return filterMemoryCandidatesByOutcomeIds(listMemoryPromotionCandidates(scope), [outcomeId]);
 }
 
 function normalizeContent(value: string): string {
@@ -276,7 +428,7 @@ export function createMemoryPromotionCandidate(input: {
   knowledgeDomain?: MemoryKnowledgeDomain;
   proposedMemoryKind: MemoryCandidateKind;
   summary: string;
-  evidenceRefs: string[];
+  evidenceRefs: Array<string | MemoryEvidenceRef>;
   sensitivityTier: MemoryCandidateTier;
   ratificationRequired?: boolean;
   status?: MemoryCandidateStatus;
@@ -402,7 +554,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
         action: 'knowledge_promotion_candidate',
         operation: 'enqueue',
         result: 'completed',
-        tenantSlug: nextCandidate.scope?.tenant_slug,
+        tenantSlug: getMemoryPromotionSourceTenant(nextCandidate) || undefined,
         correlationId: nextCandidate.candidate_id,
         metadata: {
           candidate_id: nextCandidate.candidate_id,
@@ -454,7 +606,9 @@ export function updateMemoryPromotionCandidateStatus(input: {
   allMatching?: boolean;
   /** FD-10 wave 1b: the human member who made this approve/reject decision. */
   decidedBy?: HumanDecidedBy;
-  curation?: MemoryCandidate['curation'];
+  curation?: Omit<NonNullable<MemoryCandidate['curation']>, 'evidence_refs'> & {
+    evidence_refs: MemoryEvidenceRefInput[];
+  };
   /** KL-04: ratification channel recorded on approval. */
   approvalChannel?: MemoryApprovalChannel;
   /** KL-04: merge ratification observed at mission finish (pr_review channel). */
@@ -515,12 +669,19 @@ export function updateMemoryPromotionCandidateStatus(input: {
         continue;
       }
       const requestedDomain = input.knowledgeDomain || current.knowledge_domain;
+      // D7: tagged curation refs are normalized to the canonical string form before
+      // the subset check; plain strings are compared verbatim (legacy behavior).
+      const normalizedCurationRefs = input.curation
+        ? input.curation.evidence_refs.map((ref) =>
+            typeof ref === 'string' ? ref : formatMemoryEvidenceRef(ref)
+          )
+        : undefined;
       if (input.status === 'approved') {
-        if (input.curation) {
+        if (input.curation && normalizedCurationRefs) {
           const originalRefs = new Set(current.evidence_refs);
           if (
-            input.curation.evidence_refs.length === 0 ||
-            input.curation.evidence_refs.some((ref) => !originalRefs.has(ref))
+            normalizedCurationRefs.length === 0 ||
+            normalizedCurationRefs.some((ref) => !originalRefs.has(ref))
           ) {
             throw new Error(
               'Curated evidence refs must be selected from the candidate original evidence refs.'
@@ -566,7 +727,16 @@ export function updateMemoryPromotionCandidateStatus(input: {
       const next: MemoryCandidate = {
         ...current,
         status: input.status,
-        ...(input.curation ? { curation: input.curation } : {}),
+        ...(input.curation && normalizedCurationRefs
+          ? {
+              curation: {
+                title: input.curation.title,
+                summary: input.curation.summary,
+                content: input.curation.content,
+                evidence_refs: normalizedCurationRefs,
+              },
+            }
+          : {}),
         ...(input.knowledgeDomain ? { knowledge_domain: input.knowledgeDomain } : {}),
         ...(input.scopeUpdate
           ? { scope: assertMemoryScope(input.scopeUpdate, input.scopeUpdate.tier) }
@@ -615,7 +785,7 @@ export function queueMissionMemoryPromotionCandidate(input: {
   missionType?: string;
   tier: MemoryCandidateTier;
   summary: string;
-  evidenceRefs: string[];
+  evidenceRefs: Array<string | MemoryEvidenceRef>;
   scope?: MemoryScopeEnvelope;
 }): MemoryCandidate {
   const assessment = assessMissionMemoryCandidate({

@@ -6,6 +6,8 @@ import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure
 
 import {
   claimWorkItem,
+  migrateLegacyWorkItemContexts,
+  getWorkItem,
   clearWorkCoordinationStore,
   clearWorkCoordinationNamespace,
   createBoard,
@@ -39,6 +41,54 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('validates governed display namespaces while preserving arbitrary display labels', () => {
+    for (const label of ['mission:', 'team_role:bad role', 'governance:']) {
+      expect(() => createWorkItem({ title: 'task', description: 'task', labels: [label] })).toThrow(
+        /schema violation/
+      );
+    }
+    expect(
+      createWorkItem({
+        title: 'task',
+        description: 'task',
+        labels: ['customer-visible', 'custom:some value'],
+      }).labels
+    ).toEqual(['customer-visible', 'custom:some value']);
+  });
+
+  it('migrates default contexts through the facade, preserves typed values, and is idempotent', () => {
+    const legacy = createWorkItem({
+      itemId: 'legacy',
+      title: 'legacy',
+      description: 'legacy',
+      labels: ['mission:MSN-LEGACY', 'team_role:reviewer'],
+    });
+    const typed = createWorkItem({
+      itemId: 'typed',
+      title: 'typed',
+      description: 'typed',
+      context: { mission_id: 'MSN-TYPED', task_id: 'TASK-TYPED' },
+      metadata: { mission_id: 'MSN-OLD', task_id: 'TASK-OLD', team_role: 'implementer' },
+      labels: ['mission:MSN-LABEL', 'team_role:reviewer'],
+    });
+    expect(migrateLegacyWorkItemContexts()).toMatchObject({ migrated: [], remaining: ['legacy'] });
+    expect(getWorkItem(legacy.item_id)?.context?.mission_id).toBeUndefined();
+    expect(migrateLegacyWorkItemContexts({ apply: true }).migrated).toEqual(['legacy']);
+    expect(getWorkItem(legacy.item_id)).toMatchObject({
+      context: { mission_id: 'MSN-LEGACY' },
+      metadata: { team_role: 'reviewer' },
+    });
+    expect(getWorkItem(typed.item_id)).toMatchObject({
+      context: { mission_id: 'MSN-TYPED', task_id: 'TASK-TYPED' },
+      metadata: { team_role: 'implementer' },
+    });
+    expect(migrateLegacyWorkItemContexts({ apply: true })).toEqual({
+      migrated: [],
+      remaining: [],
+      migrated_context: 0,
+    });
+  });
+
   it('rejects a namespace that can escape the coordination root', () => {
     expect(() => setWorkCoordinationNamespace('../outside')).toThrow(/invalid work coordination/);
   });

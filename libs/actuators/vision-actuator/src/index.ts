@@ -1,6 +1,6 @@
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import {
   assertSafeRepositoryPath,
@@ -56,13 +56,7 @@ const LEGACY_CAPTURE_ACTIONS = new Set(['capture_screen', 'record_screen']);
 const VISION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/vision-actuator/manifest.json'
 );
-const DEFAULT_VISION_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_VISION_RETRY = getRetryDefaults('vision-actuator:defaults');
 
 const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: VISION_MANIFEST_PATH,

@@ -6,14 +6,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "native_then_cli",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 500,
-      "maxDelayMs": 10000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    "retry_profile": "media-actuator"
   },
   "capabilities": [
     {

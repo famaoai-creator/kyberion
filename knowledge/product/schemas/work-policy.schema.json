@@ -71,8 +71,16 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "execution_boundary_profile_id": { "type": "string" },
-            "runtime_design_profile_id": { "type": "string" }
+            "execution_boundary_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "default": "default_governed_execution"
+            },
+            "runtime_design_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "default": "single_actor_delivery"
+            }
           },
           "required": ["execution_boundary_profile_id", "runtime_design_profile_id"]
         }
@@ -132,9 +140,26 @@
         "intent_label_rules": {
           "type": "array",
           "items": { "$ref": "#/$defs/intentLabelRule" }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fallback_intent_label": {
+              "type": "string",
+              "minLength": 1,
+              "default": "general_request"
+            }
+          },
+          "required": ["fallback_intent_label"]
         }
       },
-      "required": ["process_checklist_rules", "execution_shape_rules", "intent_label_rules"]
+      "required": [
+        "process_checklist_rules",
+        "execution_shape_rules",
+        "intent_label_rules",
+        "defaults"
+      ]
     },
     "agentRoutingRule": {
       "type": "object",

@@ -6,14 +6,7 @@
   "resilience_tier": "best_effort",
   "recovery_policy": {
     "fallback_strategy": "skip_and_log",
-    "retry": {
-      "maxRetries": 1,
-      "initialDelayMs": 100,
-      "maxDelayMs": 500,
-      "factor": 2,
-      "jitter": false
-    },
-    "retryable_categories": ["resource_unavailable"]
+    "retry_profile": "working-memory-actuator"
   },
   "capabilities": [
     {

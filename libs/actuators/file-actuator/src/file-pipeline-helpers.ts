@@ -20,7 +20,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from '@agent/core/secure-io';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   evaluateCondition,
@@ -49,13 +49,7 @@ import { isDirectEntry } from '@agent/core/direct-entry';
 
 const { buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: pathResolver.rootResolve('libs/actuators/file-actuator/manifest.json'),
-  retryDefaults: {
-    maxRetries: 2,
-    initialDelayMs: 150,
-    maxDelayMs: 1200,
-    factor: 2,
-    jitter: true,
-  },
+  retryDefaults: getRetryDefaults('file-actuator:defaults'),
   retryFallbackCategories: ['resource_unavailable', 'timeout'],
 });
 

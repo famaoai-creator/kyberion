@@ -21,6 +21,7 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
+import { pollForValue, waitForCondition } from '@agent/core/async-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { normalizeBrowserPipelineOp } from '@agent/core/pipeline/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/pipeline/op-input-contracts';
@@ -301,9 +302,9 @@ async function waitForCdpEndpoint(
   if (isVitestProcess()) return null;
   const filePath = path.join(userDataDir, 'DevToolsActivePort');
   const safeFilePath = safeBrowserRuntimePath(filePath);
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (isExistingRegularFile(safeFilePath)) {
+  return pollForValue(
+    async () => {
+      if (!isExistingRegularFile(safeFilePath)) return null;
       try {
         const raw = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '').trim();
         const [portLine] = raw.split(/\r?\n/);
@@ -317,10 +318,10 @@ async function waitForCdpEndpoint(
       } catch {
         // Retry until timeout.
       }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return null;
+      return null;
+    },
+    { pollMs: 100, timeoutMs }
+  );
 }
 
 function parseChromeRemoteDebuggingPorts(psOutput: string): number[] {
@@ -1316,7 +1317,6 @@ async function waitForOperatorContinue(options: {
   pollMs: number;
   timeoutMs?: number;
 }): Promise<void> {
-  const startedAt = Date.now();
   if (process.stdin.isTTY) {
     logger.info(`⏸️ [BROWSER] ${options.message}`);
     logger.info('⏎ [BROWSER] Press Enter in this terminal when manual browser work is complete.');
@@ -1337,13 +1337,15 @@ async function waitForOperatorContinue(options: {
   );
   logger.info(`⏸️ [BROWSER] ${options.message}`);
   logger.info(`📄 [BROWSER] Waiting for continue file: ${continueFile}`);
-  while (true) {
-    if (safeExistsSync(continueFile)) return;
-    if (options.timeoutMs && Date.now() - startedAt > options.timeoutMs) {
-      throw new Error(`Timed out waiting for operator continue file: ${continueFile}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, options.pollMs));
-  }
+  await waitForCondition(() => safeExistsSync(continueFile), {
+    pollMs: options.pollMs,
+    ...(options.timeoutMs > 0
+      ? {
+          timeoutMs: options.timeoutMs,
+          timeoutMessage: `Timed out waiting for operator continue file: ${continueFile}`,
+        }
+      : {}),
+  });
 }
 
 export const browserRuntimeHelpers = {

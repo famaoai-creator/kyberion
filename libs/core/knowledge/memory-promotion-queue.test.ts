@@ -387,3 +387,36 @@ describe('memory-promotion-queue', () => {
     }
   });
 });
+
+describe('memory lineage resolution', () => {
+  it('uses exact outcome references and does not match substrings', async () => {
+    const { memoryCandidateMatchesOutcomeId } = await import('./memory-promotion-queue.js');
+    expect(
+      memoryCandidateMatchesOutcomeId(
+        { candidate_id: 'other', evidence_refs: ['artifact:pptx-extra'] },
+        'artifact:pptx'
+      )
+    ).toBe(false);
+    expect(
+      memoryCandidateMatchesOutcomeId(
+        { candidate_id: 'other', evidence_refs: ['artifact:pptx'] },
+        'artifact:pptx'
+      )
+    ).toBe(true);
+    expect(
+      memoryCandidateMatchesOutcomeId(
+        { candidate_id: 'other', source_ref: 'mission:MSN-1', evidence_refs: [] },
+        'MSN-1'
+      )
+    ).toBe(true);
+  });
+  it('keeps the scope envelope authoritative over promotion grant source', async () => {
+    const { getMemoryPromotionSourceTenant } = await import('./memory-promotion-queue.js');
+    expect(
+      getMemoryPromotionSourceTenant({
+        scope: { tenant_slug: 'tenant-a', tier: 'confidential' } as any,
+        promotion: { source_tenant_slug: 'tenant-b', target_tier: 'public', redacted: true },
+      })
+    ).toBe('tenant-a');
+  });
+});

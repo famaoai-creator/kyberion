@@ -3,7 +3,8 @@
   "services": {
     "smoke-test": {
       "base_url": "https://postman-echo.com",
-      "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json",
+      "auth_strategy": "none"
     }
   }
 }

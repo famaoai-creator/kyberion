@@ -7,14 +7,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "local_append_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 500,
-      "maxDelayMs": 5000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["resource_unavailable", "timeout"]
+    "retry_profile": "blockchain-actuator"
   },
   "capabilities": [
     {

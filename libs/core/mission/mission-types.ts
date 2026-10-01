@@ -4,6 +4,7 @@
  */
 
 import type { HandoffPacket } from '../mesh/handoff-packet.js';
+import type { ArtifactKind } from '../workforce/artifact-registry.js';
 import type { MissionClassification } from './mission-classification.js';
 import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
 
@@ -165,10 +166,10 @@ export interface MissionState {
   outcome_contract?: {
     outcome_id: string;
     requested_result: string;
-    deliverable_kind: string;
+    deliverable_kind: ArtifactKind;
     success_criteria: string[];
     evidence_required: boolean;
-    expected_artifacts: Array<{ kind: string; storage_class: string }>;
+    expected_artifacts: Array<{ kind: ArtifactKind; storage_class: string }>;
     verification_method: 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
   };
   context?: {

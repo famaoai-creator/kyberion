@@ -8,7 +8,7 @@ import {
   type GovernedArtifactRole,
 } from '@agent/core/workforce/artifact-store';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
@@ -47,13 +47,7 @@ export interface ArtifactAction {
 const ARTIFACT_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/artifact-actuator/manifest.json'
 );
-const DEFAULT_ARTIFACT_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_ARTIFACT_RETRY = getRetryDefaults('artifact-actuator:defaults');
 
 const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: ARTIFACT_MANIFEST_PATH,

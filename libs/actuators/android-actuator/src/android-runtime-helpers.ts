@@ -13,7 +13,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
-import { retry, sleep } from '@agent/core/async-utils';
+import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
@@ -32,13 +32,7 @@ const ANDROID_UI_DEFAULTS_SCHEMA_PATH = pathResolver.knowledge(
 const ANDROID_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/android-actuator/manifest.json'
 );
-const DEFAULT_ANDROID_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_ANDROID_RETRY = getRetryDefaults('android-actuator:defaults');
 
 interface AndroidUiDefaults {
   login: {

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "kyberion://schemas/outcome-catalog",
+  "$id": "https://kyberion.local/schemas/outcome-catalog.schema.json",
   "title": "Outcome Catalog",
   "type": "object",
   "required": ["outcomes"],
@@ -15,7 +15,7 @@
         "properties": {
           "label": { "type": "string", "minLength": 1 },
           "description": { "type": "string", "minLength": 1 },
-          "deliverable_kind": { "type": "string", "minLength": 1 },
+          "deliverable_kind": { "$ref": "./artifact-kind.schema.json" },
           "downloadable": { "type": "boolean" },
           "previewable": { "type": "boolean" }
         },

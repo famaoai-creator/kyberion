@@ -1,9 +1,9 @@
 {
   "action": "pipeline",
   "name": "standard-pr-lifecycle-fragment",
-  "version": "2.0.0",
-  "description": "A reusable pipeline fragment that automates the standard Git workflow: create a branch, commit changes, push, create a pull request, and optionally merge it.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "version": "2.2.0",
+  "description": "Governed typed PR lifecycle with argv-only staging, readiness checks, and fail-closed optional merge.",
+  "_migration_note": "C3: procedural Git/PR lifecycle belongs in system:standard_pr_lifecycle. Publish uses the canonical readiness/knowledge gate; external effects retain the unsafe execution gate.",
   "context": {
     "branch_name": "feature/default-branch",
     "commit_message": "feat: default commit message",
@@ -13,104 +13,19 @@
   },
   "steps": [
     {
-      "id": "create_branch",
-      "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "git checkout -b {{branch_name}}"
-      }
-    },
-    {
-      "id": "stage_changes",
-      "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "git add -- $(git diff --name-only --diff-filter=ACMRTUXB)"
-      }
-    },
-    {
-      "id": "commit_changes",
-      "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "git commit -m \"{{commit_message}}\"",
-        "allow_error": true
-      }
-    },
-    {
-      "id": "push_branch",
-      "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "git push -u origin {{branch_name}}"
-      }
-    },
-    {
-      "id": "create_pr",
+      "id": "standard-pr-lifecycle",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "pr_creation_result", "type": "ShellResult" },
+      "op": "system:standard_pr_lifecycle",
+      "produces": {
+        "channel": "pr_creation_result",
+        "type": "ShellResult"
+      },
       "params": {
-        "command": "gh",
-        "args": ["pr", "create", "--title", "{{pr_title}}", "--body", "{{pr_body}}"]
-      }
-    },
-    {
-      "id": "log_pr_url",
-      "role": "sink",
-      "op": "system:log",
-      "consumes": "pr_creation_result",
-      "params": {
-        "message": "Pull Request created successfully! URL: {{pr_creation_result.stdout}}"
-      }
-    },
-    {
-      "id": "conditional_merge",
-      "role": "gate",
-      "op": "core:if",
-      "consumes": "pr_creation_result",
-      "params": {
-        "condition": { "from": "auto_merge", "operator": "equals", "value": true },
-        "then": [
-          {
-            "role": "sink",
-            "op": "system:exec",
-            "params": {
-              "command": "gh",
-              "args": [
-                "pr",
-                "merge",
-                "{{pr_creation_result.stdout}}",
-                "--merge",
-                "--delete-branch"
-              ],
-              "allow_error": true
-            }
-          },
-          {
-            "role": "sink",
-            "op": "system:shell",
-            "params": {
-              "cmd": "git checkout main && git pull origin main"
-            }
-          },
-          {
-            "role": "sink",
-            "op": "system:log",
-            "params": {
-              "message": "Pull Request automatically merged and branch deleted."
-            }
-          }
-        ],
-        "else": [
-          {
-            "role": "sink",
-            "op": "system:log",
-            "params": {
-              "message": "Auto-merge is disabled. The PR is ready for human review."
-            }
-          }
-        ]
+        "branch_name": "{{branch_name}}",
+        "commit_message": "{{commit_message}}",
+        "pr_title": "{{pr_title}}",
+        "pr_body": "{{pr_body}}",
+        "auto_merge": "{{auto_merge}}"
       }
     }
   ]

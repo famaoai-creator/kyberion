@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkVisibilityProjection, resolveWorkItemContext } from './work-visibility.js';
+import {
+  buildWorkVisibilityProjection,
+  matchesMissionId,
+  resolveWorkItemContext,
+} from './work-visibility.js';
 import type { WorkItem } from './work-coordination.js';
 
 function item(partial: Partial<WorkItem>): WorkItem {
@@ -22,6 +26,23 @@ function item(partial: Partial<WorkItem>): WorkItem {
 }
 
 describe('work-visibility', () => {
+  it('requires canonical mission context for membership and search', () => {
+    const legacy = item({ labels: ['mission:MSN-A'], metadata: { mission_id: 'MSN-A' } });
+    const canonical = item({ item_id: 'canonical', context: { mission_id: 'MSN-A' } });
+    expect(matchesMissionId(legacy, 'MSN-A')).toBe(false);
+    expect(matchesMissionId(canonical, 'MSN-A')).toBe(true);
+    expect(
+      buildWorkVisibilityProjection({
+        items: [legacy, canonical],
+        viewer: { tenantSlugs: 'all' },
+        missionId: 'MSN-A',
+      }).items.map((entry) => entry.item_id)
+    ).toEqual(['canonical']);
+    expect(resolveWorkItemContext(item({ labels: ['mission:MSN-A'] })).warnings.join(' ')).toMatch(
+      /DEPRECATED/
+    );
+  });
+
   it('resolves explicit context before legacy labels', () => {
     const resolved = resolveWorkItemContext(
       item({

@@ -54,6 +54,28 @@
           "service_id": { "type": "string", "minLength": 1 },
           "action": { "type": "string", "minLength": 1 },
           "model": { "type": "string", "minLength": 1 },
+          "aliases": {
+            "type": "array",
+            "description": "Legacy backend ids that resolve to this record (governed alias table; see media-backend-registry.ts).",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "probe": {
+            "type": "object",
+            "description": "Governed availability-probe dispatch descriptor. The registry resolver dispatches on kind instead of branching on provider literals.",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["service_runtime", "tool_runtime", "native_bridge", "registry"]
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Runtime id probed in the target registry (service_id or tool_id). Omitted for native_bridge/registry kinds."
+              }
+            },
+            "required": ["kind"]
+          },
           "api_key_env": { "type": "string", "minLength": 1 },
           "endpoint_env": { "type": "string", "minLength": 1 },
           "command": { "type": "string", "minLength": 1 },

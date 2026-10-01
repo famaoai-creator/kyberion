@@ -5,6 +5,9 @@ import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 
+import { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
+export { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
+
 export interface ArtifactOwnershipRecord {
   artifact_id: string;
   tenant_slug?: string;
@@ -12,7 +15,7 @@ export interface ArtifactOwnershipRecord {
   project_id?: string;
   mission_id?: string;
   task_session_id?: string;
-  kind: string;
+  kind: ArtifactKind;
   storage_class: 'repo' | 'artifact_store' | 'vault' | 'tmp' | 'external_ref';
   path?: string;
   external_ref?: string;
@@ -205,4 +208,9 @@ export function findReusableArtifactOwnershipRecord(
 
 export function artifactOwnershipRegistryPath(): string {
   return artifactRegistryPath();
+}
+
+/** Validate artifact vocabulary against its governed schema instead of casting strings. */
+export function isArtifactKind(value: string): value is ArtifactKind {
+  return (ARTIFACT_KINDS as readonly string[]).includes(value);
 }

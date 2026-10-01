@@ -119,7 +119,8 @@
             "environment_and_recovery",
             "decision_support",
             "customer_engagement",
-            "platform_onboarding"
+            "platform_onboarding",
+            "long_running_job"
           ]
         },
         "risk_profile": {

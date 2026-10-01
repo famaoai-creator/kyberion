@@ -6,15 +6,10 @@
       "preset_path": "knowledge/product/orchestration/service-presets/slack.json",
       "allow_stream_ingress": false,
       "credential_suffixes": {
-        "accessToken": [
-          "ACCESS_TOKEN",
-          "BOT_TOKEN",
-          "TOKEN"
-        ],
-        "appToken": [
-          "APP_TOKEN"
-        ]
-      }
+        "accessToken": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"],
+        "appToken": ["APP_TOKEN"]
+      },
+      "auth_strategy": "Bearer"
     }
   }
 }

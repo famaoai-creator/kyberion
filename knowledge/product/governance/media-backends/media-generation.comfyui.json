@@ -21,6 +21,7 @@
       },
       "service_id": "media-generation",
       "action": "generate_image",
+      "probe": { "kind": "service_runtime", "ref": "comfyui" },
       "cost_tier": "self_hosted",
       "data_policy": "local_only",
       "execution_locality": "local",

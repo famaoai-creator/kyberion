@@ -1,3 +1,4 @@
+import { getCredentialSuffixSchemaDefaults } from '../service/service-endpoint-registry.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { secretGuard } from '../secret/secret-guard.js';
 import {
@@ -149,23 +150,15 @@ function inspectSurfaceAuthReadOnly(
   const policy = getServicePresetPolicy(preset);
   const strategy = (policy.auth_strategy || 'none').toLowerCase();
   const endpoint = getServiceEndpointRecord(serviceId);
-  const suffixes = endpoint?.credential_suffixes || {};
+  const suffixes = endpoint?.credential_suffixes || getCredentialSuffixSchemaDefaults();
   const requiredSecrets = Array.from(
     new Set(
       strategy === 'bearer'
-        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
+        ? [...suffixes.accessToken]
         : strategy === 'basic'
-          ? [
-              ...(suffixes.clientId || ['CLIENT_ID']),
-              ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-              ...(suffixes.accessToken || ['ACCESS_TOKEN']),
-            ]
+          ? [...suffixes.clientId, ...suffixes.clientSecret, ...suffixes.accessToken]
           : strategy === 'session'
-            ? [
-                ...(suffixes.clientId || ['CLIENT_ID']),
-                ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-                ...(suffixes.redirectUri || ['REDIRECT_URI']),
-              ]
+            ? [...suffixes.clientId, ...suffixes.clientSecret, ...suffixes.redirectUri]
             : []
     )
   ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);

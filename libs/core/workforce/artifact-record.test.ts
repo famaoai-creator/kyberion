@@ -89,3 +89,13 @@ describe('artifact-record', () => {
     expect(() => loadArtifactRecord('../outside')).toThrow('[artifact-record] invalid artifact id');
   });
 });
+
+it('keeps generated artifact vocabulary aligned with its canonical schema', async () => {
+  const { ARTIFACT_KINDS } = await import('./artifact-kind.generated.js');
+  const { safeReadFile } = await import('../secure-io.js');
+  const { pathResolver } = await import('../path-resolver.js');
+  const schema = JSON.parse(
+    safeReadFile(pathResolver.knowledge('product/schemas/artifact-kind.schema.json'), 'utf8')
+  );
+  expect([...ARTIFACT_KINDS].sort()).toEqual([...schema.enum].sort());
+});

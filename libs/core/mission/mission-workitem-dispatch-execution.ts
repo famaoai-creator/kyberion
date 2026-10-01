@@ -108,7 +108,6 @@ export function resolveWorkItemProjectIds(state: MissionState): string[] {
   // relationship. Recover the project from the scoped canonical WorkItems so
   // typed context remains the source of truth without broadening tenant scope.
   const scopedItems = listWorkItems({
-    labels: [`mission:${missionId}`],
     tenantSlugs: [tenantSlug],
   });
   const recoveredProjectIds = scopedItems
@@ -179,7 +178,6 @@ export function selectWorkItems(
   options: MissionWorkItemDispatchOptions
 ): WorkItem[] {
   const missionId = state.mission_id.toUpperCase();
-  const labels = [`mission:${missionId}`];
   const statuses =
     options.statuses && options.statuses.length > 0
       ? options.statuses
@@ -191,7 +189,6 @@ export function selectWorkItems(
   const canonical = readMissionWorkGraph(state);
   const allMissionItems = canonical.items
     .filter((item) => sources.includes(item.source))
-    .filter((item) => labels.every((label) => item.labels.includes(label)))
     .filter((item) => getMissionLabel(item) === missionId);
   return allMissionItems
     .filter((item) => statuses.includes(item.status))

@@ -3,7 +3,8 @@
   "services": {
     "gitlab": {
       "base_url": "https://{{host}}.com/api/v4",
-      "preset_path": "knowledge/product/orchestration/service-presets/gitlab.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/gitlab.json",
+      "auth_strategy": "bearer"
     }
   }
 }

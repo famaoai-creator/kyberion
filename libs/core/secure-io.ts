@@ -5,7 +5,10 @@ import {
   spawn,
   spawnSync,
   type ChildProcessWithoutNullStreams,
+  type ChildProcess,
+  type SpawnOptions,
 } from 'node:child_process';
+export type { ChildProcess, SpawnOptions };
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath } from './path-resolver.js';
@@ -1157,9 +1160,19 @@ export function safeExecShellScriptResult(
  */
 export function safeSpawn(
   command: string,
+  args?: string[],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): ChildProcessWithoutNullStreams;
+export function safeSpawn(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; stdio: SpawnOptions['stdio'] }
+): ChildProcess;
+export function safeSpawn(
+  command: string,
   args: string[] = [],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
-): ChildProcessWithoutNullStreams {
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; stdio?: SpawnOptions['stdio'] } = {}
+): ChildProcess {
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
@@ -1167,7 +1180,7 @@ export function safeSpawn(
     cwd: options.cwd ?? process.cwd(),
     env: buildSafeExecEnv(options.env ?? {}),
     shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
   });
 }
 

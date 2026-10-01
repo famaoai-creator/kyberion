@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import {
+  startBridgePollLoop,
+  type BridgePollLoopHandle,
+} from '../../../../../../../../../satellites/shared/bridge-poll-loop';
 import { NextRequest } from 'next/server';
 import { withLiveReply } from '@agent/core/discussion/discussion-live';
 import { withLiveMissionStatus } from '@agent/core/discussion/discussion-mission';
@@ -45,13 +50,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
   const encoder = new TextEncoder();
   let closed = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let timer: BridgePollLoopHandle | undefined;
   let ping: ReturnType<typeof setInterval> | undefined;
   let lastSent = '';
   const close = () => {
     if (closed) return;
     closed = true;
-    if (timer) clearInterval(timer);
+    if (timer) timer.stop();
     if (ping) clearInterval(ping);
   };
 
@@ -88,7 +93,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       };
       write('retry: 1500\n\n');
       poll();
-      timer = setInterval(poll, 180);
+      if (closed) return;
+      timer = startBridgePollLoop({
+        name: 'surface-sse:' + randomUUID(),
+        intervalMs: 180,
+        poll: poll,
+      });
       ping = setInterval(() => write(': keep-alive\n\n'), 15_000);
     },
     cancel() {

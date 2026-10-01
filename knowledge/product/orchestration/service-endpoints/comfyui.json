@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "comfyui": {
-      "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json",
+      "auth_strategy": "none"
     }
   }
 }

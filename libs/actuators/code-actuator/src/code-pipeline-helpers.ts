@@ -30,7 +30,7 @@ import {
   loadCapabilityRegistry,
   scanProviderCapabilities,
 } from '@agent/core/provider/provider-capability-scanner';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { runGovernedCommand, runGovernedShellScript } from '@agent/core/command-runner';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
@@ -41,13 +41,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 
-const DEFAULT_CODE_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 150,
-  maxDelayMs: 1200,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_CODE_RETRY = getRetryDefaults('code-actuator:defaults');
 
 function resolveCodeRepositoryPath(rootDir: string, value: unknown, label: string): string {
   const requested = String(value ?? '').trim();

@@ -30,7 +30,7 @@
     "source": { "enum": ["local", "github", "jira", "peer"] },
     "source_ref": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
-    "labels": { "type": "array", "items": { "type": "string" } },
+    "labels": { "$ref": "workitem-label-taxonomy.schema.json" },
     "dependencies": { "type": "array", "items": { "type": "string" } },
     "version": { "type": "integer", "minimum": 1 },
     "created_at": { "type": "string", "minLength": 1 },

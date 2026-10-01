@@ -3,7 +3,8 @@
   "services": {
     "jira": {
       "base_url": "https://atlassian.net/rest/api/3",
-      "preset_path": "knowledge/product/orchestration/service-presets/jira.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/jira.json",
+      "auth_strategy": "basic"
     }
   }
 }

@@ -9,7 +9,8 @@
         "clientId": ["CLIENT_ID"],
         "clientSecret": ["CLIENT_SECRET"],
         "redirectUri": ["REDIRECT_URI"]
-      }
+      },
+      "auth_strategy": "session"
     }
   }
 }

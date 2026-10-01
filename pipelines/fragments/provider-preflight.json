@@ -1,0 +1,52 @@
+{
+  "action": "pipeline",
+  "name": "provider-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Probe provider installation, version, ping and protocol support through a single typed op. Caller supplies typed command and argv records.",
+  "context": {
+    "providers": [
+      {
+        "name": "Gemini",
+        "command": "gemini",
+        "version_args": ["--version"],
+        "ping_args": ["-p", "Reply with only the word PONG"],
+        "capability_marker": "--acp"
+      },
+      {
+        "name": "Claude",
+        "command": "claude",
+        "version_args": ["--version"],
+        "ping_args": ["-p", "Reply with only the word PONG", "--output-format", "text"],
+        "capability_marker": "stream-json"
+      },
+      {
+        "name": "GitHub Copilot",
+        "command": "gh",
+        "version_args": ["copilot", "--", "--version"],
+        "ping_args": ["copilot", "--", "-p", "Reply with only the word PONG", "--allow-all"],
+        "capability_marker": "--acp",
+        "capability_args": ["copilot", "--", "--help"]
+      },
+      {
+        "name": "Codex",
+        "command": "codex",
+        "fallback_command": "npx",
+        "fallback_args": ["codex", "--version"]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "id": "provider-preflight",
+      "role": "source",
+      "op": "system:provider_preflight",
+      "produces": {
+        "channel": "provider_results",
+        "type": "ProviderProbeResults"
+      },
+      "params": {
+        "providers": "{{providers}}"
+      }
+    }
+  ]
+}

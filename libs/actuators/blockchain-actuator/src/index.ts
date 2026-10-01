@@ -2,7 +2,7 @@ import { logger } from '@agent/core/core';
 import { safeMkdir, safeExistsSync } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import * as path from 'node:path';
@@ -28,13 +28,7 @@ const MOCK_CHAIN_PATH = pathResolver.active('audit/mock_blockchain.jsonl');
 const BLOCKCHAIN_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/blockchain-actuator/manifest.json'
 );
-const DEFAULT_BLOCKCHAIN_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_BLOCKCHAIN_RETRY = getRetryDefaults('blockchain-actuator:defaults');
 
 interface BlockchainTransaction {
   block_number: number;

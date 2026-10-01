@@ -12,7 +12,8 @@ import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
-import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
+// C7: shared poll-loop + typing guards (behavior unchanged).
+import { startBridgePollLoop, startBridgeTypingIndicator } from '../../shared/bridge-poll-loop.js';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -338,7 +339,8 @@ async function handleDiscordMessageInner(message: Message) {
     actorId: message.author.id,
     threadContext: () => collectDiscordThreadContext(message, priorHistoryEntries),
     typing: () =>
-      startBridgeTypingLoop(
+      // C7: shared typing guard (8s cadence preserved).
+      startBridgeTypingIndicator(
         'discord-bridge',
         () => (hasSendTyping(message.channel) ? message.channel.sendTyping() : Promise.resolve()),
         8000
@@ -542,14 +544,18 @@ async function main(args: string[] = []) {
     return;
   }
 
-  const outboxTimer = setInterval(() => {
-    runDiscordOutbox(() => drainDiscordOutbox(client)).catch((error) => {
+  // C7: shared poll loop (fixed 15s cadence + drain guard preserved; the
+  // previous inline .catch becomes onError).
+  startBridgePollLoop({
+    name: 'discord-outbox',
+    intervalMs: 15_000,
+    poll: () => runDiscordOutbox(() => drainDiscordOutbox(client)),
+    onError: (error) => {
       logger.error(
         `❌ [DiscordBridge] Outbox poll failed: ${error instanceof Error ? error.message : String(error)}`
       );
-    });
-  }, 15_000);
-  outboxTimer.unref?.();
+    },
+  });
   void runDiscordOutbox(() => drainDiscordOutbox(client));
 }
 

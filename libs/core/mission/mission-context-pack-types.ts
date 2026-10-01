@@ -1,4 +1,4 @@
-import type { ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
+import type { ArtifactKind, ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
 import type { ContextFragmentRejection, ContextSecurityScope } from '../context-security-scope.js';
 import type { FacetRequest } from '../facet-registry.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
@@ -72,7 +72,7 @@ export interface MissionStateSummary {
   outcome_contract?: {
     outcome_id?: string;
     requested_result?: string;
-    deliverable_kind?: string;
+    deliverable_kind?: ArtifactKind;
     success_criteria?: string[];
     evidence_required?: boolean;
     vision_ref?: {

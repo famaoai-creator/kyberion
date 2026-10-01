@@ -74,6 +74,7 @@ import {
   slackMissionProposalFallbackText,
 } from '@agent/core/integrations/slack-mission-proposal-ui';
 import { dispatchPresenceFrame } from '@agent/core/presence-bridge';
+import { startBridgePollLoop } from '../../shared/bridge-poll-loop.js';
 import {
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
@@ -680,12 +681,14 @@ async function start(_args: string[] = []) {
     }
   });
 
-  const outboxTimer = setInterval(() => {
-    runSlackOutbox(() => processSlackOutbox(app.client)).catch((err: unknown) => {
+  startBridgePollLoop({
+    name: 'slack-outbox',
+    intervalMs: 3000,
+    poll: () => runSlackOutbox(() => processSlackOutbox(app.client)),
+    onError: (err: unknown) => {
       logger.error(`❌ [SlackBridge] Outbox poll failed: ${errorDetail(err)}`);
-    });
-  }, 3000);
-  outboxTimer.unref?.();
+    },
+  });
 
   // 1. Listen for messages
   app.message(async ({ message, client }) =>

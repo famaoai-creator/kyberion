@@ -1,3 +1,4 @@
+import { getRetryDefaults } from '@agent/core/async-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadRecoveryPolicy as loadRecoveryPolicyFromManifest } from '@agent/core/recovery-policy';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -11,13 +12,7 @@ export const videoCompositionActionValidate = compileSchema(
 export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/video-composition-actuator/manifest.json'
 );
-export const DEFAULT_VIDEO_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+export const DEFAULT_VIDEO_RETRY = getRetryDefaults('video-composition-actuator:defaults');
 
 export const runtime = new VideoRenderRuntime();
 export const packetHistory = new Map<string, any[]>();

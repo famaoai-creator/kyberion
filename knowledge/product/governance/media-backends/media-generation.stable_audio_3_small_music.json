@@ -21,6 +21,12 @@
       },
       "command": "uvx",
       "args": ["--from", "git+https://github.com/Stability-AI/stable-audio-3.git", "stable-audio"],
+      "aliases": [
+        "stable_audio_3",
+        "stable_audio_3_small_music",
+        "media-generation.stable_audio_3_small_music"
+      ],
+      "probe": { "kind": "tool_runtime", "ref": "stable_audio_3" },
       "cost_tier": "self_hosted",
       "data_policy": "local_only",
       "execution_locality": "local",
