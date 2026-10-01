@@ -215,6 +215,19 @@ export interface ChannelActorAccessDecision extends Omit<SurfaceAccessDecision, 
 export interface ChannelAuthorityOptions {
   /** Member registry root seam for hermetic callers. */
   memberRegistry?: MemberRegistryPathOptions;
+  /** A speaker already resolved for this actor and channel (avoids a second registry scan). */
+  speaker?: ChannelSpeakerPrincipal;
+}
+
+function speakerFor(
+  policy: ChannelModePolicy,
+  actorId: string,
+  options: ChannelAuthorityOptions
+): ChannelSpeakerPrincipal {
+  const actor = String(actorId || '').trim();
+  return options.speaker && options.speaker.actorId === actor
+    ? options.speaker
+    : resolveChannelSpeaker(policy, actor, options.memberRegistry);
 }
 
 /**
@@ -234,8 +247,9 @@ export function evaluateChannelActorAccess(
   if (policy.source === 'invalid') {
     return { ...decision, allowed: false, source: 'invalid', reason: 'invalid_allowlist' };
   }
-  if (policy.mode !== 'team') return decision;
-  const speaker = resolveChannelSpeaker(policy, actorId, options.memberRegistry);
+  // A configured-but-unparsable allowlist fails closed for members too.
+  if (policy.mode !== 'team' || decision.reason === 'invalid_allowlist') return decision;
+  const speaker = speakerFor(policy, actorId, options);
   if (speaker.denied) {
     return { ...decision, allowed: false, reason: 'member_binding_denied', speaker };
   }
@@ -321,7 +335,7 @@ export function evaluateChannelApprovalAuthority(
       if (!actor || policy.source === 'invalid') {
         return { allowed: false, reason: 'not_channel_approver', decidedBy: actor };
       }
-      const speaker = resolveChannelSpeaker(policy, actor, options.memberRegistry);
+      const speaker = speakerFor(policy, actor, options);
       const decidedBy = speaker.principalId ?? actor;
       if (speaker.denied) return { allowed: false, reason: 'member_binding_denied', decidedBy };
       if (speakerCan(speaker, 'decide')) {

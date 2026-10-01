@@ -1,4 +1,6 @@
 import { withExecutionContext } from '@agent/core/governance';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   linkMemberExternalIdentity,
   unlinkMemberExternalIdentity,
@@ -74,6 +76,14 @@ export async function runOrganizationMember(
   if (result.status === 'member_not_found') {
     throw new Error(`member '${command.memberId}' does not exist`);
   }
+  // An identity link grants a chat actor the member's authority: audit it.
+  auditChain.record({
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    action: `member.${command.action}`,
+    operation: `user:${command.memberId}`,
+    result: 'completed',
+    metadata: { status: result.status, issuer: identity.issuer, subject: identity.subject },
+  });
   print(
     JSON.stringify(
       {

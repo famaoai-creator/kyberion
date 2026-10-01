@@ -20,6 +20,7 @@ const captured = vi.hoisted(() => ({
     threadContext?: string;
     text: string;
     scope?: SurfaceConversationMessageInput['scope'];
+    workAuthority?: SurfaceConversationMessageInput['workAuthority'];
   }[],
 }));
 
@@ -32,6 +33,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
         threadContext: input.threadContext,
         text: input.text,
         scope: input.scope,
+        workAuthority: input.workAuthority,
       });
       return {
         text: 'ok',
@@ -359,6 +361,43 @@ describe('slack team channel', () => {
     expect(input.scope).toEqual({ tier: 'confidential', tenant_slug: 'acme' });
     expect(input.threadContext?.startsWith('[channel-policy]')).toBe(true);
     expect(input.threadContext).toContain(THREAD_CONTEXT);
+  });
+
+  it('runs ask-only speakers with workAuthority ask_only', async () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    const channelPolicy = resolveChannelModePolicy('slack', 'C-team');
+    const adapter: ChannelAdapter = { channel: 'slack', actorId: 'U-x', send: () => undefined };
+    const speaker = (role?: 'viewer' | 'operator') => ({
+      surface: 'slack',
+      actorId: 'U-x',
+      denied: false,
+      tenantSlug: 'acme',
+      tierAccess: ['public' as const, 'confidential' as const],
+      ...(role ? { role, principalId: 'user:x', memberId: 'x' } : {}),
+      capabilities:
+        role === 'operator'
+          ? (['ask', 'request_work'] as const).slice()
+          : (['ask'] as const).slice(),
+    });
+
+    captured.conversationInputs.length = 0;
+    await runSlackChannelTurn(adapter, {
+      ...baseRequest(),
+      channel: 'C-team',
+      channelPolicy,
+      channelSpeaker: speaker('viewer'),
+    });
+    expect(captured.conversationInputs[0].workAuthority).toBe('ask_only');
+    expect(captured.conversationInputs[0].threadContext).toContain("role 'viewer'");
+
+    captured.conversationInputs.length = 0;
+    await runSlackChannelTurn(adapter, {
+      ...baseRequest(),
+      channel: 'C-team',
+      channelPolicy,
+      channelSpeaker: speaker('operator'),
+    });
+    expect(captured.conversationInputs[0].workAuthority).toBeUndefined();
   });
 
   it('keeps owner_direct turns unscoped and without a directive', async () => {

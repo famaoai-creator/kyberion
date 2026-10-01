@@ -287,6 +287,10 @@ export function runSlackChannelTurn(
   options: RunChannelTurnOptions = {}
 ): Promise<SurfaceConversationResult> {
   const scope = request.channelPolicy ? channelTurnScope(request.channelPolicy) : undefined;
+  // Team Channel P1: speakers without request_work get direct replies only.
+  const askOnly = Boolean(
+    request.channelSpeaker && !speakerCan(request.channelSpeaker, 'request_work')
+  );
   return runChannelTurn(
     adapter,
     {
@@ -315,6 +319,7 @@ export function runSlackChannelTurn(
           request.channelSpeaker
         ),
         ...(scope ? { scope } : {}),
+        ...(askOnly ? { workAuthority: 'ask_only' as const } : {}),
         delegationSummaryInstruction:
           'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
         metadata: request.metadata,
@@ -382,11 +387,16 @@ export function resolveSlackApprovalText(params: {
   text: string;
   actorId: string;
   channelPolicy?: ChannelModePolicy;
+  channelSpeaker?: ChannelSpeakerPrincipal;
 }): string | null {
   const policy = params.channelPolicy;
   // Team channels record the member principal (user:<id>) as the decider.
   const authority =
-    policy?.mode === 'team' ? evaluateChannelApprovalAuthority(policy, params.actorId) : undefined;
+    policy?.mode === 'team'
+      ? evaluateChannelApprovalAuthority(policy, params.actorId, {
+          ...(params.channelSpeaker ? { speaker: params.channelSpeaker } : {}),
+        })
+      : undefined;
   const resolved = resolveSurfaceApprovalReply({
     surface: 'slack',
     channel: params.channel,
@@ -758,6 +768,7 @@ async function start(_args: string[] = []) {
         text: messageText,
         actorId: message.user || 'unknown',
         channelPolicy,
+        ...(channelSpeaker ? { channelSpeaker } : {}),
       });
       if (approvalReply !== null) {
         await postSlackText(client, {
@@ -827,7 +838,9 @@ async function start(_args: string[] = []) {
 
       const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
       const mayDecideProposal = () =>
-        evaluateChannelApprovalAuthority(channelPolicy, message.user || '').allowed;
+        evaluateChannelApprovalAuthority(channelPolicy, message.user || '', {
+          ...(channelSpeaker ? { speaker: channelSpeaker } : {}),
+        }).allowed;
       const isProposalDecision =
         pendingMissionProposal &&
         (isSlackMissionRejection(messageText) || isSlackMissionConfirmation(messageText));
