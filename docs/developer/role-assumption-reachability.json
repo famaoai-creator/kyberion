@@ -606,6 +606,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/channel-memory-store.ts#writeFile (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["chronos_gateway", "slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/operator-notifications.ts#deliver",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -913,6 +918,11 @@
     {
       "site": "libs/core/surface/surface-mission-steering.ts#handleResumeVerb",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/thread-work-index.ts#writeAsSurface (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["chronos_gateway", "slack_bridge"],
       "unresolved": []
     },
     {
