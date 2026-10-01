@@ -22,6 +22,7 @@ your local environment, credentials, or host permissions.
 | Onboarding                                               | Ready                 | Run `pnpm onboarding`, then register the tenant, bind organization context, complete activation probes, and obtain human acceptance before tenant-bound first work. See [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md). |
 | Health checks                                            | Ready                 | Run `pnpm kyberion doctor` to see what is missing before you start.                                                                                                                                                                                    |
 | Consolidated readiness                                   | Ready                 | Run `pnpm kyberion setup report` for surfaces, services, reasoning, and doctor together.                                                                                                                                                               |
+| Baseline / vital pipelines                               | Ready                 | `pnpm kyberion vital --format=json` and `pnpm pipeline --input pipelines/baseline-check.json` are used as real gates.                                                                                                                                  |
 | Mission lifecycle                                        | Ready                 | Core mission flows are in place and usable.                                                                                                                                                                                                            |
 | Governance checks                                        | Ready                 | Validation and policy checks are part of normal operation.                                                                                                                                                                                             |
 | Surface lifecycle                                        | Ready                 | You can enable, disable, and inspect individual gateways.                                                                                                                                                                                              |
@@ -30,7 +31,16 @@ your local environment, credentials, or host permissions.
 | Voice features                                           | Conditional           | They work when the device, engine, and profile are configured.                                                                                                                                                                                         |
 | Browser / desktop automation                             | Conditional           | These need the right permissions and a supported host setup.                                                                                                                                                                                           |
 | Reasoning backends                                       | Ready with guardrails | Claude, Gemini, and Codex paths work when the provider is authenticated and not rate-limited.                                                                                                                                                          |
+| Gemini quota fallback                                    | Ready with guardrails | Quota exhaustion falls through to the next candidate profile instead of stopping early.                                                                                                                                                                |
 | UI / web app                                             | Conditional           | Usable, but still has environment-specific warnings in the build path.                                                                                                                                                                                 |
+| Cross-platform parity                                    | Risky                 | macOS-oriented flows are better covered than Windows/Linux equivalents.                                                                                                                                                                                |
+
+## Reading the status column
+
+- `Ready`: you can rely on it for normal work.
+- `Ready with guardrails`: verify credentials or quota before assuming it works in every environment.
+- `Conditional`: do a capability check first.
+- `Risky`: expect environment-specific failures and do not treat it as a default path.
 
 ## How to use this
 
@@ -61,4 +71,10 @@ authentication before assuming it will work.
 - Provider quotas and API credentials.
 
 This matrix is not saying the conditional features are broken.
-It is saying they are ready only when the environment is ready.
+It is saying they are ready only when the environment is ready. It is also not a
+claim that the system is finished: the core control plane is usable, while the
+edges still need environment-specific validation.
+
+This is the single canonical readiness matrix. The developer-tier path
+[`../developer/OPERATIONS_READINESS_MATRIX.md`](../developer/OPERATIONS_READINESS_MATRIX.md)
+is a pointer to this page.
