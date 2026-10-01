@@ -1239,6 +1239,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/push/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/setup/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2771,6 +2776,7 @@
         "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/route.ts",
+        "presence/displays/concierge/src/app/api/push/route.ts",
         "presence/displays/concierge/src/app/api/response-status/route.ts",
         "presence/displays/concierge/src/app/api/secrets/apply/route.ts",
         "presence/displays/concierge/src/app/api/secrets/introduce/route.ts",
@@ -2817,6 +2823,7 @@
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ProfileSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/PushPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/QuietHoursPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/RecordingConsentSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ServicesSection.tsx",
@@ -2853,6 +2860,8 @@
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
+        "presence/displays/concierge/src/lib/push-client.ts",
+        "presence/displays/concierge/src/lib/push-server.ts",
         "presence/displays/concierge/src/lib/quiet-hours-view.ts",
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
