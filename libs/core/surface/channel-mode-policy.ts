@@ -2,7 +2,13 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import type { TierLevel } from '../types.js';
+import type { MemberRegistryPathOptions } from '../organization/member-registry.js';
 import { evaluateSurfaceActorAccess, type SurfaceAccessDecision } from './surface-access-policy.js';
+import {
+  resolveChannelSpeaker,
+  speakerCan,
+  type ChannelSpeakerPrincipal,
+} from './channel-speaker-principal.js';
 
 /**
  * Team Channel P0: per-channel conversation mode.
@@ -200,17 +206,55 @@ export function resolveChannelModePolicy(surface: string, channelId: string): Ch
 }
 
 /** Speaker access for a channel: team mode is deny-by-default when no allowlist exists. */
+export interface ChannelActorAccessDecision extends Omit<SurfaceAccessDecision, 'reason'> {
+  reason: SurfaceAccessDecision['reason'] | 'tenant_member' | 'member_binding_denied';
+  /** Team channels: the resolved speaker (member, role, capabilities). */
+  speaker?: ChannelSpeakerPrincipal;
+}
+
+export interface ChannelAuthorityOptions {
+  /** Member registry root seam for hermetic callers. */
+  memberRegistry?: MemberRegistryPathOptions;
+  /** A speaker already resolved for this actor and channel (avoids a second registry scan). */
+  speaker?: ChannelSpeakerPrincipal;
+}
+
+function speakerFor(
+  policy: ChannelModePolicy,
+  actorId: string,
+  options: ChannelAuthorityOptions
+): ChannelSpeakerPrincipal {
+  const actor = String(actorId || '').trim();
+  return options.speaker && options.speaker.actorId === actor
+    ? options.speaker
+    : resolveChannelSpeaker(policy, actor, options.memberRegistry);
+}
+
+/**
+ * Speaker access for a channel. Team channels admit active members of the
+ * channel tenant (Team Channel P1) and, as ask-only guests, allowlisted
+ * actors; anyone else is denied, as is an identity bound to a suspended
+ * member. Owner-direct channels keep the surface allowlist semantics.
+ */
 export function evaluateChannelActorAccess(
   policy: ChannelModePolicy,
-  actorId: string
-): SurfaceAccessDecision {
+  actorId: string,
+  options: ChannelAuthorityOptions = {}
+): ChannelActorAccessDecision {
   const decision = evaluateSurfaceActorAccess(policy.surface, actorId, {
     ...(policy.rules.denyUnconfiguredAllowlist ? { defaultAllow: false } : {}),
   });
   if (policy.source === 'invalid') {
     return { ...decision, allowed: false, source: 'invalid', reason: 'invalid_allowlist' };
   }
-  return decision;
+  // A configured-but-unparsable allowlist fails closed for members too.
+  if (policy.mode !== 'team' || decision.reason === 'invalid_allowlist') return decision;
+  const speaker = speakerFor(policy, actorId, options);
+  if (speaker.denied) {
+    return { ...decision, allowed: false, reason: 'member_binding_denied', speaker };
+  }
+  if (speaker.role) return { ...decision, allowed: true, reason: 'tenant_member', speaker };
+  return { ...decision, speaker };
 }
 
 export interface ChannelEngagementInput {
@@ -261,24 +305,51 @@ export async function decideChannelEngagement(
 
 export interface ChannelApprovalAuthorityDecision {
   allowed: boolean;
-  reason: 'allowlisted_actor' | 'channel_approver' | 'not_channel_approver' | 'mode_forbids';
+  reason:
+    | 'allowlisted_actor'
+    | 'member_approver'
+    | 'channel_approver'
+    | 'not_channel_approver'
+    | 'member_binding_denied'
+    | 'mode_forbids';
+  /** Id to record as the decider: `user:<member_id>` for a member, else the actor id. */
+  decidedBy: string;
 }
 
-/** Whether `actorId` may decide an approval posted in this channel. */
+/**
+ * Whether `actorId` may decide an approval posted in this channel. Team
+ * channels accept members whose tenant role carries `surface.decision.write`
+ * (owner / approver); the channel `approvers` list remains a transitional
+ * fallback for actors not yet linked to a member.
+ */
 export function evaluateChannelApprovalAuthority(
   policy: ChannelModePolicy,
-  actorId: string
+  actorId: string,
+  options: ChannelAuthorityOptions = {}
 ): ChannelApprovalAuthorityDecision {
   const actor = String(actorId || '').trim();
   switch (policy.rules.approvalAuthority) {
     case 'allowlisted_actor':
-      return { allowed: true, reason: 'allowlisted_actor' };
-    case 'channel_approvers':
-      return Boolean(actor) && policy.source !== 'invalid' && policy.approvers.includes(actor)
-        ? { allowed: true, reason: 'channel_approver' }
-        : { allowed: false, reason: 'not_channel_approver' };
+      return { allowed: true, reason: 'allowlisted_actor', decidedBy: actor };
+    case 'channel_approvers': {
+      if (!actor || policy.source === 'invalid') {
+        return { allowed: false, reason: 'not_channel_approver', decidedBy: actor };
+      }
+      const speaker = speakerFor(policy, actor, options);
+      const decidedBy = speaker.principalId ?? actor;
+      if (speaker.denied) return { allowed: false, reason: 'member_binding_denied', decidedBy };
+      if (speakerCan(speaker, 'decide')) {
+        return { allowed: true, reason: 'member_approver', decidedBy };
+      }
+      // A linked member's role is authoritative: the fallback list only
+      // covers actors that are not members of the channel tenant yet.
+      if (!speaker.role && policy.approvers.includes(actor)) {
+        return { allowed: true, reason: 'channel_approver', decidedBy };
+      }
+      return { allowed: false, reason: 'not_channel_approver', decidedBy };
+    }
     default:
-      return { allowed: false, reason: 'mode_forbids' };
+      return { allowed: false, reason: 'mode_forbids', decidedBy: actor };
   }
 }
 
@@ -297,15 +368,24 @@ export function channelTurnScope(
  * Disclosure directive prepended to a team turn's context so the reasoning
  * layer knows it is speaking to several people, not to its owner.
  */
-export function buildChannelDisclosureDirective(policy: ChannelModePolicy): string | undefined {
+export function buildChannelDisclosureDirective(
+  policy: ChannelModePolicy,
+  speaker?: ChannelSpeakerPrincipal
+): string | undefined {
   if (policy.mode !== 'team') return undefined;
   const allowed =
     policy.maxTier === 'public'
       ? 'public knowledge only'
       : `public knowledge and confidential knowledge of tenant '${policy.tenantSlug}' only`;
+  const speakerLine = speaker
+    ? speaker.role
+      ? `Current speaker: ${speaker.principalId} (role '${speaker.role}' on tenant '${policy.tenantSlug}').`
+      : 'Current speaker is not a registered member of this tenant: answer questions only; do not start missions, task sessions or approval requests for them.'
+    : undefined;
   return [
     '[channel-policy] This is a shared team channel: several team members read every reply.',
     `Disclose ${allowed}. Never reveal personal-tier material (the owner's private identity, vision, connections, credentials) or another tenant's data.`,
     'If a request needs such material, say it must be handled in the owner channel instead.',
+    ...(speakerLine ? [speakerLine] : []),
   ].join('\n');
 }
