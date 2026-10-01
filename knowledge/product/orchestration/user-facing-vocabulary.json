@@ -10846,6 +10846,26 @@
         "ja": "この憲章をやめる",
         "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
       },
+      "setup.connections_mine": {
+        "en": "Your connections",
+        "ja": "あなたの連携",
+        "qps-ploc": "⟦Ẏőůř ƈőññėƈŧïőñş ŀőřėɱ⟧"
+      },
+      "setup.connections_organization": {
+        "en": "{tenant} connections",
+        "ja": "{tenant} の連携",
+        "qps-ploc": "⟦{tenant} ƈőññėƈŧïőñş ŀőřėɱ ⟧"
+      },
+      "setup.connection_owner_person": {
+        "en": "Yours",
+        "ja": "あなたの",
+        "qps-ploc": "⟦Ẏőůřş ŀőř⟧"
+      },
+      "setup.connection_owner_organization": {
+        "en": "Organization: {tenant}",
+        "ja": "組織: {tenant}",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
+      },
       "setup.charter_usage_day": {
         "en": "Spent today: {spent} of {limit}",
         "ja": "本日の使用額: {limit} のうち {spent}",

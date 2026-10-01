@@ -26,6 +26,8 @@ import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { visibleConnections } from '../../../lib/connection-view';
+import { resolveConciergeDecidedBy } from '../../../lib/front-desk-member';
 import { readRequestObject } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
@@ -103,14 +105,20 @@ export function GET(req: NextRequest) {
       provider_hint: agent.provider_hint || '',
       model_hint: agent.model_hint || '',
     }));
-    const connectionRecords = Array.isArray(onboarding.service_bindings)
+    const allConnectionRecords = Array.isArray(onboarding.service_bindings)
       ? onboarding.service_bindings
       : [];
-    const configuredServices = new Set(
-      connectionRecords
-        .map((record) => (record as Record<string, unknown>).service_id)
-        .filter((value): value is string => typeof value === 'string')
+    // Connections are owned (person / organization / operator): the viewer sees
+    // only their own and their organizations', and "connected" reflects only those.
+    const viewerMember = withExecutionContext('sovereign_concierge', () =>
+      resolveConciergeDecidedBy(resolved.context)
     );
+    const connections = visibleConnections(allConnectionRecords, {
+      loopback: resolved.context.source === 'loopback',
+      ...(viewerMember ? { memberId: viewerMember.id.replace(/^user:/, '') } : {}),
+      tenantSlugs: resolved.context.tenantSlugs,
+    });
+    const configuredServices = new Set(connections.map((connection) => connection.service_id));
     const serviceCatalog = [
       { id: 'google-workspace', label: t('service.google'), auth: t('auth.oauth') },
       { id: 'microsoft-365', label: t('service.microsoft'), auth: t('auth.oauth') },
@@ -235,6 +243,7 @@ export function GET(req: NextRequest) {
           durable_identities: managedAgents,
         },
         service_catalog: serviceCatalog,
+        connections,
         providers: onboarding.providers,
         diagnostics,
         // ceo-ux.md: no internal execution vocabulary (pipeline IDs, shell
