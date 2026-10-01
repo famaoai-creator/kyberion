@@ -16,8 +16,8 @@ describe('provider managed env', () => {
 
   it('registers the supported provider CLI set and npm install metadata', () => {
     expect(listManagedProviderCliDefinitions().map((entry) => entry.provider)).toEqual([
-      'codex',
       'claude',
+      'codex',
       'gemini',
       'agy',
       'grok',

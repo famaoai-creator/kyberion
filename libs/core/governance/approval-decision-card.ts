@@ -4,8 +4,9 @@ import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
 import { resolveLocale } from '../locale.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { localeToBcp47, localeUsesWordSpaces, type SupportedLocale } from '../locale-normalize.js';
 import { t, type VocabularyKey } from '../t.js';
+import { neutralizeChannelMarkup } from '../surface/channel-adapter-registry.js';
 
 export type { InterventionLevel } from './decision-card.js';
 
@@ -96,7 +97,7 @@ export function formatDecisionInstant(
 ): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
-  return new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return new Intl.DateTimeFormat(localeToBcp47(locale), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -202,9 +203,22 @@ function describeIfNoResponse(
     );
   }
   return {
-    text: lines.join(locale === 'ja' ? '' : ' '),
+    text: lines.join(localeUsesWordSpaces(locale) ? ' ' : ''),
     ...(deadline ? { deadlineAt: deadline } : {}),
   };
+}
+
+/**
+ * Locale for a card that may have no inbound message to follow (a proactive
+ * push): the turn's reply locale when one is active, else the locale stored
+ * for the approval's tenant / organization / project scope, else the
+ * operator's (identity language, `KYBERION_LOCALE`, catalog default).
+ */
+export function resolveApprovalLocale(
+  record: Pick<ApprovalRequestRecord, 'scope'>,
+  explicit?: SupportedLocale
+): SupportedLocale {
+  return explicit ?? resolveLocale({ scope: record.scope });
 }
 
 export function viewDecisionCard(
@@ -212,7 +226,7 @@ export function viewDecisionCard(
   options: { now?: number; locale?: SupportedLocale } = {}
 ): DecisionCardView {
   const now = options.now ?? Date.now();
-  const locale = options.locale ?? resolveLocale();
+  const locale = resolveApprovalLocale(record, options.locale);
   const card = record.decisionCard;
   const level = effectiveInterventionLevel(record, now);
   const vetoState = record.veto ? evaluateVetoWindow(record.veto, now) : undefined;
@@ -331,17 +345,6 @@ export function neutralizeSurfaceMarkup(
   text: string,
   surface: NotificationChannelTarget['surface']
 ): string {
-  switch (surface) {
-    case 'slack':
-      return text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
-    case 'telegram':
-      // Legacy Markdown: only these four characters can be escaped.
-      return text.replace(/[_*`[]/gu, (char) => `\\${char}`);
-    case 'discord':
-      return text
-        .replace(/[\\*_~`|[\]()<>]/gu, (char) => `\\${char}`)
-        .replace(/@(everyone|here)/giu, '@\u200b$1');
-    default:
-      return text;
-  }
+  // Escaping rules are channel-adapter registry data (RS-06), not per-caller branches.
+  return neutralizeChannelMarkup(text, surface);
 }

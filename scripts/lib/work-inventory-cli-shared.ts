@@ -1,12 +1,16 @@
 /**
  * WI-07: shared argv-parsing, scope-resolution, and formatting helpers for
- * `pnpm inventory` (scripts/work_inventory.ts). Kept separate from the
+ * `pnpm work:inventory` (scripts/work_inventory.ts). Kept separate from the
  * dispatcher and the per-area command modules so none of them grows past the
  * ~600 line guideline (docs/developer/improvement-plans-2026-08/
  * WORK_INVENTORY_PLAN_2026-09-22.ja.md §3 WI-07).
  */
-import { withExecutionContext } from '@agent/core/authority';
-import { HUMAN_ACTOR_PREFIX } from '@agent/core/actor';
+import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
+import { humanActor, HUMAN_ACTOR_PREFIX } from '@agent/core/actor';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
+import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
+import { currentExecutionScope, getRegisteredEnvText, isCiProcess } from '@agent/core/foundation';
 import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import type {
   WorkFrequencyPer,
@@ -159,4 +163,102 @@ export function truncate(value: string, max: number): string {
  */
 export function governed<T>(fn: () => T): T {
   return withExecutionContext('sovereign_concierge', fn);
+}
+
+/**
+ * Govern one explicit tenant operation from the operator CLI. The registry is
+ * the authority for tenant existence/status; an already-bound execution may
+ * only select that same tenant. Bind the validated scope while the operation
+ * runs so downstream writers cannot infer it from signal payloads.
+ */
+export function governedTenant<T>(
+  tenantSlug: string,
+  fn: () => T,
+  options: { rootDir?: string; decidedBy?: HumanDecidedBy }
+): T {
+  const activeTenantSlug = resolveIdentityContext().tenantSlug?.trim();
+  if (activeTenantSlug && activeTenantSlug !== tenantSlug) {
+    throw new Error(
+      `[TENANT_SCOPE_MISMATCH] requested tenant '${tenantSlug}' does not match active tenant '${activeTenantSlug}'`
+    );
+  }
+  if (
+    !activeTenantSlug &&
+    (isCiProcess() ||
+      !process.stdin.isTTY ||
+      !process.stdout.isTTY ||
+      ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_DELEGATED_ROLE', 'KYBERION_NHI_ID'].some((name) =>
+        getRegisteredEnvText(name)?.trim()
+      ))
+  ) {
+    throw new Error(
+      '[TENANT_SCOPE_SELECTION_DENIED] an automated execution cannot select a tenant; use an active tenant scope or approved broker context'
+    );
+  }
+  if (!activeTenantSlug && !options.decidedBy) {
+    throw new WorkInventoryCliUsageError(
+      'Usage: inventory learn --tenant <slug> --decided-by user:<member-id>'
+    );
+  }
+  const decidedBy = options.decidedBy;
+  if (!activeTenantSlug && decidedBy) {
+    const member = withExecutionContext('sovereign_concierge', () =>
+      resolveMemberByPrincipal(
+        { source: 'loopback' },
+        options.rootDir ? { rootDir: options.rootDir } : {}
+      )
+    );
+    if (!member || decidedBy.id !== `${HUMAN_ACTOR_PREFIX}${member.member_id}`) {
+      throw new Error(
+        '[TENANT_SCOPE_SELECTION_DENIED] --decided-by must identify the authenticated local owner'
+      );
+    }
+    const membership = member?.memberships.find(
+      (entry) =>
+        entry.tenant_slug === tenantSlug && ['owner', 'approver', 'operator'].includes(entry.role)
+    );
+    if (!member || member.status !== 'active' || !membership) {
+      throw new Error(
+        `[TENANT_SCOPE_SELECTION_DENIED] active owner/operator/approver membership for '${tenantSlug}' is required`
+      );
+    }
+  }
+  const tenant = withExecutionContext('sovereign_concierge', () =>
+    resolveTenant(tenantSlug, options.rootDir ? { rootDir: options.rootDir } : {})
+  );
+  if (!activeTenantSlug) {
+    const receipt = auditChain.record({
+      agentId: decidedBy.id,
+      actor: humanActor(bareMemberId(decidedBy)),
+      action: 'work_inventory.tenant_scope_selected',
+      operation: 'inventory learn',
+      result: 'allowed',
+      metadata: {
+        command: 'inventory learn',
+        target_tenant: tenant.profile.tenant_slug,
+        scope_source: '--tenant',
+      },
+    });
+    if (
+      !auditChain
+        .loadAll()
+        .some((entry) => entry.id === receipt.id && entry.currentHash === receipt.currentHash)
+    ) {
+      throw new Error(
+        `[TENANT_SCOPE_AUDIT_REQUIRED] failed to persist tenant selection audit for '${tenant.profile.tenant_slug}'`
+      );
+    }
+  }
+  const organizationId = currentExecutionScope()?.organizationId;
+  return withExecutionContext(
+    'sovereign_concierge',
+    fn,
+    undefined,
+    tenant.profile.tenant_slug,
+    organizationId
+  );
+}
+
+export function optionalDecidedBy(argv: string[]): HumanDecidedBy | undefined {
+  return resolveDecidedByFromArgv(argv);
 }

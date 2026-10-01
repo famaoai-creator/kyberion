@@ -44,7 +44,7 @@ export const COMMANDS: ReadonlyArray<readonly [string, string]> = [
     'pnpm kyberion deals --ingest-audio <deal-id> --audio <path>',
     'i18n:recorder:recorder_help_deals_audio',
   ],
-  ['pnpm kyberion doctor', 'i18n:recorder:recorder_help_doctor'],
+  ['pnpm kyberion doctor [--scope <scope>]', 'i18n:recorder:recorder_help_doctor'],
 ] as const;
 
 export function printCommands(ui: HomeUi, print: HomePrint = () => undefined): void {

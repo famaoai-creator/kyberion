@@ -244,7 +244,7 @@ describe('shared report output boundary', () => {
       true
     );
 
-    expect(output).toContain('[report:i18n-coverage]');
+    expect(output).toContain('[i18n:report]');
     expect(output).toContain('ja: 100% -> 66.67%');
   });
 

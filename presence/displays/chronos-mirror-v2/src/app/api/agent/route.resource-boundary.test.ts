@@ -43,7 +43,7 @@ describe('chronos agent route resource boundary', () => {
     expect(routeSource).not.toContain("['prereq:check']");
   });
 
-  it('passes the normalized request locale into the shared conversation contract', () => {
+  it('passes only an explicit normalized request locale into the shared conversation contract', () => {
     const routeSource = String(
       safeReadFile(
         pathResolver.rootResolve('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts'),
@@ -51,6 +51,6 @@ describe('chronos agent route resource boundary', () => {
       )
     );
 
-    expect(routeSource).toContain('text: query,\n      locale,\n      threadTs: sessionId');
+    expect(routeSource).toContain('locale: normalizeLocale(body.locale) ?? undefined');
   });
 });

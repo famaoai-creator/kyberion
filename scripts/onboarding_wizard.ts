@@ -1,3 +1,4 @@
+import { pickByLocale } from '@agent/core/locale-normalize';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
@@ -19,6 +20,7 @@ import {
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
 import { writeServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
+import { resolveComfyBaseUrl } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -45,7 +47,12 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
-import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
+import {
+  isExpressOnboarding,
+  ONBOARD_CLI,
+  shouldRefuseNonInteractiveOnboarding,
+} from './onboarding_mode.js';
+import { guardCliArgs } from './lib/cli-guard.js';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -92,7 +99,7 @@ function setWizardLanguage(language: string): void {
 }
 
 function t(en: string, ja: string): string {
-  return wizardLocale === 'ja' ? ja : en;
+  return pickByLocale(wizardLocale, { en, ja });
 }
 
 function pt(value: LocalizedOnboardingText): string {
@@ -580,9 +587,9 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
       if (!continueWithStub) {
         print(
           t(
-            'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.',
+            'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboarding`.',
             // i18n-exempt: bilingual prompt pair (JA side intentional)
-            'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboard` を再実行してください。'
+            'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboarding` を再実行してください。'
           )
         );
         rl.close();
@@ -660,7 +667,7 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
 }
 
 async function promptComfyuiConnection(): Promise<Record<string, unknown> | null> {
-  const baseUrl = await ask('ComfyUI base URL [http://127.0.0.1:8188]: ', 'http://127.0.0.1:8188');
+  const baseUrl = await ask(`ComfyUI base URL [${resolveComfyBaseUrl()}]: `, resolveComfyBaseUrl());
   const outputDir = await ask('ComfyUI output dir [optional]: ');
   const notes = await ask('ComfyUI notes [optional]: ');
   if (!baseUrl && !outputDir && !notes) return null;
@@ -952,7 +959,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
           allow_cross_distillation: false,
         },
         metadata: {
-          onboarding_source: 'pnpm onboard',
+          onboarding_source: 'pnpm onboarding',
         },
       },
       `onboarding-tenant-${tenantSlug}`
@@ -1090,6 +1097,16 @@ export async function runOnboarding(
   args: string[] = [],
   print: Print = () => undefined
 ): Promise<void> {
+  // CU-01: help / unknown flags never start the wizard or write onboarding state.
+  try {
+    if (guardCliArgs(args, ONBOARD_CLI, print)) {
+      rl.close();
+      return;
+    }
+  } catch (error) {
+    rl.close();
+    throw error;
+  }
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
@@ -1147,15 +1164,15 @@ export async function runOnboarding(
     print(t('\n  Options:', '\n  選択肢:'));
     print(
       t(
-        '    1. Run from a real terminal: pnpm onboard',
+        '    1. Run from a real terminal: pnpm onboarding',
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        '    1. 実ターミナルから実行する: pnpm onboard'
+        '    1. 実ターミナルから実行する: pnpm onboarding'
       )
     );
     print(
-      '    2. If you need a customer overlay, create it first with `pnpm customer:create <slug>`'
+      '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`'
     );
-    print('       and activate it with `pnpm customer:switch <slug>` before onboarding.');
+    print('       and activate it with `pnpm stance:switch <slug>` before onboarding.');
     print('    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the');
     print(`       active profile root (${profileRoot()}/...) directly per the schemas under`);
     print('       knowledge/public/{schemas,templates}.');
@@ -1185,9 +1202,9 @@ export async function runOnboarding(
   if (expressMode) {
     print(
       t(
-        'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboard`.',
+        'Express mode: accept safe defaults now; refine identity and connections later with `pnpm onboarding`.',
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        'Express モード: 安全な既定値で開始し、後から `pnpm onboard` でアイデンティティと接続を調整します。'
+        'Express モード: 安全な既定値で開始し、後から `pnpm onboarding` でアイデンティティと接続を調整します。'
       )
     );
   }

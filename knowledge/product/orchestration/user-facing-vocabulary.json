@@ -6280,6 +6280,61 @@
         "en": "Workflow steps",
         "ja": "進め方の手順",
         "qps-ploc": "⟦Ẇőřķƒŀőẇ şŧėṗş ŀőřė⟧"
+      },
+      "learned_patterns_available": {
+        "en": "Learned patterns such as {titles} are also available.",
+        "ja": "過去の learned pattern（{titles}）も参照できます。",
+        "qps-ploc": "⟦Ŀėȧřñėḓ ṗȧŧŧėřñş şůƈħ ȧş {titles} ȧřė ȧŀşő ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "list_separator": {
+        "en": ", ",
+        "ja": "、",
+        "qps-ploc": "⟦,  ŀőř⟧"
+      },
+      "chronos_a2ui_approval_approved": {
+        "en": "Approval request {id} was approved.",
+        "ja": "承認リクエスト {id} を承認しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ {id} ẇȧş ȧṗṗřőṽėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_a2ui_approval_rejected": {
+        "en": "Approval request {id} was sent back.",
+        "ja": "承認リクエスト {id} を差し戻しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ {id} ẇȧş şėñŧ ƀȧƈķ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_a2ui_intervention_sent": {
+        "en": "Sent the intervention response \"{label}\" to mission {missionId}.",
+        "ja": "ミッション {missionId} へ介入回答「{label}」を送信しました。",
+        "qps-ploc": "⟦Şėñŧ ŧħė ïñŧėřṽėñŧïőñ řėşṗőñşė \"{label}\" ŧő ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_a2ui_intervention_no_target": {
+        "en": "This intervention panel has no target (mission_id / approval_id).",
+        "ja": "この介入パネルには対象（mission_id / approval_id）が指定されていません。",
+        "qps-ploc": "⟦Ŧħïş ïñŧėřṽėñŧïőñ ṗȧñėŀ ħȧş ñő ŧȧřɠėŧ (ɱïşşïőñ_ïḓ / ȧṗṗřőṽȧŀ_ïḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "chronos_a2ui_artifact_no_path": {
+        "en": "This artifact tile has no path.",
+        "ja": "この成果物タイルにはパスがありません。",
+        "qps-ploc": "⟦Ŧħïş ȧřŧïƒȧƈŧ ŧïŀė ħȧş ñő ṗȧŧħ. ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_plan_request_required": {
+        "en": "Enter the request text.",
+        "ja": "依頼文を入力してください",
+        "qps-ploc": "⟦Ėñŧėř ŧħė řėɋůėşŧ ŧėẋŧ. ŀőřėɱ ï⟧"
+      },
+      "chronos_plan_preview_required": {
+        "en": "Create a plan preview first.",
+        "ja": "先に plan preview を作成してください",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ṗŀȧñ ṗřėṽïėẇ ƒïřşŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_plan_preview_stale": {
+        "en": "The input changed, so rerun the plan preview.",
+        "ja": "入力を変更したので plan preview を再実行してください",
+        "qps-ploc": "⟦Ŧħė ïñṗůŧ ƈħȧñɠėḓ, şő řėřůñ ŧħė ṗŀȧñ ṗřėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_deliverable_select_required": {
+        "en": "Select a deliverable.",
+        "ja": "成果物を選択してください",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ḓėŀïṽėřȧƀŀė. ŀőřėɱ ⟧"
       }
     },
     "cli": {
@@ -6639,14 +6694,14 @@
         "qps-ploc": "⟦Ůşėƒůŀ ƒïřşŧ-řůñ ƈőɱɱȧñḓş: ŀőřėɱ ïṗ⟧"
       },
       "cli_help_onboard": {
-        "en": "  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
-        "ja": "  pnpm onboard          # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先",
-        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓ          # ƈůşŧőɱėř/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ƇŮŞŦŐⱮĖŘ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "  pnpm onboarding       # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
+        "ja": "  pnpm onboarding       # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先",
+        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓïñɠ       # ƈůşŧőɱėř/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ƇŮŞŦŐⱮĖŘ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "cli_help_doctor": {
-        "en": "  pnpm doctor          Check environment readiness",
-        "ja": "  pnpm doctor          環境の準備状態を確認",
-        "qps-ploc": "⟦  ṗñṗɱ ḓőƈŧőř          Ƈħėƈķ ėñṽïřőñɱėñŧ řėȧḓïñėşş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "en": "  pnpm kyberion doctor [--scope env|service|voice|meeting|app|setup]  Check environment readiness",
+        "ja": "  pnpm kyberion doctor [--scope env|service|voice|meeting|app|setup]  環境の準備状態を確認",
+        "qps-ploc": "⟦  ṗñṗɱ ķẏƀėřïőñ ḓőƈŧőř [--şƈőṗė ėñṽ|şėřṽïƈė|ṽőïƈė|ɱėėŧïñɠ|ȧṗṗ|şėŧůṗ]  Ƈħėƈķ ėñṽïřőñɱėñŧ řėȧḓïñėşş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_capabilities": {
         "en": "  pnpm capabilities    Check which actuator capabilities fit this environment",
@@ -6787,6 +6842,1556 @@
         "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",
         "ja": "  削除は soft-delete: active/archive/.trash/ へ移動し、janitor が purge するまで復元可能。",
         "qps-ploc": "⟦  Ḓėŀėŧïőñş ȧřė şőƒŧ: ėṽėřẏŧħïñɠ ɱőṽėş ŧő ȧƈŧïṽė/ȧřƈħïṽė/.ŧřȧşħ/ ȧñḓ şŧȧẏş řėşŧőřȧƀŀė ůñŧïŀ ŧħė ĵȧñïŧőř ṗůřɠėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "cli_cmd_operator_home_default": {
+        "en": "Home: status digest and next action",
+        "ja": "ホーム: 状態ダイジェストと次の一手",
+        "qps-ploc": "⟦Ħőɱė: şŧȧŧůş ḓïɠėşŧ ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_operator_home_ask": {
+        "en": "Ask Kyberion in natural language",
+        "ja": "自然文で Kyberion に依頼する",
+        "qps-ploc": "⟦Ȧşķ Ķẏƀėřïőñ ïñ ñȧŧůřȧŀ ŀȧñɠůȧɠė ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_operator_home_procedure": {
+        "en": "List, inspect, repair, promote, or run registered procedures",
+        "ja": "登録済み手順の一覧・確認・修復・昇格・実行",
+        "qps-ploc": "⟦Ŀïşŧ, ïñşṗėƈŧ, řėṗȧïř, ṗřőɱőŧė, őř řůñ řėɠïşŧėřėḓ ṗřőƈėḓůřėş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_operator_home_feedback": {
+        "en": "Record feedback or a correction for a past intent",
+        "ja": "過去の intent へのフィードバックや訂正を記録",
+        "qps-ploc": "⟦Řėƈőřḓ ƒėėḓƀȧƈķ őř ȧ ƈőřřėƈŧïőñ ƒőř ȧ ṗȧşŧ ïñŧėñŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_operator_home_improvements": {
+        "en": "Review improvement candidates",
+        "ja": "改善候補を確認してレビュー",
+        "qps-ploc": "⟦Řėṽïėẇ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_operator_home_record": {
+        "en": "Record an OS demonstration with screen evidence",
+        "ja": "OS 実演を画面証跡つきで記録",
+        "qps-ploc": "⟦Řėƈőřḓ ȧñ ŐŞ ḓėɱőñşŧřȧŧïőñ ẇïŧħ şƈřėėñ ėṽïḓėñƈė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_operator_home_recording": {
+        "en": "Inspect the intent and steps reconstructed from a recording",
+        "ja": "記録から再構成した意図と手順を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ïñŧėñŧ ȧñḓ şŧėṗş řėƈőñşŧřůƈŧėḓ ƒřőɱ ȧ řėƈőřḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_operator_home_inbox": {
+        "en": "Review and accept deliverables in the inbox",
+        "ja": "inbox の成果物を確認して受領",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_home_approvals": {
+        "en": "Review and decide approval requests",
+        "ja": "承認リクエストを確認して裁可",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_operator_home_notify": {
+        "en": "Inspect or configure notification targets",
+        "ja": "通知先を確認・設定",
+        "qps-ploc": "⟦Ïñşṗėƈŧ őř ƈőñƒïɠůřė ñőŧïƒïƈȧŧïőñ ŧȧřɠėŧş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_home_deals": {
+        "en": "List deals and inspect captured requirements",
+        "ja": "商談一覧とヒアリング要件を確認",
+        "qps-ploc": "⟦Ŀïşŧ ḓėȧŀş ȧñḓ ïñşṗėƈŧ ƈȧṗŧůřėḓ řėɋůïřėɱėñŧş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_home_doctor": {
+        "en": "Diagnose health and suggest the next action",
+        "ja": "健全性を診断し次の一手を提示",
+        "qps-ploc": "⟦Ḓïȧɠñőşė ħėȧŀŧħ ȧñḓ şůɠɠėşŧ ŧħė ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_cli_help": {
+        "en": "Show this command list",
+        "ja": "このコマンド一覧を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħïş ƈőɱɱȧñḓ ŀïşŧ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_operator_cli_list": {
+        "en": "List actuators (--check probes runtime capability)",
+        "ja": "アクチュエータ一覧 (--check で実行環境を確認)",
+        "qps-ploc": "⟦Ŀïşŧ ȧƈŧůȧŧőřş (--ƈħėƈķ ṗřőƀėş řůñŧïɱė ƈȧṗȧƀïŀïŧẏ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_operator_cli_search": {
+        "en": "Search actuators by keyword",
+        "ja": "キーワードでアクチュエータを検索",
+        "qps-ploc": "⟦Şėȧřƈħ ȧƈŧůȧŧőřş ƀẏ ķėẏẇőřḓ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_info": {
+        "en": "Show details for one actuator",
+        "ja": "アクチュエータの詳細を表示",
+        "qps-ploc": "⟦Şħőẇ ḓėŧȧïŀş ƒőř őñė ȧƈŧůȧŧőř ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_operator_cli_examples": {
+        "en": "Show runnable actuator examples",
+        "ja": "実行可能なアクチュエータの例を表示",
+        "qps-ploc": "⟦Şħőẇ řůññȧƀŀė ȧƈŧůȧŧőř ėẋȧɱṗŀėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_operator_cli_mobile_profiles": {
+        "en": "List or inspect shared mobile app profiles",
+        "ja": "共有モバイルアプリプロファイルの一覧/詳細",
+        "qps-ploc": "⟦Ŀïşŧ őř ïñşṗėƈŧ şħȧřėḓ ɱőƀïŀė ȧṗṗ ṗřőƒïŀėş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_cli_web_profiles": {
+        "en": "List or inspect shared web app profiles",
+        "ja": "共有 Web アプリプロファイルの一覧/詳細",
+        "qps-ploc": "⟦Ŀïşŧ őř ïñşṗėƈŧ şħȧřėḓ ẇėƀ ȧṗṗ ṗřőƒïŀėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_artifact": {
+        "en": "Inspect a generated artifact",
+        "ja": "生成アーティファクトを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧ ɠėñėřȧŧėḓ ȧřŧïƒȧƈŧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_operator_cli_open_artifact": {
+        "en": "Open a generated artifact in the OS viewer",
+        "ja": "生成アーティファクトを OS 既定ビューアで開く",
+        "qps-ploc": "⟦Őṗėñ ȧ ɠėñėřȧŧėḓ ȧřŧïƒȧƈŧ ïñ ŧħė ŐŞ ṽïėẇėř ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_cli_packet": {
+        "en": "Render an operator packet or status report",
+        "ja": "オペレータパケットや状況報告を表示",
+        "qps-ploc": "⟦Řėñḓėř ȧñ őṗėřȧŧőř ṗȧƈķėŧ őř şŧȧŧůş řėṗőřŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_cli_accept_next_action": {
+        "en": "Execute a suggested next action from a packet",
+        "ja": "パケット内の推奨アクションを実行",
+        "qps-ploc": "⟦Ėẋėƈůŧė ȧ şůɠɠėşŧėḓ ñėẋŧ ȧƈŧïőñ ƒřőɱ ȧ ṗȧƈķėŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_operator_cli_approve": {
+        "en": "Approve a pending request",
+        "ja": "保留中のリクエストを承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ȧ ṗėñḓïñɠ řėɋůėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_reject": {
+        "en": "Reject a pending request",
+        "ja": "保留中のリクエストを却下",
+        "qps-ploc": "⟦Řėĵėƈŧ ȧ ṗėñḓïñɠ řėɋůėşŧ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_operator_cli_email": {
+        "en": "Email workflow: status, drafts, delivery, archive",
+        "ja": "メール業務: 状態・下書き・送信・アーカイブ",
+        "qps-ploc": "⟦Ėɱȧïŀ ẇőřķƒŀőẇ: şŧȧŧůş, ḓřȧƒŧş, ḓėŀïṽėřẏ, ȧřƈħïṽė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_operator_cli_email_status": {
+        "en": "Show email connection and workflow status",
+        "ja": "メール接続と業務の状態を表示",
+        "qps-ploc": "⟦Şħőẇ ėɱȧïŀ ƈőññėƈŧïőñ ȧñḓ ẇőřķƒŀőẇ şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_email_latest_draft": {
+        "en": "Show the latest email draft",
+        "ja": "最新のメール下書きを表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė ŀȧŧėşŧ ėɱȧïŀ ḓřȧƒŧ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_email_draft": {
+        "en": "Draft email replies from a triage file",
+        "ja": "トリアージファイルからメール返信を下書き",
+        "qps-ploc": "⟦Ḓřȧƒŧ ėɱȧïŀ řėṗŀïėş ƒřőɱ ȧ ŧřïȧɠė ƒïŀė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_operator_cli_email_deliver": {
+        "en": "Send an approved email draft",
+        "ja": "承認済みのメール下書きを送信",
+        "qps-ploc": "⟦Şėñḓ ȧñ ȧṗṗřőṽėḓ ėɱȧïŀ ḓřȧƒŧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_operator_cli_email_archive_inbox": {
+        "en": "Archive processed inbox messages",
+        "ja": "処理済みの受信メールをアーカイブ",
+        "qps-ploc": "⟦Ȧřƈħïṽė ṗřőƈėşşėḓ ïñƀőẋ ɱėşşȧɠėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_operator_cli_calendar": {
+        "en": "Calendar workflow: status, agenda, free/busy, events",
+        "ja": "カレンダー業務: 状態・予定・空き時間・予定作成",
+        "qps-ploc": "⟦Ƈȧŀėñḓȧř ẇőřķƒŀőẇ: şŧȧŧůş, ȧɠėñḓȧ, ƒřėė/ƀůşẏ, ėṽėñŧş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_operator_cli_calendar_status": {
+        "en": "Show calendar connection status",
+        "ja": "カレンダー接続の状態を表示",
+        "qps-ploc": "⟦Şħőẇ ƈȧŀėñḓȧř ƈőññėƈŧïőñ şŧȧŧůş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_operator_cli_calendar_list_calendars": {
+        "en": "List available calendars",
+        "ja": "利用可能なカレンダーを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ȧṽȧïŀȧƀŀė ƈȧŀėñḓȧřş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_operator_cli_calendar_agenda": {
+        "en": "Show upcoming agenda",
+        "ja": "今後の予定を表示",
+        "qps-ploc": "⟦Şħőẇ ůṗƈőɱïñɠ ȧɠėñḓȧ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_operator_cli_calendar_freebusy": {
+        "en": "Show free/busy slots",
+        "ja": "空き時間を表示",
+        "qps-ploc": "⟦Şħőẇ ƒřėė/ƀůşẏ şŀőŧş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_operator_cli_calendar_create_event": {
+        "en": "Create a calendar event (approval-gated)",
+        "ja": "カレンダー予定を作成 (承認制)",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ƈȧŀėñḓȧř ėṽėñŧ (ȧṗṗřőṽȧŀ-ɠȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_memory": {
+        "en": "Inspect or capture operator memory",
+        "ja": "オペレータメモリの確認・記録",
+        "qps-ploc": "⟦Ïñşṗėƈŧ őř ƈȧṗŧůřė őṗėřȧŧőř ɱėɱőřẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_operator_cli_task": {
+        "en": "Plan or start a governed cross-tool task",
+        "ja": "複数ツールにまたがるタスクを計画・開始",
+        "qps-ploc": "⟦Ṗŀȧñ őř şŧȧřŧ ȧ ɠőṽėřñėḓ ƈřőşş-ŧőőŀ ŧȧşķ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_task_plan": {
+        "en": "Preview a task plan without executing it",
+        "ja": "実行せずにタスク計画をプレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ȧ ŧȧşķ ṗŀȧñ ẇïŧħőůŧ ėẋėƈůŧïñɠ ïŧ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_task_start": {
+        "en": "Create a governed task session from a plan",
+        "ja": "計画から governed task session を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ɠőṽėřñėḓ ŧȧşķ şėşşïőñ ƒřőɱ ȧ ṗŀȧñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_operator_cli_task_scenario": {
+        "en": "Show task scenario examples",
+        "ja": "タスクシナリオの例を表示",
+        "qps-ploc": "⟦Şħőẇ ŧȧşķ şƈėñȧřïő ėẋȧɱṗŀėş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_offboard": {
+        "en": "Preview or run export-then-delete for a closing tenant or project",
+        "ja": "終了するテナント/プロジェクトの export → 削除を確認・実行",
+        "qps-ploc": "⟦Ṗřėṽïėẇ őř řůñ ėẋṗőřŧ-ŧħėñ-ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ ŧėñȧñŧ őř ṗřőĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_operator_cli_read": {
+        "en": "Read a document (pdf, pptx, docx, xlsx, html, md) as Markdown",
+        "ja": "文書 (pdf/pptx/docx/xlsx/html/md) を Markdown で読む",
+        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_operator_cli_write": {
+        "en": "Author a document from a semantic brief",
+        "ja": "セマンティックブリーフから文書を作成",
+        "qps-ploc": "⟦Ȧůŧħőř ȧ ḓőƈůɱėñŧ ƒřőɱ ȧ şėɱȧñŧïƈ ƀřïėƒ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_diff": {
+        "en": "Compare the design of two documents",
+        "ja": "2 つの文書のデザイン差分を比較",
+        "qps-ploc": "⟦Ƈőɱṗȧřė ŧħė ḓėşïɠñ őƒ ŧẇő ḓőƈůɱėñŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_operator_cli_see": {
+        "en": "Describe an image",
+        "ja": "画像の内容を説明",
+        "qps-ploc": "⟦Ḓėşƈřïƀė ȧñ ïɱȧɠė ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_listen": {
+        "en": "Transcribe audio",
+        "ja": "音声を文字起こし",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀė ȧůḓïő ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_watch": {
+        "en": "Summarize a video",
+        "ja": "動画の内容を要約",
+        "qps-ploc": "⟦Şůɱɱȧřïẑė ȧ ṽïḓėő ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_speak": {
+        "en": "Speak text aloud",
+        "ja": "テキストを読み上げる",
+        "qps-ploc": "⟦Şṗėȧķ ŧėẋŧ ȧŀőůḓ ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_draw": {
+        "en": "Generate an image",
+        "ja": "画像を生成",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ȧñ ïɱȧɠė ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_capture": {
+        "en": "Capture a still image of the screen, a window, or the camera",
+        "ja": "画面・ウィンドウ・カメラの静止画を撮影",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ȧ şŧïŀŀ ïɱȧɠė őƒ ŧħė şƈřėėñ, ȧ ẇïñḓőẇ, őř ŧħė ƈȧɱėřȧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_operator_cli_record_screen": {
+        "en": "Record the screen",
+        "ja": "画面を録画",
+        "qps-ploc": "⟦Řėƈőřḓ ŧħė şƈřėėñ ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_record_audio": {
+        "en": "Record audio",
+        "ja": "音声を録音",
+        "qps-ploc": "⟦Řėƈőřḓ ȧůḓïő ŀőř⟧"
+      },
+      "cli_cmd_operator_cli_record_camera": {
+        "en": "Record the camera",
+        "ja": "カメラを録画",
+        "qps-ploc": "⟦Řėƈőřḓ ŧħė ƈȧɱėřȧ ŀőřėɱ⟧"
+      },
+      "cli_cmd_operator_cli_run": {
+        "en": "Execute an actuator",
+        "ja": "アクチュエータを実行",
+        "qps-ploc": "⟦Ėẋėƈůŧė ȧñ ȧƈŧůȧŧőř ŀőřėɱ ⟧"
+      },
+      "cli_cmd_operator_cli_preview": {
+        "en": "Validate a pipeline JSON and show its step tree",
+        "ja": "パイプライン JSON を検証しステップツリーを表示",
+        "qps-ploc": "⟦Ṽȧŀïḓȧŧė ȧ ṗïṗėŀïñė ĴŞŐÑ ȧñḓ şħőẇ ïŧş şŧėṗ ŧřėė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_operator_cli_intent": {
+        "en": "Deprecated alias of ask (resolve free text into an intent)",
+        "ja": "ask の非推奨エイリアス (自由文を intent に解決)",
+        "qps-ploc": "⟦Ḓėṗřėƈȧŧėḓ ȧŀïȧş őƒ ȧşķ (řėşőŀṽė ƒřėė ŧėẋŧ ïñŧő ȧñ ïñŧėñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_operator_cli_schedule": {
+        "en": "Manage scheduled pipelines",
+        "ja": "定期実行パイプラインを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė şƈħėḓůŀėḓ ṗïṗėŀïñėş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_schedule_list": {
+        "en": "List scheduled pipelines",
+        "ja": "定期実行パイプラインを一覧",
+        "qps-ploc": "⟦Ŀïşŧ şƈħėḓůŀėḓ ṗïṗėŀïñėş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_operator_cli_schedule_register": {
+        "en": "Register a scheduled pipeline",
+        "ja": "定期実行パイプラインを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ şƈħėḓůŀėḓ ṗïṗėŀïñė ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_operator_cli_schedule_remove": {
+        "en": "Remove a scheduled pipeline",
+        "ja": "定期実行パイプラインを削除",
+        "qps-ploc": "⟦Řėɱőṽė ȧ şƈħėḓůŀėḓ ṗïṗėŀïñė ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_project_trust": {
+        "en": "Show project trust requests",
+        "ja": "プロジェクト信頼リクエストを表示",
+        "qps-ploc": "⟦Şħőẇ ṗřőĵėƈŧ ŧřůşŧ řėɋůėşŧş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_operator_cli_project_trust_request": {
+        "en": "Request trust for a project pipeline",
+        "ja": "プロジェクトのパイプラインに信頼を申請",
+        "qps-ploc": "⟦Řėɋůėşŧ ŧřůşŧ ƒőř ȧ ṗřőĵėƈŧ ṗïṗėŀïñė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_pipeline_runner_default": {
+        "en": "Run a governed pipeline",
+        "ja": "governed パイプラインを実行",
+        "qps-ploc": "⟦Řůñ ȧ ɠőṽėřñėḓ ṗïṗėŀïñė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_operator_readiness_vital": {
+        "en": "Check operator readiness (vital signs)",
+        "ja": "オペレータ準備状況 (バイタル) を確認",
+        "qps-ploc": "⟦Ƈħėƈķ őṗėřȧŧőř řėȧḓïñėşş (ṽïŧȧŀ şïɠñş) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_operator_setup_report": {
+        "en": "Report setup status and missing steps",
+        "ja": "セットアップ状況と未完了の手順を報告",
+        "qps-ploc": "⟦Řėṗőřŧ şėŧůṗ şŧȧŧůş ȧñḓ ɱïşşïñɠ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_operator_voice_setup": {
+        "en": "Check and set up voice readiness",
+        "ja": "音声機能の準備状況を確認・設定",
+        "qps-ploc": "⟦Ƈħėƈķ ȧñḓ şėŧ ůṗ ṽőïƈė řėȧḓïñėşş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_organization_model_default": {
+        "en": "Manage the organization operating model and roles",
+        "ja": "組織運営モデルとロールを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ŧħė őřɠȧñïẑȧŧïőñ őṗėřȧŧïñɠ ɱőḓėŀ ȧñḓ řőŀėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_project_controller_default": {
+        "en": "Manage governed projects",
+        "ja": "governed プロジェクトを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ɠőṽėřñėḓ ṗřőĵėƈŧş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_pads": {
+        "en": "Start the local capture pads server",
+        "ja": "ローカルのキャプチャパッドサーバーを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ŀőƈȧŀ ƈȧṗŧůřė ṗȧḓş şėřṽėř ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_test": {
+        "en": "Run the test suite",
+        "ja": "テストスイートを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ŧėşŧ şůïŧė ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_test_unit": {
+        "en": "Run the unit test suite",
+        "ja": "ユニットテストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ůñïŧ ŧėşŧ şůïŧė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_lint": {
+        "en": "Run ESLint",
+        "ja": "ESLint を実行",
+        "qps-ploc": "⟦Řůñ ĖŞĿïñŧ ŀőř⟧"
+      },
+      "cli_cmd_script_format": {
+        "en": "Format the repository with Prettier",
+        "ja": "Prettier でリポジトリを整形",
+        "qps-ploc": "⟦Ƒőřɱȧŧ ŧħė řėṗőşïŧőřẏ ẇïŧħ Ṗřėŧŧïėř ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_build": {
+        "en": "Build everything (packages, actuators, repo, UI)",
+        "ja": "全体をビルド (パッケージ・アクチュエータ・リポジトリ・UI)",
+        "qps-ploc": "⟦Ƀůïŀḓ ėṽėřẏŧħïñɠ (ṗȧƈķȧɠėş, ȧƈŧůȧŧőřş, řėṗő, ŮÏ) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_build_packages": {
+        "en": "Build shared packages",
+        "ja": "共有パッケージをビルド",
+        "qps-ploc": "⟦Ƀůïŀḓ şħȧřėḓ ṗȧƈķȧɠėş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_build_actuators": {
+        "en": "Build actuators",
+        "ja": "アクチュエータをビルド",
+        "qps-ploc": "⟦Ƀůïŀḓ ȧƈŧůȧŧőřş ŀőřė⟧"
+      },
+      "cli_cmd_script_build_bundle": {
+        "en": "Bundle hot script entry points",
+        "ja": "主要スクリプトのエントリをバンドル",
+        "qps-ploc": "⟦Ƀůñḓŀė ħőŧ şƈřïṗŧ ėñŧřẏ ṗőïñŧş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_build_repo": {
+        "en": "Compile repository TypeScript",
+        "ja": "リポジトリの TypeScript をコンパイル",
+        "qps-ploc": "⟦Ƈőɱṗïŀė řėṗőşïŧőřẏ ŦẏṗėŞƈřïṗŧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_build_ui": {
+        "en": "Build the UI apps",
+        "ja": "UI アプリをビルド",
+        "qps-ploc": "⟦Ƀůïŀḓ ŧħė ŮÏ ȧṗṗş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_audit_mirror_reconcile": {
+        "en": "Reconcile customer audit mirrors against the master chain",
+        "ja": "顧客監査ミラーをマスターチェーンと突き合わせる",
+        "qps-ploc": "⟦Řėƈőñƈïŀė ƈůşŧőɱėř ȧůḓïŧ ɱïřřőřş ȧɠȧïñşŧ ŧħė ɱȧşŧėř ƈħȧïñ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_generate_op_registry": {
+        "en": "Regenerate the actuator op registry",
+        "ja": "アクチュエータ op レジストリを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧƈŧůȧŧőř őṗ řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_generate_vocabulary_types": {
+        "en": "Regenerate vocabulary key types",
+        "ja": "語彙キーの型を再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ṽőƈȧƀůŀȧřẏ ķėẏ ŧẏṗėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_generate_pseudo_locale": {
+        "en": "Regenerate the pseudo-locale catalog",
+        "ja": "疑似ロケールのカタログを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ṗşėůḓő-ŀőƈȧŀė ƈȧŧȧŀőɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_service_harness": {
+        "en": "Run the service harness",
+        "ja": "サービスハーネスを実行",
+        "qps-ploc": "⟦Řůñ ŧħė şėřṽïƈė ħȧřñėşş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_check_chronos_perf": {
+        "en": "Check Chronos performance baseline (browser)",
+        "ja": "Chronos の性能ベースラインを確認 (ブラウザ)",
+        "qps-ploc": "⟦Ƈħėƈķ Ƈħřőñőş ṗėřƒőřɱȧñƈė ƀȧşėŀïñė (ƀřőẇşėř) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_check_plugin_views_e2e": {
+        "en": "End-to-end check of Chronos plugin views",
+        "ja": "Chronos プラグインビューの E2E 確認",
+        "qps-ploc": "⟦Ėñḓ-ŧő-ėñḓ ƈħėƈķ őƒ Ƈħřőñőş ṗŀůɠïñ ṽïėẇş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_service_recording": {
+        "en": "Run the service recording flow",
+        "ja": "サービス記録フローを実行",
+        "qps-ploc": "⟦Řůñ ŧħė şėřṽïƈė řėƈőřḓïñɠ ƒŀőẇ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_generate_cli_reference": {
+        "en": "Regenerate the CLI command reference page",
+        "ja": "CLI コマンドリファレンスのページを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ƇĿÏ ƈőɱɱȧñḓ řėƒėřėñƈė ṗȧɠė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_docs_check": {
+        "en": "Check docs for stale commands, broken links and unlisted pipelines",
+        "ja": "docs の存在しないコマンド・リンク切れ・未掲載パイプラインを検査",
+        "qps-ploc": "⟦Ƈħėƈķ ḓőƈş ƒőř şŧȧŀė ƈőɱɱȧñḓş, ƀřőķėñ ŀïñķş ȧñḓ ůñŀïşŧėḓ ṗïṗėŀïñėş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_generate_env_registry": {
+        "en": "Regenerate the environment variable registry",
+        "ja": "環境変数レジストリを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ėñṽïřőñɱėñŧ ṽȧřïȧƀŀė řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_config_report": {
+        "en": "Report operational configuration",
+        "ja": "運用設定を報告",
+        "qps-ploc": "⟦Řėṗőřŧ őṗėřȧŧïőñȧŀ ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_agents_generate": {
+        "en": "Regenerate provider subagent definitions",
+        "ja": "プロバイダのサブエージェント定義を再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ṗřőṽïḓėř şůƀȧɠėñŧ ḓėƒïñïŧïőñş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_check_apple_fm": {
+        "en": "Check on-device Apple Intelligence availability",
+        "ja": "オンデバイス Apple Intelligence の利用可否を確認",
+        "qps-ploc": "⟦Ƈħėƈķ őñ-ḓėṽïƈė Ȧṗṗŀė Ïñŧėŀŀïɠėñƈė ȧṽȧïŀȧƀïŀïŧẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_auth_check": {
+        "en": "Check reasoning backend authentication",
+        "ja": "推論バックエンドの認証を確認",
+        "qps-ploc": "⟦Ƈħėƈķ řėȧşőñïñɠ ƀȧƈķėñḓ ȧůŧħėñŧïƈȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_check_backend_conformance": {
+        "en": "Check reasoning backend conformance",
+        "ja": "推論バックエンドの適合性を確認",
+        "qps-ploc": "⟦Ƈħėƈķ řėȧşőñïñɠ ƀȧƈķėñḓ ƈőñƒőřɱȧñƈė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_inventory_resource_loaders": {
+        "en": "Inventory resource loader helpers",
+        "ja": "リソースローダー補助関数を棚卸し",
+        "qps-ploc": "⟦Ïñṽėñŧőřẏ řėşőůřƈė ŀőȧḓėř ħėŀṗėřş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_check_script_integrity": {
+        "en": "Check package script integrity",
+        "ja": "パッケージスクリプトの整合性を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ṗȧƈķȧɠė şƈřïṗŧ ïñŧėɠřïŧẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_check_improvement_plan_metadata": {
+        "en": "Check improvement plan metadata",
+        "ja": "改善計画のメタデータを確認",
+        "qps-ploc": "⟦Ƈħėƈķ ïɱṗřőṽėɱėñŧ ṗŀȧñ ɱėŧȧḓȧŧȧ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_report_i18n_coverage": {
+        "en": "Report translation coverage",
+        "ja": "翻訳カバレッジを報告",
+        "qps-ploc": "⟦Řėṗőřŧ ŧřȧñşŀȧŧïőñ ƈőṽėřȧɠė ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_sync_component_inventory": {
+        "en": "Sync the actuator component inventory",
+        "ja": "アクチュエータのコンポーネント棚卸しを同期",
+        "qps-ploc": "⟦Şẏñƈ ŧħė ȧƈŧůȧŧőř ƈőɱṗőñėñŧ ïñṽėñŧőřẏ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_sync_model_registry": {
+        "en": "Sync the model registry",
+        "ja": "モデルレジストリを同期",
+        "qps-ploc": "⟦Şẏñƈ ŧħė ɱőḓėŀ řėɠïşŧřẏ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_tenant": {
+        "en": "Manage tenants",
+        "ja": "テナントを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ŧėñȧñŧş ŀőřė⟧"
+      },
+      "cli_cmd_script_tenant_activation": {
+        "en": "Check or complete tenant activation",
+        "ja": "テナントの有効化を確認・完了",
+        "qps-ploc": "⟦Ƈħėƈķ őř ƈőɱṗŀėŧė ŧėñȧñŧ ȧƈŧïṽȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_migrate_physical_namespaces": {
+        "en": "Plan or apply the physical tenant namespace migration",
+        "ja": "物理テナント名前空間への移行を計画・適用",
+        "qps-ploc": "⟦Ṗŀȧñ őř ȧṗṗŀẏ ŧħė ṗħẏşïƈȧŀ ŧėñȧñŧ ñȧɱėşṗȧƈė ɱïɠřȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_migrate_peer_tenant_runtime": {
+        "en": "Plan or apply the peer runtime tenant migration",
+        "ja": "ピアランタイムのテナント移行を計画・適用",
+        "qps-ploc": "⟦Ṗŀȧñ őř ȧṗṗŀẏ ŧħė ṗėėř řůñŧïɱė ŧėñȧñŧ ɱïɠřȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_peer_runtime_recovery": {
+        "en": "Recover the peer runtime",
+        "ja": "ピアランタイムを復旧",
+        "qps-ploc": "⟦Řėƈőṽėř ŧħė ṗėėř řůñŧïɱė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_organization": {
+        "en": "Organization facade (same target as kyberion organization)",
+        "ja": "組織ファサード (kyberion organization と同じ実体)",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ƒȧƈȧḓė (şȧɱė ŧȧřɠėŧ ȧş ķẏƀėřïőñ őřɠȧñïẑȧŧïőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_knowledge_rank": {
+        "en": "Rank knowledge for a context",
+        "ja": "コンテキストに対して knowledge をランク付け",
+        "qps-ploc": "⟦Řȧñķ ķñőẇŀėḓɠė ƒőř ȧ ƈőñŧėẋŧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_knowledge": {
+        "en": "Manage knowledge",
+        "ja": "knowledge を管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ķñőẇŀėḓɠė ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_knowledge_feedback": {
+        "en": "Record knowledge feedback",
+        "ja": "knowledge へのフィードバックを記録",
+        "qps-ploc": "⟦Řėƈőřḓ ķñőẇŀėḓɠė ƒėėḓƀȧƈķ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_knowledge_scope_health": {
+        "en": "Report tenant knowledge scope health",
+        "ja": "テナント knowledge スコープの健全性を報告",
+        "qps-ploc": "⟦Řėṗőřŧ ŧėñȧñŧ ķñőẇŀėḓɠė şƈőṗė ħėȧŀŧħ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_knowledge_scope_reconcile": {
+        "en": "Reconcile tenant knowledge scopes",
+        "ja": "テナント knowledge スコープを整合",
+        "qps-ploc": "⟦Řėƈőñƈïŀė ŧėñȧñŧ ķñőẇŀėḓɠė şƈőṗėş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_scope": {
+        "en": "Inspect the active scope",
+        "ja": "現在のスコープを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ȧƈŧïṽė şƈőṗė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_bindings": {
+        "en": "Inspect the runtime seam catalog",
+        "ja": "ランタイムのシームカタログを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė řůñŧïɱė şėȧɱ ƈȧŧȧŀőɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_generate_capability_seams": {
+        "en": "Regenerate the capability seam graph",
+        "ja": "ケイパビリティのシームグラフを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ƈȧṗȧƀïŀïŧẏ şėȧɱ ɠřȧṗħ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_check": {
+        "en": "Run repository checks (pnpm check -- --scope pr before a PR)",
+        "ja": "リポジトリのチェックを実行 (PR 前は --scope pr)",
+        "qps-ploc": "⟦Řůñ řėṗőşïŧőřẏ ƈħėƈķş (ṗñṗɱ ƈħėƈķ -- --şƈőṗė ṗř ƀėƒőřė ȧ ṖŘ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_knowledge_sync": {
+        "en": "Run the knowledge sync pipeline",
+        "ja": "knowledge 同期パイプラインを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ķñőẇŀėḓɠė şẏñƈ ṗïṗėŀïñė ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_check_contract_semver": {
+        "en": "Check contract semver changes",
+        "ja": "契約の semver 変更を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ƈőñŧřȧƈŧ şėɱṽėř ƈħȧñɠėş ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_check_pr_title": {
+        "en": "Check a PR title against Conventional Commits",
+        "ja": "PR タイトルが Conventional Commits に従うか確認",
+        "qps-ploc": "⟦Ƈħėƈķ ȧ ṖŘ ŧïŧŀė ȧɠȧïñşŧ Ƈőñṽėñŧïőñȧŀ Ƈőɱɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_pr_create": {
+        "en": "Open a GitHub pull request after the readiness gates",
+        "ja": "準備ゲートを通してから GitHub の PR を作成",
+        "qps-ploc": "⟦Őṗėñ ȧ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ ȧƒŧėř ŧħė řėȧḓïñėşş ɠȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_check_commit_subject": {
+        "en": "Check the HEAD commit subject",
+        "ja": "HEAD のコミット件名を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ĦĖȦḒ ƈőɱɱïŧ şůƀĵėƈŧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_task_list": {
+        "en": "List tasks",
+        "ja": "タスクを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ŧȧşķş ŀőř⟧"
+      },
+      "cli_cmd_script_task_init": {
+        "en": "Initialize a task",
+        "ja": "タスクを初期化",
+        "qps-ploc": "⟦Ïñïŧïȧŀïẑė ȧ ŧȧşķ ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_task_run": {
+        "en": "Run a task",
+        "ja": "タスクを実行",
+        "qps-ploc": "⟦Řůñ ȧ ŧȧşķ ŀőř⟧"
+      },
+      "cli_cmd_script_task_smoke": {
+        "en": "Run the task smoke test",
+        "ja": "タスクのスモークテストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ŧȧşķ şɱőķė ŧėşŧ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_intent_trace": {
+        "en": "Trace intent resolution",
+        "ja": "intent の解決過程をトレース",
+        "qps-ploc": "⟦Ŧřȧƈė ïñŧėñŧ řėşőŀůŧïőñ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_onboarding_context": {
+        "en": "Resolve tenant and organization context for onboarding",
+        "ja": "オンボーディング用のテナント/組織コンテキストを解決",
+        "qps-ploc": "⟦Řėşőŀṽė ŧėñȧñŧ ȧñḓ őřɠȧñïẑȧŧïőñ ƈőñŧėẋŧ ƒőř őñƀőȧřḓïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_minutes_record": {
+        "en": "Record a meeting from the microphone into minutes",
+        "ja": "マイク録音から議事録を作成",
+        "qps-ploc": "⟦Řėƈőřḓ ȧ ɱėėŧïñɠ ƒřőɱ ŧħė ɱïƈřőṗħőñė ïñŧő ɱïñůŧėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_license_audit": {
+        "en": "Audit third-party licenses",
+        "ja": "サードパーティライセンスを監査",
+        "qps-ploc": "⟦Ȧůḓïŧ ŧħïřḓ-ṗȧřŧẏ ŀïƈėñşėş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_voice_upgrade": {
+        "en": "Upgrade the voice tier",
+        "ja": "音声ティアをアップグレード",
+        "qps-ploc": "⟦Ůṗɠřȧḓė ŧħė ṽőïƈė ŧïėř ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_generate_pii_rules": {
+        "en": "Regenerate PII rules",
+        "ja": "PII ルールを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ṖÏÏ řůŀėş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_meeting_preflight": {
+        "en": "Check meeting readiness",
+        "ja": "会議機能の準備状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ɱėėŧïñɠ řėȧḓïñėşş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_dev_watch": {
+        "en": "Watch core tests",
+        "ja": "コアのテストを監視実行",
+        "qps-ploc": "⟦Ẇȧŧƈħ ƈőřė ŧėşŧş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_smoke_intent": {
+        "en": "Run the intent smoke test",
+        "ja": "intent のスモークテストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ïñŧėñŧ şɱőķė ŧėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_watch_tenant_drift": {
+        "en": "Watch for tenant drift",
+        "ja": "テナントのドリフトを監視",
+        "qps-ploc": "⟦Ẇȧŧƈħ ƒőř ŧėñȧñŧ ḓřïƒŧ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_pipeline_promote": {
+        "en": "Promote a successful one-off run into a pipeline",
+        "ja": "成功した単発実行をパイプラインに昇格",
+        "qps-ploc": "⟦Ṗřőɱőŧė ȧ şůƈƈėşşƒůŀ őñė-őƒƒ řůñ ïñŧő ȧ ṗïṗėŀïñė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_inventory": {
+        "en": "Manage the work inventory",
+        "ja": "業務棚卸しを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ŧħė ẇőřķ ïñṽėñŧőřẏ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_patch_dependency": {
+        "en": "Apply a governed dependency patch",
+        "ja": "governed な依存パッチを適用",
+        "qps-ploc": "⟦Ȧṗṗŀẏ ȧ ɠőṽėřñėḓ ḓėṗėñḓėñƈẏ ṗȧŧƈħ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_manifests_sign": {
+        "en": "Sign governed environment manifests",
+        "ja": "governed 環境マニフェストに署名",
+        "qps-ploc": "⟦Şïɠñ ɠőṽėřñėḓ ėñṽïřőñɱėñŧ ɱȧñïƒėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_secrets_encrypt": {
+        "en": "Encrypt (or --decrypt) connection documents",
+        "ja": "接続ドキュメントを暗号化 (--decrypt で復号)",
+        "qps-ploc": "⟦Ėñƈřẏṗŧ (őř --ḓėƈřẏṗŧ) ƈőññėƈŧïőñ ḓőƈůɱėñŧş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_workspace_list": {
+        "en": "List workspace ledger entries",
+        "ja": "ワークスペース台帳を一覧",
+        "qps-ploc": "⟦Ŀïşŧ ẇőřķşṗȧƈė ŀėḓɠėř ėñŧřïėş ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_workspace_gc": {
+        "en": "Garbage-collect stale workspaces",
+        "ja": "古いワークスペースを回収",
+        "qps-ploc": "⟦Ɠȧřƀȧɠė-ƈőŀŀėƈŧ şŧȧŀė ẇőřķşṗȧƈėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_secret_introduce": {
+        "en": "Introduce a secret through a hidden prompt",
+        "ja": "非表示入力でシークレットを登録",
+        "qps-ploc": "⟦Ïñŧřőḓůƈė ȧ şėƈřėŧ ŧħřőůɠħ ȧ ħïḓḓėñ ṗřőɱṗŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_secret_status": {
+        "en": "Show secret status",
+        "ja": "シークレットの状態を表示",
+        "qps-ploc": "⟦Şħőẇ şėƈřėŧ şŧȧŧůş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_secret_apply": {
+        "en": "Apply an introduced secret",
+        "ja": "登録済みシークレットを適用",
+        "qps-ploc": "⟦Ȧṗṗŀẏ ȧñ ïñŧřőḓůƈėḓ şėƈřėŧ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_cost_report": {
+        "en": "Report usage cost",
+        "ja": "利用コストを報告",
+        "qps-ploc": "⟦Řėṗőřŧ ůşȧɠė ƈőşŧ ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_egress_report": {
+        "en": "Report egress warnings",
+        "ja": "外部送信の警告を報告",
+        "qps-ploc": "⟦Řėṗőřŧ ėɠřėşş ẇȧřñïñɠş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_daemon_watchdog": {
+        "en": "Check long-lived daemons",
+        "ja": "常駐デーモンを確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŀőñɠ-ŀïṽėḓ ḓȧėɱőñş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_mesh_deliver": {
+        "en": "Drive Mesh Hub delivery",
+        "ja": "Mesh Hub の配送を実行",
+        "qps-ploc": "⟦Ḓřïṽė Ɱėşħ Ħůƀ ḓėŀïṽėřẏ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_campaign_suite": {
+        "en": "Run the campaign suite",
+        "ja": "キャンペーンスイートを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ƈȧɱṗȧïɠñ şůïŧė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_audit_verify": {
+        "en": "Verify the audit chain",
+        "ja": "監査チェーンを検証",
+        "qps-ploc": "⟦Ṽėřïƒẏ ŧħė ȧůḓïŧ ƈħȧïñ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_ai_test": {
+        "en": "Run the AI audit test layer",
+        "ja": "AI 監査テスト層を実行",
+        "qps-ploc": "⟦Řůñ ŧħė ȦÏ ȧůḓïŧ ŧėşŧ ŀȧẏėř ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_generate_knowledge_index": {
+        "en": "Regenerate the knowledge index",
+        "ja": "knowledge インデックスを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ķñőẇŀėḓɠė ïñḓėẋ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_history_search": {
+        "en": "Search history",
+        "ja": "履歴を検索",
+        "qps-ploc": "⟦Şėȧřƈħ ħïşŧőřẏ ŀőřė⟧"
+      },
+      "cli_cmd_script_scenario": {
+        "en": "Run scenario files",
+        "ja": "シナリオファイルを実行",
+        "qps-ploc": "⟦Řůñ şƈėñȧřïő ƒïŀėş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_plugin_install": {
+        "en": "Install a skill plugin (provenance-gated)",
+        "ja": "スキルプラグインをインストール (出所確認あり)",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ȧ şķïŀŀ ṗŀůɠïñ (ṗřőṽėñȧñƈė-ɠȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_background_review": {
+        "en": "Run background review maintenance",
+        "ja": "バックグラウンドレビューの保守を実行",
+        "qps-ploc": "⟦Řůñ ƀȧƈķɠřőůñḓ řėṽïėẇ ɱȧïñŧėñȧñƈė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_background_review_mission_e2e": {
+        "en": "Run the background review mission E2E",
+        "ja": "バックグラウンドレビューのミッション E2E を実行",
+        "qps-ploc": "⟦Řůñ ŧħė ƀȧƈķɠřőůñḓ řėṽïėẇ ɱïşşïőñ Ė2Ė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_automation_blueprint": {
+        "en": "Preview an automation blueprint",
+        "ja": "自動化ブループリントをプレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ȧñ ȧůŧőɱȧŧïőñ ƀŀůėṗřïñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_mesh_hub_inspect": {
+        "en": "Inspect the Mesh Hub",
+        "ja": "Mesh Hub を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė Ɱėşħ Ħůƀ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_export_validation_bundle": {
+        "en": "Export the validation evidence bundle",
+        "ja": "検証エビデンスバンドルを書き出し",
+        "qps-ploc": "⟦Ėẋṗőřŧ ŧħė ṽȧŀïḓȧŧïőñ ėṽïḓėñƈė ƀůñḓŀė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_meeting_run": {
+        "en": "Run the meeting orchestrator",
+        "ja": "会議オーケストレーターを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ɱėėŧïñɠ őřƈħėşŧřȧŧőř ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_meeting_participate": {
+        "en": "Join a meeting as a participant",
+        "ja": "参加者として会議に参加",
+        "qps-ploc": "⟦Ĵőïñ ȧ ɱėėŧïñɠ ȧş ȧ ṗȧřŧïƈïṗȧñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_gws_meet_create": {
+        "en": "Create a Google Meet",
+        "ja": "Google Meet を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ Ɠőőɠŀė Ɱėėŧ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_env_bootstrap": {
+        "en": "Bootstrap the local environment",
+        "ja": "ローカル環境をブートストラップ",
+        "qps-ploc": "⟦Ƀőőŧşŧřȧṗ ŧħė ŀőƈȧŀ ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_meeting_consent": {
+        "en": "Capture voice consent",
+        "ja": "音声利用の同意を記録",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ṽőïƈė ƈőñşėñŧ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_voice_route": {
+        "en": "Show or set voice routing",
+        "ja": "音声ルーティングを表示・設定",
+        "qps-ploc": "⟦Şħőẇ őř şėŧ ṽőïƈė řőůŧïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_voice_conversation_config": {
+        "en": "Show realtime voice conversation config",
+        "ja": "リアルタイム音声会話の設定を表示",
+        "qps-ploc": "⟦Şħőẇ řėȧŀŧïɱė ṽőïƈė ƈőñṽėřşȧŧïőñ ƈőñƒïɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_typecheck": {
+        "en": "Typecheck the repository",
+        "ja": "リポジトリを型チェック",
+        "qps-ploc": "⟦Ŧẏṗėƈħėƈķ ŧħė řėṗőşïŧőřẏ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_validate": {
+        "en": "Build, typecheck, and run full checks",
+        "ja": "ビルド・型チェック・全チェックを実行",
+        "qps-ploc": "⟦Ƀůïŀḓ, ŧẏṗėƈħėƈķ, ȧñḓ řůñ ƒůŀŀ ƈħėƈķş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_doctor": {
+        "en": "Health rollup (same target as kyberion doctor)",
+        "ja": "健全性ロールアップ (kyberion doctor と同じ実体)",
+        "qps-ploc": "⟦Ħėȧŀŧħ řőŀŀůṗ (şȧɱė ŧȧřɠėŧ ȧş ķẏƀėřïőñ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_office": {
+        "en": "Open the Virtual Office surface",
+        "ja": "バーチャルオフィスを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė Ṽïřŧůȧŀ Őƒƒïƈė şůřƒȧƈė ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_tui": {
+        "en": "Open the terminal HUD",
+        "ja": "ターミナル HUD を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ŧėřɱïñȧŀ ĦŮḒ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_deps_check": {
+        "en": "Check dependencies",
+        "ja": "依存関係を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ḓėṗėñḓėñƈïėş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_media_visual_proof_ds04": {
+        "en": "Generate the DS-04 video visual proof",
+        "ja": "DS-04 動画のビジュアル検証を生成",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ŧħė ḒŞ-04 ṽïḓėő ṽïşůȧŀ ṗřőőƒ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_service_preflight": {
+        "en": "Check service readiness",
+        "ja": "サービスの準備状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ şėřṽïƈė řėȧḓïñėşş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_browser_run": {
+        "en": "Run a browser procedure or ADF",
+        "ja": "ブラウザ手順や ADF を実行",
+        "qps-ploc": "⟦Řůñ ȧ ƀřőẇşėř ṗřőƈėḓůřė őř ȦḒƑ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_browser_inspect": {
+        "en": "Inspect a browser page",
+        "ja": "ブラウザのページを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧ ƀřőẇşėř ṗȧɠė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_browser_profiles": {
+        "en": "List browser profiles",
+        "ja": "ブラウザプロファイルを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ƀřőẇşėř ṗřőƒïŀėş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_browser_open": {
+        "en": "Open a browser profile",
+        "ja": "ブラウザプロファイルを開く",
+        "qps-ploc": "⟦Őṗėñ ȧ ƀřőẇşėř ṗřőƒïŀė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_browser_create": {
+        "en": "Create a browser profile",
+        "ja": "ブラウザプロファイルを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ƀřőẇşėř ṗřőƒïŀė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_vault_mount": {
+        "en": "Mount a vault",
+        "ja": "ボールトをマウント",
+        "qps-ploc": "⟦Ɱőůñŧ ȧ ṽȧůŀŧ ŀőřė⟧"
+      },
+      "cli_cmd_script_vault_unmount": {
+        "en": "Unmount a vault",
+        "ja": "ボールトをアンマウント",
+        "qps-ploc": "⟦Ůñɱőůñŧ ȧ ṽȧůŀŧ ŀőřė⟧"
+      },
+      "cli_cmd_script_vault_list": {
+        "en": "List vault mounts",
+        "ja": "ボールトのマウントを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ṽȧůŀŧ ɱőůñŧş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_vault_cleanup": {
+        "en": "Clean up vault mounts",
+        "ja": "ボールトのマウントを片付け",
+        "qps-ploc": "⟦Ƈŀėȧñ ůṗ ṽȧůŀŧ ɱőůñŧş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_kyberion": {
+        "en": "The kyberion CLI itself",
+        "ja": "kyberion CLI 本体",
+        "qps-ploc": "⟦Ŧħė ķẏƀėřïőñ ƇĿÏ ïŧşėŀƒ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_email_workflow": {
+        "en": "Run the email workflow",
+        "ja": "メール業務を実行",
+        "qps-ploc": "⟦Řůñ ŧħė ėɱȧïŀ ẇőřķƒŀőẇ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_mission": {
+        "en": "Mission lifecycle: start, checkpoint, finish",
+        "ja": "ミッションのライフサイクル: 開始・チェックポイント・完了",
+        "qps-ploc": "⟦Ɱïşşïőñ ŀïƒėƈẏƈŀė: şŧȧřŧ, ƈħėƈķṗőïñŧ, ƒïñïşħ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_project": {
+        "en": "Project controller (same target as kyberion project)",
+        "ja": "プロジェクト管理 (kyberion project と同じ実体)",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ƈőñŧřőŀŀėř (şȧɱė ŧȧřɠėŧ ȧş ķẏƀėřïőñ ṗřőĵėƈŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_create_actuator": {
+        "en": "Scaffold a new actuator",
+        "ja": "新しいアクチュエータの雛形を作成",
+        "qps-ploc": "⟦Şƈȧƒƒőŀḓ ȧ ñėẇ ȧƈŧůȧŧőř ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_review_stamp": {
+        "en": "Stamp or strip the review layer in an HTML file",
+        "ja": "HTML ファイルにレビューレイヤを焼き込む/剥がす",
+        "qps-ploc": "⟦Şŧȧɱṗ őř şŧřïṗ ŧħė řėṽïėẇ ŀȧẏėř ïñ ȧñ ĦŦⱮĿ ƒïŀė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_sketch_input_server": {
+        "en": "Start the sketch input pad",
+        "ja": "スケッチ入力パッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė şķėŧƈħ ïñṗůŧ ṗȧḓ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_meeting_notepad_server": {
+        "en": "Start the meeting notepad pad",
+        "ja": "会議メモパッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ɱėėŧïñɠ ñőŧėṗȧḓ ṗȧḓ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_memory_capture_server": {
+        "en": "Start the memory capture pad",
+        "ja": "メモリキャプチャパッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ɱėɱőřẏ ƈȧṗŧůřė ṗȧḓ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_screenshot_annotate_server": {
+        "en": "Start the screenshot annotation pad",
+        "ja": "スクリーンショット注釈パッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė şƈřėėñşħőŧ ȧññőŧȧŧïőñ ṗȧḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_clipboard_inbox_server": {
+        "en": "Start the clipboard inbox pad",
+        "ja": "クリップボード inbox パッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ƈŀïṗƀőȧřḓ ïñƀőẋ ṗȧḓ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_daily_desk_server": {
+        "en": "Start the daily desk pad",
+        "ja": "デイリーデスクパッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ḓȧïŀẏ ḓėşķ ṗȧḓ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_doc_drop_server": {
+        "en": "Start the document drop pad",
+        "ja": "ドキュメントドロップパッドを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ḓőƈůɱėñŧ ḓřőṗ ṗȧḓ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_personal_workbench_server": {
+        "en": "Start the personal workbench",
+        "ja": "パーソナルワークベンチを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ṗėřşőñȧŀ ẇőřķƀėñƈħ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_model_feedback": {
+        "en": "Record model feedback",
+        "ja": "モデルへのフィードバックを記録",
+        "qps-ploc": "⟦Řėƈőřḓ ɱőḓėŀ ƒėėḓƀȧƈķ ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_agent_runtime_supervisor": {
+        "en": "Run the agent runtime supervisor",
+        "ja": "エージェントランタイムのスーパーバイザーを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ȧɠėñŧ řůñŧïɱė şůṗėřṽïşőř ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_agent_runtime_daemon": {
+        "en": "Run the agent runtime supervisor daemon",
+        "ja": "エージェントランタイムのスーパーバイザーデーモンを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ȧɠėñŧ řůñŧïɱė şůṗėřṽïşőř ḓȧėɱőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_peer_conversation_server": {
+        "en": "Start the peer conversation server",
+        "ja": "ピア会話サーバーを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ṗėėř ƈőñṽėřşȧŧïőñ şėřṽėř ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_peer_register": {
+        "en": "Register this runtime with the peer network",
+        "ja": "このランタイムをピアネットワークに登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħïş řůñŧïɱė ẇïŧħ ŧħė ṗėėř ñėŧẇőřķ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_peer_conversation": {
+        "en": "Converse with a peer runtime",
+        "ja": "ピアランタイムと会話",
+        "qps-ploc": "⟦Ƈőñṽėřşė ẇïŧħ ȧ ṗėėř řůñŧïɱė ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_peer_collaboration": {
+        "en": "Run a peer collaboration",
+        "ja": "ピア協働を実行",
+        "qps-ploc": "⟦Řůñ ȧ ṗėėř ƈőŀŀȧƀőřȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_peer_send": {
+        "en": "Send a peer message",
+        "ja": "ピアにメッセージを送信",
+        "qps-ploc": "⟦Şėñḓ ȧ ṗėėř ɱėşşȧɠė ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_work": {
+        "en": "Coordinate work items",
+        "ja": "ワークアイテムを調整",
+        "qps-ploc": "⟦Ƈőőřḓïñȧŧė ẇőřķ ïŧėɱş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_mission_orchestrator": {
+        "en": "Run the mission orchestration event worker",
+        "ja": "ミッションのオーケストレーションイベントワーカーを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ɱïşşïőñ őřƈħėşŧřȧŧïőñ ėṽėñŧ ẇőřķėř ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_onboard": {
+        "en": "Run the onboarding wizard (identity, services, tenant)",
+        "ja": "オンボーディングウィザードを実行 (アイデンティティ・サービス・テナント)",
+        "qps-ploc": "⟦Řůñ ŧħė őñƀőȧřḓïñɠ ẇïẑȧřḓ (ïḓėñŧïŧẏ, şėřṽïƈėş, ŧėñȧñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_mission_journal": {
+        "en": "Show the mission journal",
+        "ja": "ミッションジャーナルを表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė ɱïşşïőñ ĵőůřñȧŀ ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_ingest": {
+        "en": "Ingest a file into tenant knowledge",
+        "ja": "ファイルをテナントの knowledge に取り込む",
+        "qps-ploc": "⟦Ïñɠėşŧ ȧ ƒïŀė ïñŧő ŧėñȧñŧ ķñőẇŀėḓɠė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_dashboard": {
+        "en": "Open the sovereign dashboard",
+        "ja": "ソブリンダッシュボードを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė şőṽėřėïɠñ ḓȧşħƀőȧřḓ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_control": {
+        "en": "Control plane CLI",
+        "ja": "コントロールプレーン CLI",
+        "qps-ploc": "⟦Ƈőñŧřőŀ ṗŀȧñė ƇĿÏ ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_surfaces": {
+        "en": "Manage runtime surfaces",
+        "ja": "ランタイムサーフェスを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė řůñŧïɱė şůřƒȧƈėş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_config_mission": {
+        "en": "Run a configuration mission",
+        "ja": "設定ミッションを実行",
+        "qps-ploc": "⟦Řůñ ȧ ƈőñƒïɠůřȧŧïőñ ɱïşşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_services_setup": {
+        "en": "Set up external service connections",
+        "ja": "外部サービス接続をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ėẋŧėřñȧŀ şėřṽïƈė ƈőññėƈŧïőñş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_channels_list": {
+        "en": "List channels",
+        "ja": "チャネルを一覧",
+        "qps-ploc": "⟦Ŀïşŧ ƈħȧññėŀş ŀőřė⟧"
+      },
+      "cli_cmd_script_generation_schedule": {
+        "en": "Run the generation schedule tick",
+        "ja": "生成スケジュールのティックを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ɠėñėřȧŧïőñ şƈħėḓůŀė ŧïƈķ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_chronos": {
+        "en": "Run the Chronos scheduler daemon",
+        "ja": "Chronos スケジューラーデーモンを実行",
+        "qps-ploc": "⟦Řůñ ŧħė Ƈħřőñőş şƈħėḓůŀėř ḓȧėɱőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_chronos_install": {
+        "en": "Install the Chronos launchd agent",
+        "ja": "Chronos の launchd エージェントをインストール",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ŧħė Ƈħřőñőş ŀȧůñƈħḓ ȧɠėñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_chronos_uninstall": {
+        "en": "Show Chronos launchd uninstall steps",
+        "ja": "Chronos の launchd アンインストール手順を表示",
+        "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_ops_alerts": {
+        "en": "Triage undelivered alerts",
+        "ja": "未配信アラートを確認",
+        "qps-ploc": "⟦Ŧřïȧɠė ůñḓėŀïṽėřėḓ ȧŀėřŧş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_voice_conversation_turn": {
+        "en": "Run one realtime voice conversation turn",
+        "ja": "リアルタイム音声会話を 1 ターン実行",
+        "qps-ploc": "⟦Řůñ őñė řėȧŀŧïɱė ṽőïƈė ƈőñṽėřşȧŧïőñ ŧůřñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_voice_profile_promote": {
+        "en": "Promote a voice profile",
+        "ja": "音声プロファイルを昇格",
+        "qps-ploc": "⟦Ṗřőɱőŧė ȧ ṽőïƈė ṗřőƒïŀė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_agy_sdk_setup": {
+        "en": "Set up the agy SDK",
+        "ja": "agy SDK をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ŧħė ȧɠẏ ŞḒĶ ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_tool_setup": {
+        "en": "Install or inspect tool runtimes",
+        "ja": "ツールランタイムをインストール・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ŧőőŀ řůñŧïɱėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_managed_env": {
+        "en": "Install or inspect managed provider CLIs",
+        "ja": "管理対象のプロバイダ CLI を導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ɱȧñȧɠėḓ ṗřőṽïḓėř ƇĿÏş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_seam_select": {
+        "en": "Inspect, calibrate, and set seam provider selection",
+        "ja": "シームのプロバイダ選択を確認・較正・設定",
+        "qps-ploc": "⟦Ïñşṗėƈŧ, ƈȧŀïƀřȧŧė, ȧñḓ şėŧ şėȧɱ ṗřőṽïḓėř şėŀėƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_reasoning_setup": {
+        "en": "Set up a reasoning backend",
+        "ja": "推論バックエンドをセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ȧ řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_reasoning_config": {
+        "en": "Show or change reasoning configuration",
+        "ja": "推論設定を表示・変更",
+        "qps-ploc": "⟦Şħőẇ őř ƈħȧñɠė řėȧşőñïñɠ ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_customer_create": {
+        "en": "Create a stance overlay (customer/{slug}/)",
+        "ja": "スタンスのオーバーレイを作成 (customer/{slug}/)",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ şŧȧñƈė őṽėřŀȧẏ (ƈůşŧőɱėř/{slug}/) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_customer_list": {
+        "en": "List stance overlays",
+        "ja": "スタンスのオーバーレイを一覧",
+        "qps-ploc": "⟦Ŀïşŧ şŧȧñƈė őṽėřŀȧẏş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_customer_migrate_from_personal": {
+        "en": "Migrate personal data into a stance overlay",
+        "ja": "個人データをスタンスのオーバーレイへ移行",
+        "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_customer_switch": {
+        "en": "Switch the active stance overlay",
+        "ja": "有効なスタンスのオーバーレイを切り替え",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_backup": {
+        "en": "Back up or export tenant data",
+        "ja": "テナントデータをバックアップ・書き出し",
+        "qps-ploc": "⟦Ƀȧƈķ ůṗ őř ėẋṗőřŧ ŧėñȧñŧ ḓȧŧȧ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_telegram_bridge": {
+        "en": "Run the Telegram bridge",
+        "ja": "Telegram ブリッジを実行",
+        "qps-ploc": "⟦Řůñ ŧħė Ŧėŀėɠřȧɱ ƀřïḓɠė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_chronos_dev": {
+        "en": "Run the Chronos UI dev server",
+        "ja": "Chronos UI の開発サーバーを実行",
+        "qps-ploc": "⟦Řůñ ŧħė Ƈħřőñőş ŮÏ ḓėṽ şėřṽėř ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_capabilities": {
+        "en": "Discover actuators without a build",
+        "ja": "ビルドなしでアクチュエータを探索",
+        "qps-ploc": "⟦Ḓïşƈőṽėř ȧƈŧůȧŧőřş ẇïŧħőůŧ ȧ ƀůïŀḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_playground": {
+        "en": "Open the actuator playground",
+        "ja": "アクチュエータのプレイグラウンドを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ȧƈŧůȧŧőř ṗŀȧẏɠřőůñḓ ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_provider_capabilities_scan": {
+        "en": "Scan provider CLI capabilities",
+        "ja": "プロバイダ CLI の機能をスキャン",
+        "qps-ploc": "⟦Şƈȧñ ṗřőṽïḓėř ƇĿÏ ƈȧṗȧƀïŀïŧïėş ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_examples": {
+        "en": "Discover actuator example catalogs",
+        "ja": "アクチュエータの例カタログを探索",
+        "qps-ploc": "⟦Ḓïşƈőṽėř ȧƈŧůȧŧőř ėẋȧɱṗŀė ƈȧŧȧŀőɠş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_system_upgrade": {
+        "en": "Upgrade the Kyberion installation",
+        "ja": "Kyberion のインストールをアップグレード",
+        "qps-ploc": "⟦Ůṗɠřȧḓė ŧħė Ķẏƀėřïőñ ïñşŧȧŀŀȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_pipeline": {
+        "en": "Pipeline runner (same target as kyberion pipeline)",
+        "ja": "パイプライン実行 (kyberion pipeline と同じ実体)",
+        "qps-ploc": "⟦Ṗïṗėŀïñė řůññėř (şȧɱė ŧȧřɠėŧ ȧş ķẏƀėřïőñ ṗïṗėŀïñė) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_pipeline_super": {
+        "en": "Run a super pipeline",
+        "ja": "スーパーパイプラインを実行",
+        "qps-ploc": "⟦Řůñ ȧ şůṗėř ṗïṗėŀïñė ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_intent_run": {
+        "en": "Dispatch a catalog intent as a task session",
+        "ja": "カタログの intent を task session として実行",
+        "qps-ploc": "⟦Ḓïşṗȧŧƈħ ȧ ƈȧŧȧŀőɠ ïñŧėñŧ ȧş ȧ ŧȧşķ şėşşïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_release_notes": {
+        "en": "Extract release notes from CHANGELOG.md",
+        "ja": "CHANGELOG.md からリリースノートを抽出",
+        "qps-ploc": "⟦Ėẋŧřȧƈŧ řėŀėȧşė ñőŧėş ƒřőɱ ƇĦȦÑƓĖĿŐƓ.ɱḓ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_release_source_archive": {
+        "en": "Build a deterministic source archive",
+        "ja": "決定的なソースアーカイブを作成",
+        "qps-ploc": "⟦Ƀůïŀḓ ȧ ḓėŧėřɱïñïşŧïƈ şőůřƈė ȧřƈħïṽė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_changelog_assemble": {
+        "en": "Assemble changelog fragments",
+        "ja": "changelog の断片を統合",
+        "qps-ploc": "⟦Ȧşşėɱƀŀė ƈħȧñɠėŀőɠ ƒřȧɠɱėñŧş ŀőřėɱ ïṗş⟧"
+      },
+      "cli_cmd_script_resolve_install_driver": {
+        "en": "Install the generated-file merge driver",
+        "ja": "生成ファイル用のマージドライバーをインストール",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ŧħė ɠėñėřȧŧėḓ-ƒïŀė ɱėřɠė ḓřïṽėř ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_resolve_generated": {
+        "en": "Regenerate tracked generated files to resolve conflicts",
+        "ja": "追跡中の生成ファイルを再生成して競合を解消",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧřȧƈķėḓ ɠėñėřȧŧėḓ ƒïŀėş ŧő řėşőŀṽė ƈőñƒŀïƈŧş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_release_install_smoke": {
+        "en": "Run the clean-install smoke test",
+        "ja": "クリーンインストールのスモークテストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ƈŀėȧñ-ïñşŧȧŀŀ şɱőķė ŧėşŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_migration": {
+        "en": "Run pending migrations",
+        "ja": "未適用のマイグレーションを実行",
+        "qps-ploc": "⟦Řůñ ṗėñḓïñɠ ɱïɠřȧŧïőñş ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_dev": {
+        "en": "Typecheck, lint, and run unit tests",
+        "ja": "型チェック・lint・ユニットテストを実行",
+        "qps-ploc": "⟦Ŧẏṗėƈħėƈķ, ŀïñŧ, ȧñḓ řůñ ůñïŧ ŧėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_ci": {
+        "en": "Run the full CI sequence locally",
+        "ja": "CI 一式をローカルで実行",
+        "qps-ploc": "⟦Řůñ ŧħė ƒůŀŀ ƇÏ şėɋůėñƈė ŀőƈȧŀŀẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_generate_types": {
+        "en": "Regenerate types",
+        "ja": "型定義を再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧẏṗėş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_project_os_init": {
+        "en": "Generate a project operating system",
+        "ja": "プロジェクト運用一式を生成",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ȧ ṗřőĵėƈŧ őṗėřȧŧïñɠ şẏşŧėɱ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cli_cmd_script_prepare": {
+        "en": "Install git hooks",
+        "ja": "git フックをインストール",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ɠïŧ ħőőķş ŀőřėɱ⟧"
+      },
+      "cli_cmd_script_skill_install": {
+        "en": "Install a skill bundle",
+        "ja": "スキルバンドルをインストール",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ȧ şķïŀŀ ƀůñḓŀė ŀőřėɱ ï⟧"
+      },
+      "cli_cmd_script_mcp_server": {
+        "en": "Run the MCP server on stdio",
+        "ja": "MCP サーバーを stdio で実行",
+        "qps-ploc": "⟦Řůñ ŧħė ⱮƇṖ şėřṽėř őñ şŧḓïő ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_knowledge_cowork_sync": {
+        "en": "Sync knowledge with Cowork",
+        "ja": "Cowork と knowledge を同期",
+        "qps-ploc": "⟦Şẏñƈ ķñőẇŀėḓɠė ẇïŧħ Ƈőẇőřķ ŀőřėɱ ïṗ⟧"
+      },
+      "cli_cmd_script_co_session": {
+        "en": "Coordinate same-checkout provider CLIs",
+        "ja": "同一チェックアウトのプロバイダ CLI を調整",
+        "qps-ploc": "⟦Ƈőőřḓïñȧŧė şȧɱė-ƈħėƈķőůŧ ṗřőṽïḓėř ƇĿÏş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_cmd_script_agy_profile": {
+        "en": "Manage agy profiles",
+        "ja": "agy プロファイルを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ȧɠẏ ṗřőƒïŀėş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_codex_profile": {
+        "en": "Manage codex profiles",
+        "ja": "codex プロファイルを管理",
+        "qps-ploc": "⟦Ɱȧñȧɠė ƈőḓėẋ ṗřőƒïŀėş ŀőřėɱ ⟧"
+      },
+      "cli_cmd_script_check_dep_cycles": {
+        "en": "Check for dependency cycles",
+        "ja": "依存関係の循環を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ƒőř ḓėṗėñḓėñƈẏ ƈẏƈŀėş ŀőřėɱ ïṗ⟧"
+      },
+      "cli_guard_usage": {
+        "en": "Usage: {usage}",
+        "ja": "使い方: {usage}",
+        "qps-ploc": "⟦Ůşȧɠė: {usage} ŀőřė⟧"
+      },
+      "cli_guard_options": {
+        "en": "Options:",
+        "ja": "オプション:",
+        "qps-ploc": "⟦Őṗŧïőñş: ŀőř⟧"
+      },
+      "cli_guard_unknown_option": {
+        "en": "Unknown option: {flag}. Nothing was run. See `{command} --help`.",
+        "ja": "不明なオプションです: {flag}。何も実行していません。`{command} --help` を確認してください。",
+        "qps-ploc": "⟦Ůñķñőẇñ őṗŧïőñ: {flag}. Ñőŧħïñɠ ẇȧş řůñ. Şėė `{command} --ħėŀṗ`. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_guard_missing_value": {
+        "en": "Option {flag} needs a value. Nothing was run. See `{command} --help`.",
+        "ja": "オプション {flag} には値が必要です。何も実行していません。`{command} --help` を確認してください。",
+        "qps-ploc": "⟦Őṗŧïőñ {flag} ñėėḓş ȧ ṽȧŀůė. Ñőŧħïñɠ ẇȧş řůñ. Şėė `{command} --ħėŀṗ`. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_guard_unexpected_argument": {
+        "en": "Unexpected argument: {arg}. Nothing was run. See `{command} --help`.",
+        "ja": "想定外の引数です: {arg}。何も実行していません。`{command} --help` を確認してください。",
+        "qps-ploc": "⟦Ůñėẋṗėƈŧėḓ ȧřɠůɱėñŧ: {arg}. Ñőŧħïñɠ ẇȧş řůñ. Şėė `{command} --ħėŀṗ`. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_guard_help_only": {
+        "en": "Help only: `kyberion {command}` was not run (it has no built-in --help that is safe to forward).",
+        "ja": "ヘルプのみ表示しました。`kyberion {command}` は実行していません (安全に転送できる組み込み --help がないため)。",
+        "qps-ploc": "⟦Ħėŀṗ őñŀẏ: `ķẏƀėřïőñ {command}` ẇȧş ñőŧ řůñ (ïŧ ħȧş ñő ƀůïŀŧ-ïñ --ħėŀṗ ŧħȧŧ ïş şȧƒė ŧő ƒőřẇȧřḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "cli_caution_pr_create": {
+        "en": "Caution: creates a real GitHub pull request (runs `pnpm check -- --scope pr` and the knowledge gate first).",
+        "ja": "注意: 実際に GitHub の PR を作成します (先に `pnpm check -- --scope pr` と knowledge ゲートを実行)。",
+        "qps-ploc": "⟦Ƈȧůŧïőñ: ƈřėȧŧėş ȧ řėȧŀ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ (řůñş `ṗñṗɱ ƈħėƈķ -- --şƈőṗė ṗř` ȧñḓ ŧħė ķñőẇŀėḓɠė ɠȧŧė ƒïřşŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "cli_manifest_help_title": {
+        "en": "Kyberion commands",
+        "ja": "Kyberion コマンド",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ƈőɱɱȧñḓş ŀőřėɱ⟧"
+      },
+      "cli_manifest_help_group_start": {
+        "en": "Start here",
+        "ja": "はじめに",
+        "qps-ploc": "⟦Şŧȧřŧ ħėřė ŀőř⟧"
+      },
+      "cli_manifest_help_group_inspect": {
+        "en": "Inspect and read",
+        "ja": "確認・参照",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧñḓ řėȧḓ ŀőřėɱ⟧"
+      },
+      "cli_manifest_help_group_operate": {
+        "en": "Operate",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧė ŀőř⟧"
+      },
+      "cli_manifest_help_group_dev": {
+        "en": "Development (repository maintainers)",
+        "ja": "開発 (リポジトリ保守者向け)",
+        "qps-ploc": "⟦Ḓėṽėŀőṗɱėñŧ (řėṗőşïŧőřẏ ɱȧïñŧȧïñėřş) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_manifest_help_footer": {
+        "en": "Run `kyberion <command> --help` for command-specific options.",
+        "ja": "コマンドごとのオプションは `kyberion <コマンド> --help` で確認できます。",
+        "qps-ploc": "⟦Řůñ `ķẏƀėřïőñ <ƈőɱɱȧñḓ> --ħėŀṗ` ƒőř ƈőɱɱȧñḓ-şṗėƈïƒïƈ őṗŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_manifest_help_footer_all": {
+        "en": "{count} development commands are hidden; `kyberion --help --all` shows them.",
+        "ja": "開発用コマンド {count} 件を非表示にしています。`kyberion --help --all` で表示します。",
+        "qps-ploc": "⟦{count} ḓėṽėŀőṗɱėñŧ ƈőɱɱȧñḓş ȧřė ħïḓḓėñ; `ķẏƀėřïőñ --ħėŀṗ --ȧŀŀ` şħőẇş ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "cli_unknown_command_hint": {
+        "en": "Unknown kyberion command: {command}.",
+        "ja": "不明な kyberion コマンドです: {command}。",
+        "qps-ploc": "⟦Ůñķñőẇñ ķẏƀėřïőñ ƈőɱɱȧñḓ: {command}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_unknown_command_suggest": {
+        "en": "Did you mean: {suggestions}?",
+        "ja": "もしかして: {suggestions}",
+        "qps-ploc": "⟦Ḓïḓ ẏőů ɱėȧñ: {suggestions}? ŀőřėɱ ïṗş⟧"
+      },
+      "cli_unknown_command_help": {
+        "en": "Run `kyberion --help` to list commands.",
+        "ja": "`kyberion --help` でコマンド一覧を表示できます。",
+        "qps-ploc": "⟦Řůñ `ķẏƀėřïőñ --ħėŀṗ` ŧő ŀïşŧ ƈőɱɱȧñḓş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_manifest_help_footer_detail": {
+        "en": "`kyberion help --detail` adds argument syntax for actuator and workflow commands.",
+        "ja": "`kyberion help --detail` でアクチュエータ/業務コマンドの引数の書式も表示します。",
+        "qps-ploc": "⟦`ķẏƀėřïőñ ħėŀṗ --ḓėŧȧïŀ` ȧḓḓş ȧřɠůɱėñŧ şẏñŧȧẋ ƒőř ȧƈŧůȧŧőř ȧñḓ ẇőřķƒŀőẇ ƈőɱɱȧñḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_deprecated_command": {
+        "en": "[deprecated] `kyberion {old}` is renamed to `kyberion {new}`; the old name still works for now.",
+        "ja": "[非推奨] `kyberion {old}` は `kyberion {new}` に改名されました。旧名も当面は動作します。",
+        "qps-ploc": "⟦[ḓėṗřėƈȧŧėḓ] `ķẏƀėřïőñ {old}` ïş řėñȧɱėḓ ŧő `ķẏƀėřïőñ {new}`; ŧħė őŀḓ ñȧɱė şŧïŀŀ ẇőřķş ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "cli_deprecated_script": {
+        "en": "[deprecated] `pnpm {old}` is renamed to `pnpm {new}`; the old name still works for now.",
+        "ja": "[非推奨] `pnpm {old}` は `pnpm {new}` に改名されました。旧名も当面は動作します。",
+        "qps-ploc": "⟦[ḓėṗřėƈȧŧėḓ] `ṗñṗɱ {old}` ïş řėñȧɱėḓ ŧő `ṗñṗɱ {new}`; ŧħė őŀḓ ñȧɱė şŧïŀŀ ẇőřķş ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "cli_env_unknown_variables": {
+        "en": "unregistered KYBERION_* variables set: {names} (register via pnpm generate:env-registry)",
+        "ja": "未登録の KYBERION_* 変数が設定されています: {names}（pnpm generate:env-registry で登録してください）",
+        "qps-ploc": "⟦ůñřėɠïşŧėřėḓ ĶẎɃĖŘÏŐÑ_* ṽȧřïȧƀŀėş şėŧ: {names} (řėɠïşŧėř ṽïȧ ṗñṗɱ ɠėñėřȧŧė:ėñṽ-řėɠïşŧřẏ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "cli_manifest_help_scopes": {
+        "en": "Scopes: {usage}",
+        "ja": "スコープ: {usage}",
+        "qps-ploc": "⟦Şƈőṗėş: {usage} ŀőřė⟧"
+      },
+      "cli_scope_help_usage": {
+        "en": "Usage: {usage}",
+        "ja": "使い方: {usage}",
+        "qps-ploc": "⟦Ůşȧɠė: {usage} ŀőřė⟧"
+      },
+      "cli_scope_help_delegates": {
+        "en": "runs {command}",
+        "ja": "{command} を実行",
+        "qps-ploc": "⟦řůñş {command} ŀőřė⟧"
+      },
+      "cli_scope_unknown": {
+        "en": "Unknown {command} scope \"{scope}\". Choose one of: {scopes}",
+        "ja": "{command} のスコープ \"{scope}\" は不明です。次から選んでください: {scopes}",
+        "qps-ploc": "⟦Ůñķñőẇñ {command} şƈőṗė \"{scope}\". Ƈħőőşė őñė őƒ: {scopes} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_operator_setup_default": {
+        "en": "Set up one area (onboarding, reasoning, env, services, tools, voice, ...)",
+        "ja": "領域ごとにセットアップ (onboarding・reasoning・env・services・tools・voice など)",
+        "qps-ploc": "⟦Şėŧ ůṗ őñė ȧřėȧ (őñƀőȧřḓïñɠ, řėȧşőñïñɠ, ėñṽ, şėřṽïƈėş, ŧőőŀş, ṽőïƈė, ...) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_scope_doctor_env": {
+        "en": "Local vitals: dependencies, build, identity files",
+        "ja": "ローカルの基礎状態 (依存関係・ビルド・アイデンティティ) を確認",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṽïŧȧŀş: ḓėṗėñḓėñƈïėş, ƀůïŀḓ, ïḓėñŧïŧẏ ƒïŀėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_scope_doctor_service": {
+        "en": "Service connection readiness (auth and probe)",
+        "ja": "サービス接続の準備状況 (認証・疎通) を確認",
+        "qps-ploc": "⟦Şėřṽïƈė ƈőññėƈŧïőñ řėȧḓïñėşş (ȧůŧħ ȧñḓ ṗřőƀė) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_scope_doctor_voice": {
+        "en": "Voice runtime capabilities (audio, speech-to-text, text-to-speech)",
+        "ja": "音声ランタイム (音声入出力・音声認識・音声合成) を確認",
+        "qps-ploc": "⟦Ṽőïƈė řůñŧïɱė ƈȧṗȧƀïŀïŧïėş (ȧůḓïő, şṗėėƈħ-ŧő-ŧėẋŧ, ŧėẋŧ-ŧő-şṗėėƈħ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_scope_doctor_meeting": {
+        "en": "Meeting readiness: devices, browser, consent",
+        "ja": "会議の準備状況 (デバイス・ブラウザ・同意) を確認",
+        "qps-ploc": "⟦Ɱėėŧïñɠ řėȧḓïñėşş: ḓėṽïƈėş, ƀřőẇşėř, ƈőñşėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_doctor_app": {
+        "en": "Mobile app preflight (iOS/Android toolchain)",
+        "ja": "モバイルアプリの事前確認 (iOS/Android ツールチェーン)",
+        "qps-ploc": "⟦Ɱőƀïŀė ȧṗṗ ṗřėƒŀïɠħŧ (ïŐŞ/Ȧñḓřőïḓ ŧőőŀƈħȧïñ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_doctor_setup": {
+        "en": "Setup status and recommended surfaces",
+        "ja": "セットアップ状況と推奨サーフェスを確認",
+        "qps-ploc": "⟦Şėŧůṗ şŧȧŧůş ȧñḓ řėƈőɱɱėñḓėḓ şůřƒȧƈėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_scope_setup_onboarding": {
+        "en": "Run the onboarding wizard (identity, services, tenant)",
+        "ja": "オンボーディングウィザードを実行 (アイデンティティ・サービス・テナント)",
+        "qps-ploc": "⟦Řůñ ŧħė őñƀőȧřḓïñɠ ẇïẑȧřḓ (ïḓėñŧïŧẏ, şėřṽïƈėş, ŧėñȧñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_scope_setup_context": {
+        "en": "Resolve and bind the tenant/organization onboarding context",
+        "ja": "テナント・組織のオンボーディング文脈を解決して紐付け",
+        "qps-ploc": "⟦Řėşőŀṽė ȧñḓ ƀïñḓ ŧħė ŧėñȧñŧ/őřɠȧñïẑȧŧïőñ őñƀőȧřḓïñɠ ƈőñŧėẋŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_scope_setup_reasoning": {
+        "en": "Choose and configure the reasoning backend",
+        "ja": "推論バックエンドを選択・設定",
+        "qps-ploc": "⟦Ƈħőőşė ȧñḓ ƈőñƒïɠůřė ŧħė řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_setup_env": {
+        "en": "Probe an environment manifest; install missing capabilities with --apply",
+        "ja": "環境マニフェストを確認し、--apply で不足分を導入",
+        "qps-ploc": "⟦Ṗřőƀė ȧñ ėñṽïřőñɱėñŧ ɱȧñïƒėşŧ; ïñşŧȧŀŀ ɱïşşïñɠ ƈȧṗȧƀïŀïŧïėş ẇïŧħ --ȧṗṗŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_scope_setup_services": {
+        "en": "Connect external services (auth, presets, notifications)",
+        "ja": "外部サービスを接続 (認証・プリセット・通知)",
+        "qps-ploc": "⟦Ƈőññėƈŧ ėẋŧėřñȧŀ şėřṽïƈėş (ȧůŧħ, ṗřėşėŧş, ñőŧïƒïƈȧŧïőñş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_scope_setup_tools": {
+        "en": "Install or inspect system tool runtimes",
+        "ja": "システムツールのランタイムを導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ şẏşŧėɱ ŧőőŀ řůñŧïɱėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_scope_setup_provider_cli": {
+        "en": "Install or inspect managed provider CLIs",
+        "ja": "管理対象のプロバイダ CLI を導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ɱȧñȧɠėḓ ṗřőṽïḓėř ƇĿÏş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_scope_setup_agy_sdk": {
+        "en": "Set up the agy SDK managed environment",
+        "ja": "agy SDK の管理環境をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ŧħė ȧɠẏ ŞḒĶ ɱȧñȧɠėḓ ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_scope_setup_voice": {
+        "en": "Install local voice tools (speech-to-text, text-to-speech, VAD)",
+        "ja": "ローカル音声ツール (音声認識・音声合成・VAD) を導入",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ŀőƈȧŀ ṽőïƈė ŧőőŀş (şṗėėƈħ-ŧő-ŧėẋŧ, ŧėẋŧ-ŧő-şṗėėƈħ, ṼȦḒ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_scope_setup_config": {
+        "en": "Extend configuration through a governed config mission",
+        "ja": "統制された設定ミッションで構成を拡張",
+        "qps-ploc": "⟦Ėẋŧėñḓ ƈőñƒïɠůřȧŧïőñ ŧħřőůɠħ ȧ ɠőṽėřñėḓ ƈőñƒïɠ ɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_help_setup": {
+        "en": "  pnpm kyberion setup <area>  Set up one area (run without an area to list them)",
+        "ja": "  pnpm kyberion setup <area>  領域ごとにセットアップ (領域なしで一覧を表示)",
+        "qps-ploc": "⟦  ṗñṗɱ ķẏƀėřïőñ şėŧůṗ <ȧřėȧ>  Şėŧ ůṗ őñė ȧřėȧ (řůñ ẇïŧħőůŧ ȧñ ȧřėȧ ŧő ŀïşŧ ŧħėɱ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "cli_hooks_none": {
         "en": "No project-local Claude/Codex hook configs found.",
@@ -7576,9 +9181,9 @@
         "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ȧşķ \"<řėɋůėşŧ>\" ŀőřėɱ ïṗşůɱ ⟧"
       },
       "recorder_ask_empty": {
-        "en": "(No response — check backend settings with pnpm doctor)",
-        "ja": "(応答が空でした — pnpm doctor で backend 設定を確認してください)",
-        "qps-ploc": "⟦(Ñő řėşṗőñşė — ƈħėƈķ ƀȧƈķėñḓ şėŧŧïñɠş ẇïŧħ ṗñṗɱ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "(No response — check backend settings with pnpm kyberion doctor)",
+        "ja": "(応答が空でした — pnpm kyberion doctor で backend 設定を確認してください)",
+        "qps-ploc": "⟦(Ñő řėşṗőñşė — ƈħėƈķ ƀȧƈķėñḓ şėŧŧïñɠş ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "recorder_procedure_not_found": {
         "en": "Procedure not found: {id}",
@@ -7720,11 +9325,6 @@
         "ja": "商談が見つかりません: {id}",
         "qps-ploc": "⟦Ḓėȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ⟧"
       },
-      "recorder_deal_tenant_ambiguous": {
-        "en": "Deal {id} exists in several tenants ({tenants}); pass --tenant <slug>.",
-        "ja": "商談 {id} は複数のテナント ({tenants}) に存在します。--tenant <slug> を指定してください。",
-        "qps-ploc": "⟦Ḓėȧŀ {id} ėẋïşŧş ïñ şėṽėřȧŀ ŧėñȧñŧş ({tenants}); ṗȧşş --ŧėñȧñŧ <şŀůɠ>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
-      },
       "recorder_deal_audio_usage": {
         "en": "Usage: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>",
         "ja": "使い方: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>",
@@ -7780,6 +9380,31 @@
         "ja": "要件ヒアリング内容: pnpm kyberion deals --requirements <deal-id>",
         "qps-ploc": "⟦Řėɋůïřėɱėñŧş ħėȧřïñɠ: ṗñṗɱ ķẏƀėřïőñ ḓėȧŀş --řėɋůïřėɱėñŧş <ḓėȧŀ-ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
+      "recorder_capture_not_promotable": {
+        "en": "No native OS events were captured. Keep this recording as observation evidence and re-record after enabling Accessibility permission.",
+        "ja": "ネイティブOSイベントを取得できませんでした。この記録は観測証跡として保持し、アクセシビリティ権限を有効にして再記録してください。",
+        "qps-ploc": "⟦Ñő ñȧŧïṽė ŐŞ ėṽėñŧş ẇėřė ƈȧṗŧůřėḓ. Ķėėṗ ŧħïş řėƈőřḓïñɠ ȧş őƀşėřṽȧŧïőñ ėṽïḓėñƈė ȧñḓ řė-řėƈőřḓ ȧƒŧėř ėñȧƀŀïñɠ Ȧƈƈėşşïƀïŀïŧẏ ṗėřɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "recorder_procedure_usage": {
+        "en": "Usage: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
+        "ja": "使い方: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ṗřőƈėḓůřė <ŀïşŧ|ïñşṗėƈŧ|řůñ|ṗřőɱőŧė> [ṗřőƈėḓůřė-ïḓ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_record_usage": {
+        "en": "Usage: pnpm kyberion record desktop [--duration <sec>]",
+        "ja": "使い方: pnpm kyberion record desktop [--duration <sec>]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ řėƈőřḓ ḓėşķŧőṗ [--ḓůřȧŧïőñ <şėƈ>] ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "recorder_unknown_subcommand": {
+        "en": "Unknown subcommand: {subcommand}",
+        "ja": "不明なサブコマンド: {subcommand}",
+        "qps-ploc": "⟦Ůñķñőẇñ şůƀƈőɱɱȧñḓ: {subcommand} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_deal_tenant_ambiguous": {
+        "en": "Deal {id} exists in several tenants ({tenants}); pass --tenant <slug>.",
+        "ja": "商談 {id} は複数のテナント ({tenants}) に存在します。--tenant <slug> を指定してください。",
+        "qps-ploc": "⟦Ḓėȧŀ {id} ėẋïşŧş ïñ şėṽėřȧŀ ŧėñȧñŧş ({tenants}); ṗȧşş --ŧėñȧñŧ <şŀůɠ>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
       "recorder_deal_quote_usage": {
         "en": "Usage: pnpm kyberion deals --quote <deal-id> --lines '[{\"task_kind\":\"...\",\"size\":\"...\"}]'",
         "ja": "使い方: pnpm kyberion deals --quote <deal-id> --lines '[{\"task_kind\":\"...\",\"size\":\"...\"}]'",
@@ -7819,26 +9444,6 @@
         "en": "✓ Deal {id} handed to mission {mission}. Next pipeline: {pipeline}",
         "ja": "✓ 商談 {id} をミッション {mission} に引き渡しました。次のパイプライン: {pipeline}",
         "qps-ploc": "⟦✓ Ḓėȧŀ {id} ħȧñḓėḓ ŧő ɱïşşïőñ {mission}. Ñėẋŧ ṗïṗėŀïñė: {pipeline} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
-      },
-      "recorder_capture_not_promotable": {
-        "en": "No native OS events were captured. Keep this recording as observation evidence and re-record after enabling Accessibility permission.",
-        "ja": "ネイティブOSイベントを取得できませんでした。この記録は観測証跡として保持し、アクセシビリティ権限を有効にして再記録してください。",
-        "qps-ploc": "⟦Ñő ñȧŧïṽė ŐŞ ėṽėñŧş ẇėřė ƈȧṗŧůřėḓ. Ķėėṗ ŧħïş řėƈőřḓïñɠ ȧş őƀşėřṽȧŧïőñ ėṽïḓėñƈė ȧñḓ řė-řėƈőřḓ ȧƒŧėř ėñȧƀŀïñɠ Ȧƈƈėşşïƀïŀïŧẏ ṗėřɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
-      },
-      "recorder_procedure_usage": {
-        "en": "Usage: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
-        "ja": "使い方: pnpm kyberion procedure <list|inspect|run|promote> [procedure-id]",
-        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ṗřőƈėḓůřė <ŀïşŧ|ïñşṗėƈŧ|řůñ|ṗřőɱőŧė> [ṗřőƈėḓůřė-ïḓ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
-      },
-      "recorder_record_usage": {
-        "en": "Usage: pnpm kyberion record desktop [--duration <sec>]",
-        "ja": "使い方: pnpm kyberion record desktop [--duration <sec>]",
-        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ řėƈőřḓ ḓėşķŧőṗ [--ḓůřȧŧïőñ <şėƈ>] ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
-      },
-      "recorder_unknown_subcommand": {
-        "en": "Unknown subcommand: {subcommand}",
-        "ja": "不明なサブコマンド: {subcommand}",
-        "qps-ploc": "⟦Ůñķñőẇñ şůƀƈőɱɱȧñḓ: {subcommand} ŀőřėɱ ïṗşů⟧"
       }
     },
     "status": {
@@ -8011,6 +9616,16 @@
         "en": "stopped",
         "ja": "停止",
         "qps-ploc": "⟦şŧőṗṗėḓ ŀőř⟧"
+      },
+      "probe_node_engines_unmet": {
+        "en": "Node {current} does not satisfy package.json engines \"{range}\". Fix: `nvm install {major} && nvm use {major}` (or `mise install node@{major}`), then rerun.",
+        "ja": "実行中の Node {current} は engines \"{range}\" を満たしていません。`nvm install {major} && nvm use {major}`(または `mise install node@{major}`)でアップグレードしてから再実行してください。",
+        "qps-ploc": "⟦Ñőḓė {current} ḓőėş ñőŧ şȧŧïşƒẏ ṗȧƈķȧɠė.ĵşőñ ėñɠïñėş \"{range}\". Ƒïẋ: `ñṽɱ ïñşŧȧŀŀ {major} && ñṽɱ ůşė {major}` (őř `ɱïşė ïñşŧȧŀŀ ñőḓė@{major}`), ŧħėñ řėřůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "probe_playwright_missing": {
+        "en": "No Playwright browser cache at {dir} — browser features (first-win screenshot, browser:goto) will silently fall back to text. Fix: `pnpm env:bootstrap` (installs the managed browser runtime).",
+        "ja": "Playwright ブラウザ未導入です ({dir})。ブラウザ機能 (first-win スクリーンショット, browser:goto) はテキストにフォールバックします。`pnpm env:bootstrap` で管理ブラウザランタイムを導入してください。",
+        "qps-ploc": "⟦Ñő Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} — ƀřőẇşėř ƒėȧŧůřėş (ƒïřşŧ-ẇïñ şƈřėėñşħőŧ, ƀřőẇşėř:ɠőŧő) ẇïŀŀ şïŀėñŧŀẏ ƒȧŀŀ ƀȧƈķ ŧő ŧėẋŧ. Ƒïẋ: `ṗñṗɱ ėñṽ:ƀőőŧşŧřȧṗ` (ïñşŧȧŀŀş ŧħė ɱȧñȧɠėḓ ƀřőẇşėř řůñŧïɱė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       }
     },
     "error": {
@@ -8150,6 +9765,136 @@
         "en": "What should Kyberion do, and what outcome should count as success?",
         "ja": "Kyberion は何を実行し、何を成功とみなせばよいですか?",
         "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ Ķẏƀėřïőñ ḓő, ȧñḓ ẇħȧŧ őůŧƈőɱė şħőůŀḓ ƈőůñŧ ȧş şůƈƈėşş? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "contextual_reason_missing_threshold": {
+        "en": "Missing inputs remain above the clarification threshold{detail}",
+        "ja": "不足している入力は確認しきい値を超えています{detail}",
+        "qps-ploc": "⟦Ɱïşşïñɠ ïñṗůŧş řėɱȧïñ ȧƀőṽė ŧħė ƈŀȧřïƒïƈȧŧïőñ ŧħřėşħőŀḓ{detail} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "contextual_reason_missing_critical": {
+        "en": "Missing critical inputs: {items}.",
+        "ja": "重要な不足入力があります: {items}。",
+        "qps-ploc": "⟦Ɱïşşïñɠ ƈřïŧïƈȧŀ ïñṗůŧş: {items}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "contextual_reason_none_missing": {
+        "en": "No clarification is required because no inputs are missing.",
+        "ja": "入力の不足がないため、追加の確認は不要です。",
+        "qps-ploc": "⟦Ñő ƈŀȧřïƒïƈȧŧïőñ ïş řėɋůïřėḓ ƀėƈȧůşė ñő ïñṗůŧş ȧřė ɱïşşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "contextual_reason_force_pattern": {
+        "en": "The request matches a force-clarification ambiguity pattern.",
+        "ja": "依頼が強制確認の曖昧性パターンに一致しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ɱȧŧƈħėş ȧ ƒőřƈė-ƈŀȧřïƒïƈȧŧïőñ ȧɱƀïɠůïŧẏ ṗȧŧŧėřñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "contextual_reason_policy_defaults": {
+        "en": "The missing inputs are covered by policy defaults.",
+        "ja": "不足入力はポリシーの既定値で補完できます。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïñɠ ïñṗůŧş ȧřė ƈőṽėřėḓ ƀẏ ṗőŀïƈẏ ḓėƒȧůŀŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "contextual_reason_policy_confidence": {
+        "en": "The request can proceed with policy defaults because confidence is {confidence}.",
+        "ja": "confidence {confidence} なので、ポリシーの既定値で進められます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈȧñ ṗřőƈėėḓ ẇïŧħ ṗőŀïƈẏ ḓėƒȧůŀŧş ƀėƈȧůşė ƈőñƒïḓėñƈė ïş {confidence}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "clarification_injection_warning": {
+        "en": "⚠️ Injection suspected in external content",
+        "ja": "⚠️ 外部コンテンツにインジェクションの疑いがあります",
+        "qps-ploc": "⟦⚠️ Ïñĵėƈŧïőñ şůşṗėƈŧėḓ ïñ ėẋŧėřñȧŀ ƈőñŧėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "clarification_none_missing": {
+        "en": "No missing inputs. Ready to proceed.",
+        "ja": "不足している情報はありません。実行を進められます。",
+        "qps-ploc": "⟦Ñő ɱïşşïñɠ ïñṗůŧş. Řėȧḓẏ ŧő ṗřőƈėėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "clarification_next_required": {
+        "en": "Next required{more}: `{id}`",
+        "ja": "次に必要な情報{more}: `{id}`",
+        "qps-ploc": "⟦Ñėẋŧ řėɋůïřėḓ{more}: `{id}` ŀőřėɱ ïṗ⟧"
+      },
+      "clarification_more_hint": {
+        "en": " (+ {count} more)",
+        "ja": "（他 {count} 件）",
+        "qps-ploc": "⟦ (+ {count} ɱőřė) ŀőřėɱ⟧"
+      },
+      "clarification_reason_line": {
+        "en": "Reason: {reason}",
+        "ja": "理由: {reason}",
+        "qps-ploc": "⟦Řėȧşőñ: {reason} ŀőřėɱ⟧"
+      },
+      "clarification_default_line": {
+        "en": "Default: {value}",
+        "ja": "デフォルト: {value}",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ: {value} ŀőřėɱ⟧"
+      },
+      "orch_brief_q_reference_source": {
+        "en": "Specify the reference screen, URL, document, or app name.",
+        "ja": "参照元となる画面、URL、資料、またはアプリ名を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řėƒėřėñƈė şƈřėėñ, ŮŘĿ, ḓőƈůɱėñŧ, őř ȧṗṗ ñȧɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "orch_brief_q_preserved_elements": {
+        "en": "Which elements should be preserved? Specify colors, layout, tone, navigation flow, and so on.",
+        "ja": "踏襲したい要素は何ですか。配色、レイアウト、トーン、導線などを指定してください。",
+        "qps-ploc": "⟦Ẇħïƈħ ėŀėɱėñŧş şħőůŀḓ ƀė ṗřėşėřṽėḓ? Şṗėƈïƒẏ ƈőŀőřş, ŀȧẏőůŧ, ŧőñė, ñȧṽïɠȧŧïőñ ƒŀőẇ, ȧñḓ şő őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "orch_brief_q_new_concept": {
+        "en": "State the new concept or goal you want to achieve in one sentence.",
+        "ja": "新しく実現したいコンセプトや目的を一文で指定してください。",
+        "qps-ploc": "⟦Şŧȧŧė ŧħė ñėẇ ƈőñƈėṗŧ őř ɠőȧŀ ẏőů ẇȧñŧ ŧő ȧƈħïėṽė ïñ őñė şėñŧėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "orch_brief_q_target_environment": {
+        "en": "Specify the target environment. Example: local / staging / production-like.",
+        "ja": "対象環境を指定してください。例: local / staging / production-like。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ŧȧřɠėŧ ėñṽïřőñɱėñŧ. Ėẋȧɱṗŀė: ŀőƈȧŀ / şŧȧɠïñɠ / ṗřőḓůƈŧïőñ-ŀïķė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "orch_brief_q_execution_environment": {
+        "en": "Specify the execution environment. Example: simulator / emulator / local browser.",
+        "ja": "実行環境を指定してください。例: simulator / emulator / local browser。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ėẋėƈůŧïőñ ėñṽïřőñɱėñŧ. Ėẋȧɱṗŀė: şïɱůŀȧŧőř / ėɱůŀȧŧőř / ŀőƈȧŀ ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "orch_brief_q_source_materials": {
+        "en": "Specify the documents or input files to build on.",
+        "ja": "ベースにする資料や入力ファイルを指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ḓőƈůɱėñŧş őř ïñṗůŧ ƒïŀėş ŧő ƀůïŀḓ őñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "orch_brief_q_target_audience": {
+        "en": "Specify the intended readers or users.",
+        "ja": "想定読者または利用者を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ïñŧėñḓėḓ řėȧḓėřş őř ůşėřş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "orch_brief_q_storyline": {
+        "en": "Specify the flow you want to convey: chapter outline or key points.",
+        "ja": "どういう流れで伝えたいか、章立てまたは要点を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ƒŀőẇ ẏőů ẇȧñŧ ŧő ƈőñṽėẏ: ƈħȧṗŧėř őůŧŀïñė őř ķėẏ ṗőïñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "orch_brief_q_required_output_format": {
+        "en": "Specify the required output format. Example: pptx / docx / pdf.",
+        "ja": "必要な出力形式を指定してください。例: pptx / docx / pdf。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řėɋůïřėḓ őůŧṗůŧ ƒőřɱȧŧ. Ėẋȧɱṗŀė: ṗṗŧẋ / ḓőƈẋ / ṗḓƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "orch_brief_q_project_name": {
+        "en": "Specify the project name. The official or working name is fine.",
+        "ja": "プロジェクト名を指定してください。正式名または運用名で構いません。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ṗřőĵėƈŧ ñȧɱė. Ŧħė őƒƒïƈïȧŀ őř ẇőřķïñɠ ñȧɱė ïş ƒïñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "orch_brief_q_delivery_scope": {
+        "en": "Specify the delivery scope this time. Example: project OS / document pack / design pack.",
+        "ja": "今回の納品範囲を指定してください。例: project OS / document pack / design pack。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ḓėŀïṽėřẏ şƈőṗė ŧħïş ŧïɱė. Ėẋȧɱṗŀė: ṗřőĵėƈŧ ŐŞ / ḓőƈůɱėñŧ ṗȧƈķ / ḓėşïɠñ ṗȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "orch_brief_q_phase_or_gate": {
+        "en": "Specify the target phase or gate. Example: define / design / gate-requirements-baseline.",
+        "ja": "対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ŧȧřɠėŧ ṗħȧşė őř ɠȧŧė. Ėẋȧɱṗŀė: ḓėƒïñė / ḓėşïɠñ / ɠȧŧė-řėɋůïřėɱėñŧş-ƀȧşėŀïñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "orch_brief_q_related_missions": {
+        "en": "Specify any related mission. If there is none, answer none.",
+        "ja": "関連する mission があれば指定してください。無ければ none と答えてください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ȧñẏ řėŀȧŧėḓ ɱïşşïőñ. Ïƒ ŧħėřė ïş ñőñė, ȧñşẇėř ñőñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "orch_brief_q_default": {
+        "en": "Specify {name}.",
+        "ja": "{name} を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ {name}. ŀőřė⟧"
       }
     },
     "common": {
@@ -8451,6 +10196,46 @@
         "en": "Bootstrap {runtime}",
         "ja": "{runtime} を初期設定",
         "qps-ploc": "⟦Ƀőőŧşŧřȧṗ {runtime} ŀőřėɱ ⟧"
+      },
+      "followup_reconcile_surface": {
+        "en": "Reconcile {surface} and re-check its status.",
+        "ja": "{surface} を reconcile して状態を再確認してください。",
+        "qps-ploc": "⟦Řėƈőñƈïŀė {surface} ȧñḓ řė-ƈħėƈķ ïŧş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "followup_fix_esm_integrity": {
+        "en": "Fix the failing ESM integrity checks.",
+        "ja": "ESM integrity の失敗箇所を修正してください。",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ĖŞⱮ ïñŧėɠřïŧẏ ƈħėƈķş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "followup_fix_catalog_integrity": {
+        "en": "Fix the failing catalog integrity checks.",
+        "ja": "catalog integrity の失敗箇所を修正してください。",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ƈȧŧȧŀőɠ ïñŧėɠřïŧẏ ƈħėƈķş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "followup_review_active_missions": {
+        "en": "Review the checkpoints or finish criteria of the active missions.",
+        "ja": "active な mission の checkpoint または finish 条件を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƈħėƈķṗőïñŧş őř ƒïñïşħ ƈřïŧėřïȧ őƒ ŧħė ȧƈŧïṽė ɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "followup_review_mission_artifacts": {
+        "en": "Review the artifacts and distillation of {missionId}.",
+        "ja": "{missionId} の成果物と distillation を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ȧřŧïƒȧƈŧş ȧñḓ ḓïşŧïŀŀȧŧïőñ őƒ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "followup_resume_mission": {
+        "en": "Resume {missionId} and check its progress.",
+        "ja": "{missionId} を再開して進捗を確認してください。",
+        "qps-ploc": "⟦Řėşůɱė {missionId} ȧñḓ ƈħėƈķ ïŧş ṗřőɠřėşş. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "followup_review_project_ledger": {
+        "en": "Review the target project mission ledger and gate documents.",
+        "ja": "対象 project の mission ledger と gate 資料を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ŧȧřɠėŧ ṗřőĵėƈŧ ɱïşşïőñ ŀėḓɠėř ȧñḓ ɠȧŧė ḓőƈůɱėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "followup_specify_other_target": {
+        "en": "If needed, specify another mission or project to check its detailed status.",
+        "ja": "必要なら別の mission または project を指定して詳細状態を確認してください。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, şṗėƈïƒẏ ȧñőŧħėř ɱïşşïőñ őř ṗřőĵėƈŧ ŧő ƈħėƈķ ïŧş ḓėŧȧïŀėḓ şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "bridge": {
@@ -8763,6 +10548,16 @@
         "en": "This approval request has expired.",
         "ja": "この承認要求は期限切れです。",
         "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "approval_action_approved": {
+        "en": "Approved by {actor}: {title}",
+        "ja": "{actor} が承認しました: {title}",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
+      },
+      "approval_action_rejected": {
+        "en": "Rejected by {actor}: {title}",
+        "ja": "{actor} が却下しました: {title}",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
       }
     },
     "concierge": {
@@ -11360,6 +13155,41 @@
         "en": "Could not complete the request: {error}",
         "ja": "申請を完了できませんでした: {error}",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė řėɋůėşŧ: {error} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "api.id_status_required": {
+        "en": "id and status ({statuses}) are required",
+        "ja": "id と status ({statuses}) が必要です",
+        "qps-ploc": "⟦ïḓ ȧñḓ şŧȧŧůş ({statuses}) ȧřė řėɋůïřėḓ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "api.id_decision_required": {
+        "en": "id and decision (approved|rejected) are required",
+        "ja": "id と decision (approved|rejected) が必要です",
+        "qps-ploc": "⟦ïḓ ȧñḓ ḓėƈïşïőñ (ȧṗṗřőṽėḓ|řėĵėƈŧėḓ) ȧřė řėɋůïřėḓ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "setup.charter_usage_day": {
+        "en": "Spent today: {spent} of {limit}",
+        "ja": "本日の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} őƒ {limit} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.charter_usage_month": {
+        "en": "Spent this month: {spent} of {limit}",
+        "ja": "今月の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} őƒ {limit} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_proposals_title": {
+        "en": "Things the AI could not do (change proposals)",
+        "ja": "AI が実行できなかったこと(変更の提案)",
+        "qps-ploc": "⟦Ŧħïñɠş ŧħė ȦÏ ƈőůŀḓ ñőŧ ḓő (ƈħȧñɠė ṗřőṗőşȧŀş) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.charter_proposal_line": {
+        "en": "Refused {count} time(s) — {field}: {current} → {requested}",
+        "ja": "{count} 回拒否 — {field}: {current} → {requested}",
+        "qps-ploc": "⟦Řėƒůşėḓ {count} ŧïɱė(ş) — {field}: {current} → {requested} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.charter_proposal_apply": {
+        "en": "Put this in the form",
+        "ja": "フォームに入れる",
+        "qps-ploc": "⟦Ṗůŧ ŧħïş ïñ ŧħė ƒőřɱ ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
@@ -13093,6 +14923,11 @@
         "en": "Capture from one place and review it safely later",
         "ja": "ひとつの作業場所から記録し、あとで安全に振り返る",
         "qps-ploc": "⟦Ƈȧṗŧůřė ƒřőɱ őñė ṗŀȧƈė ȧñḓ řėṽïėẇ ïŧ şȧƒėŀẏ ŀȧŧėř ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "error_tenant_required": {
+        "en": "Confidential and personal pads need a tenant scope. Set KYBERION_TENANT (list tenants with `pnpm tenant list`), or run the public pads with `--tier public`.",
+        "ja": "機密・個人パッドにはテナント指定が必要です。KYBERION_TENANT を設定してください（テナント一覧は `pnpm tenant list`）。公開パッドだけを使う場合は `--tier public` を付けて起動します。",
+        "qps-ploc": "⟦Ƈőñƒïḓėñŧïȧŀ ȧñḓ ṗėřşőñȧŀ ṗȧḓş ñėėḓ ȧ ŧėñȧñŧ şƈőṗė. Şėŧ ĶẎɃĖŘÏŐÑ_ŦĖÑȦÑŦ (ŀïşŧ ŧėñȧñŧş ẇïŧħ `ṗñṗɱ ŧėñȧñŧ ŀïşŧ`), őř řůñ ŧħė ṗůƀŀïƈ ṗȧḓş ẇïŧħ `--ŧïėř ṗůƀŀïƈ`. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
       },
       "storage_personal": {
         "en": "This tenant's personal records",
@@ -16023,6 +17858,11 @@
         "en": " (audio was too short; minutes were not generated)",
         "ja": " （音声が短すぎたため議事録は未生成）",
         "qps-ploc": "⟦ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "segment_transcription_failed": {
+        "en": "(Transcription of segment {segment} failed: {detail})",
+        "ja": "(segment {segment} の文字起こしに失敗: {detail})",
+        "qps-ploc": "⟦(Ŧřȧñşƈřïṗŧïőñ őƒ şėɠɱėñŧ {segment} ƒȧïŀėḓ: {detail}) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       }
     },
     "presence_studio": {
@@ -16128,7 +17968,7 @@
       },
       "email_auth_checking": {
         "en": "Checking email account status...",
-        "ja": "メールアカウント認証状態を確認中...（未認証の場合は CLI で pnpm services:setup を実行してください）",
+        "ja": "メールアカウント認証状態を確認中...（未認証の場合は CLI で pnpm service:setup を実行してください）",
         "qps-ploc": "⟦Ƈħėƈķïñɠ ėɱȧïŀ ȧƈƈőůñŧ şŧȧŧůş... ŀőřėɱ ïṗşů⟧"
       },
       "account_auto": {
@@ -16625,6 +18465,21 @@
         "en": "Failed to generate minutes",
         "ja": "議事録の生成に失敗しました",
         "qps-ploc": "⟦Ƒȧïŀėḓ ŧő ɠėñėřȧŧė ɱïñůŧėş ŀőřėɱ ïṗ⟧"
+      },
+      "minutes_already_recording": {
+        "en": "Already recording ({missionId})",
+        "ja": "既に録音中です ({missionId})",
+        "qps-ploc": "⟦Ȧŀřėȧḓẏ řėƈőřḓïñɠ ({missionId}) ŀőřėɱ ïṗşů⟧"
+      },
+      "minutes_mic_unavailable": {
+        "en": "The microphone is not available",
+        "ja": "マイクが利用できません",
+        "qps-ploc": "⟦Ŧħė ɱïƈřőṗħőñė ïş ñőŧ ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşů⟧"
+      },
+      "minutes_no_active_session": {
+        "en": "There is no recording session in progress",
+        "ja": "録音中のセッションがありません",
+        "qps-ploc": "⟦Ŧħėřė ïş ñő řėƈőřḓïñɠ şėşşïőñ ïñ ṗřőɠřėşş ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "tui": {
@@ -17499,6 +19354,896 @@
         "en": "A hands-on mirror for the current browser and terminal work.",
         "ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
         "qps-ploc": "⟦Ȧ ħȧñḓş-őñ ɱïřřőř ƒőř ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "steering_status_unavailable": {
+        "en": "State: could not fetch the status of mission {missionId}.",
+        "ja": "状態: ミッション {missionId} の状態を取得できませんでした。",
+        "qps-ploc": "⟦Şŧȧŧė: ƈőůŀḓ ñőŧ ƒėŧƈħ ŧħė şŧȧŧůş őƒ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "steering_status_unavailable_next": {
+        "en": "Next action: Check the mission ID and your permissions.",
+        "ja": "次のアクション: ミッションIDと権限を確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ ÏḒ ȧñḓ ẏőůř ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_status_current": {
+        "en": "State: Mission {missionId} is currently {status}.",
+        "ja": "状態: ミッション {missionId} は現在 {status} です。",
+        "qps-ploc": "⟦Şŧȧŧė: Ɱïşşïőñ {missionId} ïş ƈůřřėñŧŀẏ {status}. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "steering_status_recent_history": {
+        "en": "Result: recent history\n{history}",
+        "ja": "結果: 直近の履歴\n{history}",
+        "qps-ploc": "⟦Řėşůŀŧ: řėƈėñŧ ħïşŧőřẏ\n{history} ŀőřėɱ ïṗşů⟧"
+      },
+      "steering_next_action_line": {
+        "en": "Next action: {action}",
+        "ja": "次のアクション: {action}",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: {action} ŀőřėɱ ⟧"
+      },
+      "steering_none": {
+        "en": "None.",
+        "ja": "特にありません。",
+        "qps-ploc": "⟦Ñőñė. ŀőř⟧"
+      },
+      "steering_status_failed": {
+        "en": "State: failed to fetch the status of mission {missionId} ({error}).",
+        "ja": "状態: ミッション {missionId} の状態取得に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: ƒȧïŀėḓ ŧő ƒėŧƈħ ŧħė şŧȧŧůş őƒ ɱïşşïőñ {missionId} ({error}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "steering_retry_later": {
+        "en": "Next action: Please try again later.",
+        "ja": "次のアクション: しばらくしてから再度お試しください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ṗŀėȧşė ŧřẏ ȧɠȧïñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_checkpoint_default_note": {
+        "en": "Steering checkpoint via {surface}",
+        "ja": "{surface} 経由の操縦チェックポイント",
+        "qps-ploc": "⟦Şŧėėřïñɠ ƈħėƈķṗőïñŧ ṽïȧ {surface} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_checkpoint_recorded": {
+        "en": "State: Recorded a checkpoint for mission {missionId}.",
+        "ja": "状態: ミッション {missionId} にチェックポイントを記録しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Řėƈőřḓėḓ ȧ ƈħėƈķṗőïñŧ ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_result_line": {
+        "en": "Result: {text}",
+        "ja": "結果: {text}",
+        "qps-ploc": "⟦Řėşůŀŧ: {text} ŀőřė⟧"
+      },
+      "steering_continue_work": {
+        "en": "Next action: Please continue the work.",
+        "ja": "次のアクション: 作業を継続してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ṗŀėȧşė ƈőñŧïñůė ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_checkpoint_failed": {
+        "en": "State: Failed to record the checkpoint ({error}).",
+        "ja": "状態: チェックポイントの記録に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő řėƈőřḓ ŧħė ƈħėƈķṗőïñŧ ({error}). ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "steering_check_then_retry": {
+        "en": "Next action: Check the mission state, then try again.",
+        "ja": "次のアクション: ミッションの状態を確認してから再試行してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ şŧȧŧė, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_pause_reason": {
+        "en": "Steering pause via {surface}",
+        "ja": "{surface} 経由の操縦一時停止",
+        "qps-ploc": "⟦Şŧėėřïñɠ ṗȧůşė ṽïȧ {surface} ŀőřėɱ ïṗş⟧"
+      },
+      "steering_paused": {
+        "en": "State: Paused mission {missionId}.",
+        "ja": "状態: ミッション {missionId} を一時停止しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Ṗȧůşėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_paused_next": {
+        "en": "Next action: To resume, send \"resume\".",
+        "ja": "次のアクション: 再開する場合は「再開」と送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ŧő řėşůɱė, şėñḓ \"řėşůɱė\". ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_pause_failed": {
+        "en": "State: Failed to pause ({error}).",
+        "ja": "状態: 一時停止に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő ṗȧůşė ({error}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_check_state": {
+        "en": "Next action: Check the mission state.",
+        "ja": "次のアクション: ミッションの状態を確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ şŧȧŧė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_resumed": {
+        "en": "State: Resumed mission {missionId}.",
+        "ja": "状態: ミッション {missionId} を再開しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Řėşůɱėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_resumed_next": {
+        "en": "Next action: You can check progress with \"status\".",
+        "ja": "次のアクション: 進捗は「ステータス」で確認できます。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ẏőů ƈȧñ ƈħėƈķ ṗřőɠřėşş ẇïŧħ \"şŧȧŧůş\". ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "steering_resume_failed": {
+        "en": "State: Failed to resume ({error}).",
+        "ja": "状態: 再開に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő řėşůɱė ({error}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_note_line": {
+        "en": "Note: {note}",
+        "ja": "メモ: {note}",
+        "qps-ploc": "⟦Ñőŧė: {note} ŀőř⟧"
+      },
+      "steering_gate_title": {
+        "en": "Gate approval for mission {missionId}",
+        "ja": "ミッション {missionId} のゲート承認",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ ƒőř ɱïşşïőñ {missionId} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_gate_summary_note": {
+        "en": "Gate approval request: {note}",
+        "ja": "ゲート承認要求: {note}",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ řėɋůėşŧ: {note} ŀőřėɱ ïṗş⟧"
+      },
+      "steering_gate_summary": {
+        "en": "Gate approval request for mission {missionId}.",
+        "ja": "ミッション {missionId} のゲート承認要求です。",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ řėɋůėşŧ ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_verb_gate": {
+        "en": "gate approval",
+        "ja": "ゲート承認",
+        "qps-ploc": "⟦ɠȧŧė ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "steering_finish_not_found": {
+        "en": "State: Cannot finish mission {missionId} because it was not found.",
+        "ja": "状態: ミッション {missionId} が見つからないため完了にできません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈȧññőŧ ƒïñïşħ ɱïşşïőñ {missionId} ƀėƈȧůşė ïŧ ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "steering_check_mission_id": {
+        "en": "Next action: Check the mission ID.",
+        "ja": "次のアクション: ミッションIDを確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ ÏḒ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_gap_unknown": {
+        "en": "- (details unknown)",
+        "ja": "- (詳細不明)",
+        "qps-ploc": "⟦- (ḓėŧȧïŀş ůñķñőẇñ) ŀőřėɱ ⟧"
+      },
+      "steering_finish_unsatisfied": {
+        "en": "State: Cannot finish mission {missionId} because the completion criteria (IL-04) are not met.",
+        "ja": "状態: ミッション {missionId} は完了条件(IL-04)を満たしていないため完了にできません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈȧññőŧ ƒïñïşħ ɱïşşïőñ {missionId} ƀėƈȧůşė ŧħė ƈőɱṗŀėŧïőñ ƈřïŧėřïȧ (ÏĿ-04) ȧřė ñőŧ ɱėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "steering_finish_gaps": {
+        "en": "Result: unmet gaps\n{gaps}",
+        "ja": "結果: 未充足のギャップ\n{gaps}",
+        "qps-ploc": "⟦Řėşůŀŧ: ůñɱėŧ ɠȧṗş\n{gaps} ŀőřėɱ ïṗ⟧"
+      },
+      "steering_finish_gaps_next": {
+        "en": "Next action: Resolve the gaps above, then send \"finish\" again.",
+        "ja": "次のアクション: 上記のギャップを解消してから、再度「完了にして」と送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Řėşőŀṽė ŧħė ɠȧṗş ȧƀőṽė, ŧħėñ şėñḓ \"ƒïñïşħ\" ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "steering_finish_title": {
+        "en": "Finish mission {missionId}",
+        "ja": "ミッション {missionId} の完了",
+        "qps-ploc": "⟦Ƒïñïşħ ɱïşşïőñ {missionId} ŀőřėɱ ïṗ⟧"
+      },
+      "steering_finish_summary": {
+        "en": "Finish mission {missionId}. The completion criteria (IL-04) are met.",
+        "ja": "ミッション {missionId} を完了(finish)します。完了条件(IL-04)は満たされています。",
+        "qps-ploc": "⟦Ƒïñïşħ ɱïşşïőñ {missionId}. Ŧħė ƈőɱṗŀėŧïőñ ƈřïŧėřïȧ (ÏĿ-04) ȧřė ɱėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "steering_verb_finish": {
+        "en": "finish",
+        "ja": "完了(finish)",
+        "qps-ploc": "⟦ƒïñïşħ ŀőř⟧"
+      },
+      "steering_authority_lost": {
+        "en": "State: The approved action ({verb}) was not executed — this thread has lost ownership of mission {missionId} ({caseId}).",
+        "ja": "状態: 承認された操作({verb})は実行されませんでした — このスレッドはミッション {missionId} の所有権を失っています({caseId})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħė ȧṗṗřőṽėḓ ȧƈŧïőñ ({verb}) ẇȧş ñőŧ ėẋėƈůŧėḓ — ŧħïş ŧħřėȧḓ ħȧş ŀőşŧ őẇñėřşħïṗ őƒ ɱïşşïőñ {missionId} ({caseId}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "steering_outcome_gate_approved": {
+        "en": "Approved the gate for mission {missionId}.",
+        "ja": "ミッション {missionId} のゲートを承認しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŧħė ɠȧŧė ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "steering_outcome_finished": {
+        "en": "Finished mission {missionId}.",
+        "ja": "ミッション {missionId} を完了しました。",
+        "qps-ploc": "⟦Ƒïñïşħėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗş⟧"
+      },
+      "steering_outcome_line": {
+        "en": "State: {outcome}",
+        "ja": "状態: {outcome}",
+        "qps-ploc": "⟦Şŧȧŧė: {outcome} ŀőřėɱ⟧"
+      },
+      "steering_check_status_next": {
+        "en": "Next action: Check with \"status\" if needed.",
+        "ja": "次のアクション: 必要であれば「ステータス」で確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ẇïŧħ \"şŧȧŧůş\" ïƒ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "steering_label_steer": {
+        "en": "steering instruction",
+        "ja": "操縦指示",
+        "qps-ploc": "⟦şŧėėřïñɠ ïñşŧřůƈŧïőñ ŀőřėɱ ⟧"
+      },
+      "steering_label_follow_up": {
+        "en": "next-turn instruction",
+        "ja": "次回 turn 指示",
+        "qps-ploc": "⟦ñėẋŧ-ŧůřñ ïñşŧřůƈŧïőñ ŀőřėɱ ⟧"
+      },
+      "steering_queued": {
+        "en": "State: Added the {label} to the queue.",
+        "ja": "状態: {label}を queue に追加しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Ȧḓḓėḓ ŧħė {label} ŧő ŧħė ɋůėůė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_queued_next": {
+        "en": "Next action: The running turn is not interrupted; the worker will handle it at the next turn boundary.",
+        "ja": "次のアクション: 実行中の turn は中断せず、次の turn boundary で worker が処理します。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ŧħė řůññïñɠ ŧůřñ ïş ñőŧ ïñŧėřřůṗŧėḓ; ŧħė ẇőřķėř ẇïŀŀ ħȧñḓŀė ïŧ ȧŧ ŧħė ñėẋŧ ŧůřñ ƀőůñḓȧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "steering_unparsed": {
+        "en": "State: Could not interpret the steering intent.",
+        "ja": "状態: 操縦意図を解釈できませんでした。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈőůŀḓ ñőŧ ïñŧėřṗřėŧ ŧħė şŧėėřïñɠ ïñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_unparsed_next": {
+        "en": "Next action: Send one of \"status\", \"checkpoint: <note>\", \"pause\", \"resume\", \"approve\" or \"finish\".",
+        "ja": "次のアクション: 「ステータス」「チェックポイント: <メモ>」「一時停止」「再開」「承認」「完了にして」のいずれかを送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Şėñḓ őñė őƒ \"şŧȧŧůş\", \"ƈħėƈķṗőïñŧ: <ñőŧė>\", \"ṗȧůşė\", \"řėşůɱė\", \"ȧṗṗřőṽė\" őř \"ƒïñïşħ\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "steering_session_missing": {
+        "en": "State: No orchestrator session was found for this thread.",
+        "ja": "状態: このスレッドのオーケストレータセッションが見つかりません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ñő őřƈħėşŧřȧŧőř şėşşïőñ ẇȧş ƒőůñḓ ƒőř ŧħïş ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "steering_session_missing_next": {
+        "en": "Next action: Recreate the session, then steer the mission.",
+        "ja": "次のアクション: セッションを再作成してから操縦してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Řėƈřėȧŧė ŧħė şėşşïőñ, ŧħėñ şŧėėř ŧħė ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "feedback_prompt_line1": {
+        "en": "Feedback: to improve this scenario, reply with \"feedback {scenarioId}: satisfied\", ",
+        "ja": "評価: このシナリオを改善する場合は、「評価 {scenarioId}: 満足」、",
+        "qps-ploc": "⟦Ƒėėḓƀȧƈķ: ŧő ïɱṗřőṽė ŧħïş şƈėñȧřïő, řėṗŀẏ ẇïŧħ \"ƒėėḓƀȧƈķ {scenarioId}: şȧŧïşƒïėḓ\",  ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "feedback_prompt_line2": {
+        "en": "\"feedback {scenarioId}: partially_satisfied: what to fix\", or \"feedback {scenarioId}: dissatisfied: reason\".",
+        "ja": "「評価 {scenarioId}: 一部違う: 修正点」、または「評価 {scenarioId}: 不満: 理由」で返信できます。",
+        "qps-ploc": "⟦\"ƒėėḓƀȧƈķ {scenarioId}: ṗȧřŧïȧŀŀẏ_şȧŧïşƒïėḓ: ẇħȧŧ ŧő ƒïẋ\", őř \"ƒėėḓƀȧƈķ {scenarioId}: ḓïşşȧŧïşƒïėḓ: řėȧşőñ\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "feedback_outcome_satisfied": {
+        "en": "satisfied",
+        "ja": "満足",
+        "qps-ploc": "⟦şȧŧïşƒïėḓ ŀőř⟧"
+      },
+      "feedback_outcome_partially_satisfied": {
+        "en": "partially different",
+        "ja": "一部違う",
+        "qps-ploc": "⟦ṗȧřŧïȧŀŀẏ ḓïƒƒėřėñŧ ŀőřėɱ ⟧"
+      },
+      "feedback_outcome_dissatisfied": {
+        "en": "dissatisfied",
+        "ja": "不満",
+        "qps-ploc": "⟦ḓïşşȧŧïşƒïėḓ ŀőř⟧"
+      },
+      "feedback_recorded": {
+        "en": "Recorded your feedback ({outcome}). It will be reflected as an improvement candidate the next time the \"{scenarioId}\" scenario is generated.",
+        "ja": "評価を記録しました（{outcome}）。次回の「{scenarioId}」シナリオ生成時に改善候補として反映します。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ẏőůř ƒėėḓƀȧƈķ ({outcome}). Ïŧ ẇïŀŀ ƀė řėƒŀėƈŧėḓ ȧş ȧñ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė ŧħė ñėẋŧ ŧïɱė ŧħė \"{scenarioId}\" şƈėñȧřïő ïş ɠėñėřȧŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "slot_correct_last": {
+        "en": "Understood. I will correct {slot}. Please tell me again.",
+        "ja": "了解です。{slot} を修正します。もう一度教えてください。",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ. Ï ẇïŀŀ ƈőřřėƈŧ {slot}. Ṗŀėȧşė ŧėŀŀ ɱė ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "slot_ask_again": {
+        "en": "Understood. Please tell me {slot} again.",
+        "ja": "了解です。{slot} をもう一度教えてください。",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ. Ṗŀėȧşė ŧėŀŀ ɱė {slot} ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "slot_needed": {
+        "en": "I need the information for slot [{slot}]. Please enter it.",
+        "ja": "スロット [{slot}] の情報が必要です。入力してください。",
+        "qps-ploc": "⟦Ï ñėėḓ ŧħė ïñƒőřɱȧŧïőñ ƒőř şŀőŧ [{slot}]. Ṗŀėȧşė ėñŧėř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "session_reopened": {
+        "en": "Reopened the previous session. Tell me what you would like to correct.",
+        "ja": "前回のセッションを再オープンしました。修正したい点を教えてください。",
+        "qps-ploc": "⟦Řėőṗėñėḓ ŧħė ṗřėṽïőůş şėşşïőñ. Ŧėŀŀ ɱė ẇħȧŧ ẏőů ẇőůŀḓ ŀïķė ŧő ƈőřřėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "external_data_url_missing": {
+        "en": "No URL was specified for the data source. Please enter a URL.",
+        "ja": "データ取得先のURLが指定されていません。URLを入力してください。",
+        "qps-ploc": "⟦Ñő ŮŘĿ ẇȧş şṗėƈïƒïėḓ ƒőř ŧħė ḓȧŧȧ şőůřƈė. Ṗŀėȧşė ėñŧėř ȧ ŮŘĿ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "external_data_extract_failed": {
+        "en": "Could not extract text from the fetched page (URL: {url})",
+        "ja": "取得したページからテキストを抽出できませんでした (URL: {url})",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ėẋŧřȧƈŧ ŧėẋŧ ƒřőɱ ŧħė ƒėŧƈħėḓ ṗȧɠė (ŮŘĿ: {url}) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "external_data_fetched": {
+        "en": "Fetched information for **{topic}**.",
+        "ja": "**{topic}** の情報を取得しました。",
+        "qps-ploc": "⟦Ƒėŧƈħėḓ ïñƒőřɱȧŧïőñ ƒőř **{topic}**. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "external_data_omitted": {
+        "en": "\n...({count} more characters omitted)",
+        "ja": "\n...(以降 {count} 文字省略)",
+        "qps-ploc": "⟦\n...({count} ɱőřė ƈħȧřȧƈŧėřş őɱïŧŧėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "external_data_source": {
+        "en": "`Source: {url}`",
+        "ja": "`ソース: {url}`",
+        "qps-ploc": "⟦`Şőůřƈė: {url}` ŀőřė⟧"
+      },
+      "external_data_failed": {
+        "en": "Failed to fetch external data: {error}",
+        "ja": "外部データの取得に失敗しました: {error}",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŧő ƒėŧƈħ ėẋŧėřñȧŀ ḓȧŧȧ: {error} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_approval_completed": {
+        "en": "[Approval-Actuator] Approval action [{action}] completed successfully.\nResult: {result}",
+        "ja": "[Approval-Actuator] 承認アクション [{action}] が正常に完了しました。\n結果: {result}",
+        "qps-ploc": "⟦[Ȧṗṗřőṽȧŀ-Ȧƈŧůȧŧőř] Ȧṗṗřőṽȧŀ ȧƈŧïőñ [{action}] ƈőɱṗŀėŧėḓ şůƈƈėşşƒůŀŀẏ.\nŘėşůŀŧ: {result} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "service_bridge_enabled": {
+        "en": "[Messaging Bridge] Started and enabled the message-sync bridge with {platform}. Verified the connected auth token and completed the channel integration.",
+        "ja": "[Messaging Bridge] {platform} とのメッセージ同期連携ブリッジを正常に起動・有効化しました。接続された認証トークンを確認し、チャンネル統合を完了しました。",
+        "qps-ploc": "⟦[Ɱėşşȧɠïñɠ Ƀřïḓɠė] Şŧȧřŧėḓ ȧñḓ ėñȧƀŀėḓ ŧħė ɱėşşȧɠė-şẏñƈ ƀřïḓɠė ẇïŧħ {platform}. Ṽėřïƒïėḓ ŧħė ƈőññėƈŧėḓ ȧůŧħ ŧőķėñ ȧñḓ ƈőɱṗŀėŧėḓ ŧħė ƈħȧññėŀ ïñŧėɠřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "service_inspected": {
+        "en": "Checked the status of service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] のステータスを確認しました。\n\n{output}",
+        "qps-ploc": "⟦Ƈħėƈķėḓ ŧħė şŧȧŧůş őƒ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "service_started": {
+        "en": "Started service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] を起動しました。\n\n{output}",
+        "qps-ploc": "⟦Şŧȧřŧėḓ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_stopped": {
+        "en": "Stopped service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] を停止しました。\n\n{output}",
+        "qps-ploc": "⟦Şŧőṗṗėḓ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_voice_enabled_detail": {
+        "en": "[System-Actuator] Enabled voice input. Target: {service}\nResult: {result}",
+        "ja": "[System-Actuator] 音声入力を有効化しました。対象: {service}\n結果: {result}",
+        "qps-ploc": "⟦[Şẏşŧėɱ-Ȧƈŧůȧŧőř] Ėñȧƀŀėḓ ṽőïƈė ïñṗůŧ. Ŧȧřɠėŧ: {service}\nŘėşůŀŧ: {result} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "service_operation_executed": {
+        "en": "Service operation [{intent}] executed successfully.",
+        "ja": "サービスオペレーション [{intent}] を正常に実行しました。",
+        "qps-ploc": "⟦Şėřṽïƈė őṗėřȧŧïőñ [{intent}] ėẋėƈůŧėḓ şůƈƈėşşƒůŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "service_voice_enabled": {
+        "en": "Enabled voice input.",
+        "ja": "音声入力を有効化しました。",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ṽőïƈė ïñṗůŧ. ŀőřėɱ ⟧"
+      },
+      "service_operation_completed": {
+        "en": "Operation [{intent}] completed successfully.",
+        "ja": "オペレーション [{intent}] が正常に完了しました。",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ [{intent}] ƈőɱṗŀėŧėḓ şůƈƈėşşƒůŀŀẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "confirmation_needed": {
+        "en": "There are points to confirm.",
+        "ja": "必要な確認点があります。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ṗőïñŧş ŧő ƈőñƒïřɱ. ŀőřėɱ ïṗş⟧"
+      },
+      "confirmation_none": {
+        "en": "I have all the information I need.",
+        "ja": "必要な情報はそろっています。",
+        "qps-ploc": "⟦Ï ħȧṽė ȧŀŀ ŧħė ïñƒőřɱȧŧïőñ Ï ñėėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_completed": {
+        "en": "Completed as a short task.",
+        "ja": "短い作業として完了しました。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ȧş ȧ şħőřŧ ŧȧşķ. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_pending": {
+        "en": "Working on it as a short task.",
+        "ja": "短い作業として進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ȧş ȧ şħőřŧ ŧȧşķ. ŀőřėɱ ïṗşů⟧"
+      },
+      "task_reply_failed": {
+        "en": "Could not complete the short task.",
+        "ja": "短い作業としてうまく進められませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė şħőřŧ ŧȧşķ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_check_done": {
+        "en": "The check is done.",
+        "ja": "確認が終わりました。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ïş ḓőñė. ŀőřėɱ⟧"
+      },
+      "task_reply_schedule_check_done": {
+        "en": "The schedule check is done.",
+        "ja": "予定の確認が終わりました。",
+        "qps-ploc": "⟦Ŧħė şƈħėḓůŀė ƈħėƈķ ïş ḓőñė. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_check_pending": {
+        "en": "Working on the check.",
+        "ja": "確認を進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ŧħė ƈħėƈķ. ŀőřėɱ ⟧"
+      },
+      "task_reply_schedule_check_pending": {
+        "en": "Working on the schedule check.",
+        "ja": "予定の確認を進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ŧħė şƈħėḓůŀė ƈħėƈķ. ŀőřėɱ ïṗşů⟧"
+      },
+      "task_reply_check_failed": {
+        "en": "The check did not go well.",
+        "ja": "うまく進められませんでした。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ḓïḓ ñőŧ ɠő ẇėŀŀ. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_schedule_check_failed": {
+        "en": "The schedule check did not go well.",
+        "ja": "予定の確認がうまく進みませんでした。",
+        "qps-ploc": "⟦Ŧħė şƈħėḓůŀė ƈħėƈķ ḓïḓ ñőŧ ɠő ẇėŀŀ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_slot_schedule_scope": {
+        "en": "scope",
+        "ja": "対象",
+        "qps-ploc": "⟦şƈőṗė ŀőř⟧"
+      },
+      "task_reply_slot_date_range": {
+        "en": "date range",
+        "ja": "期間",
+        "qps-ploc": "⟦ḓȧŧė řȧñɠė ŀőř⟧"
+      },
+      "task_reply_slot_fixed_constraints": {
+        "en": "fixed constraints",
+        "ja": "動かせない条件",
+        "qps-ploc": "⟦ƒïẋėḓ ƈőñşŧřȧïñŧş ŀőřėɱ⟧"
+      },
+      "task_reply_slot_calendar_action_boundary": {
+        "en": "whether to only propose or also update the calendar",
+        "ja": "提案だけか更新まで行うか",
+        "qps-ploc": "⟦ẇħėŧħėř ŧő őñŀẏ ṗřőṗőşė őř ȧŀşő ůṗḓȧŧė ŧħė ƈȧŀėñḓȧř ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "task_reply_slot_meeting_handoff_boundary": {
+        "en": "whether to hand off to meeting coordination",
+        "ja": "会議調整への引き継ぎ可否",
+        "qps-ploc": "⟦ẇħėŧħėř ŧő ħȧñḓ őƒƒ ŧő ɱėėŧïñɠ ƈőőřḓïñȧŧïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "task_reply_list_separator": {
+        "en": ", ",
+        "ja": "、",
+        "qps-ploc": "⟦,  ŀőř⟧"
+      },
+      "task_reply_schedule_missing": {
+        "en": "Points to confirm: {items}",
+        "ja": "確認したい点があります: {items}",
+        "qps-ploc": "⟦Ṗőïñŧş ŧő ƈőñƒïřɱ: {items} ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_missing": {
+        "en": "Information needed: {items}",
+        "ja": "必要な情報があります: {items}",
+        "qps-ploc": "⟦Ïñƒőřɱȧŧïőñ ñėėḓėḓ: {items} ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_stop_candidates": {
+        "en": "Services that can be stopped:",
+        "ja": "停止するサービス候補:",
+        "qps-ploc": "⟦Şėřṽïƈėş ŧħȧŧ ƈȧñ ƀė şŧőṗṗėḓ: ŀőřėɱ ïṗş⟧"
+      },
+      "task_reply_stop_prompt": {
+        "en": "Please specify the name of the service to stop.",
+        "ja": "停止したいサービス名を指定してください。",
+        "qps-ploc": "⟦Ṗŀėȧşė şṗėƈïƒẏ ŧħė ñȧɱė őƒ ŧħė şėřṽïƈė ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "task_reply_start_candidates": {
+        "en": "Services that can be started:",
+        "ja": "起動するサービス候補:",
+        "qps-ploc": "⟦Şėřṽïƈėş ŧħȧŧ ƈȧñ ƀė şŧȧřŧėḓ: ŀőřėɱ ïṗş⟧"
+      },
+      "task_reply_start_prompt": {
+        "en": "Please specify the name of the service to start.",
+        "ja": "起動したいサービス名を指定してください。",
+        "qps-ploc": "⟦Ṗŀėȧşė şṗėƈïƒẏ ŧħė ñȧɱė őƒ ŧħė şėřṽïƈė ŧő şŧȧřŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "task_reply_handoff_meeting": {
+        "en": "If needed, I can hand this off to meeting coordination.",
+        "ja": "必要なら会議調整まで引き継げます。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, Ï ƈȧñ ħȧñḓ ŧħïş őƒƒ ŧő ɱėėŧïñɠ ƈőőřḓïñȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "task_reply_handoff_next": {
+        "en": "If needed, I can hand this off to the next owner.",
+        "ja": "必要なら次の担当に引き継げます。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, Ï ƈȧñ ħȧñḓ ŧħïş őƒƒ ŧő ŧħė ñėẋŧ őẇñėř. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "task_reply_detail": {
+        "en": "Details: {error}",
+        "ja": "詳細: {error}",
+        "qps-ploc": "⟦Ḓėŧȧïŀş: {error} ŀőřėɱ⟧"
+      },
+      "knowledge_reply_none": {
+        "en": "I couldn't find a match. If you want, I can try a different phrasing.",
+        "ja": "見つかった情報はありませんでした。必要なら別の言い方で探し直せます。",
+        "qps-ploc": "⟦Ï ƈőůŀḓñ'ŧ ƒïñḓ ȧ ɱȧŧƈħ. Ïƒ ẏőů ẇȧñŧ, Ï ƈȧñ ŧřẏ ȧ ḓïƒƒėřėñŧ ṗħřȧşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "knowledge_reply_opener": {
+        "en": "Here is the short summary from {provider}: I found {count} item(s).",
+        "ja": "確認できた内容を短くまとめると、{provider} で {count} 件見つかりました。",
+        "qps-ploc": "⟦Ħėřė ïş ŧħė şħőřŧ şůɱɱȧřẏ ƒřőɱ {provider}: Ï ƒőůñḓ {count} ïŧėɱ(ş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "knowledge_reply_tags": {
+        "en": " ({tags})",
+        "ja": "（{tags}）",
+        "qps-ploc": "⟦ ({tags}) ŀőř⟧"
+      },
+      "knowledge_reply_closing": {
+        "en": "If you'd like, I can narrow this down further.",
+        "ja": "必要なら、ここからさらに絞って見ます。",
+        "qps-ploc": "⟦Ïƒ ẏőů'ḓ ŀïķė, Ï ƈȧñ ñȧřřőẇ ŧħïş ḓőẇñ ƒůřŧħėř. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_repair_adf": {
+        "en": "execution flow",
+        "ja": "実行フロー",
+        "qps-ploc": "⟦ėẋėƈůŧïőñ ƒŀőẇ ŀőřė⟧"
+      },
+      "ux_repair_actuator": {
+        "en": "capability",
+        "ja": "機能",
+        "qps-ploc": "⟦ƈȧṗȧƀïŀïŧẏ ŀőř⟧"
+      },
+      "ux_repair_runtime_supervisor": {
+        "en": "control service",
+        "ja": "制御サービス",
+        "qps-ploc": "⟦ƈőñŧřőŀ şėřṽïƈė ŀőřė⟧"
+      },
+      "ux_repair_intent_resolution_packet": {
+        "en": "intent summary",
+        "ja": "意図要約",
+        "qps-ploc": "⟦ïñŧėñŧ şůɱɱȧřẏ ŀőřė⟧"
+      },
+      "ux_repair_execution_shape": {
+        "en": "execution route",
+        "ja": "実行形",
+        "qps-ploc": "⟦ėẋėƈůŧïőñ řőůŧė ŀőřė⟧"
+      },
+      "ux_repair_mission_class": {
+        "en": "mission type",
+        "ja": "ミッション種別",
+        "qps-ploc": "⟦ɱïşşïőñ ŧẏṗė ŀőř⟧"
+      },
+      "ux_repair_workflow_id": {
+        "en": "workflow ID",
+        "ja": "ワークフローID",
+        "qps-ploc": "⟦ẇőřķƒŀőẇ ÏḒ ŀőř⟧"
+      },
+      "ux_repair_needs_clarification": {
+        "en": "needs clarification",
+        "ja": "追加確認が必要",
+        "qps-ploc": "⟦ñėėḓş ƈŀȧřïƒïƈȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "ux_repair_fully_automatable": {
+        "en": "ready to run",
+        "ja": "そのまま実行可能",
+        "qps-ploc": "⟦řėȧḓẏ ŧő řůñ ŀőř⟧"
+      },
+      "ux_repair_needs_external_assets": {
+        "en": "needs external assets",
+        "ja": "外部素材が必要",
+        "qps-ploc": "⟦ñėėḓş ėẋŧėřñȧŀ ȧşşėŧş ŀőřėɱ ⟧"
+      },
+      "ux_repair_missing_runtime_prerequisites": {
+        "en": "missing runtime prerequisites",
+        "ja": "実行環境が不足",
+        "qps-ploc": "⟦ɱïşşïñɠ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "steering_reject_no_session": {
+        "en": "State: This thread is not the owner of mission {missionId} (no orchestrator session has been created).\nNext action: Issue the mission from this thread to become its owner, or ask the current owner's thread to steer it.",
+        "ja": "状態: このスレッドはミッション {missionId} のオーナーではありません(オーケストレータセッション未作成)。\n次のアクション: このスレッドからミッションを発行してオーナーになるか、現在のオーナーのスレッドから操縦を依頼してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ ïş ñőŧ ŧħė őẇñėř őƒ ɱïşşïőñ {missionId} (ñő őřƈħėşŧřȧŧőř şėşşïőñ ħȧş ƀėėñ ƈřėȧŧėḓ).\nÑėẋŧ ȧƈŧïőñ: Ïşşůė ŧħė ɱïşşïőñ ƒřőɱ ŧħïş ŧħřėȧḓ ŧő ƀėƈőɱė ïŧş őẇñėř, őř ȧşķ ŧħė ƈůřřėñŧ őẇñėř'ş ŧħřėȧḓ ŧő şŧėėř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "steering_reject_different_mission": {
+        "en": "State: This thread owns a different mission ({ownerMissionId}) and is not the owner of mission {missionId}.\nNext action: Steer from the target mission's owner thread, or request a handoff.",
+        "ja": "状態: このスレッドは別のミッション({ownerMissionId})のオーナーであり、ミッション {missionId} のオーナーではありません。\n次のアクション: 対象ミッションのオーナースレッドから操縦するか、ハンドオフを依頼してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ őẇñş ȧ ḓïƒƒėřėñŧ ɱïşşïőñ ({ownerMissionId}) ȧñḓ ïş ñőŧ ŧħė őẇñėř őƒ ɱïşşïőñ {missionId}.\nÑėẋŧ ȧƈŧïőñ: Şŧėėř ƒřőɱ ŧħė ŧȧřɠėŧ ɱïşşïőñ'ş őẇñėř ŧħřėȧḓ, őř řėɋůėşŧ ȧ ħȧñḓőƒƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_reject_session_released": {
+        "en": "State: This thread's orchestrator session has been released (reason: {reason}).\nNext action: Create a new orchestrator session, then steer the mission.",
+        "ja": "状態: このスレッドのオーケストレータセッションは解放済みです(理由: {reason})。\n次のアクション: 新しいオーケストレータセッションを作成してから操縦してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ'ş őřƈħėşŧřȧŧőř şėşşïőñ ħȧş ƀėėñ řėŀėȧşėḓ (řėȧşőñ: {reason}).\nÑėẋŧ ȧƈŧïőñ: Ƈřėȧŧė ȧ ñėẇ őřƈħėşŧřȧŧőř şėşşïőñ, ŧħėñ şŧėėř ŧħė ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "steering_reject_lease_expired": {
+        "en": "State: This thread's ownership lease has expired or was reacquired by another process.\nNext action: Recreate the session, or renew the lease on the owner side, then try again.",
+        "ja": "状態: このスレッドの所有権リースが期限切れか、他プロセスに再取得されています。\n次のアクション: セッションを再作成する、またはオーナー側でリースを更新してから再試行してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ'ş őẇñėřşħïṗ ŀėȧşė ħȧş ėẋṗïřėḓ őř ẇȧş řėȧƈɋůïřėḓ ƀẏ ȧñőŧħėř ṗřőƈėşş.\nÑėẋŧ ȧƈŧïőñ: Řėƈřėȧŧė ŧħė şėşşïőñ, őř řėñėẇ ŧħė ŀėȧşė őñ ŧħė őẇñėř şïḓė, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "steering_reject_default": {
+        "en": "State: This thread cannot steer the mission right now ({reason}).\nNext action: Check the owner status, then try the operation again.",
+        "ja": "状態: このスレッドは現在ミッションを操縦できません({reason})。\n次のアクション: オーナー状況を確認のうえ、あらためて操作してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ ƈȧññőŧ şŧėėř ŧħė ɱïşşïőñ řïɠħŧ ñőẇ ({reason}).\nÑėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė őẇñėř şŧȧŧůş, ŧħėñ ŧřẏ ŧħė őṗėřȧŧïőñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "steering_unknown": {
+        "en": "unknown",
+        "ja": "不明",
+        "qps-ploc": "⟦ůñķñőẇñ ŀőř⟧"
+      },
+      "ask_why_incorrect_content": {
+        "en": "Incorrect content",
+        "ja": "内容が誤り",
+        "qps-ploc": "⟦Ïñƈőřřėƈŧ ƈőñŧėñŧ ŀőřėɱ⟧"
+      },
+      "ask_why_wrong_direction": {
+        "en": "Wrong direction",
+        "ja": "方向が違う",
+        "qps-ploc": "⟦Ẇřőñɠ ḓïřėƈŧïőñ ŀőřė⟧"
+      },
+      "ask_why_quality": {
+        "en": "Insufficient quality",
+        "ja": "品質不足",
+        "qps-ploc": "⟦Ïñşůƒƒïƈïėñŧ ɋůȧŀïŧẏ ŀőřėɱ ⟧"
+      },
+      "ask_why_scope": {
+        "en": "Scope too broad or narrow",
+        "ja": "スコープ過不足",
+        "qps-ploc": "⟦Şƈőṗė ŧőő ƀřőȧḓ őř ñȧřřőẇ ŀőřėɱ ïṗ⟧"
+      },
+      "ask_why_other": {
+        "en": "Other",
+        "ja": "その他",
+        "qps-ploc": "⟦Őŧħėř ŀőř⟧"
+      },
+      "ask_why_skip": {
+        "en": "Skip",
+        "ja": "スキップ",
+        "qps-ploc": "⟦Şķïṗ ŀőř⟧"
+      },
+      "ask_why_target_missing": {
+        "en": "This rejection does not exist or is in a different thread.",
+        "ja": "この却下要求は存在しないか、別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş řėĵėƈŧïőñ ḓőėş ñőŧ ėẋïşŧ őř ïş ïñ ȧ ḓïƒƒėřėñŧ ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ask_why_skipped": {
+        "en": "Skipped recording the reason.",
+        "ja": "理由の記録をスキップしました。",
+        "qps-ploc": "⟦Şķïṗṗėḓ řėƈőřḓïñɠ ŧħė řėȧşőñ. ŀőřėɱ ïṗş⟧"
+      },
+      "ask_why_recorded": {
+        "en": "Recorded the rejection reason ({category}). It will be reflected in future improvements.",
+        "ja": "却下理由を記録しました({category})。次回の作業改善に反映されます。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ŧħė řėĵėƈŧïőñ řėȧşőñ ({category}). Ïŧ ẇïŀŀ ƀė řėƒŀėƈŧėḓ ïñ ƒůŧůřė ïɱṗřőṽėɱėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "approval_not_found_or_done": {
+        "en": "This approval request does not exist or has already been handled.",
+        "ja": "この承認要求は存在しないか、すでに処理済みです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ḓőėş ñőŧ ėẋïşŧ őř ħȧş ȧŀřėȧḓẏ ƀėėñ ħȧñḓŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "approval_other_thread": {
+        "en": "This approval request is in a different thread.",
+        "ja": "この承認要求は別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ïş ïñ ȧ ḓïƒƒėřėñŧ ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "approval_expired": {
+        "en": "This approval request has expired.",
+        "ja": "この承認要求は期限切れです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "approval_approved_reply": {
+        "en": "Approved: {title}",
+        "ja": "承認しました: {title}",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ: {title} ŀőřėɱ⟧"
+      },
+      "approval_rejected_reply": {
+        "en": "Rejected: {title}",
+        "ja": "却下しました: {title}",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ: {title} ŀőřėɱ⟧"
+      },
+      "approval_decision_unparsed": {
+        "en": "Could not interpret the approval action.",
+        "ja": "承認操作を解釈できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ïñŧėřṗřėŧ ŧħė ȧṗṗřőṽȧŀ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "approval_none_pending": {
+        "en": "There is no approval request waiting in this thread.",
+        "ja": "このスレッドに処理待ちの承認要求はありません。",
+        "qps-ploc": "⟦Ŧħėřė ïş ñő ȧṗṗřőṽȧŀ řėɋůėşŧ ẇȧïŧïñɠ ïñ ŧħïş ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "approval_multiple_pending": {
+        "en": "There are multiple approval requests. Reply with appr:<id>:approve / reject from the request message.",
+        "ja": "承認要求が複数あります。要求メッセージの appr:<id>:approve / reject を返信してください。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ɱůŀŧïṗŀė ȧṗṗřőṽȧŀ řėɋůėşŧş. Řėṗŀẏ ẇïŧħ ȧṗṗř:<ïḓ>:ȧṗṗřőṽė / řėĵėƈŧ ƒřőɱ ŧħė řėɋůėşŧ ɱėşşȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "agenda_none": {
+        "en": "No events were found for {range}.",
+        "ja": "{range} の予定は見つかりませんでした。",
+        "qps-ploc": "⟦Ñő ėṽėñŧş ẇėřė ƒőůñḓ ƒőř {range}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "agenda_header": {
+        "en": "Events for {range}:",
+        "ja": "{range} の予定:",
+        "qps-ploc": "⟦Ėṽėñŧş ƒőř {range}: ŀőřėɱ ⟧"
+      },
+      "agenda_assume_self": {
+        "en": "Checking the operator's default calendar.",
+        "ja": "本人の既定カレンダーとして確認します。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė őṗėřȧŧőř'ş ḓėƒȧůŀŧ ƈȧŀėñḓȧř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "agenda_assume_range": {
+        "en": "Assuming the period {range}.",
+        "ja": "期間は {range} として補完します。",
+        "qps-ploc": "⟦Ȧşşůɱïñɠ ŧħė ṗėřïőḓ {range}. ŀőřėɱ ïṗş⟧"
+      },
+      "agenda_read_failed": {
+        "en": "Tried to fetch events for {range}, but calendar-actuator could not read them: {error}",
+        "ja": "{range} の予定を取得しようとしましたが、calendar-actuator で読めませんでした: {error}",
+        "qps-ploc": "⟦Ŧřïėḓ ŧő ƒėŧƈħ ėṽėñŧş ƒőř {range}, ƀůŧ ƈȧŀėñḓȧř-ȧƈŧůȧŧőř ƈőůŀḓ ñőŧ řėȧḓ ŧħėɱ: {error} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "operator_event_question": {
+        "en": "❓ Question",
+        "ja": "❓ 質問",
+        "qps-ploc": "⟦❓ Ɋůėşŧïőñ ŀőř⟧"
+      },
+      "operator_event_approval_required": {
+        "en": "🔐 Awaiting approval",
+        "ja": "🔐 承認待ち",
+        "qps-ploc": "⟦🔐 Ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ⟧"
+      },
+      "operator_event_mission_completed": {
+        "en": "✅ Mission completed",
+        "ja": "✅ ミッション完了",
+        "qps-ploc": "⟦✅ Ɱïşşïőñ ƈőɱṗŀėŧėḓ ŀőřėɱ ⟧"
+      },
+      "operator_event_mission_failed": {
+        "en": "❌ Mission failed",
+        "ja": "❌ ミッション失敗",
+        "qps-ploc": "⟦❌ Ɱïşşïőñ ƒȧïŀėḓ ŀőřėɱ⟧"
+      },
+      "operator_event_deliverable_ready": {
+        "en": "📦 Deliverable",
+        "ja": "📦 成果物",
+        "qps-ploc": "⟦📦 Ḓėŀïṽėřȧƀŀė ŀőřė⟧"
+      },
+      "operator_event_ops_alert": {
+        "en": "🚨 Ops alert",
+        "ja": "🚨 運用アラート",
+        "qps-ploc": "⟦🚨 Őṗş ȧŀėřŧ ŀőř⟧"
+      },
+      "recovery_next_step": {
+        "en": "Next step: {value}",
+        "ja": "次の一手: {value}",
+        "qps-ploc": "⟦Ñėẋŧ şŧėṗ: {value} ŀőřėɱ⟧"
+      },
+      "recovery_command": {
+        "en": "Command: {value}",
+        "ja": "実行コマンド: {value}",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ: {value} ŀőřėɱ⟧"
+      },
+      "recovery_fallback": {
+        "en": "Fallback: {value}",
+        "ja": "代替手段: {value}",
+        "qps-ploc": "⟦Ƒȧŀŀƀȧƈķ: {value} ŀőřėɱ⟧"
+      },
+      "async_accepted": {
+        "en": "Accepted. Routing this to {receiver}. The request id is {requestId}. You can track it in Presence Studio async requests, and I will notify this surface when it completes.",
+        "ja": "依頼を受け付けました。{receiver} に回しています。リクエストIDは {requestId} です。進行状況は Presence Studio の async requests で確認でき、完了したらこの surface に通知します。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧėḓ. Řőůŧïñɠ ŧħïş ŧő {receiver}. Ŧħė řėɋůėşŧ ïḓ ïş {requestId}. Ẏőů ƈȧñ ŧřȧƈķ ïŧ ïñ Ṗřėşėñƈė Şŧůḓïő ȧşẏñƈ řėɋůėşŧş, ȧñḓ Ï ẇïŀŀ ñőŧïƒẏ ŧħïş şůřƒȧƈė ẇħėñ ïŧ ƈőɱṗŀėŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "voice_tts_request_id_token": {
+        "en": "request id",
+        "ja": "リクエストID",
+        "qps-ploc": "⟦řėɋůėşŧ ïḓ ŀőř⟧"
+      },
+      "voice_tts_url_token": {
+        "en": "link",
+        "ja": "URL",
+        "qps-ploc": "⟦ŀïñķ ŀőř⟧"
+      },
+      "photo_captured": {
+        "en": "Photo captured.",
+        "ja": "写真を取得しました。",
+        "qps-ploc": "⟦Ṗħőŧő ƈȧṗŧůřėḓ. ŀőřė⟧"
+      },
+      "photo_camera_used": {
+        "en": "Camera used: {camera}",
+        "ja": "使用カメラ: {camera}",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ůşėḓ: {camera} ŀőřėɱ ⟧"
+      },
+      "photo_saved_to": {
+        "en": "Saved to: {path}",
+        "ja": "保存先: {path}",
+        "qps-ploc": "⟦Şȧṽėḓ ŧő: {path} ŀőřėɱ⟧"
+      },
+      "collab_event_received": {
+        "en": "Event received",
+        "ja": "イベントを受信しました",
+        "qps-ploc": "⟦Ėṽėñŧ řėƈėïṽėḓ ŀőřė⟧"
+      },
+      "surface_enable_hint": {
+        "en": "Disabled. Enable with: pnpm surfaces enable --surface {surface}",
+        "ja": "無効です。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ. Ėñȧƀŀė ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_gateway_disabled_by_default_warning": {
+        "en": "Gateway \"{surface}\" has credentials configured but is now disabled by default, so it was not started. Enable it with: pnpm surfaces enable --surface {surface}",
+        "ja": "ゲートウェイ「{surface}」は認証情報が設定済みですが、既定で無効になったため起動していません。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ɠȧŧėẇȧẏ \"{surface}\" ħȧş ƈřėḓėñŧïȧŀş ƈőñƒïɠůřėḓ ƀůŧ ïş ñőẇ ḓïşȧƀŀėḓ ƀẏ ḓėƒȧůŀŧ, şő ïŧ ẇȧş ñőŧ şŧȧřŧėḓ. Ėñȧƀŀė ïŧ ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
+      },
+      "surface_notes_slack_bridge": {
+        "en": "External channel ingress. Auth readiness matters before runtime repair.",
+        "ja": "外部チャネルの受け口です。復旧の前に、まず認証の準備を確認してください。",
+        "qps-ploc": "⟦Ėẋŧėřñȧŀ ƈħȧññėŀ ïñɠřėşş. Ȧůŧħ řėȧḓïñėşş ɱȧŧŧėřş ƀėƒőřė řůñŧïɱė řėṗȧïř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "surface_notes_oauth_callback_surface": {
+        "en": "Loopback-only helper for completing OAuth handshakes into personal connections.",
+        "ja": "OAuth 認証を完了し、個人の接続情報に保存するための、ローカル専用の受け口です。",
+        "qps-ploc": "⟦Ŀőőṗƀȧƈķ-őñŀẏ ħėŀṗėř ƒőř ƈőɱṗŀėŧïñɠ ŐȦůŧħ ħȧñḓşħȧķėş ïñŧő ṗėřşőñȧŀ ƈőññėƈŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "surface_notes_chronos_mirror_v2": {
+        "en": "Primary operator control UI for mission and runtime visibility.",
+        "ja": "ミッションと実行状況を確認する、主要な運用画面です。",
+        "qps-ploc": "⟦Ṗřïɱȧřẏ őṗėřȧŧőř ƈőñŧřőŀ ŮÏ ƒőř ɱïşşïőñ ȧñḓ řůñŧïɱė ṽïşïƀïŀïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_notes_presence_studio": {
+        "en": "Best suited for expressive voice / transcript feedback during first-win demos.",
+        "ja": "最初のデモで、音声や文字起こしの反応を見せるのに向いています。",
+        "qps-ploc": "⟦Ƀėşŧ şůïŧėḓ ƒőř ėẋṗřėşşïṽė ṽőïƈė / ŧřȧñşƈřïṗŧ ƒėėḓƀȧƈķ ḓůřïñɠ ƒïřşŧ-ẇïñ ḓėɱőş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "surface_notes_voice_hub": {
+        "en": "Pairs with Presence Studio. Browser and OS permissions usually fail before the runtime itself.",
+        "ja": "スタジオと組み合わせて使います。多くの場合、本体より先にブラウザや OS の権限で止まります。",
+        "qps-ploc": "⟦Ṗȧïřş ẇïŧħ Ṗřėşėñƈė Şŧůḓïő. Ƀřőẇşėř ȧñḓ ŐŞ ṗėřɱïşşïőñş ůşůȧŀŀẏ ƒȧïŀ ƀėƒőřė ŧħė řůñŧïɱė ïŧşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "surface_notes_computer_surface": {
+        "en": "Use for governed browser or terminal walkthroughs after runtime is already healthy.",
+        "ja": "実行環境が正常になってから、ブラウザやターミナルの操作を見せるときに使います。",
+        "qps-ploc": "⟦Ůşė ƒőř ɠőṽėřñėḓ ƀřőẇşėř őř ŧėřɱïñȧŀ ẇȧŀķŧħřőůɠħş ȧƒŧėř řůñŧïɱė ïş ȧŀřėȧḓẏ ħėȧŀŧħẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "surface_notes_terminal_bridge": {
+        "en": "Background bridge. Operators usually feel breakage here indirectly through control surfaces.",
+        "ja": "裏で動く中継です。不具合は、操作画面の挙動を通じて間接的に気づくことが多いです。",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ ƀřïḓɠė. Őṗėřȧŧőřş ůşůȧŀŀẏ ƒėėŀ ƀřėȧķȧɠė ħėřė ïñḓïřėƈŧŀẏ ŧħřőůɠħ ƈőñŧřőŀ şůřƒȧƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "surface_notes_mcp_server_cowork": {
+        "en": "Desktop integration surface. Good fit when the operator already lives in an MCP client.",
+        "ja": "デスクトップ連携用の窓口です。普段から MCP クライアントを使っている人に向いています。",
+        "qps-ploc": "⟦Ḓėşķŧőṗ ïñŧėɠřȧŧïőñ şůřƒȧƈė. Ɠőőḓ ƒïŧ ẇħėñ ŧħė őṗėřȧŧőř ȧŀřėȧḓẏ ŀïṽėş ïñ ȧñ ⱮƇṖ ƈŀïėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "surface_notes_default": {
+        "en": "Managed runtime surface exposed through the surface manifest catalog.",
+        "ja": "サーフェス定義から管理されている実行画面です。",
+        "qps-ploc": "⟦Ɱȧñȧɠėḓ řůñŧïɱė şůřƒȧƈė ėẋṗőşėḓ ŧħřőůɠħ ŧħė şůřƒȧƈė ɱȧñïƒėşŧ ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "surface_best_for_presence_studio": {
+        "en": "short conversation, transcript feedback, first-run launcher",
+        "ja": "短い会話、文字起こしの確認、初回の起動画面",
+        "qps-ploc": "⟦şħőřŧ ƈőñṽėřşȧŧïőñ, ŧřȧñşƈřïṗŧ ƒėėḓƀȧƈķ, ƒïřşŧ-řůñ ŀȧůñƈħėř ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "surface_best_for_voice_hub": {
+        "en": "realtime voice ingress and spoken replies",
+        "ja": "リアルタイムの音声入力と、音声での返答",
+        "qps-ploc": "⟦řėȧŀŧïɱė ṽőïƈė ïñɠřėşş ȧñḓ şṗőķėñ řėṗŀïėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "surface_best_for_chronos_mirror_v2": {
+        "en": "durable work, mission visibility, and runtime control",
+        "ja": "継続的な作業、ミッションの確認、実行の制御",
+        "qps-ploc": "⟦ḓůřȧƀŀė ẇőřķ, ɱïşşïőñ ṽïşïƀïŀïŧẏ, ȧñḓ řůñŧïɱė ƈőñŧřőŀ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "surface_best_for_slack_bridge": {
+        "en": "threaded remote requests and follow-up",
+        "ja": "スレッドでの遠隔依頼とフォローアップ",
+        "qps-ploc": "⟦ŧħřėȧḓėḓ řėɱőŧė řėɋůėşŧş ȧñḓ ƒőŀŀőẇ-ůṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "surface_best_for_computer_surface": {
+        "en": "guided browser and terminal walkthroughs",
+        "ja": "ブラウザとターミナルの操作案内",
+        "qps-ploc": "⟦ɠůïḓėḓ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇȧŀķŧħřőůɠħş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "surface_best_for_oauth_callback_surface": {
+        "en": "interactive OAuth callback completion",
+        "ja": "OAuth のコールバック完了",
+        "qps-ploc": "⟦ïñŧėřȧƈŧïṽė ŐȦůŧħ ƈȧŀŀƀȧƈķ ƈőɱṗŀėŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "surface_best_for_mcp_server_cowork": {
+        "en": "desktop MCP integration",
+        "ja": "デスクトップの MCP 連携",
+        "qps-ploc": "⟦ḓėşķŧőṗ ⱮƇṖ ïñŧėɠřȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "surface_best_for_default": {
+        "en": "managed runtime access",
+        "ja": "管理された実行画面へのアクセス",
+        "qps-ploc": "⟦ɱȧñȧɠėḓ řůñŧïɱė ȧƈƈėşş ŀőřėɱ ï⟧"
       }
     },
     "computer_surface": {
@@ -18445,9 +21190,9 @@
         "qps-ploc": "⟦Şŧȧřŧ ŧħė ïñṽėñŧőřẏ ŀőřėɱ ⟧"
       },
       "progress_work_inventory_operator_hint": {
-        "en": "Detailed setup runs through pnpm inventory.",
-        "ja": "詳しい操作は pnpm inventory で行えます。",
-        "qps-ploc": "⟦Ḓėŧȧïŀėḓ şėŧůṗ řůñş ŧħřőůɠħ ṗñṗɱ ïñṽėñŧőřẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "en": "Detailed setup runs through pnpm work:inventory.",
+        "ja": "詳しい操作は pnpm work:inventory で行えます。",
+        "qps-ploc": "⟦Ḓėŧȧïŀėḓ şėŧůṗ řůñş ŧħřőůɠħ ṗñṗɱ ẇőřķ:ïñṽėñŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "progress_work_inventory_empty": {
         "en": "Once you inventory your regular work, automation candidates worth handing off will show up here.",
@@ -21689,6 +24434,66 @@
         "en": "⚠️  {what}: {reason}",
         "ja": "⚠️  {what}: {reason}",
         "qps-ploc": "⟦⚠️  {what}: {reason} ŀőřėɱ ⟧"
+      },
+      "repair_resume": {
+        "en": "Resuming the repair session for {sampleId}. The first recording and verification are not rerun.",
+        "ja": "{sampleId} の修復セッションを再開します。初回録音と確認を再実行しません。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ŧħė řėṗȧïř şėşşïőñ ƒőř {sampleId}. Ŧħė ƒïřşŧ řėƈőřḓïñɠ ȧñḓ ṽėřïƒïƈȧŧïőñ ȧřė ñőŧ řėřůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "repair_stt_checking": {
+        "en": "Verifying {sampleId} with STT (preferring a timestamped backend)...",
+        "ja": "{sampleId} のSTT確認中（タイムスタンプ付きバックエンドを優先）...",
+        "qps-ploc": "⟦Ṽėřïƒẏïñɠ {sampleId} ẇïŧħ ŞŦŦ (ṗřėƒėřřïñɠ ȧ ŧïɱėşŧȧɱṗėḓ ƀȧƈķėñḓ)... ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "repair_stt_start_failed": {
+        "en": "Could not start STT verification: {detail}",
+        "ja": "STT確認を開始できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ŞŦŦ ṽėřïƒïƈȧŧïőñ: {detail} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "repair_stt_ok": {
+        "en": "{sampleId} passed STT verification. No re-recording is needed.",
+        "ja": "{sampleId} STT確認OK。再録音は不要です。",
+        "qps-ploc": "⟦{sampleId} ṗȧşşėḓ ŞŦŦ ṽėřïƒïƈȧŧïőñ. Ñő řė-řėƈőřḓïñɠ ïş ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "repair_no_timestamps": {
+        "en": "Cannot locate the sentence with timestamped STT, so a safe partial replacement cannot run. Check the STT settings and retry.",
+        "ja": "タイムスタンプ付きSTTで文の位置を特定できないため、安全な部分置換を実行できません。STT設定を確認してから再試行してください。",
+        "qps-ploc": "⟦Ƈȧññőŧ ŀőƈȧŧė ŧħė şėñŧėñƈė ẇïŧħ ŧïɱėşŧȧɱṗėḓ ŞŦŦ, şő ȧ şȧƒė ṗȧřŧïȧŀ řėṗŀȧƈėɱėñŧ ƈȧññőŧ řůñ. Ƈħėƈķ ŧħė ŞŦŦ şėŧŧïñɠş ȧñḓ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "repair_segment_mismatch": {
+        "en": "{sampleId} repair {index}/{total}: {segmentId} does not match. Re-recording only this sentence ({attempt}/{maxAttempts}).\nScript: \"{text}\"",
+        "ja": "{sampleId} 修復 {index}/{total} {segmentId} が不一致。この文だけ再録音します ({attempt}/{maxAttempts})。\n原稿: 「{text}」",
+        "qps-ploc": "⟦{sampleId} řėṗȧïř {index}/{total}: {segmentId} ḓőėş ñőŧ ɱȧŧƈħ. Řė-řėƈőřḓïñɠ őñŀẏ ŧħïş şėñŧėñƈė ({attempt}/{maxAttempts}).\nŞƈřïṗŧ: \"{text}\" ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "repair_stt_failed": {
+        "en": "STT verification failed: {detail}",
+        "ja": "STT確認に失敗: {detail}",
+        "qps-ploc": "⟦ŞŦŦ ṽėřïƒïƈȧŧïőñ ƒȧïŀėḓ: {detail} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "repair_no_source_span": {
+        "en": "Partial replacement aborted because the source audio span of {segmentId} could not be located",
+        "ja": "{segmentId} の元音声区間を特定できないため、部分置換を中止しました",
+        "qps-ploc": "⟦Ṗȧřŧïȧŀ řėṗŀȧƈėɱėñŧ ȧƀőřŧėḓ ƀėƈȧůşė ŧħė şőůřƈė ȧůḓïő şṗȧñ őƒ {segmentId} ƈőůŀḓ ñőŧ ƀė ŀőƈȧŧėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "repair_done": {
+        "en": "Re-recorded only the mismatched sentences of {sampleId} and passed STT verification.",
+        "ja": "{sampleId} のズレた文だけ再録音し、STT確認を通過しました。",
+        "qps-ploc": "⟦Řė-řėƈőřḓėḓ őñŀẏ ŧħė ɱïşɱȧŧƈħėḓ şėñŧėñƈėş őƒ {sampleId} ȧñḓ ṗȧşşėḓ ŞŦŦ ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "recorder_prompt_text": {
+        "en": "Text to read aloud:\n\"{text}\"",
+        "ja": "読み上げる文章:\n「{text}」",
+        "qps-ploc": "⟦Ŧėẋŧ ŧő řėȧḓ ȧŀőůḓ:\n\"{text}\" ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_countdown": {
+        "en": "Mic on in {seconds}s...",
+        "ja": "マイク ON まで {seconds} 秒...",
+        "qps-ploc": "⟦Ɱïƈ őñ ïñ {seconds}ş... ŀőřėɱ ï⟧"
+      },
+      "recorder_start": {
+        "en": "Recording started. Read the following text aloud exactly as written:\n\"{text}\"",
+        "ja": "録音開始。次の文章をそのまま読み上げてください:\n「{text}」",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ şŧȧřŧėḓ. Řėȧḓ ŧħė ƒőŀŀőẇïñɠ ŧėẋŧ ȧŀőůḓ ėẋȧƈŧŀẏ ȧş ẇřïŧŧėñ:\n\"{text}\" ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       }
     },
     "plugin": {
@@ -22480,6 +25285,510 @@
         "en": "Too many sign-in attempts. Wait a minute and try again.",
         "ja": "サインインの試行が多すぎます。1 分ほど待ってからもう一度お試しください。",
         "qps-ploc": "⟦Ŧőő ɱȧñẏ şïɠñ-ïñ ȧŧŧėɱṗŧş. Ẇȧïŧ ȧ ɱïñůŧė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      }
+    },
+    "integrations": {
+      "slack_onboarding_q_name": {
+        "en": "First, what should I call you?",
+        "ja": "まず、どのようにお呼びすれば良いですか？",
+        "qps-ploc": "⟦Ƒïřşŧ, ẇħȧŧ şħőůŀḓ Ï ƈȧŀŀ ẏőů? ŀőřėɱ ïṗşů⟧"
+      },
+      "slack_onboarding_q_language": {
+        "en": "Which language would you like to use for everyday conversation? e.g. Japanese / English",
+        "ja": "普段のやり取りで使いたい言語を教えてください。例: Japanese / English",
+        "qps-ploc": "⟦Ẇħïƈħ ŀȧñɠůȧɠė ẇőůŀḓ ẏőů ŀïķė ŧő ůşė ƒőř ėṽėřẏḓȧẏ ƈőñṽėřşȧŧïőñ? ė.ɠ. Ĵȧṗȧñėşė / Ėñɠŀïşħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "slack_onboarding_q_interaction_style": {
+        "en": "Which interaction style do you prefer? Choose from Senior Partner / Concierge / Minimalist.",
+        "ja": "対話スタイルはどうしますか？ Senior Partner / Concierge / Minimalist から選んでください。",
+        "qps-ploc": "⟦Ẇħïƈħ ïñŧėřȧƈŧïőñ şŧẏŀė ḓő ẏőů ṗřėƒėř? Ƈħőőşė ƒřőɱ Şėñïőř Ṗȧřŧñėř / Ƈőñƈïėřɠė / Ɱïñïɱȧŀïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "slack_onboarding_q_primary_domain": {
+        "en": "What is your main area of work? e.g. Software Engineering / Data Analysis / Writing",
+        "ja": "主な活動領域を教えてください。例: Software Engineering / Data Analysis / Writing",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ẏőůř ɱȧïñ ȧřėȧ őƒ ẇőřķ? ė.ɠ. Şőƒŧẇȧřė Ėñɠïñėėřïñɠ / Ḓȧŧȧ Ȧñȧŀẏşïş / Ẇřïŧïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "slack_onboarding_q_vision": {
+        "en": "Briefly tell me the vision you want to achieve in this environment.",
+        "ja": "この環境で実現したい vision を短く教えてください。",
+        "qps-ploc": "⟦Ƀřïėƒŀẏ ŧėŀŀ ɱė ŧħė ṽïşïőñ ẏőů ẇȧñŧ ŧő ȧƈħïėṽė ïñ ŧħïş ėñṽïřőñɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "slack_onboarding_q_agent_id": {
+        "en": "Lastly, let's decide the main Agent ID for this environment. Tell me your preferred name if you have one. To use the default, send \"default\". The default is KYBERION-PRIME.",
+        "ja": "最後に、この環境のメイン Agent ID を決めます。希望名があれば教えてください。既定値を使う場合は「そのまま」「default」「おまかせ」のいずれかを送ってください。既定値は KYBERION-PRIME です。",
+        "qps-ploc": "⟦Ŀȧşŧŀẏ, ŀėŧ'ş ḓėƈïḓė ŧħė ɱȧïñ Ȧɠėñŧ ÏḒ ƒőř ŧħïş ėñṽïřőñɱėñŧ. Ŧėŀŀ ɱė ẏőůř ṗřėƒėřřėḓ ñȧɱė ïƒ ẏőů ħȧṽė őñė. Ŧő ůşė ŧħė ḓėƒȧůŀŧ, şėñḓ \"ḓėƒȧůŀŧ\". Ŧħė ḓėƒȧůŀŧ ïş ĶẎɃĖŘÏŐÑ-ṖŘÏⱮĖ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "slack_onboarding_start": {
+        "en": "This environment has not been initialized yet, so let's start with onboarding.",
+        "ja": "この環境はまだ初期化されていないため、まずオンボーディングを進めます。",
+        "qps-ploc": "⟦Ŧħïş ėñṽïřőñɱėñŧ ħȧş ñőŧ ƀėėñ ïñïŧïȧŀïẑėḓ ẏėŧ, şő ŀėŧ'ş şŧȧřŧ ẇïŧħ őñƀőȧřḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "slack_onboarding_one_at_a_time": {
+        "en": "I'll ask one question at a time.",
+        "ja": "1問ずつ確認していきます。",
+        "qps-ploc": "⟦Ï'ŀŀ ȧşķ őñė ɋůėşŧïőñ ȧŧ ȧ ŧïɱė. ŀőřėɱ ïṗşů⟧"
+      },
+      "slack_onboarding_saved": {
+        "en": "Saved your onboarding information.",
+        "ja": "オンボーディング情報を保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ ẏőůř őñƀőȧřḓïñɠ ïñƒőřɱȧŧïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "slack_onboarding_switch_routing": {
+        "en": "Initialization is complete, so from your next message I'll switch to normal routing.",
+        "ja": "初期化が完了したので、次のメッセージから通常の routing に切り替えます。",
+        "qps-ploc": "⟦Ïñïŧïȧŀïẑȧŧïőñ ïş ƈőɱṗŀėŧė, şő ƒřőɱ ẏőůř ñėẋŧ ɱėşşȧɠė Ï'ŀŀ şẇïŧƈħ ŧő ñőřɱȧŀ řőůŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "slack_onboarding_already_done": {
+        "en": "Onboarding is already complete. Please send your regular request.",
+        "ja": "オンボーディングは完了しています。通常の依頼を送ってください。",
+        "qps-ploc": "⟦Őñƀőȧřḓïñɠ ïş ȧŀřėȧḓẏ ƈőɱṗŀėŧė. Ṗŀėȧşė şėñḓ ẏőůř řėɠůŀȧř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "slack_ask_why_prompt": {
+        "en": "Where did it differ from what you expected? (One question only, skippable — your answer is used to improve future work)",
+        "ja": "どこが期待と違いましたか？(1問だけ・スキップ可 — 理由は次回の作業改善に使われます)",
+        "qps-ploc": "⟦Ẇħėřė ḓïḓ ïŧ ḓïƒƒėř ƒřőɱ ẇħȧŧ ẏőů ėẋṗėƈŧėḓ? (Őñė ɋůėşŧïőñ őñŀẏ, şķïṗṗȧƀŀė — ẏőůř ȧñşẇėř ïş ůşėḓ ŧő ïɱṗřőṽė ƒůŧůřė ẇőřķ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      }
+    },
+    "mission_ops": {
+      "hygiene_rec_design_missing": {
+        "en": "Tasks not expanded yet. To continue, start from process design: pnpm mission-controller start <ID> / otherwise: pnpm mission-controller cancel <ID>",
+        "ja": "タスク未展開。続けるなら process 設計から: pnpm mission-controller start <ID> / 不要なら: pnpm mission-controller cancel <ID>",
+        "qps-ploc": "⟦Ŧȧşķş ñőŧ ėẋṗȧñḓėḓ ẏėŧ. Ŧő ƈőñŧïñůė, şŧȧřŧ ƒřőɱ ṗřőƈėşş ḓėşïɠñ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř şŧȧřŧ <ÏḒ> / őŧħėřẇïşė: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ƈȧñƈėŀ <ÏḒ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "hygiene_rec_ready_not_started": {
+        "en": "Tasks are ready but not started. Start: pnpm mission-controller dispatch-workitems <ID> --mode subagent",
+        "ja": "タスクは準備済みで未着手。開始: pnpm mission-controller dispatch-workitems <ID> --mode subagent",
+        "qps-ploc": "⟦Ŧȧşķş ȧřė řėȧḓẏ ƀůŧ ñőŧ şŧȧřŧėḓ. Şŧȧřŧ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ḓïşṗȧŧƈħ-ẇőřķïŧėɱş <ÏḒ> --ɱőḓė şůƀȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "hygiene_rec_awaiting_gate": {
+        "en": "Dispatched but the activation gate has not passed. Run the gate or confirm the planned→active transition.",
+        "ja": "ディスパッチ済みだが activation gate 未通過。gate 実行または planned→active の確認を",
+        "qps-ploc": "⟦Ḓïşṗȧŧƈħėḓ ƀůŧ ŧħė ȧƈŧïṽȧŧïőñ ɠȧŧė ħȧş ñőŧ ṗȧşşėḓ. Řůñ ŧħė ɠȧŧė őř ƈőñƒïřɱ ŧħė ṗŀȧññėḓ→ȧƈŧïṽė ŧřȧñşïŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "hygiene_age_days": {
+        "en": "{days}d",
+        "ja": "{days}日",
+        "qps-ploc": "⟦{days}ḓ ŀőř⟧"
+      },
+      "hygiene_alert_title": {
+        "en": "{count} mission hygiene item(s) need attention (planned: {planned})",
+        "ja": "ミッション衛生の要対応が {count} 件あります (planned {planned} 件)",
+        "qps-ploc": "⟦{count} ɱïşşïőñ ħẏɠïėñė ïŧėɱ(ş) ñėėḓ ȧŧŧėñŧïőñ (ṗŀȧññėḓ: {planned}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "hygiene_question_title": {
+        "en": "Decide what to do with {count} unstarted mission(s)",
+        "ja": "未開始ミッション {count} 件の扱いを決めてください",
+        "qps-ploc": "⟦Ḓėƈïḓė ẇħȧŧ ŧő ḓő ẇïŧħ {count} ůñşŧȧřŧėḓ ɱïşşïőñ(ş) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hygiene_rec_distilling_stale": {
+        "en": "distilling has continued for {days}+ days. Check the review / finish: pnpm mission-controller finish {missionId}",
+        "ja": "distilling が {days}日以上継続。レビュー/finish を確認: pnpm mission-controller finish {missionId}",
+        "qps-ploc": "⟦ḓïşŧïŀŀïñɠ ħȧş ƈőñŧïñůėḓ ƒőř {days}+ ḓȧẏş. Ƈħėƈķ ŧħė řėṽïėẇ / ƒïñïşħ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ƒïñïşħ {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "hygiene_rec_active_stale": {
+        "en": "active has continued for {days}+ days. Check checkpoints and remaining tasks: pnpm mission-controller status {missionId}",
+        "ja": "active が {days}日以上継続。checkpoint と残タスクを確認: pnpm mission-controller status {missionId}",
+        "qps-ploc": "⟦ȧƈŧïṽė ħȧş ƈőñŧïñůėḓ ƒőř {days}+ ḓȧẏş. Ƈħėƈķ ƈħėƈķṗőïñŧş ȧñḓ řėɱȧïñïñɠ ŧȧşķş: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř şŧȧŧůş {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "hygiene_question_body_stalled": {
+        "en": "Some missions are stuck in planned ({days}+ days).",
+        "ja": "planned のまま止まっているミッションがあります({days}日以上)。",
+        "qps-ploc": "⟦Şőɱė ɱïşşïőñş ȧřė şŧůƈķ ïñ ṗŀȧññėḓ ({days}+ ḓȧẏş). ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hygiene_question_body_action": {
+        "en": "Start them, or cancel them if they are not needed:",
+        "ja": "開始するか、不要なら cancel してください:",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħėɱ, őř ƈȧñƈėŀ ŧħėɱ ïƒ ŧħėẏ ȧřė ñőŧ ñėėḓėḓ: ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "retro_wo_kind": {
+        "en": "- Kind: {value}",
+        "ja": "- 種別: {value}",
+        "qps-ploc": "⟦- Ķïñḓ: {value} ŀőřė⟧"
+      },
+      "retro_wo_target": {
+        "en": "- Target: {value}",
+        "ja": "- 対象: {value}",
+        "qps-ploc": "⟦- Ŧȧřɠėŧ: {value} ŀőřėɱ⟧"
+      },
+      "retro_wo_mission": {
+        "en": "- Originating mission: {value}",
+        "ja": "- 発生ミッション: {value}",
+        "qps-ploc": "⟦- Őřïɠïñȧŧïñɠ ɱïşşïőñ: {value} ŀőřėɱ ïṗşů⟧"
+      },
+      "retro_wo_approved_at": {
+        "en": "- Approved at: {value}",
+        "ja": "- 承認日: {value}",
+        "qps-ploc": "⟦- Ȧṗṗřőṽėḓ ȧŧ: {value} ŀőřėɱ ï⟧"
+      },
+      "retro_wo_changes_heading": {
+        "en": "## Changes",
+        "ja": "## 変更内容",
+        "qps-ploc": "⟦## Ƈħȧñɠėş ŀőř⟧"
+      },
+      "retro_wo_rationale_heading": {
+        "en": "## Rationale",
+        "ja": "## 根拠",
+        "qps-ploc": "⟦## Řȧŧïőñȧŀė ŀőř⟧"
+      },
+      "retro_wo_evidence_heading": {
+        "en": "## Evidence",
+        "ja": "## エビデンス",
+        "qps-ploc": "⟦## Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "retro_wo_footer": {
+        "en": "> After implementing, append the result to this file and update the related plan doc / ledger.",
+        "ja": "> 実装したら本ファイルに結果を追記し、関連する plan doc / ledger を更新すること。",
+        "qps-ploc": "⟦> Ȧƒŧėř ïɱṗŀėɱėñŧïñɠ, ȧṗṗėñḓ ŧħė řėşůŀŧ ŧő ŧħïş ƒïŀė ȧñḓ ůṗḓȧŧė ŧħė řėŀȧŧėḓ ṗŀȧñ ḓőƈ / ŀėḓɠėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "retro_wo_issued_title": {
+        "en": "Improvement work order issued: {kind} ({id})",
+        "ja": "改善ワークオーダー発行: {kind} ({id})",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ẇőřķ őřḓėř ïşşůėḓ: {kind} ({id}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "retro_stats_heading": {
+        "en": "## Execution statistics (deterministic)",
+        "ja": "## 実行統計(決定論)",
+        "qps-ploc": "⟦## Ėẋėƈůŧïőñ şŧȧŧïşŧïƈş (ḓėŧėřɱïñïşŧïƈ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "retro_proposals_heading": {
+        "en": "## Improvement proposals (awaiting approval — process-improvement queue)",
+        "ja": "## 改善提案(承認待ち — process-improvement queue)",
+        "qps-ploc": "⟦## Ïɱṗřőṽėɱėñŧ ṗřőṗőşȧŀş (ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ — ṗřőƈėşş-ïɱṗřőṽėɱėñŧ ɋůėůė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "retro_rationale_label": {
+        "en": "Rationale",
+        "ja": "根拠",
+        "qps-ploc": "⟦Řȧŧïőñȧŀė ŀőř⟧"
+      },
+      "retro_none": {
+        "en": "None",
+        "ja": "なし",
+        "qps-ploc": "⟦Ñőñė ŀőř⟧"
+      },
+      "retro_queue_footer": {
+        "en": "> Approve or reject proposals by updating the queue ({path}); only approved ones are reflected into the blueprint / workflow catalog.",
+        "ja": "> 提案の承認/却下は queue ({path}) を更新し、承認済みのみ blueprint / workflow catalog へ反映すること。",
+        "qps-ploc": "⟦> Ȧṗṗřőṽė őř řėĵėƈŧ ṗřőṗőşȧŀş ƀẏ ůṗḓȧŧïñɠ ŧħė ɋůėůė ({path}); őñŀẏ ȧṗṗřőṽėḓ őñėş ȧřė řėƒŀėƈŧėḓ ïñŧő ŧħė ƀŀůėṗřïñŧ / ẇőřķƒŀőẇ ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "retro_question_title": {
+        "en": "Retrospective: {count} process improvement proposal(s) ({missionId})",
+        "ja": "Retrospective: {count} 件のプロセス改善提案 ({missionId})",
+        "qps-ploc": "⟦Řėŧřőşṗėƈŧïṽė: {count} ṗřőƈėşş ïɱṗřőṽėɱėñŧ ṗřőṗőşȧŀ(ş) ({missionId}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "bg_review_rule_transient": {
+        "en": "Do not record one-off or temporary failures in durable knowledge",
+        "ja": "一過性・一時的な障害は durable knowledge に記録しない",
+        "qps-ploc": "⟦Ḓő ñőŧ řėƈőřḓ őñė-őƒƒ őř ŧėɱṗőřȧřẏ ƒȧïŀůřėş ïñ ḓůřȧƀŀė ķñőẇŀėḓɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bg_review_rule_environment": {
+        "en": "Do not record environment-specific failures or local paths in durable knowledge",
+        "ja": "環境固有の失敗やローカルパスは durable knowledge に記録しない",
+        "qps-ploc": "⟦Ḓő ñőŧ řėƈőřḓ ėñṽïřőñɱėñŧ-şṗėƈïƒïƈ ƒȧïŀůřėş őř ŀőƈȧŀ ṗȧŧħş ïñ ḓůřȧƀŀė ķñőẇŀėḓɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bg_review_rule_provider": {
+        "en": "Do not draw conclusions about a provider/backend/model from a single case",
+        "ja": "単一事例から provider/backend/model を断定しない",
+        "qps-ploc": "⟦Ḓő ñőŧ ḓřȧẇ ƈőñƈŀůşïőñş ȧƀőůŧ ȧ ṗřőṽïḓėř/ƀȧƈķėñḓ/ɱőḓėŀ ƒřőɱ ȧ şïñɠŀė ƈȧşė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "bg_review_empty": {
+        "en": "The review result is empty",
+        "ja": "レビュー結果が空です",
+        "qps-ploc": "⟦Ŧħė řėṽïėẇ řėşůŀŧ ïş ėɱṗŧẏ ŀőřėɱ ïṗ⟧"
+      },
+      "resume_journal_next_event": {
+        "en": "Resuming from journal: next event={eventType} ({eventId}) / tasks to recover={count}",
+        "ja": "journal から再開: 次イベント={eventType} ({eventId}) / 回収タスク={count} 件",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƒřőɱ ĵőůřñȧŀ: ñėẋŧ ėṽėñŧ={eventType} ({eventId}) / ŧȧşķş ŧő řėƈőṽėř={count} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "resume_worker_restarted": {
+        "en": "Restarted the orchestration worker: {eventId} ({path})",
+        "ja": "orchestration worker を再起動しました: {eventId} ({path})",
+        "qps-ploc": "⟦Řėşŧȧřŧėḓ ŧħė őřƈħėşŧřȧŧïőñ ẇőřķėř: {eventId} ({path}) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "resume_journal_nothing": {
+        "en": "Resuming from journal: no orchestration event to resume.",
+        "ja": "journal から再開: 再開対象の orchestration event はありません。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƒřőɱ ĵőůřñȧŀ: ñő őřƈħėşŧřȧŧïőñ ėṽėñŧ ŧő řėşůɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "resume_blocked_reissued": {
+        "en": "Returned blocked tasks to planned (to be re-preflighted): {taskIds}",
+        "ja": "blocked タスクを planned に戻しました (再preflight対象): {taskIds}",
+        "qps-ploc": "⟦Řėŧůřñėḓ ƀŀőƈķėḓ ŧȧşķş ŧő ṗŀȧññėḓ (ŧő ƀė řė-ṗřėƒŀïɠħŧėḓ): {taskIds} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "bg_review_notice_needs_approval": {
+        "en": "The background review proposal needs human approval.",
+        "ja": "background review の提案に人間の承認が必要です。",
+        "qps-ploc": "⟦Ŧħė ƀȧƈķɠřőůñḓ řėṽïėẇ ṗřőṗőşȧŀ ñėėḓş ħůɱȧñ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "bg_review_notice_request": {
+        "en": "Approval request: {id}",
+        "ja": "承認要求: {id}",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ: {id} ŀőřėɱ ï⟧"
+      },
+      "bg_review_notice_candidate": {
+        "en": "Candidate: {id}",
+        "ja": "候補: {id}",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė: {id} ŀőřė⟧"
+      },
+      "bg_review_notice_reply": {
+        "en": "Reply: appr:{id}:approve or appr:{id}:reject",
+        "ja": "返信: appr:{id}:approve または appr:{id}:reject",
+        "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{id}:ȧṗṗřőṽė őř ȧṗṗř:{id}:řėĵėƈŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "bg_review_notice_approve_cmd": {
+        "en": "Approve: pnpm kyberion approve {id} background-review",
+        "ja": "承認: pnpm kyberion approve {id} background-review",
+        "qps-ploc": "⟦Ȧṗṗřőṽė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽė {id} ƀȧƈķɠřőůñḓ-řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "bg_review_notice_apply": {
+        "en": "After approval, apply the candidate.",
+        "ja": "承認後に候補の apply を実行してください。",
+        "qps-ploc": "⟦Ȧƒŧėř ȧṗṗřőṽȧŀ, ȧṗṗŀẏ ŧħė ƈȧñḓïḓȧŧė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "approval_chrome_run_title": {
+        "en": "Chrome run: {origin}",
+        "ja": "Chrome 実行: {origin}",
+        "qps-ploc": "⟦Ƈħřőɱė řůñ: {origin} ŀőřėɱ ⟧"
+      },
+      "approval_chrome_high_risk_summary": {
+        "en": "{count} high-risk operation(s) ({operations})",
+        "ja": "{count} 件の高リスク操作（{operations}）",
+        "qps-ploc": "⟦{count} ħïɠħ-řïşķ őṗėřȧŧïőñ(ş) ({operations}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "approval_service_run_title": {
+        "en": "Service run: {name}",
+        "ja": "Service 実行: {name}",
+        "qps-ploc": "⟦Şėřṽïƈė řůñ: {name} ŀőřėɱ ⟧"
+      },
+      "approval_service_external_effect_summary": {
+        "en": "{count} external-effect step(s) ({operations})",
+        "ja": "{count} 件の external-effect（{operations}）",
+        "qps-ploc": "⟦{count} ėẋŧėřñȧŀ-ėƒƒėƈŧ şŧėṗ(ş) ({operations}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "deliverables_in_inbox": {
+        "en": "{count} deliverable(s) arrived in the inbox.",
+        "ja": "成果物 {count} 件が inbox に届きました。",
+        "qps-ploc": "⟦{count} ḓėŀïṽėřȧƀŀė(ş) ȧřřïṽėḓ ïñ ŧħė ïñƀőẋ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      }
+    },
+    "project_ops": {
+      "bootstrap_web_frame": {
+        "en": "Pin down the purpose, users, and key use cases of {project}.",
+        "ja": "{project} の目的、利用者、主要ユースケースを固める。",
+        "qps-ploc": "⟦Ṗïñ ḓőẇñ ŧħė ṗůřṗőşė, ůşėřş, ȧñḓ ķėẏ ůşė ƈȧşėş őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "bootstrap_web_arch": {
+        "en": "Design the information architecture, key components, and operational boundaries.",
+        "ja": "情報設計、主要コンポーネント、運用境界を設計する。",
+        "qps-ploc": "⟦Ḓėşïɠñ ŧħė ïñƒőřɱȧŧïőñ ȧřƈħïŧėƈŧůřė, ķėẏ ƈőɱṗőñėñŧş, ȧñḓ őṗėřȧŧïőñȧŀ ƀőůñḓȧřïėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bootstrap_web_build": {
+        "en": "Carve out the smallest implementation slice and the repository/worktree strategy.",
+        "ja": "最小の実装スライスと repository/worktree 戦略を切る。",
+        "qps-ploc": "⟦Ƈȧřṽė őůŧ ŧħė şɱȧŀŀėşŧ ïɱṗŀėɱėñŧȧŧïőñ şŀïƈė ȧñḓ ŧħė řėṗőşïŧőřẏ/ẇőřķŧřėė şŧřȧŧėɠẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bootstrap_web_verify": {
+        "en": "Verify tests, operating flow, and external service integration.",
+        "ja": "試験、運用導線、外部サービス連携を確認する。",
+        "qps-ploc": "⟦Ṽėřïƒẏ ŧėşŧş, őṗėřȧŧïñɠ ƒŀőẇ, ȧñḓ ėẋŧėřñȧŀ şėřṽïƈė ïñŧėɠřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bootstrap_doc_scope": {
+        "en": "Organize the purpose, target readers, and required deliverables of {project}.",
+        "ja": "{project} の目的、対象読者、必要成果物を整理する。",
+        "qps-ploc": "⟦Őřɠȧñïẑė ŧħė ṗůřṗőşė, ŧȧřɠėŧ řėȧḓėřş, ȧñḓ řėɋůïřėḓ ḓėŀïṽėřȧƀŀėş őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "bootstrap_doc_source": {
+        "en": "Collect the available documents, requirements, and references.",
+        "ja": "利用可能な資料、要件、参照元を集める。",
+        "qps-ploc": "⟦Ƈőŀŀėƈŧ ŧħė ȧṽȧïŀȧƀŀė ḓőƈůɱėñŧş, řėɋůïřėɱėñŧş, ȧñḓ řėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bootstrap_doc_draft": {
+        "en": "Generate the first draft of the main deliverables.",
+        "ja": "主要な成果物の初版を生成する。",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ŧħė ƒïřşŧ ḓřȧƒŧ őƒ ŧħė ɱȧïñ ḓėŀïṽėřȧƀŀėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "bootstrap_generic_frame": {
+        "en": "Organize the purpose and success criteria of {project}.",
+        "ja": "{project} の目的と成功条件を整理する。",
+        "qps-ploc": "⟦Őřɠȧñïẑė ŧħė ṗůřṗőşė ȧñḓ şůƈƈėşş ƈřïŧėřïȧ őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "bootstrap_generic_plan": {
+        "en": "Carve out the first durable work and decide how to proceed.",
+        "ja": "最初の durable work を切り出し、進め方を決める。",
+        "qps-ploc": "⟦Ƈȧřṽė őůŧ ŧħė ƒïřşŧ ḓůřȧƀŀė ẇőřķ ȧñḓ ḓėƈïḓė ħőẇ ŧő ṗřőƈėėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      }
+    },
+    "automation": {
+      "cron_field_minute": {
+        "en": "minute",
+        "ja": "分",
+        "qps-ploc": "⟦ɱïñůŧė ŀőř⟧"
+      },
+      "cron_field_hour": {
+        "en": "hour",
+        "ja": "時",
+        "qps-ploc": "⟦ħőůř ŀőř⟧"
+      },
+      "cron_field_day_of_month": {
+        "en": "day of month",
+        "ja": "日",
+        "qps-ploc": "⟦ḓȧẏ őƒ ɱőñŧħ ŀőř⟧"
+      },
+      "cron_field_month": {
+        "en": "month",
+        "ja": "月",
+        "qps-ploc": "⟦ɱőñŧħ ŀőř⟧"
+      },
+      "cron_field_day_of_week": {
+        "en": "day of week",
+        "ja": "曜日",
+        "qps-ploc": "⟦ḓȧẏ őƒ ẇėėķ ŀőř⟧"
+      },
+      "cron_field_prompt": {
+        "en": "Specify the {field}",
+        "ja": "{field}を指定してください",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė {field} ŀőřėɱ ⟧"
+      },
+      "slot_delivery_label": {
+        "en": "Delivery channel",
+        "ja": "配信先 channel",
+        "qps-ploc": "⟦Ḓėŀïṽėřẏ ƈħȧññėŀ ŀőřėɱ⟧"
+      },
+      "slot_delivery_prompt": {
+        "en": "Specify the channel to deliver the result to",
+        "ja": "結果を届ける channel を指定してください",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ƈħȧññėŀ ŧő ḓėŀïṽėř ŧħė řėşůŀŧ ŧő ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "question_intro": {
+        "en": "Specify the run conditions for {name}.",
+        "ja": "{name} の実行条件を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řůñ ƈőñḓïŧïőñş ƒőř {name}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "slash_description": {
+        "en": "Register the schedule of {name} from slot input.",
+        "ja": "{name} の schedule を slot 入力から登録します。",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħė şƈħėḓůŀė őƒ {name} ƒřőɱ şŀőŧ ïñṗůŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "slack_modal_submit": {
+        "en": "Register",
+        "ja": "登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ŀőř⟧"
+      },
+      "slack_modal_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "slack_modal_intro": {
+        "en": "Specify the run conditions for *{name}*.",
+        "ja": "*{name}* の実行条件を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řůñ ƈőñḓïŧïőñş ƒőř *{name}*. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      }
+    },
+    "deal_ops": {
+      "learning_outcome_won": {
+        "en": "won and delivered",
+        "ja": "受注・納品まで完了",
+        "qps-ploc": "⟦ẇőñ ȧñḓ ḓėŀïṽėřėḓ ŀőřėɱ⟧"
+      },
+      "learning_outcome_lost": {
+        "en": "lost",
+        "ja": "失注",
+        "qps-ploc": "⟦ŀőşŧ ŀőř⟧"
+      },
+      "learning_headline": {
+        "en": "Learning candidate from deal {dealId} ({outcome}): {summary}",
+        "ja": "商談 {dealId}({outcome})の学び候補: {summary}",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ƈȧñḓïḓȧŧė ƒřőɱ ḓėȧŀ {dealId} ({outcome}): {summary} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "learning_agreed_amount": {
+        "en": "Agreed amount {value} {currency}",
+        "ja": "合意金額 {value} {currency}",
+        "qps-ploc": "⟦Ȧɠřėėḓ ȧɱőůñŧ {value} {currency} ŀőřėɱ ïṗşů⟧"
+      },
+      "learning_recent_notes": {
+        "en": "Recent exchanges: {notes}",
+        "ja": "直近のやりとり: {notes}",
+        "qps-ploc": "⟦Řėƈėñŧ ėẋƈħȧñɠėş: {notes} ŀőřėɱ ïṗ⟧"
+      },
+      "customer_question_title": {
+        "en": "Customer question ({tenant} / {dealId})",
+        "ja": "顧客からの確認事項 ({tenant} / {dealId})",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ɋůėşŧïőñ ({tenant} / {dealId}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      }
+    },
+    "browser_conversation": {
+      "control_resumed": {
+        "en": "Resuming browser control.",
+        "ja": "ブラウザ操作を再開します。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗ⟧"
+      },
+      "control_paused": {
+        "en": "Browser control is paused for now.",
+        "ja": "ブラウザ操作をいったん停止しました。",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ïş ṗȧůşėḓ ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "candidates_found": {
+        "en": "Found {count} candidates. Checking the target.",
+        "ja": "候補が {count} 件あります。対象を確認します。",
+        "qps-ploc": "⟦Ƒőůñḓ {count} ƈȧñḓïḓȧŧėş. Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "target_proceeding": {
+        "en": "Proceeding with \"{label}\" as the target.",
+        "ja": "「{label}」を対象として操作を進めます。",
+        "qps-ploc": "⟦Ṗřőƈėėḓïñɠ ẇïŧħ \"{label}\" ȧş ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "task_preparing": {
+        "en": "Getting ready for browser control.",
+        "ja": "ブラウザ操作の準備を始めます。",
+        "qps-ploc": "⟦Ɠėŧŧïñɠ řėȧḓẏ ƒőř ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "step_proceeding": {
+        "en": "Checking the target and proceeding.",
+        "ja": "対象を確認して操作を進めます。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ ȧñḓ ṗřőƈėėḓïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "input_unresolved": {
+        "en": "Could not work out the value to enter from the conversation.",
+        "ja": "入力する値が会話から解決できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ẇőřķ őůŧ ŧħė ṽȧŀůė ŧő ėñŧėř ƒřőɱ ŧħė ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_unsupported": {
+        "en": "This kind of action is not yet wired to automatic execution.",
+        "ja": "この操作種別はまだ自動実行に接続されていません。",
+        "qps-ploc": "⟦Ŧħïş ķïñḓ őƒ ȧƈŧïőñ ïş ñőŧ ẏėŧ ẇïřėḓ ŧő ȧůŧőɱȧŧïƈ ėẋėƈůŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_done": {
+        "en": "Operated \"{label}\".",
+        "ja": "「{label}」を操作しました。",
+        "qps-ploc": "⟦Őṗėřȧŧėḓ \"{label}\". ŀőřėɱ ⟧"
+      },
+      "action_failed": {
+        "en": "Browser control failed: {error}",
+        "ja": "ブラウザ操作に失敗しました: {error}",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗşů⟧"
+      },
+      "candidates_ask": {
+        "en": "There are {count} candidates. Specify one by number or say \"that one\".",
+        "ja": "候補は {count} 件あります。番号か「それ」で指定してください。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė {count} ƈȧñḓïḓȧŧėş. Şṗėƈïƒẏ őñė ƀẏ ñůɱƀėř őř şȧẏ \"ŧħȧŧ őñė\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "candidate_selected": {
+        "en": "Selected candidate {index}.",
+        "ja": "候補 {index} を選択しました。",
+        "qps-ploc": "⟦Şėŀėƈŧėḓ ƈȧñḓïḓȧŧė {index}. ŀőřėɱ ïṗ⟧"
+      }
+    },
+    "ceo_summary": {
+      "approval_title_fallback": {
+        "en": "Approval request",
+        "ja": "承認のご依頼",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "exception_title_fallback": {
+        "en": "Event needing attention",
+        "ja": "要確認の事象",
+        "qps-ploc": "⟦Ėṽėñŧ ñėėḓïñɠ ȧŧŧėñŧïőñ ŀőřėɱ ï⟧"
       }
     }
   }

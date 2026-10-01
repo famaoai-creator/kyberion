@@ -7,6 +7,7 @@
  * Optional: `KYBERION_GROK_API_URL`, `KYBERION_GROK_API_MODEL`.
  */
 
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -19,7 +20,10 @@ import {
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 
 export const GROK_API_DEFAULT_BASE_URL = 'https://api.x.ai/v1';
-export const GROK_API_DEFAULT_MODEL = 'grok-4.7';
+/** Default xAI Grok model: provider-config.json runtime_defaults['grok-default'] (RS-02). */
+export function grokDefaultModel(env: NodeJS.ProcessEnv = process.env): string {
+  return resolveRuntimeModelId('grok-default', env);
+}
 
 export function resolveGrokApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
   return (
@@ -43,7 +47,7 @@ export function resolveGrokApiModel(
     modelOverride?.trim() ||
     getRegisteredEnvText('KYBERION_GROK_API_MODEL', { env })?.trim() ||
     getRegisteredEnvText('KYBERION_REASONING_MODEL', { env })?.trim() ||
-    GROK_API_DEFAULT_MODEL
+    grokDefaultModel(env)
   );
 }
 

@@ -189,7 +189,7 @@ tenant: active/shared/runtime/media-generation/schedules/tenants/{tenant}/{id}.j
 
 `libs/core/physical-namespace.ts` が tenant/entity lineage の path segment を検証し、surface coordination と generation scheduler が同じ resolver を使う。tenant-scoped read は対象 tenant subtree だけを走査する。system/operator の aggregate read は `includeTenantNamespaces` を明示した場合だけ tenant subtree を観測でき、tenant viewer の認可には使わない。外部 egress bridge は aggregate read を channel binding と scope の一致検証を通した brokered delivery として扱う。
 
-既存 flat record は `pnpm migrate:physical-namespaces -- --dry-run --kind all` で計画を出し、`--apply` で移動する。canonical / mission-derived scope がある record だけを tenant namespace へ移動し、unscoped / invalid record は tenant を推測せず `active/shared/runtime/migrations/physical-namespace/quarantine/` へ移す。destination collision は上書きせず停止する。今回の apply では surface の 10件を移動し、135件を quarantine した。apply 後の tenant reader は flat path を互換 source として扱わないため、quarantine manifest が cutover の監査証跡になる。
+既存 flat record は `pnpm namespace:migrate-physical -- --dry-run --kind all` で計画を出し、`--apply` で移動する。canonical / mission-derived scope がある record だけを tenant namespace へ移動し、unscoped / invalid record は tenant を推測せず `active/shared/runtime/migrations/physical-namespace/quarantine/` へ移す。destination collision は上書きせず停止する。今回の apply では surface の 10件を移動し、135件を quarantine した。apply 後の tenant reader は flat path を互換 source として扱わないため、quarantine manifest が cutover の監査証跡になる。
 
 `scope-offboarding.ts` の tenant / project discovery も physical namespace を対象に含めた。tenant offboarding は schedule、channel coordination、presence coordination の tenant subtree を export → soft-delete → leftover verification の同じ ceremony で処理する。project offboarding は `tenant_slug` / `organization_id` lineage を使い、project ID が複数 namespace に存在する場合は ambiguity として停止する。
 
@@ -356,7 +356,7 @@ customer mode で binding がない channel は tenant request として扱わ�
 
 ### Phase 5: 移行と offboarding
 
-- `migrate:physical-namespaces --dry-run` で対象を分類し、canonical / mission-derived だけを移動する。unscoped / invalid は quarantine へ隔離し、owner が確認する。
+- `namespace:migrate-physical --dry-run` で対象を分類し、canonical / mission-derived だけを移動する。unscoped / invalid は quarantine へ隔離し、owner が確認する。
 - `--apply` 後は tenant reader が flat path を参照しないこと、manifest と hash が保存されていることを確認する。（今回の apply で旧 source 0件、hash mismatch 0件を確認済み）
 - tenant offboarding は queue 停止、schedule 停止、surface binding 停止、projection 停止、export / retention の順に実施する。
 - tenant ごとの runtime process isolation は、要件または監査上必要な場合だけ追加する。

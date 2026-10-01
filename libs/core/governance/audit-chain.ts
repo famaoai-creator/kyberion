@@ -678,7 +678,7 @@ class AuditChainImpl {
     // Per-tenant mirror: copy to customer/{slug}/logs/audit/ when slug is present.
     //
     // EG-14: the mirror follows an existing stance overlay; it never creates one.
-    // `customer/{slug}/` is a stance overlay owned by `pnpm customer:create`, and
+    // `customer/{slug}/` is a stance overlay owned by `pnpm stance:create`, and
     // entity-scope-hierarchy is explicit that "readers must not create missing
     // directories as a side effect; creation belongs to the governed writer".
     // Mirroring used to mkdir -p the whole path, so any audit entry carrying a

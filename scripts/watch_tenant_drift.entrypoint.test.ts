@@ -33,7 +33,7 @@ describe('tenant drift watchdog entrypoint', () => {
     expect(main(['--help'])).toEqual({
       status: 0,
       alert: null,
-      help: expect.stringContaining('watch:tenant-drift'),
+      help: expect.stringContaining('tenant:watch-drift'),
     });
   });
 });

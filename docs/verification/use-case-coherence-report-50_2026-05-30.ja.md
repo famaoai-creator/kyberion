@@ -39,7 +39,7 @@ last_updated: 2026-05-30
 |   # | ユースケース                                                       | 参照ロードマップ / 実装軸                                   | 判定     | コメント                                                           |
 | --: | ------------------------------------------------------------------ | ----------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
 |   1 | クリーン環境で `baseline-check` を通して初回状態を確認する         | Phase A-4 / `setup:report` / `kyberion vital --format=json` | 整合     | 入口の診断は揃っており、first win の前提を確認できる。             |
-|   2 | `pnpm onboard` で identity と環境設定を完了する                    | Phase A-3 / A-4                                             | 部分整合 | 進行はできるが、依存前提の説明がまだ厚い。                         |
+|   2 | `pnpm onboarding` で identity と環境設定を完了する                 | Phase A-3 / A-4                                             | 部分整合 | 進行はできるが、依存前提の説明がまだ厚い。                         |
 |   3 | Voice first win をブラウザ入力 + OS TTS で 1 往復成立させる        | Phase A-5 / Appendix A                                      | 部分整合 | 方向性は一致しているが、browser permission に依存しやすい。        |
 |   4 | `pnpm kyberion vital --format=json` で readiness を 1 行で把握する | UX-0 / A-4                                                  | 整合     | 情報圧縮の役割が明確で、ロードマップと一致する。                   |
 |   5 | `surfaces reconcile` で Slack / WebUI の接続を同期する             | Phase A / surface ops                                       | 部分整合 | 実装はあるが、復旧導線はさらに強化余地がある。                     |

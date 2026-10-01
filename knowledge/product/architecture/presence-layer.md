@@ -98,7 +98,7 @@ Provides the Agent with the ability to capture and interpret the physical state 
   see `orchestration/perception-playbook.md`.
 
 The former `presence/sensors/visual-sensor.js` driver and the
-`pnpm kyberion system visual-capture` command no longer exist.
+`kyberion system visual-capture` command no longer exist.
 
 ## 6. 🛡️ Service Management & Watchdog
 

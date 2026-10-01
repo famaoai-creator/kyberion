@@ -9,6 +9,10 @@
  */
 import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import {
+  getChannelAdapter,
+  listOperatorNotificationChannels,
+} from '@agent/core/surface/channel-adapter-registry';
+import {
   getRegisteredEnvText,
   nowIso,
   parseSafeJsonObjectInput,
@@ -137,10 +141,14 @@ function localizeRecorderWarning(warning: string): string {
 // operator's default notification channel (surface:target).
 function handleNotifySubcommand(setValue: string): void {
   const [surface, ...rest] = setValue.split(':');
-  // `inbox` is the local fallback surface (deliverable inbox, no bridge);
-  // `--set inbox` needs no remote target.
-  const target = rest.join(':') || (surface === 'inbox' ? 'operator' : '');
-  const allowed = ['slack', 'imessage', 'telegram', 'discord', 'inbox'];
+  // Allowed channels and local default targets (`inbox` → `operator`, so
+  // `--set inbox` needs no remote target) come from the channel adapter registry.
+  const allowed = listOperatorNotificationChannels();
+  const target =
+    rest.join(':') ||
+    (allowed.includes(surface)
+      ? (getChannelAdapter(surface).operator_notification?.default_target ?? '')
+      : '');
   if (!allowed.includes(surface) || !target) {
     printOutput(ui('recorder:recorder_notify_usage', { channels: allowed.join('|') }));
     throw new ScriptExitError(1, '', true);

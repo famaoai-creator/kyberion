@@ -17,6 +17,7 @@ import {
   type Violation as TierHygieneViolation,
 } from './check_tier_hygiene.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 export interface KnowledgeScopeReconciliationReport {
   generated_at: string;
@@ -84,10 +85,18 @@ export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconcil
   });
 }
 
+/** CU-01: `--help` / typos exit before the reconciliation report or ops alert is written. */
+export const KNOWLEDGE_SCOPE_RECONCILE_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion knowledge scope-reconcile',
+  manifestId: 'script.knowledge.scope-reconcile',
+  options: [{ flag: '--alert' }, { flag: '--fail' }, { flag: '--json' }, { flag: '--quiet' }],
+};
+
 export const runKnowledgeScopeReconciliation = defineScript({
   name: 'knowledge:scope-reconcile',
   flags: ['json', 'quiet'],
   run: async ({ argv, json, quiet, print }) => {
+    if (guardCliArgs(argv, KNOWLEDGE_SCOPE_RECONCILE_CLI, print)) return;
     try {
       const report = await reconcileKnowledgeScopes();
       if (json) print(report);

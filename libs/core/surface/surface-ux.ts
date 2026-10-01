@@ -1,6 +1,11 @@
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { secretGuard } from '../secret/secret-guard.js';
-import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
+import {
+  loadSurfaceManifest,
+  loadSurfaceState,
+  type SurfaceRuntimeDefinition,
+} from './surface-runtime.js';
+import { renderVocabularyText } from '../ux-vocabulary.js';
 import { getServicePresetPolicy } from '../service/service-preset-policy.js';
 import { getServicePresetRecord } from '../service/service-preset-registry.js';
 import { getServiceEndpointRecord } from '../service/service-endpoint-registry.js';
@@ -11,6 +16,7 @@ import {
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from '../next-action.js';
 import type { SupportedLocale } from '../locale-normalize.js';
+import { t } from '../t.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
 export interface SurfaceDirectoryRow {
@@ -96,48 +102,14 @@ function surfaceScenarioIds(surfaceId: string): string[] {
   return [...ids];
 }
 
-function surfaceOperatorNotes(surfaceId: string): string {
-  switch (surfaceId) {
-    case 'slack-bridge':
-      return 'External channel ingress. Auth readiness matters before runtime repair.';
-    case 'oauth-callback-surface':
-      return 'Loopback-only helper for completing OAuth handshakes into personal connections.';
-    case 'chronos-mirror-v2':
-      return 'Primary operator control UI for mission and runtime visibility.';
-    case 'presence-studio':
-      return 'Best suited for expressive voice / transcript feedback during first-win demos.';
-    case 'voice-hub':
-      return 'Pairs with Presence Studio. Browser and OS permissions usually fail before the runtime itself.';
-    case 'computer-surface':
-      return 'Use for governed browser or terminal walkthroughs after runtime is already healthy.';
-    case 'terminal-bridge':
-      return 'Background bridge. Operators usually feel breakage here indirectly through control surfaces.';
-    case 'mcp-server-cowork':
-      return 'Desktop integration surface. Good fit when the operator already lives in an MCP client.';
-    default:
-      return 'Managed runtime surface exposed through the surface manifest catalog.';
-  }
+function surfaceOperatorNotes(
+  definition: Pick<SurfaceRuntimeDefinition, 'operatorNotesKey'>
+): string {
+  return renderVocabularyText(definition.operatorNotesKey || 'surface:surface_notes_default');
 }
 
-function surfaceBestFor(surfaceId: string): string {
-  switch (surfaceId) {
-    case 'presence-studio':
-      return 'short conversation, transcript feedback, first-run launcher';
-    case 'voice-hub':
-      return 'realtime voice ingress and spoken replies';
-    case 'chronos-mirror-v2':
-      return 'durable work, mission visibility, and runtime control';
-    case 'slack-bridge':
-      return 'threaded remote requests and follow-up';
-    case 'computer-surface':
-      return 'guided browser and terminal walkthroughs';
-    case 'oauth-callback-surface':
-      return 'interactive OAuth callback completion';
-    case 'mcp-server-cowork':
-      return 'desktop MCP integration';
-    default:
-      return 'managed runtime access';
-  }
+function surfaceBestFor(definition: Pick<SurfaceRuntimeDefinition, 'bestForKey'>): string {
+  return renderVocabularyText(definition.bestForKey || 'surface:surface_best_for_default');
 }
 
 function surfaceNextCommand(
@@ -253,8 +225,8 @@ export function getSurfaceDirectory(): SurfaceDirectoryRow[] {
       const authorityRole = String((definition as any).env?.MISSION_ROLE || 'surface_runtime');
       const authority = roles[authorityRole];
       const notes = authority?.description
-        ? `${surfaceOperatorNotes(definition.id)} ${authority.description}`
-        : surfaceOperatorNotes(definition.id);
+        ? `${surfaceOperatorNotes(definition)} ${authority.description}`
+        : surfaceOperatorNotes(definition);
       const row: SurfaceDirectoryRow = {
         id: definition.id,
         kind: definition.kind,
@@ -270,7 +242,7 @@ export function getSurfaceDirectory(): SurfaceDirectoryRow[] {
         use_cases: surfaceScenarioIds(definition.id),
         operator_notes: notes,
         next_command: '',
-        best_for: surfaceBestFor(definition.id),
+        best_for: surfaceBestFor(definition),
         blocked_by: [],
       };
       row.next_command = surfaceNextCommand(row);
@@ -461,7 +433,7 @@ export function buildSurfaceLauncherRecommendations(
       suggestedCommand:
         voiceReadiness === 'ready'
           ? 'pnpm pipeline --input pipelines/voice-hello.json'
-          : 'pnpm doctor --runtime browser',
+          : 'pnpm kyberion doctor --runtime browser',
     },
     {
       id: 'messaging',
@@ -578,17 +550,15 @@ export function formatSurfaceRecoveryAction(
   action: SurfaceRecoveryAction,
   language: SupportedLocale
 ): string {
-  if (language === 'ja') {
-    const parts = [action.reason];
-    if (action.next_step) parts.push(`次の一手: ${action.next_step}`);
-    if (action.command) parts.push(`実行コマンド: ${action.command}`);
-    if (action.fallback) parts.push(`代替手段: ${action.fallback}`);
-    return parts.join(' ');
-  }
   const parts = [action.reason];
-  if (action.next_step) parts.push(`Next step: ${action.next_step}`);
-  if (action.command) parts.push(`Command: ${action.command}`);
-  if (action.fallback) parts.push(`Fallback: ${action.fallback}`);
+  if (action.next_step) {
+    parts.push(t('surface:recovery_next_step', { value: action.next_step }, language));
+  }
+  if (action.command)
+    parts.push(t('surface:recovery_command', { value: action.command }, language));
+  if (action.fallback) {
+    parts.push(t('surface:recovery_fallback', { value: action.fallback }, language));
+  }
   return parts.join(' ');
 }
 
@@ -597,8 +567,9 @@ export function buildSurfaceAsyncAcceptedReply(params: {
   receiver: string;
   language: SupportedLocale;
 }): string {
-  if (params.language === 'ja') {
-    return `依頼を受け付けました。${params.receiver} に回しています。リクエストIDは ${params.requestId} です。進行状況は Presence Studio の async requests で確認でき、完了したらこの surface に通知します。`;
-  }
-  return `Accepted. Routing this to ${params.receiver}. The request id is ${params.requestId}. You can track it in Presence Studio async requests, and I will notify this surface when it completes.`;
+  return t(
+    'surface:async_accepted',
+    { receiver: params.receiver, requestId: params.requestId },
+    params.language
+  );
 }

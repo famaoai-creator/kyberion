@@ -1,4 +1,5 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
+import { Text } from './text.js';
 import type { ListRow } from '../store/types.js';
 import { theme } from '../theme.js';
 

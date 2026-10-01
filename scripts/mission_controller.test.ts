@@ -94,7 +94,18 @@ describe('mission_controller argument parsing', () => {
     // pin the invariant so a future REASONING_FREE_ACTIONS edit can't regress it.
     expect(shouldSkipReasoningBootstrap('kickoff')).toBe(false);
     expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
-    expect(shouldSkipReasoningBootstrap('status')).toBe(false);
+    for (const readOnly of [
+      'status',
+      'outbox',
+      'organization-catalogs',
+      'organization-profiles',
+      'organization-profile',
+      'organization-discovery',
+      'memory-queue',
+      'memory-review',
+    ]) {
+      expect(shouldSkipReasoningBootstrap(readOnly)).toBe(true);
+    }
     expect(shouldSkipReasoningBootstrap(undefined)).toBe(false);
     expect(shouldSkipReasoningBootstrap('--')).toBe(false);
   });

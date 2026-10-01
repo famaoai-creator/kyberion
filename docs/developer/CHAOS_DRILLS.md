@@ -14,11 +14,11 @@ This is Phase B-5 of `docs/PRODUCTIZATION_ROADMAP.md`.
 
 ## Current drills
 
-| Pipeline | What it injects | Expected handling |
-|---|---|---|
-| `pipelines/chaos-actuator-down.json` | Actuator binary unavailable (mask PATH) | Either `on_error.fallback` runs, or pipeline aborts with category `missing_dependency`. No unhandled exception. |
-| `pipelines/chaos-network-partition.json` | Unreachable host / DNS failure | Error classifier returns `network` or `timeout`. Pipeline status = `failed`. |
-| `pipelines/chaos-secret-missing.json` | secret:read of nonexistent key | Error classifier returns `missing_secret` or `auth`. **No secret-shaped value in logs.** |
+| Pipeline                                 | What it injects                         | Expected handling                                                                                               |
+| ---------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `pipelines/chaos-actuator-down.json`     | Actuator binary unavailable (mask PATH) | Either `on_error.fallback` runs, or pipeline aborts with category `missing_dependency`. No unhandled exception. |
+| `pipelines/chaos-network-partition.json` | Unreachable host / DNS failure          | Error classifier returns `network` or `timeout`. Pipeline status = `failed`.                                    |
+| `pipelines/chaos-secret-missing.json`    | secret:read of nonexistent key          | Error classifier returns `missing_secret` or `auth`. **No secret-shaped value in logs.**                        |
 
 ## Manual run
 
@@ -32,7 +32,7 @@ Each drill prints `CHAOS_OK: ...` when the failure was handled as expected. If a
 
 ## Scheduled run
 
-Weekly via the existing scheduler. To register, add to your environment's cron / `pnpm schedule`:
+Weekly via the existing scheduler. To register, add to your environment's cron (or register each pipeline with `pnpm kyberion schedule register`):
 
 ```
 0 4 * * 0   pnpm pipeline --input pipelines/chaos-actuator-down.json     >> active/shared/logs/chaos.log 2>&1

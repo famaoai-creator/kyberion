@@ -17,9 +17,9 @@ The key rule is that all three artifacts must come from the same analysis brief.
 - **Actuator**: `video-composition-actuator`
 - **Actuator**: `voice-actuator`
 - **Schemas**:
-  - [`document-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/document-brief.schema.json)
-  - [`video-content-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-content-brief.schema.json)
-  - [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/narrated-video-brief.schema.json)
+  - [`document-brief.schema.json`](../../../product/schemas/document-brief.schema.json)
+  - [`video-content-brief.schema.json`](../../../product/schemas/video-content-brief.schema.json)
+  - [`narrated-video-brief.schema.json`](../../../product/schemas/narrated-video-brief.schema.json)
 
 ## 3. Principle
 
