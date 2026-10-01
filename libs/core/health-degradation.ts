@@ -234,7 +234,7 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
     context: { findings: report.findings, thresholds },
     recommendation:
       report.verdict === 'red'
-        ? 'Investigate before continuing unattended operation: run pnpm doctor and inspect recent traces.'
+        ? 'Investigate before continuing unattended operation: run pnpm kyberion doctor and inspect recent traces.'
         : 'Review the findings during the next maintenance window; thresholds live in health-thresholds.json.',
     dedupe_key: `health-degradation:${report.verdict}`,
   });

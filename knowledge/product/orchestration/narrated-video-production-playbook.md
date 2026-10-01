@@ -12,7 +12,7 @@ last_updated: 2026-09-13
 # Narrated Video Production Playbook
 
 Use this playbook when the user asks for a narrated product video, a tutorial clip, a promotional video, or a video that may later be uploaded to YouTube.
-It specializes the shared [Guided Coordination Protocol](knowledge/product/orchestration/guided-coordination-protocol.md) for narrated media work.
+It specializes the shared [Guided Coordination Protocol](guided-coordination-protocol.md) for narrated media work.
 
 ## Default production shape: scratch first, pipeline second
 
@@ -40,7 +40,7 @@ Use Kyberion when the task has at least one of these properties:
 4. It might be uploaded to YouTube or another public channel.
 
 If the request is prompt-based rather than narrated, route it through
-[`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md)
+[`generate-video-from-adf.md`](../../public/procedures/media/generate-video-from-adf.md)
 instead of the narrated composition flow.
 
 ## Brief And Theme Separation
@@ -90,9 +90,9 @@ Good fits for this preflight include tutorial videos, product intros, onboarding
 ## Nearby Media Surfaces
 
 - [`scratch-to-pipeline-video-promotion.md`](./scratch-to-pipeline-video-promotion.md)
-- [`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md)
-- [`transcribe-audio-from-asset.md`](knowledge/public/procedures/media/transcribe-audio-from-asset.md)
-- [`realtime-voice-conversation.md`](knowledge/public/procedures/media/realtime-voice-conversation.md)
+- [`generate-video-from-adf.md`](../../public/procedures/media/generate-video-from-adf.md)
+- [`transcribe-audio-from-asset.md`](../../public/procedures/media/transcribe-audio-from-asset.md)
+- [`realtime-voice-conversation.md`](../../public/procedures/media/realtime-voice-conversation.md)
 
 ## Publish Boundary
 

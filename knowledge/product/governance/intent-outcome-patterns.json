@@ -461,7 +461,7 @@
       "intent_id": "inventory-work",
       "canonical_flow": [
         "intent normalization",
-        "work description capture (hearing scenario=work_inventory or pnpm inventory add)",
+        "work description capture (hearing scenario=work_inventory or pnpm work:inventory add)",
         "step decomposition and rule-based execution-method classification",
         "demand harvest from trace/repeat-run/unhandled-intent signals",
         "candidate ranking and calibration",

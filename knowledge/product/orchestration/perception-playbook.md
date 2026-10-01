@@ -55,7 +55,7 @@ Detailed document rules (engines per format, ingest, OCR traps):
 | Understand it now, nothing persisted | the sense command above                                                                      |
 | Same inside a pipeline               | `media:document_digest`, `vision:ocr_image`, `voice:transcribe`                              |
 | Meeting minutes (speaker, actions)   | `pnpm minutes:record` (live mic) / `ingest:meeting_digest` — see meeting-operations-playbook |
-| Land it as tenant knowledge          | `pnpm ingest --tenant <slug> --file <file> [--ocr]` (documents, html, md)                    |
+| Land it as tenant knowledge          | `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr]` (documents, html, md)          |
 | Web page (URL)                       | `network:fetch` (egress-governed) to save it, then `read` the saved file                     |
 
 ## 3. How to run

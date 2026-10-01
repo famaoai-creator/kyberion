@@ -20,7 +20,7 @@ phase_affinity: [alignment, execution]
 | その場で読む・答える・要約する（保存しない）                     | `pnpm kyberion read <file> [--ocr]`                                                                            | 標準出力に Markdown（`--json` で形式・タイトル・表・警告） |
 | 同じことをパイプライン内で                                       | `media:document_digest { path, ocr? }`                                                                         | コンテキスト上の Markdown                                  |
 | 後続処理用の構造化データ（レイアウト・画像・スライド単位の項目） | `media:pdf_extract`, `media:pptx_slide_text`, `media:pptx_extract`, `media:xlsx_extract`, `media:docx_extract` | コンテキスト上の design protocol / スライドレコード        |
-| テナントのナレッジとして取り込む（統制・台帳付き）               | `pnpm ingest --tenant <slug> --file <path> [--ocr]`                                                            | ナレッジカード + 資産台帳レコード                          |
+| テナントのナレッジとして取り込む（統制・台帳付き）               | `pnpm knowledge:ingest --tenant <slug> --file <path> [--ocr]`                                                  | ナレッジカード + 資産台帳レコード                          |
 
 `kyberion read`・`document_digest`・取込儀式は同じ読み取り関数（`@agent/core/document-reader`）を共有するので、どこから読んでも同じ結果になる。`unzip` / `pdftotext` / python-docx / 正規表現による自作抽出はしない。シェルポリシー（`document-hand-extraction`）が拒否し、この文書へ案内する。`knowledge/confidential/{tenant}/` へ入れる正規の経路は取込儀式だけ。
 
@@ -50,7 +50,7 @@ phase_affinity: [alignment, execution]
 - `media:xlsx_extract { path, sheet?, range?, values_only? }`。シート・範囲・`values_only` を指定すると値だけの軽量な射影になる。結合セルは左上のセルだけが値を持つ。
 - `media:document_digest`（xlsx）→ 表示中のシートごとに Markdown の表 1 つ。非表示の行・シートは除外し、セル内改行は `<br>` にする。数値はセルの表示形式で出す（`33.5%`・`1,234,567`・`▲28,957`・`2026/05/31`。保存されている生の値ではない）。
 
-### 取込儀式（`pnpm ingest`）
+### 取込儀式（`pnpm knowledge:ingest`）
 
 - 形式: `docx`, `pdf`, `xlsx`, `pptx`, `html`, `slack_thread`, `markdown`, `text`（拡張子から推定）。
 - `--ocr`（pptx・pdf・docx）: 埋め込み画像をローカル OCR し、`Image text (OCR — unverified)` ブロックとしてカードに入れる（docx は各画像の目印の位置に入る）。「スライドを Word に貼っただけ」の文書は本文がすべて画像なので必須。
@@ -78,7 +78,7 @@ pnpm kyberion read active/shared/tmp/<job>/<file> --images active/shared/tmp/<jo
 2. **最終版を選ぶ。** 資料は多数のドラフトで届く。同日の `final.pdf` は最新の `DraftN.pptx` より優先されることが多い。更新日時を確認し、迷ったら聞く。
 3. **表の OCR はラベルと数値の対応が崩れる。** Apple Vision は列を上から下へ読むため、貸借対照表や損益計算書は「ラベルの列挙 → 数値の列挙」になる。財務表は画像を見て Markdown の表に転記する。図は `--images <dir>` で PNG として取り出せる（EMF/WMF も変換済み）ので、パッケージを手で展開する必要はない。OCR は文章主体の画像（アセスメント・契約書）に使う。
 4. **グラフ画像の OCR は崩れる。** グラフに印字された数値ラベルだけを記録し、ラベルの無い点は原本で読む必要があると明記する。
-5. **confidential 書込の実行主体。** `pnpm ingest` には `KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` が必要。儀式は最初にこれを確認し、足りなければポリシー違反を出さずに正しい実行方法を示して止まる。ロールを当て推量で試さないこと（10 分で 3 回の違反でキルスイッチが作動する）。
+5. **confidential 書込の実行主体。** `pnpm knowledge:ingest` には `KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` が必要。儀式は最初にこれを確認し、足りなければポリシー違反を出さずに正しい実行方法を示して止まる。ロールを当て推量で試さないこと（10 分で 3 回の違反でキルスイッチが作動する）。
 6. **PII。** 取込ゲートはメール・電話・口座・住所をマスクし、カード番号・マイナンバーをブロックする。氏名は検出しない。契約書の OCR や PDF メタデータ（作成者）には氏名が載りうるので、コミット前に確認する。
 7. **抽出画像を片付ける。** PDF の画像は `active/shared/tmp/native-pdf/images/<文書ハッシュ>/`、PPTX のアセットは `active/shared/tmp/actuators/media-actuator/` に出る。テナントの図表を 24 時間 TTL の間そこへ残さず、カードをコミットしたら自分が作ったディレクトリを消す。
 8. **パスワード付きの Office ファイル**（`file` で `CDFV2 Encrypted` と出る）は読めない。復号の op は無いので、再試行せず持ち主に復号済みのコピーを依頼する。

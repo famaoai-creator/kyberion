@@ -8,22 +8,22 @@ Give the operator a single entry point for the cloned-voice flow.
 
 1. **Collect**
    - Stage raw samples under `active/shared/tmp/voice-sample-collection/<request_id>/`
-   - Procedure: [collect-voice-samples.md](/Users/famao/kyberion/knowledge/public/procedures/media/collect-voice-samples.md)
+   - Procedure: [collect-voice-samples.md](collect-voice-samples.md)
 
 2. **Register**
    - Validate the sample set and write a registration receipt
-   - Procedure: [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
+   - Procedure: [register-voice-profile.md](register-voice-profile.md)
 
 3. **Promote**
    - Approve the receipt and move the profile into the active registry
    - The runtime voice files live under `active/shared/runtime/voice-profiles/<profile_id>/`
-   - Procedure: [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+   - Procedure: [promote-voice-profile.md](promote-voice-profile.md)
 
 4. **Speak**
    - Use the promoted runtime profile for narration or live conversation
    - Procedures:
-     - [speak-with-my-voice.json](/Users/famao/kyberion/knowledge/product/pipeline-templates/speak-with-my-voice.json)
-     - [realtime-voice-conversation.md](/Users/famao/kyberion/knowledge/public/procedures/media/realtime-voice-conversation.md)
+     - [speak-with-my-voice.json](../../../product/pipeline-templates/speak-with-my-voice.json)
+     - [realtime-voice-conversation.md](realtime-voice-conversation.md)
 
 ## Where Data Lives
 

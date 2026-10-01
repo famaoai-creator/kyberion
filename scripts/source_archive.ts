@@ -14,6 +14,7 @@ import {
 } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 
 const DEFAULT_OUTPUT = pathResolver.rootResolve(
   'active/shared/exports/source-archives/kyberion-source.tar.gz'
@@ -206,10 +207,24 @@ function optionValue(args: readonly string[], name: string): string | undefined 
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+const SOURCE_ARCHIVE_CLI: CliGuardSpec = {
+  command: 'pnpm release:source-archive',
+  options: [
+    { flag: '--output', value: '<path>' },
+    { flag: '--ref', value: '<git-ref>' },
+    { flag: '--install-smoke' },
+    { flag: '--check' },
+    { flag: '--json' },
+    { flag: '--dry-run' },
+    { flag: '--quiet' },
+  ],
+};
+
 export const runSourceArchive = defineScript({
   name: 'release:source-archive',
   flags: ['check'],
   run(context) {
+    if (guardCliArgs(context.argv, SOURCE_ARCHIVE_CLI, context.print)) return;
     const output = optionValue(context.argv, '--output');
     const ref = optionValue(context.argv, '--ref') || 'HEAD';
     if (context.argv.includes('--install-smoke')) {

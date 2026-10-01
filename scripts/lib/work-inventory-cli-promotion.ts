@@ -1,5 +1,5 @@
 /**
- * WI-07: `pnpm inventory promote` and `pnpm inventory learn` command
+ * WI-07: `pnpm work:inventory promote` and `pnpm work:inventory learn` command
  * handlers.
  */
 import {

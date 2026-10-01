@@ -63,12 +63,12 @@ When a requirement, incident lesson, or fix changes, the system should identify:
 
 ## Kyberion Mapping
 
-| CoDD idea | Kyberion mapping |
-|---|---|
+| CoDD idea                               | Kyberion mapping                                |
+| --------------------------------------- | ----------------------------------------------- |
 | requirements/design/code/test coherence | `work_loop.process_design` + `Track` gate model |
-| impact analysis | analysis brief with `impact_bands` |
-| propagation | mission seed fan-out |
-| wave / V-model sequencing | SDLC gate readiness + next required artifacts |
+| impact analysis                         | analysis brief with `impact_bands`              |
+| propagation                             | mission seed fan-out                            |
+| wave / V-model sequencing               | SDLC gate readiness + next required artifacts   |
 
 ## Current Runtime Shape
 
@@ -104,7 +104,7 @@ The responsibility boundary for this flow is:
 
 Reference:
 
-- [analysis-execution-boundary.md](/Users/famao/kyberion/knowledge/product/architecture/analysis-execution-boundary.md)
+- [analysis-execution-boundary.md](analysis-execution-boundary.md)
 
 ## Remaining Work
 

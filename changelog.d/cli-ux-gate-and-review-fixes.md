@@ -1,0 +1,5 @@
+---
+category: Fixed
+---
+
+- **CLI UX gate and review fixes** — the streamed (interactive / long-running) script path now runs through the secure-io exec policy (`assertGovernedExec`, allowlisted env plus the operator's `KYBERION_*` settings), re-raises a signal that killed the child instead of reporting exit 1, forwards SIGHUP, and spawns `pnpm.cmd` on Windows. `guardCliArgsNormalized` rewrites `--flag=value` to `--flag value` for the legacy parsers (validation-bundle export, peer tenant / physical namespace migrations, `pr create`). `pnpm intent:trace <id>` no longer needs a repeated `trace`; `pnpm run doctor --help` prints usage; the deprecated-script notice and the unregistered-env warning are localized (en/ja); the Chronos systemd unit / launchd plist run `pnpm scheduler`, and `docs:check` now scans `*.service` / `*.plist` / `*.yml` under `docs/` and `.github/` for renamed or missing pnpm scripts. `defineGenerator` ignores the `--` separator instead of rejecting it as an unknown option. Smoke, release-operations and scenario-coverage contracts and the Chronos A2UI sanitizer test were updated to the current behavior.

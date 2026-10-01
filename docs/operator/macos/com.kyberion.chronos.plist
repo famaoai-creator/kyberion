@@ -10,7 +10,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/pnpm</string>
-    <string>chronos</string>
+    <string>scheduler</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
