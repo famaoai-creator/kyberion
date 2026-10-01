@@ -20,7 +20,11 @@ type Viewer = Pick<ConciergeViewerContext, 'source' | 'memberId'>;
 
 export type PushFailure = { ok: false; status: 400 | 403 | 409 | 503; error: string };
 
-/** A stable per-viewer key: the member, or the local operator on loopback. */
+function isLocalOperator(viewer: Viewer): boolean {
+  return viewer.source === 'loopback' && !viewer.memberId;
+}
+
+/** A stable per-viewer key. `owner_kind` separately distinguishes the local operator. */
 export function pushOwner(viewer: Viewer): string | null {
   if (viewer.memberId) return viewer.memberId;
   return viewer.source === 'loopback' ? 'operator' : null;
@@ -29,13 +33,20 @@ export function pushOwner(viewer: Viewer): string | null {
 export function readPushStatus(
   viewer: Viewer,
   options: WebPushPathOptions = {}
-): { configured: boolean; public_key: string | null; subscribed: number } {
+): {
+  configured: boolean;
+  public_key: string | null;
+  subscribed: number;
+  operator_eligible: boolean;
+} {
   const config = loadWebPushConfig();
   const owner = pushOwner(viewer);
+  const ownerKind = isLocalOperator(viewer) ? 'operator' : 'member';
   return {
     configured: config !== null,
     public_key: config?.publicKey ?? null,
-    subscribed: owner ? pushSubscribedFor(owner, options) : 0,
+    subscribed: owner ? pushSubscribedFor(owner, options, ownerKind) : 0,
+    operator_eligible: isLocalOperator(viewer),
   };
 }
 
@@ -48,13 +59,27 @@ export function subscribePush(
   const owner = pushOwner(viewer);
   if (!owner) return { ok: false, status: 403, error: 'member_required' };
   if (!loadWebPushConfig()) return { ok: false, status: 503, error: 'push_not_configured' };
-  const result = addPushSubscription(owner, subscription, options, now);
+  const ownerKind = isLocalOperator(viewer) ? 'operator' : 'member';
+  const result = addPushSubscription(owner, subscription, options, now, ownerKind);
   if (result.ok) return result;
   return {
     ok: false,
     status: result.error === 'too_many' ? 409 : 400,
     error: result.error,
   };
+}
+
+/** Operator-wide events have no tenant/member audience, so only operator devices may subscribe. */
+export function subscribeOperatorPush(
+  viewer: Viewer,
+  subscription: unknown,
+  options: WebPushPathOptions = {},
+  now: Date = new Date()
+): { ok: true } | PushFailure {
+  if (!isLocalOperator(viewer)) {
+    return { ok: false, status: 403, error: 'operator_subscription_required' };
+  }
+  return subscribePush(viewer, subscription, options, now);
 }
 
 export function unsubscribePush(
@@ -67,5 +92,6 @@ export function unsubscribePush(
   if (typeof endpoint !== 'string' || !endpoint) {
     return { ok: false, status: 400, error: 'endpoint_required' };
   }
-  return { ok: true, removed: removePushSubscription(owner, endpoint, options) };
+  const ownerKind = isLocalOperator(viewer) ? 'operator' : 'member';
+  return { ok: true, removed: removePushSubscription(owner, endpoint, options, ownerKind) };
 }
