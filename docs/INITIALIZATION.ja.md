@@ -213,7 +213,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 - **目的**: 判定層 L0〜L11 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
 - **初回に落ちやすい層**:
   - **L8（storage janitor）**: baseline-check が janitor を自動で投入します。完了後に再実行すれば通ります。手動で走らせる場合は `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'` を使います。
-  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm scheduler` です。
+  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm scheduler` です。`--daemon generation-schedule` / `--daemon daemon-watchdog` でメディア生成スケジューラーとデーモン監視（5 分間隔の one-shot）も同じ儀式で登録できます。launchd に渡る node は `<prefix>/opt/node/bin/node`（バージョン非依存の symlink）に解決されるため、`brew upgrade node` で壊れません。
   - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちます。Stage 7 などの governed 操作で記録されます。
 
 ### Stage 9: tenant・organization・activation（必要な場合のみ）

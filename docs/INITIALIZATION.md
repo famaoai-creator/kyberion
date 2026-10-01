@@ -210,7 +210,7 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
 - **Purpose**: confirm that every judgment layer L0-L11 passes. The layers are listed in standard flow Step 0.
 - **Layers that often fail the first time**:
   - **L8 (storage janitor)**: baseline-check enqueues the janitor automatically. Re-run after it completes. To run it by hand: `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'`.
-  - **L10 (scheduler)**: passes when no schedule is enabled. After registering schedules, keep the chronos daemon resident. On macOS, `pnpm kyberion scheduler install` shows what it will do and `--apply` registers a LaunchAgent. To just run it in the foreground, use `pnpm scheduler`.
+  - **L10 (scheduler)**: passes when no schedule is enabled. After registering schedules, keep the chronos daemon resident. On macOS, `pnpm kyberion scheduler install` shows what it will do and `--apply` registers a LaunchAgent. To just run it in the foreground, use `pnpm scheduler`. The same ceremony registers the media generation scheduler and the daemon watchdog (a 5-minute one-shot) with `--daemon generation-schedule` / `--daemon daemon-watchdog`. The node binary passed to launchd resolves to `<prefix>/opt/node/bin/node` (a version-independent symlink), so `brew upgrade node` does not break it.
   - **L11 (audit ledger)**: fails if there are no audit records, or they are stale. Governed operations such as Stage 7 record them.
 
 ### Stage 9: Tenant, organization, activation (only when needed)

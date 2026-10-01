@@ -1,4 +1,5 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
+import { Text } from './text.js';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import type { OperatorHomeSummary } from '@agent/core/surface/operator-home-summary';
 import { useI18n } from '../i18n.js';
