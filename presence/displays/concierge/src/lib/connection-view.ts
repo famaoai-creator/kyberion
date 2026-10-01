@@ -20,6 +20,25 @@ export interface ConnectionViewItem {
   /** `user:<member>` for a person, the tenant slug for an organization. */
   owner_ref?: string;
   group: 'mine' | 'organization';
+  /**
+   * What the record itself says, nothing probed: `ready` (nothing missing),
+   * `needs_credential` (it asks for a stored credential but references none).
+   * No secret is read and no service is contacted to decide this.
+   */
+  readiness: ConnectionReadiness;
+}
+
+export type ConnectionReadiness = 'ready' | 'needs_credential';
+
+export function connectionReadiness(record: {
+  auth_mode?: unknown;
+  secret_refs?: unknown;
+}): ConnectionReadiness {
+  if (record.auth_mode !== 'secret-guard') return 'ready';
+  const refs = Array.isArray(record.secret_refs) ? record.secret_refs : [];
+  return refs.some((ref) => typeof ref === 'string' && ref.trim() !== '')
+    ? 'ready'
+    : 'needs_credential';
 }
 
 export interface ConnectionViewer {
@@ -29,7 +48,12 @@ export interface ConnectionViewer {
   tenantSlugs: readonly string[] | 'all';
 }
 
-type RawBinding = BindingOwnerFields & { binding_id?: unknown; service_id?: unknown };
+type RawBinding = BindingOwnerFields & {
+  binding_id?: unknown;
+  service_id?: unknown;
+  auth_mode?: unknown;
+  secret_refs?: unknown;
+};
 
 /**
  * Operator-owned connections (reasoning backend, local media services) never
@@ -64,6 +88,7 @@ export function visibleConnections(
       owner_kind: owner.owner_kind,
       ...(owner.owner_ref ? { owner_ref: owner.owner_ref } : {}),
       group: owner.owner_kind === 'organization' ? 'organization' : 'mine',
+      readiness: connectionReadiness(record),
     });
   }
   return out.sort(
