@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/semantic-design-tokens.schema.json",
+  "title": "Semantic Design Tokens",
+  "description": "Per-engine semantic colour tokens (status.*, video.palette.*, diagram.*, ...) read by artifact engines through resolveSemanticTokens so tenant overlays can override them.",
+  "type": "object",
+  "required": ["version", "engines"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "engines": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { semanticToken, type ResolveSemanticTokensOptions } from '../../semantic-design-tokens.js';
 import type { PptxElement, PptxPos, PptxStyle } from '../../contracts/pptx-protocol.js';
 
 /**
@@ -14,29 +15,80 @@ import type { PptxElement, PptxPos, PptxStyle } from '../../contracts/pptx-proto
  */
 
 /** Neutral palette shared by the showcase deck and layout primitives. */
-export const PPTX_PALETTE = {
-  navy: '#1E3A5F',
-  navyDark: '#0F1F33',
-  blue: '#3B82F6',
-  blueLight: '#DBEAFE',
-  green: '#10B981',
-  greenLight: '#D1FAE5',
-  orange: '#F59E0B',
-  orangeLight: '#FEF3C7',
-  purple: '#8B5CF6',
-  purpleLight: '#EDE9FE',
-  red: '#EF4444',
-  redLight: '#FEE2E2',
-  gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray400: '#9CA3AF',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  white: '#FFFFFF',
-  black: '#000000',
-} as const;
+export interface PptxPalette {
+  navy: string;
+  navyDark: string;
+  blue: string;
+  blueLight: string;
+  green: string;
+  greenLight: string;
+  orange: string;
+  orangeLight: string;
+  purple: string;
+  purpleLight: string;
+  red: string;
+  redLight: string;
+  gray50: string;
+  gray100: string;
+  gray200: string;
+  gray400: string;
+  gray600: string;
+  gray700: string;
+  gray800: string;
+  white: string;
+  black: string;
+}
+
+const PPTX_PALETTE_TOKENS: Readonly<Record<keyof PptxPalette, string>> = {
+  navy: 'pptx.navy',
+  navyDark: 'pptx.navyDark',
+  blue: 'pptx.blue',
+  blueLight: 'pptx.blueLight',
+  green: 'status.success',
+  greenLight: 'status.success.light',
+  orange: 'status.warning',
+  orangeLight: 'status.warning.light',
+  purple: 'pptx.purple',
+  purpleLight: 'pptx.purpleLight',
+  red: 'status.danger',
+  redLight: 'status.danger.light',
+  gray50: 'pptx.gray50',
+  gray100: 'pptx.gray100',
+  gray200: 'pptx.gray200',
+  gray400: 'pptx.gray400',
+  gray600: 'pptx.gray600',
+  gray700: 'pptx.gray700',
+  gray800: 'pptx.gray800',
+  white: 'pptx.white',
+  black: 'pptx.black',
+};
+
+/**
+ * Resolve the palette for one render. Semantic tokens are tenant-scoped, so this
+ * runs per call with the tenant in scope (default: the process tenant) — a
+ * multi-tenant process must never reuse the first tenant's palette.
+ */
+export function resolvePptxPalette(options?: ResolveSemanticTokensOptions): Readonly<PptxPalette> {
+  const palette = {} as PptxPalette;
+  for (const [key, token] of Object.entries(PPTX_PALETTE_TOKENS)) {
+    palette[key as keyof PptxPalette] = semanticToken('pptx', token, options);
+  }
+  return palette;
+}
+
+/**
+ * Back-compat view of the default (process-tenant) palette. Values resolve on
+ * access, not at import; render paths take an explicit `tenantSlug` instead.
+ */
+export const PPTX_PALETTE: Readonly<PptxPalette> = Object.defineProperties(
+  {} as PptxPalette,
+  Object.fromEntries(
+    Object.entries(PPTX_PALETTE_TOKENS).map(([key, token]) => [
+      key,
+      { enumerable: true, get: () => semanticToken('pptx', token) },
+    ])
+  )
+);
 
 export function textElement(text: string, pos: PptxPos, style: PptxStyle = {}): PptxElement {
   return { type: 'text', pos, text, style };
@@ -62,6 +114,8 @@ export interface SectionHeaderOptions {
   accentColor?: string;
   titleColor?: string;
   fontSize?: number;
+  /** Tenant whose semantic-token overlay colours the defaults (default: process tenant). */
+  tenantSlug?: string;
 }
 
 /** Full-width section header: title bar + accent rule underneath. */
@@ -70,9 +124,10 @@ export function sectionHeaderElements(
   options: SectionHeaderOptions = {}
 ): PptxElement[] {
   const w = options.canvasWidth ?? 10;
-  const barColor = options.barColor ?? PPTX_PALETTE.navy;
-  const accentColor = options.accentColor ?? PPTX_PALETTE.blue;
-  const titleColor = options.titleColor ?? PPTX_PALETTE.white;
+  const palette = resolvePptxPalette({ tenantSlug: options.tenantSlug });
+  const barColor = options.barColor ?? palette.navy;
+  const accentColor = options.accentColor ?? palette.blue;
+  const titleColor = options.titleColor ?? palette.white;
   return [
     shapeElement('rect', { x: 0, y: 0, w, h: 0.9 }, '', { fill: barColor }),
     textElement(
@@ -99,14 +154,17 @@ export interface FooterOptions {
   y?: number;
   ruleColor?: string;
   textColor?: string;
+  /** Tenant whose semantic-token overlay colours the defaults (default: process tenant). */
+  tenantSlug?: string;
 }
 
 /** Footer rule + label + page counter. */
 export function footerElements(options: FooterOptions): PptxElement[] {
   const w = options.canvasWidth ?? 10;
   const y = options.y ?? 7.0;
-  const ruleColor = options.ruleColor ?? PPTX_PALETTE.navy;
-  const textColor = options.textColor ?? PPTX_PALETTE.gray400;
+  const palette = resolvePptxPalette({ tenantSlug: options.tenantSlug });
+  const ruleColor = options.ruleColor ?? palette.navy;
+  const textColor = options.textColor ?? palette.gray400;
   return [
     lineElement({ x: 0.5, y, w: w - 1, h: 0 }, { line: ruleColor, lineWidth: 0.5 }),
     textElement(
