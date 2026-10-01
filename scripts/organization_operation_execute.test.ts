@@ -21,7 +21,12 @@ vi.mock('@agent/core/organization/organization-operating-model-operations', () =
   loadOrganizationIncident: mocks.loadIncident,
   saveOrganizationIncident: mocks.saveIncident,
 }));
-vi.mock('@agent/core/path-resolver', () => ({ pathResolver: { rootDir: () => '/repo' } }));
+vi.mock('@agent/core/path-resolver', () => ({
+  pathResolver: {
+    rootDir: () => '/repo',
+    knowledge: (relative = '') => `/repo/knowledge/${relative}`,
+  },
+}));
 vi.mock('@agent/core/organization/organization-interventions', () => ({
   createOrganizationIncident: (input: Record<string, unknown>) => ({
     incident_id: input.incidentId,

@@ -71,7 +71,16 @@ vi.mock('@agent/core/path-resolver', () => ({
   ...mocks.pathResolver,
   pathResolver: mocks.pathResolver,
 }));
-vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/async-utils', () => ({
+  retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 250,
+    maxDelayMs: 2000,
+    factor: 2,
+    jitter: true,
+  })),
+}));
 vi.mock('@agent/core/recovery-policy', () => ({
   createGovernedRetryOptionsBuilder: vi.fn(
     ({ defaults }: { defaults: unknown }) =>
