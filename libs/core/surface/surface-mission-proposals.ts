@@ -530,6 +530,10 @@ export interface MissionIssuanceParams {
   routingDecision?: AgentRoutingDecision;
   /** Authority role recorded on the orchestration event (default `<surface>_bridge`). */
   requestedBy?: string;
+  /** Team Channel P2: principal that confirmed the proposal (`user:<member_id>`). */
+  confirmedBy?: string;
+  /** Team Channel P2: tenant scope of the originating channel; progress replies stay in it. */
+  scope?: { tenant_slug: string; tier?: 'public' | 'confidential' | 'personal' };
 }
 
 /**
@@ -595,6 +599,8 @@ export async function issueMissionFromProposal(
           tier,
           persona,
           missionType,
+          ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
+          ...(params.scope ? { scope: params.scope } : {}),
         },
       });
       return startMissionOrchestrationWorker(orchestrationEvent);
@@ -613,6 +619,8 @@ export async function issueMissionFromProposal(
     resource_id: missionId,
     thread_ts: params.thread,
     surface_channel: params.channel,
+    ...(params.confirmedBy ? { confirmed_by: params.confirmedBy } : {}),
+    ...(params.scope ? { tenant_slug: params.scope.tenant_slug } : {}),
     mission_type: missionType,
     tier,
     routing_decision_summary: formatRoutingDecisionSummary(params.routingDecision),
@@ -660,6 +668,8 @@ export async function issueSlackMissionFromProposal(params: {
   proposal: MissionProposal;
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
+  confirmedBy?: string;
+  scope?: MissionIssuanceParams['scope'];
 }): Promise<SlackMissionIssuanceResult> {
   return issueMissionFromProposal({
     surface: 'slack',
@@ -669,6 +679,8 @@ export async function issueSlackMissionFromProposal(params: {
     sourceText: params.sourceText,
     routingDecision: params.routingDecision,
     requestedBy: 'slack_bridge',
+    ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
+    ...(params.scope ? { scope: params.scope } : {}),
   });
 }
 

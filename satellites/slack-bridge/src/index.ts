@@ -95,6 +95,9 @@ import {
 import {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
+  handleSlackTeamChannelCommand,
+  linkSlackMissionToThread,
+  slackMissionIssueContext,
   evaluateSlackChannelActorAccess,
   isSlackOwnerOnboardingActor,
   slackBotParticipatesInThread,
@@ -104,6 +107,7 @@ import {
 export {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
+  handleSlackTeamChannelCommand,
   evaluateSlackChannelActorAccess,
   isSlackOwnerOnboardingActor,
   slackBotParticipatesInThread,
@@ -761,6 +765,28 @@ async function start(_args: string[] = []) {
     const messageText = engagement.text;
     if (!messageText) return;
 
+    // Team Channel P2: thread status and channel memory commands are answered
+    // deterministically, before any approval or model handling.
+    try {
+      const commandReply = handleSlackTeamChannelCommand({
+        policy: channelPolicy,
+        ...(channelSpeaker ? { speaker: channelSpeaker } : {}),
+        threadTs,
+        text: messageText,
+      });
+      if (commandReply !== undefined) {
+        await postSlackText(client, {
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: commandReply,
+        });
+        return;
+      }
+    } catch (err) {
+      logger.error(`❌ [SlackBridge] Team channel command failed: ${errorDetail(err)}`);
+      return;
+    }
+
     try {
       const approvalReply = resolveSlackApprovalText({
         channel: message.channel,
@@ -871,13 +897,18 @@ async function start(_args: string[] = []) {
         return;
       }
       if (pendingMissionProposal && isSlackMissionConfirmation(messageText)) {
+        const confirmedBy = evaluateChannelApprovalAuthority(channelPolicy, message.user || '', {
+          ...(channelSpeaker ? { speaker: channelSpeaker } : {}),
+        }).decidedBy;
         const issued = await issueSlackMissionFromProposal({
           channel: message.channel,
           threadTs,
           proposal: pendingMissionProposal.proposal,
           sourceText: pendingMissionProposal.sourceText,
           routingDecision: pendingMissionProposal.routingDecision,
+          ...slackMissionIssueContext(message.channel, confirmedBy),
         });
+        linkSlackMissionToThread(message.channel, threadTs, issued.missionId, confirmedBy);
         clearSlackMissionProposalState(message.channel, threadTs);
         const response = await client.chat.postMessage({
           channel: message.channel,
@@ -1246,7 +1277,8 @@ async function start(_args: string[] = []) {
       }
       if (!channel || !threadTs)
         throw new Error('Slack mission proposal action is missing channel/thread');
-      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
+      const confirmedBy = await ensureSlackApprovalAuthority(client, channel, threadTs, actorId);
+      if (!confirmedBy) return;
 
       const pending = getSlackMissionProposalState(channel, threadTs);
       if (!pending) {
@@ -1278,7 +1310,9 @@ async function start(_args: string[] = []) {
         proposal: pending.proposal,
         sourceText: pending.sourceText,
         routingDecision: pending.routingDecision,
+        ...slackMissionIssueContext(channel, confirmedBy),
       });
+      linkSlackMissionToThread(channel, threadTs, issued.missionId, confirmedBy);
       await client.chat.postMessage({
         channel,
         thread_ts: threadTs,

@@ -8,7 +8,26 @@ import {
   resolveChannelModePolicy,
   type ChannelModePolicy,
 } from '@agent/core/surface/channel-mode-policy';
-import type { ChannelSpeakerPrincipal } from '@agent/core/surface/channel-speaker-principal';
+import {
+  speakerCan,
+  type ChannelSpeakerPrincipal,
+} from '@agent/core/surface/channel-speaker-principal';
+import {
+  CHANNEL_MEMORY_LIMITS,
+  addChannelMemory,
+  buildChannelMemoryContext,
+  listChannelMemory,
+  parseChannelMemoryCommand,
+  removeChannelMemory,
+  type ChannelMemoryRef,
+} from '@agent/core/surface/channel-memory-store';
+import {
+  formatThreadWorkStatus,
+  isThreadStatusQuery,
+  readThreadWork,
+  recordThreadWork,
+  resolveThreadWorkStatus,
+} from '@agent/core/surface/thread-work-index';
 
 /**
  * Team Channel helpers for the Slack bridge: engagement (bot participation,
@@ -131,7 +150,27 @@ export function isSlackOwnerOnboardingActor(channel: string, actorId: string): b
   return false;
 }
 
-/** Prefix the team disclosure directive to the thread context, if any. */
+function slackMemoryRef(policy: ChannelModePolicy): ChannelMemoryRef | undefined {
+  return policy.mode === 'team' && policy.tenantSlug
+    ? { surface: 'slack', tenantSlug: policy.tenantSlug, channel: policy.channelId }
+    : undefined;
+}
+
+/** Team Channel P2: the channel's memory, capped at its disclosure tier. */
+export function slackChannelMemoryContext(policy: ChannelModePolicy): string | undefined {
+  const ref = slackMemoryRef(policy);
+  if (!ref) return undefined;
+  try {
+    return buildChannelMemoryContext(listChannelMemory(ref, policy.maxTier));
+  } catch (error: unknown) {
+    logger.warn(
+      `[SlackBridge] Channel memory unavailable — turn continues without it | check ${policy.channelId} memory file | ${errorDetail(error)}`
+    );
+    return undefined;
+  }
+}
+
+/** Prefix the team disclosure directive (and channel memory) to the thread context. */
 export function withSlackChannelDirective(
   policy: ChannelModePolicy | undefined,
   threadContext: string | undefined,
@@ -139,5 +178,102 @@ export function withSlackChannelDirective(
 ): string | undefined {
   const directive = policy ? buildChannelDisclosureDirective(policy, speaker) : undefined;
   if (!directive) return threadContext;
-  return threadContext ? `${directive}\n\n${threadContext}` : directive;
+  const memory = policy ? slackChannelMemoryContext(policy) : undefined;
+  return [directive, memory, threadContext].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Team Channel P2: deterministic thread commands handled without the model —
+ * "status?" (work this thread started) and channel memory commands
+ * (remember / forget / list). Returns the reply text, or undefined when the
+ * message is a normal turn.
+ */
+export function handleSlackTeamChannelCommand(params: {
+  policy: ChannelModePolicy;
+  speaker?: ChannelSpeakerPrincipal;
+  threadTs: string;
+  text: string;
+}): string | undefined {
+  const { policy, speaker, threadTs, text } = params;
+  if (policy.mode !== 'team') return undefined;
+  const locale = resolveOperatorLocale();
+  if (isThreadStatusQuery(text)) {
+    const index = readThreadWork({ surface: 'slack', channel: policy.channelId, threadTs });
+    return formatThreadWorkStatus(resolveThreadWorkStatus(index), locale);
+  }
+  const command = parseChannelMemoryCommand(text);
+  const ref = slackMemoryRef(policy);
+  if (!command || !ref) return undefined;
+  if (command.kind === 'list') {
+    const entries = listChannelMemory(ref, policy.maxTier);
+    if (entries.length === 0) return t('bridge:channel_memory_empty', undefined, locale);
+    return [
+      t('bridge:channel_memory_list_header', { count: entries.length }, locale),
+      ...entries.map((entry) => `- ${entry.id}: ${entry.text}`),
+    ].join('\n');
+  }
+  const needed = command.kind === 'remember' ? 'request_work' : 'decide';
+  if (!speaker || !speakerCan(speaker, needed)) {
+    return t('bridge:channel_memory_not_authorized', undefined, locale);
+  }
+  if (command.kind === 'forget') {
+    return removeChannelMemory(ref, command.id)
+      ? t('bridge:channel_memory_forgotten', { id: command.id }, locale)
+      : t('bridge:channel_memory_not_found', { id: command.id }, locale);
+  }
+  const result = addChannelMemory(ref, {
+    text: command.text,
+    tier: policy.maxTier,
+    createdBy: speaker.principalId ?? speaker.actorId,
+    sourceThread: threadTs,
+  });
+  switch (result.status) {
+    case 'saved':
+      return t('bridge:channel_memory_saved', { id: result.entry.id }, locale);
+    case 'too_long':
+      return t(
+        'bridge:channel_memory_too_long',
+        { max: CHANNEL_MEMORY_LIMITS.maxTextLength },
+        locale
+      );
+    case 'full':
+      return t('bridge:channel_memory_full', { max: CHANNEL_MEMORY_LIMITS.maxEntries }, locale);
+    default:
+      return t('bridge:channel_memory_nothing', undefined, locale);
+  }
+}
+
+/** Team Channel P2: attribution and tenant scope carried by an issued mission. */
+export function slackMissionIssueContext(
+  channel: string,
+  confirmedBy: string
+): { confirmedBy: string; scope?: { tenant_slug: string; tier: ChannelModePolicy['maxTier'] } } {
+  const policy = resolveChannelModePolicy('slack', channel);
+  return {
+    confirmedBy,
+    ...(policy.mode === 'team' && policy.tenantSlug
+      ? { scope: { tenant_slug: policy.tenantSlug, tier: policy.maxTier } }
+      : {}),
+  };
+}
+
+/** Team Channel P2: remember that this thread started the mission (best-effort). */
+export function linkSlackMissionToThread(
+  channel: string,
+  threadTs: string,
+  missionId: string,
+  confirmedBy: string
+): void {
+  const policy = resolveChannelModePolicy('slack', channel);
+  try {
+    recordThreadWork(
+      { surface: 'slack', channel, threadTs },
+      { kind: 'mission', id: missionId, confirmed_by: confirmedBy },
+      policy.tenantSlug ? { tenantSlug: policy.tenantSlug } : {}
+    );
+  } catch (error: unknown) {
+    logger.warn(
+      `[SlackBridge] Thread work link failed — status queries will not list ${missionId} | check thread-work store | ${errorDetail(error)}`
+    );
+  }
 }
