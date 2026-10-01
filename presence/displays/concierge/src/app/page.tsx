@@ -36,7 +36,10 @@ import {
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
 import {
   deriveCardFields,
+  NO_TENANT_FILTER,
+  filterByTenant,
   groupDecideQueue,
+  tenantFilterOptions,
   hasEffectColumn,
   presentKinds,
   type DecideKind,
@@ -334,6 +337,7 @@ export default function ConciergePage() {
   }, []);
 
   const [kindFilter, setKindFilter] = React.useState<DecideKind | 'all'>('all');
+  const [tenantFilter, setTenantFilter] = React.useState<string>('all');
 
   const refresh = React.useCallback(async () => {
     try {
@@ -1011,8 +1015,21 @@ export default function ConciergePage() {
 
   const { queue, deferred, countsByKind } = groupDecideQueue(allEntries, deferredIds);
   const visibleKinds = presentKinds(countsByKind);
+  const tenantOptions = tenantFilterOptions(queue);
+  // The organization row only appears once the queue spans more than one
+  // organization; a stale selection (its items all decided) falls back to everything.
+  const showTenantFilter = tenantOptions.tenants.length > 1;
+  const activeTenantFilter =
+    showTenantFilter &&
+    (tenantFilter === 'all' ||
+      (tenantFilter === NO_TENANT_FILTER
+        ? tenantOptions.unassigned > 0
+        : tenantOptions.tenants.some((entry) => entry.slug === tenantFilter)))
+      ? tenantFilter
+      : 'all';
+  const byTenant = filterByTenant(queue, activeTenantFilter);
   const filteredQueue =
-    kindFilter === 'all' ? queue : queue.filter((entry) => entry.kind === kindFilter);
+    kindFilter === 'all' ? byTenant : byTenant.filter((entry) => entry.kind === kindFilter);
   const totalQueueCount = queue.length;
 
   const entryTitle = (entry: DecideQueueEntry): string =>
@@ -1110,6 +1127,35 @@ export default function ConciergePage() {
               })),
             ]}
           />
+
+          {showTenantFilter ? (
+            <Tabs
+              label={frontDeskText('decide_filter_tenant', locale)}
+              active={activeTenantFilter}
+              onSelect={(id) => setTenantFilter(id)}
+              items={[
+                {
+                  id: 'all',
+                  label: frontDeskText('decide_filter_all', locale),
+                  count: totalQueueCount,
+                },
+                ...tenantOptions.tenants.map((entry) => ({
+                  id: entry.slug,
+                  label: entry.slug,
+                  count: entry.count,
+                })),
+                ...(tenantOptions.unassigned > 0
+                  ? [
+                      {
+                        id: NO_TENANT_FILTER,
+                        label: frontDeskText('decide_filter_no_tenant', locale),
+                        count: tenantOptions.unassigned,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          ) : null}
 
           {filteredQueue.length === 0 ? (
             <p className="decide-muted decide-empty">{frontDeskText('decide_empty', locale)}</p>
