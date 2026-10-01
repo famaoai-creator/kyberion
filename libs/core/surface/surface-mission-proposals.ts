@@ -518,6 +518,12 @@ export function isSlackMissionRejection(text: string): boolean {
   ].some((pattern) => pattern.test(normalized));
 }
 
+const TIER_RANK: Record<'public' | 'confidential' | 'personal', number> = {
+  public: 1,
+  confidential: 2,
+  personal: 3,
+};
+
 export interface MissionIssuanceParams {
   /** Originating surface ('slack' | 'chronos' | 'terminal' | 'telegram' | …). */
   surface: string;
@@ -530,6 +536,10 @@ export interface MissionIssuanceParams {
   routingDecision?: AgentRoutingDecision;
   /** Authority role recorded on the orchestration event (default `<surface>_bridge`). */
   requestedBy?: string;
+  /** Team Channel P2: principal that confirmed the proposal (`user:<member_id>`). */
+  confirmedBy?: string;
+  /** Team Channel P2: tenant scope of the originating channel; progress replies stay in it. */
+  scope?: { tenant_slug: string; tier?: 'public' | 'confidential' | 'personal' };
 }
 
 /**
@@ -549,7 +559,14 @@ export async function issueMissionFromProposal(
     params.proposal,
     params.sourceText
   );
-  const tier = params.proposal.tier || 'public';
+  // Team Channel P2: a mission never runs above the originating channel's
+  // disclosure tier, whatever tier the model proposed.
+  const proposedTier = params.proposal.tier || 'public';
+  const tier =
+    params.scope?.tier && TIER_RANK[proposedTier] > TIER_RANK[params.scope.tier]
+      ? params.scope.tier
+      : proposedTier;
+  const tenantArgs = params.scope ? ['--tenant-slug', params.scope.tenant_slug] : [];
   const missionType = params.proposal.mission_type || 'development';
   const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
   const env = buildExecutionEnv(process.env, 'mission_controller');
@@ -570,6 +587,7 @@ export async function issueMissionFromProposal(
       'default',
       missionType,
       ...routingDecisionArg,
+      ...tenantArgs,
     ],
     { env, cwd: pathResolver.rootDir() }
   );
@@ -595,7 +613,10 @@ export async function issueMissionFromProposal(
           tier,
           persona,
           missionType,
+          ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
+          ...(params.scope ? { scope: params.scope } : {}),
         },
+        ...(params.scope ? { scope: { tenant_slug: params.scope.tenant_slug, tier } } : {}),
       });
       return startMissionOrchestrationWorker(orchestrationEvent);
     });
@@ -613,6 +634,8 @@ export async function issueMissionFromProposal(
     resource_id: missionId,
     thread_ts: params.thread,
     surface_channel: params.channel,
+    ...(params.confirmedBy ? { confirmed_by: params.confirmedBy } : {}),
+    ...(params.scope ? { tenant_slug: params.scope.tenant_slug } : {}),
     mission_type: missionType,
     tier,
     routing_decision_summary: formatRoutingDecisionSummary(params.routingDecision),
@@ -660,6 +683,8 @@ export async function issueSlackMissionFromProposal(params: {
   proposal: MissionProposal;
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
+  confirmedBy?: string;
+  scope?: MissionIssuanceParams['scope'];
 }): Promise<SlackMissionIssuanceResult> {
   return issueMissionFromProposal({
     surface: 'slack',
@@ -669,6 +694,8 @@ export async function issueSlackMissionFromProposal(params: {
     sourceText: params.sourceText,
     routingDecision: params.routingDecision,
     requestedBy: 'slack_bridge',
+    ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
+    ...(params.scope ? { scope: params.scope } : {}),
   });
 }
 

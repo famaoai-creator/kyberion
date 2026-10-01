@@ -58,12 +58,14 @@ import { withExecutionContext } from '@agent/core/authority';
 import { buildDecisionCard } from '@agent/core/governance/decision-card';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import { resolveChannelModePolicy } from '@agent/core/surface/channel-mode-policy';
+import { channelMemoryLogicalPath } from '@agent/core/surface/channel-memory-store';
 import {
   collectSlackThreadContext,
   createSlackBotUserIdResolver,
   createSlackTypingHandle,
   ensureSlackApprovalAuthority,
   isSlackOwnerOnboardingActor,
+  handleSlackTeamChannelCommand,
   resolveSlackApprovalText,
   runSlackChannelTurn,
   slackBotParticipatesInThread,
@@ -528,5 +530,155 @@ describe('slack team channel', () => {
       status: 'rejected',
       decidedBy: 'U-lead',
     });
+  });
+});
+
+describe('slack team channel commands (P2)', () => {
+  const channel = `C-p2-${Date.now().toString(36)}`;
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    withExecutionContext('mission_controller', () => {
+      const file = pathResolver.rootResolve(
+        channelMemoryLogicalPath({ surface: 'slack', tenantSlug: 'acme', channel })
+      );
+      if (safeExistsSync(file)) safeRmSync(file, { force: true });
+    });
+  });
+
+  function speaker(role?: 'viewer' | 'operator' | 'approver') {
+    const capabilities =
+      role === 'operator'
+        ? ['ask', 'request_work']
+        : role === 'approver'
+          ? ['ask', 'decide']
+          : ['ask'];
+    return {
+      surface: 'slack',
+      actorId: `U-${role ?? 'guest'}`,
+      denied: false,
+      tenantSlug: 'acme',
+      tierAccess: ['public' as const, 'confidential' as const],
+      ...(role ? { role, principalId: `user:${role}`, memberId: role } : {}),
+      capabilities: capabilities as Array<'ask' | 'request_work' | 'decide'>,
+    };
+  }
+
+  it('saves, lists and forgets channel memory by role and injects it into turns', async () => {
+    vi.stubEnv(
+      'KYBERION_SURFACE_CHANNEL_MODES',
+      JSON.stringify({ slack: { [channel]: { mode: 'team', tenant_slug: 'acme' } } })
+    );
+    const policy = resolveChannelModePolicy('slack', channel);
+    const run = (text: string, role?: 'viewer' | 'operator' | 'approver') =>
+      handleSlackTeamChannelCommand({ policy, speaker: speaker(role), threadTs: '1.0', text });
+
+    const locale = resolveOperatorLocale();
+    expect(run('remember: standup is at 9:30', 'viewer')).toBe(
+      t('bridge:channel_memory_not_authorized', undefined, locale)
+    );
+    const saved = run('remember: standup is at 9:30', 'operator');
+    const id = saved?.match(/m[a-f0-9]{8}/)?.[0];
+    expect(id).toBeTruthy();
+    expect(run('memory', 'viewer')).toContain('standup is at 9:30');
+
+    captured.conversationInputs.length = 0;
+    await runSlackChannelTurn(
+      { channel: 'slack', actorId: 'U-x', send: () => undefined },
+      { ...baseRequest(), channel, channelPolicy: policy }
+    );
+    expect(captured.conversationInputs[0].threadContext).toContain('[channel-memory]');
+    expect(captured.conversationInputs[0].threadContext).toContain('standup is at 9:30');
+
+    expect(run(`forget ${id}`, 'operator')).toBe(
+      t('bridge:channel_memory_not_authorized', undefined, locale)
+    );
+    expect(run(`forget ${id}`, 'approver')).toBe(
+      t('bridge:channel_memory_forgotten', { id: String(id) }, locale)
+    );
+    expect(run('memory', 'viewer')).toBe(t('bridge:channel_memory_empty', undefined, locale));
+  });
+
+  it('escapes member text, honours the approvers fallback and hides other-tier facts', () => {
+    vi.stubEnv(
+      'KYBERION_SURFACE_CHANNEL_MODES',
+      JSON.stringify({
+        slack: { [channel]: { mode: 'team', tenant_slug: 'acme', approvers: ['U-guest'] } },
+      })
+    );
+    const policy = resolveChannelModePolicy('slack', channel);
+    const locale = resolveOperatorLocale();
+    const saved = handleSlackTeamChannelCommand({
+      policy,
+      speaker: speaker('operator'),
+      threadTs: '1.0',
+      text: 'remember: ping <!channel> & <@U1>',
+    });
+    const id = String(saved?.match(/m[a-f0-9]{8}/)?.[0]);
+    const listed = handleSlackTeamChannelCommand({
+      policy,
+      speaker: speaker(),
+      threadTs: '1.0',
+      text: 'memory',
+    });
+    expect(listed).toContain('&lt;!channel&gt; &amp; &lt;@U1&gt;');
+    expect(listed).not.toContain('<!channel>');
+
+    const denied = { ...speaker('operator'), denied: true };
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: denied,
+        threadTs: '1.0',
+        text: 'remember: x',
+      })
+    ).toBe(t('bridge:channel_memory_not_authorized', undefined, locale));
+
+    // Unlinked actor on the channel approvers list may forget (same rule as approvals).
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: { ...speaker(), actorId: 'U-other' },
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_not_authorized', undefined, locale));
+    const guestApprover = { ...speaker(), actorId: 'U-guest' };
+    expect(
+      handleSlackTeamChannelCommand({
+        policy: { ...policy, maxTier: 'public' },
+        speaker: guestApprover,
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_not_found', { id }, locale));
+    expect(
+      handleSlackTeamChannelCommand({
+        policy,
+        speaker: guestApprover,
+        threadTs: '1.0',
+        text: `forget ${id}`,
+      })
+    ).toBe(t('bridge:channel_memory_forgotten', { id }, locale));
+  });
+
+  it('answers thread status deterministically and ignores normal text', () => {
+    vi.stubEnv(
+      'KYBERION_SURFACE_CHANNEL_MODES',
+      JSON.stringify({ slack: { [channel]: { mode: 'team', tenant_slug: 'acme' } } })
+    );
+    const policy = resolveChannelModePolicy('slack', channel);
+    expect(handleSlackTeamChannelCommand({ policy, threadTs: '9.9', text: 'status?' })).toBe(
+      t('bridge:thread_work_none', undefined, resolveOperatorLocale())
+    );
+    expect(
+      handleSlackTeamChannelCommand({ policy, threadTs: '9.9', text: 'please summarise the doc' })
+    ).toBeUndefined();
+    expect(
+      handleSlackTeamChannelCommand({
+        policy: resolveChannelModePolicy('slack', 'C-dm'),
+        threadTs: '9.9',
+        text: 'status?',
+      })
+    ).toBeUndefined();
   });
 });
