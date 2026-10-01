@@ -89,6 +89,10 @@ import {
   type ChannelModePolicy,
 } from '@agent/core/surface/channel-mode-policy';
 import {
+  speakerCan,
+  type ChannelSpeakerPrincipal,
+} from '@agent/core/surface/channel-speaker-principal';
+import {
   createSlackBotUserIdResolver,
   ensureSlackApprovalAuthority,
   evaluateSlackChannelActorAccess,
@@ -266,6 +270,8 @@ export interface SlackChannelTurnRequest {
   metadata?: Record<string, unknown>;
   /** Team Channel: the channel's conversation-mode policy (absent = owner_direct). */
   channelPolicy?: ChannelModePolicy;
+  /** Team Channel P1: the resolved speaker (member principal, role, capabilities). */
+  channelSpeaker?: ChannelSpeakerPrincipal;
 }
 
 /**
@@ -303,7 +309,11 @@ export function runSlackChannelTurn(
         senderAgentId: 'kyberion:slack-bridge',
         agentId: SLACK_SURFACE_AGENT_ID,
         forcedReceiver: request.forcedReceiver,
-        threadContext: withSlackChannelDirective(request.channelPolicy, threadContext),
+        threadContext: withSlackChannelDirective(
+          request.channelPolicy,
+          threadContext,
+          request.channelSpeaker
+        ),
         ...(scope ? { scope } : {}),
         delegationSummaryInstruction:
           'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
@@ -374,15 +384,21 @@ export function resolveSlackApprovalText(params: {
   channelPolicy?: ChannelModePolicy;
 }): string | null {
   const policy = params.channelPolicy;
+  // Team channels record the member principal (user:<id>) as the decider.
+  const authority =
+    policy?.mode === 'team' ? evaluateChannelApprovalAuthority(policy, params.actorId) : undefined;
   const resolved = resolveSurfaceApprovalReply({
     surface: 'slack',
     channel: params.channel,
     threadTs: params.threadTs,
     text: params.text,
-    decidedBy: params.actorId,
+    decidedBy: authority?.decidedBy || params.actorId,
     locale: resolveOperatorLocale(),
     ...(policy
-      ? { canDecide: () => evaluateChannelApprovalAuthority(policy, params.actorId).allowed }
+      ? {
+          canDecide: () =>
+            (authority ?? evaluateChannelApprovalAuthority(policy, params.actorId)).allowed,
+        }
       : {}),
   });
   return resolved.handled ? resolved.reply || '' : null;
@@ -731,6 +747,7 @@ async function start(_args: string[] = []) {
         slackBotParticipatesInThread(client, message.channel, threadTs, botUserId),
     });
     if (!engagement.respond) return;
+    const channelSpeaker = access.speaker;
     const messageText = engagement.text;
     if (!messageText) return;
 
@@ -914,14 +931,31 @@ async function start(_args: string[] = []) {
             team,
             channelType,
             channel_mode: channelPolicy.mode,
+            ...(channelSpeaker?.principalId
+              ? { speaker_principal: channelSpeaker.principalId, speaker_role: channelSpeaker.role }
+              : {}),
           },
           channelPolicy,
+          ...(channelSpeaker ? { channelSpeaker } : {}),
         },
         {
           // UX-02: the 👀 typing reaction must outlive the proposal and
           // approval envelopes this bridge posts itself — stopping typing
           // in runChannelTurn would clear it while work is still pending.
           afterTurn: async (conversation) => {
+            // Team Channel P1: ask-only speakers (viewers, unregistered guests)
+            // never open missions or approval requests.
+            const requestsWork =
+              conversation.approvalRequests.length > 0 ||
+              (conversation.missionProposals?.length ?? 0) > 0;
+            if (requestsWork && channelSpeaker && !speakerCan(channelSpeaker, 'request_work')) {
+              await postSlackText(client, {
+                channel: message.channel,
+                thread_ts: threadTs,
+                text: t('bridge:work_request_not_authorized', undefined, resolveOperatorLocale()),
+              });
+              return;
+            }
             if (conversation.approvalRequests.length > 0) {
               await reflectSlackPresence({
                 status: 'thinking',
@@ -1148,14 +1182,15 @@ async function start(_args: string[] = []) {
       const threadTs =
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs) throw new Error('Slack approval action is missing channel/thread');
-      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
+      const decidedBy = await ensureSlackApprovalAuthority(client, channel, threadTs, actorId);
+      if (!decidedBy) return;
       const updated = applySurfaceApprovalDecision({
         surface: 'slack',
         requestId: payload.requestId,
         decision: payload.decision,
         channel,
         threadTs,
-        decidedBy: actorId,
+        decidedBy,
       });
 
       await client.chat.postMessage({
@@ -1263,12 +1298,13 @@ async function start(_args: string[] = []) {
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs)
         throw new Error('Slack approval reason action is missing channel/thread');
-      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
+      const annotatedBy = await ensureSlackApprovalAuthority(client, channel, threadTs, actorId);
+      if (!annotatedBy) return;
       const resolved = resolveSurfaceApprovalAskWhy({
         surface: 'slack',
         requestId: payload.requestId,
         category: payload.category,
-        annotatedBy: actorId,
+        annotatedBy,
         channel,
         threadTs,
       });
@@ -1385,14 +1421,15 @@ async function start(_args: string[] = []) {
         return;
       }
       const submissionPolicy = resolveChannelModePolicy('slack', submission.channel);
+      const submissionAuthority = evaluateChannelApprovalAuthority(submissionPolicy, actorId);
       const resolved = resolveSurfaceApprovalReply({
         surface: 'slack',
         channel: submission.channel,
         threadTs: submission.threadTs,
         text: `appr:${submission.requestId}:changes ${submission.instruction}`,
-        decidedBy: actorId,
+        decidedBy: submissionAuthority.decidedBy || actorId,
         locale: resolveOperatorLocale(),
-        canDecide: () => evaluateChannelApprovalAuthority(submissionPolicy, actorId).allowed,
+        canDecide: () => submissionAuthority.allowed,
       });
       await client.chat.postMessage({
         channel: submission.channel,
