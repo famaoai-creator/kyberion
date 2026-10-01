@@ -1180,6 +1180,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/org-readiness/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2802,6 +2807,7 @@
         "presence/displays/concierge/src/app/api/message/route.ts",
         "presence/displays/concierge/src/app/api/notification-preferences/route.ts",
         "presence/displays/concierge/src/app/api/oauth/begin/route.ts",
+        "presence/displays/concierge/src/app/api/org-readiness/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/[id]/route.ts",
@@ -2849,6 +2855,7 @@
         "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ProfileSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/QuietHoursPane.tsx",
@@ -2882,6 +2889,8 @@
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
+        "presence/displays/concierge/src/lib/org-readiness-server.ts",
+        "presence/displays/concierge/src/lib/org-readiness-view.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
