@@ -12,7 +12,9 @@
         "active/shared/observability/chronos/",
         "active/shared/observability/mission-control/",
         "active/shared/runtime/terminal/",
-        "active/audit/"
+        "active/audit/",
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/delegations.jsonl"
       ],
       "scope_classes": [
         "communication_surface",
@@ -95,6 +97,7 @@
       "description": "EV-02: heartbeat watchdog authority. Observes daemon liveness and raises governed recovery wake triggers. Deliberately has no write scope over daemon state or repo config — it reports and requests, it does not reconfigure.",
       "default_persona": "worker",
       "write_scopes": [
+        "active/shared/coordination/autonomy/",
         "active/shared/runtime/trigger-deliveries.jsonl",
         "active/shared/runtime/heartbeats/",
         "active/shared/observability/",

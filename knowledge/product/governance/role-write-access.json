@@ -70,7 +70,9 @@
         "active/shared/observability/chronos/",
         "active/shared/observability/mission-control/",
         "active/shared/runtime/terminal/",
-        "active/audit/"
+        "active/audit/",
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/delegations.jsonl"
       ]
     },
     "chronos_operator": {
@@ -135,6 +137,15 @@
     },
     "sovereign_concierge": {
       "allow": ["knowledge/personal/", "active/projects/onboarding/"]
+    },
+    "daemon_watchdog": {
+      "allow": [
+        "active/shared/coordination/autonomy/",
+        "active/shared/runtime/trigger-deliveries.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/observability/",
+        "active/audit/"
+      ]
     }
   }
 }

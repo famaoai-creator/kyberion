@@ -8682,6 +8682,11 @@
         "en": "Generate schema-backed artifact, intent and work policy types",
         "ja": "スキーマから成果物・意図・作業ポリシーの型を生成",
         "qps-ploc": "⟦Ɠėñėřȧŧė şƈħėɱȧ-ƀȧƈķėḓ ȧřŧïƒȧƈŧ, ïñŧėñŧ ȧñḓ ẇőřķ ṗőŀïƈẏ ŧẏṗėş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_dot_list": {
+        "en": "List resident-agent (dot) charters and their status",
+        "ja": "常駐エージェント（dot）のチャーターと状態を一覧表示",
+        "qps-ploc": "⟦Ŀïşŧ řėşïḓėñŧ-ȧɠėñŧ (ḓőŧ) ƈħȧřŧėřş ȧñḓ ţħėïř şŧȧţůş ŀőřėɱ⟧"
       }
     },
     "recorder": {

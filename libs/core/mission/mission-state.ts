@@ -240,15 +240,15 @@ function findMissionPathAtRoot(
     } catch {
       continue;
     }
-    const candidate = path.join(safeDirectory, id);
-    if (
-      safeExistsSync(candidate) &&
-      safeLstat(candidate).isDirectory() &&
-      safeHistoryPath(candidate)
-    )
-      return candidate;
-    if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) continue;
     try {
+      const candidate = path.join(safeDirectory, id);
+      if (
+        safeExistsSync(candidate) &&
+        safeLstat(candidate).isDirectory() &&
+        safeHistoryPath(candidate)
+      )
+        return candidate;
+      if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) continue;
       for (const scopeEntry of safeReaddir(safeDirectory)) {
         const scopedCandidate = path.join(safeDirectory, scopeEntry, id);
         if (
@@ -390,7 +390,12 @@ export function listMissionsInSearchDirs(
     } catch {
       return;
     }
-    if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) return;
+    try {
+      if (!safeExistsSync(safeDirectory) || !safeLstat(safeDirectory).isDirectory()) return;
+    } catch (err) {
+      logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+      return;
+    }
     try {
       if (safeExistsSync(path.join(safeDirectory, 'mission-state.json'))) {
         missions.push({

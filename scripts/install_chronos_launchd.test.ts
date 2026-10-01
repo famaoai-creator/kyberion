@@ -194,6 +194,22 @@ describe('install_chronos_launchd --daemon', () => {
     expect(output[0]).not.toContain('chronos_daemon.js');
   });
 
+  it('keeps the supervisor alive only after a crash — a clean exit means another instance owns the lock', async () => {
+    const spec = LAUNCHD_DAEMON_SPECS['agent-runtime-supervisor'];
+    expect(spec.label).toBe('com.kyberion.agent-runtime-supervisor');
+    expect(spec.daemonScript).toBe('dist/scripts/agent_runtime_supervisor_daemon.js');
+    expect(spec.keepAliveOnCrashOnly).toBe(true);
+
+    const output: string[] = [];
+    await main(['--daemon', 'agent-runtime-supervisor'], (value) => output.push(String(value)));
+
+    expect(output).toHaveLength(1);
+    expect(output[0]).toContain('agent_runtime_supervisor_daemon.js');
+    // SuccessfulExit=false: a lock-held clean exit must not respawn-loop.
+    expect(output[0]).toContain('<key>SuccessfulExit</key>');
+    expect(output[0]).not.toContain('<key>KeepAlive</key>\n  <true/>');
+  });
+
   it('rejects an unknown daemon id before touching the filesystem', async () => {
     await expect(main(['--daemon', 'bogus'], () => {})).rejects.toThrow(
       /unknown daemon 'bogus'.*chronos.*generation-schedule/
