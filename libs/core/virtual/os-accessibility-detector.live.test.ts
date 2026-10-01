@@ -109,13 +109,15 @@ $window.Content = $panel
 $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($wpf))
 $process = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-STA', '-EncodedCommand', $encoded) -PassThru
 $hwnd = [IntPtr]::Zero
-for ($i = 0; $i -lt 100 -and $hwnd -eq [IntPtr]::Zero; $i++) {
+for ($i = 0; $i -lt 150 -and $hwnd -eq [IntPtr]::Zero -and -not $process.HasExited; $i++) {
   Start-Sleep -Milliseconds 200
   $hwnd = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
 }
 [uint32]$ownerPid = 0
 if ($hwnd -ne [IntPtr]::Zero) { [void][KyberionUiaSmoke]::GetWindowThreadProcessId($hwnd, [ref]$ownerPid) }
-[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64() } | ConvertTo-Json -Compress))`;
+$childExited = $process.HasExited
+$childExitCode = if ($childExited) { $process.ExitCode } else { $null }
+[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64(); child_exited = $childExited; child_exit_code = $childExitCode } | ConvertTo-Json -Compress))`;
 
 // Brings the window (handle in UIA_SMOKE_HWND) to the foreground; the ALT tap
 // lifts the foreground lock when a plain SetForegroundWindow is refused.
@@ -240,7 +242,10 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       live_screen: true,
       application: target.application,
     };
-    expect(await detector.isAvailable(request)).toBe(true);
+    if (!(await detector.isAvailable(request))) {
+      outcome = 'os_accessibility detector unavailable';
+      continue;
+    }
     const started = Date.now();
     const snapshot = await detector.readSnapshot(request);
     const roles = new Map<string, number>();
@@ -272,7 +277,10 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
     expect(snapshot.application?.toLowerCase()).toBe(target.application);
     expect(snapshot.screen?.width).toBeGreaterThan(0);
     const frame = snapshot.window;
-    expect(frame).toBeDefined();
+    if (!frame) {
+      outcome = 'snapshot has no window frame';
+      continue;
+    }
     const scale = request.image_size.width / (snapshot.screen?.width ?? 1);
     const windowBox: SomBox = {
       x: frame!.x * scale,
@@ -297,6 +305,10 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       outcome = `no candidates inside the ${target.label} window`;
       continue;
     }
+    if (windowElements.length === 0) {
+      outcome = `UIA returned no elements inside the ${target.label} window`;
+      continue;
+    }
     return { snapshot, within, windowElements, image: request.image_size };
   }
   throw new Error(`[uia-smoke:${target.label}] ${outcome}`);
@@ -312,6 +324,31 @@ function pidsOf(launch: Record<string, unknown>): number[] {
   return (Array.isArray(launch.pids) ? launch.pids : [launch.pids]).map(Number);
 }
 
+/**
+ * Runs a launch script until it reports a real window handle, retrying on a
+ * fresh process when the window never appears (slow STA/WPF startup on loaded
+ * runners is the dominant flake mode). All spawned pids are returned so the
+ * caller can clean up every attempt, including failed ones.
+ */
+function launchWithRetry(
+  script: string,
+  env: Record<string, string>,
+  label: string,
+  attempts = 3
+): { launch: Record<string, unknown>; pids: number[] } {
+  const pids: number[] = [];
+  let launch: Record<string, unknown> = {};
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    launch = runPowerShell(script, env);
+    const attemptPids = pidsOf(launch);
+    pids.push(...attemptPids);
+    console.log(`[uia-smoke:${label}] launch attempt ${attempt}`, JSON.stringify(launch));
+    if (Number(launch.hwnd) > 0) break;
+    killAll(attemptPids);
+  }
+  return { launch, pids };
+}
+
 describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)', () => {
   const shotDir = pathResolver.sharedTmp('uia-live-smoke');
 
@@ -319,9 +356,9 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
     safeMkdir(shotDir, { recursive: true });
     let pids: number[] = [];
     try {
-      const launch = runPowerShell(LAUNCH_SCRIPT);
-      console.log('[uia-smoke:notepad] launch', JSON.stringify(launch));
-      pids = pidsOf(launch);
+      const launched = launchWithRetry(LAUNCH_SCRIPT, {}, 'notepad');
+      const launch = launched.launch;
+      pids = launched.pids;
       expect(Number(launch.hwnd), 'Notepad main window did not appear').toBeGreaterThan(0);
       const { within } = await detectLive({
         label: 'notepad',
@@ -345,9 +382,9 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
     const title = `Kyberion UIA smoke ${process.pid}`;
     let pids: number[] = [];
     try {
-      const launch = runPowerShell(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title });
-      console.log('[uia-smoke:wpf] launch', JSON.stringify(launch));
-      pids = pidsOf(launch);
+      const launched = launchWithRetry(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title }, 'wpf');
+      const launch = launched.launch;
+      pids = launched.pids;
       expect(Number(launch.hwnd), 'WPF window did not appear').toBeGreaterThan(0);
       const { within, windowElements } = await detectLive({
         label: 'wpf',
@@ -382,9 +419,9 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
     const shotPath = path.join(shotDir, `wpf-click-${process.pid}.png`);
     let pids: number[] = [];
     try {
-      const launch = runPowerShell(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title });
-      console.log('[uia-smoke:click] launch', JSON.stringify(launch));
-      pids = pidsOf(launch);
+      const launched = launchWithRetry(WPF_LAUNCH_SCRIPT, { UIA_SMOKE_TITLE: title }, 'click');
+      const launch = launched.launch;
+      pids = launched.pids;
       expect(Number(launch.hwnd), 'WPF window did not appear').toBeGreaterThan(0);
       const { within, windowElements, image, snapshot } = await detectLive({
         label: 'click',
