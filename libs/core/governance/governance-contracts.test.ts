@@ -627,15 +627,6 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
-    name: 'pilot-strategy-policy',
-    schemaPath: 'knowledge/product/schemas/pilot-strategy-policy.schema.json',
-    dataPath: 'knowledge/product/governance/pilot-strategy-policy.json',
-    invalidPayload: {
-      version: '1.0.0',
-      title: 'Kyberion AI Consulting: Go-to-Market Strategy',
-    },
-  },
-  {
     name: 'production-evidence-summary-policy',
     schemaPath: 'knowledge/product/schemas/production-evidence-summary-policy.schema.json',
     dataPath: 'knowledge/product/governance/production-evidence-summary-policy.json',

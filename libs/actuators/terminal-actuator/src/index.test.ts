@@ -146,6 +146,33 @@ describe('terminal-actuator computer_interaction adapter', () => {
   });
 });
 
+describe('terminal-actuator SDK dispatch (pipeline / ADF path)', () => {
+  beforeEach(() => {
+    ptyState.sessions.clear();
+  });
+
+  it('maps action ops to { action, params } and *_terminal ops to computer_interaction', async () => {
+    const { actuator } = await import('./index');
+    const spawned = await actuator.dispatch('spawn_terminal', {
+      shell: '/bin/bash',
+      cwd: 'active/shared/tmp',
+    });
+    expect(spawned).toMatchObject({ ok: true, output: { status: 'created' } });
+
+    const listed = await actuator.dispatch('list_terminal_sessions', {});
+    expect(listed).toMatchObject({ ok: true, output: { status: 'listed' } });
+    expect((listed.output as { sessions: unknown[] }).sessions).toHaveLength(1);
+
+    const direct = await actuator.dispatch('list', {});
+    expect((direct.output as { sessions: unknown[] }).sessions).toHaveLength(1);
+
+    const sessionId = (spawned.output as { sessionId: string }).sessionId;
+    await expect(actuator.dispatch('kill_terminal', { sessionId })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+});
+
 describe('terminal-actuator direct actions', () => {
   beforeEach(() => {
     ptyState.sessions.clear();

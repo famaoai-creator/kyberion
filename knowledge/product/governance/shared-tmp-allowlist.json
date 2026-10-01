@@ -282,18 +282,6 @@
       "note": "extracted image cache (per-document hash dir)"
     },
     {
-      "file": "libs/core/media/native-pptx-engine/examples/gen_project_plan.ts",
-      "count": 2,
-      "classification": "legit-tmp",
-      "note": "example script output"
-    },
-    {
-      "file": "libs/core/media/native-xlsx-engine/examples/gen_wbs.ts",
-      "count": 2,
-      "classification": "legit-tmp",
-      "note": "example script output"
-    },
-    {
       "file": "libs/core/storage-janitor.ts",
       "count": 1,
       "classification": "legit-tmp",

@@ -204,17 +204,7 @@ export * from './governance/approval-policy.js';
 
 export * from './router-contract.js';
 
-export * from './analysis/analysis-intent-support.js';
-
 export * from './intent/intent-outcome-patterns.js';
-
-export * from './analysis/analysis-corpus.js';
-
-export * from './analysis/analysis-impact-bands.js';
-
-export * from './analysis/analysis-findings.js';
-
-export * from './analysis/analysis-execution-contract.js';
 
 export * from './workforce/work-design.js';
 

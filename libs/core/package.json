@@ -2059,10 +2059,6 @@
       "types": "./dist/mission/mission-journal-policy.d.ts",
       "default": "./dist/mission/mission-journal-policy.js"
     },
-    "./pilot-strategy-policy": {
-      "types": "./dist/pilot-strategy-policy.d.ts",
-      "default": "./dist/pilot-strategy-policy.js"
-    },
     "./production-evidence-summary-policy": {
       "types": "./dist/production-evidence-summary-policy.d.ts",
       "default": "./dist/production-evidence-summary-policy.js"
@@ -2167,10 +2163,6 @@
       "types": "./dist/intent/intent-execution-profile-registry.d.ts",
       "default": "./dist/intent/intent-execution-profile-registry.js"
     },
-    "./intelligence-primitives": {
-      "types": "./dist/intelligence-primitives.d.ts",
-      "default": "./dist/intelligence-primitives.js"
-    },
     "./surface-runtime": {
       "types": "./dist/surface/surface-runtime.d.ts",
       "default": "./dist/surface/surface-runtime.js"
@@ -2190,10 +2182,6 @@
     "./json-repair": {
       "types": "./dist/json-repair.d.ts",
       "default": "./dist/json-repair.js"
-    },
-    "./prompt-constraints": {
-      "types": "./dist/reasoning/prompt-constraints.d.ts",
-      "default": "./dist/reasoning/prompt-constraints.js"
     },
     "./semaphore": {
       "types": "./dist/semaphore.d.ts",
@@ -2242,10 +2230,6 @@
     "./ce-adoption": {
       "types": "./dist/ce-adoption.d.ts",
       "default": "./dist/ce-adoption.js"
-    },
-    "./office-snapshot": {
-      "types": "./dist/office-snapshot.d.ts",
-      "default": "./dist/office-snapshot.js"
     },
     "./company": {
       "types": "./dist/company.d.ts",
@@ -3666,26 +3650,6 @@
     "./analysis/analysis-contract": {
       "types": "./dist/analysis/analysis-contract.d.ts",
       "default": "./dist/analysis/analysis-contract.js"
-    },
-    "./analysis/analysis-corpus": {
-      "types": "./dist/analysis/analysis-corpus.d.ts",
-      "default": "./dist/analysis/analysis-corpus.js"
-    },
-    "./analysis/analysis-execution-contract": {
-      "types": "./dist/analysis/analysis-execution-contract.d.ts",
-      "default": "./dist/analysis/analysis-execution-contract.js"
-    },
-    "./analysis/analysis-findings": {
-      "types": "./dist/analysis/analysis-findings.d.ts",
-      "default": "./dist/analysis/analysis-findings.js"
-    },
-    "./analysis/analysis-impact-bands": {
-      "types": "./dist/analysis/analysis-impact-bands.d.ts",
-      "default": "./dist/analysis/analysis-impact-bands.js"
-    },
-    "./analysis/analysis-intent-support": {
-      "types": "./dist/analysis/analysis-intent-support.d.ts",
-      "default": "./dist/analysis/analysis-intent-support.js"
     },
     "./provider/anthropic-api-probe": {
       "types": "./dist/provider/anthropic-api-probe.d.ts",
@@ -5227,10 +5191,6 @@
       "types": "./dist/reasoning/prompt-cache-discipline.d.ts",
       "default": "./dist/reasoning/prompt-cache-discipline.js"
     },
-    "./reasoning/prompt-constraints": {
-      "types": "./dist/reasoning/prompt-constraints.d.ts",
-      "default": "./dist/reasoning/prompt-constraints.js"
-    },
     "./reasoning/prompt-visibility-ledger": {
       "types": "./dist/reasoning/prompt-visibility-ledger.d.ts",
       "default": "./dist/reasoning/prompt-visibility-ledger.js"
@@ -5631,10 +5591,6 @@
       "types": "./dist/shell/shell-claude-cli-backend.d.ts",
       "default": "./dist/shell/shell-claude-cli-backend.js"
     },
-    "./shell/shell-claude-cli-intent-extractor": {
-      "types": "./dist/shell/shell-claude-cli-intent-extractor.d.ts",
-      "default": "./dist/shell/shell-claude-cli-intent-extractor.js"
-    },
     "./shell/shell-command-normalize": {
       "types": "./dist/shell/shell-command-normalize.d.ts",
       "default": "./dist/shell/shell-command-normalize.js"
@@ -6018,10 +5974,6 @@
     "./video/video-composition-template-registry": {
       "types": "./dist/video/video-composition-template-registry.d.ts",
       "default": "./dist/video/video-composition-template-registry.js"
-    },
-    "./video/video-content-brief-compiler": {
-      "types": "./dist/video/video-content-brief-compiler.d.ts",
-      "default": "./dist/video/video-content-brief-compiler.js"
     },
     "./video/video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
@@ -6459,10 +6411,6 @@
       "types": "./dist/contracts/operator-interaction-packet.d.ts",
       "default": "./dist/contracts/operator-interaction-packet.js"
     },
-    "./contracts/booking-preference-profile": {
-      "types": "./dist/contracts/booking-preference-profile.d.ts",
-      "default": "./dist/contracts/booking-preference-profile.js"
-    },
     "./contracts/presentation-preference-profile": {
       "types": "./dist/contracts/presentation-preference-profile.d.ts",
       "default": "./dist/contracts/presentation-preference-profile.js"
@@ -6470,10 +6418,6 @@
     "./contracts/xlsx-protocol": {
       "types": "./dist/contracts/xlsx-protocol.d.ts",
       "default": "./dist/contracts/xlsx-protocol.js"
-    },
-    "./contracts/travel-planning-brief": {
-      "types": "./dist/contracts/travel-planning-brief.d.ts",
-      "default": "./dist/contracts/travel-planning-brief.js"
     },
     "./contracts/meeting-operations-brief": {
       "types": "./dist/contracts/meeting-operations-brief.d.ts",
@@ -6490,10 +6434,6 @@
     "./contracts/excel-protocol": {
       "types": "./dist/contracts/excel-protocol.d.ts",
       "default": "./dist/contracts/excel-protocol.js"
-    },
-    "./contracts/proposal-brief": {
-      "types": "./dist/contracts/proposal-brief.d.ts",
-      "default": "./dist/contracts/proposal-brief.js"
     },
     "./contracts/architecture-adf": {
       "types": "./dist/contracts/architecture-adf.d.ts",
@@ -6547,10 +6487,6 @@
       "types": "./dist/contracts/mobile-app-profile.d.ts",
       "default": "./dist/contracts/mobile-app-profile.js"
     },
-    "./contracts/bridge-request": {
-      "types": "./dist/contracts/bridge-request.d.ts",
-      "default": "./dist/contracts/bridge-request.js"
-    },
     "./contracts/mission-contract": {
       "types": "./dist/contracts/mission-contract.d.ts",
       "default": "./dist/contracts/mission-contract.js"
@@ -6558,10 +6494,6 @@
     "./contracts/meeting-operations-profile": {
       "types": "./dist/contracts/meeting-operations-profile.d.ts",
       "default": "./dist/contracts/meeting-operations-profile.js"
-    },
-    "./contracts/document-brief": {
-      "types": "./dist/contracts/document-brief.d.ts",
-      "default": "./dist/contracts/document-brief.js"
     },
     "./contracts/guided-coordination-brief": {
       "types": "./dist/contracts/guided-coordination-brief.d.ts",
@@ -6619,10 +6551,6 @@
       "types": "./dist/contracts/webview-session-handoff.d.ts",
       "default": "./dist/contracts/webview-session-handoff.js"
     },
-    "./contracts/diagram-adf": {
-      "types": "./dist/contracts/diagram-adf.d.ts",
-      "default": "./dist/contracts/diagram-adf.js"
-    },
     "./contracts/generation-schedule": {
       "types": "./dist/contracts/generation-schedule.d.ts",
       "default": "./dist/contracts/generation-schedule.js"
@@ -6671,10 +6599,6 @@
       "types": "./dist/media/native-xlsx-engine/workbook.d.ts",
       "default": "./dist/media/native-xlsx-engine/workbook.js"
     },
-    "./media/native-xlsx-engine/examples/gen_wbs": {
-      "types": "./dist/media/native-xlsx-engine/examples/gen_wbs.d.ts",
-      "default": "./dist/media/native-xlsx-engine/examples/gen_wbs.js"
-    },
     "./media/native-pptx-engine/content-types": {
       "types": "./dist/media/native-pptx-engine/content-types.d.ts",
       "default": "./dist/media/native-pptx-engine/content-types.js"
@@ -6711,17 +6635,9 @@
       "types": "./dist/media/native-pptx-engine/builders.d.ts",
       "default": "./dist/media/native-pptx-engine/builders.js"
     },
-    "./media/native-pptx-engine/examples/gen_project_plan": {
-      "types": "./dist/media/native-pptx-engine/examples/gen_project_plan.d.ts",
-      "default": "./dist/media/native-pptx-engine/examples/gen_project_plan.js"
-    },
     "./media/native-pdf-engine/engine": {
       "types": "./dist/media/native-pdf-engine/engine.d.ts",
       "default": "./dist/media/native-pdf-engine/engine.js"
-    },
-    "./media/native-pdf-engine/fontkit-shim": {
-      "types": "./dist/media/native-pdf-engine/fontkit-shim.d.ts",
-      "default": "./dist/media/native-pdf-engine/fontkit-shim.js"
     },
     "./media/native-pdf-engine/parser": {
       "types": "./dist/media/native-pdf-engine/parser.d.ts",
