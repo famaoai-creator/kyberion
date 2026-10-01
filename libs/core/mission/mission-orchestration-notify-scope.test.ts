@@ -38,6 +38,9 @@ describe('notifyRequestingSurface tenant scope', () => {
         scope: { tenant_slug: 'acme' },
       })
     );
+    expect(mocks.enqueueChronosOutboxMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { tenant_slug: 'acme' } })
+    );
   });
 
   it('leaves owner-direct replies unscoped', () => {

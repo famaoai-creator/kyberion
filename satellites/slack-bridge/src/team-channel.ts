@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import {
@@ -156,6 +157,32 @@ function slackMemoryRef(policy: ChannelModePolicy): ChannelMemoryRef | undefined
     : undefined;
 }
 
+/** Neutralize Slack mrkdwn control sequences (`<!channel>`, links, mentions) in member text. */
+export function escapeSlackText(text: string): string {
+  return text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+}
+
+function auditChannelMemory(
+  action: 'remember' | 'forget',
+  actor: string,
+  policy: ChannelModePolicy,
+  entryId: string
+): void {
+  try {
+    auditChain.record({
+      agentId: actor,
+      action: `channel_memory.${action}`,
+      operation: `slack:${policy.channelId}`,
+      result: 'completed',
+      metadata: { tenant_slug: policy.tenantSlug, entry_id: entryId, tier: policy.maxTier },
+    });
+  } catch (error: unknown) {
+    logger.warn(
+      `[SlackBridge] Channel memory audit record failed — ${action} ${entryId} still applied | check audit chain | ${errorDetail(error)}`
+    );
+  }
+}
+
 /** Team Channel P2: the channel's memory, capped at its disclosure tier. */
 export function slackChannelMemoryContext(policy: ChannelModePolicy): string | undefined {
   const ref = slackMemoryRef(policy);
@@ -199,7 +226,11 @@ export function handleSlackTeamChannelCommand(params: {
   const locale = resolveOperatorLocale();
   if (isThreadStatusQuery(text)) {
     const index = readThreadWork({ surface: 'slack', channel: policy.channelId, threadTs });
-    return formatThreadWorkStatus(resolveThreadWorkStatus(index), locale);
+    // A channel re-bound to another tenant must not list the old tenant's work.
+    const sameTenant = index && (!index.tenant_slug || index.tenant_slug === policy.tenantSlug);
+    return escapeSlackText(
+      formatThreadWorkStatus(resolveThreadWorkStatus(sameTenant ? index : null), locale)
+    );
   }
   const command = parseChannelMemoryCommand(text);
   const ref = slackMemoryRef(policy);
@@ -209,15 +240,27 @@ export function handleSlackTeamChannelCommand(params: {
     if (entries.length === 0) return t('bridge:channel_memory_empty', undefined, locale);
     return [
       t('bridge:channel_memory_list_header', { count: entries.length }, locale),
-      ...entries.map((entry) => `- ${entry.id}: ${entry.text}`),
+      ...entries.map((entry) => `- ${entry.id}: ${escapeSlackText(entry.text)}`),
     ].join('\n');
   }
-  const needed = command.kind === 'remember' ? 'request_work' : 'decide';
-  if (!speaker || !speakerCan(speaker, needed)) {
-    return t('bridge:channel_memory_not_authorized', undefined, locale);
-  }
+  // Saving is work (request_work); forgetting is a decision, judged exactly
+  // like approvals (member role, then the channel's approvers fallback).
+  const allowed =
+    command.kind === 'remember'
+      ? Boolean(speaker && speakerCan(speaker, 'request_work'))
+      : Boolean(
+          speaker &&
+          !speaker.denied &&
+          evaluateChannelApprovalAuthority(policy, speaker.actorId, { speaker }).allowed
+        );
+  if (!speaker || !allowed) return t('bridge:channel_memory_not_authorized', undefined, locale);
+  const actor = speaker.principalId ?? speaker.actorId;
   if (command.kind === 'forget') {
-    return removeChannelMemory(ref, command.id)
+    // Only facts visible at the channel's current tier can be removed from it.
+    const visible = listChannelMemory(ref, policy.maxTier).some((entry) => entry.id === command.id);
+    const removed = visible && removeChannelMemory(ref, command.id);
+    if (removed) auditChannelMemory('forget', actor, policy, command.id);
+    return removed
       ? t('bridge:channel_memory_forgotten', { id: command.id }, locale)
       : t('bridge:channel_memory_not_found', { id: command.id }, locale);
   }
@@ -229,6 +272,7 @@ export function handleSlackTeamChannelCommand(params: {
   });
   switch (result.status) {
     case 'saved':
+      auditChannelMemory('remember', actor, policy, result.entry.id);
       return t('bridge:channel_memory_saved', { id: result.entry.id }, locale);
     case 'too_long':
       return t(
