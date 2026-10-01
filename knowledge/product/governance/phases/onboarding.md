@@ -43,14 +43,14 @@ baseline が `needs_recovery` または `fatal_error` の場合は、通常の o
 
 ### Step 3: stance を決めてから identity を保存する
 
-顧客・会社として使う場合は、先に `pnpm customer:switch <customer-slug>` を実行する。
+顧客・会社として使う場合は、先に `pnpm stance:switch <customer-slug>` を実行する。
 baseline の L3 はアクティブな profile の identity を見るため、順序を逆にしない。
 
 ```bash
-pnpm onboard
+pnpm onboarding
 # または（非対話）
-pnpm onboard apply --identity <reviewed-identity-json> --dry-run
-pnpm onboard apply --identity <reviewed-identity-json>
+pnpm onboarding apply --identity <reviewed-identity-json> --dry-run
+pnpm onboarding apply --identity <reviewed-identity-json>
 ```
 
 GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
@@ -104,7 +104,7 @@ pnpm tenant:activation resume ... --apply --accept
 
 probe をやり直さずに activation を再開しない。停止・ロールバック・offboarding は
 `tenant:activation suspend|rollback` の governed command を使い、state を直接編集しない。
-identity のやり直しは `pnpm onboard reset` を使う。
+identity のやり直しは `pnpm onboarding reset` を使う。
 
 ## 成功条件
 

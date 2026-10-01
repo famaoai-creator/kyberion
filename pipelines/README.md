@@ -118,7 +118,7 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 | `platform-onboarding`            | —                                                                     | Platform-level dependency bootstrap                                   |
 | `setup-oauth`                    | —                                                                     | Interactive pipeline to setup OAuth connection for a specific service |
 
-> `pnpm onboard` is **not** a shortcut for `kyberion-autonomous-onboarding`: it runs the onboarding facade (`scripts/onboarding.ts`, wizard via `onboarding_wizard.ts`). Run the pipeline explicitly with `pnpm pipeline --input pipelines/kyberion-autonomous-onboarding.json`.
+> `pnpm onboarding` is **not** a shortcut for `kyberion-autonomous-onboarding`: it runs the onboarding facade (`scripts/onboarding.ts`, wizard via `onboarding_wizard.ts`). Run the pipeline explicitly with `pnpm pipeline --input pipelines/kyberion-autonomous-onboarding.json`.
 
 ### Capability & Knowledge
 

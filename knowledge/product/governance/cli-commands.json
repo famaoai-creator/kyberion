@@ -120,7 +120,40 @@
       "entry": "operator-home",
       "audience": "user",
       "description": "cli_cmd_operator_home_doctor",
-      "group": "start"
+      "group": "start",
+      "scope_selector": "flag",
+      "scopes": [
+        {
+          "id": "env",
+          "routes_to": ["vital"],
+          "description": "cli_scope_doctor_env"
+        },
+        {
+          "id": "service",
+          "routes_to": ["service", "preflight"],
+          "description": "cli_scope_doctor_service"
+        },
+        {
+          "id": "voice",
+          "routes_to": ["doctor", "--runtime", "voice"],
+          "description": "cli_scope_doctor_voice"
+        },
+        {
+          "id": "meeting",
+          "routes_to": ["meeting", "preflight"],
+          "description": "cli_scope_doctor_meeting"
+        },
+        {
+          "id": "app",
+          "routes_to": ["doctor", "--runtime", "app"],
+          "description": "cli_scope_doctor_app"
+        },
+        {
+          "id": "setup",
+          "routes_to": ["setup", "report"],
+          "description": "cli_scope_doctor_setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.help",
@@ -673,6 +706,69 @@
       "group": "start"
     },
     {
+      "id": "operator-setup.default",
+      "command": "setup",
+      "noun": "setup",
+      "verb": "default",
+      "entry": "operator-setup",
+      "audience": "operator",
+      "description": "cli_cmd_operator_setup_default",
+      "group": "start",
+      "scope_selector": "positional",
+      "scopes": [
+        {
+          "id": "onboarding",
+          "routes_to": ["onboarding"],
+          "description": "cli_scope_setup_onboarding"
+        },
+        {
+          "id": "context",
+          "routes_to": ["onboarding", "context"],
+          "description": "cli_scope_setup_context"
+        },
+        {
+          "id": "reasoning",
+          "routes_to": ["reasoning", "setup"],
+          "description": "cli_scope_setup_reasoning"
+        },
+        {
+          "id": "env",
+          "routes_to": ["env", "bootstrap"],
+          "description": "cli_scope_setup_env"
+        },
+        {
+          "id": "services",
+          "routes_to": ["service", "setup"],
+          "description": "cli_scope_setup_services"
+        },
+        {
+          "id": "tools",
+          "routes_to": ["tool", "setup"],
+          "description": "cli_scope_setup_tools"
+        },
+        {
+          "id": "provider-cli",
+          "routes_to": ["provider-cli", "setup"],
+          "description": "cli_scope_setup_provider_cli"
+        },
+        {
+          "id": "agy-sdk",
+          "routes_to": ["agy", "sdk-setup"],
+          "description": "cli_scope_setup_agy_sdk"
+        },
+        {
+          "id": "voice",
+          "routes_to": ["voice", "setup"],
+          "description": "cli_scope_setup_voice"
+        },
+        {
+          "id": "config",
+          "routes_to": ["config-mission"],
+          "description": "cli_scope_setup_config"
+        }
+      ]
+    },
+    {
       "id": "operator-voice.setup",
       "command": "voice setup",
       "noun": "voice",
@@ -803,7 +899,7 @@
     {
       "id": "operator-setup",
       "module": "scripts/setup_report.ts",
-      "commands": ["setup report"]
+      "commands": ["setup report", "setup"]
     },
     {
       "id": "operator-voice",
@@ -1110,11 +1206,11 @@
       "group": "dev"
     },
     {
-      "id": "script.report.i18n-coverage",
-      "script": "report:i18n-coverage",
-      "command": "report i18n-coverage",
-      "noun": "report",
-      "verb": "i18n-coverage",
+      "id": "script.i18n.report",
+      "script": "i18n:report",
+      "command": "i18n report",
+      "noun": "i18n",
+      "verb": "report",
       "audience": "dev",
       "description": "cli_cmd_script_report_i18n_coverage",
       "group": "dev"
@@ -1162,22 +1258,22 @@
       "group": "operate"
     },
     {
-      "id": "script.migrate.physical-namespaces",
-      "script": "migrate:physical-namespaces",
-      "command": "migrate physical-namespaces",
-      "noun": "migrate",
-      "verb": "physical-namespaces",
+      "id": "script.namespace.migrate-physical",
+      "script": "namespace:migrate-physical",
+      "command": "namespace migrate-physical",
+      "noun": "namespace",
+      "verb": "migrate-physical",
       "audience": "operator",
       "description": "cli_cmd_script_migrate_physical_namespaces",
       "group": "operate",
       "native_help": true
     },
     {
-      "id": "script.migrate.peer-tenant-runtime",
-      "script": "migrate:peer-tenant-runtime",
-      "command": "migrate peer-tenant-runtime",
-      "noun": "migrate",
-      "verb": "peer-tenant-runtime",
+      "id": "script.peer.migrate-tenant-runtime",
+      "script": "peer:migrate-tenant-runtime",
+      "command": "peer migrate-tenant-runtime",
+      "noun": "peer",
+      "verb": "migrate-tenant-runtime",
       "audience": "operator",
       "description": "cli_cmd_script_migrate_peer_tenant_runtime",
       "group": "operate",
@@ -1226,11 +1322,11 @@
       "group": "operate"
     },
     {
-      "id": "script.knowledge-feedback",
-      "script": "knowledge-feedback",
-      "command": "knowledge-feedback default",
-      "noun": "knowledge-feedback",
-      "verb": "default",
+      "id": "script.knowledge.feedback",
+      "script": "knowledge:feedback",
+      "command": "knowledge feedback",
+      "noun": "knowledge",
+      "verb": "feedback",
       "audience": "operator",
       "description": "cli_cmd_script_knowledge_feedback",
       "group": "operate"
@@ -1476,10 +1572,10 @@
       "native_help": true
     },
     {
-      "id": "script.dev.watch",
-      "script": "dev:watch",
-      "command": "dev watch",
-      "noun": "dev",
+      "id": "script.test.watch",
+      "script": "test:watch",
+      "command": "test watch",
+      "noun": "test",
       "verb": "watch",
       "audience": "dev",
       "description": "cli_cmd_script_dev_watch",
@@ -1500,11 +1596,11 @@
       "native_help": true
     },
     {
-      "id": "script.watch.tenant-drift",
-      "script": "watch:tenant-drift",
-      "command": "watch tenant-drift",
-      "noun": "watch",
-      "verb": "tenant-drift",
+      "id": "script.tenant.watch-drift",
+      "script": "tenant:watch-drift",
+      "command": "tenant watch-drift",
+      "noun": "tenant",
+      "verb": "watch-drift",
       "audience": "operator",
       "description": "cli_cmd_script_watch_tenant_drift",
       "group": "operate",
@@ -1522,11 +1618,11 @@
       "native_help": true
     },
     {
-      "id": "script.inventory",
-      "script": "inventory",
-      "command": "inventory manage",
-      "noun": "inventory",
-      "verb": "manage",
+      "id": "script.work.inventory",
+      "script": "work:inventory",
+      "command": "work inventory",
+      "noun": "work",
+      "verb": "inventory",
       "audience": "user",
       "description": "cli_cmd_script_inventory",
       "group": "operate"
@@ -1790,11 +1886,11 @@
       "native_help": true
     },
     {
-      "id": "script.export.validation-bundle",
-      "script": "export:validation-bundle",
-      "command": "export validation-bundle",
-      "noun": "export",
-      "verb": "validation-bundle",
+      "id": "script.validation-bundle.export",
+      "script": "validation-bundle:export",
+      "command": "validation-bundle export",
+      "noun": "validation-bundle",
+      "verb": "export",
       "audience": "operator",
       "description": "cli_cmd_script_export_validation_bundle",
       "group": "operate",
@@ -2351,10 +2447,10 @@
       "long_running": true
     },
     {
-      "id": "script.onboard",
-      "script": "onboard",
-      "command": "onboard default",
-      "noun": "onboard",
+      "id": "script.onboarding",
+      "script": "onboarding",
+      "command": "onboarding default",
+      "noun": "onboarding",
       "verb": "default",
       "audience": "operator",
       "description": "cli_cmd_script_onboard",
@@ -2374,11 +2470,11 @@
       "group": "inspect"
     },
     {
-      "id": "script.ingest",
-      "script": "ingest",
-      "command": "ingest default",
-      "noun": "ingest",
-      "verb": "default",
+      "id": "script.knowledge.ingest",
+      "script": "knowledge:ingest",
+      "command": "knowledge ingest",
+      "noun": "knowledge",
+      "verb": "ingest",
       "audience": "operator",
       "description": "cli_cmd_script_ingest",
       "group": "operate",
@@ -2432,10 +2528,10 @@
       "native_help": true
     },
     {
-      "id": "script.services.setup",
-      "script": "services:setup",
-      "command": "services setup",
-      "noun": "services",
+      "id": "script.service.setup",
+      "script": "service:setup",
+      "command": "service setup",
+      "noun": "service",
       "verb": "setup",
       "audience": "operator",
       "description": "cli_cmd_script_services_setup",
@@ -2467,10 +2563,10 @@
       "native_help": true
     },
     {
-      "id": "script.chronos",
-      "script": "chronos",
-      "command": "chronos default",
-      "noun": "chronos",
+      "id": "script.scheduler",
+      "script": "scheduler",
+      "command": "scheduler default",
+      "noun": "scheduler",
       "verb": "default",
       "audience": "operator",
       "description": "cli_cmd_script_chronos",
@@ -2478,10 +2574,10 @@
       "long_running": true
     },
     {
-      "id": "script.chronos.install",
+      "id": "script.scheduler.install",
       "module": "scripts/install_chronos_launchd.ts",
-      "command": "chronos install",
-      "noun": "chronos",
+      "command": "scheduler install",
+      "noun": "scheduler",
       "verb": "install",
       "audience": "operator",
       "description": "cli_cmd_script_chronos_install",
@@ -2489,11 +2585,11 @@
       "native_help": true
     },
     {
-      "id": "script.chronos.uninstall",
+      "id": "script.scheduler.uninstall",
       "module": "scripts/install_chronos_launchd.ts",
       "args": ["--uninstall"],
-      "command": "chronos uninstall",
-      "noun": "chronos",
+      "command": "scheduler uninstall",
+      "noun": "scheduler",
       "verb": "uninstall",
       "audience": "operator",
       "description": "cli_cmd_script_chronos_uninstall",
@@ -2536,8 +2632,8 @@
       "native_help": true
     },
     {
-      "id": "script.agy.sdk.setup",
-      "script": "agy:sdk:setup",
+      "id": "script.agy.sdk-setup",
+      "script": "agy:sdk-setup",
       "command": "agy sdk-setup",
       "noun": "agy",
       "verb": "sdk-setup",
@@ -2559,11 +2655,11 @@
       "native_help": true
     },
     {
-      "id": "script.managed.env",
-      "script": "managed-env",
-      "command": "managed env",
-      "noun": "managed",
-      "verb": "env",
+      "id": "script.provider-cli.setup",
+      "script": "provider-cli:setup",
+      "command": "provider-cli setup",
+      "noun": "provider-cli",
+      "verb": "setup",
       "audience": "operator",
       "description": "cli_cmd_script_managed_env",
       "group": "start",
@@ -2606,10 +2702,10 @@
       "native_help": true
     },
     {
-      "id": "script.customer.create",
-      "script": "customer:create",
-      "command": "customer create",
-      "noun": "customer",
+      "id": "script.stance.create",
+      "script": "stance:create",
+      "command": "stance create",
+      "noun": "stance",
       "verb": "create",
       "audience": "operator",
       "description": "cli_cmd_script_customer_create",
@@ -2617,20 +2713,20 @@
       "native_help": true
     },
     {
-      "id": "script.customer.list",
-      "script": "customer:list",
-      "command": "customer list",
-      "noun": "customer",
+      "id": "script.stance.list",
+      "script": "stance:list",
+      "command": "stance list",
+      "noun": "stance",
       "verb": "list",
       "audience": "operator",
       "description": "cli_cmd_script_customer_list",
       "group": "inspect"
     },
     {
-      "id": "script.customer.migrate-from-personal",
-      "script": "customer:migrate-from-personal",
-      "command": "customer migrate-from-personal",
-      "noun": "customer",
+      "id": "script.stance.migrate-from-personal",
+      "script": "stance:migrate-from-personal",
+      "command": "stance migrate-from-personal",
+      "noun": "stance",
       "verb": "migrate-from-personal",
       "audience": "operator",
       "description": "cli_cmd_script_customer_migrate_from_personal",
@@ -2638,10 +2734,10 @@
       "native_help": true
     },
     {
-      "id": "script.customer.switch",
-      "script": "customer:switch",
-      "command": "customer switch",
-      "noun": "customer",
+      "id": "script.stance.switch",
+      "script": "stance:switch",
+      "command": "stance switch",
+      "noun": "stance",
       "verb": "switch",
       "audience": "operator",
       "description": "cli_cmd_script_customer_switch",
@@ -2851,10 +2947,10 @@
       "native_help": true
     },
     {
-      "id": "script.dev",
-      "script": "dev",
-      "command": "dev default",
-      "noun": "dev",
+      "id": "script.verify",
+      "script": "verify",
+      "command": "verify default",
+      "noun": "verify",
       "verb": "default",
       "audience": "dev",
       "description": "cli_cmd_script_dev",
@@ -2984,6 +3080,164 @@
     {
       "script": "intent",
       "replaced_by": "intent:trace"
+    },
+    {
+      "script": "dev",
+      "replaced_by": "verify"
+    },
+    {
+      "script": "chronos",
+      "replaced_by": "scheduler"
+    },
+    {
+      "script": "inventory",
+      "replaced_by": "work:inventory"
+    },
+    {
+      "script": "customer:create",
+      "replaced_by": "stance:create"
+    },
+    {
+      "script": "customer:list",
+      "replaced_by": "stance:list"
+    },
+    {
+      "script": "customer:migrate-from-personal",
+      "replaced_by": "stance:migrate-from-personal"
+    },
+    {
+      "script": "customer:switch",
+      "replaced_by": "stance:switch"
+    },
+    {
+      "script": "report:i18n-coverage",
+      "replaced_by": "i18n:report"
+    },
+    {
+      "script": "migrate:physical-namespaces",
+      "replaced_by": "namespace:migrate-physical"
+    },
+    {
+      "script": "migrate:peer-tenant-runtime",
+      "replaced_by": "peer:migrate-tenant-runtime"
+    },
+    {
+      "script": "watch:tenant-drift",
+      "replaced_by": "tenant:watch-drift"
+    },
+    {
+      "script": "export:validation-bundle",
+      "replaced_by": "validation-bundle:export"
+    },
+    {
+      "script": "dev:watch",
+      "replaced_by": "test:watch"
+    },
+    {
+      "script": "agy:sdk:setup",
+      "replaced_by": "agy:sdk-setup"
+    },
+    {
+      "script": "managed-env",
+      "replaced_by": "provider-cli:setup"
+    },
+    {
+      "script": "onboard",
+      "replaced_by": "onboarding"
+    },
+    {
+      "script": "ingest",
+      "replaced_by": "knowledge:ingest"
+    },
+    {
+      "script": "knowledge-feedback",
+      "replaced_by": "knowledge:feedback"
+    },
+    {
+      "script": "services:setup",
+      "replaced_by": "service:setup"
+    }
+  ],
+  "deprecated_command_aliases": [
+    {
+      "command": "dev",
+      "replaced_by": "verify"
+    },
+    {
+      "command": "chronos",
+      "replaced_by": "scheduler"
+    },
+    {
+      "command": "inventory manage",
+      "replaced_by": "work inventory"
+    },
+    {
+      "command": "customer create",
+      "replaced_by": "stance create"
+    },
+    {
+      "command": "customer list",
+      "replaced_by": "stance list"
+    },
+    {
+      "command": "customer migrate-from-personal",
+      "replaced_by": "stance migrate-from-personal"
+    },
+    {
+      "command": "customer switch",
+      "replaced_by": "stance switch"
+    },
+    {
+      "command": "report i18n-coverage",
+      "replaced_by": "i18n report"
+    },
+    {
+      "command": "migrate physical-namespaces",
+      "replaced_by": "namespace migrate-physical"
+    },
+    {
+      "command": "migrate peer-tenant-runtime",
+      "replaced_by": "peer migrate-tenant-runtime"
+    },
+    {
+      "command": "watch tenant-drift",
+      "replaced_by": "tenant watch-drift"
+    },
+    {
+      "command": "export validation-bundle",
+      "replaced_by": "validation-bundle export"
+    },
+    {
+      "command": "dev watch",
+      "replaced_by": "test watch"
+    },
+    {
+      "command": "managed env",
+      "replaced_by": "provider-cli setup"
+    },
+    {
+      "command": "onboard",
+      "replaced_by": "onboarding"
+    },
+    {
+      "command": "ingest",
+      "replaced_by": "knowledge ingest"
+    },
+    {
+      "command": "knowledge-feedback",
+      "replaced_by": "knowledge feedback"
+    },
+    {
+      "command": "services setup",
+      "replaced_by": "service setup"
+    },
+    {
+      "command": "chronos install",
+      "replaced_by": "scheduler install"
+    },
+    {
+      "command": "chronos uninstall",
+      "replaced_by": "scheduler uninstall"
     }
   ]
 }

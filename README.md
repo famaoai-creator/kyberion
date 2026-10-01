@@ -110,7 +110,7 @@ pnpm pipeline --input pipelines/verify-session.json
 
 **Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
 
-Already have onboarding JSON? Skip the wizard: `pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
+Already have onboarding JSON? Skip the wizard: `pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
 
 To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md). For a server / customer deployment: [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 

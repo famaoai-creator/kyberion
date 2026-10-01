@@ -183,7 +183,7 @@ describe('setup report', () => {
     expect(report.nextActions).toHaveLength(4);
     expect(report.nextActions[0]).toMatchObject({
       title: 'Complete identity and onboarding profile',
-      suggested_command: 'pnpm onboard',
+      suggested_command: 'pnpm onboarding',
     });
     expect(report.nextActions[1]).toMatchObject({
       title: 'Reconcile surface readiness',
@@ -191,7 +191,7 @@ describe('setup report', () => {
     });
     expect(report.nextActions[2]).toMatchObject({
       title: 'Repair service setup',
-      suggested_command: 'pnpm services:setup',
+      suggested_command: 'pnpm service:setup',
     });
     expect(report.nextActions[3]).toMatchObject({
       title: 'Bootstrap kyberion-runtime-baseline',

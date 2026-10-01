@@ -6639,14 +6639,14 @@
         "qps-ploc": "⟦Ůşėƒůŀ ƒïřşŧ-řůñ ƈőɱɱȧñḓş: ŀőřėɱ ïṗ⟧"
       },
       "cli_help_onboard": {
-        "en": "  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
-        "ja": "  pnpm onboard          # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先",
-        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓ          # ƈůşŧőɱėř/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ƇŮŞŦŐⱮĖŘ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "  pnpm onboarding       # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
+        "ja": "  pnpm onboarding       # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先",
+        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓïñɠ       # ƈůşŧőɱėř/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ƇŮŞŦŐⱮĖŘ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "cli_help_doctor": {
-        "en": "  pnpm doctor          Check environment readiness",
-        "ja": "  pnpm doctor          環境の準備状態を確認",
-        "qps-ploc": "⟦  ṗñṗɱ ḓőƈŧőř          Ƈħėƈķ ėñṽïřőñɱėñŧ řėȧḓïñėşş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "en": "  pnpm kyberion doctor [--scope env|service|voice|meeting|app|setup]  Check environment readiness",
+        "ja": "  pnpm kyberion doctor [--scope env|service|voice|meeting|app|setup]  環境の準備状態を確認",
+        "qps-ploc": "⟦  ṗñṗɱ ķẏƀėřïőñ ḓőƈŧőř [--şƈőṗė ėñṽ|şėřṽïƈė|ṽőïƈė|ɱėėŧïñɠ|ȧṗṗ|şėŧůṗ]  Ƈħėƈķ ėñṽïřőñɱėñŧ řėȧḓïñėşş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_capabilities": {
         "en": "  pnpm capabilities    Check which actuator capabilities fit this environment",
@@ -7924,9 +7924,9 @@
         "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ŧőőŀ řůñŧïɱėş ŀőřėɱ ïṗşů⟧"
       },
       "cli_cmd_script_managed_env": {
-        "en": "Set up the managed environment",
-        "ja": "管理環境をセットアップ",
-        "qps-ploc": "⟦Şėŧ ůṗ ŧħė ɱȧñȧɠėḓ ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşů⟧"
+        "en": "Install or inspect managed provider CLIs",
+        "ja": "管理対象のプロバイダ CLI を導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ɱȧñȧɠėḓ ṗřőṽïḓėř ƇĿÏş ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "cli_cmd_script_seam_select": {
         "en": "Inspect, calibrate, and set seam provider selection",
@@ -7944,24 +7944,24 @@
         "qps-ploc": "⟦Şħőẇ őř ƈħȧñɠė řėȧşőñïñɠ ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "cli_cmd_script_customer_create": {
-        "en": "Create a customer overlay",
-        "ja": "顧客オーバーレイを作成",
-        "qps-ploc": "⟦Ƈřėȧŧė ȧ ƈůşŧőɱėř őṽėřŀȧẏ ŀőřėɱ ïṗ⟧"
+        "en": "Create a stance overlay (customer/{slug}/)",
+        "ja": "スタンスのオーバーレイを作成 (customer/{slug}/)",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ şŧȧñƈė őṽėřŀȧẏ (ƈůşŧőɱėř/{slug}/) ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_script_customer_list": {
-        "en": "List customer overlays",
-        "ja": "顧客オーバーレイを一覧",
-        "qps-ploc": "⟦Ŀïşŧ ƈůşŧőɱėř őṽėřŀȧẏş ŀőřėɱ ï⟧"
+        "en": "List stance overlays",
+        "ja": "スタンスのオーバーレイを一覧",
+        "qps-ploc": "⟦Ŀïşŧ şŧȧñƈė őṽėřŀȧẏş ŀőřėɱ ⟧"
       },
       "cli_cmd_script_customer_migrate_from_personal": {
-        "en": "Migrate personal data into a customer overlay",
-        "ja": "個人データを顧客オーバーレイへ移行",
-        "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ ƈůşŧőɱėř őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+        "en": "Migrate personal data into a stance overlay",
+        "ja": "個人データをスタンスのオーバーレイへ移行",
+        "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_script_customer_switch": {
-        "en": "Switch the active customer overlay",
-        "ja": "有効な顧客オーバーレイを切り替え",
-        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė ƈůşŧőɱėř őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Switch the active stance overlay",
+        "ja": "有効なスタンスのオーバーレイを切り替え",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşů⟧"
       },
       "cli_cmd_script_backup": {
         "en": "Back up or export tenant data",
@@ -8202,6 +8202,121 @@
         "en": "`kyberion help --detail` adds argument syntax for actuator and workflow commands.",
         "ja": "`kyberion help --detail` でアクチュエータ/業務コマンドの引数の書式も表示します。",
         "qps-ploc": "⟦`ķẏƀėřïőñ ħėŀṗ --ḓėŧȧïŀ` ȧḓḓş ȧřɠůɱėñŧ şẏñŧȧẋ ƒőř ȧƈŧůȧŧőř ȧñḓ ẇőřķƒŀőẇ ƈőɱɱȧñḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_deprecated_command": {
+        "en": "[deprecated] `kyberion {old}` is renamed to `kyberion {new}`; the old name still works for now.",
+        "ja": "[非推奨] `kyberion {old}` は `kyberion {new}` に改名されました。旧名も当面は動作します。",
+        "qps-ploc": "⟦[ḓėṗřėƈȧŧėḓ] `ķẏƀėřïőñ {old}` ïş řėñȧɱėḓ ŧő `ķẏƀėřïőñ {new}`; ŧħė őŀḓ ñȧɱė şŧïŀŀ ẇőřķş ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "cli_manifest_help_scopes": {
+        "en": "Scopes: {usage}",
+        "ja": "スコープ: {usage}",
+        "qps-ploc": "⟦Şƈőṗėş: {usage} ŀőřė⟧"
+      },
+      "cli_scope_help_usage": {
+        "en": "Usage: {usage}",
+        "ja": "使い方: {usage}",
+        "qps-ploc": "⟦Ůşȧɠė: {usage} ŀőřė⟧"
+      },
+      "cli_scope_help_delegates": {
+        "en": "runs {command}",
+        "ja": "{command} を実行",
+        "qps-ploc": "⟦řůñş {command} ŀőřė⟧"
+      },
+      "cli_scope_unknown": {
+        "en": "Unknown {command} scope \"{scope}\". Choose one of: {scopes}",
+        "ja": "{command} のスコープ \"{scope}\" は不明です。次から選んでください: {scopes}",
+        "qps-ploc": "⟦Ůñķñőẇñ {command} şƈőṗė \"{scope}\". Ƈħőőşė őñė őƒ: {scopes} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_operator_setup_default": {
+        "en": "Set up one area (onboarding, reasoning, env, services, tools, voice, ...)",
+        "ja": "領域ごとにセットアップ (onboarding・reasoning・env・services・tools・voice など)",
+        "qps-ploc": "⟦Şėŧ ůṗ őñė ȧřėȧ (őñƀőȧřḓïñɠ, řėȧşőñïñɠ, ėñṽ, şėřṽïƈėş, ŧőőŀş, ṽőïƈė, ...) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "cli_scope_doctor_env": {
+        "en": "Local vitals: dependencies, build, identity files",
+        "ja": "ローカルの基礎状態 (依存関係・ビルド・アイデンティティ) を確認",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṽïŧȧŀş: ḓėṗėñḓėñƈïėş, ƀůïŀḓ, ïḓėñŧïŧẏ ƒïŀėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_scope_doctor_service": {
+        "en": "Service connection readiness (auth and probe)",
+        "ja": "サービス接続の準備状況 (認証・疎通) を確認",
+        "qps-ploc": "⟦Şėřṽïƈė ƈőññėƈŧïőñ řėȧḓïñėşş (ȧůŧħ ȧñḓ ṗřőƀė) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_scope_doctor_voice": {
+        "en": "Voice runtime capabilities (audio, speech-to-text, text-to-speech)",
+        "ja": "音声ランタイム (音声入出力・音声認識・音声合成) を確認",
+        "qps-ploc": "⟦Ṽőïƈė řůñŧïɱė ƈȧṗȧƀïŀïŧïėş (ȧůḓïő, şṗėėƈħ-ŧő-ŧėẋŧ, ŧėẋŧ-ŧő-şṗėėƈħ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_scope_doctor_meeting": {
+        "en": "Meeting readiness: devices, browser, consent",
+        "ja": "会議の準備状況 (デバイス・ブラウザ・同意) を確認",
+        "qps-ploc": "⟦Ɱėėŧïñɠ řėȧḓïñėşş: ḓėṽïƈėş, ƀřőẇşėř, ƈőñşėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_doctor_app": {
+        "en": "Mobile app preflight (iOS/Android toolchain)",
+        "ja": "モバイルアプリの事前確認 (iOS/Android ツールチェーン)",
+        "qps-ploc": "⟦Ɱőƀïŀė ȧṗṗ ṗřėƒŀïɠħŧ (ïŐŞ/Ȧñḓřőïḓ ŧőőŀƈħȧïñ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_doctor_setup": {
+        "en": "Setup status and recommended surfaces",
+        "ja": "セットアップ状況と推奨サーフェスを確認",
+        "qps-ploc": "⟦Şėŧůṗ şŧȧŧůş ȧñḓ řėƈőɱɱėñḓėḓ şůřƒȧƈėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_scope_setup_onboarding": {
+        "en": "Run the onboarding wizard (identity, services, tenant)",
+        "ja": "オンボーディングウィザードを実行 (アイデンティティ・サービス・テナント)",
+        "qps-ploc": "⟦Řůñ ŧħė őñƀőȧřḓïñɠ ẇïẑȧřḓ (ïḓėñŧïŧẏ, şėřṽïƈėş, ŧėñȧñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_scope_setup_context": {
+        "en": "Resolve and bind the tenant/organization onboarding context",
+        "ja": "テナント・組織のオンボーディング文脈を解決して紐付け",
+        "qps-ploc": "⟦Řėşőŀṽė ȧñḓ ƀïñḓ ŧħė ŧėñȧñŧ/őřɠȧñïẑȧŧïőñ őñƀőȧřḓïñɠ ƈőñŧėẋŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_scope_setup_reasoning": {
+        "en": "Choose and configure the reasoning backend",
+        "ja": "推論バックエンドを選択・設定",
+        "qps-ploc": "⟦Ƈħőőşė ȧñḓ ƈőñƒïɠůřė ŧħė řėȧşőñïñɠ ƀȧƈķėñḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_scope_setup_env": {
+        "en": "Probe an environment manifest; install missing capabilities with --apply",
+        "ja": "環境マニフェストを確認し、--apply で不足分を導入",
+        "qps-ploc": "⟦Ṗřőƀė ȧñ ėñṽïřőñɱėñŧ ɱȧñïƒėşŧ; ïñşŧȧŀŀ ɱïşşïñɠ ƈȧṗȧƀïŀïŧïėş ẇïŧħ --ȧṗṗŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_scope_setup_services": {
+        "en": "Connect external services (auth, presets, notifications)",
+        "ja": "外部サービスを接続 (認証・プリセット・通知)",
+        "qps-ploc": "⟦Ƈőññėƈŧ ėẋŧėřñȧŀ şėřṽïƈėş (ȧůŧħ, ṗřėşėŧş, ñőŧïƒïƈȧŧïőñş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_scope_setup_tools": {
+        "en": "Install or inspect system tool runtimes",
+        "ja": "システムツールのランタイムを導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ şẏşŧėɱ ŧőőŀ řůñŧïɱėş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_scope_setup_provider_cli": {
+        "en": "Install or inspect managed provider CLIs",
+        "ja": "管理対象のプロバイダ CLI を導入・確認",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ïñşṗėƈŧ ɱȧñȧɠėḓ ṗřőṽïḓėř ƇĿÏş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_scope_setup_agy_sdk": {
+        "en": "Set up the agy SDK managed environment",
+        "ja": "agy SDK の管理環境をセットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ ŧħė ȧɠẏ ŞḒĶ ɱȧñȧɠėḓ ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cli_scope_setup_voice": {
+        "en": "Install local voice tools (speech-to-text, text-to-speech, VAD)",
+        "ja": "ローカル音声ツール (音声認識・音声合成・VAD) を導入",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ŀőƈȧŀ ṽőïƈė ŧőőŀş (şṗėėƈħ-ŧő-ŧėẋŧ, ŧėẋŧ-ŧő-şṗėėƈħ, ṼȦḒ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_scope_setup_config": {
+        "en": "Extend configuration through a governed config mission",
+        "ja": "統制された設定ミッションで構成を拡張",
+        "qps-ploc": "⟦Ėẋŧėñḓ ƈőñƒïɠůřȧŧïőñ ŧħřőůɠħ ȧ ɠőṽėřñėḓ ƈőñƒïɠ ɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_help_setup": {
+        "en": "  pnpm kyberion setup <area>  Set up one area (run without an area to list them)",
+        "ja": "  pnpm kyberion setup <area>  領域ごとにセットアップ (領域なしで一覧を表示)",
+        "qps-ploc": "⟦  ṗñṗɱ ķẏƀėřïőñ şėŧůṗ <ȧřėȧ>  Şėŧ ůṗ őñė ȧřėȧ (řůñ ẇïŧħőůŧ ȧñ ȧřėȧ ŧő ŀïşŧ ŧħėɱ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       }
     },
     "recorder": {
@@ -8706,9 +8821,9 @@
         "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ȧşķ \"<řėɋůėşŧ>\" ŀőřėɱ ïṗşůɱ ⟧"
       },
       "recorder_ask_empty": {
-        "en": "(No response — check backend settings with pnpm doctor)",
-        "ja": "(応答が空でした — pnpm doctor で backend 設定を確認してください)",
-        "qps-ploc": "⟦(Ñő řėşṗőñşė — ƈħėƈķ ƀȧƈķėñḓ şėŧŧïñɠş ẇïŧħ ṗñṗɱ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "(No response — check backend settings with pnpm kyberion doctor)",
+        "ja": "(応答が空でした — pnpm kyberion doctor で backend 設定を確認してください)",
+        "qps-ploc": "⟦(Ñő řėşṗőñşė — ƈħėƈķ ƀȧƈķėñḓ şėŧŧïñɠş ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ḓőƈŧőř) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "recorder_procedure_not_found": {
         "en": "Procedure not found: {id}",
@@ -17218,7 +17333,7 @@
       },
       "email_auth_checking": {
         "en": "Checking email account status...",
-        "ja": "メールアカウント認証状態を確認中...（未認証の場合は CLI で pnpm services:setup を実行してください）",
+        "ja": "メールアカウント認証状態を確認中...（未認証の場合は CLI で pnpm service:setup を実行してください）",
         "qps-ploc": "⟦Ƈħėƈķïñɠ ėɱȧïŀ ȧƈƈőůñŧ şŧȧŧůş... ŀőřėɱ ïṗşů⟧"
       },
       "account_auto": {
@@ -19535,9 +19650,9 @@
         "qps-ploc": "⟦Şŧȧřŧ ŧħė ïñṽėñŧőřẏ ŀőřėɱ ⟧"
       },
       "progress_work_inventory_operator_hint": {
-        "en": "Detailed setup runs through pnpm inventory.",
-        "ja": "詳しい操作は pnpm inventory で行えます。",
-        "qps-ploc": "⟦Ḓėŧȧïŀėḓ şėŧůṗ řůñş ŧħřőůɠħ ṗñṗɱ ïñṽėñŧőřẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "en": "Detailed setup runs through pnpm work:inventory.",
+        "ja": "詳しい操作は pnpm work:inventory で行えます。",
+        "qps-ploc": "⟦Ḓėŧȧïŀėḓ şėŧůṗ řůñş ŧħřőůɠħ ṗñṗɱ ẇőřķ:ïñṽėñŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "progress_work_inventory_empty": {
         "en": "Once you inventory your regular work, automation candidates worth handing off will show up here.",

@@ -16,7 +16,7 @@ tags:
   ]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-09-27
+last_updated: 2026-10-01
 role_affinity: [ecosystem_architect, knowledge_steward, mission_controller, operator]
 phase_affinity: [alignment]
 ---
@@ -127,14 +127,27 @@ CLI に移すだけになる。
 | 作業状態を書く／思い出す | `working-memory` ドメイン（`note`, `read`, `list`, `daily-open`, `weekly-open`, `todo-*`, `nominate-promotion`） |
 | 蓄積ナレッジを探す       | `wisdom:knowledge_search` / `knowledge_read` / `knowledge_inject`、`pnpm knowledge`                              |
 | 過去セッションを探す     | `wisdom:history_search`、`pnpm history:search`                                                                   |
-| テナントに取り込む       | `pnpm ingest --tenant <slug> --file <file>`                                                                      |
+| テナントに取り込む       | `pnpm knowledge:ingest --tenant <slug> --file <file>`                                                            |
 
 この軸を扱う playbook はなく、「覚える」「思い出す」に相当する動詞もないため、同じ
 探索がミッションごとに再発明されている。未整理領域としては最大。ただし §2 §3 と違い、
 CLI 入口より先に概念の決定（何を working memory に置き、何を `knowledge/` に置くか）が
 必要。
 
-## 6. 存在しないと判明している能力
+## 6. 診断とセットアップ — 動詞は 1 つ、領域はスコープで絞る
+
+診断とセットアップは領域ごとにコマンドが増えていた。現在はそれぞれ入口を 1 つにし、
+領域はスコープとして既存実装へ委譲する（旧コマンドもそのまま動く）。
+
+| 動詞                                 | スコープ / 領域 → 既存コマンド                                                                                                                                                                                                                                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion doctor [--scope <s>]` | 指定なし → 健全性ロールアップ（従来どおり）; `env` → `vital`; `service` → `service preflight`; `voice` → `doctor --runtime voice`; `meeting` → `meeting preflight`; `app` → `doctor --runtime app`; `setup` → `setup report`                                                                            |
+| `pnpm kyberion setup <area>`         | `onboarding` → `onboarding`; `context` → `onboarding context`; `reasoning` → `reasoning setup`; `env` → `env bootstrap`; `services` → `service setup`; `tools` → `tool setup`; `provider-cli` → `provider-cli setup`; `agy-sdk` → `agy sdk-setup`; `voice` → `voice setup`; `config` → `config-mission` |
+
+対応表は `knowledge/product/governance/cli-commands.json`（`doctor` / `setup` コマンドの
+`scopes`）にあり、`kyberion --help` と引数なしの `kyberion setup` がそれを表示する。
+
+## 7. 存在しないと判明している能力
 
 再調査を防ぐために記録する。
 

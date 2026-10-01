@@ -478,7 +478,7 @@ Remaining genuine gaps:
   [`counterfactual-degradation-policy.json`](../governance/counterfactual-degradation-policy.json)
   formalizes warn/poor handling, re-execution limits, and override
   rules.
-- ✅ **Tenant-drift watchdog** — `pnpm watch:tenant-drift` scans
+- ✅ **Tenant-drift watchdog** — `pnpm tenant:watch-drift` scans
   `confidential/{slug}/` paths and reports declared vs. expected tenant
   mismatches; emits an `integrity_check` audit event on findings.
 - ✅ **Rubric override audit event** —
@@ -519,7 +519,7 @@ Remaining genuine gaps:
   `simulate_all`, etc.). Exempt personas (`sovereign`,
   `ecosystem_architect`) bypass. State persists to
   `active/shared/runtime/tenant-rate-limit-state.json`.
-- ✅ **Validation bundle exporter** — `pnpm export:validation-bundle <MSN-ID>`
+- ✅ **Validation bundle exporter** — `pnpm validation-bundle:export <MSN-ID>`
   assembles the SR-11-7-class evidence bundle (output / reasoning-context
   / reasoning-environment / audit-story / governance / attestations) per
   `independent-validation-evidence-package.md` §2 with sha256 checksums

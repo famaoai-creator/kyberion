@@ -14,6 +14,7 @@ import {
   type CliManifest,
   type CliScriptCommand,
 } from '../check_cli_manifest.js';
+import { formatScopeUsage } from './cli-scopes.js';
 
 export interface CliHelpOptions {
   /** Include audience=dev commands (hidden by default). */
@@ -26,6 +27,8 @@ interface HelpRow {
   group: CliCommandGroup;
   summary: string;
   caution?: string;
+  /** CU-09: `--scope a|b` / `<a|b>` for commands that route scopes. */
+  scopes?: string;
 }
 
 const LABEL_WIDTH = 30;
@@ -59,6 +62,7 @@ function helpRows(manifest: CliManifest, locale?: SupportedLocale): HelpRow[] {
       group: groupOf(command),
       summary: render(command.description, locale) ?? `${command.noun} ${command.verb}`,
       caution: render(command.caution, locale),
+      scopes: 'entry' in command ? formatScopeUsage(command) : undefined,
     }))
     .sort((left, right) => (left.label < right.label ? -1 : left.label > right.label ? 1 : 0));
 }
@@ -91,6 +95,11 @@ export function formatCliManifestHelp(
     for (const row of groupRows) {
       lines.push(`  ${row.label.padEnd(LABEL_WIDTH)} ${row.summary}`);
       if (row.caution) lines.push(`  ${''.padEnd(LABEL_WIDTH)} ${row.caution}`);
+      if (row.scopes) {
+        lines.push(
+          `  ${''.padEnd(LABEL_WIDTH)} ${t('cli:cli_manifest_help_scopes', { usage: `${row.label} ${row.scopes}` }, locale)}`
+        );
+      }
     }
   }
   lines.push('', t('cli:cli_manifest_help_footer', undefined, locale));

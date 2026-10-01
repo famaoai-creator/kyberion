@@ -20,11 +20,11 @@ describe('Customer overlay use cases contract', () => {
       'inspect which customer overlays are present and whether the required files are filled in'
     );
     expect(doc).toContain('switch the active customer only after the overlay is ready');
-    expect(doc).toContain('pnpm customer:create <slug>');
-    expect(doc).toContain('pnpm customer:migrate-from-personal <slug>');
-    expect(doc).toContain('pnpm customer:list');
-    expect(doc).toContain('pnpm customer:switch <slug>');
-    expect(doc).toContain('pnpm onboard');
+    expect(doc).toContain('pnpm stance:create <slug>');
+    expect(doc).toContain('pnpm stance:migrate-from-personal <slug>');
+    expect(doc).toContain('pnpm stance:list');
+    expect(doc).toContain('pnpm stance:switch <slug>');
+    expect(doc).toContain('pnpm onboarding');
     expect(doc).toContain('pnpm kyberion doctor');
     expect(doc).toContain('Unset `KYBERION_CUSTOMER`');
     expect(readme).toContain('customer-overlay-use-cases.md');

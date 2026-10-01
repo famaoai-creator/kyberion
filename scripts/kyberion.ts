@@ -21,6 +21,13 @@ import {
   formatUnknownCommand,
   routedCommandName,
 } from './lib/cli-help.js';
+import {
+  findDeprecatedCommandAlias,
+  formatScopeHelp,
+  formatUnknownScope,
+  rewriteDeprecatedCommand,
+  routeScopedCommand,
+} from './lib/cli-scopes.js';
 
 export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli-help.js';
 
@@ -85,7 +92,11 @@ export function resolveCommand(
 export function resolveCommandPath(args: string[], manifest = loadCliManifest()): string {
   for (let length = Math.min(2, args.length); length >= 1; length -= 1) {
     const candidate = args.slice(0, length).join(' ');
-    if (findUniqueCommand(candidate, manifest) || findUniqueScriptCommand(candidate, manifest)) {
+    if (
+      findUniqueCommand(candidate, manifest) ||
+      findUniqueScriptCommand(candidate, manifest) ||
+      findDeprecatedCommandAlias(candidate, manifest)
+    ) {
       return candidate;
     }
   }
@@ -243,6 +254,39 @@ function helpLocale(args: string[]): SupportedLocale | undefined {
   return index >= 0 && args[index + 1] ? resolveLocale({ explicit: args[index + 1] }) : undefined;
 }
 
+/**
+ * CU-08 / CU-09: rewrite a deprecated command or a `doctor --scope` /
+ * `setup <area>` scope to the registered command it stands for. Returns the
+ * arguments to dispatch (unchanged when nothing applies).
+ */
+export function rewriteRoutedArgs(
+  args: string[],
+  manifest: CliManifest,
+  warn: (message: string) => void = (message) => logger.warn(message)
+): string[] {
+  let current = args;
+  // Each hop strictly consumes an alias or a scope; the registry check forbids
+  // scope → scope routes, so two hops (alias, then scope) is the maximum.
+  for (let hop = 0; hop < 3; hop += 1) {
+    const command = resolveCommandPath(current, manifest);
+    const alias = findDeprecatedCommandAlias(command, manifest);
+    if (alias) {
+      warn(t('cli:cli_deprecated_command', { old: alias.command, new: alias.replaced_by }));
+      current = rewriteDeprecatedCommand(alias, current);
+      continue;
+    }
+    const registered = findUniqueCommand(command, manifest);
+    if (!registered?.scopes) return current;
+    const routed = routeScopedCommand(registered, current);
+    if (routed.kind === 'unknown') {
+      throw new ScriptExitError(1, formatUnknownScope(registered, routed.scope));
+    }
+    if (routed.kind === 'none') return current;
+    current = routed.args;
+  }
+  return current;
+}
+
 export async function main(
   args: string[] = [],
   print: (value: unknown) => void = () => undefined
@@ -266,6 +310,7 @@ export async function main(
   }
   validateKyberionStartupEnvironment();
   const manifest = loadCliManifest();
+  normalizedArgs = rewriteRoutedArgs(normalizedArgs, manifest);
   const command = resolveCommandPath(normalizedArgs, manifest);
   const registeredEntrypoint = findUniqueCommand(command, manifest);
   if (!registeredEntrypoint) {
@@ -312,6 +357,12 @@ export async function main(
       return;
     }
     case 'operator-setup': {
+      if (command === 'setup') {
+        // CU-09: a bare `setup` (or `setup --help`) lists the areas it routes to.
+        const registered = findUniqueCommand(command, manifest);
+        if (registered) print(formatScopeHelp(registered, helpLocale(normalizedArgs)));
+        return;
+      }
       const { runSetupReportCli } = await import('./setup_report.js');
       await runSetupReportCli(normalizedArgs.slice(2));
       return;

@@ -26,8 +26,8 @@ describe('Customer onboarding contract', () => {
     expect(wizard).toContain('Set up a customer overlay now?');
     expect(wizard).toContain('customer_create');
     expect(wizard).toContain('customer_switch');
-    expect(readme).toContain('pnpm customer:switch acme-corp');
-    expect(operator).toContain('pnpm customer:create customer-slug');
+    expect(readme).toContain('pnpm stance:switch acme-corp');
+    expect(operator).toContain('pnpm stance:create customer-slug');
     expect(operator).toContain(
       'interactive identity setup → active stance overlay / personal fallback'
     );

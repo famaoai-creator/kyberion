@@ -71,8 +71,8 @@ Purpose: prove Roadmap Phase D' acceptance: an external FDE or SI can complete o
 Collection protocol:
 
 1. Start from [`DEPLOYMENT.md`](./DEPLOYMENT.md) and choose macOS, Linux, or Docker.
-2. Create or reuse a customer overlay with `pnpm customer:create <slug>` and record the overlay paths used.
-3. Run `pnpm customer:switch <slug>`, source `active/shared/runtime/customer.env`, and complete `pnpm onboard`.
+2. Create or reuse a customer overlay with `pnpm stance:create <slug>` and record the overlay paths used.
+3. Run `pnpm stance:switch <slug>`, source `active/shared/runtime/customer.env`, and complete `pnpm onboarding`.
 4. Run `pnpm run doctor`, the relevant runtime-specific doctor command, and the customer scenario mission or pipeline.
 5. Record every place where the FDE/SI needed code changes. The item cannot be verified if a fork or product patch was required for deployment.
 6. Write a deployment summary with environment, customer overlay, commands run, artifacts produced, unresolved gaps, and postmortem notes.
