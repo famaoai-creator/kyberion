@@ -12,6 +12,7 @@ export const actuator = defineCatalogBackedActuator({
   id: 'calendar-actuator',
   describeOps,
   handleAction,
+  actionInput: (op, params) => ({ op, params }),
 });
 
 const main = async () => {

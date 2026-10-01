@@ -14,6 +14,11 @@ export interface I18nHardcodingBaseline {
   generated_at: string;
   scan_roots: string[];
   files: Record<string, number>;
+  /**
+   * IT-05: frozen counts per file for the locale/colour token rules
+   * (intent_regex, locale_compare, locale_literal, engine_hex).
+   */
+  locale_tokens?: Record<string, Record<string, number>>;
 }
 
 const I18N_BASELINE_SCHEMA_PATH = pathResolver.knowledge(

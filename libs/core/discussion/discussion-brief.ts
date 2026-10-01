@@ -1,4 +1,5 @@
 import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
+import { pickByLocale } from '../locale-normalize.js';
 import type {
   DiscussionMessageView,
   DiscussionParticipant,
@@ -62,9 +63,12 @@ const STANCE_CLASS: Record<DiscussionStance, string> = {
 };
 
 function stanceLabel(stance: DiscussionStance, locale: 'ja' | 'en'): string {
-  const ja = { support: '賛成', oppose: '反対', question: '要確認', neutral: '中立' };
-  const en = { support: 'Support', oppose: 'Oppose', question: 'Question', neutral: 'Neutral' };
-  return (locale === 'ja' ? ja : en)[stance];
+  const labels = pickByLocale(locale, {
+    en: { support: 'Support', oppose: 'Oppose', question: 'Question', neutral: 'Neutral' },
+    // i18n-exempt: per-locale label table (the ja row of the stance labels)
+    ja: { support: '賛成', oppose: '反対', question: '要確認', neutral: '中立' },
+  });
+  return labels[stance];
 }
 
 interface ObjectionRow {

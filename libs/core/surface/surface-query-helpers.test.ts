@@ -22,6 +22,7 @@ describe('surface-query-helpers', () => {
       sourceLabel: 'browser_calendar',
       sourceName: 'Work',
       rangeLabel: 'today',
+      locale: 'en',
       events: Array.from({ length: 12 }, (_, index) => ({
         title: `Event ${index + 1}`,
         start: '2026-07-03T09:00:00.000Z',

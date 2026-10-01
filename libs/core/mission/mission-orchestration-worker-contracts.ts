@@ -16,6 +16,10 @@ export interface SlackPayload {
   persona?: string;
   missionType?: string;
   teamRoles?: string[];
+  /** Team Channel P2: principal that confirmed the mission proposal. */
+  confirmedBy?: string;
+  /** Team Channel P2: tenant scope of the originating channel. */
+  scope?: { tenant_slug: string; tier?: 'personal' | 'confidential' | 'public' };
 }
 
 export function payloadSurface(payload: SlackPayload): SurfaceAsyncChannel {

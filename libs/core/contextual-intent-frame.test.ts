@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
+import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import {
   recordSchedulePreference,
   saveContextualIntentMemory,
@@ -72,5 +73,14 @@ describe('contextual-intent-frame', () => {
         },
       })
     ).toThrow(/Invalid catalog contextual-intent-memory/);
+  });
+
+  it('does not treat "meeting" as the operator themself (whole-word English pronouns)', () => {
+    expect(
+      matchesIntentPhrase('schedule a meeting with Sato', 'contextual_frame.subject_self')
+    ).toBe(false);
+    expect(buildContextualIntentFrame('Ask Sato about the meeting').subject).toBe('unknown');
+    expect(buildContextualIntentFrame('show me the plan').subject).toBe('operator_self');
+    expect(buildContextualIntentFrame('check my agenda').subject).toBe('operator_self');
   });
 });

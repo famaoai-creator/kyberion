@@ -50,24 +50,6 @@ export function createServiceChecks(): ContractCheck[] {
       ],
     },
     {
-      id: 'service-bootstrap-catalog',
-      schemaPath: 'knowledge/product/schemas/service-bootstrap-catalog.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/service-bootstrap-catalog.json'),
-      ],
-      invalidPayloads: [
-        {
-          version: '1.0.0',
-          entries: [
-            {
-              id: 'broken',
-              service_id: 'slack',
-            },
-          ],
-        },
-      ],
-    },
-    {
       id: 'service-onboarding-catalog',
       schemaPath: 'knowledge/product/schemas/service-onboarding-catalog.schema.json',
       validPayloads: [

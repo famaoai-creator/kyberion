@@ -1,5 +1,6 @@
 'use client';
 
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import * as React from 'react';
 import {
   Badge,
@@ -13,6 +14,7 @@ import {
   StatusPill,
   Tabs,
 } from '@agent/shared-ui';
+import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import {
@@ -75,7 +77,7 @@ interface DecideRoleLabels {
 function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
   if (!value) return '';
   try {
-    return new Date(value).toLocaleString(locale === 'ja' ? 'ja-JP' : 'en-US', {
+    return new Date(value).toLocaleString(localeToBcp47(locale), {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -107,7 +109,7 @@ function relativeWhen(value: string | undefined, locale: 'en' | 'ja'): string | 
   if (Number.isNaN(date.getTime())) return undefined;
   const diffMs = date.getTime() - Date.now();
   const absMs = Math.abs(diffMs);
-  const formatter = new Intl.RelativeTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  const formatter = new Intl.RelativeTimeFormat(localeToBcp47(locale), {
     numeric: 'auto',
   });
   for (const { unit, ms } of RELATIVE_TIME_THRESHOLDS) {
@@ -337,6 +339,16 @@ export default function ConciergePage() {
 
   const [kindFilter, setKindFilter] = React.useState<DecideKind | 'all'>('all');
   const [tenantFilter, setTenantFilter] = React.useState<string>('all');
+
+  // Switching organization in the rail narrows the queue to it (display only).
+  React.useEffect(() => {
+    const onSwitch = (event: Event) => {
+      const tenant = tenantFromChangeEvent(event);
+      if (tenant) setTenantFilter(tenant);
+    };
+    window.addEventListener(TENANT_CHANGED_EVENT, onSwitch);
+    return () => window.removeEventListener(TENANT_CHANGED_EVENT, onSwitch);
+  }, []);
 
   const refresh = React.useCallback(async () => {
     try {

@@ -87,8 +87,8 @@ function buildTaskSessionApprovalRequest(
   );
   if (!session.control.requires_approval || unresolvedInputs.length > 0) return undefined;
   return {
-    title: t('dock.intent_resolution.approval_title', { summary: session.goal.summary }, 'ja'),
-    summary: t('dock.intent_resolution.approval_summary', { request: queryText }, 'ja'),
+    title: t('dock.intent_resolution.approval_title', { summary: session.goal.summary }),
+    summary: t('dock.intent_resolution.approval_summary', { request: queryText }),
     details: session.goal.success_condition,
     severity: 'high',
   };
@@ -144,8 +144,8 @@ export function appendCompletionClosure(text: string, completionSummary: string[
 
 export function buildExecutionFeedbackPrompt(scenarioId: string): string {
   return [
-    `評価: このシナリオを改善する場合は、「評価 ${scenarioId}: 満足」、`,
-    `「評価 ${scenarioId}: 一部違う: 修正点」、または「評価 ${scenarioId}: 不満: 理由」で返信できます。`,
+    t('surface:feedback_prompt_line1', { scenarioId }),
+    t('surface:feedback_prompt_line2', { scenarioId }),
   ].join('');
 }
 
@@ -173,11 +173,11 @@ export function attachExecutionFeedbackPrompt(
 
 export function buildFeedbackAcknowledgement(record: ExecutionFeedbackRecord): string {
   const outcomeLabel = {
-    satisfied: '満足',
-    partially_satisfied: '一部違う',
-    dissatisfied: '不満',
+    satisfied: t('surface:feedback_outcome_satisfied'),
+    partially_satisfied: t('surface:feedback_outcome_partially_satisfied'),
+    dissatisfied: t('surface:feedback_outcome_dissatisfied'),
   }[record.outcome];
-  return `評価を記録しました（${outcomeLabel}）。次回の「${record.scenario_id}」シナリオ生成時に改善候補として反映します。`;
+  return t('surface:feedback_recorded', { outcome: outcomeLabel, scenarioId: record.scenario_id });
 }
 
 export function buildPendingRuntimeContext(
@@ -431,7 +431,7 @@ export async function handleTaskSessionRoute(
           session: backtracked || activeSession,
           status: 'pending',
           intentId: (activeSession.payload?.intent_id as string) || '',
-          summary: `了解です。${lastFilled} を修正します。もう一度教えてください。`,
+          summary: t('surface:slot_correct_last', { slot: lastFilled }),
           missingInputs: restoredMissing,
         })
       );
@@ -442,7 +442,7 @@ export async function handleTaskSessionRoute(
         session: activeSession,
         status: 'pending',
         intentId: (activeSession.payload?.intent_id as string) || '',
-        summary: `了解です。${currentSlot} をもう一度教えてください。`,
+        summary: t('surface:slot_ask_again', { slot: currentSlot }),
         missingInputs: activeSession.requirements.missing,
       })
     );
@@ -520,7 +520,7 @@ export async function handleTaskSessionRoute(
           session: updatedSession,
           status: 'pending',
           intentId: (activeSession.payload?.intent_id as string) || '',
-          summary: `スロット [${nextNeeded}] の情報が必要です。入力してください。`,
+          summary: t('surface:slot_needed', { slot: nextNeeded }),
           missingInputs: updatedMissing,
         })
       );
@@ -558,7 +558,7 @@ export async function handleTaskSessionRoute(
               session: reopened,
               status: 'pending',
               intentId: (reopened.payload?.intent_id as string) || '',
-              summary: '前回のセッションを再オープンしました。修正したい点を教えてください。',
+              summary: t('surface:session_reopened'),
               missingInputs: reopened.requirements?.missing || [],
             })
           );
@@ -747,7 +747,7 @@ export async function handleTaskSessionRoute(
           session,
           status: 'pending',
           intentId: intent.intentId,
-          summary: 'データ取得先のURLが指定されていません。URLを入力してください。',
+          summary: t('surface:external_data_url_missing'),
           missingInputs: ['source_url'],
         })
       );
@@ -791,7 +791,7 @@ export async function handleTaskSessionRoute(
       }
 
       if (!plainText || plainText.length < 20) {
-        throw new Error(`取得したページからテキストを抽出できませんでした (URL: ${sourceUrl})`);
+        throw new Error(t('surface:external_data_extract_failed', { url: sourceUrl }));
       }
 
       // 3. Register the service if this is the first time
@@ -818,14 +818,14 @@ export async function handleTaskSessionRoute(
       // 5. Build the summary reply
       const summaryPreview = truncateTextWithCount(plainText, 1500);
       const summary = [
-        `**${dataTopic}** の情報を取得しました。`,
+        t('surface:external_data_fetched', { topic: dataTopic }),
         ``,
         summaryPreview.text,
         summaryPreview.omitted_count > 0
-          ? `\n...(以降 ${summaryPreview.omitted_count} 文字省略)`
+          ? t('surface:external_data_omitted', { count: summaryPreview.omitted_count })
           : '',
         ``,
-        `\`ソース: ${sourceUrl}\``,
+        t('surface:external_data_source', { url: sourceUrl }),
       ].join('\n');
 
       const preview = truncateTextWithCount(plainText, 500);
@@ -910,7 +910,7 @@ export async function handleTaskSessionRoute(
         buildTaskSessionReply({
           session: blocked || session,
           status: 'failed',
-          error: `外部データの取得に失敗しました: ${error?.message || String(error)}`,
+          error: t('surface:external_data_failed', { error: error?.message || String(error) }),
           intentId: intent.intentId,
         })
       );
@@ -972,10 +972,13 @@ export async function handleTaskSessionRoute(
         );
 
         const resultJson = parseSurfaceActuatorResult(execRes, 'approval-actuator');
-        output = `[Approval-Actuator] 承認アクション [${actionInput.action}] が正常に完了しました。\n結果: ${JSON.stringify(resultJson, null, 2)}`;
+        output = t('surface:service_approval_completed', {
+          action: actionInput.action,
+          result: JSON.stringify(resultJson, null, 2),
+        });
       } else if (sessionIntentId === 'setup-messaging-bridge') {
         const platformId = session.payload?.platform_id || 'slack';
-        output = `[Messaging Bridge] ${platformId} とのメッセージ同期連携ブリッジを正常に起動・有効化しました。接続された認証トークンを確認し、チャンネル統合を完了しました。`;
+        output = t('surface:service_bridge_enabled', { platform: String(platformId) });
       } else if (sessionIntentId === 'inspect-service') {
         const serviceName = session.payload?.service_name || 'voice-hub';
         const supervisorOutput = safeExec(
@@ -985,7 +988,10 @@ export async function handleTaskSessionRoute(
             cwd: pathResolver.rootDir(),
           }
         );
-        output = `サービス [${serviceName}] のステータスを確認しました。\n\n${supervisorOutput}`;
+        output = t('surface:service_inspected', {
+          service: String(serviceName),
+          output: supervisorOutput,
+        });
       } else if (sessionIntentId === 'start-service') {
         const serviceName = String(session.payload?.service_name || '').trim();
         const controlOutput = safeExec(
@@ -1001,7 +1007,7 @@ export async function handleTaskSessionRoute(
             cwd: pathResolver.rootDir(),
           }
         );
-        output = `サービス [${serviceName}] を起動しました。\n\n${controlOutput}`;
+        output = t('surface:service_started', { service: serviceName, output: controlOutput });
       } else if (sessionIntentId === 'stop-service') {
         const serviceName = String(session.payload?.service_name || '').trim();
         const controlOutput = safeExec(
@@ -1017,7 +1023,7 @@ export async function handleTaskSessionRoute(
             cwd: pathResolver.rootDir(),
           }
         );
-        output = `サービス [${serviceName}] を停止しました。\n\n${controlOutput}`;
+        output = t('surface:service_stopped', { service: serviceName, output: controlOutput });
       } else if (sessionIntentId === 'enable-voice-input') {
         const serviceName = session.payload?.service_name || 'voice-hub';
         const tempFile = sessionRuntimePath(
@@ -1046,9 +1052,12 @@ export async function handleTaskSessionRoute(
           }
         );
         const resultJson = parseSurfaceActuatorResult(execRes, 'system-actuator');
-        output = `[System-Actuator] 音声入力を有効化しました。対象: ${serviceName}\n結果: ${JSON.stringify(resultJson, null, 2)}`;
+        output = t('surface:service_voice_enabled_detail', {
+          service: String(serviceName),
+          result: JSON.stringify(resultJson, null, 2),
+        });
       } else {
-        output = `サービスオペレーション [${sessionIntentId}] を正常に実行しました。`;
+        output = t('surface:service_operation_executed', { intent: sessionIntentId });
       }
 
       const updated = updateTaskSession(session.session_id, {
@@ -1096,8 +1105,8 @@ export async function handleTaskSessionRoute(
       }
       const summaryText =
         sessionIntentId === 'enable-voice-input'
-          ? '音声入力を有効化しました。'
-          : `オペレーション [${sessionIntentId}] が正常に完了しました。`;
+          ? t('surface:service_voice_enabled')
+          : t('surface:service_operation_completed', { intent: sessionIntentId });
 
       return emptySurfaceResult(
         buildTaskSessionReply({
@@ -1173,8 +1182,8 @@ export async function handleTaskSessionRoute(
       status: 'pending',
       intentId: intent.intentId,
       summary: session.requirements?.missing?.length
-        ? `必要な確認点があります。`
-        : '必要な情報はそろっています。',
+        ? t('surface:confirmation_needed')
+        : t('surface:confirmation_none'),
       missingInputs: session.requirements?.missing || [],
       serviceOptions:
         Array.isArray(session.payload?.startable_services) && sessionIntentId === 'start-service'

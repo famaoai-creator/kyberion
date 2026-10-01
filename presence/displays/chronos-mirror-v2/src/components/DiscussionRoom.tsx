@@ -1,5 +1,6 @@
 'use client';
 
+import { coerceLocale, pickByLocale } from '@agent/core/locale-normalize';
 import * as React from 'react';
 import {
   ArrowLeft,
@@ -55,7 +56,8 @@ function writeRoomParam(id: string | null) {
 export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
   const chronosLocale = useChronosLocale();
   const [override, setOverride] = React.useState<DiscussionLocale | null>(null);
-  const locale: DiscussionLocale = override ?? (chronosLocale === 'ja' ? 'ja' : 'en');
+  const locale: DiscussionLocale =
+    override ?? coerceLocale(chronosLocale, ['en', 'ja'] as const, 'en');
   const [roomId, setRoomId] = React.useState<string | null>(null);
   const [canSteer, setCanSteer] = React.useState(false);
   const [hydrated, setHydrated] = React.useState(false);
@@ -476,7 +478,7 @@ function TopBar({
               {index < phaseIndex || done ? <Check size={11} aria-hidden /> : index + 1}
             </span>
             <span className="dr-steps__label">
-              {locale === 'ja' ? step.ja : step.en}
+              {pickByLocale(locale, { en: step.en, ja: step.ja })}
               {step.id === 'exploring' && room.round > 0
                 ? ` ${room.round}/${room.config.max_rounds}`
                 : ''}

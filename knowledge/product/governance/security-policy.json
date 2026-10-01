@@ -524,6 +524,10 @@
       "allow_read": ["knowledge/personal/connections/chronos-access.json"],
       "allow_write": []
     },
+    "scope_locale_reader": {
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
+      "allow_write": []
+    },
     "generation_scheduler": {
       "allow_read": ["knowledge/personal/tenants/"],
       "allow_write": []
