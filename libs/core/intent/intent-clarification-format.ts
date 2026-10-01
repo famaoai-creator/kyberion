@@ -1,4 +1,7 @@
 import { isInjectionSuspected } from '../untrusted-content.js';
+import { resolveLocale } from '../locale.js';
+import { normalizeLocale } from '../locale-normalize.js';
+import { t } from '../t.js';
 import type { ClarificationFormatOptions } from './intent-contract-types.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
 
@@ -10,10 +13,7 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
       : undefined;
   const lines: string[] = [];
   if (isInjectionSuspected()) {
-    lines.push(
-      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)',
-      ''
-    );
+    lines.push(t('question:clarification_injection_warning'), '');
   }
   lines.push(packet.headline, packet.summary);
   if (briefSummary) lines.push('', `Brief: ${briefSummary}`);
@@ -28,33 +28,30 @@ export function formatClarificationPacketConcise(
   packet: OperatorInteractionPacket,
   options: ClarificationFormatOptions = {}
 ): string {
-  const locale = options.locale ?? 'en';
+  const locale = normalizeLocale(options.locale) ?? resolveLocale();
   const questions = packet.questions ?? [];
   const first = questions[0];
   const remaining = questions.length - 1;
   let warning = '';
   if (isInjectionSuspected()) {
-    warning =
-      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)\n';
+    warning = `${t('question:clarification_injection_warning', undefined, locale)}\n`;
   }
   if (!first) {
-    return (
-      warning +
-      (locale === 'ja'
-        ? '不足している情報はありません。実行を進められます。'
-        : 'No missing inputs. Ready to proceed.')
+    return warning + t('question:clarification_none_missing', undefined, locale);
+  }
+  const more =
+    remaining > 0 ? t('question:clarification_more_hint', { count: remaining }, locale) : '';
+  const lines = [
+    t('question:clarification_next_required', { more, id: first.id }, locale),
+    first.question,
+  ];
+  if (first.reason) {
+    lines.push(t('question:clarification_reason_line', { reason: first.reason }, locale));
+  }
+  if (first.default_assumption) {
+    lines.push(
+      t('question:clarification_default_line', { value: first.default_assumption }, locale)
     );
   }
-  if (locale === 'ja') {
-    const moreHint = remaining > 0 ? `（他 ${remaining} 件）` : '';
-    const lines = [`次に必要な情報${moreHint}: \`${first.id}\``, first.question];
-    if (first.reason) lines.push(`理由: ${first.reason}`);
-    if (first.default_assumption) lines.push(`デフォルト: ${first.default_assumption}`);
-    return warning + lines.join('\n');
-  }
-  const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
-  const lines = [`Next required${moreHint}: \`${first.id}\``, first.question];
-  if (first.reason) lines.push(`Reason: ${first.reason}`);
-  if (first.default_assumption) lines.push(`Default: ${first.default_assumption}`);
   return warning + lines.join('\n');
 }

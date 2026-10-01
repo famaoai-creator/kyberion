@@ -1,5 +1,6 @@
 'use client';
 
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import * as React from 'react';
 import {
   Bot,
@@ -350,7 +351,7 @@ function Bubble({
   const human = message.kind === 'human';
   const participant = room.participants.find((p) => p.id === message.speaker);
   const color = human ? 'var(--kb-ui-accent)' : participantColor(room, message.speaker);
-  const time = new Date(message.ts).toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  const time = new Date(message.ts).toLocaleTimeString(localeToBcp47(locale), {
     hour: '2-digit',
     minute: '2-digit',
   });

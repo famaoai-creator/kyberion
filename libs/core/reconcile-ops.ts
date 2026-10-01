@@ -29,17 +29,40 @@ import { slugify } from './foundation/text.js';
 // ─── config fallbacks ───────────────────────────────────────
 
 export interface ConfigFallbackReconcileResult {
+  /** True only when the sweep was allowed to write knowledge files. */
+  applied: boolean;
   repaired: { knowledge_path: string; action: string }[];
+  /**
+   * Proposal-only mode: public-tier files the sweep would recreate from their
+   * defaults snapshot. Nothing under knowledge/ is written until a caller
+   * passes `apply: true` (the operator CLI's `--apply`).
+   */
+  planned: { knowledge_path: string; action: string }[];
   proposals_written: { knowledge_path: string; proposal_path: string }[];
   skipped: { knowledge_path: string; reason: string }[];
   pruned: number;
 }
 
-export function reconcileConfigFallbacks(): ConfigFallbackReconcileResult {
+export interface ConfigFallbackReconcileOptions {
+  /**
+   * Write missing public-tier knowledge files. Defaults to false so scheduled
+   * and pipeline runs stay proposal-only; only an explicit operator request
+   * (`pnpm kyberion reconcile config-fallbacks --apply` or an op `apply: true`)
+   * mutates tracked knowledge.
+   */
+  apply?: boolean;
+}
+
+export function reconcileConfigFallbacks(
+  options: ConfigFallbackReconcileOptions = {}
+): ConfigFallbackReconcileResult {
+  const apply = options.apply === true;
   const entries = listFallbacks().filter((e) => !e.resolved);
 
   const result: ConfigFallbackReconcileResult = {
+    applied: apply,
     repaired: [],
+    planned: [],
     proposals_written: [],
     skipped: [],
     pruned: 0,
@@ -49,7 +72,7 @@ export function reconcileConfigFallbacks(): ConfigFallbackReconcileResult {
 
   for (const entry of entries) {
     if (entry.reason === 'file_not_found') {
-      handleFileMissing(entry, result, repairedPaths);
+      handleFileMissing(entry, result, repairedPaths, apply);
     } else if (entry.reason === 'parse_error') {
       handleParseError(entry, result);
     } else {
@@ -71,7 +94,8 @@ export function reconcileConfigFallbacks(): ConfigFallbackReconcileResult {
 function handleFileMissing(
   entry: ConfigFallbackEntry,
   result: ConfigFallbackReconcileResult,
-  repairedPaths: string[]
+  repairedPaths: string[],
+  apply: boolean
 ): void {
   const absPath = pathResolver.knowledge(entry.knowledge_path);
   if (safeExistsSync(absPath)) {
@@ -88,6 +112,14 @@ function handleFileMissing(
     result.skipped.push({
       knowledge_path: entry.knowledge_path,
       reason: 'not in public/ tier — auto-create skipped for safety',
+    });
+    return;
+  }
+
+  if (!apply) {
+    result.planned.push({
+      knowledge_path: entry.knowledge_path,
+      action: 'would create from defaults_snapshot (re-run with --apply)',
     });
     return;
   }

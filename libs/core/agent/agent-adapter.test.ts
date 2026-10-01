@@ -245,6 +245,10 @@ describe('ClaudeAdapter tool lockdown', () => {
     const toolsAt = args.indexOf('--tools');
     expect(args[toolsAt + 1]).toBe('');
     expect(args).toContain('--strict-mcp-config');
+    // No CLAUDE.md, user hooks, plugins, slash commands or saved session.
+    expect(args).toContain('--setting-sources=');
+    expect(args).toContain('--disable-slash-commands');
+    expect(args).toContain('--no-session-persistence');
     expect(args).not.toContain('--allowedTools');
     expect(args).not.toContain('--disallowedTools');
   });

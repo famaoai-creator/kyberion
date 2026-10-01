@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
     const localeValue = optionalRequestString(body, 'locale');
     const backend = backendValue?.trim() || undefined;
     const device = deviceValue?.trim() || undefined;
-    const locale = localeValue?.trim() || 'ja-JP';
+    // IT-03: no locale supplied -> the voice hub applies the operator locale itself.
+    const locale = localeValue?.trim() || undefined;
 
     const response = await fetch(`${voiceHubUrl()}/api/listen-once`, {
       method: 'POST',

@@ -17,7 +17,6 @@ export * from './agent-input-queue.js';
 export * from './agent-instruction-loader.js';
 export * from './agent-lifecycle.js';
 export * from './agent-manifest.js';
-export * from './agent-mediator.js';
 export * from './agent-pane-runtime-bridge.js';
 export * from './agent-pane-runtime-herdr.js';
 export * from './agent-performance-index.js';
@@ -93,6 +92,5 @@ export {
   refreshAgentRuntime,
   restartAgentRuntime,
 } from './agent-runtime-supervisor.js';
-export * from './agent-slo.js';
 export * from './agentic-source-review-verification.js';
 export * from './agentic-source-review.js';

@@ -1,5 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
 import * as path from 'node:path';
+import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
 import {
@@ -582,21 +583,21 @@ export function applyProcessImprovementProposal(proposalId: string): {
     [
       `# Process Improvement Work Order — ${proposalId}`,
       '',
-      `- 種別: ${current.kind}`,
-      `- 対象: ${current.target}`,
-      `- 発生ミッション: ${current.mission_id}`,
-      `- 承認日: ${nowIso()}`,
+      t('mission_ops:retro_wo_kind', { value: current.kind }),
+      t('mission_ops:retro_wo_target', { value: current.target }),
+      t('mission_ops:retro_wo_mission', { value: current.mission_id }),
+      t('mission_ops:retro_wo_approved_at', { value: nowIso() }),
       '',
-      '## 変更内容',
+      t('mission_ops:retro_wo_changes_heading'),
       current.proposal,
       '',
-      '## 根拠',
+      t('mission_ops:retro_wo_rationale_heading'),
       current.rationale,
       '',
-      '## エビデンス',
+      t('mission_ops:retro_wo_evidence_heading'),
       ...current.evidence.map((entry) => `- ${entry}`),
       '',
-      '> 実装したら本ファイルに結果を追記し、関連する plan doc / ledger を更新すること。',
+      t('mission_ops:retro_wo_footer'),
     ].join('\n')
   );
   const updated: ProcessImprovementProposal = { ...current, status: 'applied' };
@@ -604,7 +605,7 @@ export function applyProcessImprovementProposal(proposalId: string): {
   const queuePath = processImprovementQueuePath();
   writeProcessImprovementQueue(queuePath, proposals);
   void notifyOperator('deliverable_ready', {
-    title: `改善ワークオーダー発行: ${current.kind} (${proposalId})`,
+    title: t('mission_ops:retro_wo_issued_title', { kind: current.kind, id: proposalId }),
     body: current.proposal.slice(0, 200),
     link_hint: workOrderPath,
     correlation_id: proposalId,
@@ -730,20 +731,20 @@ export async function runMissionRetrospective(
   const reportLines = [
     `# Mission Retrospective — ${missionId}`,
     '',
-    '## 実行統計(決定論)',
+    t('mission_ops:retro_stats_heading'),
     '```json',
     JSON.stringify(stats, null, 2),
     '```',
     '',
-    '## 改善提案(承認待ち — process-improvement queue)',
+    t('mission_ops:retro_proposals_heading'),
     ...(proposals.length > 0
       ? proposals.map(
           (proposal) =>
-            `- **[${proposal.kind}] ${proposal.target}** — ${proposal.proposal}\n  - 根拠: ${proposal.rationale}`
+            `- **[${proposal.kind}] ${proposal.target}** — ${proposal.proposal}\n  - ${t('mission_ops:retro_rationale_label')}: ${proposal.rationale}`
         )
-      : [`- なし${llmNote ? `(${llmNote})` : ''}`]),
+      : [`- ${t('mission_ops:retro_none')}${llmNote ? ` (${llmNote})` : ''}`]),
     '',
-    `> 提案の承認/却下は queue (${IMPROVEMENT_QUEUE_PATH}) を更新し、承認済みのみ blueprint / workflow catalog へ反映すること。`,
+    t('mission_ops:retro_queue_footer', { path: IMPROVEMENT_QUEUE_PATH }),
   ];
   const reportPath = missionPath
     ? safeMissionArtifactPath(missionPath, 'evidence/retrospective.md')
@@ -759,7 +760,7 @@ export async function runMissionRetrospective(
 
   if (proposals.length > 0) {
     void notifyOperator('question', {
-      title: `Retrospective: ${proposals.length} 件のプロセス改善提案 (${missionId})`,
+      title: t('mission_ops:retro_question_title', { count: proposals.length, missionId }),
       body: proposals
         .slice(0, 3)
         .map((proposal) => `- [${proposal.kind}] ${proposal.proposal}`)

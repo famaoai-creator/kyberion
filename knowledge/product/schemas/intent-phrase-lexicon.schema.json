@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-phrase-lexicon.schema.json",
+  "title": "Intent Phrase Lexicon",
+  "description": "Locale-keyed phrase lists for heuristic intent classification. Each concept id is matched by libs/core/intent/intent-phrase-lexicon.ts (matchesIntentPhrase). Phrases are literal (escaped) strings; patterns are regex source strings for cases a literal cannot express (wildcards, optional suffixes, whitespace classes). Every locale is checked by default because the input language may differ from the UI locale; `und` holds language-neutral tokens such as product names.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "concepts"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "default_flags": { "$ref": "#/definitions/flags" },
+    "prefix_word_suffixes": {
+      "description": "Per locale, short polite verb suffixes that may follow a prefix_word phrase ending in a non-ASCII character (停止 + して, 止めて + ください). Scripts without word spaces need these because \\b cannot separate 停止 from 停止ボタン; a suffix only counts when it is itself followed by end of text, whitespace or punctuation. Longer suffixes should be listed before their prefixes.",
+      "type": "object",
+      "propertyNames": { "pattern": "^(und|[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?)$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1, "maxLength": 20 }
+      }
+    },
+    "concepts": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" },
+      "additionalProperties": { "$ref": "#/definitions/concept" }
+    }
+  },
+  "definitions": {
+    "flags": {
+      "description": "RegExp flags. Only case-insensitive (i) and unicode (u) are allowed; stateful flags (g, y) are rejected so compiled matchers stay reusable.",
+      "type": "string",
+      "pattern": "^(i?u?|u?i?)$"
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "locales"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "match": {
+          "description": "contains (default): match anywhere. exact: the whole text must be one alternative (^(?:...)$). prefix_word: text starts with an alternative. Phrases ending in an ASCII word char need an ASCII word boundary after them; phrases ending in a non-ASCII (e.g. Japanese) char must be followed by end of text, whitespace, punctuation (、。！!？?), an ASCII word char, or a short polite suffix from prefix_word_suffixes (して / ください / …) that is itself followed by a clause end — never by a noun or particle (停止ボタン / キャンセルを).",
+          "enum": ["contains", "exact", "prefix_word"]
+        },
+        "word_boundary": {
+          "description": "ascii: literal phrases whose first/last character is an ASCII word character match as whole words (e.g. 'me' does not match inside 'meeting'). Non-ASCII phrases are unaffected.",
+          "enum": ["ascii"]
+        },
+        "flags": { "$ref": "#/definitions/flags" },
+        "locales": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^(und|[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?)$" },
+          "additionalProperties": { "$ref": "#/definitions/localeEntry" }
+        }
+      }
+    },
+    "localeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "phrases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+        },
+        "patterns": {
+          "description": "Regex source strings (max 200 chars each). ReDoS guard limits: (1) the matcher rejects nested quantifiers such as (a+)+, (?:.*x)* or (a|b*){2,} at compile time; (2) it does NOT detect other super-linear shapes, e.g. a lazy capture between delimiters followed by .* (\"(.+?)\".*x is cubic on a run of quotes) or overlapping adjacent quantifiers (\\s*\\s*). Prefer negated classes for delimited captures (\"([^\"]+)\", 「([^」]+)」). libs/core/intent/intent-phrase-lexicon.test.ts runs every concept against adversarial 5,000-char inputs under a time budget; a new pattern that trips it must be rewritten, not the budget raised.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    }
+  }
+}

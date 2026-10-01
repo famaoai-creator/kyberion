@@ -1272,7 +1272,16 @@ export class ClaudeAdapter implements AgentAdapter {
       // Tool restrictions from manifest
       if (this.options.toolsDisabled) {
         // Availability, not approval: applies even under active permission args.
-        args.push('--tools', '', '--strict-mcp-config');
+        // No setting source also means no CLAUDE.md, user hooks or plugins, so
+        // the owner's context never reaches an isolated (shared-channel) turn.
+        args.push(
+          '--tools',
+          '',
+          '--strict-mcp-config',
+          '--setting-sources=',
+          '--disable-slash-commands',
+          '--no-session-persistence'
+        );
       } else if (
         !activePermissionArgs &&
         this.options.allowedTools &&

@@ -26,6 +26,7 @@ import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candi
 import { listProjectRecords } from '@agent/core/project/project-registry';
 import { listTaskSessions } from '@agent/core/task/task-session';
 import { logger } from '@agent/core/core';
+import { t } from '@agent/core/t';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -1223,7 +1224,12 @@ export let inRoomMinutesMissionId: string | null = null;
 app.post('/api/minutes/session/start', async (req, res) => {
   try {
     if (inRoomMinutesSession) {
-      res.status(409).json({ ok: false, error: `既に録音中です (${inRoomMinutesMissionId})` });
+      res.status(409).json({
+        ok: false,
+        error: t('presence_studio:minutes_already_recording', {
+          missionId: String(inRoomMinutesMissionId),
+        }),
+      });
       return;
     }
     let requestBody: unknown = req.body;
@@ -1242,7 +1248,9 @@ app.post('/api/minutes/session/start', async (req, res) => {
     const { missionId, title, language, device } = parsed.data;
     const probe = probeMicCapture();
     if (!probe.available) {
-      res.status(503).json({ ok: false, error: probe.reason || 'マイクが利用できません' });
+      res
+        .status(503)
+        .json({ ok: false, error: probe.reason || t('presence_studio:minutes_mic_unavailable') });
       return;
     }
     const consent = checkMeetingParticipationConsent({
@@ -1307,7 +1315,7 @@ app.post('/api/minutes/session/start', async (req, res) => {
 app.post('/api/minutes/session/stop', async (_req, res) => {
   try {
     if (!inRoomMinutesSession) {
-      res.status(409).json({ ok: false, error: '録音中のセッションがありません' });
+      res.status(409).json({ ok: false, error: t('presence_studio:minutes_no_active_session') });
       return;
     }
     const session = inRoomMinutesSession;

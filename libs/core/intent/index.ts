@@ -23,6 +23,7 @@ export * from './intent-handoff.js';
 export * from './intent-input-context.js';
 export * from './intent-outcome-patterns.js';
 export * from './intent-path-utils.js';
+export * from './intent-phrase-lexicon.js';
 export * from './intent-reconciliation.js';
 export * from './intent-resolution-contract-parser.js';
 export type { IntentResolutionContractOptions } from './intent-resolution-contract.js';

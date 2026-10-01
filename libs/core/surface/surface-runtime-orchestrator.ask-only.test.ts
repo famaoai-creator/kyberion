@@ -14,6 +14,13 @@ const mocks = vi.hoisted(() => ({
   ask: vi.fn(async () => 'direct answer'),
   getAgentRuntimeHandle: vi.fn(),
   ensureAgentRuntime: vi.fn(),
+  shouldCompileSurfaceIntent: vi.fn(() => false),
+  resolveSurfaceConversationReceiver: vi.fn((): string | undefined => 'nerve-agent'),
+  triggerBackgroundReviewFork: vi.fn(() => ({ review_due: false })),
+}));
+
+vi.mock('../workforce/background-review-runner.js', () => ({
+  triggerBackgroundReviewFork: mocks.triggerBackgroundReviewFork,
 }));
 
 vi.mock('../secure-io.js', async () => {
@@ -43,8 +50,8 @@ vi.mock('./surface-runtime-router.js', () => ({
   deriveSurfaceDelegationReceiver: () => 'nerve-agent',
   normalizeSurfaceDelegationReceiver: (value?: string) => value,
   parseSlackSurfacePrompt: () => null,
-  resolveSurfaceConversationReceiver: () => 'nerve-agent',
-  shouldCompileSurfaceIntent: () => false,
+  resolveSurfaceConversationReceiver: mocks.resolveSurfaceConversationReceiver,
+  shouldCompileSurfaceIntent: mocks.shouldCompileSurfaceIntent,
   surfaceChannelFromAgentId: () => 'presence',
   surfaceRoutingText: (input: { query: string }) => ({
     text: input.query,
@@ -71,6 +78,7 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
       ask: mocks.ask,
       getRecord: () => ({ status: 'ready' }),
     });
+    mocks.resolveSurfaceConversationReceiver.mockReturnValue('nerve-agent');
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'cross-project-remediation',
       taskType: 'analysis',
@@ -122,10 +130,12 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
   });
   it('runs an isolated tenant turn on a tool-less per-tenant runtime without delegating', async () => {
     mocks.getAgentRuntimeHandle.mockReturnValue(undefined);
+    // No rule-based receiver: only the isolation guard keeps the compiler away.
+    mocks.resolveSurfaceConversationReceiver.mockReturnValue(undefined);
     mocks.ensureAgentRuntime.mockResolvedValue({
-      agentId: 'slack-surface-agent--tenant-acme',
+      agentId: 'slack-surface-agent--tenant-acme--confidential',
       ask: mocks.ask,
-      getRecord: () => ({ status: 'ready' }),
+      getRecord: () => ({ status: 'ready', metadata: { tool_access: 'none' } }),
     });
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
     const result = await runSurfaceConversation({
@@ -135,19 +145,64 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
       forcedReceiver: 'nerve-agent',
       isolation: { tenantSlug: 'acme', maxTier: 'confidential' },
     });
-    expect(mocks.getAgentRuntimeHandle).toHaveBeenCalledWith('slack-surface-agent--tenant-acme');
+    expect(mocks.getAgentRuntimeHandle).toHaveBeenCalledWith(
+      'slack-surface-agent--tenant-acme--confidential'
+    );
     expect(mocks.getAgentRuntimeHandle).not.toHaveBeenCalledWith('slack-surface-agent');
     expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        agentId: 'slack-surface-agent--tenant-acme',
+        agentId: 'slack-surface-agent--tenant-acme--confidential',
         provider: 'claude',
         runtimeBackend: 'pipe',
         toolAccess: 'none',
         scope: { tenant_slug: 'acme', tier: 'confidential' },
+        cwd: expect.stringContaining('isolated-surface/acme-confidential'),
+        systemPrompt: expect.stringContaining('Shared team channel mode'),
       })
     );
+    expect(mocks.shouldCompileSurfaceIntent).not.toHaveBeenCalled();
     expect(mocks.createTaskSession).not.toHaveBeenCalled();
     expect(mocks.a2aRoute).not.toHaveBeenCalled();
     expect(result.delegationResults).toEqual([]);
+  });
+
+  it('refuses to reuse a same-named runtime that was launched with tools', async () => {
+    mocks.getAgentRuntimeHandle.mockReturnValue({
+      ask: mocks.ask,
+      getRecord: () => ({ status: 'ready', metadata: {} }),
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await expect(
+      runSurfaceConversation({
+        agentId: 'slack-surface-agent',
+        query: 'hello',
+        senderAgentId: 'test-sender',
+        isolation: { tenantSlug: 'acme', maxTier: 'public' },
+      })
+    ).rejects.toThrow(/TOOL_LOCKDOWN_MISMATCH/);
+    expect(mocks.ask).not.toHaveBeenCalled();
+  });
+
+  it('skips the background review fork for isolated message turns only', async () => {
+    const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
+    const message = {
+      surface: 'slack' as const,
+      text: 'hello',
+      channel: 'C-team',
+      threadTs: '1.0',
+      senderAgentId: 'test-sender',
+      agentId: 'slack-surface-agent',
+    };
+    mocks.getAgentRuntimeHandle.mockReturnValue({
+      ask: mocks.ask,
+      getRecord: () => ({ status: 'ready', metadata: { tool_access: 'none' } }),
+    });
+    await runSurfaceMessageConversation({
+      ...message,
+      isolation: { tenantSlug: 'acme', maxTier: 'confidential' },
+    });
+    expect(mocks.triggerBackgroundReviewFork).not.toHaveBeenCalled();
+    await runSurfaceMessageConversation(message);
+    expect(mocks.triggerBackgroundReviewFork).toHaveBeenCalledTimes(1);
   });
 });

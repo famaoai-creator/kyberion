@@ -179,7 +179,8 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
       })
     ).rejects.toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
     expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
-    agentRegistry.unregister('lockdown-agy-agent');
+    // Refused before registration: nothing is left behind.
+    expect(agentRegistry.get('lockdown-agy-agent')).toBeUndefined();
   });
 
   it('fails closed when a tool-less runtime is requested on the pane backend', async () => {
@@ -192,6 +193,6 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
         runtimeMetadata: { skip_provider_resolution: true },
       })
     ).rejects.toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
-    agentRegistry.unregister('lockdown-pane-agent');
+    expect(agentRegistry.get('lockdown-pane-agent')).toBeUndefined();
   });
 });
