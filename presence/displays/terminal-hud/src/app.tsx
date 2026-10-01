@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Box, Text, useApp, useInput, useStdin } from 'ink';
+import { Box, useApp, useInput, useStdin } from 'ink';
+import { Text } from './components/text.js';
 import type { SupportedLocale } from '@agent/core/locale';
 import { currentScope } from '@agent/core/scope-context';
 import { listDaemonHeartbeatStatuses } from '@agent/core/daemon-heartbeat';
