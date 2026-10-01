@@ -13,6 +13,7 @@ import {
   StatusPill,
   Tabs,
 } from '@agent/shared-ui';
+import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import {
@@ -337,6 +338,16 @@ export default function ConciergePage() {
 
   const [kindFilter, setKindFilter] = React.useState<DecideKind | 'all'>('all');
   const [tenantFilter, setTenantFilter] = React.useState<string>('all');
+
+  // Switching organization in the rail narrows the queue to it (display only).
+  React.useEffect(() => {
+    const onSwitch = (event: Event) => {
+      const tenant = tenantFromChangeEvent(event);
+      if (tenant) setTenantFilter(tenant);
+    };
+    window.addEventListener(TENANT_CHANGED_EVENT, onSwitch);
+    return () => window.removeEventListener(TENANT_CHANGED_EVENT, onSwitch);
+  }, []);
 
   const refresh = React.useCallback(async () => {
     try {
