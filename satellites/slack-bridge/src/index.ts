@@ -81,7 +81,15 @@ import {
 } from '@agent/core/bridge-error-reply';
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
-import { evaluateSurfaceActorAccess } from '@agent/core/surface/surface-access-policy';
+import {
+  buildChannelDisclosureDirective,
+  channelTurnScope,
+  decideChannelEngagement,
+  evaluateChannelActorAccess,
+  evaluateChannelApprovalAuthority,
+  resolveChannelModePolicy,
+  type ChannelModePolicy,
+} from '@agent/core/surface/channel-mode-policy';
 import { renderIntentAuthorityLabel } from '@agent/core/intent/intent-resolution-contract';
 import {
   buildAutomationSlackModal,
@@ -232,6 +240,97 @@ export async function collectSlackThreadContext(
   }
 }
 
+/**
+ * Team Channel: whether the bot already posted in this thread, so follow-up
+ * replies there count as addressed to it without a fresh @mention.
+ */
+export async function slackBotParticipatesInThread(
+  client: SlackThreadRepliesClient,
+  channel: string,
+  threadTs: string,
+  botUserId: string | undefined
+): Promise<boolean> {
+  if (!botUserId || !client.conversations?.replies) return false;
+  try {
+    const response = await client.conversations.replies({ channel, ts: threadTs, limit: 50 });
+    return (response.messages || []).some((message) => message.user === botUserId);
+  } catch (error: unknown) {
+    logger.warn(`[SlackBridge] Thread participation lookup failed: ${errorDetail(error)}`);
+    return false;
+  }
+}
+
+interface SlackAuthTestClient {
+  auth: { test(): Promise<{ user_id?: string }> };
+}
+
+/** Resolve (once) the bot's own user id; undefined keeps team channels silent. */
+export function createSlackBotUserIdResolver(
+  client: SlackAuthTestClient
+): () => Promise<string | undefined> {
+  let pending: Promise<string | undefined> | undefined;
+  return () => {
+    pending ??= client.auth
+      .test()
+      .then((result) => result.user_id || undefined)
+      .catch((error: unknown) => {
+        pending = undefined;
+        logger.warn(
+          `[SlackBridge] auth.test failed — team channels stay silent until it succeeds | retry on next message | ${errorDetail(error)}`
+        );
+        return undefined;
+      });
+    return pending;
+  };
+}
+
+/** Speaker access in a specific channel (team channels are deny-by-default). */
+export function evaluateSlackChannelActorAccess(channel: string, actorId: string) {
+  const policy = resolveChannelModePolicy('slack', channel);
+  return { policy, access: evaluateChannelActorAccess(policy, actorId) };
+}
+
+interface SlackEphemeralClient {
+  chat: {
+    postEphemeral(input: {
+      channel: string;
+      user: string;
+      thread_ts?: string;
+      text: string;
+    }): Promise<unknown>;
+  };
+}
+
+/**
+ * Team Channel: approval-class actions (approve, reject, request changes,
+ * confirm a mission proposal) need the channel's approval authority. A
+ * refused actor is told privately and the refusal is logged with its reason.
+ */
+export async function ensureSlackApprovalAuthority(
+  client: SlackEphemeralClient,
+  channel: string,
+  threadTs: string,
+  actorId: string
+): Promise<boolean> {
+  const policy = resolveChannelModePolicy('slack', channel);
+  const authority = evaluateChannelApprovalAuthority(policy, actorId);
+  if (authority.allowed) return true;
+  logger.warn(
+    `[SlackBridge] Approval action refused — ${actorId} lacks approval authority in ${channel} (mode=${policy.mode}, ${authority.reason}) | ask a channel approver | channel=${channel} thread=${threadTs}`
+  );
+  try {
+    await client.chat.postEphemeral({
+      channel,
+      user: actorId,
+      thread_ts: threadTs,
+      text: 'この操作を行う権限がありません。承認者に依頼してください。',
+    });
+  } catch (error: unknown) {
+    logger.warn(`[SlackBridge] Refusal notice failed: ${errorDetail(error)}`);
+  }
+  return false;
+}
+
 export interface SlackChannelTurnRequest {
   text: string;
   channel: string;
@@ -241,6 +340,18 @@ export interface SlackChannelTurnRequest {
   actorId: string;
   forcedReceiver?: string;
   metadata?: Record<string, unknown>;
+  /** Team Channel: the channel's conversation-mode policy (absent = owner_direct). */
+  channelPolicy?: ChannelModePolicy;
+}
+
+/** Prefix the team disclosure directive to the thread context, if any. */
+export function withSlackChannelDirective(
+  policy: ChannelModePolicy | undefined,
+  threadContext: string | undefined
+): string | undefined {
+  const directive = policy ? buildChannelDisclosureDirective(policy) : undefined;
+  if (!directive) return threadContext;
+  return threadContext ? `${directive}\n\n${threadContext}` : directive;
 }
 
 /**
@@ -255,6 +366,7 @@ export function runSlackChannelTurn(
   request: SlackChannelTurnRequest,
   options: RunChannelTurnOptions = {}
 ): Promise<SurfaceConversationResult> {
+  const scope = request.channelPolicy ? channelTurnScope(request.channelPolicy) : undefined;
   return runChannelTurn(
     adapter,
     {
@@ -262,6 +374,7 @@ export function runSlackChannelTurn(
       channel: request.channel,
       threadTs: request.threadTs,
       locale: resolveOperatorLocale(),
+      ...(scope ? { scope } : {}),
     },
     ({ threadContext }) =>
       runSurfaceMessageConversation({
@@ -276,7 +389,8 @@ export function runSlackChannelTurn(
         senderAgentId: 'kyberion:slack-bridge',
         agentId: SLACK_SURFACE_AGENT_ID,
         forcedReceiver: request.forcedReceiver,
-        threadContext,
+        threadContext: withSlackChannelDirective(request.channelPolicy, threadContext),
+        ...(scope ? { scope } : {}),
         delegationSummaryInstruction:
           'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
         metadata: request.metadata,
@@ -343,7 +457,9 @@ export function resolveSlackApprovalText(params: {
   threadTs: string;
   text: string;
   actorId: string;
+  channelPolicy?: ChannelModePolicy;
 }): string | null {
+  const policy = params.channelPolicy;
   const resolved = resolveSurfaceApprovalReply({
     surface: 'slack',
     channel: params.channel,
@@ -351,6 +467,9 @@ export function resolveSlackApprovalText(params: {
     text: params.text,
     decidedBy: params.actorId,
     locale: resolveOperatorLocale(),
+    ...(policy
+      ? { canDecide: () => evaluateChannelApprovalAuthority(policy, params.actorId).allowed }
+      : {}),
   });
   return resolved.handled ? resolved.reply || '' : null;
 }
@@ -506,6 +625,7 @@ async function start(_args: string[] = []) {
     socketMode: true,
     logLevel: LogLevel.INFO,
   });
+  const resolveBotUserId = createSlackBotUserIdResolver(app.client);
 
   // HA-03: register a schedule from the same Blueprint contract used by the
   // question/slash/form preview surfaces. The bridge only handles Slack
@@ -515,7 +635,7 @@ async function start(_args: string[] = []) {
     const actorId = readStringAt(command, ['user_id']);
     const channel = readStringAt(command, ['channel_id']);
     try {
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(channel, actorId).access;
       if (!access.allowed)
         throw new Error(`Unauthorized Slack automation request: ${access.reason}`);
       if (!channel || !actorId)
@@ -571,7 +691,7 @@ async function start(_args: string[] = []) {
       metadata = parseAutomationSlackModalMetadata(readStringAt(view, ['private_metadata']));
       actorId = readStringAt(body, ['user', 'id']);
       if (actorId !== metadata.actor_id) throw new Error('Slack automation modal actor mismatch.');
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(metadata.channel, actorId).access;
       if (!access.allowed)
         throw new Error(`Unauthorized Slack automation request: ${access.reason}`);
 
@@ -599,7 +719,7 @@ async function start(_args: string[] = []) {
         metadata?.channel &&
         metadata?.actor_id &&
         actorId === metadata.actor_id &&
-        evaluateSurfaceActorAccess('slack', actorId).allowed;
+        evaluateSlackChannelActorAccess(metadata.channel, actorId).access.allowed;
       if (canNotify && metadata) {
         await postAutomationReply(client, {
           channel: metadata.channel,
@@ -678,20 +798,35 @@ async function start(_args: string[] = []) {
       return;
     }
 
-    const access = evaluateSurfaceActorAccess('slack', message.user || '');
+    const { policy: channelPolicy, access } = evaluateSlackChannelActorAccess(
+      message.channel,
+      message.user || ''
+    );
     if (!access.allowed) {
       logger.warn(
-        `[SlackBridge] Ignored unauthorized message from sender: ${message.user || 'unknown'} (${access.reason})`
+        `[SlackBridge] Ignored unauthorized message from sender: ${message.user || 'unknown'} (${access.reason}, mode=${channelPolicy.mode})`
       );
       return;
     }
+    const botUserId = await resolveBotUserId();
+    const engagement = await decideChannelEngagement(channelPolicy, {
+      text: message.text,
+      agentUserId: botUserId,
+      isThreadReply: threadTs !== message.ts,
+      agentParticipatesInThread: () =>
+        slackBotParticipatesInThread(client, message.channel, threadTs, botUserId),
+    });
+    if (!engagement.respond) return;
+    const messageText = engagement.text;
+    if (!messageText) return;
 
     try {
       const approvalReply = resolveSlackApprovalText({
         channel: message.channel,
         threadTs,
-        text: message.text,
+        text: messageText,
         actorId: message.user || 'unknown',
+        channelPolicy,
       });
       if (approvalReply !== null) {
         await postSlackText(client, {
@@ -732,7 +867,7 @@ async function start(_args: string[] = []) {
         const onboarding = handleSlackOnboardingTurn({
           channel: message.channel,
           threadTs,
-          text: message.text,
+          text: messageText,
         });
 
         const response = await postOnboardingReply(
@@ -753,7 +888,7 @@ async function start(_args: string[] = []) {
       }
 
       const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
-      if (pendingMissionProposal && isSlackMissionRejection(message.text)) {
+      if (pendingMissionProposal && isSlackMissionRejection(messageText)) {
         clearSlackMissionProposalState(message.channel, threadTs);
         const response = await client.chat.postMessage({
           channel: message.channel,
@@ -769,7 +904,16 @@ async function start(_args: string[] = []) {
         );
         return;
       }
-      if (pendingMissionProposal && isSlackMissionConfirmation(message.text)) {
+      if (pendingMissionProposal && isSlackMissionConfirmation(messageText)) {
+        // Issuing a mission is approval-class: team channels need an approver.
+        if (!evaluateChannelApprovalAuthority(channelPolicy, message.user || '').allowed) {
+          await postSlackText(client, {
+            channel: message.channel,
+            thread_ts: threadTs,
+            text: 'このミッション提案を確定する権限がありません。承認者に依頼してください。',
+          });
+          return;
+        }
         const issued = await issueSlackMissionFromProposal({
           channel: message.channel,
           threadTs,
@@ -793,13 +937,13 @@ async function start(_args: string[] = []) {
         return;
       }
 
-      const forcedReceiver = deriveSlackDelegationReceiver(message.text);
+      const forcedReceiver = deriveSlackDelegationReceiver(messageText);
       const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
       await reflectSlackPresence({
         status: 'thinking',
         expression: 'thinking',
         subtitle: 'Slack Surface is preparing a reply.',
-        transcript: [{ speaker: 'Slack User', text: message.text }],
+        transcript: [{ speaker: 'Slack User', text: messageText }],
       });
       const channelAdapter: ChannelAdapter = {
         channel: 'slack',
@@ -827,7 +971,7 @@ async function start(_args: string[] = []) {
       };
       // The `'text' in message` narrowing above is lost inside the afterTurn
       // closure under the per-package strict tsconfig; capture the text once.
-      const sourceText = message.text;
+      const sourceText = messageText;
       await runSlackChannelTurn(
         channelAdapter,
         {
@@ -842,7 +986,9 @@ async function start(_args: string[] = []) {
             user: message.user,
             team,
             channelType,
+            channel_mode: channelPolicy.mode,
           },
+          channelPolicy,
         },
         {
           // UX-02: the 👀 typing reaction must outlive the proposal and
@@ -1001,7 +1147,7 @@ async function start(_args: string[] = []) {
     const channel = readStringAt(event, ['item', 'channel']);
     const messageTs = readStringAt(event, ['item', 'ts']);
     if (!channel || !messageTs || !actorId) return;
-    const access = evaluateSurfaceActorAccess('slack', actorId);
+    const access = evaluateSlackChannelActorAccess(channel, actorId).access;
     if (!access.allowed) {
       logger.warn(`[SlackBridge] Ignored unauthorized knowledge reaction from ${actorId}`);
       return;
@@ -1061,7 +1207,10 @@ async function start(_args: string[] = []) {
     try {
       const payload = parseSlackApprovalAction(readStringAt(action, ['value']));
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(
+        readStringAt(body, ['channel', 'id']),
+        actorId
+      ).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized approval action from ${actorId}: ${access.reason}`
@@ -1072,6 +1221,7 @@ async function start(_args: string[] = []) {
       const threadTs =
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs) throw new Error('Slack approval action is missing channel/thread');
+      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
       const updated = applySurfaceApprovalDecision({
         surface: 'slack',
         requestId: payload.requestId,
@@ -1112,7 +1262,7 @@ async function start(_args: string[] = []) {
       const threadTs =
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(channel, actorId).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized mission proposal action from ${actorId}: ${access.reason}`
@@ -1121,6 +1271,7 @@ async function start(_args: string[] = []) {
       }
       if (!channel || !threadTs)
         throw new Error('Slack mission proposal action is missing channel/thread');
+      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
 
       const pending = getSlackMissionProposalState(channel, threadTs);
       if (!pending) {
@@ -1170,7 +1321,10 @@ async function start(_args: string[] = []) {
     try {
       const payload = parseSlackAskWhyAction(readStringAt(action, ['value']));
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(
+        readStringAt(body, ['channel', 'id']),
+        actorId
+      ).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized approval reason action from ${actorId}: ${access.reason}`
@@ -1205,7 +1359,10 @@ async function start(_args: string[] = []) {
     try {
       const payload = parseSlackCardAction(readStringAt(action, ['value']));
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(
+        readStringAt(body, ['channel', 'id']),
+        actorId
+      ).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized explain action from ${actorId}: ${access.reason}`
@@ -1240,7 +1397,10 @@ async function start(_args: string[] = []) {
     try {
       const payload = parseSlackCardAction(readStringAt(action, ['value']));
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(
+        readStringAt(body, ['channel', 'id']),
+        actorId
+      ).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized change request from ${actorId}: ${access.reason}`
@@ -1251,6 +1411,7 @@ async function start(_args: string[] = []) {
       const threadTs =
         readStringAt(body, ['message', 'thread_ts']) || readStringAt(body, ['message', 'ts']);
       if (!channel || !threadTs) throw new Error('Slack change request is missing channel/thread');
+      if (!(await ensureSlackApprovalAuthority(client, channel, threadTs, actorId))) return;
       await client.views.open({
         trigger_id: readStringAt(body, ['trigger_id']),
         view: buildSlackChangeRequestModal(
@@ -1288,13 +1449,14 @@ async function start(_args: string[] = []) {
     await ack();
     try {
       const actorId = readStringAt(body, ['user', 'id']) || 'unknown';
-      const access = evaluateSurfaceActorAccess('slack', actorId);
+      const access = evaluateSlackChannelActorAccess(submission.channel, actorId).access;
       if (!access.allowed) {
         logger.warn(
           `⚠️ [SlackBridge] Ignoring unauthorized change request from ${actorId}: ${access.reason}`
         );
         return;
       }
+      const submissionPolicy = resolveChannelModePolicy('slack', submission.channel);
       const resolved = resolveSurfaceApprovalReply({
         surface: 'slack',
         channel: submission.channel,
@@ -1302,6 +1464,7 @@ async function start(_args: string[] = []) {
         text: `appr:${submission.requestId}:changes ${submission.instruction}`,
         decidedBy: actorId,
         locale: resolveOperatorLocale(),
+        canDecide: () => evaluateChannelApprovalAuthority(submissionPolicy, actorId).allowed,
       });
       await client.chat.postMessage({
         channel: submission.channel,
