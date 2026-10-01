@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/docs-drift-baseline.schema.json",
   "exceptions": [
     {
       "key": "command|docs/developer/ACTUATOR_DAILY_WORK_GAP_REPORT.ja.md|pnpm doctor: bare `pnpm doctor` runs pnpm’s own diagnostic, not Kyberion’s — use `pnpm kyberion doctor` (or `pnpm run doctor`)",

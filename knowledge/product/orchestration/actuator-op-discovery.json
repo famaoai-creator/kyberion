@@ -25868,7 +25868,7 @@
           "examples": [
             {
               "mission_id": "MSN-20260826-001",
-              "tenant_slug": "acme"
+              "tenant_slug": "example-tenant"
             }
           ]
         },
