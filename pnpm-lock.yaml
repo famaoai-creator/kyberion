@@ -212,6 +212,9 @@ importers:
       tesseract.js:
         specifier: ^7.0.0
         version: 7.0.0
+      web-push:
+        specifier: 3.6.7
+        version: 3.6.7(supports-color@7.2.0)
       ws:
         specifier: 8.21.3
         version: 8.21.3

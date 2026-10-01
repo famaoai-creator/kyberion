@@ -13,7 +13,7 @@ This record covers the one dependency addition in the Web Push PR.
 
 | Package                           | Version | Kind         | License | Install scripts |
 | --------------------------------- | ------- | ------------ | ------- | --------------- |
-| `web-push` (`@agent/core`)        | 3.6.7   | direct, prod | MPL-2.0 | none            |
+| `web-push` (`@agent/core`, root)  | 3.6.7   | direct, prod | MPL-2.0 | none            |
 | `asn1.js`                         | 5.4.1   | transitive   | MIT     | none            |
 | `bn.js`                           | 4.12.5  | transitive   | MIT     | none            |
 | `http_ece`                        | 1.2.0   | transitive   | MIT     | none            |
@@ -22,6 +22,12 @@ This record covers the one dependency addition in the Web Push PR.
 
 `web-push` also depends on `https-proxy-agent`, `jws` and `minimist`, which the
 lockfile already resolved (no new versions of those).
+
+The root `package.json` also lists `web-push`: the entry-point bundles under
+`dist/scripts/` keep external packages external and resolve them from the
+repository root, so a dependency imported only through `@agent/core` must be
+declared there too (the first-win lifecycle smoke failed with
+`ERR_MODULE_NOT_FOUND` without it).
 
 ## Why a library rather than our own
 
@@ -58,4 +64,4 @@ repository `web-push-libs/web-push` per its package metadata; npm maintainer
 
 `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-10/LOCKFILE_REVIEW_2026-10-01-web-push.md pnpm check -- --scope pr`
 
-- `pnpm-lock.yaml` sha256: 9f51c4c5217d1536ff2df2ac75291c480cd8409ec9446a98843dd8aa9ca21484
+- `pnpm-lock.yaml` sha256: afad32010318748fa15b2595b8d7860b3f11edf4b6d79ec681cb3284834fd272
