@@ -78,6 +78,7 @@ export * from './surface/surface-ingress-contract.js';
 
 export * from './surface/surface-interaction-model.js';
 
+export * from './surface/surface-url.js';
 export * from './surface/surface-ux.js';
 
 export * from './surface/surface-provider-manifest.js';

@@ -1,9 +1,10 @@
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { secretGuard } from '@agent/core/secret/secret-guard';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { parsePollingResponse, parsePollingUpdates } from './polling-response.js';
-const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
+const BRIDGE_WEBHOOK_URL = `${resolveSurfaceUrl('telegram-bridge')}/webhook`;
 
 export async function main(_args: string[] = []): Promise<void> {
   const connection = secretGuard.loadConnectionDocument('telegram');

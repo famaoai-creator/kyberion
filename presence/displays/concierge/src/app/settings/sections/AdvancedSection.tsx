@@ -183,7 +183,7 @@ export function AdvancedSection({
                   ['agent_id', 'setup.agent_id', undefined],
                   ['agent_display_name', 'setup.agent_display_name', undefined],
                   ['agent_provider', 'setup.agent_provider', 'codex-cli'],
-                  ['agent_model_id', 'setup.agent_model', 'gpt-5.6-luna'],
+                  ['agent_model_id', 'setup.agent_model', '<model-id>'],
                 ] as Array<[keyof ManagementState, ConciergeMessageKey, string | undefined]>
               ).map(([field, labelKey, placeholder]) => (
                 <SettingRow key={field} label={t(labelKey)}>

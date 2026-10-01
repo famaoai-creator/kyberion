@@ -677,6 +677,10 @@ function formatSurfaceSetupReport(report: Awaited<ReturnType<typeof setupSurface
       `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
     );
     if (row.auth === 'missing' || row.auth === 'n/a') lines.push(`  ↳ ${row.hint}`);
+    if (row.enabled === 'disabled')
+      lines.push(
+        `  ↳ Disabled by default. Enable with: pnpm surfaces enable --surface ${row.surface}`
+      );
   }
   lines.push('');
   return lines.join('\n');

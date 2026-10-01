@@ -5891,6 +5891,10 @@
       "types": "./dist/surface/surface-ux-contract.d.ts",
       "default": "./dist/surface/surface-ux-contract.js"
     },
+    "./surface/surface-url": {
+      "types": "./dist/surface/surface-url.d.ts",
+      "default": "./dist/surface/surface-url.js"
+    },
     "./surface/surface-ux": {
       "types": "./dist/surface/surface-ux.d.ts",
       "default": "./dist/surface/surface-ux.js"

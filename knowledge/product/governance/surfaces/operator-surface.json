@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "operator-surface",
+      "kind": "ui",
+      "description": "Read-only audit monitor (Minimum Operator Surface). Operator-launched; not started by reconcile.",
+      "command": "pnpm",
+      "args": ["--dir", "presence/displays/operator-surface", "start"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3331,
+      "healthPath": "/",
+      "enabled": false
+    }
+  ]
+}

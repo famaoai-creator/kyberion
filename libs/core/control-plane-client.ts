@@ -2,6 +2,8 @@ import { validateNextActionContract } from './next-action-contract.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { loadSurfaceManifest, type SurfaceRuntimeDefinition } from './surface/surface-runtime.js';
+import { resolveSurfaceUrl } from './surface/surface-url.js';
 
 export type ControlPlaneSurface = 'presence' | 'chronos';
 
@@ -615,32 +617,22 @@ function normalizeTaskSessionRecord(value: unknown): ControlPlaneTaskSessionReco
   };
 }
 
-const DEFAULT_BASE_URLS: Record<ControlPlaneSurface, string> = {
-  presence: String(getRegisteredEnvText('PRESENCE_STUDIO_URL') || 'http://127.0.0.1:3031').replace(
-    /\/$/,
-    ''
-  ),
-  chronos: String(getRegisteredEnvText('CHRONOS_URL') || 'http://127.0.0.1:3000').replace(
-    /\/$/,
-    ''
-  ),
-};
-
-const DEFAULT_REMEDIATION_PLANS: Record<ControlPlaneSurface, ControlPlaneRemediationPlan> = {
-  presence: {
-    surface: 'presence',
-    runtimeId: 'presence-studio',
-    suggestedCommand: 'pnpm surfaces reconcile',
-  },
-  chronos: {
-    surface: 'chronos',
-    runtimeId: 'chronos-mirror-v2',
-    suggestedCommand: 'pnpm surfaces reconcile',
-  },
-};
+/** Surface registry entry serving a control-plane alias (RS-04: no hardcoded ports). */
+function controlPlaneDefinition(surface: ControlPlaneSurface): SurfaceRuntimeDefinition {
+  const definition = loadSurfaceManifest().surfaces.find((entry) => entry.controlPlane === surface);
+  if (!definition) {
+    throw new Error(
+      `[CONTROL_PLANE] No surface in the surface manifest declares controlPlane "${surface}".`
+    );
+  }
+  return definition;
+}
 
 export function getControlPlaneBaseUrl(surface: ControlPlaneSurface, override?: string): string {
-  return String(override || DEFAULT_BASE_URLS[surface]).replace(/\/$/, '');
+  return String(override || resolveSurfaceUrl(controlPlaneDefinition(surface).id)).replace(
+    /\/$/,
+    ''
+  );
 }
 
 function resolveToken(surface: ControlPlaneSurface, override?: string): string {
@@ -658,7 +650,12 @@ function resolveToken(surface: ControlPlaneSurface, override?: string): string {
 export function getControlPlaneRemediationPlan(
   surface: ControlPlaneSurface
 ): ControlPlaneRemediationPlan {
-  return DEFAULT_REMEDIATION_PLANS[surface];
+  const definition = controlPlaneDefinition(surface);
+  return {
+    surface,
+    runtimeId: definition.id,
+    suggestedCommand: definition.remediationCommand || 'pnpm surfaces reconcile',
+  };
 }
 
 function inferSurfaceMismatchMessage(
