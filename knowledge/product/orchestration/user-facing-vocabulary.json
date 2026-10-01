@@ -10574,6 +10574,66 @@
         "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",
         "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
+      "thread_work_none": {
+        "en": "No missions have been started from this thread yet.",
+        "ja": "このスレッドから開始したミッションはまだありません。",
+        "qps-ploc": "⟦Ñő ɱïşşïőñş ħȧṽė ƀėėñ şŧȧřŧėḓ ƒřőɱ ŧħïş ŧħřėȧḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "thread_work_header": {
+        "en": "Work started from this thread ({count}):",
+        "ja": "このスレッドから開始した作業（{count}件）:",
+        "qps-ploc": "⟦Ẇőřķ şŧȧřŧėḓ ƒřőɱ ŧħïş ŧħřėȧḓ ({count}): ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "thread_work_line": {
+        "en": "- {id}: {status} (confirmed by {confirmed})",
+        "ja": "- {id}: {status}（確定: {confirmed}）",
+        "qps-ploc": "⟦- {id}: {status} (ƈőñƒïřɱėḓ ƀẏ {confirmed}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "channel_memory_saved": {
+        "en": "Saved to this channel's memory ({id}).",
+        "ja": "このチャンネルのメモリに保存しました（{id}）。",
+        "qps-ploc": "⟦Şȧṽėḓ ŧő ŧħïş ƈħȧññėŀ'ş ɱėɱőřẏ ({id}). ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "channel_memory_forgotten": {
+        "en": "Removed {id} from this channel's memory.",
+        "ja": "{id} をこのチャンネルのメモリから削除しました。",
+        "qps-ploc": "⟦Řėɱőṽėḓ {id} ƒřőɱ ŧħïş ƈħȧññėŀ'ş ɱėɱőřẏ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "channel_memory_not_found": {
+        "en": "This channel has no memory entry {id}.",
+        "ja": "このチャンネルに {id} というメモはありません。",
+        "qps-ploc": "⟦Ŧħïş ƈħȧññėŀ ħȧş ñő ɱėɱőřẏ ėñŧřẏ {id}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "channel_memory_empty": {
+        "en": "This channel has no saved memory.",
+        "ja": "このチャンネルに保存されたメモはありません。",
+        "qps-ploc": "⟦Ŧħïş ƈħȧññėŀ ħȧş ñő şȧṽėḓ ɱėɱőřẏ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "channel_memory_list_header": {
+        "en": "This channel's memory ({count}):",
+        "ja": "このチャンネルのメモリ（{count}件）:",
+        "qps-ploc": "⟦Ŧħïş ƈħȧññėŀ'ş ɱėɱőřẏ ({count}): ŀőřėɱ ïṗşů⟧"
+      },
+      "channel_memory_too_long": {
+        "en": "Too long to save (max {max} characters).",
+        "ja": "長すぎるため保存できません（最大 {max} 文字）。",
+        "qps-ploc": "⟦Ŧőő ŀőñɠ ŧő şȧṽė (ɱȧẋ {max} ƈħȧřȧƈŧėřş). ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "channel_memory_full": {
+        "en": "This channel's memory is full ({max} entries). Remove one first.",
+        "ja": "このチャンネルのメモリが上限（{max}件）です。先にどれかを削除してください。",
+        "qps-ploc": "⟦Ŧħïş ƈħȧññėŀ'ş ɱėɱőřẏ ïş ƒůŀŀ ({max} ėñŧřïėş). Řėɱőṽė őñė ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "channel_memory_nothing": {
+        "en": "Nothing to save.",
+        "ja": "保存する内容がありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ŧő şȧṽė. ŀőřėɱ⟧"
+      },
+      "channel_memory_not_authorized": {
+        "en": "Saving to channel memory needs an operator role or higher, and removing needs an approver.",
+        "ja": "チャンネルのメモリへの保存にはオペレーター以上、削除には承認者の役割が必要です。",
+        "qps-ploc": "⟦Şȧṽïñɠ ŧő ƈħȧññėŀ ɱėɱőřẏ ñėėḓş ȧñ őṗėřȧŧőř řőŀė őř ħïɠħėř, ȧñḓ řėɱőṽïñɠ ñėėḓş ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "work_request_not_authorized": {
         "en": "You can ask questions here, but starting work (missions, approvals) needs a registered team member with an operator role or higher.",
         "ja": "このチャンネルでは質問にはお答えできますが、ミッションや承認を伴う作業の依頼には、オペレーター以上の役割を持つ登録メンバーが必要です。",

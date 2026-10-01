@@ -90,6 +90,8 @@ export * from './surface/surface-provider-manifest-catalog.js';
 export * from './surface/surface-access-policy.js';
 export * from './surface/channel-mode-policy.js';
 export * from './surface/channel-speaker-principal.js';
+export * from './surface/thread-work-index.js';
+export * from './surface/channel-memory-store.js';
 
 export * from './surface/surface-approval-ui.js';
 
