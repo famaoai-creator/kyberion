@@ -33,6 +33,16 @@
       }
     },
     "tenant_slug": { "type": "string", "minLength": 1 },
+    "owner_kind": {
+      "type": "string",
+      "enum": ["person", "organization", "operator"],
+      "description": "Who owns this connection. Derived from tenant_slug for records written before this field existed."
+    },
+    "owner_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "user:<member_id> for person; the tenant slug for organization; omitted for operator."
+    },
     "project_id": { "type": "string", "minLength": 1 },
     "service_id": { "type": "string" },
     "auth_mode": {

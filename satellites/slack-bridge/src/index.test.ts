@@ -16,7 +16,12 @@ vi.mock('@slack/bolt', () => ({
 }));
 
 const captured = vi.hoisted(() => ({
-  conversationInputs: [] as { threadContext?: string; text: string; locale?: string }[],
+  conversationInputs: [] as {
+    threadContext?: string;
+    text: string;
+    locale?: string;
+    scope?: SurfaceConversationMessageInput['scope'];
+  }[],
 }));
 
 vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
@@ -28,6 +33,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
         threadContext: input.threadContext,
         text: input.text,
         locale: input.locale,
+        scope: input.scope,
       });
       return {
         text: 'ok',
@@ -49,12 +55,21 @@ import { buildVetoWindow } from '@agent/core/governance/approval-veto-window';
 import { withExecutionContext } from '@agent/core/authority';
 import { buildDecisionCard } from '@agent/core/governance/decision-card';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import { resolveChannelModePolicy } from '@agent/core/surface/channel-mode-policy';
 import {
   collectSlackThreadContext,
+  createSlackBotUserIdResolver,
   createSlackTypingHandle,
+  ensureSlackApprovalAuthority,
+  isSlackOwnerOnboardingActor,
   resolveSlackApprovalText,
   runSlackChannelTurn,
+  slackBotParticipatesInThread,
 } from './index.js';
+
+const TEAM_CHANNEL_MODES = JSON.stringify({
+  slack: { 'C-team': { mode: 'team', tenant_slug: 'acme', approvers: ['U-lead'] } },
+});
 
 const THREAD_CONTEXT = 'Recent Slack thread context:\nUser (alice): 最初の相談';
 
@@ -313,6 +328,160 @@ describe('slack approval text replies', () => {
     expect(loadApprovalRequest('autonomy', record.id)).toMatchObject({
       status: 'rejected',
       decidedByType: 'human',
+    });
+  });
+});
+
+describe('slack team channel', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    withExecutionContext('mission_controller', () => {
+      for (const root of Object.values(approvalStoreRoots())) {
+        const dir = pathResolver.rootResolve(`${root}/autonomy`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('runs team turns with the tenant scope and the disclosure directive', async () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    captured.conversationInputs.length = 0;
+    const adapter: ChannelAdapter = {
+      channel: 'slack',
+      actorId: 'U-member',
+      threadContext: () => THREAD_CONTEXT,
+      send: () => undefined,
+    };
+
+    await runSlackChannelTurn(adapter, {
+      ...baseRequest(),
+      channel: 'C-team',
+      channelPolicy: resolveChannelModePolicy('slack', 'C-team'),
+    });
+
+    const input = captured.conversationInputs[0];
+    expect(input.scope).toEqual({ tier: 'confidential', tenant_slug: 'acme' });
+    expect(input.threadContext?.startsWith('[channel-policy]')).toBe(true);
+    expect(input.threadContext).toContain(THREAD_CONTEXT);
+  });
+
+  it('keeps owner_direct turns unscoped and without a directive', async () => {
+    captured.conversationInputs.length = 0;
+    await runSlackChannelTurn(
+      {
+        channel: 'slack',
+        actorId: 'U-operator',
+        threadContext: () => THREAD_CONTEXT,
+        send: () => undefined,
+      },
+      { ...baseRequest(), channelPolicy: resolveChannelModePolicy('slack', 'C-thread') }
+    );
+    expect(captured.conversationInputs[0].scope).toBeUndefined();
+    expect(captured.conversationInputs[0].threadContext).toBe(THREAD_CONTEXT);
+  });
+
+  it('detects bot participation from the thread replies', async () => {
+    const client = {
+      conversations: {
+        replies: vi.fn(async () => ({ messages: [{ user: 'U-member' }, { user: 'U-bot' }] })),
+      },
+    };
+    await expect(slackBotParticipatesInThread(client, 'C-team', '1.0', 'U-bot')).resolves.toBe(
+      true
+    );
+    await expect(slackBotParticipatesInThread(client, 'C-team', '1.0', 'U-other')).resolves.toBe(
+      false
+    );
+    await expect(slackBotParticipatesInThread(client, 'C-team', '1.0', undefined)).resolves.toBe(
+      false
+    );
+    const failing = {
+      conversations: { replies: vi.fn(async () => Promise.reject(new Error('x'))) },
+    };
+    await expect(slackBotParticipatesInThread(failing, 'C-team', '1.0', 'U-bot')).resolves.toBe(
+      false
+    );
+  });
+
+  it('resolves the bot user id once and retries after a failure', async () => {
+    const test = vi
+      .fn<() => Promise<{ user_id?: string }>>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ user_id: 'U-bot' });
+    const resolve = createSlackBotUserIdResolver({ auth: { test } });
+    await expect(resolve()).resolves.toBeUndefined();
+    await expect(resolve()).resolves.toBe('U-bot');
+    await expect(resolve()).resolves.toBe('U-bot');
+    expect(test).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses approval-class actions from non-approvers in team channels', async () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    const postEphemeral = vi.fn(async () => ({}));
+    const client = { chat: { postEphemeral } };
+    await expect(ensureSlackApprovalAuthority(client, 'C-team', '1.0', 'U-member')).resolves.toBe(
+      false
+    );
+    expect(postEphemeral).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'C-team', user: 'U-member' })
+    );
+    await expect(ensureSlackApprovalAuthority(client, 'C-team', '1.0', 'U-lead')).resolves.toBe(
+      true
+    );
+    await expect(ensureSlackApprovalAuthority(client, 'C-dm', '1.0', 'U-member')).resolves.toBe(
+      true
+    );
+    expect(postEphemeral).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts onboarding actions only in owner_direct channels', () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    vi.stubEnv('KYBERION_SURFACE_ALLOWLISTS', JSON.stringify({ slack: ['U-lead', 'U-owner'] }));
+    expect(isSlackOwnerOnboardingActor('C-team', 'U-lead')).toBe(false);
+    expect(isSlackOwnerOnboardingActor('C-dm', 'U-owner')).toBe(true);
+    expect(isSlackOwnerOnboardingActor('C-dm', 'U-stranger')).toBe(false);
+  });
+
+  it('refuses a text approval from a team member who is not an approver', () => {
+    vi.stubEnv('KYBERION_SURFACE_CHANNEL_MODES', TEAM_CHANNEL_MODES);
+    const record = createApprovalRequest('mission_controller', {
+      channel: 'C-team',
+      storageChannel: 'autonomy',
+      threadTs: '',
+      correlationId: 'slack-team-veto-test',
+      requestedBy: 'agent:test',
+      draft: { title: 'Merge PR 43', summary: 'Merge PR 43 into main?' },
+      decisionCard: buildDecisionCard({
+        question: 'Merge PR 43 into main?',
+        recommendation: 'Approve',
+        riskTier: 'notify',
+        level: 'veto',
+        deliveredVia: { surface: 'slack', target: 'C-team' },
+      }),
+      veto: buildVetoWindow({ windowMinutes: 120 }),
+    });
+    const channelPolicy = resolveChannelModePolicy('slack', 'C-team');
+
+    const refused = resolveSlackApprovalText({
+      channel: 'C-team',
+      threadTs: '1700000000.000100',
+      text: '異議',
+      actorId: 'U-member',
+      channelPolicy,
+    });
+    expect(refused).toBe(t('bridge:approval_not_authorized', undefined, resolveOperatorLocale()));
+    expect(loadApprovalRequest('autonomy', record.id)).toMatchObject({ status: 'pending' });
+
+    resolveSlackApprovalText({
+      channel: 'C-team',
+      threadTs: '1700000000.000100',
+      text: '異議',
+      actorId: 'U-lead',
+      channelPolicy,
+    });
+    expect(loadApprovalRequest('autonomy', record.id)).toMatchObject({
+      status: 'rejected',
+      decidedBy: 'U-lead',
     });
   });
 });
