@@ -30,6 +30,7 @@ export interface ThreadWorkEntry {
 }
 
 export interface ThreadWorkIndex {
+  schema_version: '2.0.0';
   surface: string;
   channel: string;
   thread_ts: string;
@@ -69,7 +70,14 @@ export function threadWorkLogicalPath(ref: ThreadRef): string {
 
 export function readThreadWork(ref: ThreadRef): ThreadWorkIndex | null {
   const index = readGovernedArtifactJson<ThreadWorkIndex>(threadWorkLogicalPath(ref));
-  if (!index || index.channel !== ref.channel || index.thread_ts !== ref.threadTs) return null;
+  if (
+    !index ||
+    index.schema_version !== '2.0.0' ||
+    index.channel !== ref.channel ||
+    index.thread_ts !== ref.threadTs
+  ) {
+    return null;
+  }
   return index;
 }
 
@@ -83,17 +91,21 @@ export function recordThreadWork(
     throw new Error(`[THREAD_WORK] surface '${ref.surface}' has no thread-work writer`);
   }
   const existing = readThreadWork(ref);
-  const entries = (existing?.entries ?? []).filter(
+  // Scope changes in either direction reset history. In particular, an
+  // unscoped write must not leave the previous tenant attached to its entries.
+  const tenantChanged =
+    existing !== null && (existing.tenant_slug ?? null) !== (options.tenantSlug ?? null);
+  const priorEntries = tenantChanged ? [] : (existing?.entries ?? []);
+  const entries = priorEntries.filter(
     (item) => !(item.kind === entry.kind && item.id === entry.id)
   );
   entries.push({ ...entry, created_at: entry.created_at ?? nowIso() });
   const index: ThreadWorkIndex = {
+    schema_version: '2.0.0',
     surface: ref.surface,
     channel: ref.channel,
     thread_ts: ref.threadTs,
-    ...((options.tenantSlug ?? existing?.tenant_slug)
-      ? { tenant_slug: options.tenantSlug ?? existing?.tenant_slug }
-      : {}),
+    ...(options.tenantSlug ? { tenant_slug: options.tenantSlug } : {}),
     entries: entries.slice(-MAX_ENTRIES),
   };
   writeAsSurface(ref.surface, threadWorkLogicalPath(ref), index);

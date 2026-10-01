@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
+import { coerceLocale } from '@agent/core/locale-normalize';
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { createInviteEmailDraft } from '../../../../lib/invite-email';
@@ -9,8 +10,9 @@ import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/
 export const dynamic = 'force-dynamic';
 
 /**
- * Puts the invite into a mail DRAFT for the inviter to review and send. Nothing
- * is sent from here; the draft is created in the inviter's own mail backend.
+ * Attempts to create a mail draft for the inviter to review and send. Nothing
+ * is sent from here; draft creation is unavailable until an owner-bound mail
+ * backend can be established.
  */
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
-    const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
+    const locale = coerceLocale(req.nextUrl.searchParams.get('locale'), ['en', 'ja'], 'ja');
     const result = await withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation(() =>
         createInviteEmailDraft(resolved.context, parsedBody.body ?? {}, req.nextUrl.origin, locale)
