@@ -1096,10 +1096,13 @@ async function start(_args: string[] = []) {
       await client.chat.postMessage({
         channel: updated.channel,
         thread_ts: updated.threadTs,
-        text:
+        text: t(
           payload.decision === 'approved'
-            ? `Approved by <@${actorId}>: ${updated.title}`
-            : `Rejected by <@${actorId}>: ${updated.title}`,
+            ? 'bridge:approval_action_approved'
+            : 'bridge:approval_action_rejected',
+          { actor: `<@${actorId}>`, title: updated.title },
+          resolveOperatorLocale()
+        ),
       });
       // LC-10 ask-why: one skippable follow-up on rejection. Buttons keep
       // the reply deterministic — no pending-conversation state needed.

@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-10-01T02:17:24.947Z",
+  "generated_at": "2026-10-01T02:49:47.656Z",
   "scan_roots": [
     "libs/core",
     "libs/shared-ui",
@@ -57,15 +57,79 @@
     "presence/bridge/terminal",
     "presence/sensors/voice-hub"
   ],
-  "files": {
-    "libs/core/browser/browser-conversation-session.ts": 14,
-    "libs/core/ceo-surface-summary.ts": 4,
-    "libs/core/deal-documents.ts": 12,
-    "libs/core/execution-feedback.ts": 1,
-    "libs/core/mission/mission-orchestration-worker-part-results.ts": 2,
-    "libs/core/web-design-system.ts": 4,
-    "scripts/generate_all_objects_layout_sample.ts": 1,
-    "libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/page.tsx": 13
+  "files": {},
+  "locale_tokens": {
+    "intent_regex": {
+      "libs/core/contextual-intent-frame.ts": 1,
+      "libs/core/intent/intent-resolution.ts": 1,
+      "libs/core/media/protocol-to-markdown.ts": 1,
+      "libs/core/surface/surface-mission-steering.ts": 3,
+      "libs/core/surface/surface-provider-policy.ts": 2,
+      "libs/core/surface/surface-query-helpers.ts": 1,
+      "libs/core/surface/surface-query.ts": 4,
+      "libs/core/surface/surface-runtime-conversation-data.ts": 2,
+      "libs/core/task/task-distill-candidate.ts": 2,
+      "libs/core/task/task-session.ts": 3,
+      "libs/core/virtual/virtual-device-inventory-bridge.ts": 1,
+      "libs/actuators/browser-actuator/src/browser-pipeline-helpers.ts": 1,
+      "libs/actuators/ingest-actuator/src/meeting-digest-format.ts": 2,
+      "libs/actuators/media-actuator/src/media-pdf-helpers.ts": 3,
+      "libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts": 1,
+      "libs/actuators/orchestrator-actuator/src/orchestrator-execution-brief-helpers.ts": 1,
+      "satellites/voice-hub/server.ts": 3,
+      "presence/displays/presence-studio/hearing-work-inventory.ts": 4
+    },
+    "locale_compare": {
+      "libs/core/apple-intelligence-bridge.ts": 1,
+      "libs/core/question-resolver.ts": 1,
+      "libs/core/surface/operator-learning.ts": 1,
+      "libs/core/surface/surface-auth-routes.ts": 2,
+      "libs/core/surface/surface-login-pages.ts": 2,
+      "scripts/capture_surface_screenshots.ts": 2,
+      "scripts/check_plugin_views_e2e.ts": 1,
+      "satellites/voice-hub/server.ts": 1,
+      "satellites/voice-hub/speech-synthesis.ts": 2
+    },
+    "locale_literal": {
+      "libs/core/apple-intelligence-bridge.ts": 2,
+      "libs/core/apple-speech-file-stt-bridge.ts": 2,
+      "libs/core/business-calendar.ts": 1,
+      "libs/core/contextual-intent-frame.ts": 4,
+      "libs/core/deal-documents.ts": 1,
+      "libs/core/governance/accountability-report.ts": 1,
+      "libs/core/governance/approval-veto-window.ts": 1,
+      "libs/core/governance/charter-service.ts": 1,
+      "libs/core/governance/decision-card.ts": 1,
+      "libs/core/media/native-pptx-engine/builders.ts": 3,
+      "libs/core/media/native-pptx-engine/engine.ts": 1,
+      "libs/core/media/native-xlsx-engine/drawing.ts": 3,
+      "libs/core/organization/organization-operating-model-management.ts": 1,
+      "libs/core/organization/organization-operation-runtime.ts": 1,
+      "libs/core/pipeline/cron-utils.ts": 1,
+      "libs/core/provider/codex-cli-query.ts": 1,
+      "libs/core/surface/operator-notifications.ts": 1,
+      "libs/core/temporal-context.ts": 1,
+      "scripts/check_contract_schemas_checks_1.ts": 1,
+      "scripts/check_contract_schemas_checks_2.ts": 2,
+      "scripts/check_plugin_views_e2e.ts": 1,
+      "libs/actuators/media-actuator/src/media-document-helpers.ts": 7,
+      "libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts": 1,
+      "libs/actuators/media-actuator/src/proposal-pptx-helpers.ts": 1
+    },
+    "engine_hex": {
+      "libs/core/media/media-theme-role-policy.ts": 1,
+      "libs/core/media/native-pptx-engine/design-cascade.ts": 2,
+      "libs/core/video/video-composition-compiler.ts": 11,
+      "libs/core/video/video-composition-rendering.ts": 5,
+      "libs/core/video/video-content-brief-contract.ts": 1,
+      "libs/core/video/video-visual-direction.ts": 6,
+      "libs/actuators/media-actuator/src/media-action-transform.ts": 6,
+      "libs/actuators/media-actuator/src/media-design-protocol.ts": 16,
+      "libs/actuators/media-actuator/src/media-diagram-helpers.ts": 13,
+      "libs/actuators/media-actuator/src/media-document-pipeline-helpers.ts": 6,
+      "libs/actuators/media-actuator/src/media-layout-design-tokens.ts": 10,
+      "libs/actuators/media-actuator/src/media-pdf-protocol-helpers.ts": 1,
+      "libs/actuators/media-actuator/src/media-report-pdf-builder.ts": 4
+    }
   }
 }

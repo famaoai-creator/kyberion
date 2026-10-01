@@ -264,11 +264,15 @@ export function isBestOfNCandidate(input: { teamRole: string; task: PlannedNextT
 }
 
 export const BEST_OF_APPROACHES = [
-  { key: 'A', directive: 'アプローチA: 最小実装優先 — deliver the smallest correct change first.' },
+  {
+    key: 'A',
+    directive:
+      'Approach A: minimal implementation first — deliver the smallest correct change first.',
+  },
   {
     key: 'B',
     directive:
-      'アプローチB: 堅牢性優先 — prioritize robustness: edge cases, failure handling, verification.',
+      'Approach B: robustness first — prioritize robustness: edge cases, failure handling, verification.',
   },
 ] as const;
 

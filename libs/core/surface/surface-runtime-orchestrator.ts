@@ -1067,7 +1067,11 @@ export async function runSurfaceConversation(
   // IT-02: reply in the turn's locale — explicit request locale, else the
   // language the user wrote in, else (undefined) the resolveLocale() default.
   enterReplyLocale(
-    deriveReplyLocale({ explicit: input.locale, text: input.surfaceText || input.query })
+    deriveReplyLocale({
+      explicit: input.locale,
+      text: input.surfaceText || input.query,
+      scope: input.scope,
+    })
   );
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);

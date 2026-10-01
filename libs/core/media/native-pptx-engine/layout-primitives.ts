@@ -182,3 +182,27 @@ export function footerElements(options: FooterOptions): PptxElement[] {
     ),
   ];
 }
+
+export interface PptxLayoutKit {
+  /** The tenant's resolved palette (resolved once for this kit). */
+  palette: Readonly<PptxPalette>;
+  sectionHeader(title: string, options?: Omit<SectionHeaderOptions, 'tenantSlug'>): PptxElement[];
+  footer(options: Omit<FooterOptions, 'tenantSlug'>): PptxElement[];
+}
+
+/**
+ * Layout helpers bound to one render's tenant. A render path that knows its
+ * tenant (CLI `--tenant`, the pipeline context's tenant_slug) creates the kit
+ * once and builds every slide from it, so the tenant's semantic-token overlay
+ * colours the palette, header and footer consistently (no caller has to
+ * remember to pass `tenantSlug` to each primitive).
+ */
+export function createPptxLayoutKit(options: { tenantSlug?: string } = {}): PptxLayoutKit {
+  const { tenantSlug } = options;
+  return {
+    palette: resolvePptxPalette({ tenantSlug }),
+    sectionHeader: (title, headerOptions) =>
+      sectionHeaderElements(title, { ...headerOptions, tenantSlug }),
+    footer: (footerOptions) => footerElements({ ...footerOptions, tenantSlug }),
+  };
+}

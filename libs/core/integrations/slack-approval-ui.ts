@@ -9,6 +9,7 @@ import {
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import type { SupportedLocale } from '../locale-normalize.js';
+import { resolveApprovalLocale } from '../governance/approval-decision-card.js';
 import { t } from '../t.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
@@ -77,8 +78,11 @@ export function loadSlackApprovalRequest(id: string): SlackApprovalRequestRecord
 export function buildSlackApprovalBlocks(
   record: SlackApprovalRequestRecord,
   intentResolution?: IntentResolutionContract,
-  locale: SupportedLocale = 'en'
+  localeOverride?: SupportedLocale
 ): any[] {
+  // Proactive pushes have no inbound message: follow the turn locale, else the
+  // approval's scope locale, else the operator's (never a hardcoded 'en').
+  const locale = resolveApprovalLocale(record, localeOverride);
   const severity = record.severity || 'medium';
   const labels = {
     understanding: t('bridge:contract_understanding', undefined, locale),
