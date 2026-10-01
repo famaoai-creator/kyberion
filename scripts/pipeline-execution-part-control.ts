@@ -605,6 +605,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOrganizationDigest(step, params, ctx);
   },
+  'core:accountability_report': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineAccountabilityReport(step, params, ctx);
+  },
   'core:organization_record_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 

@@ -23,6 +23,7 @@ import {
   matchesIntentPhrase,
 } from '../intent/intent-phrase-lexicon.js';
 import { t } from '../t.js';
+import { deriveReplyLocale, getReplyLocale, runWithReplyLocale } from '../locale.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -1187,7 +1188,21 @@ export function createBrowserConversationFeedback(params: {
   };
 }
 
+/** Replies follow the language of the user's utterance (IT-02), else the turn's reply locale. */
+function withUtteranceLocale<T>(utterance: string, fn: () => T): T {
+  return runWithReplyLocale(deriveReplyLocale({ text: utterance }) ?? getReplyLocale(), fn);
+}
+
 export function applyBrowserConversationCommand(
+  sessionId: string,
+  command: BrowserConversationCommand
+): BrowserConversationFeedback | null {
+  return withUtteranceLocale(command.utterance, () =>
+    applyBrowserConversationCommandInner(sessionId, command)
+  );
+}
+
+function applyBrowserConversationCommandInner(
   sessionId: string,
   command: BrowserConversationCommand
 ): BrowserConversationFeedback | null {
@@ -1477,6 +1492,15 @@ export function executeBrowserConversationCandidateAction(
 }
 
 export function confirmBrowserConversationCandidate(
+  sessionId: string,
+  utterance: string
+): BrowserConversationExecutionResult | null {
+  return withUtteranceLocale(utterance, () =>
+    confirmBrowserConversationCandidateInner(sessionId, utterance)
+  );
+}
+
+function confirmBrowserConversationCandidateInner(
   sessionId: string,
   utterance: string
 ): BrowserConversationExecutionResult | null {
