@@ -28,6 +28,7 @@ export async function handleConciergeAuthRoute(req: NextRequest): Promise<Respon
       trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
     }),
     secFetchSite: req.headers.get('sec-fetch-site'),
+    referrerOrigin: req.headers.get('origin') ?? req.headers.get('referer'),
     tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
   });
   if (!result) return new Response('Not found', { status: 404 });
