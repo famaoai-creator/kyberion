@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
 import { normalizeCodexAppServerMessage } from './agent-codex-app-server-adapter.js';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { pathResolver } from '../path-resolver.js';
@@ -215,16 +215,23 @@ describe('ClaudeAdapter tool lockdown', () => {
       stderr: new PassThrough(),
       kill: vi.fn(),
     });
-    codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
-      resourceId: spec.resourceId,
-      child: spawn(spec.command, spec.args, spec.spawnOptions),
-    }));
+    codexMocks.spawnManagedProcess.mockImplementationOnce(
+      (spec: {
+        resourceId: string;
+        command: string;
+        args: string[];
+        spawnOptions: SpawnOptions;
+      }) => ({
+        resourceId: spec.resourceId,
+        child: spawn(spec.command, spec.args, spec.spawnOptions),
+      })
+    );
     vi.mocked(spawn).mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.stdout.end(JSON.stringify({ result: 'ok' }));
         child.emit('close', 0, null);
       });
-      return child as any;
+      return child as unknown as ChildProcess;
     });
 
     const adapter = new ClaudeAdapter({
