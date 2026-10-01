@@ -102,4 +102,32 @@ describe('concierge setup response boundary', () => {
     );
     expect(parseSetupResponse(unsafe)).toBeUndefined();
   });
+
+  it('accepts the owner-grouped connections list and rejects a malformed one', () => {
+    const withConnections = (connections: unknown) => ({
+      ...validSetup,
+      setup: { ...validSetup.setup, connections },
+    });
+    const ok = [
+      {
+        binding_id: 'b1',
+        service_id: 'slack',
+        owner_kind: 'organization',
+        owner_ref: 'acme',
+        group: 'organization',
+      },
+      { binding_id: 'b2', service_id: 'google-workspace', owner_kind: 'person', group: 'mine' },
+    ];
+    expect(parseSetupResponse(withConnections(ok))?.connections).toEqual(ok);
+    // Older payloads omit it entirely.
+    expect(parseSetupResponse(validSetup)?.connections).toBeUndefined();
+    for (const bad of [
+      'x',
+      [{ binding_id: 'b1', service_id: 'slack', owner_kind: 'team', group: 'mine' }],
+      [{ binding_id: 'b1', service_id: 'slack', owner_kind: 'person', group: 'elsewhere' }],
+      [{ binding_id: '', service_id: 'slack', owner_kind: 'person', group: 'mine' }],
+    ]) {
+      expect(parseSetupResponse(withConnections(bad))).toBeUndefined();
+    }
+  });
 });
