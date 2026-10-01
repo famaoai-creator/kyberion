@@ -27,6 +27,7 @@ const secureIo = vi.hoisted(() => ({
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
+  safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -99,6 +100,16 @@ describe('FailoverReasoningBackend — XP-05 switch surfacing + provenance', () 
     fs.copyFileSync(
       path.join(process.cwd(), 'knowledge/product/schemas/knowledge-sync-rules.schema.json'),
       schemaPath
+    );
+    // RS-01: backend capability/egress lookups read the governed provider registry.
+    fs.cpSync(
+      path.join(process.cwd(), 'knowledge/product/governance/reasoning-providers'),
+      path.join(tmpRoot, 'knowledge/product/governance/reasoning-providers'),
+      { recursive: true }
+    );
+    fs.copyFileSync(
+      path.join(process.cwd(), 'knowledge/product/schemas/reasoning-provider-registry.schema.json'),
+      path.join(tmpRoot, 'knowledge/product/schemas/reasoning-provider-registry.schema.json')
     );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';

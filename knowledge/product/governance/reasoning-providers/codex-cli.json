@@ -13,7 +13,47 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["CODEX_CLI", "CODEX_VERSION"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "provider-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": true,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "aliases": ["openai"],
+      "model_vendor": "openai",
+      "endpoint": "https://api.openai.com",
+      "egress_provider_id": "codex",
+      "cli": {
+        "binary": "codex",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_CODEX_CLI_BIN",
+        "discovery": true,
+        "sandbox": {
+          "args": ["exec", "{permission_args}", "--color", "never", "-"],
+          "prompt_via_stdin": true
+        },
+        "install": {
+          "npm_package": "@openai/codex",
+          "brew_formula": "codex",
+          "hint": "npm install --prefix <managed-env> --no-save @openai/codex"
+        }
+      },
+      "runtime_instructions": [
+        "Provider note: inspect before editing, use governed file I/O, and report the exact verification performed.",
+        "Provider note: do not broaden the requested scope or publish external changes without an explicit handoff."
+      ]
     }
   ]
 }

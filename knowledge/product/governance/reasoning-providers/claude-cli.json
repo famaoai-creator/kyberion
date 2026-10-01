@@ -13,7 +13,46 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["CLAUDECODE"],
-      "cost_tier": "free"
+      "cost_tier": "free",
+      "transport": "cli",
+      "data_egress": "external-api",
+      "adapter": "claude-cli",
+      "profile": {
+        "streaming": false,
+        "tool_calling": true,
+        "native_subagent": true,
+        "thinking_levels": {
+          "low": "low",
+          "medium": "medium",
+          "high": "high"
+        },
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "aliases": ["shell-claude-cli"],
+      "model_vendor": "anthropic",
+      "endpoint": "https://api.anthropic.com",
+      "egress_provider_id": "claude",
+      "cli": {
+        "binary": "claude",
+        "version_args": ["--version"],
+        "help_args": ["--help"],
+        "bin_env_key": "KYBERION_CLAUDE_CLI_BIN",
+        "discovery": true,
+        "model_flag": "--model",
+        "sandbox": {
+          "args": ["-p", "{prompt}", "{permission_args}"]
+        },
+        "install": {
+          "npm_package": "@anthropic-ai/claude-code",
+          "hint": "npm install --prefix <managed-env> --no-save @anthropic-ai/claude-code"
+        }
+      },
+      "runtime_instructions": [
+        "Provider note: use the governed subagent/delegation boundary for child work; do not mutate mission-wide state directly.",
+        "Provider note: a permission or tenant-scope denial is a terminal governance result, not a retryable prompt failure."
+      ]
     }
   ]
 }

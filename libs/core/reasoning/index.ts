@@ -84,6 +84,7 @@ export {
 } from './reasoning-model-routing.js';
 export * from './reasoning-openai-compatible-provider.js';
 export * from './reasoning-participant.js';
+export * from './reasoning-provider-readiness.js';
 export * from './reasoning-provider-registry.js';
 export * from './reasoning-retry-policy.js';
 export * from './reasoning-route-doctor.js';

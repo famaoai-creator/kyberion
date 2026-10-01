@@ -1,3 +1,4 @@
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { secureFetch, type SecureFetchOptions } from '../network.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord } from '../foundation/text.js';
@@ -34,7 +35,10 @@ import type {
 } from '../reasoning/reasoning-backend.js';
 
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-export const GEMINI_API_DEFAULT_MODEL = 'gemini-3.6-flash';
+/** Default Gemini API model: provider-config.json runtime_defaults['gemini-default'] (RS-02). */
+export function geminiApiDefaultModel(env: NodeJS.ProcessEnv = process.env): string {
+  return resolveRuntimeModelId('gemini-default', env);
+}
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -625,7 +629,7 @@ export function buildGeminiApiBackendFromEnv(
       modelOverride?.trim() ||
         envText(env, 'KYBERION_GEMINI_MODEL')?.trim() ||
         envText(env, 'KYBERION_REASONING_MODEL')?.trim() ||
-        GEMINI_API_DEFAULT_MODEL
+        geminiApiDefaultModel(env)
     ),
     baseURL: envText(env, 'KYBERION_GEMINI_URL')?.trim(),
     samplingParams,

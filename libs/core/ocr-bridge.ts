@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './tool/runtime-model-defaults.js';
+import { resolveRuntimeEndpoint } from './provider/provider-config.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -608,7 +609,12 @@ export class LocalVlmOcrProvider implements OcrProvider {
   readonly dataEgress: OcrDataEgress;
   readonly dataPolicy: 'local_only' | 'training_eligible';
 
-  constructor(endpoint = 'http://localhost:11434/api/generate', model = 'llama3-vision') {
+  // RS-02: defaults come from provider-config.json (runtime_endpoints.ollama,
+  // runtime_defaults['ollama-vision']); OLLAMA_HOST / OLLAMA_VLM_MODEL still win.
+  constructor(
+    endpoint = `${resolveRuntimeEndpoint('ollama')}/api/generate`,
+    model = resolveRuntimeModelId('ollama-vision')
+  ) {
     const ollamaHost = getRegisteredEnvText('OLLAMA_HOST');
     this.endpoint = ollamaHost ? `${ollamaHost.replace(/\/$/, '')}/api/generate` : endpoint;
     this.model = getRegisteredEnvText('OLLAMA_VLM_MODEL') || model;

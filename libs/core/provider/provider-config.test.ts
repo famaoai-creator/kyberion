@@ -33,7 +33,7 @@ describe('provider-config', () => {
     expect(config.runtime_defaults['opencode-default']).toBe(
       'opencode/muse-spark-1.3-contributor-free'
     );
-    expect(config.lifecycle.gemini.default_model).toBe('gemini-3.6-flash');
+    expect(config.lifecycle.gemini.default_model).toBe(config.runtime_defaults['gemini-default']);
     expect(resolveRuntimeDefaultModelId('copilot-default')).toBe('auto');
     expect(resolveRuntimeDefaultModelId('cursor-default')).toBe('auto');
     expect(resolveRuntimeDefaultModelId('opencode-default')).toBe(
