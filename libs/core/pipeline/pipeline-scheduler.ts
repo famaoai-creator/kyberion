@@ -23,6 +23,12 @@ export interface ScheduledPipeline {
     timezone?: string;
   };
   enabled: boolean;
+  /**
+   * The schedule ships disabled (`schedule.enabled: false` in its pipeline)
+   * and runs only on hosts whose KYBERION_CHRONOS_SCHEDULES names its id.
+   * A schedule disabled any other way stays disabled regardless of the env.
+   */
+  optIn?: boolean;
   lastRun?: string;
   lastStatus?: 'succeeded' | 'failed';
   consecutiveFailures?: number;
@@ -276,11 +282,26 @@ export function scheduleAllowedByOperator(
   allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
 ): boolean {
   if (allowlist === undefined || allowlist === '') return true;
-  const ids = allowlist
+  return parseScheduleAllowlist(allowlist).includes(scheduleId);
+}
+
+/**
+ * Opt-in for schedules that ship disabled: only an explicit mention of the id
+ * in KYBERION_CHRONOS_SCHEDULES turns them on (an unset env never does).
+ */
+export function scheduleExplicitlyOptedIn(
+  scheduleId: string,
+  allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
+): boolean {
+  if (!allowlist) return false;
+  return parseScheduleAllowlist(allowlist).includes(scheduleId);
+}
+
+function parseScheduleAllowlist(allowlist: string): string[] {
+  return allowlist
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
-  return ids.includes(scheduleId);
 }
 
 export function isScheduledPipelineDue(
@@ -289,7 +310,8 @@ export function isScheduledPipelineDue(
   now = new Date(),
   options: PipelineSchedulerOptions = {}
 ): boolean {
-  if (!schedule.enabled) return false;
+  if (!schedule.enabled && !(schedule.optIn && scheduleExplicitlyOptedIn(schedule.id)))
+    return false;
   if (!scheduleAllowedByOperator(schedule.id)) return false;
   if (runLockActive(schedule.runLock, now, runLockTtlMs(options))) return false;
 

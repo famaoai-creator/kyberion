@@ -6,7 +6,9 @@
  * entries (description, type, enum, required, subsystem, …) are preserved;
  * newly discovered names are added with an auto classification and
  * `documented: false`. Entries whose name is no longer referenced anywhere
- * are dropped.
+ * are dropped — except entries carrying `deprecated`, which stay registered
+ * (one release) so operators who still export them get a warning instead of
+ * an unknown-variable failure. Remove the entry by hand once that window ends.
  *
  * Also generates `docs/developer/env.example` and
  * `docs/developer/CONFIGURATION.md` from the registry so the configuration
@@ -44,6 +46,8 @@ export interface EnvRegistryEntry {
   subsystem?: string;
   description: string;
   documented: boolean;
+  /** Since when the variable is ignored; kept registered even when unreferenced. */
+  deprecated?: string;
 }
 
 export interface EnvRegistryFile {
@@ -105,6 +109,15 @@ export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] 
     }
     if (typeof entry.description !== 'string') {
       failures.push(`${label}: description must be a string`);
+    }
+    if (
+      entry.deprecated !== undefined &&
+      (typeof entry.deprecated !== 'string' || !entry.deprecated.trim())
+    ) {
+      failures.push(`${label}: deprecated must be a non-empty string (since when it is ignored)`);
+    }
+    if (entry.deprecated && entry.required) {
+      failures.push(`${label}: deprecated entries may not be required`);
     }
     if (entry.type === 'enum') {
       if (
@@ -296,6 +309,14 @@ export function mergeRegistry(
       documented: false,
     } satisfies EnvRegistryEntry;
   });
+  const discoveredNames = new Set(discovered);
+  const retained = (existing?.entries || []).filter(
+    (entry) => entry.deprecated && !discoveredNames.has(entry.name)
+  );
+  if (retained.length > 0) {
+    entries.push(...retained);
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+  }
   return {
     $schema: '../schemas/env-registry.schema.json',
     version: existing?.version || '1.0.0',

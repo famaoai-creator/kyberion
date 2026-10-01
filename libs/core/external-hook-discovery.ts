@@ -204,6 +204,8 @@ export function registerDiscoveredExternalLifecycleHooksOnDefaultEngine(
 export const EXTERNAL_HOOKS_ENV = 'KYBERION_EXTERNAL_HOOKS';
 
 const registeredDefaultEngines = new WeakMap<LifecycleHookEngine, ExternalHookDiscoveryResult>();
+/** Skip warnings already emitted, so an uncached retry does not re-warn every call. */
+const warnedSkips = new Set<string>();
 
 export function isExternalHookBootstrapEnabled(env?: Record<string, string | undefined>): boolean {
   return getRegisteredEnvText(EXTERNAL_HOOKS_ENV, env ? { env } : {}) === 'project';
@@ -240,8 +242,16 @@ export function ensureTrustedExternalHooksRegistered(
     trustResolved: true,
     projectTrustApprovalIds: resolveProjectHookTrustApprovals(candidates),
   });
-  registeredDefaultEngines.set(engine, result);
+  // Nothing registered yet but configs were skipped (typically awaiting
+  // approval): do not pin that result, so a later approval is picked up on
+  // the next call instead of requiring a process restart.
+  if (!(result.registered === 0 && result.skipped.length > 0)) {
+    registeredDefaultEngines.set(engine, result);
+  }
   for (const skipped of result.skipped) {
+    const warningKey = `${skipped.path}\u0000${skipped.reason}`;
+    if (warnedSkips.has(warningKey)) continue;
+    warnedSkips.add(warningKey);
     logger.warn(
       `[external-hooks] skipped ${skipped.path} — ${skipped.reason} | next: pnpm kyberion hooks trust ${skipped.path}`
     );

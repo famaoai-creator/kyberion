@@ -151,6 +151,32 @@ function toArgv(command: string | string[]): string[] {
     : ['/bin/sh', '-c', command];
 }
 
+export interface ExternalHookCommandSummary {
+  /** Event name as written in the config (e.g. PreToolUse). */
+  event: LifecycleHookEvent;
+  matcher?: string;
+  /** Command as it would run; argv arrays are joined with spaces for display. */
+  command: string;
+}
+
+/**
+ * The exact event → command pairs registration would install from this
+ * config, for display on a human trust decision. Uses the same parser as
+ * registerExternalLifecycleHooks so the approver sees what will execute.
+ */
+export function describeExternalHookCommands(
+  config: Record<string, unknown>,
+  source: ExternalHookSource
+): ExternalHookCommandSummary[] {
+  const hooks =
+    source === 'claude-code' ? collectClaudeHooks(config) : collectNormalizedHooks(config);
+  return hooks.map((hook) => ({
+    event: hook.event,
+    ...(hook.matcher ? { matcher: hook.matcher } : {}),
+    command: Array.isArray(hook.command) ? hook.command.join(' ') : hook.command,
+  }));
+}
+
 /** Register an external hook config and return one disposer for the batch. */
 export function registerExternalLifecycleHooks(
   engine: LifecycleHookEngine,

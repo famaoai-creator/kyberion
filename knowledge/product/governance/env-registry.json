@@ -670,7 +670,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule.",
+      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule. Listing a schedule that ships disabled (schedule.enabled false in its pipeline, e.g. reconcile-config-fallbacks-weekly) opts this host into it; once set, only listed ids run.",
       "documented": true
     },
     {
@@ -862,6 +862,15 @@
       "required": false,
       "description": "Optional runtime setting for computer surface principal; leave unset to use the built-in configuration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
@@ -2691,6 +2700,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
+    },
+    {
       "name": "KYBERION_OPERATOR_SLACK_DM",
       "category": "runtime",
       "type": "string",
@@ -2770,6 +2788,15 @@
       "description": "Active persona for the policy engine (set by withExecutionContext; rarely set manually).",
       "documented": true,
       "subsystem": "governance"
+    },
+    {
+      "name": "KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_PERSONAL_PADS_PLUGIN_HOST",
@@ -3381,6 +3408,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_SOVEREIGN_SECRET",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
+    },
+    {
       "name": "KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD",
       "category": "runtime",
       "type": "string",
@@ -3629,6 +3665,15 @@
       "subsystem": "governance"
     },
     {
+      "name": "KYBERION_SUDO_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
+    },
+    {
       "name": "KYBERION_SUDO_SCOPE",
       "category": "runtime",
       "type": "string",
@@ -3712,6 +3757,15 @@
       "required": false,
       "description": "Optional path override for task scenario dir; keep it inside governed repository or runtime storage.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_TELEMETRY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Deprecated/ignored since 2026-10; unset it. Nothing reads this variable any more; the entry stays for one release so hosts that still export it get a warning instead of an unknown-variable failure.",
+      "documented": true,
+      "deprecated": "2026-10"
     },
     {
       "name": "KYBERION_TEN_VAD_PYTHON",

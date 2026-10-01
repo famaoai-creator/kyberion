@@ -9,11 +9,18 @@ const deals = vi.hoisted(() => ({
 
 vi.mock('@agent/core/deal-documents', () => deals);
 vi.mock('@agent/core/customer-channel-binding', () => ({
-  listCustomerChannelBindings: () => [{ tenantSlug: 'acme' }],
+  listCustomerChannelBindings: () => [{ tenantSlug: 'acme' }, { tenantSlug: 'beta' }],
 }));
 vi.mock('@agent/core/deal-store', () => ({
   listDeals: (tenant: string) =>
-    tenant === 'acme' ? [{ deal_id: 'DEAL-001', stage: 'discovery', summary: 'site' }] : [],
+    tenant === 'acme'
+      ? [
+          { deal_id: 'DEAL-001', stage: 'discovery', summary: 'site' },
+          { deal_id: 'DEAL-SHARED', stage: 'discovery', summary: 'a' },
+        ]
+      : tenant === 'beta'
+        ? [{ deal_id: 'DEAL-SHARED', stage: 'discovery', summary: 'b' }]
+        : [],
 }));
 
 import {
@@ -99,6 +106,20 @@ describe('pnpm kyberion deals document actions (E2E-06)', () => {
       verdict: 'approve',
       reviewer: 'legal',
       notes: 'ok',
+    });
+  });
+
+  it('requires --tenant when the deal id exists in several tenants', () => {
+    const ambiguous = run({ draftContract: 'DEAL-SHARED' });
+    expect(ambiguous.error).toBeDefined();
+    expect(String(ambiguous.output[0])).toContain('recorder:recorder_deal_tenant_ambiguous');
+    expect(deals.draftContractForDeal).not.toHaveBeenCalled();
+
+    deals.draftContractForDeal.mockReturnValue({ version: 1, contract_ref: 'c.md' });
+    expect(run({ draftContract: 'DEAL-SHARED', tenant: 'beta' }).error).toBeUndefined();
+    expect(deals.draftContractForDeal).toHaveBeenCalledWith({
+      tenantSlug: 'beta',
+      dealId: 'DEAL-SHARED',
     });
   });
 

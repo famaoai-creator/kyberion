@@ -171,6 +171,18 @@ describe('terminal-actuator SDK dispatch (pipeline / ADF path)', () => {
       ok: true,
     });
   });
+
+  it('write_terminal forwards the whole key sequence, not only the first key', async () => {
+    const { actuator } = await import('./index');
+    const { ptyEngine } = await import('@agent/core/shell/pty-engine');
+    const spawned = await actuator.dispatch('spawn_terminal', { shell: '/bin/bash' });
+    const sessionId = (spawned.output as { sessionId: string }).sessionId;
+    vi.mocked(ptyEngine.write).mockClear();
+    await expect(
+      actuator.dispatch('write_terminal', { sessionId, keys: ['C-c', 'Up', 'Enter'] })
+    ).resolves.toMatchObject({ ok: true });
+    expect(ptyEngine.write).toHaveBeenCalledWith(sessionId, 'C-c+Up+Enter');
+  });
 });
 
 describe('terminal-actuator direct actions', () => {

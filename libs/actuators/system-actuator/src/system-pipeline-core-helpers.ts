@@ -462,7 +462,10 @@ export async function opCapture(
     case 'reconcile_config_fallbacks':
       return {
         ...ctx,
-        [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks(),
+        // B1: proposal-only unless the step explicitly opts into knowledge writes.
+        [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks({
+          apply: params.apply === true,
+        }),
       };
     case 'reconcile_unclassified_errors':
       return {

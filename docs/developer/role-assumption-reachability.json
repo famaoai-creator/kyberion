@@ -1730,6 +1730,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/operator-home-secondary-actions.ts#handleDealDocumentAction",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/org.ts#main",
       "roles": ["ecosystem_architect"],
       "unresolved": []

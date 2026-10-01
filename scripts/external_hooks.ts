@@ -87,13 +87,16 @@ export function formatExternalHookDiscoveryReport(report: ExternalHookDiscoveryR
 export function requestExternalHookTrust(inputPath: string, requestedBy?: string) {
   const report = buildExternalHookDiscoveryReport();
   const relative = relativeToRoot(pathResolver.rootResolve(inputPath));
-  if (!report.configs.some((config) => config.path === relative)) {
+  const discovered = report.configs.find((config) => config.path === relative);
+  if (!discovered) {
     throw new ScriptExitError(1, t('cli:cli_hooks_trust_not_discovered', { path: relative }));
   }
   const request = withExecutionContext('mission_controller', () =>
     createProjectTrustApprovalRequest({
       inputPath: relative,
       requestedBy: requestedBy || 'external-hooks-cli',
+      // The approver authorizes shell commands from a hook config, not a pipeline.
+      resource: { kind: 'external-hook-config', source: discovered.source },
     })
   );
   return { path: relative, request_id: request.id, status: request.status };
