@@ -31,6 +31,8 @@ import type {
   SurfaceDelegationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
+import { t } from '../t.js';
+import { localeToBcp47, resolveLocale, type SupportedLocale } from '../locale.js';
 
 function getScheduleDateRange(
   value?: 'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom'
@@ -84,7 +86,10 @@ export function formatCalendarAgendaReply(params: {
   rangeLabel: string;
   events: Array<{ title: string; start: string; end: string; calendar?: string }>;
   assumption?: string;
+  locale?: SupportedLocale;
 }): { text: string; omitted_count: number } {
+  const locale = params.locale ?? resolveLocale();
+  const dateLocale = localeToBcp47(locale);
   const header = params.sourceName
     ? `${params.sourceLabel} / ${params.sourceName}`
     : params.sourceLabel;
@@ -93,7 +98,7 @@ export function formatCalendarAgendaReply(params: {
       text: [
         params.assumption ? `${params.assumption}` : '',
         `Provider: ${header}`,
-        `${params.rangeLabel} の予定は見つかりませんでした。`,
+        t('surface:agenda_none', { range: params.rangeLabel }, locale),
       ]
         .filter(Boolean)
         .join('\n'),
@@ -110,11 +115,11 @@ export function formatCalendarAgendaReply(params: {
   const lines = [
     ...(params.assumption ? [params.assumption] : []),
     `Provider: ${header}`,
-    `${params.rangeLabel} の予定:`,
+    t('surface:agenda_header', { range: params.rangeLabel }, locale),
     ...visibleEvents.map((event) => {
       const start = new Date(event.start);
       const end = new Date(event.end);
-      const time = `${start.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+      const time = `${start.toLocaleString(dateLocale, { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}`;
       const calendar = event.calendar ? ` (${event.calendar})` : '';
       return `- ${time} ${event.title}${calendar}`;
     }),
@@ -225,8 +230,8 @@ async function readScheduleAgenda(
   const calendarName = resolveDefaultScheduleSource().calendarName;
   const range = getScheduleDateRange(frame.date_range?.value);
   const assumption = [
-    frame.subject === 'operator_self' ? '本人の既定カレンダーとして確認します。' : '',
-    frame.date_range ? '' : `期間は ${range.label} として補完します。`,
+    frame.subject === 'operator_self' ? t('surface:agenda_assume_self') : '',
+    frame.date_range ? '' : t('surface:agenda_assume_range', { range: range.label }),
   ]
     .filter(Boolean)
     .join(' ');
@@ -282,7 +287,7 @@ async function readScheduleAgenda(
         confirmed: false,
       });
     }
-    return `Provider: ${scheduleSource}${calendarName ? ` / ${calendarName}` : ''}\n${range.label} の予定を取得しようとしましたが、calendar-actuator で読めませんでした: ${error?.message || String(error)}`;
+    return `Provider: ${scheduleSource}${calendarName ? ` / ${calendarName}` : ''}\n${t('surface:agenda_read_failed', { range: range.label, error: error?.message || String(error) })}`;
   }
 }
 
@@ -488,7 +493,7 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
         params: {
           name: locationHint,
           count: 1,
-          language: 'ja',
+          language: resolveLocale(),
           format: 'json',
         },
       })

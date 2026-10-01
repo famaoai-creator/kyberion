@@ -78,20 +78,17 @@ describe('I18N-07 proof-of-locale: qps-ploc end to end', () => {
       expect(lines).toContain(expectedUsageLine);
     });
 
-    it('falls back to English for a locale this CLI does not have a hardcoded phrasing for (formatClarificationPacketConcise)', () => {
-      // I18N-07 finding: `formatClarificationPacketConcise` in
-      // libs/core/intent/intent-contract.ts only has hand-written phrasing for
-      // 'ja' (else it renders English) — its `options.locale` type was
-      // widened from a hardcoded `'en' | 'ja'` union to `string` so this
-      // compiles for any locale, but the *phrasing* itself is still
-      // English-only for a third locale. That is expected (migrating this
-      // formatter's phrasing is I18N-04 scope) — this test just pins that it
-      // degrades gracefully (English) rather than throwing.
+    it('renders the third locale from the vocabulary catalog (formatClarificationPacketConcise)', () => {
+      // IT-02: the clarification formatter's phrasing moved to `question:*`
+      // vocabulary keys, so a third locale renders its own catalog text (here
+      // the generated pseudo-locale) instead of degrading to hand-written
+      // English, and never throws.
       const rendered = formatClarificationPacketConcise(
         { headline: 'h', summary: 's', questions: [] } as any,
         { locale: 'qps-ploc' }
       );
-      expect(rendered).toContain('No missing inputs. Ready to proceed.');
+      expect(rendered.startsWith('⟦')).toBe(true);
+      expect(rendered).not.toContain('No missing inputs. Ready to proceed.');
     });
   });
 

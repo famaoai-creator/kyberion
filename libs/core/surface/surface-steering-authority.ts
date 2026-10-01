@@ -23,6 +23,7 @@ import {
 } from '../mission/orchestrator-session.js';
 import { listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { validateSurfaceUxContract } from './surface-ux-contract.js';
+import { t } from '../t.js';
 
 export interface AssertSurfaceSteeringAuthorityParams {
   surface: string;
@@ -118,47 +119,31 @@ export function assertSurfaceSteeringAuthority(
 }
 
 /**
- * Japanese, UX-contract-valid rejection text for a
+ * Localized (vocabulary catalog), UX-contract-valid rejection text for a
  * {@link SurfaceSteeringAuthorityError}. SO-04 surfaces this (or a
  * summarization built around it) as the conversational response when a
  * steering turn is refused for lack of owner authority. Every branch
- * includes a State signal (状態) and a concrete Next Action (次のアクション)
+ * includes a State signal and a concrete Next Action
  * so it passes {@link validateSurfaceUxContract} unmodified.
  */
 export function formatSteeringRejection(error: SurfaceSteeringAuthorityError): string {
   switch (error.caseId) {
     case 'no_session_for_thread':
-      return (
-        `状態: このスレッドはミッション ${error.params.missionId} のオーナーではありません` +
-        '(オーケストレータセッション未作成)。\n' +
-        '次のアクション: このスレッドからミッションを発行してオーナーになるか、' +
-        '現在のオーナーのスレッドから操縦を依頼してください。'
-      );
-    case 'different_mission': {
-      const ownerMissionId = String(error.detail.sessionMissionId ?? '不明');
-      return (
-        `状態: このスレッドは別のミッション(${ownerMissionId})のオーナーであり、` +
-        `ミッション ${error.params.missionId} のオーナーではありません。\n` +
-        '次のアクション: 対象ミッションのオーナースレッドから操縦するか、ハンドオフを依頼してください。'
-      );
-    }
+      return t('surface:steering_reject_no_session', { missionId: String(error.params.missionId) });
+    case 'different_mission':
+      return t('surface:steering_reject_different_mission', {
+        ownerMissionId: String(error.detail.sessionMissionId ?? t('surface:steering_unknown')),
+        missionId: String(error.params.missionId),
+      });
     case 'session_released':
-      return (
-        '状態: このスレッドのオーケストレータセッションは解放済みです' +
-        `(理由: ${String(error.detail.releaseReason ?? '不明')})。\n` +
-        '次のアクション: 新しいオーケストレータセッションを作成してから操縦してください。'
-      );
+      return t('surface:steering_reject_session_released', {
+        reason: String(error.detail.releaseReason ?? t('surface:steering_unknown')),
+      });
     case 'lease_expired':
-      return (
-        '状態: このスレッドの所有権リースが期限切れか、他プロセスに再取得されています。\n' +
-        '次のアクション: セッションを再作成する、またはオーナー側でリースを更新してから再試行してください。'
-      );
+      return t('surface:steering_reject_lease_expired');
     default: {
       const exhaustiveCheck: never = error.caseId;
-      return (
-        `状態: このスレッドは現在ミッションを操縦できません(${String(exhaustiveCheck)})。\n` +
-        '次のアクション: オーナー状況を確認のうえ、あらためて操作してください。'
-      );
+      return t('surface:steering_reject_default', { reason: String(exhaustiveCheck) });
     }
   }
 }

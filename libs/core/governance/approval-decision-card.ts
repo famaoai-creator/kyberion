@@ -4,7 +4,7 @@ import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
 import { resolveLocale } from '../locale.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { localeToBcp47, localeUsesWordSpaces, type SupportedLocale } from '../locale-normalize.js';
 import { t, type VocabularyKey } from '../t.js';
 
 export type { InterventionLevel } from './decision-card.js';
@@ -96,7 +96,7 @@ export function formatDecisionInstant(
 ): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
-  return new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return new Intl.DateTimeFormat(localeToBcp47(locale), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -202,7 +202,7 @@ function describeIfNoResponse(
     );
   }
   return {
-    text: lines.join(locale === 'ja' ? '' : ' '),
+    text: lines.join(localeUsesWordSpaces(locale) ? ' ' : ''),
     ...(deadline ? { deadlineAt: deadline } : {}),
   };
 }

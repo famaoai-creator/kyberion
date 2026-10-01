@@ -21,6 +21,7 @@ import {
 } from '../review-reentry.js';
 import { ledger } from '../ledger.js';
 import { logger } from '../core.js';
+import { t } from '../t.js';
 import { latestSnapshot } from '../intent/intent-snapshot-store.js';
 import {
   listMemoryPromotionCandidates,
@@ -87,14 +88,20 @@ import {
   emitMissionLifecycleIntentSnapshot,
   evaluateMissionIntentDrift,
 } from './mission-intent-delta.js';
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 
 function isLifecycleClosureGap(gap: string): boolean {
   const normalized = gap.toLowerCase();
-  const mentionsLifecycle =
-    /mission\s+lifecycle|mission.*(?:完了|終了)|ミッション.*ライフサイクル/u.test(normalized);
-  const mentionsCompletion = /complet|finish|archive|完了|終了/u.test(normalized);
-  const mentionsVerification = /verif|検証/u.test(normalized);
-  const mentionsDistillation = /distill|蒸留/u.test(normalized);
+  const mentionsLifecycle = matchesIntentPhrase(normalized, 'mission_lifecycle.gap_lifecycle');
+  const mentionsCompletion = matchesIntentPhrase(normalized, 'mission_lifecycle.gap_completion');
+  const mentionsVerification = matchesIntentPhrase(
+    normalized,
+    'mission_lifecycle.gap_verification'
+  );
+  const mentionsDistillation = matchesIntentPhrase(
+    normalized,
+    'mission_lifecycle.gap_distillation'
+  );
   return mentionsLifecycle && mentionsCompletion && mentionsVerification && mentionsDistillation;
 }
 
@@ -1028,7 +1035,7 @@ export async function finishMission(
       });
       void notifyOperator('deliverable_ready', {
         title: completionGoal.summary,
-        body: `成果物 ${evidenceRefs.length} 件が inbox に届きました。`,
+        body: t('mission_ops:deliverables_in_inbox', { count: evidenceRefs.length }),
         link_hint: 'pnpm kyberion inbox',
         correlation_id: upperId,
       });

@@ -1447,6 +1447,10 @@
       "types": "./dist/creative-design-resolver.d.ts",
       "default": "./dist/creative-design-resolver.js"
     },
+    "./semantic-design-tokens": {
+      "types": "./dist/semantic-design-tokens.d.ts",
+      "default": "./dist/semantic-design-tokens.js"
+    },
     "./job-lifecycle": {
       "types": "./dist/job-lifecycle.d.ts",
       "default": "./dist/job-lifecycle.js"
