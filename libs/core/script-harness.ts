@@ -156,16 +156,37 @@ type GeneratorOutputs =
   | readonly string[]
   | ((context: ScriptContext, files: readonly GeneratedFile[]) => readonly string[]);
 
+function formatGeneratorUsage(id: string, extraFlags: readonly string[]): string {
+  const flags = ['--check', '--dry-run', '--json', '--quiet', ...extraFlags, '--help'];
+  return `Usage: pnpm generate:${id} [${flags.join('] [')}]\n\n  --check    verify generated files are up to date without writing\n  --dry-run  report changes without writing\n  --help     show this usage (no files are written)`;
+}
+
 export function defineGenerator(options: {
   id: string;
   outputs: GeneratorOutputs;
   executionContext?: string;
+  /** Generator-specific flags (e.g. `--out`) accepted in addition to the shared harness flags. */
+  flags?: readonly string[];
   normalize?: (content: string) => string;
   render(context: ScriptContext): GeneratedFile[] | Promise<GeneratedFile[]>;
 }): (argv?: string[]) => Promise<{ changed: string[]; files: GeneratedFile[] } | undefined> {
   return defineScript({
     name: `generate:${options.id}`,
     async run(context) {
+      if (context.argv.some((arg) => arg === '--help' || arg === '-h')) {
+        context.print(formatGeneratorUsage(options.id, options.flags ?? []));
+        return undefined;
+      }
+      const allowed = new Set(['--help', '-h', ...(options.flags ?? [])]);
+      const unknown = context.unknownFlags.filter(
+        (flag) => !allowed.has(flag.split('=')[0] ?? flag)
+      );
+      if (unknown.length > 0) {
+        throw new ScriptExitError(
+          2,
+          `unknown option ${unknown.join(', ')}\n${formatGeneratorUsage(options.id, options.flags ?? [])}`
+        );
+      }
       const files = await options.render(context);
       const normalize = options.normalize ?? ((content: string) => content);
       const declaredOutputs =
