@@ -70,3 +70,38 @@ export function charterInputForDecision(
     ...(options.rootDir ? { pathOptions: options } : {}),
   };
 }
+
+/**
+ * Outbound customer message → `send_message_external`. A sent message cannot be
+ * recalled, so it is irreversible and the charter must name `customer_outbound`
+ * (and allow `send_message_external`) to let it run unattended. One message,
+ * one recipient, customer-facing (reputational class B). The caller must NOT
+ * pass a charter when the audience egress floor is violated: that case always
+ * goes to a human.
+ */
+export function charterInputForCustomerOutbound(
+  input: { tenantSlug?: string },
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): ApprovalGateCharterInput | undefined {
+  if (!input.tenantSlug) return undefined;
+  const scope = { kind: 'organization', tenant_slug: input.tenantSlug } as const;
+  const charter = findActiveCharter(scope, now, options);
+  if (!charter) return undefined;
+  return {
+    scope,
+    action: {
+      actor: agentActor(
+        buildNhiId(input.tenantSlug, 'customer-conversation'),
+        charter.accountable.actor
+      ),
+      action_class: 'send_message_external',
+      reversible: false,
+      irreversible_action_name: 'customer_outbound',
+      estimated_loss: 0,
+      reputational_class: 'B',
+      blast_radius: { recipients: 1 },
+    },
+    ...(options.rootDir ? { pathOptions: options } : {}),
+  };
+}
