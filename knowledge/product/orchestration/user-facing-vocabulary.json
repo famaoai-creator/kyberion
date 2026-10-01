@@ -10831,6 +10831,46 @@
         "ja": "有効な憲章はありません。AI が実行する判断は、これまでどおり人が承認します。",
         "qps-ploc": "⟦Ñő ƈħȧřŧėř ïş ïñ ƒőřƈė. Ḓėƈïşïőñş ŧħė ȦÏ ɱȧķėş ȧřė ȧṗṗřőṽėḓ őñė ƀẏ őñė, ȧş ƀėƒőřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
+      "setup.charter_err_approver": {
+        "en": "Only an approver can propose a charter. Owners create it directly.",
+        "ja": "憲章を提案できるのは承認者だけです。オーナーは直接つくれます。",
+        "qps-ploc": "⟦Őñŀẏ ȧñ ȧṗṗřőṽėř ƈȧñ ṗřőṗőşė ȧ ƈħȧřŧėř. Őẇñėřş ƈřėȧŧė ïŧ ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "setup.charter_propose": {
+        "en": "Send to the owner as a proposal",
+        "ja": "オーナーへ提案として送る",
+        "qps-ploc": "⟦Şėñḓ ŧő ŧħė őẇñėř ȧş ȧ ṗřőṗőşȧŀ ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.charter_proposed": {
+        "en": "Sent. It takes effect only if the owner reviews and agrees to it.",
+        "ja": "送りました。オーナーが内容を確認して同意するまで、効力はありません。",
+        "qps-ploc": "⟦Şėñŧ. Ïŧ ŧȧķėş ėƒƒėƈŧ őñŀẏ ïƒ ŧħė őẇñėř řėṽïėẇş ȧñḓ ȧɠřėėş ŧő ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "setup.charter_draft_title": {
+        "en": "Proposed by an approver",
+        "ja": "承認者からの提案",
+        "qps-ploc": "⟦Ṗřőṗőşėḓ ƀẏ ȧñ ȧṗṗřőṽėř ŀőřėɱ ï⟧"
+      },
+      "setup.charter_draft_by": {
+        "en": "Drafted by {name} on {date}",
+        "ja": "{name} さんが {date} に作成",
+        "qps-ploc": "⟦Ḓřȧƒŧėḓ ƀẏ {name} őñ {date} ŀőřėɱ ïṗ⟧"
+      },
+      "setup.charter_draft_load": {
+        "en": "Load into the form",
+        "ja": "フォームに入れる",
+        "qps-ploc": "⟦Ŀőȧḓ ïñŧő ŧħė ƒőřɱ ŀőřėɱ⟧"
+      },
+      "setup.charter_draft_dismiss": {
+        "en": "Set aside",
+        "ja": "却下する",
+        "qps-ploc": "⟦Şėŧ ȧşïḓė ŀőř⟧"
+      },
+      "setup.charter_draft_dismissed": {
+        "en": "Set the proposal aside.",
+        "ja": "提案を却下しました。",
+        "qps-ploc": "⟦Şėŧ ŧħė ṗřőṗőşȧŀ ȧşïḓė. ŀőřėɱ ï⟧"
+      },
       "setup.charter_owner_only": {
         "en": "Only an owner of this organization can create a charter.",
         "ja": "憲章をつくれるのは、この組織のオーナーだけです。",
