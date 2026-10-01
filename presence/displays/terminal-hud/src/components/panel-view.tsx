@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Box, Text, useInput, useStdin, useStdout } from 'ink';
+import { Box, useInput, useStdin, useStdout } from 'ink';
+import { Text } from './text.js';
 import type { DetailLine, PanelViewModel } from '../store/types.js';
 import { ListTable } from './list-table.js';
 import { useI18n } from '../i18n.js';
