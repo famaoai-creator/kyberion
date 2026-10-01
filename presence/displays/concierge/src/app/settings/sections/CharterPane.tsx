@@ -8,6 +8,7 @@ import {
   charterErrorKind,
   checkDraft,
   draftFromCharter,
+  draftFromProposal,
   draftToForm,
   isManuallyStopped,
   parseCharterOverview,
@@ -68,13 +69,15 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
     const text =
       kind === 'owner'
         ? t('setup.charter_err_owner')
-        : kind === 'member'
-          ? t('setup.charter_err_member')
-          : kind === 'changed'
-            ? t('setup.charter_err_changed')
-            : kind === 'responsible'
-              ? t('setup.charter_err_responsible')
-              : t('setup.charter_err_generic', { detail: code });
+        : kind === 'approver'
+          ? t('setup.charter_err_approver')
+          : kind === 'member'
+            ? t('setup.charter_err_member')
+            : kind === 'changed'
+              ? t('setup.charter_err_changed')
+              : kind === 'responsible'
+                ? t('setup.charter_err_responsible')
+                : t('setup.charter_err_generic', { detail: code });
     setMessage({ text, error: true });
   };
 
@@ -126,6 +129,30 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
       setMessage({ text: t('setup.charter_saved') });
       setPreview(null);
       setAgreed(false);
+      await load();
+    }
+  };
+
+  const propose = async () => {
+    if (!check.ok || !current) return;
+    const data = await post('/api/charters', {
+      action: 'propose',
+      form: draftToForm(current.tenant_slug, draft),
+    });
+    if (data) {
+      setMessage({ text: t('setup.charter_proposed') });
+      await load();
+    }
+  };
+
+  const dismissDraft = async () => {
+    if (!current) return;
+    const data = await post('/api/charters', {
+      action: 'dismiss_proposal',
+      tenant_slug: current.tenant_slug,
+    });
+    if (data) {
+      setMessage({ text: t('setup.charter_draft_dismissed') });
       await load();
     }
   };
@@ -294,9 +321,45 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
           <p>{t('setup.charter_none')}</p>
         )}
 
-        {current && !current.can_create ? <p>{t('setup.charter_owner_only')}</p> : null}
+        {current && !current.can_create && !current.can_propose ? (
+          <p>{t('setup.charter_owner_only')}</p>
+        ) : null}
 
-        {current?.can_create ? (
+        {current?.draft ? (
+          <div className="charter-draft settings-row-block">
+            <h4>{t('setup.charter_draft_title')}</h4>
+            <p>
+              {t('setup.charter_draft_by', {
+                name: current.draft.proposed_by_name,
+                date: current.draft.proposed_at.slice(0, 10),
+              })}
+            </p>
+            {current.draft.note ? <p>{current.draft.note}</p> : null}
+            {current.can_create ? (
+              <div className="settings-row-actions">
+                <Button
+                  label={t('setup.charter_draft_load')}
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    if (!current.draft) return;
+                    setDraft(draftFromProposal(current.draft));
+                    setPreview(null);
+                    setAgreed(false);
+                  }}
+                />
+                <Button
+                  label={t('setup.charter_draft_dismiss')}
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void dismissDraft()}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {current?.can_create || current?.can_propose ? (
           <>
             <h4>{t('setup.charter_form_title')}</h4>
             {field('per_action', t('setup.charter_per_action'), 'charter-per-action')}
@@ -336,12 +399,21 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
               />
             </SettingRow>
             <div className="settings-row-actions">
-              <Button
-                label={t('setup.charter_review')}
-                variant="secondary"
-                disabled={busy || !check.ok}
-                onClick={() => void review()}
-              />
+              {current.can_create ? (
+                <Button
+                  label={t('setup.charter_review')}
+                  variant="secondary"
+                  disabled={busy || !check.ok}
+                  onClick={() => void review()}
+                />
+              ) : (
+                <Button
+                  label={t('setup.charter_propose')}
+                  variant="primary"
+                  disabled={busy || !check.ok}
+                  onClick={() => void propose()}
+                />
+              )}
             </div>
             {!check.ok ? (
               <p role="status">{t('setup.charter_err_generic', { detail: check.reason })}</p>
