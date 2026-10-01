@@ -56,6 +56,9 @@ function asError(error: unknown): Error {
  * Manages spawn/shutdown/health of multiple agent instances.
  */
 
+/** Providers whose exec adapter can launch with every tool disabled (`toolAccess: 'none'`). */
+const TOOL_LOCKDOWN_PROVIDERS: ReadonlySet<string> = new Set(['claude']);
+
 export interface SpawnOptions {
   agentId?: string;
   provider: AgentProvider;
@@ -86,6 +89,12 @@ export interface SpawnOptions {
   /** Durable supervisor ownership propagated before the runtime is registered. */
   runtimeOwnerId?: string;
   runtimeOwnerType?: string;
+  /**
+   * Team Channel E: `none` launches the provider with every tool disabled
+   * (no file, shell, web or MCP access). Only providers that can enforce it
+   * may be used; any other provider or a pane backend fails closed.
+   */
+  toolAccess?: 'default' | 'none';
 }
 
 export interface AgentHandleAskOptions {
@@ -492,6 +501,15 @@ class AgentLifecycleManagerImpl {
     }
 
     // Opt-in pane backend: interactive provider CLIs in visible terminal panes.
+    if (resolvedOptions.toolAccess === 'none') {
+      if (runtimeBackend === 'pane' || !TOOL_LOCKDOWN_PROVIDERS.has(resolvedOptions.provider)) {
+        agentRegistry.updateStatus(agentId, 'error');
+        throw new Error(
+          `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run with tools disabled`
+        );
+      }
+    }
+
     if (runtimeBackend === 'pane') {
       const paneBackend = await createAgentPaneRuntimeAdapter({
         agentId,
@@ -570,6 +588,7 @@ class AgentLifecycleManagerImpl {
         effort: taskModelHint?.effort,
         allowedActuators: manifest?.allowedActuators,
         deniedActuators: manifest?.deniedActuators,
+        ...(resolvedOptions.toolAccess === 'none' ? { toolsDisabled: true } : {}),
       });
 
       await adapter.boot();
@@ -633,6 +652,14 @@ class AgentLifecycleManagerImpl {
       };
       this.handles.set(agentId, handle);
       return handle;
+    }
+
+    // ACP mediators launch the provider with its own tools; never a lockdown target.
+    if (resolvedOptions.toolAccess === 'none') {
+      agentRegistry.updateStatus(agentId, 'error');
+      throw new Error(
+        `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: no exec adapter for '${resolvedOptions.provider}' to run with tools disabled`
+      );
     }
 
     // ACP-based agents (gemini, claude, etc.)

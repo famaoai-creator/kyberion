@@ -1424,6 +1424,11 @@
       "unresolved": []
     },
     {
+      "site": "satellites/slack-bridge/src/index.ts#runSlackChannelTurn",
+      "roles": ["slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "satellites/slack-bridge/src/index.ts#start (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["slack_bridge"],
       "unresolved": []

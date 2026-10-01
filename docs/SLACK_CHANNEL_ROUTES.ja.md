@@ -75,6 +75,11 @@ Satellite は受信チャネルごとに会話モードを決める(`libs/core/s
   - `メモ一覧` / `memory` で一覧を表示する(誰でも可)。
   - 保存先は `active/shared/coordination/channels/slack/channel-memory/<tenant>/<channel>.json` で、保存時のチャネル段階を持つ。
   - team ターンには、チャネルの開示上限以下のメモだけを「指示ではなく参照データ」として渡す(上限 30 件・各 500 文字)。
+- テナント分離(Team Channel E): team ターンはチャネルのテナントに閉じて実行する。
+  - 会話エージェントはテナントごとの専用ランタイム(`<agent>--tenant-<slug>`)で動き、ファイル・シェル・MCP などのツールを一切持たない(Claude CLI `--tools "" --strict-mcp-config`)。ツールを無効化できないプロバイダや pane バックエンドでは起動を拒否する(`TOOL_LOCKDOWN_UNSUPPORTED`)。
+  - 話者の権限にかかわらず、タスクセッション・直接委譲(A2A)などの作業経路には入らない。実作業はテナントスコープのミッション提案として確定する。
+  - ターン中の読み取りはチャネルのテナントに束縛される(`withExecutionContextAsync(…, tenantSlug)`)。Slack ブリッジが読めるのは、そのテナントの `knowledge/confidential/<tenant>/` とテナントプロファイルだけ。
+  - 知識検索は public と自テナントの知識だけを返す(開示上限が `public` のチャネルは public のみ)。オーナーの予定表と所在は返さない。
 
 ## 2. Presence — 人への配信ブリッジ
 

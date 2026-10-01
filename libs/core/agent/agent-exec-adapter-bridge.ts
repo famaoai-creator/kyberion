@@ -19,6 +19,8 @@ export interface AgentExecAdapterRequest {
   /** Manifest actuator allow-list; Claude provider maps these to CLI tool flags. */
   allowedActuators?: string[];
   deniedActuators?: string[];
+  /** Team Channel E: launch with every tool disabled (adapters that cannot must not be used). */
+  toolsDisabled?: boolean;
 }
 
 export interface AgentExecAdapterBridge {

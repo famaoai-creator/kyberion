@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   createTaskSession: vi.fn(),
   saveTaskSession: vi.fn(),
   ask: vi.fn(async () => 'direct answer'),
+  getAgentRuntimeHandle: vi.fn(),
+  ensureAgentRuntime: vi.fn(),
 }));
 
 vi.mock('../secure-io.js', async () => {
@@ -55,10 +57,8 @@ vi.mock('../agent/agent-runtime-supervisor.js', async () => {
   );
   return {
     ...actual,
-    getAgentRuntimeHandle: () => ({
-      ask: mocks.ask,
-      getRecord: () => ({ status: 'ready' }),
-    }),
+    getAgentRuntimeHandle: mocks.getAgentRuntimeHandle,
+    ensureAgentRuntime: mocks.ensureAgentRuntime,
   };
 });
 
@@ -67,6 +67,10 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.resolveSurfaceIntent.mockReturnValue({});
+    mocks.getAgentRuntimeHandle.mockReturnValue({
+      ask: mocks.ask,
+      getRecord: () => ({ status: 'ready' }),
+    });
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'cross-project-remediation',
       taskType: 'analysis',
@@ -115,5 +119,35 @@ describe('surface-runtime-orchestrator ask-only work authority', () => {
       senderAgentId: 'test-sender',
     });
     expect(mocks.createTaskSession).toHaveBeenCalled();
+  });
+  it('runs an isolated tenant turn on a tool-less per-tenant runtime without delegating', async () => {
+    mocks.getAgentRuntimeHandle.mockReturnValue(undefined);
+    mocks.ensureAgentRuntime.mockResolvedValue({
+      agentId: 'slack-surface-agent--tenant-acme',
+      ask: mocks.ask,
+      getRecord: () => ({ status: 'ready' }),
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'slack-surface-agent',
+      query: '横展開されていないバグを修正して',
+      senderAgentId: 'test-sender',
+      forcedReceiver: 'nerve-agent',
+      isolation: { tenantSlug: 'acme', maxTier: 'confidential' },
+    });
+    expect(mocks.getAgentRuntimeHandle).toHaveBeenCalledWith('slack-surface-agent--tenant-acme');
+    expect(mocks.getAgentRuntimeHandle).not.toHaveBeenCalledWith('slack-surface-agent');
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'slack-surface-agent--tenant-acme',
+        provider: 'claude',
+        runtimeBackend: 'pipe',
+        toolAccess: 'none',
+        scope: { tenant_slug: 'acme', tier: 'confidential' },
+      })
+    );
+    expect(mocks.createTaskSession).not.toHaveBeenCalled();
+    expect(mocks.a2aRoute).not.toHaveBeenCalled();
+    expect(result.delegationResults).toEqual([]);
   });
 });

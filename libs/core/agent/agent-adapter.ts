@@ -1204,6 +1204,12 @@ export interface ClaudeAdapterOptions {
   maxBudgetUsd?: number;
   sessionId?: string;
   permissionMode?: 'default' | 'plan' | 'auto' | 'bypassPermissions';
+  /**
+   * Team Channel E: disable every built-in tool (`--tools ""`) and ignore
+   * project/user MCP servers (`--strict-mcp-config` with no config), so the
+   * model can only answer from the prompt it is given.
+   */
+  toolsDisabled?: boolean;
 }
 
 // Map Kyberion actuator names to Claude Code tool names
@@ -1264,7 +1270,10 @@ export class ClaudeAdapter implements AgentAdapter {
       }
 
       // Tool restrictions from manifest
-      if (
+      if (this.options.toolsDisabled) {
+        // Availability, not approval: applies even under active permission args.
+        args.push('--tools', '', '--strict-mcp-config');
+      } else if (
         !activePermissionArgs &&
         this.options.allowedTools &&
         this.options.allowedTools.length > 0
@@ -1276,6 +1285,7 @@ export class ClaudeAdapter implements AgentAdapter {
         args.push('--allowedTools', ...this.options.allowedTools);
       }
       if (
+        !this.options.toolsDisabled &&
         !activePermissionArgs &&
         this.options.disallowedTools &&
         this.options.disallowedTools.length > 0

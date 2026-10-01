@@ -5,6 +5,7 @@ import { nowIso } from '../foundation/time.js';
 import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
 import { extractExternalResponseText } from './surface-runtime-external-response.js';
 import { queryKnowledgeHybrid } from '../knowledge/knowledge-index.js';
+import { queryTenantKnowledge } from '../organization/tenant-knowledge-retrieval.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { secureFetch } from '../network.js';
@@ -264,6 +265,30 @@ export function buildTaskSessionCompletionAction(input: {
   });
 }
 
+/**
+ * Team Channel E: knowledge of the channel's own tenant (its subtree, overlay
+ * and `common/`), only when the channel may disclose confidential data. Other
+ * tenants' knowledge never reaches the turn.
+ */
+async function isolatedTenantKnowledge(
+  isolation: NonNullable<SurfaceRuntimeRouteContext['input']['isolation']>,
+  queryText: string
+): Promise<Array<{ topic: string; hint: string; source: string; tags: string[] }>> {
+  if (isolation.maxTier !== 'confidential') return [];
+  const hits = await queryTenantKnowledge({
+    tenantSlug: isolation.tenantSlug,
+    topic: queryText,
+    limit: 5,
+    scope: { tier: 'confidential', tenant_slug: isolation.tenantSlug },
+  });
+  return hits.map((hit) => ({
+    topic: hit.title,
+    hint: hit.excerpt,
+    source: hit.path,
+    tags: hit.tags,
+  }));
+}
+
 export async function handleSurfaceQueryRoute(
   context: SurfaceRuntimeRouteContext,
   resolved: ReturnType<typeof resolveSurfaceIntent>
@@ -278,6 +303,15 @@ export async function handleSurfaceQueryRoute(
 
   if (!queryText) {
     return emptySurfaceResult('No query text was provided.');
+  }
+
+  // Team Channel E: the owner's calendar and presence are personal-tier data
+  // and never answer a shared channel.
+  const isolation = context.input.isolation;
+  if (isolation && (resolved.intentId === 'schedule-read-agenda' || queryType === 'location')) {
+    return emptySurfaceResult(
+      'That information is private to the owner and is not available in a shared channel.'
+    );
   }
 
   if (resolved.intentId === 'schedule-read-agenda') {
@@ -309,7 +343,10 @@ export async function handleSurfaceQueryRoute(
   if (queryType === 'knowledge_search') {
     const providerLabel = providerConfig.knowledge?.provider || 'local_index';
     const index = await loadKnowledgeHintIndex();
-    const results = await queryKnowledgeHybrid(index, queryText, { maxResults: 5 });
+    const publicResults = await queryKnowledgeHybrid(index, queryText, { maxResults: 5 });
+    const results = isolation
+      ? [...(await isolatedTenantKnowledge(isolation, queryText)), ...publicResults].slice(0, 5)
+      : publicResults;
     const text = buildKnowledgeQueryReply({
       queryText,
       providerLabel,

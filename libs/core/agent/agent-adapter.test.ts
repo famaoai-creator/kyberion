@@ -208,6 +208,41 @@ describe('AgyAdapter', () => {
   });
 });
 
+describe('ClaudeAdapter tool lockdown', () => {
+  it('disables every tool and ignores MCP servers when toolsDisabled is set', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+    });
+    codexMocks.spawnManagedProcess.mockImplementationOnce((spec: any) => ({
+      resourceId: spec.resourceId,
+      child: spawn(spec.command, spec.args, spec.spawnOptions),
+    }));
+    vi.mocked(spawn).mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        child.stdout.end(JSON.stringify({ result: 'ok' }));
+        child.emit('close', 0, null);
+      });
+      return child as any;
+    });
+
+    const adapter = new ClaudeAdapter({
+      toolsDisabled: true,
+      allowedTools: ['Read', 'Bash'],
+      disallowedTools: ['Write'],
+    });
+    await adapter.ask('What is our plan?');
+
+    const args = vi.mocked(spawn).mock.calls.at(-1)?.[1] as string[];
+    const toolsAt = args.indexOf('--tools');
+    expect(args[toolsAt + 1]).toBe('');
+    expect(args).toContain('--strict-mcp-config');
+    expect(args).not.toContain('--allowedTools');
+    expect(args).not.toContain('--disallowedTools');
+  });
+});
+
 describe('GeminiWisdomEnhancer path boundary', () => {
   it('revalidates the evolution directory and each lesson before reading', async () => {
     const source = readTextFile(pathResolver.rootResolve('libs/core/agent/agent-adapter.ts'));

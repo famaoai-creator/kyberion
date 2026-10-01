@@ -687,14 +687,23 @@ function _scanConfidentialTier(
   includeCommon = true
 ): void {
   const confidentialRoot = path.join(knowledgeBase, 'confidential');
-  if (!safeExistsSync(confidentialRoot)) return;
+  // Each root is checked on its own: a tenant-bound reader may see its own
+  // subtree without being allowed to stat `confidential/` or `common/`, and a
+  // root the reader cannot see is outside its scope, so it contributes nothing.
+  const isVisibleRoot = (root: string): boolean => {
+    try {
+      return safeExistsSync(root);
+    } catch {
+      return false;
+    }
+  };
 
   const scanRoot = (
     root: string,
     tenant: string | undefined,
     options: { excludeDirectories?: ReadonlySet<string> } = {}
   ): void => {
-    if (!safeExistsSync(root)) return;
+    if (!isVisibleRoot(root)) return;
     if (domains !== TIER1_SUBDIRS) {
       for (const domain of domains) {
         const dir = path.join(root, domain);
@@ -774,7 +783,7 @@ function _scanConfidentialTier(
 
   for (const cid of customerDirs) {
     const cidRoot = path.join(confidentialRoot, cid);
-    if (!safeExistsSync(cidRoot)) continue;
+    if (!isVisibleRoot(cidRoot)) continue;
     // Confidential dirs have customer-specific structures (design/, financials/,
     // browser-workflows/, etc.) that don't follow public's Tier-1 layout.
     scanRoot(cidRoot, cid);
@@ -857,16 +866,16 @@ function isSafeScannerPath(knowledgeBase: string, candidate: string): boolean {
     return false;
   }
 
-  let current = projectRoot;
-  for (const segment of relative.split('/')) {
-    current = path.join(current, segment);
-    try {
-      if (safeLstat(current).isSymbolicLink()) return false;
-    } catch {
-      return false;
-    }
+  // Structural symlink check on every segment, independent of the reader's
+  // read grants: a tenant-bound reader may scan its own subtree without being
+  // allowed to stat the shared `confidential/` parent. Contents are still read
+  // through secure-io, so the read policy still decides what is visible.
+  try {
+    pathResolver.assertSafeRepositoryPath(absolute, { rootDir: projectRoot });
+    return true;
+  } catch {
+    return false;
   }
-  return true;
 }
 
 function scannerSource(knowledgeBase: string, filePath: string): string {

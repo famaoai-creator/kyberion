@@ -782,5 +782,6 @@ export function buildSurfaceConversationInput(
   }
   if (input.attachments) baseInput.attachments = input.attachments;
   if (input.workAuthority) baseInput.workAuthority = input.workAuthority;
+  if (input.isolation) baseInput.isolation = input.isolation;
   return baseInput;
 }
