@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/slack-mission-kickoff-input.schema.json",
+  "title": "Legacy Slack Mission Kickoff Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["missionId", "channel", "threadTs"],
+  "properties": {
+    "missionId": { "type": "string", "minLength": 1 },
+    "channel": { "type": "string", "minLength": 1 },
+    "threadTs": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "sourceText": { "type": "string" },
+    "proposal": { "type": "object", "additionalProperties": true }
+  }
+}

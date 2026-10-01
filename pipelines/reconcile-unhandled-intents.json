@@ -4,6 +4,12 @@
   "version": "1.0.0",
   "name": "Unhandled Intent Reconciler",
   "description": "Reads the unhandled-intent registry (unrouted + unrecognized) and writes proposal stubs. Invokes reasoning:analyze to suggest routing entries (for unrouted) or new intent definitions (for unrecognized).",
+  "schedule": {
+    "id": "reconcile-unhandled-intents-weekly",
+    "cron": "20 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "context": {
     "registry_path": "active/shared/tmp/unhandled-intent-registry.json",
     "proposals_dir": "active/shared/tmp/unhandled-intent-proposals",

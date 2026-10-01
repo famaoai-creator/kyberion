@@ -2245,6 +2245,334 @@
       "noun": "check",
       "verb": "dep-cycles",
       "audience": "dev"
+    },
+    {
+      "id": "script.approvals.digest",
+      "module": "scripts/approval_inbox.ts",
+      "command": "approvals digest",
+      "noun": "approvals",
+      "verb": "digest",
+      "audience": "operator"
+    },
+    {
+      "id": "script.approvals.hygiene",
+      "module": "scripts/approval_store_hygiene.ts",
+      "command": "approvals hygiene",
+      "noun": "approvals",
+      "verb": "hygiene",
+      "audience": "operator"
+    },
+    {
+      "id": "script.tenant.export",
+      "module": "scripts/tenant_export.ts",
+      "command": "tenant export",
+      "noun": "tenant",
+      "verb": "export",
+      "audience": "operator"
+    },
+    {
+      "id": "script.release.changelog-draft",
+      "module": "scripts/generate_changelog.ts",
+      "command": "release changelog-draft",
+      "noun": "release",
+      "verb": "changelog-draft",
+      "audience": "dev"
+    },
+    {
+      "id": "script.workflow.register",
+      "module": "scripts/register_workflow.ts",
+      "command": "workflow register",
+      "noun": "workflow",
+      "verb": "register",
+      "audience": "operator"
+    },
+    {
+      "id": "script.agent-runtime.manage",
+      "module": "scripts/agent_runtime_manager.ts",
+      "command": "agent-runtime manage",
+      "noun": "agent-runtime",
+      "verb": "manage",
+      "audience": "operator"
+    },
+    {
+      "id": "script.surface.outbox",
+      "module": "scripts/surface_outbox.ts",
+      "command": "surface outbox",
+      "noun": "surface",
+      "verb": "outbox",
+      "audience": "operator"
+    },
+    {
+      "id": "script.action-items.remind",
+      "module": "scripts/action_item_reminders.ts",
+      "command": "action-items remind",
+      "noun": "action-items",
+      "verb": "remind",
+      "audience": "operator"
+    },
+    {
+      "id": "script.presence.stimuli",
+      "module": "scripts/presence-controller.ts",
+      "command": "presence stimuli",
+      "noun": "presence",
+      "verb": "stimuli",
+      "audience": "operator"
+    },
+    {
+      "id": "script.a2a.run",
+      "module": "scripts/run_a2a.ts",
+      "command": "a2a run",
+      "noun": "a2a",
+      "verb": "run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.report.team-decision-support",
+      "module": "scripts/report_team_decision_support.ts",
+      "command": "report team-decision-support",
+      "noun": "report",
+      "verb": "team-decision-support",
+      "audience": "operator"
+    },
+    {
+      "id": "script.sync.agent-profiles",
+      "module": "scripts/sync_agent_profiles.ts",
+      "command": "sync agent-profiles",
+      "noun": "sync",
+      "verb": "agent-profiles",
+      "audience": "dev"
+    },
+    {
+      "id": "script.sync.authority-roles",
+      "module": "scripts/sync_authority_roles.ts",
+      "command": "sync authority-roles",
+      "noun": "sync",
+      "verb": "authority-roles",
+      "audience": "dev"
+    },
+    {
+      "id": "script.sync.service-endpoints",
+      "module": "scripts/sync_service_endpoints.ts",
+      "command": "sync service-endpoints",
+      "noun": "sync",
+      "verb": "service-endpoints",
+      "audience": "dev"
+    },
+    {
+      "id": "script.sync.specialist-catalog",
+      "module": "scripts/sync_specialist_catalog.ts",
+      "command": "sync specialist-catalog",
+      "noun": "sync",
+      "verb": "specialist-catalog",
+      "audience": "dev"
+    },
+    {
+      "id": "script.sync.team-roles",
+      "module": "scripts/sync_team_roles.ts",
+      "command": "sync team-roles",
+      "noun": "sync",
+      "verb": "team-roles",
+      "audience": "dev"
+    },
+    {
+      "id": "script.generate.service-harness-registry",
+      "module": "scripts/generate_service_harness_registry.ts",
+      "command": "generate service-harness-registry",
+      "noun": "generate",
+      "verb": "service-harness-registry",
+      "audience": "dev"
+    },
+    {
+      "id": "script.generate.trace-docs",
+      "module": "scripts/generate_trace_docs.ts",
+      "command": "generate trace-docs",
+      "noun": "generate",
+      "verb": "trace-docs",
+      "audience": "dev"
+    },
+    {
+      "id": "script.provider-capabilities.report",
+      "module": "scripts/generate_provider_cli_capability_report.ts",
+      "command": "provider-capabilities report",
+      "noun": "provider-capabilities",
+      "verb": "report",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.harness",
+      "module": "scripts/eval_harness.ts",
+      "command": "eval harness",
+      "noun": "eval",
+      "verb": "harness",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.intent-trace",
+      "module": "scripts/intent_trace.ts",
+      "command": "eval intent-trace",
+      "noun": "eval",
+      "verb": "intent-trace",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.japanese-intent",
+      "module": "scripts/eval_japanese_contextual_intent.ts",
+      "command": "eval japanese-intent",
+      "noun": "eval",
+      "verb": "japanese-intent",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.mission-orchestration",
+      "module": "scripts/evaluate_mission_orchestration.ts",
+      "command": "eval mission-orchestration",
+      "noun": "eval",
+      "verb": "mission-orchestration",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.model-role-fitness",
+      "module": "scripts/evaluate_model_role_fitness.ts",
+      "command": "eval model-role-fitness",
+      "noun": "eval",
+      "verb": "model-role-fitness",
+      "audience": "dev"
+    },
+    {
+      "id": "script.eval.learning-efficiency",
+      "module": "scripts/benchmark_learning_efficiency.ts",
+      "command": "eval learning-efficiency",
+      "noun": "eval",
+      "verb": "learning-efficiency",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.dead-code",
+      "module": "scripts/find_dead_code.ts",
+      "command": "check dead-code",
+      "noun": "check",
+      "verb": "dead-code",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.rt-mode",
+      "module": "scripts/check_rt_mode.ts",
+      "command": "check rt-mode",
+      "noun": "check",
+      "verb": "rt-mode",
+      "audience": "dev"
+    },
+    {
+      "id": "script.surfaces.screenshots",
+      "module": "scripts/capture_surface_screenshots.ts",
+      "command": "surfaces screenshots",
+      "noun": "surfaces",
+      "verb": "screenshots",
+      "audience": "dev"
+    },
+    {
+      "id": "script.design.import-md-catalog",
+      "module": "scripts/import_design_md_catalog.ts",
+      "command": "design import-md-catalog",
+      "noun": "design",
+      "verb": "import-md-catalog",
+      "audience": "dev"
+    },
+    {
+      "id": "script.design.verify-resolution",
+      "module": "scripts/verify-design-resolution.mjs",
+      "command": "design verify-resolution",
+      "noun": "design",
+      "verb": "verify-resolution",
+      "audience": "dev"
+    },
+    {
+      "id": "script.media.intro-scratch",
+      "module": "scripts/kyberion_intro_scratch.ts",
+      "command": "media intro-scratch",
+      "noun": "media",
+      "verb": "intro-scratch",
+      "audience": "dev"
+    },
+    {
+      "id": "script.marketing.publish-dry-run",
+      "module": "scripts/marketing_publish_dry_run.ts",
+      "command": "marketing publish-dry-run",
+      "noun": "marketing",
+      "verb": "publish-dry-run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.marketing.review-aggregate",
+      "module": "scripts/marketing_review_aggregate.ts",
+      "command": "marketing review-aggregate",
+      "noun": "marketing",
+      "verb": "review-aggregate",
+      "audience": "operator"
+    },
+    {
+      "id": "script.pipeline.dry-run",
+      "module": "scripts/run_pipeline_dry_run.ts",
+      "command": "pipeline dry-run",
+      "noun": "pipeline",
+      "verb": "dry-run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.scenario.storage-governance",
+      "module": "scripts/scenario_storage_governance.ts",
+      "command": "scenario storage-governance",
+      "noun": "scenario",
+      "verb": "storage-governance",
+      "audience": "dev"
+    },
+    {
+      "id": "script.smoke.agent-pane-runtime",
+      "module": "scripts/smoke_agent_pane_runtime.ts",
+      "command": "smoke agent-pane-runtime",
+      "noun": "smoke",
+      "verb": "agent-pane-runtime",
+      "audience": "dev"
+    },
+    {
+      "id": "script.memory.promotion-queue",
+      "module": "scripts/summarize_memory_promotion_queue.ts",
+      "command": "memory promotion-queue",
+      "noun": "memory",
+      "verb": "promotion-queue",
+      "audience": "operator"
+    },
+    {
+      "id": "script.reconcile.config-fallbacks",
+      "module": "scripts/reconcile_config_fallbacks.ts",
+      "command": "reconcile config-fallbacks",
+      "noun": "reconcile",
+      "verb": "config-fallbacks",
+      "audience": "operator"
+    },
+    {
+      "id": "script.reconcile.unhandled-intents",
+      "module": "scripts/reconcile_unhandled_intents.ts",
+      "command": "reconcile unhandled-intents",
+      "noun": "reconcile",
+      "verb": "unhandled-intents",
+      "audience": "operator"
+    },
+    {
+      "id": "script.reconcile.unclassified-errors",
+      "module": "scripts/reconcile_unclassified_errors.ts",
+      "command": "reconcile unclassified-errors",
+      "noun": "reconcile",
+      "verb": "unclassified-errors",
+      "audience": "operator"
+    },
+    {
+      "id": "script.chat.local",
+      "module": "scripts/chat_local.ts",
+      "command": "chat local",
+      "noun": "chat",
+      "verb": "local",
+      "audience": "dev"
     }
   ]
 }

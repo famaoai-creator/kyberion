@@ -4,6 +4,12 @@
   "version": "1.0.0",
   "name": "Config Fallback Reconciler",
   "description": "Reads the config fallback registry and closes the feedback loop: creates missing knowledge JSON files from defaults (file_not_found), and writes corrected proposals for parse errors for human review.",
+  "schedule": {
+    "id": "reconcile-config-fallbacks-weekly",
+    "cron": "0 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "context": {
     "registry_path": "active/shared/tmp/config-fallback-registry.json",
     "proposals_dir": "active/shared/tmp/config-fallback-proposals"
