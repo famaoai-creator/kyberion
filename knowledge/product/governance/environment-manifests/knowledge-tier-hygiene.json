@@ -16,9 +16,9 @@
       },
       "install": {
         "operator_confirmed": false,
-        "instruction": "Run `pnpm onboard` to recreate the canonical knowledge tree.",
+        "instruction": "Run `pnpm onboarding` to recreate the canonical knowledge tree.",
         "command": "pnpm",
-        "args": ["onboard"]
+        "args": ["onboarding"]
       }
     },
     {

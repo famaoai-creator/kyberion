@@ -23,6 +23,21 @@ export interface CliCommand {
   group?: CliCommandGroup;
   /** CU-03: vocabulary key for a caution line shown under the summary. */
   caution?: string;
+  /** CU-09: how a scope is chosen — `--scope <id>` (flag) or `<command> <id>` (positional). */
+  scope_selector?: CliScopeSelector;
+  /** CU-09: scopes/areas that delegate to an existing registered command. */
+  scopes?: CliCommandScope[];
+}
+
+export type CliScopeSelector = 'flag' | 'positional';
+
+/** CU-09: one `doctor --scope <id>` / `setup <id>` route to an existing command. */
+export interface CliCommandScope {
+  id: string;
+  /** Arguments of the registered command this scope delegates to. */
+  routes_to: string[];
+  /** Vocabulary key (`cli` namespace, `cli_scope_*`) with the en/ja summary. */
+  description: string;
 }
 
 export type CliCommandGroup = 'start' | 'inspect' | 'operate' | 'dev';
@@ -61,12 +76,19 @@ export interface CliDeprecatedScriptAlias {
   replaced_by: string;
 }
 
+/** CU-08: renamed `kyberion` commands kept as warning aliases by the router. */
+export interface CliDeprecatedCommandAlias {
+  command: string;
+  replaced_by: string;
+}
+
 export interface CliManifest {
   version: number;
   commands: CliCommand[];
   entrypoints: CliEntrypoint[];
   script_commands?: CliScriptCommand[];
   deprecated_script_aliases?: CliDeprecatedScriptAlias[];
+  deprecated_command_aliases?: CliDeprecatedCommandAlias[];
 }
 
 const cliManifestCatalog = defineCatalog<CliManifest>({
@@ -81,6 +103,8 @@ export function loadCliManifest(): CliManifest {
 
 export interface CliManifestCheckOptions {
   packageScripts?: ReadonlySet<string>;
+  /** Script bodies (name -> command line); enables the deprecated-alias body check. */
+  packageScriptBodies?: Readonly<Record<string, string>>;
 }
 
 // Keep the ratchet explicit as governed operator entrypoints are added.
@@ -90,12 +114,108 @@ export function resolveCliModulePath(module: string, allowMissingLeaf = false): 
   return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });
 }
 
-function loadPackageScriptNames(): Set<string> {
+function loadPackageScripts(): Record<string, string> {
   const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
     pathResolver.rootResolve('package.json'),
     'package manifest for CLI manifest check'
   );
-  return new Set(Object.keys(packageJson.scripts || {}));
+  return packageJson.scripts || {};
+}
+
+/**
+ * CU-08 naming rule for package scripts (enforced here; explained in
+ * knowledge/product/governance/kyberion-development-practices.md):
+ *
+ * - operator/user scripts are `noun` or `noun:verb` — lowercase kebab
+ *   segments, at most one colon (`stance:create`, `knowledge:ingest`);
+ * - the conventional toolchain families keep their verb-first shape:
+ *   `build`, `test`, `lint`, `format`, `typecheck`, `check`, `generate`,
+ *   `validate`, `verify`, `ci`, `prepare` (and their `<family>:<target>`);
+ * - a non-toolchain name must not start with a verb (`report:*`, `migrate:*`,
+ *   `export:*`, `watch:*`, `onboard`, `ingest` are the shapes this rejects).
+ *
+ * Renamed scripts stay as `deprecated_script_aliases` and are exempt.
+ */
+export const TOOLCHAIN_SCRIPT_FAMILIES: ReadonlySet<string> = new Set([
+  'build',
+  'test',
+  'lint',
+  'format',
+  'typecheck',
+  'check',
+  'generate',
+  'validate',
+  'verify',
+  'ci',
+  'prepare',
+]);
+
+/** Leading words that mark a verb-first (non-noun) script name. */
+export const SCRIPT_NAME_LEADING_VERBS: ReadonlySet<string> = new Set([
+  'apply',
+  'bootstrap',
+  'create',
+  'delete',
+  'deploy',
+  'export',
+  'fetch',
+  'import',
+  'ingest',
+  'init',
+  'inspect',
+  'install',
+  'list',
+  'migrate',
+  'onboard',
+  'open',
+  'promote',
+  'record',
+  'register',
+  'remove',
+  'report',
+  'reset',
+  'run',
+  'scan',
+  'search',
+  'setup',
+  'show',
+  'sign',
+  'start',
+  'stop',
+  'switch',
+  'sync',
+  'uninstall',
+  'update',
+  'upgrade',
+  'watch',
+]);
+
+const SCRIPT_NAME_SEGMENT = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
+
+/** CU-08: why a package script name breaks the naming rule, or undefined when it conforms. */
+export function scriptNameViolation(name: string): string | undefined {
+  const segments = name.split(':');
+  if (segments.length > 2) {
+    return `package script ${name} has more than two segments; use noun:verb (e.g. agy:sdk-setup)`;
+  }
+  if (!segments.every((segment) => SCRIPT_NAME_SEGMENT.test(segment))) {
+    return `package script ${name} must use lowercase kebab-case segments`;
+  }
+  const head = segments[0] as string;
+  if (TOOLCHAIN_SCRIPT_FAMILIES.has(head)) return undefined;
+  const leadingWord = head.split('-')[0] as string;
+  if (SCRIPT_NAME_LEADING_VERBS.has(leadingWord)) {
+    return `package script ${name} starts with a verb; name it noun:verb (e.g. ${segments[1] ?? 'thing'}:${leadingWord})`;
+  }
+  return undefined;
+}
+
+/** CU-08: an alias runs the deprecation notice, then exactly the replacement's command. */
+export function expectedDeprecatedAliasBody(
+  alias: CliDeprecatedScriptAlias,
+  replacementBody: string
+): string {
+  return `node scripts/deprecated_script_alias.mjs ${alias.script} ${alias.replaced_by} && ${replacementBody}`;
 }
 
 /** CU-03: every entry carries a localized summary key and a help group. */
@@ -150,7 +270,8 @@ function checkGovernedShadowing(
 function checkDeprecatedScriptAliases(
   manifest: CliManifest,
   packageScripts: ReadonlySet<string>,
-  failures: string[]
+  failures: string[],
+  bodies?: Readonly<Record<string, string>>
 ): Set<string> {
   const aliases = new Set<string>();
   const registered = new Set(
@@ -169,16 +290,117 @@ function checkDeprecatedScriptAliases(
         `deprecated script alias ${alias.script} must point at a registered script: ${alias.replaced_by}`
       );
     }
+    const replacementBody = bodies?.[alias.replaced_by];
+    const aliasBody = bodies?.[alias.script];
+    if (
+      replacementBody !== undefined &&
+      aliasBody !== undefined &&
+      aliasBody !== expectedDeprecatedAliasBody(alias, replacementBody)
+    ) {
+      failures.push(
+        `deprecated script alias ${alias.script} must run the notice then the ${alias.replaced_by} command unchanged: "${expectedDeprecatedAliasBody(alias, replacementBody)}"`
+      );
+    }
   }
   return aliases;
+}
+
+/** Every name an operator can type after `kyberion` (governed + script commands). */
+function routableCommandNames(manifest: CliManifest): Set<string> {
+  const names = new Set(manifest.commands.map((command) => command.command));
+  for (const command of manifest.script_commands ?? []) {
+    names.add(
+      command.command.endsWith(' default')
+        ? command.command.slice(0, -' default'.length)
+        : command.command
+    );
+  }
+  return names;
+}
+
+/** Longest registered command prefix (one or two tokens) of an argument list. */
+function routedPrefix(args: readonly string[], names: ReadonlySet<string>): string | undefined {
+  for (let length = Math.min(2, args.length); length >= 1; length -= 1) {
+    const candidate = args.slice(0, length).join(' ');
+    if (names.has(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/** CU-08: renamed kyberion commands must point at a routable command and never shadow one. */
+function checkDeprecatedCommandAliases(manifest: CliManifest, failures: string[]): void {
+  const names = routableCommandNames(manifest);
+  const seen = new Set<string>();
+  for (const alias of manifest.deprecated_command_aliases ?? []) {
+    if (!alias.command || seen.has(alias.command)) {
+      failures.push(`deprecated command alias must be unique: ${alias.command || '<missing>'}`);
+    }
+    seen.add(alias.command);
+    if (names.has(alias.command)) {
+      failures.push(`deprecated command alias shadows a registered command: ${alias.command}`);
+    }
+    if (!names.has(alias.replaced_by)) {
+      failures.push(
+        `deprecated command alias ${alias.command} must point at a registered command: ${alias.replaced_by}`
+      );
+    }
+  }
+}
+
+/** CU-09: each scope delegates to an existing registered command, never to another scope. */
+function checkCommandScopes(manifest: CliManifest, failures: string[]): void {
+  const names = routableCommandNames(manifest);
+  for (const command of manifest.commands) {
+    if (command.scopes === undefined) {
+      if (command.scope_selector !== undefined) {
+        failures.push(`command ${command.id} declares scope_selector without scopes`);
+      }
+      continue;
+    }
+    if (command.scope_selector !== 'flag' && command.scope_selector !== 'positional') {
+      failures.push(
+        `command ${command.id} with scopes must declare scope_selector flag|positional`
+      );
+    }
+    const ids = new Set<string>();
+    for (const scope of command.scopes) {
+      if (!scope.id || ids.has(scope.id)) {
+        failures.push(`command ${command.id} scope id must be unique: ${scope.id || '<missing>'}`);
+      }
+      ids.add(scope.id);
+      if (!scope.description || !scope.description.startsWith('cli_scope_')) {
+        failures.push(`command ${command.id} scope ${scope.id} must declare a cli_scope_* key`);
+      }
+      const target = Array.isArray(scope.routes_to)
+        ? routedPrefix(scope.routes_to, names)
+        : undefined;
+      if (!target) {
+        failures.push(
+          `command ${command.id} scope ${scope.id} must route to a registered command: ${(scope.routes_to || []).join(' ')}`
+        );
+      } else if (
+        scope.routes_to.includes('--scope') ||
+        (command.scope_selector === 'positional' && target === command.command)
+      ) {
+        // A positional scope routed back to its own command would loop.
+        failures.push(`command ${command.id} scope ${scope.id} must not route to another scope`);
+      }
+    }
+  }
 }
 
 function checkScriptCommands(
   manifest: CliManifest,
   packageScripts: ReadonlySet<string>,
-  failures: string[]
+  failures: string[],
+  bodies?: Readonly<Record<string, string>>
 ): void {
-  const aliasScripts = checkDeprecatedScriptAliases(manifest, packageScripts, failures);
+  const aliasScripts = checkDeprecatedScriptAliases(manifest, packageScripts, failures, bodies);
+  for (const script of packageScripts) {
+    if (aliasScripts.has(script)) continue;
+    const violation = scriptNameViolation(script);
+    if (violation) failures.push(violation);
+  }
   const ratchetedScripts = packageScripts.size - aliasScripts.size;
   if (ratchetedScripts > MAX_PACKAGE_SCRIPTS) {
     failures.push(
@@ -353,7 +575,15 @@ export function checkCliManifest(
   if (commands.get('') !== 'operator-home') {
     failures.push('empty command must route to operator-home');
   }
-  checkScriptCommands(manifest, options.packageScripts || loadPackageScriptNames(), failures);
+  const bodies = options.packageScripts ? options.packageScriptBodies : loadPackageScripts();
+  checkScriptCommands(
+    manifest,
+    options.packageScripts || new Set(Object.keys(bodies || {})),
+    failures,
+    bodies
+  );
+  checkDeprecatedCommandAliases(manifest, failures);
+  checkCommandScopes(manifest, failures);
   return failures;
 }
 

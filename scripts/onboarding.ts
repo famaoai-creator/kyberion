@@ -42,7 +42,7 @@ export async function main(
 }
 
 export const runOnboarding = defineScript({
-  name: 'onboard',
+  name: 'onboarding',
   flags: ['json', 'dry-run', 'quiet'],
   run: ({ argv, print }) => main(argv, print),
 });

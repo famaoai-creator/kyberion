@@ -24,7 +24,11 @@ describe('CU-03 registry help renderer', () => {
     ) as { domains: Record<string, Record<string, Record<string, string>>> };
     const cli = vocabulary.domains.cli ?? {};
     const missing = [...manifest.commands, ...(manifest.script_commands ?? [])]
-      .flatMap((command) => [command.description, command.caution])
+      .flatMap((command) => [
+        command.description,
+        command.caution,
+        ...('scopes' in command ? (command.scopes ?? []).map((scope) => scope.description) : []),
+      ])
       .filter((key): key is string => Boolean(key))
       .filter((key) => !cli[key]?.en || !cli[key]?.ja);
     expect(missing).toEqual([]);
@@ -60,6 +64,18 @@ describe('CU-03 registry help renderer', () => {
     const help = formatCliManifestHelp(manifest, { locale: 'ja' });
     expect(help).toContain(t('cli:cli_manifest_help_group_start', undefined, 'ja'));
     expect(help).toContain('オンボーディングウィザードを実行');
+  });
+
+  it('shows the doctor scopes and setup areas under their commands (CU-09)', () => {
+    const lines = formatCliManifestHelp(manifest, { locale: 'en' }).split('\n');
+    const doctor = lines.findIndex((line) => line.startsWith('  doctor '));
+    expect(lines[doctor + 1]).toContain(
+      'Scopes: doctor --scope env|service|voice|meeting|app|setup'
+    );
+    const setup = lines.findIndex((line) => /^ {2}setup {2,}/u.test(line));
+    expect(lines[setup + 1]).toContain('Scopes: setup <onboarding|context|reasoning|');
+    const ja = formatCliManifestHelp(manifest, { locale: 'ja' });
+    expect(ja).toContain('スコープ: doctor --scope env|');
   });
 
   it('lists a same-target script alias once (under the governed command)', () => {

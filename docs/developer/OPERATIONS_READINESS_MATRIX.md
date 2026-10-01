@@ -19,8 +19,8 @@ with environment prerequisites, and what still needs caution.
 | Area                                                              | Status                | Why                                                                                                                                 |
 | ----------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Mission lifecycle                                                 | Ready                 | `create`, `resume`, `verify`, `distill`, and state persistence are in place and tested.                                             |
-| Customer overlay                                                  | Ready                 | `customer:create`, `customer:list`, `customer:switch`, and migration flows are wired end to end.                                    |
-| Onboarding / doctor                                               | Ready                 | `pnpm onboard` and `pnpm kyberion doctor` give actionable readiness checks.                                                         |
+| Customer overlay                                                  | Ready                 | `stance:create`, `stance:list`, `stance:switch`, and migration flows are wired end to end.                                          |
+| Onboarding / doctor                                               | Ready                 | `pnpm onboarding` and `pnpm kyberion doctor` give actionable readiness checks.                                                      |
 | Toolchain preflight                                               | Ready                 | `pnpm env:bootstrap --manifest kyberion-toolchain` confirms the local Node/pnpm/git/tooling baseline before you build from source.  |
 | Consolidated readiness                                            | Ready                 | `pnpm kyberion setup report` shows surfaces, services, reasoning, and doctor in one pass.                                           |
 | Baseline / vital pipelines                                        | Ready                 | `pnpm kyberion vital --format=json` and `pnpm pipeline --input pipelines/baseline-check.json` are used as real gates.               |
@@ -54,8 +54,8 @@ Recommended default flows:
 3. `pnpm kyberion setup report`
 4. `pnpm run doctor`
 5. `pnpm kyberion vital --format=json`
-6. `pnpm onboard`
-7. `pnpm customer:list`
+6. `pnpm onboarding`
+7. `pnpm stance:list`
 
 When those pass, the workspace is usually good enough for normal operator work.
 

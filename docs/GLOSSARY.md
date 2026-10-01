@@ -247,7 +247,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Onboarding
 
-The phase where environment safety and identity are established, typically via `pnpm onboard`.
+The phase where environment safety and identity are established, typically via `pnpm onboarding`.
 
 ### Alignment
 

@@ -517,8 +517,8 @@ function parseArgs(argv: string[]): PeerTenantMigrationOptions {
 
 /** CU-01: `--help` / typos exit before a plan is built or persisted. */
 export const MIGRATE_PEER_TENANT_RUNTIME_CLI: CliGuardSpec = {
-  command: 'pnpm kyberion migrate peer-tenant-runtime',
-  manifestId: 'script.migrate.peer-tenant-runtime',
+  command: 'pnpm kyberion peer migrate-tenant-runtime',
+  manifestId: 'script.peer.migrate-tenant-runtime',
   options: [
     { flag: '--apply' },
     { flag: '--tenant-id', value: '<tenant-id>' },
@@ -528,7 +528,7 @@ export const MIGRATE_PEER_TENANT_RUNTIME_CLI: CliGuardSpec = {
 };
 
 const script = defineScript({
-  name: 'migrate:peer-tenant-runtime',
+  name: 'peer:migrate-tenant-runtime',
   flags: [],
   run: ({ argv, print }) => {
     if (guardCliArgs(argv, MIGRATE_PEER_TENANT_RUNTIME_CLI, print)) return undefined;

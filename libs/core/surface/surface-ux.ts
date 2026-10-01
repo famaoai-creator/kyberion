@@ -461,7 +461,7 @@ export function buildSurfaceLauncherRecommendations(
       suggestedCommand:
         voiceReadiness === 'ready'
           ? 'pnpm pipeline --input pipelines/voice-hello.json'
-          : 'pnpm doctor --runtime browser',
+          : 'pnpm kyberion doctor --runtime browser',
     },
     {
       id: 'messaging',

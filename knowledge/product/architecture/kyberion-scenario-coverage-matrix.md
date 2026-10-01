@@ -61,7 +61,7 @@ the canonical surface(s) involved.
 | C1  | First paying-tenant launch (8 weeks) | `multi-tenant-operations.md` §5b                                                                                 | ✅     |
 | C2  | Tenant-scoped mission creation       | `mission_controller create --tenant-slug <slug>`                                                                 | ✅     |
 | C3  | Cross-tenant access denial           | `tier-guard.checkTenantScope` + `tenant.scope_violation` event                                                   | ✅     |
-| C4  | Tenant drift watchdog                | `pnpm watch:tenant-drift`                                                                                        | ✅     |
+| C4  | Tenant drift watchdog                | `pnpm tenant:watch-drift`                                                                                        | ✅     |
 | C5  | Per-tenant SIEM routing              | `TenantFilteringAuditForwarder`                                                                                  | ✅     |
 | C6  | Per-tenant rate limit                | `tenant-rate-limit-policy.json` + `consumeTenantBudget`                                                          | ✅     |
 | C7  | Cross-tenant knowledge promotion     | `mission_controller memory-promote` + tier-hygiene gate                                                          | ✅     |
@@ -114,7 +114,7 @@ the canonical surface(s) involved.
 
 | #   | Scenario                                | Mechanism                                                                               | Status                      |
 | --- | --------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------- |
-| H1  | Validation bundle export                | `pnpm export:validation-bundle <MSN-ID>`                                                | ✅                          |
+| H1  | Validation bundle export                | `pnpm validation-bundle:export <MSN-ID>`                                                | ✅                          |
 | H2  | Operator attestations                   | `attestations/README.md` shape                                                          | ✅ (manual signing process) |
 | H3  | Independent reproducibility from bundle | bundle includes prompts / model versions / governance / audit excerpt / sha256 manifest | ✅                          |
 
@@ -150,7 +150,7 @@ the canonical surface(s) involved.
 
 | #   | Surface                             | Coverage                                                                                                                                                                                                                                                                                                                                     | Status |
 | --- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| K1  | CLI (primary)                       | `mission_controller` / `pnpm pipeline` / `pnpm run validate` / `pnpm export:validation-bundle` / `pnpm watch:tenant-drift`                                                                                                                                                                                                                   | ✅     |
+| K1  | CLI (primary)                       | `mission_controller` / `pnpm pipeline` / `pnpm run validate` / `pnpm validation-bundle:export` / `pnpm tenant:watch-drift`                                                                                                                                                                                                                   | ✅     |
 | K2  | MOS read-only Web                   | 5 pages + `mos.read` events + tenant scope                                                                                                                                                                                                                                                                                                   | ✅     |
 | K3  | Chronos-mirror-v2 (ambient display) | existing presence app                                                                                                                                                                                                                                                                                                                        | ✅     |
 | K4  | Mobile (handoff target)             | iOS / Android WebView                                                                                                                                                                                                                                                                                                                        | ✅     |

@@ -3,15 +3,15 @@
  * scripts/install_chronos_launchd.ts — LC-01d
  *
  * Ceremony for keeping the chronos scheduler daemon alive across logins.
- * The daemon (`pnpm chronos`) is the ONLY scheduler in the system; when it
+ * The daemon (`pnpm scheduler`) is the ONLY scheduler in the system; when it
  * dies, every registered pipeline schedule silently stops firing. This
  * script generates a macOS LaunchAgent so launchd restarts it.
  *
  * Modes:
- *   pnpm kyberion chronos install                 # dry-run: print plist + exact steps
- *   pnpm kyberion chronos install --apply         # stage plist + run launchctl
- *   pnpm kyberion chronos uninstall               # dry-run: print bootout steps
- *   pnpm kyberion chronos uninstall --apply       # bootout + remove the plist
+ *   pnpm kyberion scheduler install                 # dry-run: print plist + exact steps
+ *   pnpm kyberion scheduler install --apply         # stage plist + run launchctl
+ *   pnpm kyberion scheduler uninstall               # dry-run: print bootout steps
+ *   pnpm kyberion scheduler uninstall --apply       # bootout + remove the plist
  *
  * secure-io note: $HOME/Library/LaunchAgents is outside the secure-io write
  * roots, so --apply never writes there via file I/O. The plist is staged
@@ -181,7 +181,7 @@ function printManualSteps(
       `3. Verify: launchctl print gui/${uid}/${CHRONOS_LAUNCHD_LABEL} | head`,
       '   (heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json)',
       '',
-      'Or run: pnpm kyberion chronos install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
+      'Or run: pnpm kyberion scheduler install --apply  (if the flag is not forwarded: node dist/scripts/install_chronos_launchd.js --apply)',
       `Uninstall later: launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL} && rm ${target}`,
     ].join('\n')
   );
@@ -223,7 +223,7 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
           `1. launchctl bootout gui/${uid}/${CHRONOS_LAUNCHD_LABEL}`,
           `2. rm ${target}`,
           '',
-          'Or run: pnpm kyberion chronos uninstall --apply',
+          'Or run: pnpm kyberion scheduler uninstall --apply',
         ].join('\n')
       );
       return;

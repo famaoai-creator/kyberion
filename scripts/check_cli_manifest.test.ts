@@ -5,6 +5,8 @@ import {
   loadCliManifest,
   MAX_PACKAGE_SCRIPTS,
   resolveCliModulePath,
+  scriptNameViolation,
+  type CliManifest,
 } from './check_cli_manifest.js';
 
 describe('CLI manifest', () => {
@@ -418,6 +420,166 @@ describe('CLI manifest', () => {
     );
     expect(() => resolveCliModulePath('/tmp/outside.ts')).toThrow(
       '[RESOURCE_PATH_SCOPE] resource path is outside the repository root'
+    );
+  });
+});
+
+describe('CU-08 package script naming', () => {
+  it('accepts noun / noun:verb names and the verb-first toolchain families', () => {
+    for (const name of [
+      'mission',
+      'stance:create',
+      'knowledge:ingest',
+      'agent-runtime:supervisor',
+      'build:actuators',
+      'generate:env-registry',
+      'check:pr-title',
+      'test:watch',
+      'verify',
+      'typecheck',
+    ]) {
+      expect(scriptNameViolation(name)).toBeUndefined();
+    }
+  });
+
+  it('rejects verb-first, three-segment and non-kebab names', () => {
+    expect(scriptNameViolation('report:i18n-coverage')).toContain('starts with a verb');
+    expect(scriptNameViolation('migrate:physical-namespaces')).toContain('starts with a verb');
+    expect(scriptNameViolation('export:validation-bundle')).toContain('starts with a verb');
+    expect(scriptNameViolation('onboard')).toContain('starts with a verb');
+    expect(scriptNameViolation('ingest')).toContain('starts with a verb');
+    expect(scriptNameViolation('agy:sdk:setup')).toContain('more than two segments');
+    expect(scriptNameViolation('Customer:Create')).toContain('kebab-case');
+  });
+
+  it('exempts deprecated aliases but lints every other package script', () => {
+    const manifest = loadCliManifest();
+    const scripts = new Set(
+      (manifest.script_commands ?? []).flatMap((command) =>
+        command.script ? [command.script] : []
+      )
+    );
+    for (const alias of manifest.deprecated_script_aliases ?? []) scripts.add(alias.script);
+    expect(checkCliManifest(manifest, { packageScripts: scripts })).toEqual([]);
+    scripts.add('export:everything');
+    expect(checkCliManifest(manifest, { packageScripts: scripts })).toContain(
+      'package script export:everything starts with a verb; name it noun:verb (e.g. everything:export)'
+    );
+  });
+
+  it('keeps each renamed script as a warning alias that runs the replacement unchanged', () => {
+    const manifest = loadCliManifest();
+    const renamed = Object.fromEntries(
+      (manifest.deprecated_script_aliases ?? []).map((alias) => [alias.script, alias.replaced_by])
+    );
+    expect(renamed).toMatchObject({
+      dev: 'verify',
+      chronos: 'scheduler',
+      inventory: 'work:inventory',
+      'customer:create': 'stance:create',
+      'customer:switch': 'stance:switch',
+      onboard: 'onboarding',
+      ingest: 'knowledge:ingest',
+      'agy:sdk:setup': 'agy:sdk-setup',
+    });
+    const bodies = { verify: 'pnpm run typecheck', dev: 'pnpm run typecheck' };
+    const failures = checkCliManifest(manifest, {
+      packageScripts: new Set([
+        ...(manifest.script_commands ?? []).flatMap((command) =>
+          command.script ? [command.script] : []
+        ),
+        ...(manifest.deprecated_script_aliases ?? []).map((alias) => alias.script),
+      ]),
+      packageScriptBodies: bodies,
+    });
+    expect(failures).toContain(
+      'deprecated script alias dev must run the notice then the verify command unchanged: "node scripts/deprecated_script_alias.mjs dev verify && pnpm run typecheck"'
+    );
+  });
+});
+
+describe('CU-08 / CU-09 command aliases and scopes', () => {
+  const base = (): CliManifest => ({
+    version: 1,
+    commands: [
+      {
+        id: 'operator-home.default',
+        command: '',
+        noun: 'home',
+        verb: 'default',
+        entry: 'operator-home',
+        audience: 'user',
+        description: 'cli_cmd_operator_home_default',
+        group: 'start',
+      },
+      {
+        id: 'operator-home.doctor',
+        command: 'doctor',
+        noun: 'doctor',
+        verb: 'default',
+        entry: 'operator-home',
+        audience: 'user',
+        description: 'cli_cmd_operator_home_doctor',
+        group: 'start',
+        scope_selector: 'flag',
+        scopes: [{ id: 'env', routes_to: ['vital'], description: 'cli_scope_doctor_env' }],
+      },
+    ],
+    entrypoints: [
+      { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: ['', 'doctor'] },
+      { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+    ],
+  });
+
+  it('requires scopes to route to a registered command', () => {
+    const failures = checkCliManifest(base(), { packageScripts: new Set() });
+    expect(failures).toContain(
+      'command operator-home.doctor scope env must route to a registered command: vital'
+    );
+  });
+
+  it('rejects positional scopes that route back into the same command', () => {
+    const manifest = base();
+    manifest.commands[1] = {
+      ...manifest.commands[1]!,
+      scope_selector: 'positional',
+      scopes: [{ id: 'loop', routes_to: ['doctor', 'other'], description: 'cli_scope_loop' }],
+    };
+    expect(checkCliManifest(manifest, { packageScripts: new Set() })).toContain(
+      'command operator-home.doctor scope loop must not route to another scope'
+    );
+  });
+
+  it('rejects command aliases that shadow or point at nothing', () => {
+    const manifest = {
+      ...base(),
+      deprecated_command_aliases: [
+        { command: 'doctor', replaced_by: 'doctor' },
+        { command: 'old', replaced_by: 'ghost' },
+      ],
+    };
+    const failures = checkCliManifest(manifest, { packageScripts: new Set() });
+    expect(failures).toContain('deprecated command alias shadows a registered command: doctor');
+    expect(failures).toContain(
+      'deprecated command alias old must point at a registered command: ghost'
+    );
+  });
+
+  it('registers doctor scopes and setup areas in the repository manifest', () => {
+    const manifest = loadCliManifest();
+    const doctor = manifest.commands.find((command) => command.command === 'doctor');
+    const setup = manifest.commands.find((command) => command.command === 'setup');
+    expect(doctor?.scopes?.map((scope) => scope.id)).toEqual([
+      'env',
+      'service',
+      'voice',
+      'meeting',
+      'app',
+      'setup',
+    ]);
+    expect(setup?.scope_selector).toBe('positional');
+    expect(setup?.scopes?.map((scope) => scope.id)).toEqual(
+      expect.arrayContaining(['onboarding', 'reasoning', 'env', 'services', 'tools', 'voice'])
     );
   });
 });

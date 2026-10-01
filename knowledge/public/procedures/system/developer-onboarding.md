@@ -142,7 +142,7 @@ work you actually do.
    most "is the system OK?" questions.
 2. `pnpm pipeline --input pipelines/agent-provider-check.json` — checks
    reasoning-backend wiring.
-3. `pnpm watch:tenant-drift` — multi-tenant integrity.
+3. `pnpm tenant:watch-drift` — multi-tenant integrity.
 4. `git log` on a related actuator's `examples/*.json` — learn by
    imitation.
 5. `knowledge/product/evolution/distill_*.md` — distilled lessons from prior

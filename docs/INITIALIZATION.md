@@ -30,8 +30,8 @@ pnpm kyberion setup report --persona first-time-user
 pnpm surfaces reconcile
 
 # stance を決めてから identity を保存（Step 3）
-pnpm customer:switch <customer-slug>   # 顧客・会社として使う場合のみ
-pnpm onboard
+pnpm stance:switch <customer-slug>   # 顧客・会社として使う場合のみ
+pnpm onboarding
 
 # baseline を all_clear にする（Step 4）
 pnpm pipeline --input pipelines/baseline-check.json
@@ -117,7 +117,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 - Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) → `.venv/bin/python3` → `python3` の順で解決されます。
 - `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
-- AGY native subagent を使う場合は、公式 SDK を managed runtime へ `pnpm agy:sdk:setup --apply`（内部では `uv venv` + `uv pip install`）で導入できます。Python 3.10+ が必要で、任意の Python 実行ファイルは `KYBERION_AGY_SDK_PYTHON` で上書きできます。
+- AGY native subagent を使う場合は、公式 SDK を managed runtime へ `pnpm agy:sdk-setup --apply`（内部では `uv venv` + `uv pip install`）で導入できます。Python 3.10+ が必要で、任意の Python 実行ファイルは `KYBERION_AGY_SDK_PYTHON` で上書きできます。
 - AGY CLI の Kyberion 用カスタムエージェント定義は `pnpm agents:generate` で `.agents/agents/` に生成されます。手動で一覧を確認する場合は `agy --add-dir "$PWD" agent`、特定の定義を選ぶ場合は `agy --add-dir "$PWD" --agent kyberion-implementer ...` を使います。`AgyCliBackend` はワークスペースを自動的に `--add-dir` へ渡します。
 - 同一マシンで複数の Google アカウントを使い分ける場合: AGY CLI は通常 `~/.gemini/antigravity-cli/` を使用しますが、`pnpm kyberion agy profile add <name>` で作成したプロファイル（`~/.agy-profiles/<name>`）にアカウントを分離できます。ホスト環境へのインストールは `pnpm kyberion agy profile setup-host`、Kyberion 推論バックエンドでの特定アカウント指定は `KYBERION_AGY_PROFILE=<name>` を使用します（詳細は [`antigravity-multi-account-operations.md`](../knowledge/product/orchestration/antigravity-multi-account-operations.md) 参照）。
 - Devin CLI 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.devin/agents/` に生成されます(ロール名そのまま: `implementer` / `reviewer` / `devils_advocate`)。Devin の `allowed-tools` は厳格な許可リストなので、AGY 向け `.agents/agents/` 側の `kyberion-*` 定義は Devin ではツール名が解決できず実質ツール無しになります — Devin 配下では `.devin/agents/` 側の名前を指定してください。
@@ -142,13 +142,13 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 #### 4b. External Service Setup と Preflight
 
-- **実行コマンド**: `pnpm services:setup`
+- **実行コマンド**: `pnpm service:setup`
 - **目的**: GitHub、Google Workspace、Slack、Notion、Jira などの service preset について、必要な secret、CLI 代替、customer/personal connection の置き場を先に確認します。実体の変更は行いません。
-- **実行直前の確認**: `pnpm service:preflight -- --service <service-id>`。`services:setup` が「準備」、`service:preflight` が「いま使えるか」です。auth が不足していれば失敗します。
+- **実行直前の確認**: `pnpm service:preflight -- --service <service-id>`。`service:setup` が「準備」、`service:preflight` が「いま使えるか」です。auth が不足していれば失敗します。
   - `voice` / `meeting` のように bridge health を持つもの
   - `google-workspace` のように auth と CLI health を合わせて見たいもの
   - `media-generation` のようにローカル runtime に依存するもの。ComfyUI などの runtime に到達できるかを確かめる入口です。失敗した場合は ComfyUI の起動、プロビジョニング、接続先を確認してください。
-- **secret の登録**: `services:setup` で不足と出た secret は、`pnpm kyberion secret introduce <service-id> <secret-key>` で登録します。
+- **secret の登録**: `service:setup` で不足と出た secret は、`pnpm kyberion secret introduce <service-id> <secret-key>` で登録します。
   - 値は argv では受け付けません。TTY の非表示プロンプトで入力するか、`active/shared/tmp/` 配下のファイルを `--from-file <path>` で渡します。
   - 提案（propose）と適用（apply）の二段階です。ローカルで自動承認された場合はそのまま適用されます。承認待ちになった場合は、表示に従って `pnpm kyberion approve <approval-id>` の後に `pnpm kyberion secret apply <approval-id> --from-file <path>` を実行します。自動承認を使わない場合は `--no-auto-approve` を付けます。
   - 登録状況は `pnpm kyberion secret status <service-id>` で確認します。値は表示されません。
@@ -186,18 +186,18 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 identity の保存先と、baseline-check の L3 が確認する場所は、アクティブな stance で決まります。**identity を保存する前に**決めてください。
 
 - 自分として使う: `KYBERION_CUSTOMER` を設定しません。保存先は `knowledge/personal/` です。
-- 顧客・会社として使う: `pnpm customer:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm customer:create <customer-slug>`）。保存先は `customer/{slug}/` です。
+- 顧客・会社として使う: `pnpm stance:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm stance:create <customer-slug>`）。保存先は `customer/{slug}/` です。
 
 ### Stage 7: 魂の注入 (Soul Infusion)
 
-- **実行コマンド**: `pnpm onboard`（`dist/` が必要です）
+- **実行コマンド**: `pnpm onboarding`（`dist/` が必要です）
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **GUI で行う場合**: concierge の `/settings` を開きます（旧 `/setup` と `/onboarding` はここへリダイレクトされます）。「あなたのこと」で identity を保存し、「組織とメンバー」でメンバーと承認者を登録します。承認者は後の tenant activation で `--owner-id` に指定します。
-- **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用します。
-  - `pnpm onboard apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
+- **非対話環境の場合**: TTY が無い環境では `pnpm onboarding` は exit 2 で停止します。代わりに以下のいずれかを使用します。
+  - `pnpm onboarding apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
-  - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
-- **やり直す場合**: `pnpm onboard reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
+  - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — 意図的に default 値で進める（評価環境向け）
+- **やり直す場合**: `pnpm onboarding reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
 - **物理的変化**:
   - `customer/{slug}/my-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json` になります。
   - `customer/{slug}/my-vision.md` が生成（または更新）されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-vision.md` になります。
@@ -211,7 +211,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 - **目的**: 判定層 L0〜L11 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
 - **初回に落ちやすい層**:
   - **L8（storage janitor）**: baseline-check が janitor を自動で投入します。完了後に再実行すれば通ります。手動で走らせる場合は `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'` を使います。
-  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion chronos install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm chronos` です。
+  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm scheduler` です。
   - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちます。Stage 7 などの governed 操作で記録されます。
 
 ### Stage 9: tenant・organization・activation（必要な場合のみ）
@@ -226,7 +226,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 
 `customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照してください。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`customer/{slug}/` には置きません。
 
-AI 会社として始める場合は、`pnpm onboard company --vertical <vertical> --slug <company-slug> --name "<会社名>" --owner-id human:<owner> --goal "<最初の成果>" --tenant-slug <tenant-slug> --dry-run` で tenant 登録と context binding をまとめて確認できます。AI worker は作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。会社オンボーディングは activation を自動完了しません。
+AI 会社として始める場合は、`pnpm onboarding company --vertical <vertical> --slug <company-slug> --name "<会社名>" --owner-id human:<owner> --goal "<最初の成果>" --tenant-slug <tenant-slug> --dry-run` で tenant 登録と context binding をまとめて確認できます。AI worker は作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。会社オンボーディングは activation を自動完了しません。
 
 ---
 
