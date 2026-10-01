@@ -96,6 +96,9 @@
     "chronos_token_registry_reader": {
       "allow": []
     },
+    "scope_locale_reader": {
+      "allow": []
+    },
     "surface_runtime": {
       "allow": [
         "active/shared/inbox/",

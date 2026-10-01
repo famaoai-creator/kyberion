@@ -15,6 +15,17 @@ import { pathResolver } from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
 import { isBuiltinPipelineResource } from '../trust-requiring-resources.js';
+import { describeExternalHookCommands, type ExternalHookSource } from '../external-hook-bridge.js';
+import { parseSafeJsonObjectInput } from '../foundation/json.js';
+import { t } from '../t.js';
+
+/**
+ * What the approver is trusting. The binding (path + content hash) is the
+ * same for every kind, so lookups and assertProjectTrustApproval are
+ * unaffected; only the human-facing card changes.
+ */
+export type ProjectTrustResource =
+  { kind: 'pipeline' } | { kind: 'external-hook-config'; source: ExternalHookSource };
 
 export const PROJECT_TRUST_APPROVAL_CHANNEL = 'project-trust';
 
@@ -44,6 +55,10 @@ function normalizeRelativePath(inputPath: string): { absolute: string; relative:
 }
 
 function contentHash(absolutePath: string): string {
+  return createHash('sha256').update(readTrustedResource(absolutePath)).digest('hex');
+}
+
+function readTrustedResource(absolutePath: string): string {
   if (!safeExistsSync(absolutePath)) {
     throw new Error(`[PROJECT_TRUST_SCOPE] pipeline resource does not exist: ${absolutePath}`);
   }
@@ -52,8 +67,64 @@ function contentHash(absolutePath: string): string {
       `[PROJECT_TRUST_SCOPE] pipeline resource must be a regular file: ${absolutePath}`
     );
   }
-  const raw = readTextFile(absolutePath);
-  return createHash('sha256').update(String(raw)).digest('hex');
+  return String(readTextFile(absolutePath));
+}
+
+function hashContent(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
+
+interface ApprovalCardText {
+  title: string;
+  summary: string;
+  details: string;
+  reason: string;
+}
+
+function hookCommandLines(raw: string, source: ExternalHookSource): string[] {
+  try {
+    const config = parseSafeJsonObjectInput(raw, 'external hook config') ?? {};
+    return describeExternalHookCommands(config, source).map(
+      (hook) => `- ${hook.event}${hook.matcher ? ` [${hook.matcher}]` : ''} → ${hook.command}`
+    );
+  } catch (error) {
+    return [
+      t('cli:cli_hooks_trust_card_unparsable', {
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    ];
+  }
+}
+
+function approvalCardText(
+  resource: ProjectTrustResource,
+  relative: string,
+  hash: string,
+  raw: string
+): ApprovalCardText {
+  const binding = `Path: ${relative}\nContent SHA-256: ${hash}`;
+  if (resource.kind === 'external-hook-config') {
+    const commands = hookCommandLines(raw, resource.source);
+    return {
+      title: t('cli:cli_hooks_trust_card_title', { path: relative }),
+      summary: t('cli:cli_hooks_trust_card_summary', { count: commands.length }),
+      details: [
+        binding,
+        `Source: ${resource.source}`,
+        t('cli:cli_hooks_trust_card_commands_header'),
+        ...(commands.length > 0 ? commands : [t('cli:cli_hooks_trust_card_no_commands')]),
+      ].join('\n'),
+      reason:
+        'Project-local hook config registers shell commands that run on agent lifecycle events; it requires a durable human trust decision.',
+    };
+  }
+  return {
+    title: `Approve project-local pipeline: ${relative}`,
+    summary:
+      'A project-local pipeline can change executable behavior and remains blocked until an authenticated human approves this exact content.',
+    details: binding,
+    reason: 'Project-local executable pipeline content requires a durable human trust decision.',
+  };
 }
 
 function effectBinding(relativePath: string): string {
@@ -76,6 +147,8 @@ function isProjectTrustRequest(record: ApprovalRequestRecord, relativePath: stri
 export function createProjectTrustApprovalRequest(params: {
   inputPath: string;
   requestedBy?: string;
+  /** Defaults to a project-local pipeline. */
+  resource?: ProjectTrustResource;
 }): ApprovalRequestRecord {
   const resolved = normalizeRelativePath(params.inputPath);
   if (isBuiltinPipelineResource(resolved.relative)) {
@@ -83,10 +156,17 @@ export function createProjectTrustApprovalRequest(params: {
       `[PROJECT_TRUST_NOT_REQUIRED] canonical pipeline is repository-owned: ${resolved.relative}`
     );
   }
-  const hash = contentHash(resolved.absolute);
+  const raw = readTrustedResource(resolved.absolute);
+  const hash = hashContent(raw);
   const payload = bindingPayload(resolved.relative, hash);
   const payloadHash = computeApprovalPayloadHash(payload);
   const binding = effectBinding(resolved.relative);
+  const card = approvalCardText(
+    params.resource ?? { kind: 'pipeline' },
+    resolved.relative,
+    hash,
+    raw
+  );
   const existing = listApprovalRequests({
     storageChannels: [PROJECT_TRUST_APPROVAL_CHANNEL],
     status: ['pending', 'approved'],
@@ -106,10 +186,9 @@ export function createProjectTrustApprovalRequest(params: {
     requestedBy,
     kind: 'channel-approval',
     draft: {
-      title: `Approve project-local pipeline: ${resolved.relative}`,
-      summary:
-        'A project-local pipeline can change executable behavior and remains blocked until an authenticated human approves this exact content.',
-      details: `Path: ${resolved.relative}\nContent SHA-256: ${hash}`,
+      title: card.title,
+      summary: card.summary,
+      details: card.details,
       severity: 'high',
     },
     requestedByContext: {
@@ -118,7 +197,7 @@ export function createProjectTrustApprovalRequest(params: {
       actorRole: 'project-trust',
     },
     justification: {
-      reason: 'Project-local executable pipeline content requires a durable human trust decision.',
+      reason: card.reason,
       requestedEffects: [binding],
     },
     risk: { level: 'high', restartScope: 'none', requiresStrongAuth: true },

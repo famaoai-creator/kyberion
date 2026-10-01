@@ -47,6 +47,7 @@ import type {
   OrganizationLearningCandidate,
   ResolveOrganizationWorkInput,
 } from './organization-operating-model.js';
+import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CATALOG_PATH = pathResolver.knowledge(
@@ -665,7 +666,7 @@ export function resolveOrganizationWork(
               : undefined;
   const authorityClass =
     classification.workShape === 'governance_cadence' ||
-    /承認|決裁|変更|削除|停止|権限|approve|approval|change|delete|disable/i.test(utterance)
+    matchesIntentPhrase(utterance, 'organization.approval_sensitive_action')
       ? 'approval_required'
       : classification.workShape === 'incident_response'
         ? 'high'

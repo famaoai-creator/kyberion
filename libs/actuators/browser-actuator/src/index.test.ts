@@ -1248,6 +1248,72 @@ describe('browser-actuator v3 contract', () => {
     });
   });
 
+  it('exports observed WebAuthn events through passkey_events', async () => {
+    const { handleAction } = await import('./index');
+    mocks.context.newCDPSession.mockImplementationOnce(async () => ({
+      send: vi.fn(async (method: string) =>
+        method === 'WebAuthn.addVirtualAuthenticator' ? { authenticatorId: 'auth-1' } : {}
+      ),
+      // Replay one credential registration as soon as the observer attaches.
+      on: vi.fn((event: string, handler: (payload: unknown) => void) => {
+        if (event === 'WebAuthn.credentialAdded') {
+          handler({ credential: { credentialId: 'cred-9', rpId: 'webauthn.io' } });
+        }
+      }),
+    }));
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-passkey-events',
+      steps: [
+        { type: 'control', op: 'setup_passkey_authenticator', params: {} },
+        { type: 'capture', op: 'passkey_events', params: { export_as: 'events' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.events).toEqual([
+      expect.objectContaining({
+        type: 'credentialAdded',
+        credential: expect.objectContaining({ credentialId: 'cred-9' }),
+      }),
+    ]);
+  });
+
+  it('repeats a nested pipeline with while until max_iterations', async () => {
+    const { handleAction } = await import('./index');
+    mocks.page.evaluate.mockResolvedValue(1);
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-while-test',
+      context: { keep_polling: true },
+      steps: [
+        {
+          type: 'control',
+          op: 'while',
+          params: {
+            condition: { from: 'keep_polling', operator: 'eq', value: true },
+            max_iterations: 3,
+            pipeline: [
+              {
+                type: 'capture',
+                op: 'query_elements',
+                params: { selector: 'button', export_as: 'button_count' },
+              },
+            ],
+          },
+        },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.button_count).toBe(1);
+    expect(mocks.page.evaluate).toHaveBeenCalledTimes(3);
+  });
+
   it('provides high-level register, authenticate, and delete passkey flows', async () => {
     const { handleAction } = await import('./index');
 

@@ -32,6 +32,7 @@
 
 import { assistWithJudgment, choiceAnswer } from '../reasoning/judgment-assist.js';
 import type { JudgmentQuestion } from '../reasoning/judgment-backend.js';
+import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
 import type { TierLevel } from '../types.js';
 
 export const BROWSER_FAILURE_QUESTION = 'browser.failure_kind';
@@ -169,6 +170,22 @@ export async function classifyBrowserFailure(
     source: result.source === 'judgment' ? 'judgment' : 'rules',
     reason: result.reason,
   };
+}
+
+/**
+ * Failure-path entry point: the failure kind a *calibrated* judgment assigned
+ * to a failure the heuristics left `unknown`, else `undefined`. No provider is
+ * asked while nothing is calibrated (`judgmentAssistReady`), so a caller that
+ * records the kind only when defined is unchanged until a fit lands.
+ */
+export async function judgeBrowserFailureKind(
+  pageText: string,
+  options: BrowserJudgmentOptions = {}
+): Promise<BrowserFailureKind | undefined> {
+  if (classifyBrowserFailureByRules(pageText) !== 'unknown') return undefined;
+  if (!judgmentAssistReady(BROWSER_FAILURE_QUESTION)) return undefined;
+  const verdict = await classifyBrowserFailure(pageText, options);
+  return verdict.source === 'judgment' ? verdict.kind : undefined;
 }
 
 export interface PageReadinessVerdict {

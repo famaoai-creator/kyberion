@@ -13,6 +13,7 @@ import {
 import { recordAutonomousActionNotice } from './approval-digest.js';
 import {
   createApprovalRequest,
+  listApprovalRequests,
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
 } from './approval-store.js';
@@ -47,6 +48,15 @@ import {
 
 export const DEFAULT_DECISION_EXPIRY_MINUTES = 72 * 60;
 
+/**
+ * Opt-in for scheduled gate callers (daemon watchdog, auto-checkpoint) that
+ * predate this loop: with `KYBERION_AUTONOMY_DECISION_ROUTING=1` a verdict that
+ * needs the operator becomes a decision card instead of only a log line.
+ */
+export function isAutonomyDecisionRoutingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.KYBERION_AUTONOMY_DECISION_ROUTING === '1';
+}
+
 export interface RouteAutonomousDecisionInput {
   role: GovernedArtifactRole;
   gate: AutonomousOpsGateResult;
@@ -64,6 +74,12 @@ export interface RouteAutonomousDecisionInput {
   scope?: EventScopeInput;
   locale?: SupportedLocale;
   now?: number;
+  /**
+   * Stable key for a recurring caller (a watchdog tick, a scheduled job). While
+   * a pending request with the same action and key exists, the decision is
+   * parked on that request again instead of opening — and ringing — a new one.
+   */
+  dedupeKey?: string;
 }
 
 export interface RoutedDecision {
@@ -78,6 +94,8 @@ export interface RoutedDecision {
   card?: DecisionCardView;
   /** The card was handed to a delivery path (not proof of delivery). */
   notified: boolean;
+  /** The decision reused an already pending request (`dedupeKey`). */
+  reused?: boolean;
 }
 
 function activeHoursFromPolicy() {
@@ -86,6 +104,21 @@ function activeHoursFromPolicy() {
   } catch {
     return undefined;
   }
+}
+
+function dedupeCorrelationId(actionId: string, dedupeKey: string): string {
+  return `autonomy:${actionId}:dedupe:${dedupeKey}`;
+}
+
+function findPendingDedupedRequest(
+  actionId: string,
+  dedupeKey: string
+): ApprovalRequestRecord | undefined {
+  const correlationId = dedupeCorrelationId(actionId, dedupeKey);
+  return listApprovalRequests({
+    storageChannels: [AUTONOMY_APPROVAL_CHANNEL],
+    status: 'pending',
+  }).find((record) => record.correlationId === correlationId);
 }
 
 export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): RoutedDecision {
@@ -115,6 +148,23 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
     };
   }
 
+  if (input.dedupeKey) {
+    const pending = findPendingDedupedRequest(input.gate.actionId, input.dedupeKey);
+    if (pending) {
+      return {
+        level,
+        timing,
+        proceed: false,
+        parked: true,
+        shadow,
+        requestId: pending.id,
+        card: viewDecisionCard(pending, { now, locale: input.locale }),
+        notified: false,
+        reused: true,
+      };
+    }
+  }
+
   const route = resolveOperatorNotificationRoute(
     'approval_required',
     loadNotificationPreferences()
@@ -141,7 +191,9 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
     channel: deliveredVia?.target ?? 'operator',
     storageChannel: AUTONOMY_APPROVAL_CHANNEL,
     threadTs: '',
-    correlationId: `autonomy:${input.gate.actionId}:${now.toString(36)}`,
+    correlationId: input.dedupeKey
+      ? dedupeCorrelationId(input.gate.actionId, input.dedupeKey)
+      : `autonomy:${input.gate.actionId}:${now.toString(36)}`,
     requestedBy: input.requestedBy,
     draft: {
       title: input.title,

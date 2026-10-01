@@ -32,12 +32,7 @@
           },
           "distill_target_kind": {
             "type": "string",
-            "enum": [
-              "pattern",
-              "sop_candidate",
-              "knowledge_hint",
-              "report_template"
-            ]
+            "enum": ["pattern", "sop_candidate", "knowledge_hint", "report_template"]
           },
           "label_ja": {
             "type": "string"

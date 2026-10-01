@@ -12,6 +12,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { decideFromObservation } from '@agent/core/semantic-decide';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { opControl } from './browser-control-helpers.js';
@@ -313,21 +314,14 @@ export async function executePipeline(
       error: message,
       console_events: runtime.consoleEvents.slice(-50),
       network_events: runtime.networkEvents.slice(-50),
+      ...(await judgedFailureKindFields(message, ctx.last_snapshot?.title)),
     };
-    ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
-      schema_version: 'browser-failure-bundle.v1',
-      session_id: sessionId,
-      created_at: nowIso(),
-      error: ctx.error,
-      url: ctx.last_url || null,
-      title: ctx.last_snapshot?.title || null,
-      snapshot: ctx.last_snapshot || null,
-      screenshot: ctx.last_screenshot || null,
-      trace_path: ctx.last_trace_path || null,
-      console_events: ctx.console_events,
-      network_events: ctx.network_events,
-      action_trail: browserRuntimeHelpers.readRecordedActions(ctx).slice(-200),
-    });
+    ctx.failure_bundle_path = saveBrowserFailureBundle(
+      sessionId,
+      ctx,
+      runtime,
+      ctx.last_trace_path || null
+    );
     throw error;
   } finally {
     const videoRecordingEnabled = options.record_video === true;
@@ -343,20 +337,8 @@ export async function executePipeline(
     // finalized. Refresh the failure bundle after tracing stops so the
     // automatic evidence artifact contains the trace path as promised.
     if (ctx.error) {
-      ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
-        schema_version: 'browser-failure-bundle.v1',
-        session_id: sessionId,
-        created_at: nowIso(),
-        error: ctx.error,
-        url: ctx.last_url || null,
-        title: ctx.last_snapshot?.title || null,
-        snapshot: ctx.last_snapshot || null,
-        screenshot: ctx.last_screenshot || null,
-        trace_path: ctx.last_trace_path || (options.record_trace ? tracePath : null),
-        console_events: runtime.consoleEvents.slice(-50),
-        network_events: runtime.networkEvents.slice(-50),
-        action_trail: browserRuntimeHelpers.readRecordedActions(ctx).slice(-200),
-      });
+      const traceRef = ctx.last_trace_path || (options.record_trace ? tracePath : null);
+      ctx.failure_bundle_path = saveBrowserFailureBundle(sessionId, ctx, runtime, traceRef);
     }
     ctx.browser_tabs = await browserRuntimeHelpers.summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;

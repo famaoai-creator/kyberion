@@ -298,6 +298,78 @@ describe('network-actuator', () => {
       });
     });
 
+    describe('distillation, A2A send and while', () => {
+      it('distill_response bounds a fetched HTML body to title, links and preview', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          context: {
+            response:
+              '<html><head><title>Login</title></head><body><a href="/a">A</a></body></html>',
+          },
+          steps: [
+            {
+              type: 'transform',
+              op: 'distill_response',
+              params: { from: 'response', max_links: 5 },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.context.response_distillate).toMatchObject({
+          kind: 'html',
+          title: 'Login',
+          links: ['/a'],
+        });
+      });
+
+      it('a2a_send resolves a templated message and sends it encrypted by default', async () => {
+        const { sendA2AMessage } = await import('./a2a-transport.js');
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { peer: 'agent-b' },
+          steps: [
+            {
+              type: 'apply',
+              op: 'a2a_send',
+              params: { message: 'ping {{peer}}' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(vi.mocked(sendA2AMessage)).toHaveBeenCalledWith(
+          'ping agent-b',
+          expect.objectContaining({ method: 'local', encrypt: true })
+        );
+      });
+
+      it('while repeats its pipeline until max_iterations', async () => {
+        const { secureFetch } = await import('@agent/core/network');
+        vi.mocked(secureFetch).mockResolvedValue({ status: 200, data: { ok: true } });
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { polling: true },
+          steps: [
+            {
+              type: 'control',
+              op: 'while',
+              params: {
+                condition: { from: 'polling', operator: 'eq', value: true },
+                max_iterations: 3,
+                pipeline: [
+                  { type: 'capture', op: 'fetch', params: { url: 'https://example.com/status' } },
+                ],
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(vi.mocked(secureFetch)).toHaveBeenCalledTimes(3);
+      });
+    });
+
     describe('apply ops', () => {
       it('write_file はリポジトリ外の出力先を拒否する', async () => {
         const result = await handleAction({

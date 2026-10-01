@@ -12,6 +12,9 @@
  * Values are per-viewer conveniences only; every storage access is wrapped
  * in try/catch and falls back to the defaults.
  */
+import { normalizeLocale } from '@agent/core/locale-normalize';
+import { CONCIERGE_LOCALES, type ConciergeLocale } from './i18n';
+
 export type ConciergeThemePreference = 'system' | 'light' | 'dark';
 export type ConciergeDensityPreference = 'comfortable' | 'compact';
 
@@ -70,12 +73,15 @@ export function normalizeThemePreference(value: unknown): ConciergeThemePreferen
 }
 
 export function readDisplayPreferences(): ConciergeDisplayPreferences {
-  const locale = readKey(CONCIERGE_DISPLAY_STORAGE_KEYS.locale);
+  const stored = normalizeLocale(readKey(CONCIERGE_DISPLAY_STORAGE_KEYS.locale));
   return {
     theme: normalizeThemePreference(readKey(CONCIERGE_DISPLAY_STORAGE_KEYS.theme)),
     density:
       readKey(CONCIERGE_DISPLAY_STORAGE_KEYS.density) === 'compact' ? 'compact' : 'comfortable',
-    locale: locale === 'ja' || locale === 'en' ? locale : null,
+    locale:
+      stored && (CONCIERGE_LOCALES as readonly string[]).includes(stored)
+        ? (stored as ConciergeLocale)
+        : null,
   };
 }
 

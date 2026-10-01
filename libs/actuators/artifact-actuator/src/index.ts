@@ -13,6 +13,7 @@ export const actuator = defineCatalogBackedActuator({
   id: 'artifact-actuator',
   describeOps,
   handleAction: handleArtifactAction,
+  actionInput: (op, params) => ({ action: op, params }),
 });
 
 const main = async () => {
