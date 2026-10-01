@@ -10,6 +10,16 @@ import {
 
 afterEach(() => resetReasoningProviderRegistryForTests());
 
+const STUB_PROFILE = {
+  streaming: false,
+  tool_calling: false,
+  native_subagent: false,
+  thinking_levels: {},
+  supports_strict_tools: false,
+  supports_grammar_tools: false,
+  utility_fit: [],
+};
+
 describe('reasoning provider registry', () => {
   it('loads the governed descriptor set and exposes capability metadata', () => {
     const descriptors = listReasoningProviderDescriptors();
@@ -99,6 +109,10 @@ describe('reasoning provider registry', () => {
         input_modalities: ['text'],
       },
       env_keys: [],
+      transport: 'in-process',
+      data_egress: 'local-only',
+      adapter: 'stub',
+      profile: STUB_PROFILE,
     };
     expect(parseReasoningProviderDescriptor(base)?.cost_tier).toBeUndefined();
     expect(parseReasoningProviderDescriptor({ ...base, cost_tier: 'free' })?.cost_tier).toBe(
