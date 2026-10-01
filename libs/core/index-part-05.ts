@@ -10,6 +10,8 @@ export * from './typesafe-jev-judgment-backend.js';
 
 export * from './laya-mlx-judgment-backend.js';
 
+export * from './reasoning/judgment-provider-bootstrap.js';
+
 export * from './reasoning/judgment-assist.js';
 
 export * from './error-classifier-judgment.js';
@@ -39,10 +41,6 @@ export * from './governance/approval-gate-summary.js';
 export { enforceApprovalGate, hasHuman } from './governance/approval-gate.js';
 
 export type { ApprovalGateParams, ApprovalGateResult } from './governance/approval-gate.js';
-
-export * from './lead-score.js';
-
-export * from './inbound-inquiry-adapter.js';
 
 export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
 
