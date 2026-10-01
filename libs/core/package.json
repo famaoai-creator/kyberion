@@ -7123,6 +7123,10 @@
       "types": "./dist/governance/accountability-report.d.ts",
       "default": "./dist/governance/accountability-report.js"
     },
+    "./governance/charter-proposal": {
+      "types": "./dist/governance/charter-proposal.d.ts",
+      "default": "./dist/governance/charter-proposal.js"
+    },
     "./governance/charter-service": {
       "types": "./dist/governance/charter-service.d.ts",
       "default": "./dist/governance/charter-service.js"

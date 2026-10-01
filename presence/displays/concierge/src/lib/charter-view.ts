@@ -108,6 +108,10 @@ export interface CharterTenantView {
   tenant_slug: string;
   role: 'owner' | 'approver' | 'viewer' | null;
   can_create: boolean;
+  /** An approver may draft limits for the owner to decide. */
+  can_propose?: boolean;
+  /** The approver's draft waiting for the owner (owner and approvers only). */
+  draft?: CharterDraft | null;
   can_stop: boolean;
   charter: null | {
     charter_id: string;
@@ -125,6 +129,40 @@ export interface CharterTenantView {
       amendment_proposals?: CharterProposal[];
     };
     report_text: string;
+  };
+}
+
+export interface CharterDraft {
+  proposed_by: string;
+  proposed_by_name: string;
+  proposed_at: string;
+  note: string;
+  form: {
+    per_action: number;
+    per_day: number;
+    per_month: number;
+    max_loss_per_incident: number;
+    deputies: string[];
+    expires_in_days: number;
+    allow_named_spend: boolean;
+    allow_customer_outbound: boolean;
+    supersedes_decision_rights: boolean;
+  };
+}
+
+/** Load an approver's draft into the form. Nothing is saved: the owner still reviews and agrees. */
+export function draftFromProposal(proposal: CharterDraft): CharterFormDraft {
+  const f = proposal.form;
+  return {
+    per_action: String(f.per_action),
+    per_day: String(f.per_day),
+    per_month: String(f.per_month),
+    max_loss_per_incident: String(f.max_loss_per_incident),
+    deputies: f.deputies.join(', '),
+    expires_in_days: String(f.expires_in_days),
+    allow_named_spend: f.allow_named_spend,
+    allow_customer_outbound: f.allow_customer_outbound,
+    supersedes_decision_rights: f.supersedes_decision_rights,
   };
 }
 
@@ -211,9 +249,11 @@ export function isManuallyStopped(view: CharterTenantView): boolean {
 }
 
 /** Server error code → message key; anything else is shown as detail. */
-export type CharterErrorKind = 'owner' | 'member' | 'changed' | 'responsible' | 'generic';
+export type CharterErrorKind =
+  'owner' | 'approver' | 'member' | 'changed' | 'responsible' | 'generic';
 export function charterErrorKind(code: string): CharterErrorKind {
   if (code === 'owner_required') return 'owner';
+  if (code === 'approver_required') return 'approver';
   if (code === 'member_required') return 'member';
   if (code === 'statement_changed') return 'changed';
   if (code === 'not_responsible') return 'responsible';
