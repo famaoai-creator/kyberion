@@ -2,7 +2,11 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { ptyEngine } from '../shell/pty-engine.js';
 import { dispatchA2UI } from '../a2ui.js';
-import { getAgentManifest, isActuatorAllowed } from '../agent/agent-manifest.js';
+import {
+  evaluateAcpManifestToolPolicy,
+  isAcpReadOnlyTitleFragment,
+} from './acp-tool-actuator-resolver.js';
+import { getAgentManifest } from '../agent/agent-manifest.js';
 import {
   touchManagedProcess,
   spawnManagedProcess,
@@ -505,27 +509,12 @@ export class ACPMediator {
           // Actuator restriction: check manifest whitelist/blacklist
           const manifest = getAgentManifest(threadId);
           if (manifest) {
-            // Extract actuator name from tool call title (e.g., "run_shell_command" → system, "read_file" → file)
-            const actuatorMap: Record<string, string> = {
-              shell: 'system-actuator',
-              command: 'system-actuator',
-              exec: 'system-actuator',
-              file: 'file-actuator',
-              read_file: 'file-actuator',
-              write_file: 'file-actuator',
-              browser: 'browser-actuator',
-              navigate: 'browser-actuator',
-              network: 'network-actuator',
-              fetch: 'network-actuator',
-              curl: 'network-actuator',
-            };
-            for (const [keyword, actuator] of Object.entries(actuatorMap)) {
-              if (title.includes(keyword) && !isActuatorAllowed(manifest, actuator)) {
-                logger.error(
-                  `[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`
-                );
-                return cancel();
-              }
+            const verdict = evaluateAcpManifestToolPolicy(manifest, title);
+            if (!verdict.allowed) {
+              logger.error(
+                `[ACP_PERMISSION] DENIED by manifest: ${threadId} ${verdict.reason} (tool: ${title})`
+              );
+              return cancel();
             }
           }
 
@@ -539,21 +528,7 @@ export class ACPMediator {
           }
 
           // Allow safe operations
-          const safePatterns = [
-            'read',
-            'search',
-            'list',
-            'view',
-            'get',
-            'ls',
-            'cat',
-            'grep',
-            'find',
-            'git status',
-            'git log',
-            'git diff',
-          ];
-          if (safePatterns.some((p) => title.includes(p))) {
+          if (isAcpReadOnlyTitleFragment(title)) {
             return selectAllowedOption();
           }
 
