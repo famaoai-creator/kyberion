@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadActuatorOpRegistry } from '@agent/core/actuator/actuator-op-registry';
 import {
   SYSTEM_CAPTURE_OP_HANDLERS,
+  SYSTEM_PROCEDURE_OP_HANDLERS,
   SYSTEM_CONTROL_OP_HANDLERS,
 } from './system-pipeline-core-helpers.js';
 
@@ -30,6 +31,15 @@ describe('system-actuator op handler maps (RS-07)', () => {
     expect(Object.keys(SYSTEM_CAPTURE_OP_HANDLERS).sort()).toEqual(
       [...(registry.capture ?? []), ...UNREGISTERED_CAPTURE_HANDLERS].sort()
     );
+  });
+
+  it('procedure handler keys exactly match the apply procedure ops', () => {
+    const procedureOps = ['provider_preflight', 'standard_pr_lifecycle'];
+    expect(Object.keys(SYSTEM_PROCEDURE_OP_HANDLERS).sort()).toEqual(procedureOps);
+    for (const op of procedureOps) {
+      expect(registry.apply).toContain(op);
+      expect(registry.capture).not.toContain(op);
+    }
   });
 
   it('control handler keys equal the registry control ops', () => {
