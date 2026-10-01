@@ -267,7 +267,6 @@ export function runSlackChannelTurn(
     ({ threadContext }) =>
       runSurfaceMessageConversation({
         surface: 'slack',
-        locale: resolveOperatorLocale(),
         text: request.text,
         channel: request.channel,
         threadTs: request.threadTs,

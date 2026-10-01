@@ -17,6 +17,24 @@ vi.mock('./path-resolver.js', () => ({
   },
 }));
 
+const designWarnings = vi.hoisted(() => [] as string[]);
+
+vi.mock('./logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./logger.js')>();
+  return {
+    ...actual,
+    createLogger: (...args: Parameters<typeof actual.createLogger>) => {
+      const real = actual.createLogger(...args);
+      return {
+        ...real,
+        warn: (msg: string) => {
+          designWarnings.push(msg);
+        },
+      };
+    },
+  };
+});
+
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   const foundation =
@@ -87,6 +105,7 @@ import {
   semanticToken,
 } from './semantic-design-tokens.js';
 import { SEMANTIC_TOKEN_FALLBACKS } from './semantic-design-token-fallbacks.js';
+import { readTenantSemanticTokens } from './creative-design-resolver.js';
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
 import {
   PPTX_PALETTE,
@@ -216,6 +235,56 @@ describe('semantic-design-tokens', () => {
     expect(resolveSemanticTokens('diagram', { tenantSlug: 'client-a' })).toEqual(
       SEMANTIC_TOKEN_FALLBACKS.diagram
     );
+  });
+
+  it('validates tenant overlay colours per engine and warns once per dropped set', () => {
+    installDefaults();
+    write('knowledge/confidential/client-v/design/tenant-override.json', {
+      tenant_id: 'client-v',
+      theme: 'client-v',
+    });
+    write('knowledge/confidential/client-v/design/theme.json', {
+      theme: {
+        name: 'client-v',
+        semantic_tokens: {
+          // OOXML engines: 6-digit hex only (# optional)
+          spreadsheet: {
+            'status.success.fill': '#ABCDEF',
+            'status.success.text': '123456',
+            'status.warning.fill': 'rgb(1,2,3)',
+            'status.warning.text': '#FFF',
+            'status.danger.fill': 'red',
+          },
+          // CSS engines: hex / rgb(a) / hsl(a) only
+          diagram: {
+            'diagram.background': '#fff',
+            'diagram.stroke': 'rgba(15, 23, 42, 0.9)',
+            'diagram.accent': 'hsl(210deg 40% 50% / 0.5)',
+            'diagram.text': 'url(https://evil.example/x.png)',
+            'diagram.grid': 'var(--brand)',
+            'diagram.edge': 'expression(alert(1))',
+            'diagram.label': 'rebeccapurple',
+          },
+        },
+      },
+    });
+    designWarnings.length = 0;
+    const sheet = readTenantSemanticTokens('client-v', 'spreadsheet');
+    expect(sheet).toEqual({ 'status.success.fill': '#ABCDEF', 'status.success.text': '123456' });
+    const diagram = readTenantSemanticTokens('client-v', 'diagram');
+    expect(diagram).toEqual({
+      'diagram.background': '#fff',
+      'diagram.stroke': 'rgba(15, 23, 42, 0.9)',
+      'diagram.accent': 'hsl(210deg 40% 50% / 0.5)',
+    });
+    expect(designWarnings).toHaveLength(2);
+    expect(designWarnings[0]).toMatch(/spreadsheet.* — .+ \| .+ \| keys: /);
+    // an engine with no declared colour format trusts nothing (fail closed)
+    expect(readTenantSemanticTokens('client-v', 'not-an-engine')).toEqual({});
+    // resolved tokens keep the defaults for dropped keys
+    expect(
+      resolveSemanticTokens('spreadsheet', { tenantSlug: 'client-v' })['status.danger.fill']
+    ).toBe(SEMANTIC_TOKEN_FALLBACKS.spreadsheet['status.danger.fill']);
   });
 
   it('resolves the pptx palette per render for the tenant in scope (no first-tenant leak)', () => {

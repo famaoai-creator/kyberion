@@ -19,6 +19,8 @@ import {
 } from './locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from './scope-context.js';
 import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
+import { withExecutionContext } from './authority.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 
 /**
  * I18N-01: single source of truth for locale *resolution*.
@@ -114,6 +116,56 @@ function readDeprecatedUiLocaleAlias(): SupportedLocale | null {
   return normalizeLocale(raw);
 }
 
+/**
+ * S2: least-privilege role that may read exactly one file per tenant —
+ * `knowledge/confidential/<tenant>/locale.json` (security-policy.json). Surface
+ * runtimes (slack_bridge, surface_runtime, …) cannot read the confidential tier,
+ * so the tenant locale is read under this role, bound to the turn's tenant.
+ */
+export const SCOPE_LOCALE_READER_ROLE = 'scope_locale_reader';
+
+/** Governance denials (tier / role / tenant / role-assumption), as opposed to a missing or malformed file. */
+const ACCESS_DENIAL = /\[(?:SECURITY|POLICY_VIOLATION|ROLE_VIOLATION|ROLE_ASSUMPTION_DENIED)\]/;
+
+const warnedDeniedLocaleOverlays = new Set<string>();
+
+function warnLocaleOverlayDenied(candidate: string, error: unknown): void {
+  const relative = path.relative(pathResolver.rootDir(), candidate);
+  if (warnedDeniedLocaleOverlays.has(relative)) return;
+  warnedDeniedLocaleOverlays.add(relative);
+  const reason = (error instanceof Error ? error.message : String(error)).split('\n')[0];
+  logger.warn(
+    `[locale] scope locale overlay ${relative} is not readable by the current role — the reply falls back to the operator locale | ` +
+      `grant the runtime role read access or move the locale to the tenant overlay (knowledge/confidential/<tenant>/locale.json, read via ${SCOPE_LOCALE_READER_ROLE}) | ${reason}`
+  );
+}
+
+/**
+ * Reads one locale overlay. Missing files and malformed JSON yield `null`
+ * (an overlay is optional and never widens scope); a governance denial is
+ * re-thrown so the caller can surface it instead of dropping it silently.
+ */
+function readLocaleOverlay(candidate: string): SupportedLocale | null {
+  try {
+    if (!safeExistsSync(candidate) || !safeLstat(candidate).isFile()) return null;
+    const parsed = parseSafeJsonObjectInput(readTextFile(candidate), `locale overlay ${candidate}`);
+    if (!parsed) return null;
+    return normalizeLocale(parsed.locale || parsed.default_locale);
+  } catch (error) {
+    if (ACCESS_DENIAL.test(error instanceof Error ? error.message : String(error))) throw error;
+    return null;
+  }
+}
+
+function readLocaleOverlayOrWarn(candidate: string, read: () => SupportedLocale | null) {
+  try {
+    return read();
+  } catch (error) {
+    warnLocaleOverlayDenied(candidate, error);
+    return null;
+  }
+}
+
 function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | null {
   if (!scope?.tenant_slug) return null;
   let normalizedScope: ScopeContext;
@@ -126,34 +178,39 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
     // A malformed or unauthorized scope never yields a locale (and must not throw from a reply path).
     return null;
   }
-  const candidates = [
+  const tenant = normalizedScope.tenant_slug as string;
+  // Organization / project overlays are read with the caller's own role (they
+  // sit beside the tenant's confidential knowledge, which no narrow role may
+  // read); a denial is warned once instead of dropped silently.
+  const callerCandidates = [
     normalizedScope.project_id
       ? pathResolver.knowledge(
-          `confidential/${normalizedScope.tenant_slug}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/locale.json`
+          `confidential/${tenant}/organizations/${normalizedScope.organization_id || '_'}/projects/${normalizedScope.project_id}/locale.json`
         )
       : null,
     normalizedScope.organization_id
       ? pathResolver.knowledge(
-          `confidential/${normalizedScope.tenant_slug}/organizations/${normalizedScope.organization_id}/locale.json`
+          `confidential/${tenant}/organizations/${normalizedScope.organization_id}/locale.json`
         )
       : null,
-    pathResolver.knowledge(`confidential/${normalizedScope.tenant_slug}/locale.json`),
   ].filter((value): value is string => Boolean(value));
-  for (const candidate of candidates) {
-    try {
-      if (!safeExistsSync(candidate) || !safeLstat(candidate).isFile()) continue;
-      const parsed = parseSafeJsonObjectInput(
-        readTextFile(candidate),
-        `locale overlay ${candidate}`
-      );
-      if (!parsed) continue;
-      const locale = normalizeLocale(parsed.locale || parsed.default_locale);
-      if (locale) return locale;
-    } catch {
-      // A malformed overlay must not widen scope or crash locale resolution.
-    }
+  for (const candidate of callerCandidates) {
+    const locale = readLocaleOverlayOrWarn(candidate, () => readLocaleOverlay(candidate));
+    if (locale) return locale;
   }
-  return null;
+  // The tenant overlay is read under the narrow reader role bound to the
+  // turn's tenant — never for a different tenant than the caller is bound to.
+  const callerTenant = resolvePolicyIdentityContext().tenantSlug;
+  if (callerTenant && callerTenant !== tenant) return null;
+  const tenantCandidate = pathResolver.knowledge(`confidential/${tenant}/locale.json`);
+  return readLocaleOverlayOrWarn(tenantCandidate, () =>
+    withExecutionContext(
+      SCOPE_LOCALE_READER_ROLE,
+      () => readLocaleOverlay(tenantCandidate),
+      undefined,
+      tenant
+    )
+  );
 }
 
 /**
@@ -171,8 +228,9 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
  * 4. the canonical `KYBERION_LOCALE` setting, then the deprecated
  *    `KYBERION_UI_LOCALE` alias (warns once).
  * 5. OS/browser locale: the registered `LANG` setting, then `ctx.navigatorLanguage`
- *    when a browser caller supplies it.
- * 6. The vocabulary catalog's `default_locale`.
+ *    when a browser caller supplies it, then the process locale
+ *    (`Intl.DateTimeFormat().resolvedOptions().locale`).
+ * 6. The vocabulary catalog's `default_locale` (warns once: no locale signal).
  *
  * Always returns a {@link SupportedLocale} — there is no unresolved case,
  * so callers never need a fallback argument of their own.
@@ -277,13 +335,42 @@ function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
   const aliasEnv = readDeprecatedUiLocaleAlias();
   if (aliasEnv) return aliasEnv;
 
-  const osLocale = normalizeLocale(getRegisteredEnvText('LANG'));
+  const lang = getRegisteredEnvText('LANG');
+  const osLocale = normalizeLocale(lang);
   if (osLocale) return osLocale;
 
   const navigatorLocale = normalizeLocale(ctx.navigatorLanguage);
   if (navigatorLocale) return navigatorLocale;
 
-  return resolveDefaultLocale();
+  // S3: a daemon launched without LANG (launchd / systemd units) still has a
+  // process locale through ICU (LC_ALL / LC_MESSAGES, or the Windows user
+  // locale); honor it before the catalog default. When LANG is set (even to
+  // C / POSIX) it already is the OS locale answer, so ICU is not consulted.
+  // ICU's own no-environment fallback is en-US, the same as the catalog default.
+  if (!lang?.trim()) {
+    const intlLocale = normalizeLocale(readIntlLocale());
+    if (intlLocale) return intlLocale;
+  }
+
+  const fallback = resolveDefaultLocale();
+  if (!warnedCatalogDefaultOnce) {
+    warnedCatalogDefaultOnce = true;
+    logger.warn(
+      `[locale] no locale signal found; using the catalog default "${fallback}" — onboarding identity language, KYBERION_LOCALE, LANG and the OS locale are all unset or unsupported | ` +
+        `set KYBERION_LOCALE (or re-run onboarding to record the operator language) | catalog default_locale=${fallback}`
+    );
+  }
+  return fallback;
+}
+
+let warnedCatalogDefaultOnce = false;
+
+function readIntlLocale(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().locale;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -294,4 +381,6 @@ function resolveWithoutExplicit(ctx: LocaleContext): SupportedLocale {
 export function _resetLocaleModuleStateForTests(): void {
   cachedDefaultLocale = undefined;
   warnedUiLocaleAliasOnce = false;
+  warnedDeniedLocaleOverlays.clear();
+  warnedCatalogDefaultOnce = false;
 }
