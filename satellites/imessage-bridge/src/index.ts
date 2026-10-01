@@ -306,12 +306,11 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
     // UX-02: iMessage has no typing API — send a one-time working note
     // only if processing outlives 5s (quick replies stay clean).
     typing: () => {
+      // Capture the turn's reply locale now: the note fires later, outside the turn's async context.
+      const noteLocale = resolveOperatorLocale();
       const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
         sendIMessageText(
-          buildIMessageReplyRequest(
-            msg,
-            t('bridge:processing_note', undefined, resolveOperatorLocale())
-          )
+          buildIMessageReplyRequest(msg, t('bridge:processing_note', undefined, noteLocale))
         )
       );
       return { stop: () => processingNote.cancel() };
