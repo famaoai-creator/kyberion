@@ -339,6 +339,13 @@
       "mission_class": "operations_and_release"
     },
     {
+      "id": "class-operations-release-ops-report",
+      "match": {
+        "mission_type_hints": ["operations_report"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
       "id": "class-research-absorption",
       "match": {
         "task_types": ["analysis"]
@@ -596,6 +603,13 @@
     }
   ],
   "delivery_shape_rules": [
+    {
+      "id": "delivery-ops-report-single",
+      "match": {
+        "mission_type_hints": ["operations_report"]
+      },
+      "delivery_shape": "single_artifact"
+    },
     {
       "id": "delivery-event-planning-multi",
       "match": {

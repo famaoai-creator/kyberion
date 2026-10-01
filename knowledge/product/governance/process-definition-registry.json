@@ -14,7 +14,7 @@
         "scripts/mission_controller.ts"
       ],
       "expected_counts": {
-        "templates": 72,
+        "templates": 73,
         "patterns": 8
       }
     },

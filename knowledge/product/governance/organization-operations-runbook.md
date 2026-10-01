@@ -21,6 +21,8 @@ pnpm organization operation tick --organization-id ORG --tier confidential --ten
 
 For a blocked Run, inspect its Incident and pipeline Trace, decide whether external effects already occurred, and resolve the Incident through the governed transition commands. A subsequent attempt needs a new explicit Run ID; the same scheduled occurrence ID is never replayed automatically. Correct the underlying failure before triggering another run.
 
+When recording a completed Run for a mission-backed Operation, `--execution-ref` may be either a scoped path or the bare mission id (resolved to that mission's `mission-state.json` under the tenant mission tree). Evidence refs must still be existing files inside the operation scope.
+
 ## Deadlines and the daily digest
 
 An Operation may carry a `deadline` (`--deadline-business-day <n> --deadline-time <HH:MM>`), evaluated in the trigger timezone on the Japanese bank calendar: weekends, national holidays (including substitute and citizen's holidays) and December 31 – January 3 are closed. A business day past the month's count is clamped to the month's last business day. A period is met only by a succeeded Run completed inside the period and at or before the deadline; a later success stays missed and is marked `completed_late`. The builder stamps `deadline.deadline_effective_from` when a deadline is added or its day/time changes and carries it forward otherwise, so a period whose deadline passed before that moment is `untracked` rather than missed. Editing other fields does not hide a missed period. Records without the field fall back to `updated_at`.
