@@ -207,6 +207,28 @@ validation.
 
 ## Contract Test Hook
 
+### Personal read-only review
+
+The Concierge home offers a manual check and an explicit one-hour opt-in for
+five-minute checks while the page remains mounted. Leaving the page, changing
+the selected organization, request failure, or the one-hour deadline stops the
+timer and cancels in-flight requests. This is browser polling; it does not claim
+24-hour background operation or external notifications.
+
+Each GET resolves the active server-authenticated member, narrows to one concrete
+allowed tenant with a membership, and rechecks the original recording consent
+at the start/end of the recording and at review time. Summaries without tenant
+attribution and viewers restricted to organizations/projects are excluded because
+the records cannot prove those scopes. Own-member data follows the existing
+recording-panel self-service exception; confidential tenant visibility is also
+required. No shared personal-tier projection is widened.
+
+Only counts of pending summaries and summaries containing attention-required
+operations are returned, from the last seven days and at most the newest 100
+eligible summaries. App names, hosts, text, step descriptions, hashes and action
+controls never enter this response. Errors clear the previous counts and stop
+periodic checks. The fixed settings link provides consent and review controls.
+
 Surface implementations should also be verifiable by automated checks.
 
 Minimum checks:
