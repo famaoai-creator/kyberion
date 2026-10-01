@@ -30,7 +30,7 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
 type Print = (value: unknown) => void;
@@ -726,8 +726,9 @@ export const MIGRATE_PHYSICAL_NAMESPACES_CLI: CliGuardSpec = {
 };
 
 export function main(argv: string[], print: Print = () => undefined): void {
-  if (guardCliArgs(argv, MIGRATE_PHYSICAL_NAMESPACES_CLI, print)) return;
-  const options = parseArgs(argv);
+  const guarded = guardCliArgsNormalized(argv, MIGRATE_PHYSICAL_NAMESPACES_CLI, print);
+  if (guarded.handled) return;
+  const options = parseArgs(guarded.argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
       ? ['schedule', 'surface', 'feedback', 'intent', 'ledger', 'promotion']

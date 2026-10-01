@@ -91,7 +91,7 @@
       "id": "auth.invalid-key",
       "category": "auth",
       "label": "Invalid or missing API key",
-      "remediation": "Set the required API key in your OS keychain (preferred) or environment. Re-run `pnpm onboard` to validate credentials.",
+      "remediation": "Set the required API key in your OS keychain (preferred) or environment. Re-run `pnpm onboarding` to validate credentials.",
       "patterns": [
         "(invalid|missing|unauthorized).*(api[\\s_-]?key|token|credential)",
         "401\\s*unauthorized",
