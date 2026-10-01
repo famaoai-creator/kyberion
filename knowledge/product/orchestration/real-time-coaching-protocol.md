@@ -20,13 +20,13 @@ last_updated: 2026-04-17
 
 `voice-actuator` と `presence-actuator` が以下をリアルタイム抽出:
 
-| シグナル | 閾値 | 意味 (推定) |
-|---|---|---|
-| 相手の沈黙 | 3 秒以上 | 同意でない / 思考中 / 不満 |
-| 相手の早口化 | 発話速度 +30% | 焦り / 隠蔽 / 関心低下 |
-| 相手の強調語 | 「絶対」「必ず」「しかし」 | 立場の固定化 |
-| 主権者の詰まり | 3 秒以上の言い澱み | 準備不足の兆候 |
-| トピック回避 | ng_topic 検知 | 話題を外す必要あり |
+| シグナル       | 閾値                       | 意味 (推定)                |
+| -------------- | -------------------------- | -------------------------- |
+| 相手の沈黙     | 3 秒以上                   | 同意でない / 思考中 / 不満 |
+| 相手の早口化   | 発話速度 +30%              | 焦り / 隠蔽 / 関心低下     |
+| 相手の強調語   | 「絶対」「必ず」「しかし」 | 立場の固定化               |
+| 主権者の詰まり | 3 秒以上の言い澱み         | 準備不足の兆候             |
+| トピック回避   | ng_topic 検知              | 話題を外す必要あり         |
 
 ## 3. Hint 出力
 
@@ -63,8 +63,9 @@ Presence Studio / Chronos Mirror の側面パネルに、以下のような短�
 
 - 実行: voice-actuator + presence-actuator
 - 表示: Presence Studio, Chronos Mirror
-- 依存: [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md)
-- 倫理: [governance/governance-policy.md](knowledge/product/governance/governance-policy.md)
+- 依存: [relationship-graph-protocol.md](relationship-graph-protocol.md)
+- 倫理: [governance/governance-policy.md](../governance/governance-policy.md)
 
 ---
+
 _Created: 2026-04-17 | Ecosystem Architect_

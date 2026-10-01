@@ -105,12 +105,12 @@ PPTX と Web は「見た目を真似る」対象ではなく、「再構成に�
 
 ## Core Contracts
 
-- [`proposal-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/proposal-brief.schema.json)
-- [`proposal-storyline-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/proposal-storyline-adf.schema.json)
+- [`proposal-brief.schema.json`](../../../product/schemas/proposal-brief.schema.json)
+- [`proposal-storyline-adf.schema.json`](../../../product/schemas/proposal-storyline-adf.schema.json)
 
 ## Media Example
 
-- [`proposal-storyline-pptx.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/proposal-storyline-pptx.json)
+- [`proposal-storyline-pptx.json`](../../../../libs/actuators/media-actuator/examples/proposal-storyline-pptx.json)
 
 ## Output Pack
 

@@ -15,7 +15,7 @@ This playbook outlines the workflow for converting hand-drawn sketches or UI ide
 Take a photo of your whiteboard, sketch, or a reference UI.
 
 ```bash
-pnpm kyberion system visual-capture camera
+pnpm kyberion record camera
 ```
 
 ### 2. Multimodal Analysis

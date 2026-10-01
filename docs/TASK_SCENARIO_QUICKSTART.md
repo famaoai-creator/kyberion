@@ -2,6 +2,8 @@
 
 TaskScenario gives you a task-first way to try one repeatable workflow without reading implementation details first.
 
+> **Do [QUICKSTART](./QUICKSTART.md) first.** This page assumes a built, healthy checkout; it is the next step once the first win works, not a second front door. The scenario documents and how they relate: [docs index](./README.md#scenario-and-use-case-documents).
+
 The first run is intentionally simple:
 
 1. List the available tasks.

@@ -433,7 +433,7 @@ async function tryHandleChronosQuickAction(
         core,
         PROJECT_ROOT,
         'Service Setup',
-        ['services:setup'],
+        ['service:setup'],
         'Inspect external service presets, auth strategies, and connection files.',
         locale
       );

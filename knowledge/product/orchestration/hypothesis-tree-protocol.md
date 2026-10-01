@@ -47,8 +47,8 @@ ACE は設計上、セキュリティ/緊急度の軸で合意形成を加速す
 
 ## 5. 関連
 
-- ベース: [consensus-protocol.md](knowledge/product/orchestration/consensus-protocol.md)
-- 人格: [personalities/matrix.md](knowledge/product/personalities/matrix.md)
+- ベース: [consensus-protocol.md](consensus-protocol.md)
+- 人格: [personalities/matrix.md](../personalities/matrix.md)
 - スキーマ: [schemas/dissent-log.schema.json](../schemas/dissent-log.schema.json)
 - パイプライン: [pipelines/hypothesis-tree.json](../pipeline-templates/hypothesis-tree.json)
 
