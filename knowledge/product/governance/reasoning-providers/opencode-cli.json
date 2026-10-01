@@ -47,6 +47,30 @@
           "npm_package": "opencode-ai",
           "brew_formula": "opencode",
           "hint": "npm install --prefix <managed-env> --no-save opencode-ai"
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "auth_args": ["auth", "list"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--agent", "--format"]
+          }
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--agent", "build"],
+            "notes": "OpenCode CLI implementer tier runs on the build agent with the full tool set."
+          },
+          "explorer": {
+            "args": ["--agent", "plan"],
+            "notes": "OpenCode CLI explorer tier runs on the read-only-leaning plan agent."
+          },
+          "planner": {
+            "args": ["--agent", "plan"],
+            "notes": "OpenCode CLI planner tier runs on the plan agent without --auto approval."
+          }
         }
       }
     }

@@ -47,6 +47,46 @@
         "install": {
           "npm_package": "@anthropic-ai/claude-code",
           "hint": "npm install --prefix <managed-env> --no-save @anthropic-ai/claude-code"
+        },
+        "capability_probe": {
+          "binary_args": ["--version"],
+          "auth_args": ["auth", "status"],
+          "headless": true,
+          "structured_output": true,
+          "sandbox_flags": {
+            "args": ["--help"],
+            "expected_flags": ["--permission-mode"]
+          },
+          "auth_interpreter": "claude-auth-status",
+          "placeholder_fallback": "claude-cli-shim"
+        },
+        "permission_profiles": {
+          "implementer": {
+            "args": ["--permission-mode", "bypassPermissions"],
+            "notes": "Full read/write/exec tier: no tool restriction beyond what the CLI session already grants."
+          },
+          "explorer": {
+            "args": [
+              "--permission-mode",
+              "default",
+              "--allowedTools",
+              "Read",
+              "Glob",
+              "Grep",
+              "WebFetch",
+              "--disallowedTools",
+              "Write",
+              "Edit",
+              "NotebookEdit",
+              "Bash",
+              "KillShell"
+            ],
+            "notes": "Read-only: only Read/Glob/Grep/WebFetch allowed, Write/Edit/NotebookEdit/Bash/KillShell explicitly denied."
+          },
+          "planner": {
+            "args": ["--permission-mode", "plan"],
+            "notes": "plan mode produces a plan without executing any tool — matches \"no tool execution at all.\""
+          }
         }
       },
       "runtime_instructions": [

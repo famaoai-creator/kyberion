@@ -178,6 +178,994 @@ export async function writeRedactedScreenFrames(
   };
   await bridge.pipeTo(redactingBus as never, input);
 }
+interface SystemCaptureOpHandlerInput {
+  op: string;
+  params: Record<string, unknown>;
+  ctx: Record<string, unknown>;
+  resolve: (value: unknown) => unknown;
+  rootDir: string;
+}
+type SystemCaptureOpHandler = (
+  input: SystemCaptureOpHandlerInput
+) => Promise<Record<string, unknown>>;
+
+const SYSTEM_CAPTURE_OP_HANDLERS_SHARED_0: SystemCaptureOpHandler = async ({ params, ctx }) => {
+  const incidentRoot = pathResolver.rootResolve('knowledge/product/incidents');
+  const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
+  const incidents: Record<string, unknown>[] = [];
+  if (safeExistsSync(incidentRoot)) {
+    const entries = readIncidentDir(incidentRoot);
+    for (const entry of entries.filter((e) => e.endsWith('.md'))) {
+      incidents.push({
+        id: entry.replace(/\.md$/, ''),
+        path: path.join('knowledge/product/incidents', entry),
+      });
+    }
+  }
+  const data = { status: 'ok', incident_list: incidents, count: incidents.length };
+  return { ...ctx, [String(params.export_as ?? 'incident_list_data')]: data };
+};
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
+  screenshot: async ({ params, ctx, resolve }) => {
+    const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+      params,
+      resolve
+    );
+    const application = typeof params.application === 'string' ? params.application.trim() : '';
+    const windowTitle = typeof params.window_title === 'string' ? params.window_title.trim() : '';
+    const windowMatchPolicy =
+      typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
+    let captureMode: 'screen' | 'focused_window' =
+      params.capture_mode === 'focused_window' ? 'focused_window' : 'screen';
+    const screenshotPath = resolveCanonicalScreenCapturePath(params, resolve);
+    const rawScreenshotPath = pathResolver.shared(
+      path.join('tmp', 'screen-captures', `raw-${randomUUID()}.png`)
+    );
+    if (!safeExistsSync(path.dirname(screenshotPath))) {
+      safeMkdir(path.dirname(screenshotPath), { recursive: true });
+    }
+    if (application) {
+      activateApplication(application);
+      captureMode = 'focused_window';
+    }
+    let windowCandidates: string[] | undefined;
+    if (application) {
+      windowCandidates = getWindowList(application);
+    }
+    if (windowTitle) {
+      activateWindowByTitle(
+        application || 'Google Chrome',
+        windowTitle,
+        windowMatchPolicy as 'strict' | 'prefix' | 'contains'
+      );
+      captureMode = 'focused_window';
+    }
+    const bridge = createScreenCaptureBridge();
+    const captureResult = await bridge.captureScreenshot({
+      save_path: rawScreenshotPath,
+      display_index: displaySelection.display_index,
+      capture_mode: captureMode,
+      application: application || undefined,
+      window_title: windowTitle || undefined,
+      window_match_policy: windowMatchPolicy,
+    } as never);
+    await redactScreenCaptureFile(captureResult.save_path || rawScreenshotPath, screenshotPath);
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'screenshot_path')]: screenshotPath,
+      screenshot_path: screenshotPath,
+      screenshot_display_index: displaySelection.display_index,
+      screenshot_display_name: displaySelection.display_name,
+      screenshot_display_selection_source: displaySelection.selection_source,
+      screenshot_application: application || undefined,
+      screenshot_window_title: windowTitle || undefined,
+      screenshot_window_selection_source: windowTitle
+        ? 'window_title'
+        : application
+          ? 'application'
+          : 'display',
+      screenshot_window_candidates: windowCandidates || [],
+    };
+  },
+  record_screen: async ({ params, ctx, resolve }) => {
+    const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+      params,
+      resolve
+    );
+    const bridge = createScreenRecordingBridge({
+      frame_redactor: redactFrameInScope(screenRedactionWorkDir()),
+    });
+    const probe = await bridge.probe();
+    if (!probe.available) {
+      throw new Error(
+        `record_screen unavailable: ${probe.capture_bridge?.reason || 'screen recording bridge unavailable'}`
+      );
+    }
+    const fpsValue = Number(resolve(params.fps || 30));
+    const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? Math.min(120, fpsValue) : 30;
+    const intervalValue = Number(resolve(params.frame_interval_ms || 0));
+    const frameIntervalMs =
+      Number.isFinite(intervalValue) && intervalValue >= 0
+        ? intervalValue
+        : Math.max(1, Math.round(1000 / fps));
+    const durationValue = Number(resolve(params.duration || 0));
+    const explicitFrameCount = Number(resolve(params.max_frames || 0));
+    const frameCount =
+      Number.isInteger(explicitFrameCount) && explicitFrameCount > 0
+        ? explicitFrameCount
+        : Number.isFinite(durationValue) && durationValue > 0
+          ? Math.max(1, Math.ceil(durationValue * fps))
+          : 1;
+    const outputPath = resolveCanonicalScreenRecordingPath(params);
+    const result = await bridge.recordToMp4(outputPath, {
+      display_index: displaySelection.display_index,
+      capture_mode: params.capture_mode === 'focused_window' ? 'focused_window' : 'screen',
+      max_frames: frameCount,
+      frame_interval_ms: frameIntervalMs,
+      fps,
+      cleanup: true,
+    });
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'screen_recording')]: {
+        ...result,
+        status: 'succeeded',
+        bridge_id: bridge.bridge_id,
+        selected_display_index: displaySelection.display_index,
+        selected_display_name: displaySelection.display_name,
+        display_selection_source: displaySelection.selection_source,
+      },
+    };
+  },
+  record_audio: async ({ params, ctx, resolve }) => {
+    return runRecordAudioOp(params, ctx, resolve);
+  },
+  capture_photo: async ({ params, ctx, resolve }) => {
+    return runCapturePhotoOp(params, ctx, resolve);
+  },
+  record_camera: async ({ params, ctx, resolve }) => {
+    return runRecordCameraOp(params, ctx, resolve);
+  },
+  macos_automation_probe: async ({ params, ctx }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'macos_automation')]: {
+        ...macosAutomationBridge.probe(),
+        capabilities: macosAutomationBridge.listCapabilities(),
+      },
+    };
+  },
+  window_list: async ({ params, ctx }) => {
+    const application =
+      typeof params.application === 'string' && params.application.trim()
+        ? params.application.trim()
+        : '';
+    if (!application) {
+      throw new Error('window_list requires application param');
+    }
+    return { ...ctx, [String(params.export_as ?? 'window_list')]: getWindowList(application) };
+  },
+  chrome_tab_list: async ({ params, ctx }) => {
+    const browser =
+      typeof params.application === 'string' && params.application.trim()
+        ? params.application.trim()
+        : 'Google Chrome';
+    return { ...ctx, [String(params.export_as ?? 'chrome_tab_list')]: listChromeTabs(browser) };
+  },
+  clipboard_read: async ({ params, ctx }) => {
+    return { ...ctx, [String(params.export_as ?? 'clipboard')]: clipboardRead() };
+  },
+  get_focused_input: async ({ params, ctx }) => {
+    return { ...ctx, [String(params.export_as ?? 'focused_input')]: detectFocusedInput() };
+  },
+  get_screen_size: async ({ params, ctx }) => {
+    return { ...ctx, [String(params.export_as ?? 'screen_size')]: getScreenSize() };
+  },
+  test_screen_stream: async ({ params, ctx, resolve }) => {
+    const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+      params,
+      resolve
+    );
+    const bridge = createScreenCaptureBridge();
+    const bus = new StubVideoFrameBus();
+    await writeRedactedScreenFrames(bridge, bus, {
+      max_frames: Math.max(1, Number(params.max_frames || 2)),
+      frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+      display_index: displaySelection.display_index,
+      display_name: displaySelection.display_name,
+    } as never);
+    const frames: unknown[] = [];
+    for await (const frame of bus.frameStream()) {
+      frames.push(frame);
+      if (frames.length >= Math.max(1, Number(params.max_frames || 2))) {
+        break;
+      }
+    }
+    await bus.close();
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'screen_stream_test')]: {
+        bridge_id: bridge.bridge_id,
+        backend: 'stub',
+        selected_display_index: displaySelection.display_index,
+        selected_display_name: displaySelection.display_name,
+        display_selection_source: displaySelection.selection_source,
+        frame_count: frames.length,
+        frames,
+      },
+    };
+  },
+  test_screen_mp4_roundtrip: async ({ params, ctx, resolve }) => {
+    const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+      params,
+      resolve
+    );
+    const bridge = createScreenCaptureBridge();
+    const redact = redactFrameInScope(screenRedactionWorkDir());
+    const frames: VideoFrame[] = [];
+    for await (const frame of bridge.captureStream({
+      max_frames: Math.max(1, Number(params.max_frames || 2)),
+      frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+      display_index: displaySelection.display_index,
+      display_name: displaySelection.display_name,
+    } as any)) {
+      const redacted = await redact(frame);
+      if (!redacted || redacted.payload.byteLength === 0) {
+        throw new Error('screen frame withheld: redaction_failed');
+      }
+      frames.push(redacted);
+    }
+    const outputPath = pathResolver.shared(`runtime/computer/screen-roundtrip-${Date.now()}.mp4`);
+    const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
+      fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
+    });
+    const importBus = new StubVideoFrameBus();
+    await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+    // Count re-imported frames (bounded: never wait past the exported
+    // count or a diagnostic timeout — an open bus blocks on empty).
+    let importedFrameCount = 0;
+    const importDeadline = Date.now() + 15_000;
+    for await (const frame of importBus.frameStream()) {
+      void frame;
+      importedFrameCount += 1;
+      if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
+    }
+    await importBus.close();
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'screen_roundtrip')]: {
+        bridge_id: bridge.bridge_id,
+        selected_display_index: displaySelection.display_index,
+        selected_display_name: displaySelection.display_name,
+        display_selection_source: displaySelection.selection_source,
+        output_path: exported.output_path,
+        exported_frame_count: exported.frame_count,
+        imported_frame_count: importedFrameCount,
+      },
+    };
+  },
+  shell: async ({ params, ctx, resolve, rootDir }) => {
+    assertUnsafeShellAllowed();
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'last_capture')]: await retry(
+        async () =>
+          safeExecShellScript(
+            resolveUserLoginShell(getRegisteredEnvText('SHELL'), '/bin/zsh'),
+            String(resolve(String(params.cmd))),
+            {
+              login: true,
+              cwd: rootDir,
+              env: stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined),
+            }
+          ).trim(),
+        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+      ),
+    };
+    // LE-03: registry reconcile sweeps as in-process typed ops (formerly
+    // `system:shell` wrappers around dist/scripts/reconcile_*.js). Structured
+    // results land directly in ctx — no stdout parsing, no silent `|| echo` fallback.
+  },
+  reconcile_config_fallbacks: async ({ params, ctx }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks(),
+    };
+  },
+  reconcile_unclassified_errors: async ({ params, ctx }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'reconcile_result')]: reconcileUnclassifiedErrors(),
+    };
+  },
+  reconcile_unhandled_intents: async ({ params, ctx }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'reconcile_result')]: reconcileUnhandledIntents(),
+    };
+    // LE-03 rollout batch 2: report/verify sweeps as in-process typed ops
+    // (formerly system:shell/system:exec wrappers around dist/scripts/*.js).
+  },
+  cost_report: async ({ params, ctx, resolve }) => {
+    const lastDays = Number(params.last_days);
+    const since = params.since
+      ? String(resolve(params.since))
+      : Number.isFinite(lastDays) && lastDays > 0
+        ? new Date(Date.now() - lastDays * 24 * 60 * 60 * 1000).toISOString()
+        : undefined;
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'cost_report')]: buildCostReportFromHistory({
+        since,
+        until: params.until ? String(resolve(params.until)) : undefined,
+      }),
+    };
+  },
+  audit_verify: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'audit_report')]: collectAuditVerifyReport({
+        since: params.since ? String(resolve(params.since)) : undefined,
+        ledgers: Array.isArray(params.ledgers) ? params.ledgers.map(String) : undefined,
+      }),
+    };
+  },
+  summarize_memory_promotion_queue: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'memory_queue_summary')]: runMemoryPromotionQueueSummary({
+        status: params.status ? String(resolve(params.status)) : undefined,
+        output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
+      }),
+    };
+  },
+  summarize_task_model_routing: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'task_model_routing_summary')]: runTaskModelRoutingSummary({
+        task_events_path: params.task_events_path
+          ? String(resolve(params.task_events_path))
+          : undefined,
+        supervisor_events_path: params.supervisor_events_path
+          ? String(resolve(params.supervisor_events_path))
+          : undefined,
+        output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
+      }),
+    };
+  },
+  cli_health_check: async ({ params, ctx, resolve }) => {
+    const command = String(resolve(params.command));
+    const args = params.args
+      ? (params.args as unknown[]).map((a) => String(resolve(a)))
+      : ['--version'];
+    const result = await retry(
+      async () => safeExecResult(command, args, { timeoutMs: Number(params.timeout_ms) || 5000 }),
+      buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+    );
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'cli_health')]: {
+        available: result.status === 0,
+        stdout: result.stdout.trim(),
+        stderr: result.stderr.trim(),
+        status: result.status,
+      },
+    };
+  },
+  exec: async ({ params, ctx, resolve, rootDir }) => {
+    assertUnsafeShellAllowed();
+    const command = String(resolve(params.command));
+    const args = params.args ? (params.args as unknown[]).map((a) => String(resolve(a))) : [];
+    // Pipeline-supplied env may not set execution authority (DR-01).
+    const env = stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined);
+    const result = await retry(
+      async () =>
+        safeExecResult(command, args, {
+          cwd: params.cwd ? resolveSystemPath(String(resolve(params.cwd)), false) : rootDir,
+          env,
+          timeoutMs: Number(params.timeout_ms) || 30000,
+          input: params.input ? String(resolve(params.input)) : undefined,
+        }),
+      buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+    );
+    if (result.status !== 0 && !params.allow_error) {
+      throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
+    }
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'last_exec')]: {
+        stdout: result.stdout.trim(),
+        stderr: result.stderr.trim(),
+        status: result.status,
+      },
+    };
+  },
+  read_file: async ({ op, params, ctx, resolve }) => {
+    return promoteDelegatedCapture(
+      await delegateToFilePipeline(
+        {
+          type: 'capture',
+          op: 'read_file',
+          params: { ...params, path: resolve(params.path) },
+        },
+        ctx
+      ),
+      params,
+      'last_capture'
+    );
+  },
+  read_json: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'last_capture_data')]: readSystemJson(
+        resolveSystemPath(String(resolve(params.path))),
+        'system read_json input'
+      ),
+    };
+  },
+  probe: async ({ params, ctx, resolve }) => {
+    if (params.capability === 'silero_vad') {
+      const status = probeSileroVad();
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'last_probe')]: {
+          capability: 'silero_vad',
+          available: status.available,
+          ...(status.reason ? { reason: status.reason } : {}),
+        },
+      };
+    }
+    const targetPath = resolveSystemPath(
+      String(resolve(params.path)),
+      true,
+      params.allow_symlink_leaf === true
+    );
+    let exists = false;
+    let kind = 'unknown';
+    try {
+      exists = await retry(
+        async () => safeExistsSync(targetPath),
+        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+      );
+      if (exists) {
+        const stats = await retry(
+          async () => safeStat(targetPath),
+          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+        );
+        kind = stats.isDirectory() ? 'dir' : 'file';
+      }
+    } catch {
+      exists = false;
+    }
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'last_probe')]: {
+        path: resolve(params.path),
+        exists,
+        kind,
+      },
+    };
+  },
+  probe_active_profile: async ({ params, ctx, resolve }) => {
+    const relativePath = String(resolve(params.path || '')).trim();
+    if (
+      !relativePath ||
+      path.isAbsolute(relativePath) ||
+      relativePath.split(/[\\/]/).includes('..')
+    ) {
+      throw new Error('probe_active_profile requires a safe profile-relative path');
+    }
+    const targetPath = path.join(resolveActiveProfileRoot(), relativePath);
+    let exists = false;
+    let kind = 'unknown';
+    try {
+      exists = safeExistsSync(targetPath);
+      if (exists) {
+        const stats = safeStat(targetPath);
+        kind = stats.isDirectory() ? 'dir' : 'file';
+      }
+    } catch {
+      exists = false;
+    }
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'last_probe')]: {
+        path: relativePath,
+        exists,
+        kind,
+      },
+    };
+  },
+  glob_files: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'file_list')]: getAllFiles(
+        resolveSystemPath(String(resolve(params.dir)))
+      )
+        .filter((f) => !params.ext || f.endsWith(String(params.ext)))
+        .map((f) => path.relative(pathResolver.rootDir(), f)),
+    };
+  },
+  scan_directory: async ({ params, ctx, resolve }) => {
+    const { safeReaddir, safeExistsSync: scanExists } = await import('@agent/core/secure-io');
+    const scanRoot = resolveSystemPath(String(resolve(params.path || '.')));
+    if (!scanExists(scanRoot)) {
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'scan_result')]: {
+          files: [],
+          count: 0,
+          dir: resolve(params.path || '.'),
+        },
+      };
+    }
+    const recursive = params.recursive !== false;
+    const includeMetadata = params.include_metadata === true;
+    const excludePatterns: string[] = Array.isArray(params.exclude)
+      ? params.exclude
+      : params.exclude
+        ? [params.exclude]
+        : [];
+    const patternStr: string | undefined = params.pattern ? String(params.pattern) : undefined;
+    const patternRe = patternStr ? new RegExp(patternStr) : undefined;
+    const maxDepth = typeof params.max_depth === 'number' ? params.max_depth : Infinity;
+
+    const isExcluded = (rel: string): boolean =>
+      excludePatterns.some((p) => rel.includes(p) || rel.split(path.sep).some((seg) => seg === p));
+
+    const scanDir = (dir: string, depth: number): Record<string, unknown>[] => {
+      if (depth > maxDepth) return [];
+      let entries: string[];
+      try {
+        entries = safeReaddir(dir);
+      } catch {
+        return [];
+      }
+      const results: Record<string, unknown>[] = [];
+      for (const entry of entries) {
+        if (entry.startsWith('.')) continue;
+        let abs: string;
+        try {
+          abs = assertSafeRepositoryPath(path.join(dir, entry));
+        } catch {
+          continue;
+        }
+        const rel = path.relative(pathResolver.rootDir(), abs);
+        if (isExcluded(rel)) continue;
+        let stats: ReturnType<typeof safeLstat> | null = null;
+        try {
+          stats = safeLstat(abs);
+        } catch {
+          continue;
+        }
+        if (stats.isSymbolicLink()) continue;
+        if (stats.isDirectory()) {
+          if (recursive) results.push(...scanDir(abs, depth + 1));
+        } else {
+          if (patternRe && !patternRe.test(rel)) continue;
+          const entry_result: Record<string, unknown> = { path: rel };
+          if (includeMetadata) {
+            entry_result.size = stats.size;
+            entry_result.mtime = stats.mtimeMs;
+          }
+          results.push(entry_result);
+        }
+      }
+      return results;
+    };
+
+    const files = scanDir(scanRoot, 0);
+    const data = { files, count: files.length, dir: resolve(params.path || '.') };
+    return { ...ctx, [String(params.export_as ?? 'scan_result')]: data };
+  },
+  vision_consult: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'vision_decision')]: await retry(
+        async () =>
+          visionJudge.consultVision(
+            resolve(params.context as Record<string, unknown>) as string,
+            params.tie_break_options as never
+          ),
+        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
+      ),
+    };
+  },
+  pulse_status: async ({ params, ctx }) => {
+    const { ledger } = await import('@agent/core/ledger');
+    return { ...ctx, [String(params.export_as ?? 'ledger_valid')]: ledger.verifyIntegrity() };
+  },
+  baseline_check: async ({ params, ctx }) => {
+    const report = await runBaselineCheck();
+    return { ...ctx, [String(params.export_as ?? 'baseline_check')]: report };
+  },
+  list_missions: async ({ params, ctx }) => {
+    const missionRoot = resolveSystemPath('active/missions');
+    const tiers = ['personal', 'confidential', 'public'];
+    const requestedStatus =
+      typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
+    const allMissions: Record<string, unknown>[] = [];
+    for (const tier of tiers) {
+      const tierPath = path.join(missionRoot, tier);
+      if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
+        const { safeReaddir } = await import('@agent/core/secure-io');
+        const missions = safeReaddir(tierPath);
+        for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
+          const missionPath = path.join(tierPath, missionId);
+          if (!safeLstat(missionPath).isDirectory()) continue;
+          const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+            allowMissingLeaf: true,
+          });
+          const state = safeExistsSync(statePath) ? loadStateAtPath(statePath) : null;
+          if (!state) continue;
+          if (requestedStatus && state?.status !== requestedStatus) continue;
+          allMissions.push({
+            id: missionId,
+            tier,
+            status: state?.status || 'unknown',
+            path: path.relative(pathResolver.rootDir(), missionPath),
+            metadata: state || {},
+          });
+        }
+      }
+    }
+    const data = { status: 'ok', mission_list: allMissions, count: allMissions.length };
+    return { ...ctx, [String(params.export_as ?? 'mission_list_data')]: data };
+  },
+  list_projects: async ({ params, ctx }) => {
+    const { listProjectRecords } = await import('@agent/core/project/project-registry');
+    const projects = listProjectRecords();
+    const data = { status: 'ok', project_list: projects, count: projects.length };
+    return { ...ctx, [String(params.export_as ?? 'project_list_data')]: data };
+  },
+  list_capabilities: async ({ params, ctx }) => {
+    const actuatorRoot = pathResolver.rootResolve('libs/actuators');
+    const { safeReaddir } = await import('@agent/core/secure-io');
+    const capabilities: Record<string, unknown>[] = [];
+    if (safeExistsSync(actuatorRoot)) {
+      const entries = safeReaddir(actuatorRoot);
+      for (const entry of entries) {
+        const actuatorPath = path.join(actuatorRoot, entry);
+        const pkgPath = path.join(actuatorPath, 'package.json');
+        if (safeLstat(actuatorPath).isDirectory() && safeExistsSync(pkgPath)) {
+          try {
+            const pkg = parseSafeJsonObjectValue(
+              readSystemJson(assertSafeRepositoryPath(pkgPath), 'system capability metadata'),
+              'system capability metadata'
+            );
+            capabilities.push({
+              id: entry,
+              name: pkg.name,
+              description: pkg.description,
+              version: pkg.version,
+            });
+          } catch (err) {
+            logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
+          }
+        }
+      }
+    }
+    const data = { status: 'ok', capability_list: capabilities, count: capabilities.length };
+    return { ...ctx, [String(params.export_as ?? 'capability_list_data')]: data };
+  },
+  list_tool_runtimes: async ({ params, ctx }) => {
+    const inventory = listToolRuntimeInventory(
+      typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
+    );
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'tool_runtimes')]: {
+        version: inventory.version,
+        platform: inventory.platform,
+        requested_mode: inventory.requested_mode,
+        default_tool_id: inventory.default_tool_id,
+        tools: inventory.items.map((item) => ({
+          tool_id: item.tool.tool_id,
+          display_name: item.tool.display_name,
+          ecosystem: item.tool.ecosystem,
+          lifecycle_stage: item.lifecycle_stage,
+          selected_action: item.selected_action,
+          selected_backend: item.selected_backend,
+          installed: item.installed,
+          requires_install: item.requires_install,
+          managed_env_path: item.managed_env_path,
+          available_commands: item.available_commands,
+          reason: item.reason,
+        })),
+      },
+    };
+  },
+  list_service_runtimes: async ({ params, ctx }) => {
+    const inventory = await listServiceRuntimeInventory(
+      typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
+    );
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'service_runtimes')]: {
+        version: inventory.version,
+        platform: inventory.platform,
+        requested_mode: inventory.requested_mode,
+        default_service_id: inventory.default_service_id,
+        services: inventory.items.map((item) => ({
+          service_id: item.service.service_id,
+          display_name: item.service.display_name,
+          kind: item.service.kind,
+          lifecycle_stage: item.lifecycle_stage,
+          selected_action: item.selected_action,
+          available: item.available,
+          installed: item.installed,
+          requires_install: item.requires_install,
+          managed_service_path: item.managed_service_path,
+          service_endpoint_path: item.service.service_endpoint_path,
+          service_preset_path: item.service.service_preset_path,
+          base_url: item.base_url,
+          probe_url: item.probe_url,
+          reason: item.reason,
+        })),
+      },
+    };
+  },
+  list_incidents: SYSTEM_CAPTURE_OP_HANDLERS_SHARED_0,
+  list_knowledge: SYSTEM_CAPTURE_OP_HANDLERS_SHARED_0,
+  collect_artifacts: async ({ params, ctx }) => {
+    const missionRoot = path.resolve(process.cwd(), 'active/missions');
+    const isPathWithin = (basePath: string, targetPath: string): boolean => {
+      const relative = path.relative(basePath, targetPath);
+      return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+    };
+    const missionObjectToRelPath = (m: Record<string, unknown>): string =>
+      typeof m?.path === 'string'
+        ? path.relative(missionRoot, path.resolve(process.cwd(), m.path))
+        : `${m?.tier ?? 'confidential'}/${m?.id ?? ''}`;
+
+    const resolveList = (value: unknown): string[] => {
+      const input = Array.isArray(value) ? value : [value];
+      return input.flatMap((item) => {
+        if (typeof item !== 'string') {
+          if (
+            item &&
+            typeof item === 'object' &&
+            ('id' in (item as object) || 'path' in (item as object))
+          ) {
+            return [missionObjectToRelPath(item)];
+          }
+          return [];
+        }
+        const resolved = resolveVars(item, {});
+        if (
+          resolved &&
+          typeof resolved === 'object' &&
+          !Array.isArray(resolved) &&
+          'mission_list' in resolved
+        ) {
+          return (
+            (resolved as Record<string, unknown>).mission_list as Record<string, unknown>[]
+          ).map(missionObjectToRelPath);
+        }
+        if (Array.isArray(resolved)) {
+          return resolved.flatMap((entry) => {
+            if (typeof entry === 'string') return [entry];
+            if (entry && typeof entry === 'object' && ('id' in entry || 'path' in entry)) {
+              return [missionObjectToRelPath(entry)];
+            }
+            return [];
+          });
+        }
+        if (typeof resolved === 'string') return [resolved];
+        return [];
+      });
+    };
+    const missionIds = resolveList(params.mission_ids);
+    const patterns = resolveList(params.patterns);
+    const results: Record<string, Record<string, string>> = {};
+    const globToRegExp = (pattern: string): RegExp => {
+      const escaped = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      return new RegExp(`^${escaped}$`);
+    };
+    const matchesPattern = (filePath: string, pattern: string): boolean => {
+      const normalizedPath = filePath.replace(/\\/g, '/');
+      const basename = path.posix.basename(normalizedPath);
+      const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
+      return matcher.test(normalizedPath) || matcher.test(basename);
+    };
+    for (const mId of missionIds) {
+      const mPath = path.resolve(missionRoot, mId);
+      let safeMissionPath: string;
+      try {
+        safeMissionPath = assertSafeRepositoryPath(mPath, { allowMissingLeaf: true });
+      } catch {
+        continue;
+      }
+      if (
+        isPathWithin(missionRoot, safeMissionPath) &&
+        safeExistsSync(safeMissionPath) &&
+        safeLstat(safeMissionPath).isDirectory()
+      ) {
+        results[mId] = {};
+        for (const pattern of patterns) {
+          const files = getAllFiles(safeMissionPath).filter((f) =>
+            matchesPattern(path.relative(safeMissionPath, f), pattern)
+          );
+          for (const f of files) {
+            const rel = path.relative(safeMissionPath, f);
+            results[mId][rel] = safeReadFile(assertSafeRepositoryPath(f), {
+              encoding: 'utf8',
+            }) as string;
+          }
+        }
+      }
+    }
+    return { ...ctx, [String(params.export_as ?? 'artifact_collection')]: results };
+  },
+  sample_traces: async ({ params, ctx }) => {
+    const missionRoot = resolveSystemPath('active/missions');
+    const count = Number(params.count || 5);
+    const allTraces: Record<string, unknown>[] = [];
+    const tiers = ['personal', 'confidential', 'public'];
+    const { safeReaddir } = await import('@agent/core/secure-io');
+    for (const tier of tiers) {
+      const tierPath = path.join(missionRoot, tier);
+      if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
+        const missions = safeReaddir(tierPath);
+        for (const m of missions) {
+          const tracePath = path.join(tierPath, m, 'trace.json');
+          if (
+            safeLstat(path.join(tierPath, m)).isDirectory() &&
+            safeExistsSync(assertSafeRepositoryPath(tracePath, { allowMissingLeaf: true }))
+          ) {
+            allTraces.push({
+              missionId: `${tier}/${m}`,
+              path: assertSafeRepositoryPath(tracePath),
+            });
+          }
+        }
+      }
+    }
+    const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
+    const results = sampled.map((s) => ({
+      missionId: s.missionId,
+      trace: readSystemJson(assertSafeRepositoryPath(String(s.path)), 'system mission trace'),
+    }));
+    return { ...ctx, [String(params.export_as ?? 'sampled_traces')]: results };
+  },
+  list_running_apps: async ({ params, ctx }) => {
+    const { platform } = await import('@agent/core/platform');
+    const apps = await platform.listRunningApps();
+    return { ...ctx, [String(params.export_as ?? 'running_apps')]: apps };
+  },
+  list_input_devices: async ({ params, ctx }) => {
+    const bridge = createVirtualInputDeviceInventoryBridge();
+    const probe = await bridge.probe();
+    return { ...ctx, [String(params.export_as ?? 'input_devices')]: probe.inventory };
+  },
+  list_displays: async ({ params, ctx }) => {
+    const bridge = createScreenDisplayInventoryBridge();
+    const probe = await bridge.probe();
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'display_inventory')]: {
+        inventory: probe.inventory,
+        primary_display: Array.isArray(probe.inventory.displays)
+          ? probe.inventory.displays.find((display) => display.primary) ||
+            probe.inventory.displays[0] ||
+            null
+          : null,
+        display_count: Array.isArray(probe.inventory.displays)
+          ? probe.inventory.displays.length
+          : 0,
+      },
+    };
+  },
+  list_media_devices: async ({ params, ctx }) => {
+    const bridge = createVirtualMediaDeviceControlBridge();
+    const probe = await bridge.probe();
+    return {
+      ...ctx,
+      [String(params.export_as ?? 'media_devices')]: {
+        ...probe.selection,
+        supported_actions: probe.supported_actions,
+      },
+    };
+  },
+  control_media_devices: async ({ params, ctx }) => {
+    const bridge = createVirtualMediaDeviceControlBridge();
+    const result = await bridge.control({
+      action: (typeof params.action === 'string' ? params.action : 'select') as never,
+      scope: (typeof params.scope === 'string' ? params.scope : 'all') as never,
+    });
+    return { ...ctx, [String(params.export_as ?? 'media_control')]: result };
+  },
+  list_audio_output_devices: async ({ params, ctx }) => {
+    const bridge = createVirtualAudioOutputPlaybackBridge();
+    const result = await bridge.playOnOutputs(params.targets as string[]);
+    return { ...ctx, [String(params.export_as ?? 'audio_output_devices')]: result };
+  },
+  list_audio_input_devices: async ({ params, ctx }) => {
+    const bridge = createVirtualAudioInputRecordingBridge();
+    const result = await bridge.recordOnInputs(params.targets as string[]);
+    return { ...ctx, [String(params.export_as ?? 'audio_input_devices')]: result };
+  },
+  camera_capture: async ({ params, ctx }) => {
+    return runCameraCaptureProbe(params, ctx);
+  },
+  camera_injection: async ({ params, ctx }) => {
+    return runCameraInjectionProbe(params, ctx);
+  },
+  screen_capture: async ({ params, ctx }) => {
+    const bridge = createScreenCaptureBridge();
+    const probe = await bridge.probe();
+    return { ...ctx, [String(params.export_as ?? 'screen_capture')]: probe };
+  },
+  screen_recording: async ({ params, ctx }) => {
+    const bridge = createScreenRecordingBridge();
+    const probe = await bridge.probe();
+    return { ...ctx, [String(params.export_as ?? 'screen_recording')]: probe };
+  },
+  test_audio_outputs: async ({ params, ctx }) => {
+    const bridge = createVirtualAudioOutputPlaybackBridge();
+    const result = await bridge.playOnOutputs(params.targets as string[]);
+    return { ...ctx, [String(params.export_as ?? 'audio_test')]: result };
+  },
+  test_audio_inputs: async ({ params, ctx }) => {
+    const bridge = createVirtualAudioInputRecordingBridge();
+    const result = await bridge.recordOnInputs(params.targets as string[]);
+    return { ...ctx, [String(params.export_as ?? 'audio_input_test')]: result };
+  },
+  test_camera_stream: async ({ params, ctx }) => {
+    return runTestCameraStreamOp(params, ctx);
+  },
+  test_camera_mp4_roundtrip: async ({ params, ctx }) => {
+    return runTestCameraMp4RoundtripOp(params, ctx);
+  },
+  test_camera_injection: async ({ params, ctx }) => {
+    return runTestCameraInjectionOp(params, ctx);
+  },
+  resolve_path: async ({ params, ctx, resolve }) => {
+    // Pure (no-I/O) path resolution so pipelines/ADF never embed a machine-specific
+    // prefix. Modes mirror pathResolver: `resolve`/domain helpers expand a portable
+    // input to a machine-local absolute path (runtime use only); `to_relative`/`normalize`
+    // collapse an absolute path back to a portable repo-relative path (safe to persist).
+    const mode = typeof params.mode === 'string' ? params.mode.trim() : 'resolve';
+    const input = params.path !== undefined ? String(resolve(params.path)) : '';
+    let result: unknown;
+    switch (mode) {
+      case 'resolve':
+        result = pathResolver.resolve(input);
+        break;
+      case 'to_relative':
+        result = pathResolver.toRepoRelative(input);
+        break;
+      case 'normalize':
+        result = pathResolver.normalizeStoredPath(input);
+        break;
+      case 'shared':
+        result = pathResolver.shared(input);
+        break;
+      case 'knowledge':
+        result = pathResolver.knowledge(input);
+        break;
+      case 'active':
+        result = pathResolver.active(input);
+        break;
+      case 'tmp':
+        result = pathResolver.shared(input ? `tmp/${input}` : 'tmp');
+        break;
+      case 'vault':
+        result = pathResolver.vault(input);
+        break;
+      default:
+        throw new Error(
+          `resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`
+        );
+    }
+    return { ...ctx, [String(params.export_as ?? 'resolved_path')]: result };
+  },
+};
+
 export async function opCapture(
   op: string,
   params: Record<string, unknown>,
@@ -186,989 +1174,13 @@ export async function opCapture(
 ) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
-  switch (op) {
-    case 'screenshot': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
-        params,
-        resolve
-      );
-      const application = typeof params.application === 'string' ? params.application.trim() : '';
-      const windowTitle = typeof params.window_title === 'string' ? params.window_title.trim() : '';
-      const windowMatchPolicy =
-        typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
-      let captureMode: 'screen' | 'focused_window' =
-        params.capture_mode === 'focused_window' ? 'focused_window' : 'screen';
-      const screenshotPath = resolveCanonicalScreenCapturePath(params, resolve);
-      const rawScreenshotPath = pathResolver.shared(
-        path.join('tmp', 'screen-captures', `raw-${randomUUID()}.png`)
-      );
-      if (!safeExistsSync(path.dirname(screenshotPath))) {
-        safeMkdir(path.dirname(screenshotPath), { recursive: true });
-      }
-      if (application) {
-        activateApplication(application);
-        captureMode = 'focused_window';
-      }
-      let windowCandidates: string[] | undefined;
-      if (application) {
-        windowCandidates = getWindowList(application);
-      }
-      if (windowTitle) {
-        activateWindowByTitle(
-          application || 'Google Chrome',
-          windowTitle,
-          windowMatchPolicy as 'strict' | 'prefix' | 'contains'
-        );
-        captureMode = 'focused_window';
-      }
-      const bridge = createScreenCaptureBridge();
-      const captureResult = await bridge.captureScreenshot({
-        save_path: rawScreenshotPath,
-        display_index: displaySelection.display_index,
-        capture_mode: captureMode,
-        application: application || undefined,
-        window_title: windowTitle || undefined,
-        window_match_policy: windowMatchPolicy,
-      } as never);
-      await redactScreenCaptureFile(captureResult.save_path || rawScreenshotPath, screenshotPath);
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'screenshot_path')]: screenshotPath,
-        screenshot_path: screenshotPath,
-        screenshot_display_index: displaySelection.display_index,
-        screenshot_display_name: displaySelection.display_name,
-        screenshot_display_selection_source: displaySelection.selection_source,
-        screenshot_application: application || undefined,
-        screenshot_window_title: windowTitle || undefined,
-        screenshot_window_selection_source: windowTitle
-          ? 'window_title'
-          : application
-            ? 'application'
-            : 'display',
-        screenshot_window_candidates: windowCandidates || [],
-      };
-    }
-    case 'record_screen': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
-        params,
-        resolve
-      );
-      const bridge = createScreenRecordingBridge({
-        frame_redactor: redactFrameInScope(screenRedactionWorkDir()),
-      });
-      const probe = await bridge.probe();
-      if (!probe.available) {
-        throw new Error(
-          `record_screen unavailable: ${probe.capture_bridge?.reason || 'screen recording bridge unavailable'}`
-        );
-      }
-      const fpsValue = Number(resolve(params.fps || 30));
-      const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? Math.min(120, fpsValue) : 30;
-      const intervalValue = Number(resolve(params.frame_interval_ms || 0));
-      const frameIntervalMs =
-        Number.isFinite(intervalValue) && intervalValue >= 0
-          ? intervalValue
-          : Math.max(1, Math.round(1000 / fps));
-      const durationValue = Number(resolve(params.duration || 0));
-      const explicitFrameCount = Number(resolve(params.max_frames || 0));
-      const frameCount =
-        Number.isInteger(explicitFrameCount) && explicitFrameCount > 0
-          ? explicitFrameCount
-          : Number.isFinite(durationValue) && durationValue > 0
-            ? Math.max(1, Math.ceil(durationValue * fps))
-            : 1;
-      const outputPath = resolveCanonicalScreenRecordingPath(params);
-      const result = await bridge.recordToMp4(outputPath, {
-        display_index: displaySelection.display_index,
-        capture_mode: params.capture_mode === 'focused_window' ? 'focused_window' : 'screen',
-        max_frames: frameCount,
-        frame_interval_ms: frameIntervalMs,
-        fps,
-        cleanup: true,
-      });
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'screen_recording')]: {
-          ...result,
-          status: 'succeeded',
-          bridge_id: bridge.bridge_id,
-          selected_display_index: displaySelection.display_index,
-          selected_display_name: displaySelection.display_name,
-          display_selection_source: displaySelection.selection_source,
-        },
-      };
-    }
-    case 'record_audio': {
-      return runRecordAudioOp(params, ctx, resolve);
-    }
-    case 'capture_photo': {
-      return runCapturePhotoOp(params, ctx, resolve);
-    }
-    case 'record_camera': {
-      return runRecordCameraOp(params, ctx, resolve);
-    }
-    case 'macos_automation_probe':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'macos_automation')]: {
-          ...macosAutomationBridge.probe(),
-          capabilities: macosAutomationBridge.listCapabilities(),
-        },
-      };
-    case 'window_list': {
-      const application =
-        typeof params.application === 'string' && params.application.trim()
-          ? params.application.trim()
-          : '';
-      if (!application) {
-        throw new Error('window_list requires application param');
-      }
-      return { ...ctx, [String(params.export_as ?? 'window_list')]: getWindowList(application) };
-    }
-    case 'chrome_tab_list': {
-      const browser =
-        typeof params.application === 'string' && params.application.trim()
-          ? params.application.trim()
-          : 'Google Chrome';
-      return { ...ctx, [String(params.export_as ?? 'chrome_tab_list')]: listChromeTabs(browser) };
-    }
-    case 'clipboard_read':
-      return { ...ctx, [String(params.export_as ?? 'clipboard')]: clipboardRead() };
-    case 'get_focused_input':
-      return { ...ctx, [String(params.export_as ?? 'focused_input')]: detectFocusedInput() };
-    case 'get_screen_size':
-      return { ...ctx, [String(params.export_as ?? 'screen_size')]: getScreenSize() };
-    case 'window_list': {
-      const application =
-        typeof params.application === 'string' && params.application.trim()
-          ? params.application.trim()
-          : '';
-      if (!application) {
-        throw new Error('window_list requires application param');
-      }
-      return { ...ctx, [String(params.export_as ?? 'window_list')]: getWindowList(application) };
-    }
-    case 'chrome_tab_list': {
-      const browser =
-        typeof params.application === 'string' && params.application.trim()
-          ? params.application.trim()
-          : 'Google Chrome';
-      return { ...ctx, [String(params.export_as ?? 'chrome_tab_list')]: listChromeTabs(browser) };
-    }
-    case 'test_screen_stream': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
-        params,
-        resolve
-      );
-      const bridge = createScreenCaptureBridge();
-      const bus = new StubVideoFrameBus();
-      await writeRedactedScreenFrames(bridge, bus, {
-        max_frames: Math.max(1, Number(params.max_frames || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        display_index: displaySelection.display_index,
-        display_name: displaySelection.display_name,
-      } as never);
-      const frames: unknown[] = [];
-      for await (const frame of bus.frameStream()) {
-        frames.push(frame);
-        if (frames.length >= Math.max(1, Number(params.max_frames || 2))) {
-          break;
-        }
-      }
-      await bus.close();
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'screen_stream_test')]: {
-          bridge_id: bridge.bridge_id,
-          backend: 'stub',
-          selected_display_index: displaySelection.display_index,
-          selected_display_name: displaySelection.display_name,
-          display_selection_source: displaySelection.selection_source,
-          frame_count: frames.length,
-          frames,
-        },
-      };
-    }
-    case 'test_screen_mp4_roundtrip': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
-        params,
-        resolve
-      );
-      const bridge = createScreenCaptureBridge();
-      const redact = redactFrameInScope(screenRedactionWorkDir());
-      const frames: VideoFrame[] = [];
-      for await (const frame of bridge.captureStream({
-        max_frames: Math.max(1, Number(params.max_frames || 2)),
-        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
-        display_index: displaySelection.display_index,
-        display_name: displaySelection.display_name,
-      } as any)) {
-        const redacted = await redact(frame);
-        if (!redacted || redacted.payload.byteLength === 0) {
-          throw new Error('screen frame withheld: redaction_failed');
-        }
-        frames.push(redacted);
-      }
-      const outputPath = pathResolver.shared(`runtime/computer/screen-roundtrip-${Date.now()}.mp4`);
-      const exported = await writeVideoFramesToMp4(outputPath, replayCollectedFrames(frames), {
-        fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
-      });
-      const importBus = new StubVideoFrameBus();
-      await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
-      // Count re-imported frames (bounded: never wait past the exported
-      // count or a diagnostic timeout — an open bus blocks on empty).
-      let importedFrameCount = 0;
-      const importDeadline = Date.now() + 15_000;
-      for await (const frame of importBus.frameStream()) {
-        void frame;
-        importedFrameCount += 1;
-        if (importedFrameCount >= exported.frame_count || Date.now() > importDeadline) break;
-      }
-      await importBus.close();
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'screen_roundtrip')]: {
-          bridge_id: bridge.bridge_id,
-          selected_display_index: displaySelection.display_index,
-          selected_display_name: displaySelection.display_name,
-          display_selection_source: displaySelection.selection_source,
-          output_path: exported.output_path,
-          exported_frame_count: exported.frame_count,
-          imported_frame_count: importedFrameCount,
-        },
-      };
-    }
-    case 'shell':
-      assertUnsafeShellAllowed();
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'last_capture')]: await retry(
-          async () =>
-            safeExecShellScript(
-              resolveUserLoginShell(getRegisteredEnvText('SHELL'), '/bin/zsh'),
-              String(resolve(String(params.cmd))),
-              {
-                login: true,
-                cwd: rootDir,
-                env: stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined),
-              }
-            ).trim(),
-          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-        ),
-      };
-    // LE-03: registry reconcile sweeps as in-process typed ops (formerly
-    // `system:shell` wrappers around dist/scripts/reconcile_*.js). Structured
-    // results land directly in ctx — no stdout parsing, no silent `|| echo` fallback.
-    case 'reconcile_config_fallbacks':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'reconcile_result')]: reconcileConfigFallbacks(),
-      };
-    case 'reconcile_unclassified_errors':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'reconcile_result')]: reconcileUnclassifiedErrors(),
-      };
-    case 'reconcile_unhandled_intents':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'reconcile_result')]: reconcileUnhandledIntents(),
-      };
-    // LE-03 rollout batch 2: report/verify sweeps as in-process typed ops
-    // (formerly system:shell/system:exec wrappers around dist/scripts/*.js).
-    case 'cost_report': {
-      const lastDays = Number(params.last_days);
-      const since = params.since
-        ? String(resolve(params.since))
-        : Number.isFinite(lastDays) && lastDays > 0
-          ? new Date(Date.now() - lastDays * 24 * 60 * 60 * 1000).toISOString()
-          : undefined;
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'cost_report')]: buildCostReportFromHistory({
-          since,
-          until: params.until ? String(resolve(params.until)) : undefined,
-        }),
-      };
-    }
-    case 'audit_verify':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'audit_report')]: collectAuditVerifyReport({
-          since: params.since ? String(resolve(params.since)) : undefined,
-          ledgers: Array.isArray(params.ledgers) ? params.ledgers.map(String) : undefined,
-        }),
-      };
-    case 'summarize_memory_promotion_queue':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'memory_queue_summary')]: runMemoryPromotionQueueSummary({
-          status: params.status ? String(resolve(params.status)) : undefined,
-          output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
-        }),
-      };
-    case 'summarize_task_model_routing':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'task_model_routing_summary')]: runTaskModelRoutingSummary({
-          task_events_path: params.task_events_path
-            ? String(resolve(params.task_events_path))
-            : undefined,
-          supervisor_events_path: params.supervisor_events_path
-            ? String(resolve(params.supervisor_events_path))
-            : undefined,
-          output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
-        }),
-      };
-    case 'cli_health_check': {
-      const command = String(resolve(params.command));
-      const args = params.args
-        ? (params.args as unknown[]).map((a) => String(resolve(a)))
-        : ['--version'];
-      const result = await retry(
-        async () => safeExecResult(command, args, { timeoutMs: Number(params.timeout_ms) || 5000 }),
-        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-      );
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'cli_health')]: {
-          available: result.status === 0,
-          stdout: result.stdout.trim(),
-          stderr: result.stderr.trim(),
-          status: result.status,
-        },
-      };
-    }
-    case 'exec': {
-      assertUnsafeShellAllowed();
-      const command = String(resolve(params.command));
-      const args = params.args ? (params.args as unknown[]).map((a) => String(resolve(a))) : [];
-      // Pipeline-supplied env may not set execution authority (DR-01).
-      const env = stripAuthorityEnvOverrides(params.env as Record<string, string> | undefined);
-      const result = await retry(
-        async () =>
-          safeExecResult(command, args, {
-            cwd: params.cwd ? resolveSystemPath(String(resolve(params.cwd)), false) : rootDir,
-            env,
-            timeoutMs: Number(params.timeout_ms) || 30000,
-            input: params.input ? String(resolve(params.input)) : undefined,
-          }),
-        buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-      );
-      if (result.status !== 0 && !params.allow_error) {
-        throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
-      }
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'last_exec')]: {
-          stdout: result.stdout.trim(),
-          stderr: result.stderr.trim(),
-          status: result.status,
-        },
-      };
-    }
-    case 'read_file':
-      return promoteDelegatedCapture(
-        await delegateToFilePipeline(
-          {
-            type: 'capture',
-            op: 'read_file',
-            params: { ...params, path: resolve(params.path) },
-          },
-          ctx
-        ),
-        params,
-        'last_capture'
-      );
-    case 'read_json':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'last_capture_data')]: readSystemJson(
-          resolveSystemPath(String(resolve(params.path))),
-          'system read_json input'
-        ),
-      };
-    case 'probe': {
-      if (params.capability === 'silero_vad') {
-        const status = probeSileroVad();
-        return {
-          ...ctx,
-          [String(params.export_as ?? 'last_probe')]: {
-            capability: 'silero_vad',
-            available: status.available,
-            ...(status.reason ? { reason: status.reason } : {}),
-          },
-        };
-      }
-      const targetPath = resolveSystemPath(
-        String(resolve(params.path)),
-        true,
-        params.allow_symlink_leaf === true
-      );
-      let exists = false;
-      let kind = 'unknown';
-      try {
-        exists = await retry(
-          async () => safeExistsSync(targetPath),
-          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-        );
-        if (exists) {
-          const stats = await retry(
-            async () => safeStat(targetPath),
-            buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-          );
-          kind = stats.isDirectory() ? 'dir' : 'file';
-        }
-      } catch {
-        exists = false;
-      }
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'last_probe')]: {
-          path: resolve(params.path),
-          exists,
-          kind,
-        },
-      };
-    }
-    case 'probe_active_profile': {
-      const relativePath = String(resolve(params.path || '')).trim();
-      if (
-        !relativePath ||
-        path.isAbsolute(relativePath) ||
-        relativePath.split(/[\\/]/).includes('..')
-      ) {
-        throw new Error('probe_active_profile requires a safe profile-relative path');
-      }
-      const targetPath = path.join(resolveActiveProfileRoot(), relativePath);
-      let exists = false;
-      let kind = 'unknown';
-      try {
-        exists = safeExistsSync(targetPath);
-        if (exists) {
-          const stats = safeStat(targetPath);
-          kind = stats.isDirectory() ? 'dir' : 'file';
-        }
-      } catch {
-        exists = false;
-      }
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'last_probe')]: {
-          path: relativePath,
-          exists,
-          kind,
-        },
-      };
-    }
-    case 'glob_files':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'file_list')]: getAllFiles(
-          resolveSystemPath(String(resolve(params.dir)))
-        )
-          .filter((f) => !params.ext || f.endsWith(String(params.ext)))
-          .map((f) => path.relative(pathResolver.rootDir(), f)),
-      };
-    case 'scan_directory': {
-      const { safeReaddir, safeExistsSync: scanExists } = await import('@agent/core/secure-io');
-      const scanRoot = resolveSystemPath(String(resolve(params.path || '.')));
-      if (!scanExists(scanRoot)) {
-        return {
-          ...ctx,
-          [String(params.export_as ?? 'scan_result')]: {
-            files: [],
-            count: 0,
-            dir: resolve(params.path || '.'),
-          },
-        };
-      }
-      const recursive = params.recursive !== false;
-      const includeMetadata = params.include_metadata === true;
-      const excludePatterns: string[] = Array.isArray(params.exclude)
-        ? params.exclude
-        : params.exclude
-          ? [params.exclude]
-          : [];
-      const patternStr: string | undefined = params.pattern ? String(params.pattern) : undefined;
-      const patternRe = patternStr ? new RegExp(patternStr) : undefined;
-      const maxDepth = typeof params.max_depth === 'number' ? params.max_depth : Infinity;
-
-      const isExcluded = (rel: string): boolean =>
-        excludePatterns.some(
-          (p) => rel.includes(p) || rel.split(path.sep).some((seg) => seg === p)
-        );
-
-      const scanDir = (dir: string, depth: number): Record<string, unknown>[] => {
-        if (depth > maxDepth) return [];
-        let entries: string[];
-        try {
-          entries = safeReaddir(dir);
-        } catch {
-          return [];
-        }
-        const results: Record<string, unknown>[] = [];
-        for (const entry of entries) {
-          if (entry.startsWith('.')) continue;
-          let abs: string;
-          try {
-            abs = assertSafeRepositoryPath(path.join(dir, entry));
-          } catch {
-            continue;
-          }
-          const rel = path.relative(pathResolver.rootDir(), abs);
-          if (isExcluded(rel)) continue;
-          let stats: ReturnType<typeof safeLstat> | null = null;
-          try {
-            stats = safeLstat(abs);
-          } catch {
-            continue;
-          }
-          if (stats.isSymbolicLink()) continue;
-          if (stats.isDirectory()) {
-            if (recursive) results.push(...scanDir(abs, depth + 1));
-          } else {
-            if (patternRe && !patternRe.test(rel)) continue;
-            const entry_result: Record<string, unknown> = { path: rel };
-            if (includeMetadata) {
-              entry_result.size = stats.size;
-              entry_result.mtime = stats.mtimeMs;
-            }
-            results.push(entry_result);
-          }
-        }
-        return results;
-      };
-
-      const files = scanDir(scanRoot, 0);
-      const data = { files, count: files.length, dir: resolve(params.path || '.') };
-      return { ...ctx, [String(params.export_as ?? 'scan_result')]: data };
-    }
-    case 'vision_consult':
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'vision_decision')]: await retry(
-          async () =>
-            visionJudge.consultVision(
-              resolve(params.context as Record<string, unknown>) as string,
-              params.tie_break_options as never
-            ),
-          buildRetryOptions(params.retry as Record<string, unknown> | undefined)
-        ),
-      };
-    case 'pulse_status': {
-      const { ledger } = await import('@agent/core/ledger');
-      return { ...ctx, [String(params.export_as ?? 'ledger_valid')]: ledger.verifyIntegrity() };
-    }
-    case 'baseline_check': {
-      const report = await runBaselineCheck();
-      return { ...ctx, [String(params.export_as ?? 'baseline_check')]: report };
-    }
-    case 'list_missions': {
-      const missionRoot = resolveSystemPath('active/missions');
-      const tiers = ['personal', 'confidential', 'public'];
-      const requestedStatus =
-        typeof params.status === 'string' && params.status.trim()
-          ? params.status.trim()
-          : undefined;
-      const allMissions: Record<string, unknown>[] = [];
-      for (const tier of tiers) {
-        const tierPath = path.join(missionRoot, tier);
-        if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
-          const { safeReaddir } = await import('@agent/core/secure-io');
-          const missions = safeReaddir(tierPath);
-          for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
-            const missionPath = path.join(tierPath, missionId);
-            if (!safeLstat(missionPath).isDirectory()) continue;
-            const statePath = assertSafeRepositoryPath(
-              path.join(missionPath, 'mission-state.json'),
-              { allowMissingLeaf: true }
-            );
-            const state = safeExistsSync(statePath) ? loadStateAtPath(statePath) : null;
-            if (!state) continue;
-            if (requestedStatus && state?.status !== requestedStatus) continue;
-            allMissions.push({
-              id: missionId,
-              tier,
-              status: state?.status || 'unknown',
-              path: path.relative(pathResolver.rootDir(), missionPath),
-              metadata: state || {},
-            });
-          }
-        }
-      }
-      const data = { status: 'ok', mission_list: allMissions, count: allMissions.length };
-      return { ...ctx, [String(params.export_as ?? 'mission_list_data')]: data };
-    }
-    case 'list_projects': {
-      const { listProjectRecords } = await import('@agent/core/project/project-registry');
-      const projects = listProjectRecords();
-      const data = { status: 'ok', project_list: projects, count: projects.length };
-      return { ...ctx, [String(params.export_as ?? 'project_list_data')]: data };
-    }
-    case 'list_capabilities': {
-      const actuatorRoot = pathResolver.rootResolve('libs/actuators');
-      const { safeReaddir } = await import('@agent/core/secure-io');
-      const capabilities: Record<string, unknown>[] = [];
-      if (safeExistsSync(actuatorRoot)) {
-        const entries = safeReaddir(actuatorRoot);
-        for (const entry of entries) {
-          const actuatorPath = path.join(actuatorRoot, entry);
-          const pkgPath = path.join(actuatorPath, 'package.json');
-          if (safeLstat(actuatorPath).isDirectory() && safeExistsSync(pkgPath)) {
-            try {
-              const pkg = parseSafeJsonObjectValue(
-                readSystemJson(assertSafeRepositoryPath(pkgPath), 'system capability metadata'),
-                'system capability metadata'
-              );
-              capabilities.push({
-                id: entry,
-                name: pkg.name,
-                description: pkg.description,
-                version: pkg.version,
-              });
-            } catch (err) {
-              logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
-            }
-          }
-        }
-      }
-      const data = { status: 'ok', capability_list: capabilities, count: capabilities.length };
-      return { ...ctx, [String(params.export_as ?? 'capability_list_data')]: data };
-    }
-    case 'list_tool_runtimes': {
-      const inventory = listToolRuntimeInventory(
-        typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
-      );
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'tool_runtimes')]: {
-          version: inventory.version,
-          platform: inventory.platform,
-          requested_mode: inventory.requested_mode,
-          default_tool_id: inventory.default_tool_id,
-          tools: inventory.items.map((item) => ({
-            tool_id: item.tool.tool_id,
-            display_name: item.tool.display_name,
-            ecosystem: item.tool.ecosystem,
-            lifecycle_stage: item.lifecycle_stage,
-            selected_action: item.selected_action,
-            selected_backend: item.selected_backend,
-            installed: item.installed,
-            requires_install: item.requires_install,
-            managed_env_path: item.managed_env_path,
-            available_commands: item.available_commands,
-            reason: item.reason,
-          })),
-        },
-      };
-    }
-    case 'list_service_runtimes': {
-      const inventory = await listServiceRuntimeInventory(
-        typeof params.requested_mode === 'string' ? (params.requested_mode as never) : 'trial'
-      );
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'service_runtimes')]: {
-          version: inventory.version,
-          platform: inventory.platform,
-          requested_mode: inventory.requested_mode,
-          default_service_id: inventory.default_service_id,
-          services: inventory.items.map((item) => ({
-            service_id: item.service.service_id,
-            display_name: item.service.display_name,
-            kind: item.service.kind,
-            lifecycle_stage: item.lifecycle_stage,
-            selected_action: item.selected_action,
-            available: item.available,
-            installed: item.installed,
-            requires_install: item.requires_install,
-            managed_service_path: item.managed_service_path,
-            service_endpoint_path: item.service.service_endpoint_path,
-            service_preset_path: item.service.service_preset_path,
-            base_url: item.base_url,
-            probe_url: item.probe_url,
-            reason: item.reason,
-          })),
-        },
-      };
-    }
-    case 'list_incidents':
-    case 'list_knowledge': {
-      const incidentRoot = pathResolver.rootResolve('knowledge/product/incidents');
-      const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
-      const incidents: Record<string, unknown>[] = [];
-      if (safeExistsSync(incidentRoot)) {
-        const entries = readIncidentDir(incidentRoot);
-        for (const entry of entries.filter((e) => e.endsWith('.md'))) {
-          incidents.push({
-            id: entry.replace(/\.md$/, ''),
-            path: path.join('knowledge/product/incidents', entry),
-          });
-        }
-      }
-      const data = { status: 'ok', incident_list: incidents, count: incidents.length };
-      return { ...ctx, [String(params.export_as ?? 'incident_list_data')]: data };
-    }
-    case 'collect_artifacts': {
-      const missionRoot = path.resolve(process.cwd(), 'active/missions');
-      const isPathWithin = (basePath: string, targetPath: string): boolean => {
-        const relative = path.relative(basePath, targetPath);
-        return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
-      };
-      const missionObjectToRelPath = (m: Record<string, unknown>): string =>
-        typeof m?.path === 'string'
-          ? path.relative(missionRoot, path.resolve(process.cwd(), m.path))
-          : `${m?.tier ?? 'confidential'}/${m?.id ?? ''}`;
-
-      const resolveList = (value: unknown): string[] => {
-        const input = Array.isArray(value) ? value : [value];
-        return input.flatMap((item) => {
-          if (typeof item !== 'string') {
-            if (
-              item &&
-              typeof item === 'object' &&
-              ('id' in (item as object) || 'path' in (item as object))
-            ) {
-              return [missionObjectToRelPath(item)];
-            }
-            return [];
-          }
-          const resolved = resolveVars(item, {});
-          if (
-            resolved &&
-            typeof resolved === 'object' &&
-            !Array.isArray(resolved) &&
-            'mission_list' in resolved
-          ) {
-            return (
-              (resolved as Record<string, unknown>).mission_list as Record<string, unknown>[]
-            ).map(missionObjectToRelPath);
-          }
-          if (Array.isArray(resolved)) {
-            return resolved.flatMap((entry) => {
-              if (typeof entry === 'string') return [entry];
-              if (entry && typeof entry === 'object' && ('id' in entry || 'path' in entry)) {
-                return [missionObjectToRelPath(entry)];
-              }
-              return [];
-            });
-          }
-          if (typeof resolved === 'string') return [resolved];
-          return [];
-        });
-      };
-      const missionIds = resolveList(params.mission_ids);
-      const patterns = resolveList(params.patterns);
-      const results: Record<string, Record<string, string>> = {};
-      const globToRegExp = (pattern: string): RegExp => {
-        const escaped = pattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-          .replace(/\*/g, '.*')
-          .replace(/\?/g, '.');
-        return new RegExp(`^${escaped}$`);
-      };
-      const matchesPattern = (filePath: string, pattern: string): boolean => {
-        const normalizedPath = filePath.replace(/\\/g, '/');
-        const basename = path.posix.basename(normalizedPath);
-        const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
-        return matcher.test(normalizedPath) || matcher.test(basename);
-      };
-      for (const mId of missionIds) {
-        const mPath = path.resolve(missionRoot, mId);
-        let safeMissionPath: string;
-        try {
-          safeMissionPath = assertSafeRepositoryPath(mPath, { allowMissingLeaf: true });
-        } catch {
-          continue;
-        }
-        if (
-          isPathWithin(missionRoot, safeMissionPath) &&
-          safeExistsSync(safeMissionPath) &&
-          safeLstat(safeMissionPath).isDirectory()
-        ) {
-          results[mId] = {};
-          for (const pattern of patterns) {
-            const files = getAllFiles(safeMissionPath).filter((f) =>
-              matchesPattern(path.relative(safeMissionPath, f), pattern)
-            );
-            for (const f of files) {
-              const rel = path.relative(safeMissionPath, f);
-              results[mId][rel] = safeReadFile(assertSafeRepositoryPath(f), {
-                encoding: 'utf8',
-              }) as string;
-            }
-          }
-        }
-      }
-      return { ...ctx, [String(params.export_as ?? 'artifact_collection')]: results };
-    }
-    case 'sample_traces': {
-      const missionRoot = resolveSystemPath('active/missions');
-      const count = Number(params.count || 5);
-      const allTraces: Record<string, unknown>[] = [];
-      const tiers = ['personal', 'confidential', 'public'];
-      const { safeReaddir } = await import('@agent/core/secure-io');
-      for (const tier of tiers) {
-        const tierPath = path.join(missionRoot, tier);
-        if (safeExistsSync(tierPath) && safeLstat(tierPath).isDirectory()) {
-          const missions = safeReaddir(tierPath);
-          for (const m of missions) {
-            const tracePath = path.join(tierPath, m, 'trace.json');
-            if (
-              safeLstat(path.join(tierPath, m)).isDirectory() &&
-              safeExistsSync(assertSafeRepositoryPath(tracePath, { allowMissingLeaf: true }))
-            ) {
-              allTraces.push({
-                missionId: `${tier}/${m}`,
-                path: assertSafeRepositoryPath(tracePath),
-              });
-            }
-          }
-        }
-      }
-      const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
-      const results = sampled.map((s) => ({
-        missionId: s.missionId,
-        trace: readSystemJson(assertSafeRepositoryPath(String(s.path)), 'system mission trace'),
-      }));
-      return { ...ctx, [String(params.export_as ?? 'sampled_traces')]: results };
-    }
-    case 'list_running_apps': {
-      const { platform } = await import('@agent/core/platform');
-      const apps = await platform.listRunningApps();
-      return { ...ctx, [String(params.export_as ?? 'running_apps')]: apps };
-    }
-    case 'list_input_devices': {
-      const bridge = createVirtualInputDeviceInventoryBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [String(params.export_as ?? 'input_devices')]: probe.inventory };
-    }
-    case 'list_displays': {
-      const bridge = createScreenDisplayInventoryBridge();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'display_inventory')]: {
-          inventory: probe.inventory,
-          primary_display: Array.isArray(probe.inventory.displays)
-            ? probe.inventory.displays.find((display) => display.primary) ||
-              probe.inventory.displays[0] ||
-              null
-            : null,
-          display_count: Array.isArray(probe.inventory.displays)
-            ? probe.inventory.displays.length
-            : 0,
-        },
-      };
-    }
-    case 'list_media_devices': {
-      const bridge = createVirtualMediaDeviceControlBridge();
-      const probe = await bridge.probe();
-      return {
-        ...ctx,
-        [String(params.export_as ?? 'media_devices')]: {
-          ...probe.selection,
-          supported_actions: probe.supported_actions,
-        },
-      };
-    }
-    case 'control_media_devices': {
-      const bridge = createVirtualMediaDeviceControlBridge();
-      const result = await bridge.control({
-        action: (typeof params.action === 'string' ? params.action : 'select') as never,
-        scope: (typeof params.scope === 'string' ? params.scope : 'all') as never,
-      });
-      return { ...ctx, [String(params.export_as ?? 'media_control')]: result };
-    }
-    case 'list_audio_output_devices': {
-      const bridge = createVirtualAudioOutputPlaybackBridge();
-      const result = await bridge.playOnOutputs(params.targets as string[]);
-      return { ...ctx, [String(params.export_as ?? 'audio_output_devices')]: result };
-    }
-    case 'list_audio_input_devices': {
-      const bridge = createVirtualAudioInputRecordingBridge();
-      const result = await bridge.recordOnInputs(params.targets as string[]);
-      return { ...ctx, [String(params.export_as ?? 'audio_input_devices')]: result };
-    }
-    case 'camera_capture': {
-      return runCameraCaptureProbe(params, ctx);
-    }
-    case 'camera_injection': {
-      return runCameraInjectionProbe(params, ctx);
-    }
-    case 'screen_capture': {
-      const bridge = createScreenCaptureBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [String(params.export_as ?? 'screen_capture')]: probe };
-    }
-    case 'screen_recording': {
-      const bridge = createScreenRecordingBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [String(params.export_as ?? 'screen_recording')]: probe };
-    }
-    case 'test_audio_outputs': {
-      const bridge = createVirtualAudioOutputPlaybackBridge();
-      const result = await bridge.playOnOutputs(params.targets as string[]);
-      return { ...ctx, [String(params.export_as ?? 'audio_test')]: result };
-    }
-    case 'test_audio_inputs': {
-      const bridge = createVirtualAudioInputRecordingBridge();
-      const result = await bridge.recordOnInputs(params.targets as string[]);
-      return { ...ctx, [String(params.export_as ?? 'audio_input_test')]: result };
-    }
-    case 'test_camera_stream': {
-      return runTestCameraStreamOp(params, ctx);
-    }
-    case 'test_camera_mp4_roundtrip': {
-      return runTestCameraMp4RoundtripOp(params, ctx);
-    }
-    case 'test_camera_injection': {
-      return runTestCameraInjectionOp(params, ctx);
-    }
-    case 'resolve_path': {
-      // Pure (no-I/O) path resolution so pipelines/ADF never embed a machine-specific
-      // prefix. Modes mirror pathResolver: `resolve`/domain helpers expand a portable
-      // input to a machine-local absolute path (runtime use only); `to_relative`/`normalize`
-      // collapse an absolute path back to a portable repo-relative path (safe to persist).
-      const mode = typeof params.mode === 'string' ? params.mode.trim() : 'resolve';
-      const input = params.path !== undefined ? String(resolve(params.path)) : '';
-      let result: unknown;
-      switch (mode) {
-        case 'resolve':
-          result = pathResolver.resolve(input);
-          break;
-        case 'to_relative':
-          result = pathResolver.toRepoRelative(input);
-          break;
-        case 'normalize':
-          result = pathResolver.normalizeStoredPath(input);
-          break;
-        case 'shared':
-          result = pathResolver.shared(input);
-          break;
-        case 'knowledge':
-          result = pathResolver.knowledge(input);
-          break;
-        case 'active':
-          result = pathResolver.active(input);
-          break;
-        case 'tmp':
-          result = pathResolver.shared(input ? `tmp/${input}` : 'tmp');
-          break;
-        case 'vault':
-          result = pathResolver.vault(input);
-          break;
-        default:
-          throw new Error(
-            `resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`
-          );
-      }
-      return { ...ctx, [String(params.export_as ?? 'resolved_path')]: result };
-    }
-    default:
-      throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
+  const handler = Object.prototype.hasOwnProperty.call(SYSTEM_CAPTURE_OP_HANDLERS, op)
+    ? SYSTEM_CAPTURE_OP_HANDLERS[op]
+    : undefined;
+  if (!handler) {
+    throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }
+  return handler({ op, params, ctx, resolve, rootDir });
 }
 
 export const warnedSystemOpAliases = new Set<string>();
@@ -1382,6 +1394,47 @@ export function windowTitleMatches(
   return systemFocusHelpers.windowTitleMatches(expected, actual, matchPolicy);
 }
 
+interface SystemControlOpHandlerInput {
+  op: string;
+  params: Record<string, unknown>;
+  ctx: Record<string, unknown>;
+  runNested: (
+    steps: AdfStep[],
+    seedCtx: Record<string, unknown> | undefined
+  ) => Promise<Record<string, unknown>>;
+}
+type SystemControlOpHandler = (
+  input: SystemControlOpHandlerInput
+) => Promise<Record<string, unknown>>;
+
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const SYSTEM_CONTROL_OP_HANDLERS: Readonly<Record<string, SystemControlOpHandler>> = {
+  if: async ({ params, ctx, runNested }) => {
+    if (evaluateCondition(params.condition, ctx)) {
+      return await runNested(params.then as AdfStep[], ctx);
+    } else if (params.else) {
+      return await runNested(params.else as AdfStep[], ctx);
+    }
+    return ctx;
+  },
+  while: async ({ params, ctx, runNested }) => {
+    let iterations = 0;
+    const maxIter = params.max_iterations || undefined;
+    while (
+      evaluateCondition(params.condition, ctx) &&
+      withinLoopBounds(iterations as number, maxIter as number)
+    ) {
+      logger.info(`    [LOOP] Iteration ${++iterations}...`);
+      ctx = await runNested(params.pipeline as AdfStep[], ctx);
+    }
+    if (!withinLoopBounds(iterations as number, maxIter as number))
+      logger.warn(
+        `[SAFETY_GUARD] Loop reached max_iterations (${maxIter ?? DEFAULT_MAX_LOOP_ITERATIONS})`
+      );
+    return ctx;
+  },
+};
+
 export async function opControl(
   op: string,
   params: Record<string, unknown>,
@@ -1401,35 +1454,13 @@ export async function opControl(
     return res.context as Record<string, unknown>;
   };
 
-  switch (op) {
-    case 'if':
-      if (evaluateCondition(params.condition, ctx)) {
-        return await runNested(params.then as AdfStep[], ctx);
-      } else if (params.else) {
-        return await runNested(params.else as AdfStep[], ctx);
-      }
-      return ctx;
-
-    case 'while': {
-      let iterations = 0;
-      const maxIter = params.max_iterations || undefined;
-      while (
-        evaluateCondition(params.condition, ctx) &&
-        withinLoopBounds(iterations as number, maxIter as number)
-      ) {
-        logger.info(`    [LOOP] Iteration ${++iterations}...`);
-        ctx = await runNested(params.pipeline as AdfStep[], ctx);
-      }
-      if (!withinLoopBounds(iterations as number, maxIter as number))
-        logger.warn(
-          `[SAFETY_GUARD] Loop reached max_iterations (${maxIter ?? DEFAULT_MAX_LOOP_ITERATIONS})`
-        );
-      return ctx;
-    }
-
-    default:
-      throw new Error(buildUnknownSystemOpMessage(op));
+  const handler = Object.prototype.hasOwnProperty.call(SYSTEM_CONTROL_OP_HANDLERS, op)
+    ? SYSTEM_CONTROL_OP_HANDLERS[op]
+    : undefined;
+  if (!handler) {
+    throw new Error(buildUnknownSystemOpMessage(op));
   }
+  return handler({ op, params, ctx, runNested });
 }
 
 export function resolveCanonicalScreenRecordingPath(params: Record<string, unknown>): string {

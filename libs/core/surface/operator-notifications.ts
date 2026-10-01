@@ -15,6 +15,8 @@ import {
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
+import type { SurfaceAsyncChannel } from './channel-surface-types.js';
+import { getChannelAdapter, listOperatorNotificationChannels } from './channel-adapter-registry.js';
 import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
 import { sendIMessage } from '../imessage-bridge.js';
 import { currentTriggerDeliveryId } from '../trigger-correlation.js';
@@ -120,13 +122,11 @@ const NOTIFICATION_PREFERENCES_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/notification-preferences.schema.json'
 );
 
-const NOTIFICATION_SURFACES = new Set<NotificationChannelTarget['surface']>([
-  'slack',
-  'imessage',
-  'telegram',
-  'discord',
-  'inbox',
-]);
+// Notification destinations are the channel-adapter registry entries that
+// declare `operator_notification` (RS-06).
+function isNotificationSurface(value: unknown): value is NotificationChannelTarget['surface'] {
+  return typeof value === 'string' && listOperatorNotificationChannels().includes(value);
+}
 const OPERATOR_EVENTS = new Set<OperatorEvent>([
   'question',
   'approval_required',
@@ -151,7 +151,7 @@ function parseNotificationChannelTarget(value: unknown): NotificationChannelTarg
   if (!hasOnlyKeys(record, ['surface', 'target'])) return null;
   if (
     typeof record.surface !== 'string' ||
-    !NOTIFICATION_SURFACES.has(record.surface as NotificationChannelTarget['surface']) ||
+    !isNotificationSurface(record.surface) ||
     typeof record.target !== 'string' ||
     !record.target.trim()
   ) {
@@ -384,11 +384,14 @@ function deliver(
   correlationId: string,
   title: string
 ): Promise<void> {
-  switch (route.surface) {
-    case 'imessage':
+  // Delivery mechanics are declared per channel in the adapter registry (RS-06);
+  // an unregistered surface fails closed in getChannelAdapter.
+  const delivery = getChannelAdapter(route.surface).operator_notification?.delivery;
+  switch (delivery) {
+    case 'imessage-direct':
       sendIMessage({ recipient: route.target, text });
       return;
-    case 'inbox': {
+    case 'local-inbox': {
       // Local fallback surface: no bridge/daemon required. The notification
       // lands in the deliverable inbox that `pnpm kyberion` surfaces on the
       // home screen and `pnpm kyberion inbox` lists/acknowledges.
@@ -410,17 +413,22 @@ function deliver(
       }
       return;
     }
-    // slack/telegram/discord: enqueue to the surface outbox; each bridge
-    // drains its own outbox and performs the actual API send.
-    default:
+    // Remote chat surfaces: enqueue to the surface outbox; each bridge drains
+    // its own outbox and performs the actual API send.
+    case 'surface-outbox':
       enqueueSurfaceOutboxMessage({
-        surface: route.surface,
+        surface: route.surface as SurfaceAsyncChannel,
         correlationId,
         channel: route.target,
         threadTs: '',
         text,
         source: 'system',
       });
+      return;
+    default:
+      throw new Error(
+        `[operator-notifications] channel "${route.surface}" declares no operator_notification delivery in the channel adapter registry`
+      );
   }
 }
 

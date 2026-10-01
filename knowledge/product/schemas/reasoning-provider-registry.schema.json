@@ -181,6 +181,203 @@
                   "hint": { "type": "string", "minLength": 1 }
                 },
                 "required": ["hint"]
+              },
+              "capability_probe": {
+                "description": "XP-01 cheap capability probe for this CLI (binary/auth/sandbox-flag help probes). Commands run this descriptor's cli.binary (or its bin_env_key override); code hooks are referenced by id.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["binary_args", "headless", "structured_output"],
+                "properties": {
+                  "binary_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "auth_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "auth_interpreter": {
+                    "description": "Named auth-result interpreter; default is exit-status success.",
+                    "enum": ["claude-auth-status"]
+                  },
+                  "placeholder_fallback": {
+                    "description": "Named placeholder-shim detector + fallback binary resolver.",
+                    "enum": ["claude-cli-shim"]
+                  },
+                  "headless": {
+                    "type": "boolean"
+                  },
+                  "structured_output": {
+                    "type": "boolean"
+                  },
+                  "sandbox_flags": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["args", "expected_flags"],
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "expected_flags": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^--?[a-z][a-z0-9-]*$"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "permission_profiles": {
+                "description": "XP-02 KD-05 tier to provider permission projection. Every declared tier is an explicit grant (args) or refusal; an undeclared tier fails closed.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "implementer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "explorer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "planner": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
               }
             },
             "required": ["binary", "version_args", "discovery"]

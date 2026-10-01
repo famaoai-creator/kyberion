@@ -196,6 +196,9 @@ function resolveExistingMeetingFile(ref: string, label: string): string {
 }
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
+type MeetingActuatorPlatform = MeetingAction['params']['platform'];
+type MeetingActuatorProvider = NonNullable<MeetingAction['params']['provider']>;
+
 export interface MeetingAction {
   action: 'check_consent' | 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
   params: {
@@ -811,13 +814,9 @@ export async function handleAction(
       ...input,
       params: {
         ...input.params,
-        provider:
-          providerAdapter.id === 'google_meet'
-            ? 'google_meet'
-            : providerAdapter.id === 'teams'
-              ? 'teams_pipeline'
-              : 'zoom',
-        platform: providerAdapter.id === 'google_meet' ? 'meet' : providerAdapter.id,
+        // Execution provider and platform id are meeting-platform registry data.
+        provider: providerAdapter.executionProvider as MeetingActuatorProvider,
+        platform: providerAdapter.platform as MeetingActuatorPlatform,
       },
     };
   }
