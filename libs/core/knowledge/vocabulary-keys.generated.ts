@@ -383,6 +383,7 @@ export type VocabularyKey =
   | 'bridge:thread_assistant'
   | 'bridge:thread_context'
   | 'bridge:thread_user'
+  | 'bridge:work_request_not_authorized'
   | 'brief_title'
   | 'browser_conversation:action_done'
   | 'browser_conversation:action_failed'
@@ -10077,4 +10078,5 @@ export type VocabularyKey =
   | 'voice_tts_url_token'
   | 'why_human_label'
   | 'work_page_title'
+  | 'work_request_not_authorized'
   | 'you';
