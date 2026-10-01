@@ -467,7 +467,9 @@
         "active/shared/observability/chronos/",
         "active/shared/observability/mission-control/",
         "active/shared/runtime/terminal/",
-        "active/audit/"
+        "active/audit/",
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/delegations.jsonl"
       ],
       "allow_write": [
         "active/shared/coordination/chronos/",
@@ -476,7 +478,9 @@
         "active/shared/observability/chronos/",
         "active/shared/observability/mission-control/",
         "active/shared/runtime/terminal/",
-        "active/audit/"
+        "active/audit/",
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/delegations.jsonl"
       ]
     },
     "chronos_operator": {
@@ -633,6 +637,22 @@
       "allow_write": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
         "active/organizations/public/${KYBERION_TENANT}/"
+      ]
+    },
+    "daemon_watchdog": {
+      "allow_read": [
+        "active/shared/coordination/autonomy/",
+        "active/shared/runtime/trigger-deliveries.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/observability/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/autonomy/",
+        "active/shared/runtime/trigger-deliveries.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/observability/",
+        "active/audit/"
       ]
     }
   },
