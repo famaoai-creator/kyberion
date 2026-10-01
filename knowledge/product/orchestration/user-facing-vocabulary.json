@@ -9296,6 +9296,101 @@
         "ja": "この憲章をやめる",
         "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
       },
+      "setup.invite_title": {
+        "en": "Invite people",
+        "ja": "メンバーを招待する",
+        "qps-ploc": "⟦Ïñṽïŧė ṗėőṗŀė ŀőřė⟧"
+      },
+      "setup.invite_description": {
+        "en": "Create a one-time link for someone to join an organization. They must sign in themselves; the link alone gives nothing.",
+        "ja": "組織に参加するための 1 回限りのリンクを作ります。参加する人が自分でサインインする必要があり、リンクだけでは何も得られません。",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ őñė-ŧïɱė ŀïñķ ƒőř şőɱėőñė ŧő ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ. Ŧħėẏ ɱůşŧ şïɠñ ïñ ŧħėɱşėŀṽėş; ŧħė ŀïñķ ȧŀőñė ɠïṽėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "setup.invite_tenant": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "setup.invite_role": {
+        "en": "Role",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀė ŀőř⟧"
+      },
+      "setup.invite_ttl": {
+        "en": "Valid for (hours)",
+        "ja": "有効時間(時間)",
+        "qps-ploc": "⟦Ṽȧŀïḓ ƒőř (ħőůřş) ŀőřėɱ⟧"
+      },
+      "setup.invite_create": {
+        "en": "Create invite link",
+        "ja": "招待リンクを作る",
+        "qps-ploc": "⟦Ƈřėȧŧė ïñṽïŧė ŀïñķ ŀőřėɱ⟧"
+      },
+      "setup.invite_link_once": {
+        "en": "Share this link now. It is shown only once.",
+        "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",
+        "qps-ploc": "⟦Şħȧřė ŧħïş ŀïñķ ñőẇ. Ïŧ ïş şħőẇñ őñŀẏ őñƈė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "setup.invite_list_title": {
+        "en": "Invites",
+        "ja": "招待の一覧",
+        "qps-ploc": "⟦Ïñṽïŧėş ŀőř⟧"
+      },
+      "setup.invite_none": {
+        "en": "No invites yet.",
+        "ja": "招待はまだありません。",
+        "qps-ploc": "⟦Ñő ïñṽïŧėş ẏėŧ. ŀőřė⟧"
+      },
+      "setup.invite_line": {
+        "en": "{role} · {status} · until {date}",
+        "ja": "{role} · {status} · {date} まで",
+        "qps-ploc": "⟦{role} · {status} · ůñŧïŀ {date} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.invite_status_pending": {
+        "en": "waiting",
+        "ja": "待機中",
+        "qps-ploc": "⟦ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "setup.invite_status_accepted": {
+        "en": "used",
+        "ja": "使用済み",
+        "qps-ploc": "⟦ůşėḓ ŀőř⟧"
+      },
+      "setup.invite_status_revoked": {
+        "en": "revoked",
+        "ja": "取り消し済み",
+        "qps-ploc": "⟦řėṽőķėḓ ŀőř⟧"
+      },
+      "setup.invite_status_expired": {
+        "en": "expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦ėẋṗïřėḓ ŀőř⟧"
+      },
+      "setup.invite_revoke": {
+        "en": "Revoke",
+        "ja": "取り消す",
+        "qps-ploc": "⟦Řėṽőķė ŀőř⟧"
+      },
+      "setup.invite_role_approver": {
+        "en": "Approver",
+        "ja": "承認者",
+        "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
+      },
+      "setup.invite_role_operator": {
+        "en": "Operator",
+        "ja": "実行者",
+        "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
+      },
+      "setup.invite_role_viewer": {
+        "en": "Viewer",
+        "ja": "閲覧者",
+        "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
+      },
+      "setup.invite_err": {
+        "en": "Could not complete: {detail}",
+        "ja": "実行できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė: {detail} ŀőřėɱ ïṗş⟧"
+      },
       "setup.charter_usage_day": {
         "en": "Spent today: {spent} of {limit}",
         "ja": "本日の使用額: {limit} のうち {spent}",
@@ -18503,6 +18598,111 @@
         "en": "Member updated.",
         "ja": "メンバーを更新しました。",
         "qps-ploc": "⟦Ɱėɱƀėř ůṗḓȧŧėḓ. ŀőřė⟧"
+      },
+      "join_title": {
+        "en": "Join an organization",
+        "ja": "組織に参加する",
+        "qps-ploc": "⟦Ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "join_lead": {
+        "en": "Check what you are joining, then confirm.",
+        "ja": "参加先と、あなたに見える範囲を確認して、参加してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ẇħȧŧ ẏőů ȧřė ĵőïñïñɠ, ŧħėñ ƈőñƒïřɱ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_missing_code": {
+        "en": "This link has no invite code.",
+        "ja": "このリンクには招待コードがありません。",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ħȧş ñő ïñṽïŧė ƈőḓė. ŀőřėɱ ïṗş⟧"
+      },
+      "join_sign_in_required": {
+        "en": "Sign in first, then open this link again.",
+        "ja": "先にサインインしてから、もう一度このリンクを開いてください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ƒïřşŧ, ŧħėñ őṗėñ ŧħïş ŀïñķ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_org": {
+        "en": "Organization: {tenant}",
+        "ja": "参加先: {tenant}",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
+      },
+      "join_role": {
+        "en": "You will join as: {role}",
+        "ja": "あなたの役割: {role}",
+        "qps-ploc": "⟦Ẏőů ẇïŀŀ ĵőïñ ȧş: {role} ŀőřėɱ ï⟧"
+      },
+      "join_role_viewer": {
+        "en": "You can see this organization's decisions and progress. You cannot change anything.",
+        "ja": "この組織の判断と進み具合を見られます。変更はできません。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ḓėƈïşïőñş ȧñḓ ṗřőɠřėşş. Ẏőů ƈȧññőŧ ƈħȧñɠė ȧñẏŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "join_role_operator": {
+        "en": "You can see this organization's work and ask for work to be done. You cannot decide approvals.",
+        "ja": "この組織の仕事を見て、依頼を出せます。承認の判断はできません。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ȧşķ ƒőř ẇőřķ ŧő ƀė ḓőñė. Ẏőů ƈȧññőŧ ḓėƈïḓė ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "join_role_approver": {
+        "en": "You can see this organization's work and decide approvals within its limits.",
+        "ja": "この組織の仕事を見て、決められた範囲で承認の判断ができます。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀş ẇïŧħïñ ïŧş ŀïɱïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "join_separation": {
+        "en": "Your other organizations stay separate, and your personal data stays yours.",
+        "ja": "他の組織の情報は混ざりません。あなたの個人の情報も、あなたのものです。",
+        "qps-ploc": "⟦Ẏőůř őŧħėř őřɠȧñïẑȧŧïőñş şŧȧẏ şėṗȧřȧŧė, ȧñḓ ẏőůř ṗėřşőñȧŀ ḓȧŧȧ şŧȧẏş ẏőůřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "join_display_name": {
+        "en": "Your name",
+        "ja": "あなたの名前",
+        "qps-ploc": "⟦Ẏőůř ñȧɱė ŀőř⟧"
+      },
+      "join_submit": {
+        "en": "Join",
+        "ja": "参加する",
+        "qps-ploc": "⟦Ĵőïñ ŀőř⟧"
+      },
+      "join_done": {
+        "en": "You joined {tenant}.",
+        "ja": "{tenant} に参加しました。",
+        "qps-ploc": "⟦Ẏőů ĵőïñėḓ {tenant}. ŀőřėɱ ⟧"
+      },
+      "join_next": {
+        "en": "Next: set up your personal preferences.",
+        "ja": "次は、あなた自身の設定を整えましょう。",
+        "qps-ploc": "⟦Ñėẋŧ: şėŧ ůṗ ẏőůř ṗėřşőñȧŀ ṗřėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_err_not_found": {
+        "en": "This invite was not found. Check the link.",
+        "ja": "この招待は見つかりません。リンクを確認してください。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ñőŧ ƒőůñḓ. Ƈħėƈķ ŧħė ŀïñķ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "join_err_expired": {
+        "en": "This invite has expired. Ask for a new one.",
+        "ja": "この招待は期限切れです。新しい招待を依頼してください。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ħȧş ėẋṗïřėḓ. Ȧşķ ƒőř ȧ ñėẇ őñė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "join_err_used": {
+        "en": "This invite was already used.",
+        "ja": "この招待は使用済みです。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ȧŀřėȧḓẏ ůşėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "join_err_revoked": {
+        "en": "This invite was revoked.",
+        "ja": "この招待は取り消されました。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş řėṽőķėḓ. ŀőřėɱ ï⟧"
+      },
+      "join_err_already_member": {
+        "en": "You are already a member of this organization (or this sign-in already has an account).",
+        "ja": "すでにこの組織のメンバーです(または、このサインインにはすでにアカウントがあります)。",
+        "qps-ploc": "⟦Ẏőů ȧřė ȧŀřėȧḓẏ ȧ ɱėɱƀėř őƒ ŧħïş őřɠȧñïẑȧŧïőñ (őř ŧħïş şïɠñ-ïñ ȧŀřėȧḓẏ ħȧş ȧñ ȧƈƈőůñŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "join_err_forbidden": {
+        "en": "This account cannot join right now.",
+        "ja": "このアカウントでは、いま参加できません。",
+        "qps-ploc": "⟦Ŧħïş ȧƈƈőůñŧ ƈȧññőŧ ĵőïñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "join_err_generic": {
+        "en": "Could not join: {detail}",
+        "ja": "参加できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ĵőïñ: {detail} ŀőřėɱ ï⟧"
       },
       "signin_title": {
         "en": "Who's there?",
