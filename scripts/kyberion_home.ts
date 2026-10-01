@@ -1386,6 +1386,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
           {
             ingestAudio: String(argv['ingest-audio']),
             audio: argv.audio ? String(argv.audio) : undefined,
+            tenant: argv.tenant ? String(argv.tenant) : undefined,
           },
           activePrint
         );
