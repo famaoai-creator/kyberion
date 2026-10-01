@@ -205,7 +205,7 @@ export function explainPolicyViolation(errorText: string): PolicyViolationDiagno
     explanation: 'A policy violation was raised but the specific rule could not be identified.',
     repairSteps: [
       'Check KYBERION_PERSONA and MISSION_ROLE environment variables.',
-      'Run `pnpm doctor` to verify environment health.',
+      'Run `pnpm kyberion doctor` to verify environment health.',
       'Review the full error message for a POLICY_VIOLATION prefix with additional detail.',
     ],
   };

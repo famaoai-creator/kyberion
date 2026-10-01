@@ -47,6 +47,6 @@ That writes `vault/secrets/file-secrets.json` at `chmod 0600` (directory `0700`)
 
 ## Related
 
-- First-win install: [`docs/INITIALIZATION.md`](../INITIALIZATION.md) (keep the contract-locked `pnpm doctor` block unchanged)
+- First-win install: [`docs/INITIALIZATION.md`](../INITIALIZATION.md) (keep the contract-locked `pnpm kyberion doctor` block unchanged)
 - Discovery: [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md)
 - Gap report: [`ACTUATOR_DAILY_WORK_GAP_REPORT.ja.md`](./ACTUATOR_DAILY_WORK_GAP_REPORT.ja.md)

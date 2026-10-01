@@ -16,5 +16,5 @@ pnpm kyberion mobile-profiles example-mobile-login-passkey
 
 Reference handoff adapter templates:
 
-- [`mobile-webview-handoff/README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/README.md)
-- [`mobile-sample-apps/README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/README.md)
+- [`mobile-webview-handoff/README.md`](../../../public/templates/mobile-webview-handoff/README.md)
+- [`mobile-sample-apps/README.md`](../../../public/templates/mobile-sample-apps/README.md)

@@ -204,6 +204,7 @@ export function renderProjectOs(argv: readonly string[]): GeneratedFile[] {
 
 export const runGenerateProjectOs = defineGenerator({
   id: 'project-os',
+  flags: ['--name', '-n', '--out', '-o'],
   outputs: (_context, files) => files.map((file) => file.path),
   render: (context: ScriptContext) => renderProjectOs(context.argv),
 });

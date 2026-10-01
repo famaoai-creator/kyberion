@@ -28,7 +28,7 @@
         "description": "Re-check the installed Antigravity SDK runtime."
       },
       "managed_env_subpath": "tool-runtimes/agy-sdk",
-      "notes": "Python 3.10+ runtime for the official Antigravity SDK native-subagent bridge. Install through pnpm agy:sdk:setup."
+      "notes": "Python 3.10+ runtime for the official Antigravity SDK native-subagent bridge. Install through pnpm agy:sdk-setup."
     }
   ]
 }

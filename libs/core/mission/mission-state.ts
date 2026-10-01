@@ -136,7 +136,7 @@ export function checkPrerequisites(): void {
   if (missingFiles.length > 0) {
     throw new Error(
       `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
-        'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.'
+        'Please run "pnpm onboarding" (or complete customer onboarding) before creating missions.'
     );
   }
 

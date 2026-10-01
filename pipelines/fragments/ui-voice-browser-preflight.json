@@ -10,7 +10,7 @@
       "params": {
         "fragment": "fragments/runtime-preflight.json",
         "context": {
-          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm doctor --runtime browser && pnpm service:preflight -- --service meeting && echo ok"
+          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm kyberion doctor --runtime browser && pnpm service:preflight -- --service meeting && echo ok"
         }
       }
     }

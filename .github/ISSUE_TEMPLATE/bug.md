@@ -1,7 +1,7 @@
 ---
 name: Bug Report
 about: Something Kyberion did wrong
-title: "[bug] "
+title: '[bug] '
 labels: bug
 ---
 
@@ -15,7 +15,7 @@ labels: bug
 
 ```bash
 # e.g.
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/example.json
 ```
 
@@ -31,10 +31,10 @@ pnpm pipeline --input pipelines/example.json
 - Node version: <!-- `node --version` -->
 - pnpm version: <!-- `pnpm --version` -->
 - OS: <!-- macOS Sonoma / Ubuntu 22.04 / Windows 11 / etc. -->
-- Reasoning backend: <!-- output of `pnpm doctor` re. backend, or `KYBERION_REASONING_BACKEND` -->
+- Reasoning backend: <!-- output of `pnpm kyberion doctor` re. backend, or `KYBERION_REASONING_BACKEND` -->
 - Customer overlay: <!-- `KYBERION_CUSTOMER` value, or "none" -->
 
-## `pnpm doctor` output
+## `pnpm kyberion doctor` output
 
 <details>
 <summary>Click to expand</summary>

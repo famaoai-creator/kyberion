@@ -15,31 +15,41 @@ your local environment, credentials, or host permissions.
 
 ## Matrix
 
-| Area                                                     | Status                | What that means                                                                                                                                                                                                                                     |
-| -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Customer overlays                                        | Ready                 | Create, inspect, switch, and migrate customer workspaces.                                                                                                                                                                                           |
-| Toolchain preflight                                      | Ready                 | Run `pnpm env:bootstrap --manifest kyberion-toolchain` before you build from source.                                                                                                                                                                |
-| Onboarding                                               | Ready                 | Run `pnpm onboard`, then register the tenant, bind organization context, complete activation probes, and obtain human acceptance before tenant-bound first work. See [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md). |
-| Health checks                                            | Ready                 | Run `pnpm doctor` to see what is missing before you start.                                                                                                                                                                                          |
-| Consolidated readiness                                   | Ready                 | Run `pnpm kyberion setup report` for surfaces, services, reasoning, and doctor together.                                                                                                                                                            |
-| Mission lifecycle                                        | Ready                 | Core mission flows are in place and usable.                                                                                                                                                                                                         |
-| Governance checks                                        | Ready                 | Validation and policy checks are part of normal operation.                                                                                                                                                                                          |
-| Surface lifecycle                                        | Ready                 | You can enable, disable, and inspect individual gateways.                                                                                                                                                                                           |
-| Channel directory                                        | Ready                 | Run `pnpm channels:list` to see the governed channel targets and their coordination roots.                                                                                                                                                          |
-| Slack / iMessage / Discord / Telegram / Google Workspace | Conditional           | They work when the host app, permissions, and credentials are present.                                                                                                                                                                              |
-| Voice features                                           | Conditional           | They work when the device, engine, and profile are configured.                                                                                                                                                                                      |
-| Browser / desktop automation                             | Conditional           | These need the right permissions and a supported host setup.                                                                                                                                                                                        |
-| Reasoning backends                                       | Ready with guardrails | Claude, Gemini, and Codex paths work when the provider is authenticated and not rate-limited.                                                                                                                                                       |
-| UI / web app                                             | Conditional           | Usable, but still has environment-specific warnings in the build path.                                                                                                                                                                              |
+| Area                                                     | Status                | What that means                                                                                                                                                                                                                                        |
+| -------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Customer overlays                                        | Ready                 | Create, inspect, switch, and migrate customer workspaces.                                                                                                                                                                                              |
+| Toolchain preflight                                      | Ready                 | Run `pnpm env:bootstrap --manifest kyberion-toolchain` before you build from source.                                                                                                                                                                   |
+| Onboarding                                               | Ready                 | Run `pnpm onboarding`, then register the tenant, bind organization context, complete activation probes, and obtain human acceptance before tenant-bound first work. See [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md). |
+| Health checks                                            | Ready                 | Run `pnpm kyberion doctor` to see what is missing before you start.                                                                                                                                                                                    |
+| Consolidated readiness                                   | Ready                 | Run `pnpm kyberion setup report` for surfaces, services, reasoning, and doctor together.                                                                                                                                                               |
+| Baseline / vital pipelines                               | Ready                 | `pnpm kyberion vital --format=json` and `pnpm pipeline --input pipelines/baseline-check.json` are used as real gates.                                                                                                                                  |
+| Mission lifecycle                                        | Ready                 | Core mission flows are in place and usable.                                                                                                                                                                                                            |
+| Governance checks                                        | Ready                 | Validation and policy checks are part of normal operation.                                                                                                                                                                                             |
+| Surface lifecycle                                        | Ready                 | You can enable, disable, and inspect individual gateways.                                                                                                                                                                                              |
+| Channel directory                                        | Ready                 | Run `pnpm channels:list` to see the governed channel targets and their coordination roots.                                                                                                                                                             |
+| Slack / iMessage / Discord / Telegram / Google Workspace | Conditional           | They work when the host app, permissions, and credentials are present.                                                                                                                                                                                 |
+| Voice features                                           | Conditional           | They work when the device, engine, and profile are configured.                                                                                                                                                                                         |
+| Browser / desktop automation                             | Conditional           | These need the right permissions and a supported host setup.                                                                                                                                                                                           |
+| Reasoning backends                                       | Ready with guardrails | Claude, Gemini, and Codex paths work when the provider is authenticated and not rate-limited.                                                                                                                                                          |
+| Gemini quota fallback                                    | Ready with guardrails | Quota exhaustion falls through to the next candidate profile instead of stopping early.                                                                                                                                                                |
+| UI / web app                                             | Conditional           | Usable, but still has environment-specific warnings in the build path.                                                                                                                                                                                 |
+| Cross-platform parity                                    | Risky                 | macOS-oriented flows are better covered than Windows/Linux equivalents.                                                                                                                                                                                |
+
+## Reading the status column
+
+- `Ready`: you can rely on it for normal work.
+- `Ready with guardrails`: verify credentials or quota before assuming it works in every environment.
+- `Conditional`: do a capability check first.
+- `Risky`: expect environment-specific failures and do not treat it as a default path.
 
 ## How to use this
 
 1. Run `pnpm pipeline --input pipelines/baseline-check.json`.
 2. Run `pnpm env:bootstrap --manifest kyberion-toolchain`.
 3. Run `pnpm kyberion setup report`.
-4. Run `pnpm doctor`.
-5. Run `pnpm customer:list` if you use customer overlays.
-6. Activate the stance you want with `pnpm customer:switch <slug>`.
+4. Run `pnpm kyberion doctor`.
+5. Run `pnpm stance:list` if you use customer overlays.
+6. Activate the stance you want with `pnpm stance:switch <slug>`.
 7. For tenant-bound work, follow the activation gate in [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md).
 8. Then work normally.
 
@@ -61,4 +71,10 @@ authentication before assuming it will work.
 - Provider quotas and API credentials.
 
 This matrix is not saying the conditional features are broken.
-It is saying they are ready only when the environment is ready.
+It is saying they are ready only when the environment is ready. It is also not a
+claim that the system is finished: the core control plane is usable, while the
+edges still need environment-specific validation.
+
+This is the single canonical readiness matrix. The developer-tier path
+[`../developer/OPERATIONS_READINESS_MATRIX.md`](../developer/OPERATIONS_READINESS_MATRIX.md)
+is a pointer to this page.

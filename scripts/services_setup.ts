@@ -128,7 +128,7 @@ function inspectOpsAlertChannel(): ReturnType<typeof resolveOpsAlertChannelStatu
 }
 
 export function buildServiceConnectionSetupCommand(serviceId: string): string {
-  return `pnpm onboard -- --services-only --service ${serviceId}`;
+  return `pnpm onboarding -- --services-only --service ${serviceId}`;
 }
 
 export function buildServiceAuthNextAction(
@@ -144,7 +144,7 @@ export function buildServiceAuthNextAction(
           suggested_command: `KYBERION_OAUTH_SERVICE_ID=${serviceId} node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts`,
         }
       : {
-          suggested_followup_request: `Store one of ${auth.requiredSecrets.join(', ') || 'the required service credentials'} through Secret Guard, then rerun pnpm services:setup.`,
+          suggested_followup_request: `Store one of ${auth.requiredSecrets.join(', ') || 'the required service credentials'} through Secret Guard, then rerun pnpm service:setup.`,
         }),
   });
 }

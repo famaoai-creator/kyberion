@@ -59,20 +59,20 @@ pnpm build
 
 ```bash
 pnpm surfaces reconcile     # bring up background surfaces
-pnpm onboard                # interactive identity setup → active stance overlay / personal fallback
+pnpm onboarding                # interactive identity setup → active stance overlay / personal fallback
 ```
 
 ### 1.4 Configure (FDE / customer overlay)
 
 ```bash
-pnpm customer:create customer-slug
+pnpm stance:create customer-slug
 $EDITOR customer/customer-slug/customer.json
 $EDITOR customer/customer-slug/identity.json
 $EDITOR customer/customer-slug/vision.md
 
-pnpm customer:switch customer-slug
+pnpm stance:switch customer-slug
 source active/shared/runtime/customer.env
-pnpm onboard
+pnpm onboarding
 ```
 
 For tenant-bound work, continue with [the standard onboarding flow](../../knowledge/product/governance/onboarding-flow.md): register the canonical tenant profile, bind the organization context, complete the activation probes, and obtain human acceptance before starting first work.
@@ -80,7 +80,7 @@ For tenant-bound work, continue with [the standard onboarding flow](../../knowle
 ### 1.5 Verify
 
 ```bash
-pnpm doctor                 # preflight: must, should, nice
+pnpm kyberion doctor                 # preflight: must, should, nice
 pnpm dashboard              # visual status
 ```
 
@@ -102,7 +102,7 @@ For background services:
 
 ```bash
 pnpm agent-runtime:supervisor   # in one terminal (or use a launchd plist)
-pnpm chronos                    # optional scheduled pipeline daemon
+pnpm scheduler                    # optional scheduled pipeline daemon
 pnpm mission:orchestrator       # in another
 ```
 
@@ -208,7 +208,7 @@ pattern for `mission:orchestrator` if needed.
 ```bash
 sudo -iu kyberion
 cd ~/kyberion
-pnpm doctor
+pnpm kyberion doctor
 ```
 
 ## Windows Workstation
@@ -241,10 +241,10 @@ Set-Location kyberion
 pnpm install --frozen-lockfile
 pnpm build
 pnpm surfaces reconcile
-pnpm onboard
+pnpm onboarding
 ```
 
-For tenant-bound work, do not start a mission immediately after `pnpm onboard`; follow [the standard onboarding flow](../../knowledge/product/governance/onboarding-flow.md) and pass the activation gate first.
+For tenant-bound work, do not start a mission immediately after `pnpm onboarding`; follow [the standard onboarding flow](../../knowledge/product/governance/onboarding-flow.md) and pass the activation gate first.
 
 The same setup is available through the governed environment manifests. Use a dry run first, then apply operator-confirmed installs when a tool is missing:
 
@@ -257,7 +257,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ### Verify
 
 ```powershell
-pnpm doctor
+pnpm kyberion doctor
 pnpm kyberion list --check
 pnpm pipeline --input pipelines/baseline-check.json
 ```
@@ -339,7 +339,7 @@ docker run -d \
 After any of the three deploys above:
 
 ```bash
-pnpm doctor                 # preflight: must / should / nice
+pnpm kyberion doctor                 # preflight: must / should / nice
 pnpm kyberion list --check       # actuator capability check
 pnpm pipeline --input pipelines/baseline-check.json   # full health
 ```
@@ -364,7 +364,7 @@ node migration/<script>.js   # run each one in order
 sudo systemctl restart kyberion-supervisor   # Linux
 launchctl kickstart -k gui/$UID/com.kyberion.supervisor   # macOS
 
-pnpm doctor                  # confirm health
+pnpm kyberion doctor                  # confirm health
 ```
 
 For breaking changes, see `CHANGELOG.md` and per-major migration guides under `migration/`.
@@ -390,14 +390,14 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 ## 7. Troubleshooting
 
-| Symptom                                         | Likely cause                     | Action                                                                                                                                                           |
-| ----------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm doctor` reports Playwright missing        | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
-| `pnpm onboard` says "no reasoning backend"      | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
-| Mission stuck in `active` after process crash   | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
-| `Trace persisted path` empty in pipeline output | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
-| Customer overlay not picked up                  | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
-| Voice surface silent                            | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
+| Symptom                                           | Likely cause                     | Action                                                                                                                                                           |
+| ------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion doctor` reports Playwright missing | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
+| `pnpm onboarding` says "no reasoning backend"     | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
+| Mission stuck in `active` after process crash     | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
+| `Trace persisted path` empty in pipeline output   | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
+| Customer overlay not picked up                    | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
+| Voice surface silent                              | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
 
 ---
 
@@ -473,8 +473,8 @@ the dry-run plan first and review its manifest. Records without an explicit
 valid tenant are quarantined rather than guessed:
 
 ```bash
-pnpm migrate:peer-tenant-runtime
-pnpm migrate:peer-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
+pnpm peer:migrate-tenant-runtime
+pnpm peer:migrate-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
 ```
 
 Backups containing `vault/`, `knowledge/confidential/`, or confidential

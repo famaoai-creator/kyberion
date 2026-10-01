@@ -55,6 +55,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/governance/audit-chain';
 
 interface BundleManifest {
@@ -369,6 +370,12 @@ must not be handed to an external validator.
   return bundleRoot;
 }
 
+const EXPORT_VALIDATION_BUNDLE_CLI: CliGuardSpec = {
+  command: 'pnpm validation-bundle:export',
+  options: [{ flag: '--output', value: '<dir>' }],
+  positional: '<MISSION_ID>',
+};
+
 function main(args: string[]): number {
   const missionId = args.find((a) => !a.startsWith('--'));
   if (!missionId) {
@@ -399,10 +406,16 @@ if (
   isDirectScript(import.meta.url, 'export_validation_bundle.js')
 )
   void defineScript({
-    name: 'export:validation-bundle',
+    name: 'validation-bundle:export',
     flags: [],
     run(context) {
-      const status = main(context.argv);
+      const guarded = guardCliArgsNormalized(
+        context.argv,
+        EXPORT_VALIDATION_BUNDLE_CLI,
+        context.print
+      );
+      if (guarded.handled) return;
+      const status = main(guarded.argv);
       if (status !== 0) throw new Error(`validation bundle export failed with exit code ${status}`);
     },
   })();

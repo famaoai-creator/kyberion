@@ -161,16 +161,16 @@ LOG_LEVEL=debug pnpm pipeline --input pipelines/baseline-check.json
 
 ## Common slow-down causes
 
-| Symptom                           | Cause                                | Fix                                                                           |
-| --------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
-| `pnpm build` takes > 60 s         | Full TS rebuild                      | Use `pnpm --filter` for incremental                                           |
-| `pnpm vitest run` is slow         | Cold module imports (workspace size) | Use `pnpm vitest watch` to keep modules cached                                |
-| Doctor times out on `pnpm doctor` | Provider discovery scanning all CLIs | `KYBERION_REASONING_BACKEND=stub pnpm doctor` to skip                         |
-| Path-scope policy errors in tests | Missing persona env                  | `export KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` |
+| Symptom                                    | Cause                                | Fix                                                                           |
+| ------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `pnpm build` takes > 60 s                  | Full TS rebuild                      | Use `pnpm --filter` for incremental                                           |
+| `pnpm vitest run` is slow                  | Cold module imports (workspace size) | Use `pnpm vitest watch` to keep modules cached                                |
+| Doctor times out on `pnpm kyberion doctor` | Provider discovery scanning all CLIs | `KYBERION_REASONING_BACKEND=stub pnpm kyberion doctor` to skip                |
+| Path-scope policy errors in tests          | Missing persona env                  | `export KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` |
 
 ## What's coming (Phase C'-7 follow-up)
 
-- [x] `pnpm dev:watch` — current narrow watch loop for `libs/core/` while iterating locally.
+- [x] `pnpm test:watch` — current narrow watch loop for `libs/core/` while iterating locally.
 - [ ] `pnpm dev` — single-command workspace watch mode that rebuilds + reruns affected tests on save.
 - [ ] Hot-reload for actuators in pipelines (currently each change requires a build).
 - [ ] In-browser TypeScript playground for ADF authoring (Phase D' candidate).

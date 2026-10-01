@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "manifest_version": 1,
-  "last_reviewed": "2026-09-23",
+  "last_reviewed": "2026-10-01",
   "purpose": "Single navigation authority for overlapping status, concept, and onboarding documentation. Listed supporting documents remain useful but do not override the canonical source for their category or scope.",
   "categories": [
     {
@@ -34,7 +34,7 @@
     {
       "id": "onboarding",
       "canonical": "docs/QUICKSTART.md",
-      "canonical_scope": "First-win entry point. The end-to-end onboarding order (routes, identity, baseline all_clear, tenant activation, first work) is canonical in the onboarding standard flow; INITIALIZATION.md is the day-2 command reference.",
+      "canonical_scope": "The single front door: first-win entry point and the onboarding entry-points table. The end-to-end onboarding order (routes, identity, baseline all_clear, tenant activation, first work) is canonical in the onboarding standard flow; INITIALIZATION.md (English canonical, INITIALIZATION.ja.md alongside) is the day-2 command reference reached from QUICKSTART, not a competing start page.",
       "scoped_sources": [
         {
           "scope": "first_win",
@@ -55,6 +55,7 @@
   "entrypoints": [
     "README.md",
     "docs/QUICKSTART.md",
+    "docs/README.md",
     "docs/INITIALIZATION.md",
     "docs/developer/improvement-plans-2026-08/README.ja.md"
   ]

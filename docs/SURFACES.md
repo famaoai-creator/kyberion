@@ -76,6 +76,17 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作、パネル 9「連携」で mission→task→agent→child agent の連携ツリーと待ち関係(承認待ち/子の完了待ち/クレーム待ち/ブロック)を表示([README](../presence/displays/terminal-hud/README.md))                                    | 常駐監視向け                                                                                                                                                                                                                                  |
 | MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign)。**discover** (`capability.*` / `skill.*` / knowledge) · **act** (allowlist pipeline / `service.*` / bounded `actuator.invoke`) · **govern** (mission / approval / audit)。モデル: [mcp-facade-model](../knowledge/product/architecture/mcp-facade-model.md) | `pnpm mcp:server`                                                                                                                                                                                                                             |
 
+### サテライト(`satellites/`)
+
+会話チャネルと音声のネイティブ側を担う、UI を持たない外部接続コンポーネント。
+
+| サテライト                                                                | 役割                                                                                                                                                                        |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slack-bridge` / `telegram-bridge` / `discord-bridge` / `imessage-bridge` | 各チャットサービスの ingress/egress(Gateway)。`runSurfaceMessageConversation` 経由で会話・承認・通知を行う                                                                  |
+| `voice-hub`                                                               | 音声入出力のハブ(STT/TTS/リスナー)。相棒・秘書室の音声と共通                                                                                                                |
+| `fluid-audio-cli`                                                         | macOS 向け Swift 製 FluidAudio STT ブリッジ(`fluidaudio-bridge transcribe`)。`KYBERION_FLUID_AUDIO_STT_COMMAND` から呼ぶ([VOICE_LOCAL_BACKENDS](./VOICE_LOCAL_BACKENDS.md)) |
+| `macos-camera`                                                            | macOS のカメラ静止画キャプチャ用 Swift ヘルパー(`swift macos-camera.swift <output_path>`)。現状コードからの参照はなく、手動実行用のスタンドアロンヘルパー                   |
+
 ## 会議・議事録
 
 | 入口                                                    | 役割                                                                                                          |

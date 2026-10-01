@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { formatBuildRequiredMessage } from './build_required_message.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_CLI = resolve(ROOT, 'dist/scripts/kyberion.js');
@@ -30,21 +31,6 @@ if (existsSync(DIST_CLI)) {
     command === 'list' ? args.slice(1) : args.filter((arg) => !discoveryCommands.has(arg));
   run(['scripts/capability_discovery_entry.mjs', ...forwarded]);
 } else {
-  const nodeMajor = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
-  const nodeHint =
-    nodeMajor < 24
-      ? `This process is Node ${process.versions.node}; package.json engines require Node >=24. Use nvm install 24 && nvm use 24, then rebuild.`
-      : `Node ${process.versions.node} meets engines (>=24).`;
-  console.error(
-    [
-      `Kyberion CLI execution needs a build (missing ${DIST_CLI}).`,
-      nodeHint,
-      'Cloud Agent / fresh VM: see docs/developer/CLOUD_AGENT_ENVIRONMENT.md',
-      'Discovery without build: pnpm capabilities',
-      '  or: pnpm kyberion list',
-      'Execution: pnpm build && pnpm kyberion <command>',
-      "Doctor: pnpm run doctor  (not bare `pnpm doctor`, which is pnpm's own doctor)",
-    ].join('\n')
-  );
+  console.error(formatBuildRequiredMessage('dist/scripts/kyberion.js'));
   process.exit(1);
 }

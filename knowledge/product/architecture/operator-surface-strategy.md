@@ -12,9 +12,9 @@ This document fixes Kyberion's stance on **how operators interact with the
 system**: which surfaces are first-class, which are observation-only, and
 what is intentionally not built.
 
-It complements [`USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
-(which defines the *language* of the human boundary) by defining the
-*surfaces* that boundary lives on.
+It complements [`USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+(which defines the _language_ of the human boundary) by defining the
+_surfaces_ that boundary lives on.
 
 ## 1. Stance
 
@@ -25,14 +25,14 @@ read-only web; mutations to mission state never originate from a Web UI**.
 
 ## 2. Surface Tiers
 
-| Tier | Surface | Who | Mutates state? |
-|---|---|---|---|
-| Primary | `claude` / `codex` / `gemini` CLI + `pnpm pipeline` | Operators, agents | Yes — primary entry |
-| Primary | `mission_controller` CLI | Operators | Yes — mission lifecycle |
-| Secondary | Read-only mission status viewer (web) | Operators, leadership | No — view only |
-| Secondary | `chronos-mirror-v2` (presence display) | Stakeholders | No — passive feed |
-| Tertiary | Mobile / WebView surfaces (handoff target) | Operators in motion | Limited — handoff-imported sessions |
-| Forbidden | Public-facing web admin UI | — | Never |
+| Tier      | Surface                                             | Who                   | Mutates state?                      |
+| --------- | --------------------------------------------------- | --------------------- | ----------------------------------- |
+| Primary   | `claude` / `codex` / `gemini` CLI + `pnpm pipeline` | Operators, agents     | Yes — primary entry                 |
+| Primary   | `mission_controller` CLI                            | Operators             | Yes — mission lifecycle             |
+| Secondary | Read-only mission status viewer (web)               | Operators, leadership | No — view only                      |
+| Secondary | `chronos-mirror-v2` (presence display)              | Stakeholders          | No — passive feed                   |
+| Tertiary  | Mobile / WebView surfaces (handoff target)          | Operators in motion   | Limited — handoff-imported sessions |
+| Forbidden | Public-facing web admin UI                          | —                     | Never                               |
 
 ## 3. Why CLI-first
 
@@ -65,14 +65,14 @@ not yet implemented) renders the following from filesystem + audit-chain
 
 ### 5.1 Pages
 
-| Path | Purpose |
-|---|---|
-| `/` | Active missions (one row per mission, latest checkpoint, status) |
-| `/missions/:id` | Mission detail: history, checkpoints, evidence files, audit chain entries |
-| `/audit` | Audit chain timeline filtered by tenant / mission / date |
+| Path                | Purpose                                                                   |
+| ------------------- | ------------------------------------------------------------------------- |
+| `/`                 | Active missions (one row per mission, latest checkpoint, status)          |
+| `/missions/:id`     | Mission detail: history, checkpoints, evidence files, audit chain entries |
+| `/audit`            | Audit chain timeline filtered by tenant / mission / date                  |
 | `/intent-snapshots` | Recent intent decisions (snapshot store) with diff against prior snapshot |
-| `/health` | Latest `vital-check` / `full-health-report` outputs |
-| `/knowledge` | Browseable `knowledge/public/` index |
+| `/health`           | Latest `vital-check` / `full-health-report` outputs                       |
+| `/knowledge`        | Browseable `knowledge/public/` index                                      |
 
 ### 5.2 Data sources (read-only)
 
@@ -102,16 +102,16 @@ Where the user might want to act, the page renders a **`suggested_command`**
 they can copy into their CLI — never a button that calls an API.
 
 This matches the `Next Action Contract` from
-[`USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md):
+[`USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md):
 the surface explains the purpose, then shows the runnable command.
 
 ## 6. Existing Surfaces — Where They Fit
 
-| Existing | Role |
-|---|---|
-| `presence/displays/chronos-mirror-v2/` | Ambient status / wallboard (passive) |
-| `presence/displays/computer-surface/` | Computer-use bridging (input/output to a remote GUI session) — **not** a Kyberion operator UI |
-| `presence/displays/presence-studio/` | Authoring surface for presence content; not for mission control |
+| Existing                               | Role                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `presence/displays/chronos-mirror-v2/` | Ambient status / wallboard (passive)                                                          |
+| `presence/displays/computer-surface/`  | Computer-use bridging (input/output to a remote GUI session) — **not** a Kyberion operator UI |
+| `presence/displays/presence-studio/`   | Authoring surface for presence content; not for mission control                               |
 
 The MOS does not replace any of these — it's a fourth display whose only
 job is to make filesystem + audit-chain readable.
@@ -126,7 +126,7 @@ job is to make filesystem + audit-chain readable.
    persona context; centralizing them muddies authority.
 3. **Mobile authoring** — composing missions from a phone. The surface
    is too narrow for the audit story to land cleanly. Mobile is a
-   handoff *target*, not a source.
+   handoff _target_, not a source.
 4. **Dashboards that aggregate confidential data across tenants** — they
    will leak under operational pressure. Per-tenant deployments only.
 
@@ -211,8 +211,8 @@ Will the deployment serve >5 stakeholder personas (CEO, compliance, ops,
 
 ## 10. Reference
 
-- [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
-- [`kyberion-canonical-concept-index.md`](knowledge/product/architecture/kyberion-canonical-concept-index.md)
-- [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md)
-- [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)
-- [`../../../presence/displays/chronos-mirror-v2/`](presence/displays/chronos-mirror-v2)
+- [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md)
+- [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md)
+- [`multi-tenant-operations.md`](multi-tenant-operations.md)
+- [`../../../presence/displays/chronos-mirror-v2/`](../../../presence/displays/chronos-mirror-v2)

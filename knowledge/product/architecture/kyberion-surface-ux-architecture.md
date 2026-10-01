@@ -283,7 +283,8 @@ Surfaces should default to showing:
 
 Operators should be able to drill down into the deeper trace when needed.
 
-See also: [Intent-First Observability Model](knowledge/product/architecture/intent-observability-model.md)
+See also: [Intent-First Observability Model](intent-observability-model.md)
+
 - live intent handling
 - task detail and artifacts
 - browser and operator assistance

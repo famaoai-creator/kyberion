@@ -197,11 +197,11 @@ Kyberion は不足情報を補うために clarification を返します。
 
 ## 7. Related Docs / 関連文書
 
-- [`knowledge/product/architecture/kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md)
-- [`knowledge/product/orchestration/actuator-intent-normalization.md`](knowledge/product/orchestration/actuator-intent-normalization.md)
-- [`knowledge/product/orchestration/guided-coordination-protocol.md`](knowledge/product/orchestration/guided-coordination-protocol.md)
-- [`knowledge/product/orchestration/onboarding-protocol.md`](knowledge/product/orchestration/onboarding-protocol.md)
-- [`knowledge/product/orchestration/mission-playbooks/messaging-bridge-orchestration.md`](knowledge/product/orchestration/mission-playbooks/messaging-bridge-orchestration.md)
-- [`knowledge/product/orchestration/schedule-coordination-playbook.md`](knowledge/product/orchestration/schedule-coordination-playbook.md)
-- [`knowledge/product/orchestration/voice-interface-protocol.md`](knowledge/product/orchestration/voice-interface-protocol.md)
-- [`knowledge/product/orchestration/supported-actuators.md`](knowledge/product/orchestration/supported-actuators.md)
+- [`knowledge/product/architecture/kyberion-intent-catalog.md`](../architecture/kyberion-intent-catalog.md)
+- [`knowledge/product/orchestration/actuator-intent-normalization.md`](actuator-intent-normalization.md)
+- [`knowledge/product/orchestration/guided-coordination-protocol.md`](guided-coordination-protocol.md)
+- [`knowledge/product/orchestration/onboarding-protocol.md`](onboarding-protocol.md)
+- [`knowledge/product/orchestration/mission-playbooks/messaging-bridge-orchestration.md`](mission-playbooks/messaging-bridge-orchestration.md)
+- [`knowledge/product/orchestration/schedule-coordination-playbook.md`](schedule-coordination-playbook.md)
+- [`knowledge/product/orchestration/voice-interface-protocol.md`](voice-interface-protocol.md)
+- [`knowledge/product/orchestration/supported-actuators.md`](supported-actuators.md)
