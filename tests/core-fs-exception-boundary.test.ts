@@ -116,7 +116,6 @@ const allowedCoreFsImports = [
   'libs/core/reasoning/model-registry-directory.test.ts',
   'libs/core/provider/openai-compatible-backend.test.ts',
   'libs/core/provider/openrouter-backend.test.ts',
-  'libs/core/persona-loader.test.ts',
   'libs/core/knowledge/procedure-registry.test.ts',
   'libs/core/tool/runtime-health-history.test.ts',
   'libs/core/organization/tenant-design-resolver.test.ts',

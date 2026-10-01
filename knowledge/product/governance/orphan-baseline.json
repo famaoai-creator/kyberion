@@ -4,60 +4,20 @@
   "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
   "libs_core_modules": [
     {
-      "id": "libs/core/classifier.ts",
-      "reason": "Keyword classification engine (classify/classifyFile), published only as the `classifier` namespace re-export of the @agent/core barrel and covered by classifier.test.ts; no in-repo caller imports it — the earlier 'use' was unrelated `classify` identifiers. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/corporate-design-adf.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/corporate-design-adf.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/points-portal-clickout-usecase.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/points-portal-clickout-usecase.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/skill-input.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/skill-input.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/slide-pattern-pack.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/slide-pattern-pack.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/system-status-report.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/system-status-report.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/contracts/webview-session-handoff.ts",
-      "reason": "Generated TypeScript mirror of knowledge/product/schemas/webview-session-handoff.schema.json (scripts/generate_types.ts), published as an @agent/core contracts subpath for consumers that type that payload; runtime code validates the JSON against the schema and no in-repo TS caller imports the type. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/data-utils.ts",
-      "reason": "parseData/stringifyData helpers re-exported from the @agent/core barrel (index-part-01) with a unit test; no in-repo caller imports them. Kept as barrel API for plugin authors. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "libs/core/detectors.ts",
-      "reason": "detectEncoding/detectLanguage/detectFormat re-exported from the @agent/core barrel (index-part-01) with a unit test; no in-repo caller imports them. Kept as barrel API for plugin authors. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
       "id": "libs/core/mesh/acp-mediator-entry.ts",
-      "reason": "Side-effect bootstrap behind the public subpath @agent/core/acp-mediator (libs/core/package.json exports): imports risky-op-registry so a package-name consumer gets the governed approval handler, then re-exports acp-mediator. Consumed by package name only; no in-repo consumer yet (ACP mediator work)."
-    },
-    {
-      "id": "libs/core/persona-loader.ts",
-      "reason": "Perspective loader for knowledge/product/personalities/matrix.md (types.ts documents it as the Perspective counterpart of Persona); not exported from a barrel or package subpath and no caller imports it. Retiring it also touches tests/fixtures/governance-import-baseline.json and tests/core-fs-exception-boundary.test.ts, so it is left to the next orphan wave's retire decision. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Public subpath @agent/core/acp-mediator, listed in docs/PACKAGING_CONTRACT.md (\"Agent runtime and orchestration\") and libs/core/package.json exports: a side-effect bootstrap that imports risky-op-registry so a package-name consumer gets the governed approval handler, then re-exports acp-mediator. Consumed by package name only; in-repo code imports mesh/acp-mediator directly."
     },
     {
       "id": "libs/core/plugin/skill-wrapper.ts",
-      "reason": "wrapSkill/runSkill* capability wrappers published as @agent/core/skill-wrapper and via the barrel for external skill plugins; no in-repo caller imports them (core.test.ts covers them). Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Documented extension point: docs/developer/EXTENSION_POINTS.md §2.4 (Skill Format, Beta) declares the runSkill(name, fn) / runAsyncSkill(name, fn) signatures as the contract for external skills, published as @agent/core/skill-wrapper and via the barrel. No in-repo caller imports it; core.test.ts covers it."
     },
     {
       "id": "libs/core/reasoning/judgment-callsite-eval.ts",
-      "reason": "Calibration measurement harness (evaluateCallSite / recommendRequireCalibrated) published as @agent/core/judgment-callsite-eval and run by hand per judgment-backend-seam.md 'Adding a provider' steps 4-5; the browser and knowledge assists only cite its recommendation in comments, nothing imports it. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Per-call-site calibration harness (evaluateCallSite / recommendRequireCalibrated), published as @agent/core/judgment-callsite-eval. Run by hand: its caller is the measurement script active/missions/public/JUDGMENT-SEAM-20260921/evidence/eval_callsites.ts (gitignored mission evidence), and the requireCalibrated settings in browser/browser-judgment.ts and knowledge/knowledge-relevance-judgment.ts cite its recommendation. No committed module imports it."
     },
     {
       "id": "libs/core/secret/secret-guard-entry.ts",
-      "reason": "Side-effect bootstrap behind the public subpath @agent/core/secret-guard (libs/core/package.json exports): registers the risky-op approval handler before re-exporting secret-guard. In-repo callers import @agent/core/secret/secret-guard directly; this entry serves package-name consumers."
+      "reason": "Public subpath @agent/core/secret-guard, listed in docs/PACKAGING_CONTRACT.md (\"Contracts and policy helpers\") and libs/core/package.json exports: registers the risky-op approval handler before re-exporting secret-guard. In-repo callers import @agent/core/secret/secret-guard directly; this entry serves package-name consumers."
     },
     {
       "id": "libs/core/store-contract.ts",
@@ -70,10 +30,6 @@
     {
       "id": "libs/core/test-governance-payload.ts",
       "reason": "Test helper (withoutSchemaMetadata) shared by the governance contract tests; tests are its only intended consumers (ORPHAN_DECISIONS OW-02: keep)."
-    },
-    {
-      "id": "libs/core/test-utils.ts",
-      "reason": "Console-based describe/it helper from the pre-vitest skill tests; not exported from a barrel or package subpath and nothing imports it. Retiring it is left to the next orphan wave alongside persona-loader.ts. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "libs/core/tool/tool-actuator-routing.ts",
@@ -141,11 +97,7 @@
     },
     {
       "id": "pipelines/kyberion-autonomous-onboarding.json",
-      "reason": "Full autonomous onboarding flow documented in pipelines/README.md; the README's `pnpm onboard` column is aspirational — scripts/onboarding.ts does not load this pipeline — so it runs only by hand."
-    },
-    {
-      "id": "pipelines/kyberion-config-provisioner.json",
-      "reason": "Provision operator config from canonical defaults (pipelines/README.md); run by hand during setup."
+      "reason": "LLM-drafted organization profile and interview questions (pipelines/README.md 'Onboarding & Provisioning' row); run by hand. `pnpm onboard` runs scripts/onboarding.ts and never loads this pipeline (README corrected 2026-10-01)."
     },
     {
       "id": "pipelines/kyberion-product-intro.json",
@@ -181,11 +133,11 @@
     },
     {
       "id": "pipelines/orchestration-jobs.json",
-      "reason": "Orchestration batch documented in pipelines/README.md as 'scheduled', but it declares no schedule and nothing invokes it; runs only by hand until a schedule is added."
+      "reason": "Runs each job in knowledge/product/governance/orchestration-config.json via orchestrator:run_execution_plan_set (pipelines/README.md row); declares no schedule and nothing invokes it, so it runs only by hand (README no longer calls it scheduled, 2026-10-01)."
     },
     {
       "id": "pipelines/platform-onboarding.json",
-      "reason": "Platform-level dependency bootstrap documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during setup."
+      "reason": "Organization-integration artifact flow (discovery transcript → requirements → design → test plan → task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding, then knowledge/product/pipeline-templates/execute-task-plan.json executes the plan."
     },
     {
       "id": "pipelines/project-management-validation.json",
@@ -231,43 +183,39 @@
     },
     {
       "id": "android:llm_decide",
-      "reason": "Generic pipeline step `llm_decide` (also registered by browser, network, system) that the android runner accepts inside actuator-scoped ADFs; no ADF or android test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make android ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `llm_decide` (also registered by browser, network, system and terminal) that the android runner accepts inside actuator-scoped ADFs; no ADF or android test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make android ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "artifact:list",
-      "reason": "Generic pipeline step `list` (also registered by agent, file, process) that the artifact runner accepts inside actuator-scoped ADFs; no ADF or artifact test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make artifact ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `list` (also registered by agent, file, process, secret, terminal and working-memory) that the artifact runner accepts inside actuator-scoped ADFs; no ADF or artifact test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make artifact ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "browser:extract_text_ref",
-      "reason": "Browser v3 surface op (browser-actuator-v3.md, browser-automation-pipeline.schema.json) that the browser recording compiler emits as a computed step op; tests only list it in the catalog (browser-phase3.test.ts). Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Browser v3 surface op (browser-actuator-v3.md, browser-automation-pipeline.schema.json, browser-recording.schema.json): the step handler is in browser-pipeline-helpers.ts and recorded flows compile their text reads to it (browser-execution-substrate-howto.md). It needs a snapshot ref, so no static example ADF can call it; tests only list it in the catalog (browser-phase3.test.ts)."
     },
     {
       "id": "browser:json_query",
-      "reason": "Generic pipeline step `json_query` (also registered by modeling, network) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `json_query` (also registered by modeling, network, system and wisdom) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "browser:regex_extract",
-      "reason": "Generic pipeline step `regex_extract` (also registered by network, system, wisdom) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `regex_extract` (also registered by network, system and wisdom) that the browser runner accepts inside actuator-scoped ADFs; no ADF or browser test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make browser ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "browser:scroll_ref",
-      "reason": "Browser v3 surface op the browser interaction helpers emit when scrolling a ref target (computed `op`), listed in browser-automation-pipeline.schema.json; tests only list it in the catalog. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "browser:session_health",
-      "reason": "Browser v3 surface op documented in browser-actuator-v3.md and browser-automation-pipeline.schema.json; no ADF uses it and tests only list it in the catalog. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Browser v3 surface op listed in browser-automation-pipeline.schema.json: the step handler is in browser-pipeline-helpers.ts and browser-interaction-helpers.ts records a scroll on a ref target as `scroll_ref`. It needs a snapshot ref, so no static example ADF can call it; tests only list it in the catalog (browser-phase3.test.ts)."
     },
     {
       "id": "code:regex_replace",
-      "reason": "Generic pipeline step `regex_replace` (also registered by file, wisdom) that the code runner accepts inside actuator-scoped ADFs; no ADF or code test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make code ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `regex_replace` (also registered by file and wisdom) that the code runner accepts inside actuator-scoped ADFs; no ADF or code test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make code ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "file:write_artifact",
-      "reason": "Generic pipeline step `write_artifact` (also registered by code, modeling, network, wisdom) that the file runner accepts inside actuator-scoped ADFs; no ADF or file test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make file ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `write_artifact` (also registered by code, modeling, network, system and wisdom) that the file runner accepts inside actuator-scoped ADFs; no ADF or file test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make file ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "gemini:log",
-      "reason": "Generic pipeline step `log` (also registered by most actuators) that the gemini runner accepts inside actuator-scoped ADFs; no ADF or gemini test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make gemini ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `log` (also registered by android, browser, code, ios, media, modeling, network, system and wisdom) that the gemini runner accepts inside actuator-scoped ADFs; no ADF or gemini test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make gemini ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "ios:capture_runtime_session_handoff",
@@ -279,7 +227,7 @@
     },
     {
       "id": "media:log",
-      "reason": "Generic pipeline step `log` (also registered by most actuators) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `log` (also registered by android, browser, code, gemini, ios, modeling, network, system and wisdom) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "media:pptx_diff",
@@ -287,27 +235,27 @@
     },
     {
       "id": "media:set",
-      "reason": "Generic pipeline step `set` (also registered by android, ios) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `set` (also registered by android, ios and secret) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "modeling:glob_files",
-      "reason": "Generic pipeline step `glob_files` (also registered by code, system) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `glob_files` (also registered by code, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "modeling:if",
-      "reason": "Generic pipeline step `if` (also registered by browser and other control-step runners) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `if` (also registered by browser, code, file, network, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "modeling:read_file",
-      "reason": "Generic pipeline step `read_file` (also registered by code, file) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `read_file` (also registered by code, file, system and wisdom) that the modeling runner accepts inside actuator-scoped ADFs; no ADF or modeling test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make modeling ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "network:llm_decide",
-      "reason": "Generic pipeline step `llm_decide` (also registered by android, browser, system) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `llm_decide` (also registered by android, browser, system and terminal) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "network:write_artifact",
-      "reason": "Generic pipeline step `write_artifact` (also registered by code, file, modeling, wisdom) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `write_artifact` (also registered by code, file, modeling, system and wisdom) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "service:mcp",
@@ -319,7 +267,7 @@
     },
     {
       "id": "wisdom:conduct_1on1",
-      "reason": "Deprecated spelling of wisdom:conduct_1on_1 (compatibility/legacy-aliases.ts), itself forwarded to meeting:conduct_1on_1; kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Deprecated spelling of wisdom:conduct_1on_1 (libs/actuators/wisdom-actuator/src/compatibility/legacy-aliases.ts), itself forwarded to meeting:conduct_1on_1; kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:conduct_1on_1",
@@ -379,7 +327,7 @@
     },
     {
       "id": "wisdom:react_loop",
-      "reason": "Deprecated alias of wisdom:reasoning_loop (compatibility/legacy-aliases.ts); kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Deprecated alias of wisdom:reasoning_loop (libs/actuators/wisdom-actuator/src/compatibility/legacy-aliases.ts); kept so older ADFs resolve. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:read_json",
@@ -391,7 +339,7 @@
     },
     {
       "id": "wisdom:regex_extract",
-      "reason": "Generic pipeline step `regex_extract` (also registered by browser, network, system) that the wisdom runner accepts inside actuator-scoped ADFs; no ADF or wisdom test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make wisdom ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
+      "reason": "Generic pipeline step `regex_extract` (also registered by browser, network and system) that the wisdom runner accepts inside actuator-scoped ADFs; no ADF or wisdom test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make wisdom ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:task_plan_to_next_tasks",
