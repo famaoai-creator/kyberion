@@ -136,6 +136,15 @@ export function pickByLocale<T>(
  * scripts) -> `null` so the caller keeps
  * its own default instead of flipping language on an ambiguous message.
  */
+const TRAILING_PUNCTUATION = new Set(['.', ',', '!', '?', ';', ':']);
+
+/** Linear-time trim of trailing sentence punctuation (a `/[...]+$/` regex is polynomial). */
+function stripTrailingPunctuation(token: string): string {
+  let end = token.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(token[end - 1]!)) end -= 1;
+  return token.slice(0, end);
+}
+
 export function detectTextLocale(text: unknown): SupportedLocale | null {
   const value = String(text ?? '');
   if (/[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9f]/u.test(value)) return 'ja';
@@ -146,7 +155,7 @@ export function detectTextLocale(text: unknown): SupportedLocale | null {
   const plainWords = value
     .split(/\s+/u)
     .filter((token) => /^[A-Za-z']{3,}[.,!?;:]*$/u.test(token) && token !== token.toUpperCase())
-    .map((token) => token.replace(/[.,!?;:]+$/u, '').toLowerCase());
+    .map((token) => stripTrailingPunctuation(token).toLowerCase());
   if (plainWords.length >= 2) return 'en';
   // A lone acknowledgement ("Yes", "Okay", "Thanks", "Done") is used by
   // speakers of every language, so it is not a language signal.
