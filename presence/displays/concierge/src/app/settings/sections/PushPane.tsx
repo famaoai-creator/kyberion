@@ -18,6 +18,7 @@ type Message = { text: string; error?: boolean } | null;
  */
 export function PushPane({ t }: { t: SettingsTranslate }) {
   const [status, setStatus] = React.useState<PushStatusResponse | null>(null);
+  const [operatorEligible, setOperatorEligible] = React.useState(false);
   const [deviceOn, setDeviceOn] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<Message>(null);
@@ -35,8 +36,18 @@ export function PushPane({ t }: { t: SettingsTranslate }) {
   const load = React.useCallback(async () => {
     try {
       const response = await fetch('/api/push', { cache: 'no-store' });
-      const parsed = parsePushStatus(await response.json().catch(() => null));
-      if (response.ok && parsed) setStatus(parsed);
+      const payload = await response.json().catch(() => null);
+      const parsed = parsePushStatus(payload);
+      if (response.ok && parsed) {
+        setStatus(parsed);
+        setOperatorEligible(
+          Boolean(
+            payload &&
+            typeof payload === 'object' &&
+            (payload as Record<string, unknown>).operator_eligible === true
+          )
+        );
+      }
       if (supported) {
         const registration = await navigator.serviceWorker.getRegistration('/');
         setDeviceOn(Boolean(await registration?.pushManager.getSubscription()));
@@ -123,6 +134,20 @@ export function PushPane({ t }: { t: SettingsTranslate }) {
     >
       {!supported ? (
         <p role="status">{t('setup.push_unsupported')}</p>
+      ) : !operatorEligible ? (
+        <>
+          <p role="status">{t('setup.push_description')}</p>
+          {deviceOn ? (
+            <div className="settings-row-actions">
+              <Button
+                label={t('setup.push_off')}
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void turnOff()}
+              />
+            </div>
+          ) : null}
+        </>
       ) : !status.configured ? (
         <p role="status">{t('setup.push_unconfigured')}</p>
       ) : (

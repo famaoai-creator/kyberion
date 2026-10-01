@@ -13437,9 +13437,9 @@
         "qps-ploc": "⟦Ñőŧïƒẏ ŧħïş ḓėṽïƈė ŀőřėɱ⟧"
       },
       "setup.push_description": {
-        "en": "A short alert that something is waiting. It never says what, so nothing private is sent through the push service.",
-        "ja": "「決めることがあります」とだけ知らせます。内容は一切送らないので、通知サービスに機密が渡ることはありません。",
-        "qps-ploc": "⟦Ȧ şħőřŧ ȧŀėřŧ ŧħȧŧ şőɱėŧħïñɠ ïş ẇȧïŧïñɠ. Ïŧ ñėṽėř şȧẏş ẇħȧŧ, şő ñőŧħïñɠ ṗřïṽȧŧė ïş şėñŧ ŧħřőůɠħ ŧħė ṗůşħ şėřṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+        "en": "Process-wide approval and question alerts go only to the local operator's device. Tenant-member devices are not eligible for this global stream.",
+        "ja": "プロセス全体の承認・質問通知はローカル運用者の端末だけに届きます。テナント利用者の端末には通知されません。",
+        "qps-ploc": "⟦Ṗřőƈėşş-ẇïḓė ȧṗṗřőṽȧŀ ȧñḓ ɋůėşŧïőñ ȧŀėřŧş ɠő őñŀẏ ŧő ŧħė ŀőƈȧŀ őṗėřȧŧőř'ş ḓėṽïƈė. Ŧėñȧñŧ-ɱėɱƀėř ḓėṽïƈėş ȧřė ñőŧ ėŀïɠïƀŀė ƒőř ŧħïş ɠŀőƀȧŀ şŧřėȧɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       },
       "setup.push_on": {
         "en": "Turn on notifications on this device",
