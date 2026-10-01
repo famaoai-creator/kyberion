@@ -22,6 +22,7 @@ import { sendIMessage } from '../imessage-bridge.js';
 import { currentTriggerDeliveryId } from '../trigger-correlation.js';
 import { appendOpsAlertLogRecord } from '../ops-alert-log.js';
 import { withExecutionContext } from '../authority.js';
+import { sendWebPushForEvent, webPushWouldDeliver } from './web-push.js';
 
 /**
  * E2E-04 Task 2: the return path (Kyberion → operator).
@@ -447,6 +448,17 @@ export async function notifyOperator(
   return notifyOperatorSync(event, payload);
 }
 
+/** Fire-and-forget Web Push; true when a push was attempted (never throws). */
+function fanOutWebPush(event: OperatorEvent, dedupeKey: string): boolean {
+  try {
+    if (!webPushWouldDeliver(event) || !shouldNotifyOperator(dedupeKey)) return false;
+    void sendWebPushForEvent(event).catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Synchronous delivery path used when a caller must return an honest receipt. */
 export function notifyOperatorSync(
   event: OperatorEvent,
@@ -463,8 +475,14 @@ export function notifyOperatorSync(
     const route = resolveOperatorNotificationRoute(event, prefs);
     if (route === 'mute') return false;
     if (!route) {
-      recordUndeliveredNotification(event, payload, 'no_channel_configured');
-      return false;
+      // Web Push is its own opt-in channel (a device subscribed): it needs no
+      // configured route. Content-free, rate-limited like any other delivery.
+      const pushed = fanOutWebPush(
+        event,
+        `webpush:${event}:${payload.correlation_id || payload.title}`
+      );
+      if (!pushed) recordUndeliveredNotification(event, payload, 'no_channel_configured');
+      return pushed;
     }
     // EV-09: when this notification is a consequence of a trigger firing,
     // inherit that delivery id so the operator can trace the notification back
@@ -478,6 +496,8 @@ export function notifyOperatorSync(
     const dedupeKey = `${event}:${payload.correlation_id || currentTriggerDeliveryId() || payload.title}`;
     if (!shouldNotifyOperator(dedupeKey)) return false;
     deliver(route, formatNotificationText(event, payload), correlationId, payload.title);
+    // Quiet hours defer to the inbox; a phone must not buzz then either.
+    if (route.target !== 'quiet-hours') fanOutWebPush(event, `webpush:${dedupeKey}`);
     return true;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
