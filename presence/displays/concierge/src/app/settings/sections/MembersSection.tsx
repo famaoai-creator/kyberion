@@ -24,6 +24,7 @@ import type {
 } from '../../../lib/settings-types';
 import { CharterPane } from './CharterPane';
 import { InvitesPane } from './InvitesPane';
+import { OrgReadinessPane } from './OrgReadinessPane';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 /** FD-06/FD-07/HT-05 組織とメンバー pane (`#settings-members`) — tenants list,
@@ -528,6 +529,7 @@ export function MembersSection({
           ) : null}
         </SettingsGroup>
       </FormScope>
+      <OrgReadinessPane t={t} />
       <InvitesPane t={t} />
       <CharterPane t={t} />
     </div>
