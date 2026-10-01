@@ -474,4 +474,24 @@ describe('browser conversation session helpers', () => {
       'control_command'
     );
   });
+
+  it('keeps Japanese button clicks named after a control word out of control commands', () => {
+    for (const utterance of [
+      '停止ボタンを押して',
+      'キャンセルボタンをクリック',
+      '再開ボタンを押して',
+    ]) {
+      expect(classifyBrowserConversationCommand(utterance)?.commandType, utterance).not.toBe(
+        'control_command'
+      );
+    }
+    expect(classifyBrowserConversationCommand('停止して')).toMatchObject({
+      commandType: 'control_command',
+      action: 'cancel',
+    });
+    expect(classifyBrowserConversationCommand('再開してください')).toMatchObject({
+      commandType: 'control_command',
+      action: 'resume',
+    });
+  });
 });

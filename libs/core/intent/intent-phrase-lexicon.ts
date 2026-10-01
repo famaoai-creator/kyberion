@@ -12,7 +12,9 @@
  * Adding a locale (or a phrase) is a JSON edit only — no code change.
  *
  * Each (concept, locale filter) pair is compiled once and cached against the
- * loaded lexicon object; the governed catalog reloads the file when it changes.
+ * loaded lexicon object; the governed catalog reloads the file when it changes,
+ * and the compiled matcher re-checks the file at most once per
+ * INTENT_PHRASE_LEXICON_RECHECK_MS (or after resetIntentPhraseLexiconCache()).
  */
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -44,6 +46,11 @@ export interface IntentPhraseLexicon {
   version: string;
   description?: string;
   default_flags?: string;
+  /**
+   * Per locale: polite verb suffixes allowed after a non-ASCII `prefix_word`
+   * phrase (停止 + して). See {@link nonAsciiPrefixWordTail}.
+   */
+  prefix_word_suffixes?: Record<string, string[]>;
   concepts: Record<string, IntentPhraseConcept>;
 }
 
@@ -100,11 +107,43 @@ function wrapForMode(body: string, mode: IntentPhraseMatchMode): string {
 
 const ASCII_WORD = /[A-Za-z0-9_]/;
 
-/** Escape a literal phrase and guard its ASCII-word edges (never non-ASCII edges). */
-function phraseAlternative(phrase: string, leading: boolean, trailing: boolean): string {
+/** End of an utterance or a clause: end of input, whitespace or punctuation (ja + ASCII). */
+const CLAUSE_END = '(?:$|[\\s\u3001\u3002\uff0c,\uff0e.\uff01!\uff1f?])';
+
+/**
+ * Trailing guard for a `prefix_word` phrase that ends in a non-ASCII (e.g.
+ * Japanese) character. Scripts without word spaces give `\b` nothing to
+ * separate 「停止」 from 「停止ボタンを押して」, so the command word must be
+ * followed by a clause end, an ASCII word character (kept for parity with the
+ * old `\b` literal, e.g. 止めてok), or one of the lexicon's
+ * `prefix_word_suffixes` that is itself followed by a clause end — never by
+ * a noun or particle (ボタン / リンク / を / 中).
+ */
+function nonAsciiPrefixWordTail(suffixes: readonly string[]): string {
+  const suffixAlternatives = suffixes.length
+    ? `|(?:${suffixes.map(escapeRegExp).join('|')})${CLAUSE_END}`
+    : '';
+  return `(?=${CLAUSE_END}|[A-Za-z0-9_]${suffixAlternatives})`;
+}
+
+/**
+ * Escape a literal phrase and guard its edges. ASCII-word edges get a word
+ * boundary when `leading` / `trailing` is set; a non-ASCII trailing edge gets
+ * `nonAsciiTail` (prefix_word mode only).
+ */
+function phraseAlternative(
+  phrase: string,
+  leading: boolean,
+  trailing: boolean,
+  nonAsciiTail = ''
+): string {
   const escaped = escapeRegExp(phrase);
   const head = leading && ASCII_WORD.test(phrase[0]) ? '(?<![A-Za-z0-9_])' : '';
-  const tail = trailing && ASCII_WORD.test(phrase[phrase.length - 1]) ? '(?![A-Za-z0-9_])' : '';
+  const tail = ASCII_WORD.test(phrase[phrase.length - 1])
+    ? trailing
+      ? '(?![A-Za-z0-9_])'
+      : ''
+    : nonAsciiTail;
   return `${head}${escaped}${tail}`;
 }
 
@@ -180,8 +219,17 @@ export function compileIntentPhraseLexicon(lexicon: IntentPhraseLexicon): Intent
     const prefixWord = concept.match === 'prefix_word';
     for (const locale of selectLocales(Object.keys(concept.locales), options)) {
       const entry = concept.locales[locale];
+      const nonAsciiTail = prefixWord
+        ? nonAsciiPrefixWordTail(
+            lexicon.prefix_word_suffixes?.[locale] ??
+              lexicon.prefix_word_suffixes?.[locale.split('-')[0]] ??
+              []
+          )
+        : '';
       for (const phrase of entry.phrases || []) {
-        alternatives.push(phraseAlternative(phrase, wholeWord, wholeWord || prefixWord));
+        alternatives.push(
+          phraseAlternative(phrase, wholeWord, wholeWord || prefixWord, nonAsciiTail)
+        );
       }
       for (const pattern of entry.patterns || []) {
         alternatives.push(prefixWord ? `(?:${pattern})\\b` : `(?:${pattern})`);
@@ -255,14 +303,34 @@ export function loadIntentPhraseLexicon(filePath?: string): IntentPhraseLexicon 
 
 const matcherCache = new WeakMap<IntentPhraseLexicon, IntentPhraseMatcher>();
 
+/**
+ * How long a compiled matcher is served without re-checking the lexicon file.
+ * Intent matching runs several times per utterance; the governed catalog load
+ * re-asserts the repository path and stats the file on every call, so the hot
+ * path checks for edits at most once per window (or after an explicit reset).
+ */
+export const INTENT_PHRASE_LEXICON_RECHECK_MS = 2000;
+
+interface MemoizedMatcher {
+  matcher: IntentPhraseMatcher;
+  checkedAt: number;
+}
+
+const matcherByPath = new Map<string, MemoizedMatcher>();
+
 /** Matcher for the governed lexicon (or a lexicon file path, e.g. a tenant overlay). */
 export function getIntentPhraseMatcher(filePath?: string): IntentPhraseMatcher {
-  const lexicon = loadIntentPhraseLexicon(filePath);
+  const resolvedPath = filePath ?? INTENT_PHRASE_LEXICON_PATH();
+  const now = Date.now();
+  const memo = matcherByPath.get(resolvedPath);
+  if (memo && now - memo.checkedAt < INTENT_PHRASE_LEXICON_RECHECK_MS) return memo.matcher;
+  const lexicon = loadIntentPhraseLexicon(resolvedPath);
   let matcher = matcherCache.get(lexicon);
   if (!matcher) {
     matcher = compileIntentPhraseLexicon(lexicon);
     matcherCache.set(lexicon, matcher);
   }
+  matcherByPath.set(resolvedPath, { matcher, checkedAt: now });
   return matcher;
 }
 
@@ -307,4 +375,5 @@ export function intentPhraseFlags(conceptId: string): string {
 export function resetIntentPhraseLexiconCache(): void {
   for (const catalog of lexiconCatalogs.values()) catalog.reset();
   lexiconCatalogs.clear();
+  matcherByPath.clear();
 }

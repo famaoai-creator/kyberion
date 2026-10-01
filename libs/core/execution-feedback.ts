@@ -10,7 +10,11 @@ import {
   updateDistillCandidateRecord,
   type DistillCandidateRecord,
 } from './knowledge/distill-candidate-registry.js';
-import { intentPhraseSource, matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import {
+  getIntentPhraseMatcher,
+  matchesIntentPhrase,
+  type IntentPhraseMatcher,
+} from './intent/intent-phrase-lexicon.js';
 import { t } from './t.js';
 
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
@@ -181,12 +185,27 @@ function resolveFeedbackOutcome(label: string): ExecutionFeedbackOutcome {
   return 'dissatisfied';
 }
 
-/** `<feedback prefix> <scenario-id>: <outcome>[: detail]` — prefixes come from the intent phrase lexicon. */
+const feedbackReplyPatternCache = new WeakMap<IntentPhraseMatcher, RegExp>();
+
+/**
+ * `<feedback prefix> <scenario-id>: <outcome>[: detail]` — prefixes come from the
+ * intent phrase lexicon. Compiled once per lexicon matcher (a lexicon edit yields
+ * a new matcher and therefore a fresh pattern).
+ */
 function feedbackReplyPattern(): RegExp {
-  const prefix = intentPhraseSource('execution_feedback.prefix');
-  const outcomeWords = FEEDBACK_OUTCOME_CONCEPTS.map(([concept]) =>
-    intentPhraseSource(concept)
-  ).join('|');
+  const matcher = getIntentPhraseMatcher();
+  const cached = feedbackReplyPatternCache.get(matcher);
+  if (cached) return cached;
+  const compiled = buildFeedbackReplyPattern(matcher);
+  feedbackReplyPatternCache.set(matcher, compiled);
+  return compiled;
+}
+
+function buildFeedbackReplyPattern(matcher: IntentPhraseMatcher): RegExp {
+  const prefix = matcher.source('execution_feedback.prefix');
+  const outcomeWords = FEEDBACK_OUTCOME_CONCEPTS.map(([concept]) => matcher.source(concept)).join(
+    '|'
+  );
   return new RegExp(
     `^${prefix}\\s+(use-case-[a-z0-9_-]+)\\s*[:：]\\s*(${outcomeWords})(?:\\s*[:：]\\s*(\\S.*))?$`,
     'iu'

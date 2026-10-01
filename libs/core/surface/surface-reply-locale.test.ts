@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deriveReplyLocale,
   enterReplyLocale,
@@ -6,9 +6,12 @@ import {
   resolveLocale,
   resolveScopeLocale,
   runWithReplyLocale,
+  _resetLocaleModuleStateForTests,
 } from '../locale.js';
+import { logger } from '../core.js';
+import { resetRoleAssumptionPolicyCache } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../governance.js';
 import { buildSlackApprovalBlocks } from '../integrations/slack-approval-ui.js';
 import { detectTextLocale } from '../locale-normalize.js';
@@ -33,6 +36,14 @@ describe('chat reply locale follows the incoming message (IT-02)', () => {
     // ids, digits, acronyms and emoji say nothing about the language
     expect(detectTextLocale('REQ-FINAL-789')).toBeNull();
     expect(detectTextLocale('1')).toBeNull();
+    // one-word acks are typed by speakers of every language: not a signal
+    for (const ack of ['Yes', 'OK', 'Okay', 'Sure', 'Done', 'Thanks', 'thanks!', 'Ok.']) {
+      expect(detectTextLocale(ack), ack).toBeNull();
+    }
+    // ... but two plain words, or one non-ack word, still read as English
+    expect(detectTextLocale('Yes please')).toBe('en');
+    expect(detectTextLocale('Thanks, done')).toBe('en');
+    expect(detectTextLocale('approve')).toBe('en');
     expect(detectTextLocale('👍')).toBeNull();
     expect(detectTextLocale('')).toBeNull();
   });
@@ -130,6 +141,73 @@ describe('replies with no language signal in the message (IT-02 follow-up)', () 
     expect(asArchitect(() => deriveReplyLocale({ text: 'hello there', scope }))).toBe('en');
     expect(asArchitect(() => deriveReplyLocale({ explicit: 'en', text: '1', scope }))).toBe('en');
     expect(asArchitect(() => resolveScopeLocale(scope))).toBe('ja');
+  });
+
+  describe('under a surface runtime role (SYSTEM_ROLE=slack_bridge)', () => {
+    const originalSystemRole = process.env.SYSTEM_ROLE;
+    const asSlackBridge = <T>(fn: () => T): T => {
+      process.env.SYSTEM_ROLE = 'slack_bridge';
+      resetRoleAssumptionPolicyCache();
+      try {
+        return fn();
+      } finally {
+        if (originalSystemRole === undefined) delete process.env.SYSTEM_ROLE;
+        else process.env.SYSTEM_ROLE = originalSystemRole;
+        resetRoleAssumptionPolicyCache();
+      }
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      _resetLocaleModuleStateForTests();
+    });
+
+    it('cannot read the confidential tenant locale directly', () => {
+      storeTenantLocale('ja');
+      expect(() => asSlackBridge(() => safeReadFile(localePath, { encoding: 'utf8' }))).toThrow(
+        /\[SECURITY\]/
+      );
+    });
+
+    it('reads the tenant locale through the scope_locale_reader role', () => {
+      process.env.KYBERION_LOCALE = 'en';
+      storeTenantLocale('ja');
+      const scope = { tenant_slug: tenant };
+      expect(asSlackBridge(() => resolveScopeLocale(scope))).toBe('ja');
+      expect(asSlackBridge(() => deriveReplyLocale({ text: '1', scope }))).toBe('ja');
+    });
+
+    it('warns once (diagnostic) when an organization overlay is denied, and still uses the tenant locale', () => {
+      process.env.KYBERION_LOCALE = 'en';
+      storeTenantLocale('ja');
+      withExecutionContext('ecosystem_architect', () => {
+        const orgDir = pathResolver.knowledge(`confidential/${tenant}/organizations/org-a`);
+        safeMkdir(orgDir, { recursive: true });
+        safeWriteFile(`${orgDir}/locale.json`, JSON.stringify({ locale: 'en' }));
+      });
+      const warn = vi.spyOn(logger, 'warn');
+      const scope = { tenant_slug: tenant, organization_id: 'org-a' };
+      expect(asSlackBridge(() => resolveScopeLocale(scope))).toBe('ja');
+      expect(asSlackBridge(() => resolveScopeLocale(scope))).toBe('ja');
+      const denials = warn.mock.calls.filter(([line]) =>
+        String(line).includes('scope locale overlay')
+      );
+      expect(denials).toHaveLength(1);
+      expect(String(denials[0][0])).toMatch(/ — .+ \| .+ \| /);
+      // an authorized role still reads the organization overlay
+      expect(asArchitect(() => resolveScopeLocale(scope))).toBe('en');
+    });
+
+    it('never reads another tenant than the one the caller is bound to', () => {
+      storeTenantLocale('ja');
+      const other = withExecutionContext(
+        'ecosystem_architect',
+        () => resolveScopeLocale({ tenant_slug: tenant }),
+        undefined,
+        'zz-other-tenant'
+      );
+      expect(other).toBeUndefined();
+    });
   });
 
   it('never throws or leaks a locale for an unknown or malformed scope', () => {

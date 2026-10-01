@@ -11,8 +11,18 @@
 //   locale_compare  — `=== 'ja'` / `!== 'en'` style comparisons. Branch on
 //                     the locale through pickByLocale / t() instead.
 //   locale_literal  — hardcoded 'ja-JP' / 'en-US' tags. Use localeToBcp47().
-//   engine_hex      — raw hex / rgb() colour literals in the artifact-engine
-//                     directories. Engines read semantic design tokens.
+//                     Exempt: a tag passed straight to a formatting API
+//                     (`x.toLocaleString('en-US')`, `toLocaleDateString` /
+//                     `toLocaleTimeString`, `localeCompare(b, 'en')`,
+//                     `new Intl.NumberFormat('en-US')` / any `Intl.*`) — that
+//                     pins machine-stable output (ids, CSV, logs), it is not
+//                     a user-facing locale decision.
+//   engine_hex      — raw colour values in the artifact-engine directories:
+//                     a string that IS a colour token ('#1E3A5F', 'rgba(...)'),
+//                     or a colour in a CSS declaration (`fill: #fff`) or a
+//                     markup attribute (`fill="#fff"`). Prose such as
+//                     'Ticket #123' or 'HTTP #404' is not a colour.
+//                     Engines read semantic design tokens.
 // A flagged node is exempt when `// i18n-exempt: <reason>` is on the same or
 // the previous line (the same directive the Japanese-literal ratchet uses).
 import ts from 'typescript';
@@ -33,7 +43,29 @@ export type LocaleTokenScanResult = {
 /** Hiragana, Katakana and CJK ideographs, written as \u escapes so this file stays ASCII. */
 const CJK_PATTERN = /[぀-ヿ一-鿿]/u;
 const EXEMPT_PATTERN = /\/\/\s*i18n-exempt:\s*(.*)$/u;
-const HEX_COLOUR_PATTERN = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\(\s*\d/u;
+/** One colour value: #rgb / #rgba / #rrggbb / #rrggbbaa (not part of a longer word) or rgb()/rgba(). */
+const COLOUR_VALUE = String.raw`(?:(?<![\w&#])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])|rgba?\(\s*\d)`;
+/** The whole string is a colour token. */
+const WHOLE_COLOUR_PATTERN = new RegExp(
+  String.raw`^\s*(?:#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})|rgba?\([^()]*\))\s*$`,
+  'u'
+);
+/** A colour inside a CSS declaration (`color: #fff`, `border: 1px solid #333`). */
+const CSS_DECLARATION_COLOUR = new RegExp(
+  String.raw`(?:^|[;{\s])[a-z-]+\s*:[^;:{}]*?${COLOUR_VALUE}`,
+  'u'
+);
+/** A colour as a markup attribute value (`fill="#fff"`, `stroke='#000'`). */
+const ATTRIBUTE_COLOUR = new RegExp(String.raw`=\s*["']?${COLOUR_VALUE}`, 'u');
+
+function containsColourValue(text: string): boolean {
+  return (
+    WHOLE_COLOUR_PATTERN.test(text) ||
+    CSS_DECLARATION_COLOUR.test(text) ||
+    ATTRIBUTE_COLOUR.test(text)
+  );
+}
+
 const LOCALE_COMPARE_VALUES = new Set(['ja', 'en', 'ja-JP', 'en-US']);
 const LOCALE_TAG_LITERALS = new Set(['ja-JP', 'en-US']);
 const MATCHER_METHODS = new Set(['test', 'exec', 'match', 'matchAll', 'search']);
@@ -82,6 +114,34 @@ function isMatcherUse(node: ts.RegularExpressionLiteral): boolean {
     return ts.isPropertyAccessExpression(callee) && MATCHER_METHODS.has(callee.name.text);
   }
   return false;
+}
+
+const FORMATTING_METHODS = new Set([
+  'toLocaleString',
+  'toLocaleDateString',
+  'toLocaleTimeString',
+  'localeCompare',
+]);
+
+/** `Intl` or `Intl.X` (also `globalThis.Intl.X`). */
+function isIntlReference(node: ts.Expression): boolean {
+  if (ts.isIdentifier(node)) return node.text === 'Intl';
+  if (ts.isPropertyAccessExpression(node)) return isIntlReference(node.expression);
+  return false;
+}
+
+/** A locale tag passed directly to a formatting API pins machine-stable output. */
+function isFormattingApiArgument(node: ts.Node): boolean {
+  const parent = node.parent;
+  if (!parent) return false;
+  const args =
+    ts.isCallExpression(parent) || ts.isNewExpression(parent) ? parent.arguments : undefined;
+  if (!args?.some((arg) => arg === node)) return false;
+  const callee = (parent as ts.CallExpression | ts.NewExpression).expression;
+  if (ts.isPropertyAccessExpression(callee) && FORMATTING_METHODS.has(callee.name.text)) {
+    return true;
+  }
+  return isIntlReference(callee);
 }
 
 export function scanFileForLocaleTokens(
@@ -141,14 +201,16 @@ export function scanFileForLocaleTokens(
 
     const literal = stringValue(node);
     if (literal !== undefined) {
-      if (localeRulesApply && LOCALE_TAG_LITERALS.has(literal)) record('locale_literal', node);
-      if (hexRuleApplies && HEX_COLOUR_PATTERN.test(literal)) record('engine_hex', node);
+      if (localeRulesApply && LOCALE_TAG_LITERALS.has(literal) && !isFormattingApiArgument(node)) {
+        record('locale_literal', node);
+      }
+      if (hexRuleApplies && containsColourValue(literal)) record('engine_hex', node);
     } else if (
       hexRuleApplies &&
       (node.kind === ts.SyntaxKind.TemplateHead ||
         node.kind === ts.SyntaxKind.TemplateMiddle ||
         node.kind === ts.SyntaxKind.TemplateTail) &&
-      HEX_COLOUR_PATTERN.test((node as ts.TemplateLiteralToken).text)
+      containsColourValue((node as ts.TemplateLiteralToken).text)
     ) {
       record('engine_hex', node);
     }

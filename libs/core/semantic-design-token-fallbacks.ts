@@ -10,6 +10,25 @@
 export type SemanticEngine =
   'spreadsheet' | 'video' | 'layout' | 'deck' | 'pptx' | 'docx' | 'diagram';
 
+/**
+ * Colour syntax each engine can render. OOXML engines (xlsx / pptx / docx /
+ * native layout) write `RRGGBB` into the package, so a tenant value must be a
+ * 6-digit hex; CSS engines accept hex / rgb(a) / hsl(a) only — never url(),
+ * var(), expression() or named colours from a tenant file. A new engine must
+ * declare its format here (the Record type enforces it).
+ */
+export type SemanticColorFormat = 'ooxml_hex' | 'css_color';
+
+export const SEMANTIC_ENGINE_COLOR_FORMAT: Readonly<Record<SemanticEngine, SemanticColorFormat>> = {
+  spreadsheet: 'ooxml_hex',
+  pptx: 'ooxml_hex',
+  docx: 'ooxml_hex',
+  layout: 'ooxml_hex',
+  deck: 'css_color',
+  video: 'css_color',
+  diagram: 'css_color',
+};
+
 export const SEMANTIC_TOKEN_FALLBACKS: Record<SemanticEngine, Readonly<Record<string, string>>> = {
   video: {
     'video.palette.promo-spot.bgDeep': '#0b1224',

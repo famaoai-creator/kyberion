@@ -1,5 +1,6 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
+import { getFoundationIo } from '../foundation/io.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
@@ -7,6 +8,7 @@ import {
   captureIntentPhrase,
   findIntentPhrase,
   getIntentPhraseMatcher,
+  INTENT_PHRASE_LEXICON_RECHECK_MS,
   intentPhraseFlags,
   intentPhraseSource,
   loadIntentPhraseLexicon,
@@ -218,5 +220,92 @@ describe('intent phrase lexicon — fail closed', () => {
     expect(first.flags).not.toMatch(/[gy]/);
     expect(matcher.matches('今日', 'date_range.today')).toBe(true);
     expect(matcher.matches('今日', 'date_range.today')).toBe(true);
+  });
+});
+
+describe('intent phrase lexicon — hot-path caching', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetIntentPhraseLexiconCache();
+  });
+
+  it('serves the compiled matcher without re-statting the catalog inside the recheck window', () => {
+    const filePath = path.join(TMP_ROOT, 'lexicon-cache.json');
+    safeMkdir(TMP_ROOT, { recursive: true });
+    safeWriteFile(filePath, `${JSON.stringify(cloneGovernedLexicon(), null, 2)}\n`);
+    resetIntentPhraseLexiconCache();
+
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const stat = vi.spyOn(getFoundationIo(), 'stat');
+
+    const first = getIntentPhraseMatcher(filePath);
+    const loadsAfterFirst = stat.mock.calls.length;
+    expect(loadsAfterFirst).toBeGreaterThan(0);
+    for (let i = 0; i < 50; i += 1) {
+      expect(getIntentPhraseMatcher(filePath)).toBe(first);
+      first.matches('今日', 'date_range.today');
+    }
+    expect(stat.mock.calls.length).toBe(loadsAfterFirst);
+
+    // An edit inside the window is not seen yet ...
+    const edited = cloneGovernedLexicon();
+    edited.concepts['date_range.today'].locales.fr = { phrases: ["aujourd'hui"] };
+    safeWriteFile(filePath, `${JSON.stringify(edited, null, 2)}\n`);
+    const statsAfterEdit = stat.mock.calls.length;
+    expect(getIntentPhraseMatcher(filePath).matches("aujourd'hui", 'date_range.today')).toBe(false);
+    expect(stat.mock.calls.length).toBe(statsAfterEdit);
+
+    // ... and is picked up once the window elapses (one re-check, new matcher).
+    const statsBeforeRecheck = stat.mock.calls.length;
+    now += INTENT_PHRASE_LEXICON_RECHECK_MS;
+    const reloaded = getIntentPhraseMatcher(filePath);
+    expect(stat.mock.calls.length).toBeGreaterThan(statsBeforeRecheck);
+    expect(reloaded).not.toBe(first);
+    expect(reloaded.matches("aujourd'hui", 'date_range.today')).toBe(true);
+  });
+
+  it('re-checks immediately after an explicit reset', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(5_000_000);
+    getIntentPhraseMatcher();
+    const stat = vi.spyOn(getFoundationIo(), 'stat');
+    getIntentPhraseMatcher();
+    expect(stat).not.toHaveBeenCalled();
+    resetIntentPhraseLexiconCache();
+    getIntentPhraseMatcher();
+    expect(stat).toHaveBeenCalled();
+  });
+});
+
+describe('intent phrase lexicon — bounded matching time (ReDoS smoke)', () => {
+  const ADVERSARIAL_INPUTS = [
+    `${'a'.repeat(5000)}!`,
+    `${'あ'.repeat(5000)}!`,
+    `${' '.repeat(5000)}x`,
+    `${'1'.repeat(5000)}.`,
+    `${'「'.repeat(2500)}${'」'.repeat(2500)}`,
+    `${'"'.repeat(5000)}`,
+    `${'a '.repeat(2500)}!`,
+    `${'use-case-'.repeat(600)}:`,
+    `${'「a」を'.repeat(800)}`,
+    `${'"a" '.repeat(1200)}`,
+  ];
+
+  it('runs every concept (match and capture) over adversarial inputs within a time budget', () => {
+    const matcher = getIntentPhraseMatcher();
+    let slowest = { conceptId: '', ms: 0 };
+    const started = performance.now();
+    for (const conceptId of matcher.conceptIds) {
+      for (const input of ADVERSARIAL_INPUTS) {
+        const t0 = performance.now();
+        matcher.matches(input, conceptId);
+        matcher.capture(input, conceptId);
+        const ms = performance.now() - t0;
+        if (ms > slowest.ms) slowest = { conceptId, ms };
+      }
+    }
+    const total = performance.now() - started;
+    expect(slowest.ms, `slowest concept ${slowest.conceptId}`).toBeLessThan(250);
+    expect(total).toBeLessThan(5000);
   });
 });
