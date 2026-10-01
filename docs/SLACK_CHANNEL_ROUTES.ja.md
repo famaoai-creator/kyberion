@@ -61,7 +61,10 @@ Satellite は受信チャネルごとに会話モードを決める(`libs/core/s
 - team ターンは `scope: { tier, tenant_slug }` と開示ディレクティブ(`[channel-policy]`)付きで会話層へ渡る。
 - 承認系の操作(承認・却下・変更依頼・ミッション提案の確定)は、ボタンでもテキスト返信でも `approvers` 以外を拒否する。
 - 設定が壊れている場合(不正 JSON、tenant 欠落、`customer` 指定など)は、そのチャネルを誰も使えない team として扱う(fail closed)。
-- 現時点では、話者は Slack ID の allowlist で判定する。組織メンバーへの解決と ViewerContext は Team Channel P1 で導入予定。
+- 話者の判定(Team Channel P1): Slack ユーザー ID をメンバーの `external_identities`(issuer `https://slack.com`)で組織メンバーに結び付ける。紐付けは `pnpm organization member link-identity <member-id> --slack <U…>`(解除は `unlink-identity`)。
+  - チャネルのテナントで有効なメンバーは allowlist なしで話せる。役割は `frontDeskRoleAuthority` に従い、owner / approver は承認可、owner / operator は作業依頼(ミッション・承認要求)可、viewer は質問のみ。
+  - 未登録の人は allowlist に載っていれば質問のみ可。ミッションや承認要求が必要な依頼は断る。停止中メンバーに紐付いた ID は拒否する。
+  - 承認記録の `decidedBy` はメンバーの principal(`user:<member_id>`)。チャネル設定の `approvers` は、まだメンバーに紐付いていない人のための移行用フォールバックとして残る。
 
 ## 2. Presence — 人への配信ブリッジ
 

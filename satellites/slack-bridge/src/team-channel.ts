@@ -8,6 +8,7 @@ import {
   resolveChannelModePolicy,
   type ChannelModePolicy,
 } from '@agent/core/surface/channel-mode-policy';
+import type { ChannelSpeakerPrincipal } from '@agent/core/surface/channel-speaker-principal';
 
 /**
  * Team Channel helpers for the Slack bridge: engagement (bot participation,
@@ -100,10 +101,10 @@ export async function ensureSlackApprovalAuthority(
   channel: string,
   threadTs: string,
   actorId: string
-): Promise<boolean> {
+): Promise<string | null> {
   const policy = resolveChannelModePolicy('slack', channel);
   const authority = evaluateChannelApprovalAuthority(policy, actorId);
-  if (authority.allowed) return true;
+  if (authority.allowed) return authority.decidedBy || actorId;
   logger.warn(
     `[SlackBridge] Approval action refused — ${actorId} lacks approval authority in ${channel} (mode=${policy.mode}, ${authority.reason}) | ask a channel approver | channel=${channel} thread=${threadTs}`
   );
@@ -117,7 +118,7 @@ export async function ensureSlackApprovalAuthority(
   } catch (error: unknown) {
     logger.warn(`[SlackBridge] Refusal notice failed: ${errorDetail(error)}`);
   }
-  return false;
+  return null;
 }
 
 /** Onboarding actions are accepted only from allowed speakers in owner_direct channels. */
@@ -133,9 +134,10 @@ export function isSlackOwnerOnboardingActor(channel: string, actorId: string): b
 /** Prefix the team disclosure directive to the thread context, if any. */
 export function withSlackChannelDirective(
   policy: ChannelModePolicy | undefined,
-  threadContext: string | undefined
+  threadContext: string | undefined,
+  speaker?: ChannelSpeakerPrincipal
 ): string | undefined {
-  const directive = policy ? buildChannelDisclosureDirective(policy) : undefined;
+  const directive = policy ? buildChannelDisclosureDirective(policy, speaker) : undefined;
   if (!directive) return threadContext;
   return threadContext ? `${directive}\n\n${threadContext}` : directive;
 }

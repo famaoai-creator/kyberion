@@ -416,16 +416,16 @@ describe('slack team channel', () => {
     const postEphemeral = vi.fn(async () => ({}));
     const client = { chat: { postEphemeral } };
     await expect(ensureSlackApprovalAuthority(client, 'C-team', '1.0', 'U-member')).resolves.toBe(
-      false
+      null
     );
     expect(postEphemeral).toHaveBeenCalledWith(
       expect.objectContaining({ channel: 'C-team', user: 'U-member' })
     );
     await expect(ensureSlackApprovalAuthority(client, 'C-team', '1.0', 'U-lead')).resolves.toBe(
-      true
+      'U-lead'
     );
     await expect(ensureSlackApprovalAuthority(client, 'C-dm', '1.0', 'U-member')).resolves.toBe(
-      true
+      'U-member'
     );
     expect(postEphemeral).toHaveBeenCalledTimes(1);
   });
