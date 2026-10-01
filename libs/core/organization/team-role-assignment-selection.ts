@@ -113,6 +113,7 @@ export interface MissionTeamAssignment {
   notes: string;
   model_hint?: {
     tier: 'small' | 'standard' | 'large';
+    execution_tier?: 'fast' | 'standard' | 'deep';
     effort: 'low' | 'medium' | 'high';
     model_id: string;
     route_reason: string;

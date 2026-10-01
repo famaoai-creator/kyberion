@@ -1285,7 +1285,27 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/work-inventory/review-digest/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/avatar-generation-jobs.ts#defaultRunner [delegated child role]",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#asStore",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#beginConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2866,6 +2886,7 @@
         "presence/displays/concierge/src/app/api/voice/synthesize/route.ts",
         "presence/displays/concierge/src/app/api/work-inventory/consent/route.ts",
         "presence/displays/concierge/src/app/api/work-inventory/observations/route.ts",
+        "presence/displays/concierge/src/app/api/work-inventory/review-digest/route.ts",
         "presence/displays/concierge/src/app/auth/callback/route.ts",
         "presence/displays/concierge/src/app/auth/start/route.ts",
         "presence/displays/concierge/src/app/command-palette.tsx",
@@ -2881,6 +2902,7 @@
         "presence/displays/concierge/src/app/logout/route.ts",
         "presence/displays/concierge/src/app/manifest.ts",
         "presence/displays/concierge/src/app/page.tsx",
+        "presence/displays/concierge/src/app/review-checkin.tsx",
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/AvatarGenerationPanel.tsx",
@@ -2911,6 +2933,8 @@
         "presence/displays/concierge/src/lib/concierge-advisory-response.ts",
         "presence/displays/concierge/src/lib/concierge-theme.ts",
         "presence/displays/concierge/src/lib/connection-view.ts",
+        "presence/displays/concierge/src/lib/conversation-history.ts",
+        "presence/displays/concierge/src/lib/conversation-store.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",
         "presence/displays/concierge/src/lib/front-desk-auth-token.ts",
@@ -2926,6 +2950,8 @@
         "presence/displays/concierge/src/lib/invite-view.ts",
         "presence/displays/concierge/src/lib/loopback-peer.ts",
         "presence/displays/concierge/src/lib/mutation-response.ts",
+        "presence/displays/concierge/src/lib/observation-review-types.ts",
+        "presence/displays/concierge/src/lib/observation-review.ts",
         "presence/displays/concierge/src/lib/org-readiness-server.ts",
         "presence/displays/concierge/src/lib/org-readiness-view.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
@@ -2936,6 +2962,7 @@
         "presence/displays/concierge/src/lib/quiet-hours-view.ts",
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
+        "presence/displays/concierge/src/lib/review-watch.ts",
         "presence/displays/concierge/src/lib/settings-types.ts",
         "presence/displays/concierge/src/lib/settings-view.ts",
         "presence/displays/concierge/src/lib/setup-auxiliary-response.ts",
