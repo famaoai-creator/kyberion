@@ -9296,6 +9296,31 @@
         "ja": "この憲章をやめる",
         "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
       },
+      "setup.charter_usage_day": {
+        "en": "Spent today: {spent} of {limit}",
+        "ja": "本日の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} őƒ {limit} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.charter_usage_month": {
+        "en": "Spent this month: {spent} of {limit}",
+        "ja": "今月の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} őƒ {limit} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_proposals_title": {
+        "en": "Things the AI could not do (change proposals)",
+        "ja": "AI が実行できなかったこと(変更の提案)",
+        "qps-ploc": "⟦Ŧħïñɠş ŧħė ȦÏ ƈőůŀḓ ñőŧ ḓő (ƈħȧñɠė ṗřőṗőşȧŀş) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.charter_proposal_line": {
+        "en": "Refused {count} time(s) — {field}: {current} → {requested}",
+        "ja": "{count} 回拒否 — {field}: {current} → {requested}",
+        "qps-ploc": "⟦Řėƒůşėḓ {count} ŧïɱė(ş) — {field}: {current} → {requested} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.charter_proposal_apply": {
+        "en": "Put this in the form",
+        "ja": "フォームに入れる",
+        "qps-ploc": "⟦Ṗůŧ ŧħïş ïñ ŧħė ƒőřɱ ŀőřėɱ ⟧"
+      },
       "setup.charter_stopped": {
         "en": "Stopped. The AI cannot run anything under this charter, even inside its limits.",
         "ja": "停止中です。AI は、憲章の範囲内でも実行できません。",
