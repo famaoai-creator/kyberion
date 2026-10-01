@@ -17889,10 +17889,15 @@
         "ja": "すべて",
         "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
       },
+      "decide_filter_no_tenant": {
+        "en": "Not tied to an organization",
+        "ja": "組織に属さないもの",
+        "qps-ploc": "⟦Ñőŧ ŧïėḓ ŧő ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
       "decide_filter_tenant": {
-        "en": "Tenant",
-        "ja": "テナント",
-        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
       },
       "decide_why": {
         "en": "Why this needs you",
