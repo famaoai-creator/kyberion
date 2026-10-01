@@ -1,11 +1,10 @@
 // DA-05: the KKP ⇄ information-asset-ledger connection
 // (resolveIngestAssetProvenance lookup hook in knowledge/knowledge-package.ts).
 //
-// NOTE: this suite lives OUTSIDE src/knowledge/ on purpose — the root vitest
-// config excludes '**/knowledge/**', so a test file placed next to
-// knowledge-package.ts is never discovered (the pre-existing
-// src/knowledge/knowledge-package.test.ts suite is affected by the same
-// exclusion).
+// NOTE: this suite lives outside src/knowledge/ for historical reasons: the
+// root vitest config used to exclude '**/knowledge/**', which hid tests next
+// to knowledge-package.ts. The exclude is now root-anchored ('knowledge/**'),
+// so src/knowledge/*.test.ts runs too.
 //
 // Hermetic: tenant profile + ledger live under a fixture rootDir in
 // active/shared/tmp via the ingest-ledger path seam.

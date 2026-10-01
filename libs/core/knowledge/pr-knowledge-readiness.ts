@@ -15,6 +15,7 @@
 import * as path from 'node:path';
 import { safeExecResult, safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
+import { PHYSICAL_TENANT_NAMESPACE } from '../physical-namespace.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import type { GitRunner } from './memory-promotion-git.js';
 import { coreDistDirUrl, defaultGitRunner } from './memory-promotion-git.js';
@@ -109,7 +110,7 @@ function stripMissionIdDecoration(raw: string): string {
 function parseMissionId(sanitizedBody: string): string | undefined {
   const coordination = extractMarkdownSection(sanitizedBody, 'Coordination');
   if (coordination === null) return undefined;
-  const match = coordination.match(/^-\s*Mission ID:\s*(.*)$/imu);
+  const match = coordination.match(/^-[ \t]*Mission ID:[ \t]*(.*)$/imu);
   if (!match) return undefined;
   const stripped = stripMissionIdDecoration(match[1] || '');
   if (!stripped || PLACEHOLDER_MISSION_ID_PATTERN.test(stripped)) return undefined;
@@ -191,6 +192,11 @@ export interface ResolveMissionRootInput {
 const GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const MISSIONS_RELATIVE_PATH = 'active/missions';
 const ARCHIVE_MISSIONS_RELATIVE_PATH = 'active/archive/missions';
+/** Mirrors `memory-promotion-queue.ts`'s own tenant queue layout (`physicalScopedPath('active/shared/runtime', {tenant_slug, scope_kind:'tenant'}, 'memory', 'promotion-queue.jsonl')` — see `physical-namespace.ts`). */
+const TENANT_RUNTIME_RELATIVE_PATH = path.posix.join(
+  'active/shared/runtime',
+  PHYSICAL_TENANT_NAMESPACE
+);
 
 /** True when `root` itself already has mission/queue records (no need to look elsewhere). Only used when no Mission ID was parsed to check against. */
 function rootHasMissionRecords(root: string): boolean {
@@ -198,9 +204,36 @@ function rootHasMissionRecords(root: string): boolean {
   return safeExistsSync(path.join(root, MISSIONS_RELATIVE_PATH));
 }
 
-/** True when `root`'s memory promotion queue file mentions a candidate whose `source_ref` is this mission (`mission:<ID>` or `mission:<ID>:...`), matched case-insensitively on the ID. */
-function rootHasMissionCandidateRecords(root: string, missionId: string): boolean {
-  const queuePath = path.join(root, GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH);
+/**
+ * Enumerate every tenant-scoped memory promotion queue file under `root`
+ * (`active/shared/runtime/tenants/<slug>/memory/promotion-queue.jsonl`).
+ * Organization/personal-domain candidates live here rather than in the
+ * global queue — see `memory-promotion-queue.ts`'s `queuePathsForAllScopes`,
+ * which this mirrors for the case where `root` is a foreign worktree (not
+ * the current process's own root, so its API can't be called in-process). A
+ * missing/unreadable tenants dir just means "no tenant queues" rather than
+ * an error — a foreign worktree's tenant runtime state must never abort a
+ * readiness check.
+ */
+function listTenantPromotionQueuePaths(root: string): string[] {
+  const tenantsDir = path.join(root, TENANT_RUNTIME_RELATIVE_PATH);
+  if (!safeExistsSync(tenantsDir)) return [];
+  let tenantSlugs: string[] = [];
+  try {
+    tenantSlugs = safeReaddir(tenantsDir);
+  } catch {
+    return [];
+  }
+  const queuePaths: string[] = [];
+  for (const slug of tenantSlugs) {
+    const queuePath = path.join(tenantsDir, slug, 'memory', 'promotion-queue.jsonl');
+    if (safeExistsSync(queuePath)) queuePaths.push(queuePath);
+  }
+  return queuePaths;
+}
+
+/** True when a memory promotion queue file mentions a candidate whose `source_ref` is this mission (`mission:<ID>` or `mission:<ID>:...`), matched case-insensitively on the ID. */
+function queueFileHasMissionCandidateRecord(queuePath: string, idLower: string): boolean {
   if (!safeExistsSync(queuePath)) return false;
   let raw = '';
   try {
@@ -211,13 +244,22 @@ function rootHasMissionCandidateRecords(root: string, missionId: string): boolea
     return false;
   }
   const haystack = raw.toLowerCase();
-  const idLower = missionId.toLowerCase();
   return (
     haystack.includes(`"source_ref":"mission:${idLower}"`) ||
     haystack.includes(`"source_ref":"mission:${idLower}:`) ||
     haystack.includes(`"source_ref": "mission:${idLower}"`) ||
     haystack.includes(`"source_ref": "mission:${idLower}:`)
   );
+}
+
+/** True when `root`'s global OR any tenant-scoped memory promotion queue file mentions a candidate whose `source_ref` names this mission. */
+function rootHasMissionCandidateRecords(root: string, missionId: string): boolean {
+  const idLower = missionId.toLowerCase();
+  const queuePaths = [
+    path.join(root, GLOBAL_PROMOTION_QUEUE_RELATIVE_PATH),
+    ...listTenantPromotionQueuePaths(root),
+  ];
+  return queuePaths.some((queuePath) => queueFileHasMissionCandidateRecord(queuePath, idLower));
 }
 
 /**
@@ -342,10 +384,15 @@ export function listChangedFiles(input: ListChangedFilesInput): ChangedFile[] {
 /**
  * Print the mission root's memory candidates as JSON. Runs in a child node
  * process whose Kyberion root IS the mission root (`KYBERION_ROOT` below),
- * mirroring `writePromotedFilesToWorktree` (KL-05): secure-io's tier-guard
- * confines file reads to the current process's own project root, so a
- * cross-worktree read has to happen inside a process rooted at that worktree
- * rather than by reading its files in-process.
+ * mirroring `writePromotedFilesToWorktree` (KL-05): `listMemoryPromotionCandidates`
+ * resolves its queue paths relative to the CURRENT process's own root
+ * (`pathResolver.rootResolve`), so a cross-worktree read has to happen
+ * inside a process rooted at that worktree rather than by calling it
+ * in-process with a foreign root. `queue.listMemoryPromotionCandidates()`
+ * (no scope argument) already discovers and merges every tenant-scoped
+ * queue under that root itself (`active/shared/runtime/tenants/<slug>/memory/promotion-queue.jsonl`),
+ * so this script needs no extra tenant list — no caller data beyond `payload`
+ * flows into it, keeping it a constant string (argv injection guard).
  */
 const CHILD_READER_SCRIPT = [
   `const path = await import('node:path');`,
@@ -403,12 +450,46 @@ export const readMissionMemoryCandidatesFromRoot: MissionMemoryCandidateReader =
 };
 
 /**
+ * De-duplicate by `candidate_id`, keeping the first occurrence. Returns the
+ * original array (same reference) when there is nothing to drop, so callers
+ * that pin an exact array (tests injecting a reader) keep seeing that same
+ * reference. A global-vs-tenant-queue candidate should never collide in
+ * practice, but a mission/candidate reader that merges multiple queue files
+ * (global + every tenant) must not surface the same candidate twice if it
+ * ever does.
+ */
+function dedupeCandidatesById(candidates: MemoryCandidate[]): MemoryCandidate[] {
+  const seen = new Set<string>();
+  let hasDuplicate = false;
+  for (const candidate of candidates) {
+    if (seen.has(candidate.candidate_id)) {
+      hasDuplicate = true;
+      break;
+    }
+    seen.add(candidate.candidate_id);
+  }
+  if (!hasDuplicate) return candidates;
+  const deduped: MemoryCandidate[] = [];
+  const kept = new Set<string>();
+  for (const candidate of candidates) {
+    if (kept.has(candidate.candidate_id)) continue;
+    kept.add(candidate.candidate_id);
+    deduped.push(candidate);
+  }
+  return deduped;
+}
+
+/**
  * Read a mission root's memory candidates, taking the in-process fast path
  * (the existing, governed `listMemoryPromotionCandidates`) when the mission
  * root IS the current process's root and no reader was injected, and using
  * `reader` (the cross-worktree child process by default) otherwise. An
  * explicitly injected `reader` always wins, even when the roots match, so
- * callers (tests) can pin the candidate set precisely.
+ * callers (tests) can pin the candidate set precisely. Both paths already
+ * include tenant-scoped candidates (`listMemoryPromotionCandidates()` with
+ * no scope argument merges the global queue with every tenant queue under
+ * the target root — see `memory-promotion-queue.ts`'s `queuePathsForAllScopes`);
+ * the result is de-duplicated by `candidate_id` as a defensive measure.
  */
 export function readMissionMemoryCandidates(
   missionRoot: string,
@@ -418,9 +499,9 @@ export function readMissionMemoryCandidates(
   const resolvedMissionRoot = path.resolve(missionRoot);
   const resolvedCwdRoot = path.resolve(cwdRoot);
   if (!reader && resolvedMissionRoot === resolvedCwdRoot) {
-    return listMemoryPromotionCandidates();
+    return dedupeCandidatesById(listMemoryPromotionCandidates());
   }
-  return (reader ?? readMissionMemoryCandidatesFromRoot)(resolvedMissionRoot);
+  return dedupeCandidatesById((reader ?? readMissionMemoryCandidatesFromRoot)(resolvedMissionRoot));
 }
 
 // --- readiness evaluation --------------------------------------------------
